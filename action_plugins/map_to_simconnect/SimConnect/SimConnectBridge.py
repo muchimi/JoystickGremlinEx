@@ -225,7 +225,7 @@ class SimConnectBridge(QtCore.QObject):
                         syslog.info("SIMCONNECT BRIDGE: received pong alive")
                         if self._alive_thread and self._alive_thread.is_alive():
                             self._connect_in_progress = False
-                            self._alive_thread.join()  # wait for it to finish
+                            gremlin.util.safeJoin(self._alive_thread)
                             self._alive_thread = None
                             self._alive = True
                             self.alive.emit()  # report the bridge is alive

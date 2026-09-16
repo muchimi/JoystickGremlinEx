@@ -30,6 +30,8 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import itertools
+
+
 from dinput import DeviceSummary
 
 
@@ -849,6 +851,9 @@ class EventListener(QtCore.QObject):
         self._device_change_pending = False  # true if a device change occured while suppressed
 
         self._running = True
+        self._run_thread = None
+        self._keep_alive_thread = None
+        self._event_thread = None
 
         self._process_device_change_lock = threading.Lock()
 
@@ -874,15 +879,10 @@ class EventListener(QtCore.QObject):
         self.profile_after_start.connect(self._handle_profile_started)
         self.config_option_changed.connect(self._handle_options_changed)
 
-        self._run_event = threading.Event()
-        self._run_thread = Thread(target=self._run)
-        self._run_thread.name = "EVENT run"
-        self._run_thread.start()
+        self._run_event = threading.Event() # thread abort flag for run thread
+        self._keep_alive_event = threading.Event() # thread abort flag for keep alive thread
+        self._event_event = threading.Event() # thread abort flag for event runner thread
 
-        self._keep_alive_event = threading.Event()
-        self._keep_alive_thread = threading.Thread(target=self._keep_alive, daemon=False)
-        self._keep_alive_thread.name = "EVENT heartbeat"
-        self._keep_alive_thread.start()
 
         self._vjoy_callbacks = []
         self._debounce_map = {}
@@ -905,14 +905,20 @@ class EventListener(QtCore.QObject):
         # setup the event queue for joystick events
         self._event_queue: FastQueue[Event] = FastQueue[Event](name="event listener queue")  # queue.Queue() # holds the queue of events waiting to be processed
         self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
-        self._event_thread = gremlin.threading.AbortableThreadX(target=self._event_runner, eh=self)
-        self._event_thread.name = "EVENTLISTENER listener"
-        self._event_thread.start()
+
+
         self.joystick_event_ui.connect(self._fireUIJoystickEventCallbacks_ui, QtCore.Qt.ConnectionType.QueuedConnection)  # no wait signal for speed
 
         self.profile_unload.connect(self.reset)  # reset data on profile unload before a new profile is loaded
 
         self._handle_options_changed()  # load verbose modes
+
+        self.startRunThread()
+        self.startKeepAlive()
+        self.startEventThread()
+
+
+
 
     def pushDeviceChangeSuppression(self):
         """increments the device change suppression counter"""
@@ -969,19 +975,18 @@ class EventListener(QtCore.QObject):
         else:
             self._event_queue.put(event)
 
-    # @ignore_function
+
     def _event_runner(self) -> None:
-        """Process inbound joystick events."""
+        """Process inbound joystick event thread worker"""
 
         event_queue = self._event_queue
-        event_thread = self._event_thread
 
         joystick_event_emit = self.joystick_event.emit
         joystick_event_ui_emit = self.joystick_event_ui.emit
         axis_state_change_emit = self.axis_state_change.emit
         button_state_change_emit = self.button_state_change.emit
 
-        while not event_thread.stopped():
+        while not self._event_event.is_set():
             event_list = event_queue.getNowait()
             if not event_list:
                 time.sleep(0)
@@ -1027,6 +1032,52 @@ class EventListener(QtCore.QObject):
         except Exception as e:
             pass
 
+    def startKeepAlive(self):
+        """Starts the keep alive thread if it is not already running"""
+        if self._keep_alive_thread is None:
+            self._keep_alive_event.clear()
+            self._keep_alive_thread = threading.Thread(target=self._keep_alive, daemon=False)
+            self._keep_alive_thread.name = "EVENT heartbeat"
+            self._keep_alive_thread.start()
+
+    def stopKeepAlive(self):
+        """Stops the keep alive thread if is running"""
+        if self._keep_alive_thread is not None:
+            self._keep_alive_event.set()
+            gremlin.util.safeJoin(self._keep_alive_thread)
+            self._keep_alive_thread = None
+
+    def startRunThread(self):
+        """Starts the run thread if it is not already running"""
+        if self._run_thread is None:
+            self._run_event.clear()
+            self._run_thread = threading.Thread(target=self._run, daemon=False)
+            self._run_thread.name = "EVENT run"
+            self._run_thread.start()
+
+    def stopRunThread(self):
+        """Stops the run thread if it is running"""
+        if self._run_thread is not None:
+            self._run_event.set()
+            gremlin.util.safeJoin(self._run_thread)
+            self._run_thread = None
+
+    def startEventThread(self):
+        """Starts the event thread if it is not already running"""
+        if self._event_thread is None:
+            self._event_event.clear()
+            self._event_thread = threading.Thread(target=self._event_runner, daemon=False)
+            self._event_thread.name = "EVENT listener"
+            self._event_thread.start()
+
+    def stopEventThread(self):
+        """Stops the event thread if it is running"""
+        if self._event_thread is not None:
+            self._event_event.set()
+            gremlin.util.safeJoin(self._event_thread)
+            self._event_thread = None
+
+
     @QtCore.Slot()
     def _shutdown_handler(self):
         """terminate threads"""
@@ -1035,23 +1086,10 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
 
         verbose = config.verbose_mode_inputs
-        if self._keep_alive_thread:
-            self._keep_alive_event.set()
-            self._keep_alive_thread.join()
-            self._keep_alive_thread = None
 
-        if self._run_thread:
-            self._run_event.set()
-            self._run_thread.join()
-            self._run_thread = None
-
-        # event runner
-        if self._event_thread.is_alive():
-            if verbose:
-                syslog.info("EVENTLISTENER: listen stop")
-            self._event_thread.stop()
-            self._event_thread.join()
-            self._event_thread = None
+        self.stopKeepAlive()
+        self.stopRunThread()
+        self.stopEventThread()
 
         # mark all events processed
         self._event_queue.clear()
@@ -1448,20 +1486,23 @@ class EventListener(QtCore.QObject):
         self.disableMouse()
 
         # send the shutdown trigger to all code parts
-        if self._run_thread is not None:
-            # terminate run thread
-            self._run_event.set()
-            self._run_thread.join()
+        self.stopEventThread()
 
         # stop heart beat
-        self._keep_alive_event.set()
-        self._keep_alive_thread.join()
+        self.stopKeepAlive()
+
+        # stop run thread
+        self.stopRunThread()
+
 
         self.request_activate.emit(False)
         try:
             self.shutdown.emit()
         except Exception as e:
             syslog.error(f"EVENT: error during shutdown: {e}")
+
+
+
 
     def reload_calibrations(self):
         """Reloads the calibration data from the configuration file."""
@@ -2285,12 +2326,15 @@ class EventHandler(QtCore.QObject):
             last_mode = gremlin.shared_state.runtime_mode
             current_profile.set_last_runtime_mode(last_mode)
 
+
+
             if self._execute_thread.is_alive():
                 syslog.info("EXEC: stopping execute runner thread")
                 self._execute_thread.stop()
+                gremlin.util.safeJoin(self._execute_thread)
                 syslog.info("EXEC: execute runner thread stopped")
-                self._execute_thread.join()
-                syslog.info("EXEC: stop")
+                self._execute_thread = None
+
 
     def registerModeValidator(self, callback: Callable):
         assert callback is not None and callable(callback), "Callback must provided and be a callable "

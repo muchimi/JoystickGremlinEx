@@ -289,7 +289,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
         :param key_list the keys to use in the key combination
         """
-        
+
         self.action_data.setKeys(sort_keys(key_list))
         gremlin.util.InvokeUiMethod(self._populate_ui)  # reload new keys
 
@@ -658,7 +658,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if self._ar_thread is not None:
             self._ar_event.set()
             self._ar_running = False
-            self._ar_thread.join()
+            gremlin.util.safeJoin(self._ar_thread)
             self._ar_thread = None
             # ensure the keys are released
             gremlin.macro.MacroManager().queue_macro(self.release)

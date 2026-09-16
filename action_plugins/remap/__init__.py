@@ -326,7 +326,7 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
                 self.thread_last_update = time.time()
                 if self.thread_running is False:
                     if isinstance(self.thread, threading.Thread):
-                        self.thread.join()
+                        gremlin.util.safeJoin(self.thread)
                     self.thread = threading.Thread(target=self.relative_axis_thread, daemon=False)
                     self.thread.name = "REMAP relative axis"
                     self.thread.start()

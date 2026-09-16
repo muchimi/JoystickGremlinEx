@@ -1817,7 +1817,7 @@ class OscServer:
         if self._server:
             self._server.shutdown()
             time.sleep(0.1)
-        self._server_thread.join()
+        gremlin.util.safeJoin(self._server_thread)
         self._server_thread = None
         self._running = False
         time.sleep(0.1)  # allow time for the server thread to fully terminate

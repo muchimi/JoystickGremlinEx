@@ -472,7 +472,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             if not device_guid:
                 raise ValueError("device_guid could not be derived from the mode object and must be provided")
 
-
         self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
         if self._custom_input_id_handler is not None and input_id is not None:
             raise ValueError("input_id should not be provided when a custom input id handler is set")
@@ -548,7 +547,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         # self._profile_mode = None
         self._enabled = True  # enabled flag
 
-
         self._message_key = None  # message key for this input (device_guid, input_type, input_id)
 
         self._custom_sort_callback = None
@@ -562,15 +560,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self._initialized = True
 
-    def notifyContentChanged(self, extra_data : dict = None, force : bool = False, operation : str = None):
+    def notifyContentChanged(self, extra_data: dict = None, force: bool = False, operation: str = None):
         """notifies that the content has changed"""
         self._handle_content_changed(extra_data=extra_data, force=force, operation=operation)
 
-    def _handle_content_changed(self, extra_data : dict = None, force : bool = False, operation : str = None):
-        """ called when the containers or container contents change """
+    def _handle_content_changed(self, extra_data: dict = None, force: bool = False, operation: str = None):
+        """called when the containers or container contents change"""
         if self._input_widget:
             self._input_widget.updateActionIcons(force=True)
-
 
     def registerLatchedInput(self, input_id):
         """registers an additional latched input for this input item - this is called on profile start when the excution tree is being built"""
@@ -953,7 +950,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @device_guid.setter
     def device_guid(self, value: dinput.GUID | uuid.UUID | str = None):  # noqa: F405
-        assert value is not None,"value must be provided"
+        assert value is not None, "value must be provided"
         if gremlin.util.compare_guid(self._device_guid, value):
             device = gremlin.joystick_handling.getDevice(value)
             assert device is not None, f"device not found for device GUID: [{value}]"
@@ -1300,8 +1297,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def short_display_name(self):
         return self.getDisplayName(include_device_name=False)
 
-
-    def getDisplayName(self, include_device_name : bool =True):
+    def getDisplayName(self, include_device_name: bool = True):
         """gets a display name for this input"""
         device = gremlin.joystick_handling.getDevice(self.device_guid)
         if device:
@@ -1314,7 +1310,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 device = gremlin.joystick_handling.getDevice(self.device_guid)
                 if not device:
                     stub = f"(Unknown device) Axis [{self._input_id}]"
-                    syslog.error(f"INTERNAL ERROR: Unable to retrieve device axis name for device: {self.device_guid}  axis [{self._input_id}] - the device is not found in the current device list")
+                    syslog.error(
+                        f"INTERNAL ERROR: Unable to retrieve device axis name for device: {self.device_guid}  axis [{self._input_id}] - the device is not found in the current device list"
+                    )
                 else:
                     stub = f"{device.get_axis_name(self._input_id)}"
             case InputType.JoystickButton:
@@ -1335,6 +1333,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 stub = f"IFR1: {self._input_id.name}"
             case InputType.ModeControl:
                 stub = f"ModeControl: {self._input_id}"
+            case InputType.Voice:
+                stub = f"Voice: "
             case _:
                 stub = f"[unknown input type: {self._input_type}]"
 
@@ -2366,7 +2366,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._repeater_container_widget.setWidget(None)
         gremlin.util.clear_layout(self._custom_container_layout)
 
-
         gremlin.util.clear_widget_references(self)
 
         gremlin.util.clear_layout(self.main_layout)
@@ -2539,11 +2538,11 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             else:
                 self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
 
-    def updateActionIcons(self, force = False):
+    def updateActionIcons(self, force=False):
         """updates the input item's action icon list"""
         gremlin.util.InvokeUiMethod(self._update_action_icons_ui, force)
 
-    def _update_action_icons_ui(self, force : bool = False):
+    def _update_action_icons_ui(self, force: bool = False):
         # update mapping icons
         # syslog.info(f"update action icons for input item: {self.input_item.display_name}")
         self.create_action_icons(self.input_item, force=force)
@@ -2670,8 +2669,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         """adds custom content to the input widget (vertical container)"""
         gremlin.util.clear_layout(self._custom_container_layout)
 
-
-        if  items:
+        if items:
             widgets = items if hasattr(items, "__iter__") else [items]
             if len(widgets) == 1:
                 self._custom_container_layout.addWidget(widgets[0])
@@ -2683,14 +2681,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # hint = self._custom_container_widget.sizeHint()
         # self._custom_container_widget.setFixedHeight(hint.height())
 
-
     def setInputDescription(self, description: str | None):
         gremlin.util.InvokeUiMethod(self._set_input_description_ui, description)
 
     def _set_input_description_ui(self, description: str | None):
         """sets the input description for an input widget (optional)"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
-        if description is not None:
+        if description:
             if verbose:
                 syslog.info(f"InputItemWidget: setting input description: [{description}]")
             self._input_description_widget.setText(description, self._input_description_icon)
@@ -2948,7 +2945,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._title_icon_layout.removeWidget(self._edit_button_widget)
             self._edit_button_widget = None
 
-    def create_action_icons(self, input_item: InputItem, force : bool = False):
+    def create_action_icons(self, input_item: InputItem, force: bool = False):
         """creates the action icons for mapped actions associated with the input item
         :param input_item: the InputItem instance for which to create action icons
         """
@@ -4645,7 +4642,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.parent = parent
 
         self._abstract_container_generating_xml = False  # true if generating
-        self._action_sets = ActionSets(self, content_callback=content_callback)  # containers contain one or more action sets, each action sets contains a list of action set object
+        self._action_sets = ActionSets(
+            self, content_callback=content_callback
+        )  # containers contain one or more action sets, each action sets contains a list of action set object
         # self._action_sets.addOnItemChangedCallback(self._on_action_sets_changed)
 
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
@@ -4700,8 +4699,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         """sets the content changed callback for this container"""
         self._content_callback = callback
         self.action_sets.setContentCallback(callback)
-
-
 
     def hasOutput(self) -> bool:
         """returns True if this container has output, meaning it contains an action that has output"""
@@ -5453,7 +5450,6 @@ class AbstractAction(BaseProfileData):
         el.profile_unhook.connect(self.unhook)
         el.profile_unload.connect(self._cleanup)
 
-
     @property
     def debug_name(self) -> str:
         """friendly display name"""
@@ -5576,7 +5572,7 @@ class AbstractAction(BaseProfileData):
         return self._priority
 
     def setPriority(self, value: int):
-        """sets the priority of the action, numeric, lower priority executes before higher priority """
+        """sets the priority of the action, numeric, lower priority executes before higher priority"""
         value = gremlin.util.clamp(value, 0, 1000)
         self._priority = value
 
@@ -5707,7 +5703,7 @@ class AbstractAction(BaseProfileData):
     def fireIconChanged(self):
         """fires the icon changed event"""
         self.icon_changed.emit()
-        self.notifyContentChanged() # tell input to update icons as needed
+        self.notifyContentChanged()  # tell input to update icons as needed
 
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the instance with data from the given XML node.
@@ -6537,7 +6533,6 @@ class ConditionModel(AbstractCallbackModel):
             allowed_types=(
                 BaseAbstractCondition,
                 AbstractCondition,
-
             ),
             content_callback=content_callback,
             model_description="ConditionModel",
@@ -6711,19 +6706,20 @@ class MultiModeAbstractAction(AbstractAction):
 class ActionSets(AbstractCallbackModel):
     """contains ActionSet objects for a container"""
 
-    def __init__(self, container: AbstractContainer, description: str = None, data=None, content_callback : Callable =None):
+    def __init__(self, container: AbstractContainer, description: str = None, data=None, content_callback: Callable = None):
         assert isinstance(container, AbstractContainer), "Invalid container object"
 
-        super().__init__(allowed_types=(ActionSet,),
-                         model_description=f"ActionSets model for container: [{container.debug_name}]",
-                         content_callback=content_callback,
-                         data=container)
+        super().__init__(
+            allowed_types=(ActionSet,),
+            model_description=f"ActionSets model for container: [{container.debug_name}]",
+            content_callback=content_callback,
+            data=container,
+        )
 
         self._container = container
         self._input_item = self._container.input_item
         self._description = description
         self._data = data
-
 
         # add at least one action set object
         # load from container
@@ -9309,7 +9305,7 @@ class ContainerModel(AbstractCallbackModel):
             allowed_types=(AbstractContainer,),
             model_description=f"ContainerModel for input: [{input_item.device_name} {input_item.display_name}]",
             data=input_item,
-            content_callback=content_callback
+            content_callback=content_callback,
         )
 
         self._input_item = input_item
@@ -11566,7 +11562,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             raise ValueError(f"DeviceWidget: CreateUi() - invalid model - got [{type(self._input_item_list_model)}]")
 
         try:
-
             if self._input_item_list_model.count() == 0:
                 # no inputs in the model
                 if self._input_item_list_model.rows():
@@ -11610,7 +11605,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 if Shiboken.isValid(self.listview_container):
                     self.listview_container.setCurrentIndex(1)  # display the list view in the stack widget
 
-
                 # update the selection if nothing is selected
                 selected_index = widget.currentIndex()
                 if selected_index is not None and selected_index != -1:
@@ -11630,7 +11624,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return False
 
         return True
-
 
     def _handle_create_widget(self, input_item: InputItem):
 

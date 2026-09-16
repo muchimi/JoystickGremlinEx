@@ -1129,8 +1129,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 if self._verbose:
                     syslog.info("SEQUENCE: affinity: stop sequence runner due to mode change")
                 self.action_data._is_running = False
-                if self.action_data._thread.is_alive():
-                    self.action_data._thread.join()
+                gremlin.util.safeJoin(self.action_data._thread)
+
                 self.action_data._thread = None
 
         # reset
@@ -1160,7 +1160,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: stop wiggle sequence runner")
             self.action_data._is_running = False
-            self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             self.action_data._thread = None
             # reduce concurrency count
             gs = GlobalSequence()
@@ -1188,8 +1188,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: normal mode: stop sequence runner")
             self.action_data._is_running = False
-            if self.action_data._thread.is_alive():
-                self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()
@@ -1217,8 +1216,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: stepped mode: stop sequence runner")
             self.action_data._is_running = False
-            if self.action_data._thread.is_alive():
-                self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()

@@ -434,7 +434,7 @@ class MacroManager(QtCore.QObject):
             self._abort_event.set()
             self._schedule_event.set()
             if not self._run_scheduler_thread.daemon:
-                self._run_scheduler_thread.join()
+                gremlin.util.safeJoin(self._run_scheduler_thread)
             # Always drop the reference, even if the thread had already exited,
             # so start() never sees a stale/terminated thread object.
             self._run_scheduler_thread = None

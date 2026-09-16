@@ -1240,7 +1240,7 @@ class SimConnectMonitor:
             syslog.info(f"SCMONITOR: received aircraft name: [{name}]")
         with self._request_lock:
             self._request_running = False
-        self._request_thread.join()
+        gremlin.util.safeJoin(self._request_thread)
         self._request_thread = None
         self._update_status_bar(name)
 
@@ -1392,7 +1392,8 @@ class SimConnectMonitor:
         if not self._started:
             return
         self._auto_reconnect_event.set()
-        self._auto_reconnect_thread.join()
+        gremlin.util.safeJoin(self._auto_reconnect_thread)
+        self._auto_reconnect_thread = None
 
         if self._options.auto_mode_select:
             # disconnect the aircraft change notification

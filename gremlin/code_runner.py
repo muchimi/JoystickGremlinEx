@@ -524,7 +524,6 @@ class CodeRunner:
 
                 device_id = device_node.device_id
 
-
                 # set axes
                 for id in range(1, device_node.axis_count + 1):
                     enabled = profile.getStartAxisEnabled(device_id, id)

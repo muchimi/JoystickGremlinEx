@@ -505,7 +505,7 @@ class Osc:
         self._stop = True
         if self._server:
             self._server.shutdown()
-        self._server_thread.join()
+        gremlin.util.safeJoin(self._server_thread)
         self._server_thread = None
         self._running = False
         log("OSC: server stopped")

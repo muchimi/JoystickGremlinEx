@@ -45,6 +45,7 @@ from enum import Enum, auto
 from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
+from gremlin.types import DeviceType
 
 import gremlin.gated_handler
 from psygnal import Signal
@@ -1737,12 +1738,20 @@ class ExecutionContext:
             device_node.device = device
             device_node.parent = self.graph
 
-            if device.device_type == gremlin.types.DeviceType.State:
+            if device.device_type == DeviceType.State:
                 # state device (modeless)
                 import gremlin.ui.state_device
 
                 sd = gremlin.ui.state_device.StateData()
                 input_items = sd.getInputItems()
+                if input_items:
+                    self._build_input(device_node, input_items, device_node, "")
+            elif device.device_type == DeviceType.Voice:
+                # voice device (modeless)
+                import gremlin.ui.voice_device
+
+                vd = gremlin.ui.voice_device.VoiceData()
+                input_items = vd.getInputItems()
                 if input_items:
                     self._build_input(device_node, input_items, device_node, "")
             else:
@@ -1924,12 +1933,16 @@ class ExecutionContext:
 
         """
 
-        if not node.has_actions:
-            return True  # nodes with no actions return PASS
 
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition
+
+        if not node.has_actions:
+            if verbose_exec:
+                syslog.info(f"EXEC: Node [{node.id}] has no actions defined - skipping node execution")
+            return True  # nodes with no actions return PASS
+
 
         if not event:
             syslog.error(f"EXEC: Executing node [{node.id}] has no event passed.")

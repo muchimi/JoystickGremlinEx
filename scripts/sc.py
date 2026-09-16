@@ -37,7 +37,7 @@ MOUSE_MOVE_DELTA_MAX = 10
 MOUSE_MOVE_DELTA_MIN = 1
 MOUSE_MOVE_DELTA_SPAN = MOUSE_MOVE_DELTA_MAX - MOUSE_MOVE_DELTA_MIN
 
-""" axis names to ID 
+""" axis names to ID
 
     X   # 1
     Y   # 2
@@ -803,18 +803,16 @@ class Wiggle:
             syslog.debug("Wiggle stop local requested...")
             with self._lock:
                 self._wiggle_local_stop_requested.set()
-                if self._wiggle_local_thread.is_alive():
-                    self._wiggle_local_thread.join()
+
+                gremlin.util.safeJoin(self._wiggle_local_thread)
                 syslog.debug("Wiggle thread local exited...")
-                self._wiggle_local_thread = None
                 self._wiggle_local_stop_requested = None
 
         if is_remote and self.remote_running:
-            syslog.debug("Wiggle stop local requested...")
+            syslog.debug("Wiggle stop remote requested...")
             with self._lock:
                 self._wiggle_remote_stop_requested.set()
-                if self._wiggle_remote_thread.is_alive():
-                    self._wiggle_remote_thread.join()
+                gremlin.util.safeJoin(self._wiggle_remote_thread)
                 syslog.debug("Wiggle thread remote exited...")
                 self._wiggle_remote_thread = None
                 self._wiggle_remote_stop_requested = None
