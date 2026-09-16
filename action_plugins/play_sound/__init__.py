@@ -1822,7 +1822,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if self.tts_suppress_duplicate:
             if phrase:
                 hash_key = phrase.key if phrase else None
-            syslog.info(f"phrase text: {phrase.text}  hash: {hash_key}")
+            # syslog.info(f"phrase text: {phrase.text}  hash: {hash_key}")
             key = hash_key
 
             if self.last_phrase_key:

@@ -481,10 +481,14 @@ class SpeechRecognizer:
         self._running = False
         self._abort_event = threading.Event()
 
+        self.verbose = True
+
     def start(self):
         """Start the recognition thread."""
         if self._running:
             return
+        # if self.verbose:
+        #     syslog.info("Recog: starting recognition thread")
         self._running = True
         self._abort_event.clear()
         self._thread = threading.Thread(
@@ -497,11 +501,14 @@ class SpeechRecognizer:
 
     def stop(self):
         """Stop the recognition thread."""
-        self._running = False
-        self._abort_event.set()
-        self._queue.put(None)
+        if self._running:
+            # if self.verbose:
+            #     syslog.info("Recog: stopping recognition thread")
+            self._running = False
+            self._abort_event.set()
+            self._queue.put(None)
 
-        self._thread.join(timeout=2.0)
+            self._thread.join(timeout=2.0)
 
     def add_audio(
         self,
@@ -526,7 +533,8 @@ class SpeechRecognizer:
                 .copy()
             )
 
-        # syslog.info(f"adding audio to recognize queue started: {speech_started}, ended: {speech_ended}")
+        # if self.verbose:
+        #     syslog.info(f"adding audio to recognize queue started: {speech_started}, ended: {speech_ended}")
         self._queue.put(
             (
                 audio,
@@ -540,11 +548,13 @@ class SpeechRecognizer:
     # ---------------------------------------------------------
 
     def _worker(self, abort_event):
-
+        # verbose = self.verbose
+        # if verbose:
+        #     syslog.info("Recog: worker thread runner started")
         while not abort_event.is_set():
             item = self._queue.get()
-
-            # syslog.info(f"Recog: has data: {item is not None}")
+            # if verbose:
+            #     syslog.info(f"Recog: has data: {item is not None}")
 
             if item is None:
                 # got signal break
@@ -554,7 +564,9 @@ class SpeechRecognizer:
             audio, started, ended = item
 
             if started:
-                # syslog.info("Recog: SPEECH STARTED")
+                # Speech has started
+                # if verbose:
+                #     syslog.info("Recog: SPEECH STARTED")
                 self._audio.clear()
 
             if audio is not None:
@@ -562,8 +574,13 @@ class SpeechRecognizer:
                 self._audio.append(audio)
 
             if ended:
-                # syslog.info("Recog: SPEECH ENDED")
+                # Speech has ended
+                # if verbose:
+                #     syslog.info("Recog: SPEECH ENDED")
                 self._recognize()
+
+        # if verbose:
+        #     syslog.info("Recog: worker thread runner stopped")
 
     # ---------------------------------------------------------
     # Recognition
@@ -600,7 +617,8 @@ class SpeechRecognizer:
         for segment in segments:
             text = segment.text.strip().casefold()
             if text:
-                syslog.info(f"Processing segment: {text}")
+                if self.verbose:
+                    syslog.info(f"Processing segment: {text}")
                 words.extend([w.strip(string.punctuation) for w in text.split()])
 
         if words and self.callback:
@@ -645,27 +663,30 @@ DEFAULT_FILLER_WORDS = {
 class VoiceCommand:
     """holds voice command information including a callback called when the command is triggered"""
 
-    def __init__(self, phrase, callback=None, owner=None):
-        """ creates a voice command
-
-        There should be one voice command per phrase to recognize.
-        Voice commands are identified by their phrase, and the key is derived from the phrase.
-        Voice commands are associated with an owner, usually the input item that owns the phrase.
-        Phrases must be unique for the entire profile as they need to trigger a specific input.
-        However a specific input can own multiple commands, so long as the phrases for each command are unique.
-
-        :param phrase: the phrase that triggers this command
-        :param callback: the function to call when the command is triggered
-        :param owner: the owner of this command (optional)
-
-        """
-        self._id = gremlin.util.get_guid()
-        self._key = None
-        self._phrase = phrase.casefold().strip() if phrase is not None else None
-        self._callback = callback
-        self._owner = owner
+    def __init__(self, phrase, callback=None, key=None, owner=None):
+        self.key = key if key is not None else gremlin.util.get_guid()
+        self.phrase = phrase.casefold().strip() if phrase is not None else None
+        self._callbacks = [] # list of callbacks
+        if callback is not None:
+            self.registerCallback(callback)
+        self.owner = owner
         self.meaningful_length = None
         self._update_key()
+
+
+    def registerCallback(self, callback):
+        """Adds a callback to the list of callbacks."""
+        if callback is not None and callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """Removes a callback from the list of callbacks."""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def clearCallbacks(self):
+        """Clears all callbacks from the list of callbacks."""
+        self._callbacks.clear()
 
     @property
     def key(self) -> str:
@@ -727,9 +748,10 @@ class VoiceCommand:
         self._owner = value
 
     def trigger(self):
-        """triggers the command callback"""
-        if self.callback is not None:
-            self.callback(self)
+        """triggers the registered callbacks for the voice command """
+        for callback in self._callbacks:
+            callback(self)
+
 
     def __str__(self):
         return f"VoiceCommand(key=[{self.key}], phrase=[{self.phrase}])"
@@ -755,7 +777,7 @@ class CommandMatcher:
         *,
         filler_words=None,
         fuzzy_match=True,
-        fuzzy_threshold=95,
+        fuzzy_threshold=89,
         word_threshold=60,
         gap_penalty=25,
         filler_penalty=2,
@@ -763,6 +785,21 @@ class CommandMatcher:
         max_extra_words=5,
         callback: Callable = None,
     ):
+        """
+        Initializes the CommandMatcher with the given commands and matching parameters.
+
+        Args:
+            commands (list): List of VoiceCommand instances or command strings.
+            filler_words (set, optional): Set of filler words to ignore. Defaults to None.
+            fuzzy_match (bool, optional): Enable fuzzy matching. Defaults to True.
+            fuzzy_threshold (int, optional): Threshold for fuzzy matching. Defaults to 89.
+            word_threshold (int, optional): Threshold for individual word matching. Defaults to 60.
+            gap_penalty (int, optional): Penalty for gaps in matching. Defaults to 25.
+            filler_penalty (int, optional): Penalty for filler words. Defaults to 2.
+            swap_penalty (int, optional): Penalty for adjacent word swaps. Defaults to 10.
+            max_extra_words (int, optional): Maximum allowed extra words. Defaults to 5.
+            callback (Callable, optional): Callback function when a command is matched. Passes the recognized command.
+        """
         self.fuzzy_match = fuzzy_match
         self.fuzzy_threshold = fuzzy_threshold
         self.word_threshold = word_threshold
@@ -771,6 +808,7 @@ class CommandMatcher:
         self.swap_penalty = swap_penalty
         self.max_extra_words = max_extra_words
         self.callback = callback  # called when a command is matched
+        self._callbacks = [] # list of callbacks
         self._buffer = deque()
         self._commands = []
         self.verbose = gremlin.config.Configuration().verbose_mode_voice
@@ -780,20 +818,43 @@ class CommandMatcher:
         self._command_map = {}  # holds the commands
         if commands:
             for command in commands:
-                if isinstance(command, VoiceCommand):
-                    vc = command
-                else:
-                    # command as a string
-                    vc = VoiceCommand(command)
+                assert isinstance(command, VoiceCommand), "Command must be a VoiceCommand instance"
+                assert command.owner is not None,"VoiceCommand must have an owner"
+                vc = command
+
+
 
                 words = self._tokenize(vc.phrase)
 
+                vc.registerCallback(self._handle_command_trigger)
                 vc.meaningful_length = self._meaningful_length(words)
                 vc.words = words
 
                 self._command_map[vc.key] = vc
 
             self._update_commands()
+
+        if callback is not None:
+            self.registerCallback(callback)
+
+    def registerCallback(self, callback):
+        """Adds a callback to the list of callbacks."""
+        if callback is not None and callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """Removes a callback from the list of callbacks."""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def clearCallbacks(self):
+        """Clears all callbacks from the list of callbacks."""
+        self._callbacks.clear()
+
+    def _handle_command_trigger(self, command : VoiceCommand):
+        # fire the command callback, passes the command
+        for callback in self._callbacks:
+            callback(command)
 
     def hasCommands(self):
         return bool(self._commands)
@@ -826,7 +887,18 @@ class CommandMatcher:
             # singleton
             commands = [commands]
 
-        verbose = self.verbose
+        :param command: The command to add. Can be a VoiceCommand instance or a string representing the phrase.  If a voice command, callback will be called when a match occurs with the key.
+        """
+        if isinstance(command, VoiceCommand):
+            vc = command
+        else:
+            vc = VoiceCommand(command)
+        vc.words = self._tokenize(vc.phrase)
+        vc.meaningful_length = self._meaningful_length(vc.words)
+        self._command_map[vc.key] = vc
+        vc.registerCallback(self._handle_command_trigger)
+
+        self._update_commands()
 
         for command in commands:
             if isinstance(command, VoiceCommand):
@@ -839,13 +911,26 @@ class CommandMatcher:
                 syslog.info(f"Voice: Command: registered [{vc.phrase}] length: {vc.meaningful_length}")
 
             self._command_map[vc.key] = vc
-
-        # FIX: rebuild once after bulk insert
+            vc.registerCallback(self._handle_command_trigger)
         self._update_commands()
+
+    def removeCommand(self, command: Union[VoiceCommand, str]):
+        """removes a single command from the matcher"""
+        if isinstance(command, VoiceCommand):
+            key = command.key
+        else:
+            key = VoiceCommand(command).key
+        if key in self._command_map:
+            vc = self._command_map[key]
+            vc.removeCallback(self._handle_command_trigger)
+            del self._command_map[key]
+            self._update_commands()
 
 
     def clearCommands(self):
         """clears all commands from the matcher"""
+        for vc in self._command_map.values():
+            vc.removeCallback(self._handle_command_trigger)
         self._command_map.clear()
         self._update_commands()
 
@@ -925,7 +1010,9 @@ class CommandMatcher:
                     best_command = command
                     best_start = start
 
-        if best_command is not None and best_score >= self.fuzzy_threshold:
+                syslog.info(f"Fuzzy match candidate: [{command.phrase}] with score [{score}]")
+
+        if best_command is not None: # and best_score >= self.fuzzy_threshold:
             self._consume_from(best_start)
 
             best_command.trigger()
@@ -1217,10 +1304,11 @@ class Voice:
     def __init__(
         self,
         commands: list = None,
-        fuzzy_match=False,
-        fuzzy_threshold=95,
+        fuzzy_match=True,
+        fuzzy_threshold=89,
     ):
         os.environ["HF_HUB_VERBOSITY"] = "error"
+        self.verbose = False
         self._voice_lock = threading.RLock()
         self._audio_lock = threading.RLock()  # lock when adding new recognized words
         self._model_size = "small"  # "base" #  possible models: "tiny", "base", "small", "medium", "large-v3"
@@ -1241,11 +1329,31 @@ class Voice:
         self._new_word = False  # flag to indicate if a new word has been added
         self._volume = 0.0  # default volume level (system microphone level)
 
-        self._rolling_matcher = CommandMatcher(commands=commands, fuzzy_match=fuzzy_match, fuzzy_threshold=fuzzy_threshold)
+        self._callbacks = []
+
+        self._rolling_matcher = CommandMatcher(commands=commands,
+                                               fuzzy_match=fuzzy_match,
+                                               fuzzy_threshold=fuzzy_threshold,
+                                               callback=self._handle_command_trigger)
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
         el.profile_stop.connect(self.stop)
+
+    def registerCallback(self, callback):
+        """register a callback to be invoked when a command is triggered"""
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """remove a previously registered callback"""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def _handle_command_trigger(self, command: VoiceCommand):
+        """ trigger all registered callbacks with the given command  when that command is triggered """
+        for callback in self._callbacks:
+            callback(command)
 
     def addCommand(self, command: VoiceCommand):
         """adds a single command to the matcher - duplicates are ignored"""
@@ -1293,6 +1401,8 @@ class Voice:
         """enable or disable listening while monitoring"""
         with self._listen_lock:
             self._listen_enabled = enable
+        if self.verbose:
+            syslog.info(f"Voice: Listening set to {'enabled' if enable else 'disabled'}")
 
     def listenEnabled(self) -> bool:
         """returns whether listening is currently enabled"""
@@ -1346,6 +1456,7 @@ class Voice:
                     self._listen_thread.start()
             else:
                 self._listening = False
+
 
     def _on_recognized(self, words: list[str]):
         """callback when speech is recognized"""
@@ -1402,7 +1513,8 @@ class Voice:
     def _listen_runner(self, abort_event: threading.Event):
         """Internal method run in a separate thread to handle listening."""
 
-        syslog.info("Voice listen runner started...")
+        # if self.verbose:
+        #     syslog.info("Voice listen runner started...")
         audio_queue = queue.Queue(maxsize=64)
 
         def callback(indata, frames, time_info, status):
@@ -1439,6 +1551,8 @@ class Voice:
                     listen_enabled = self._listen_enabled
 
                 if not listen_enabled:
+                    # if self.verbose:
+                    #     syslog.info("Voice listen runner: listening disabled")
                     continue
 
                 output, info = self.processor.process(audio)
