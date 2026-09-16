@@ -671,6 +671,7 @@ class VoiceCommand:
             self.registerCallback(callback)
         self.owner = owner
         self.meaningful_length = None
+        self._update_key()
 
 
     def registerCallback(self, callback):
@@ -689,18 +690,33 @@ class VoiceCommand:
 
     @property
     def key(self) -> str:
+        """ unique key for this command - based on the phrase or id """
+        if self._key is None:
+            self._update_key()
         return self._key
 
     @key.setter
     def key(self, value):
-        self._key = value
+        raise ValueError("Key is readonly")
+
+
+    def _update_key(self):
+        """ updates the unique key value for the command """
+        # key depends on the phrase and not the owner because voice recognition would not know otherwise, in the case of duplicate
+        # phrases, which input to trigger.  This is checked when inputs are added.
+        if self._phrase is not None:
+            self._key = hash(self._phrase)
+        else:
+            self._key = hash(self._id)
+
+    @property
+    def id(self):
+        """ id of this object - changes for ever instance and not persisted """
+        return self._id
 
     @property
     def hashKey(self) -> str:
-        """unique hash for the phrase in the command"""
-        if self.phrase is None:
-            return None
-        return hash(self.phrase)
+        return self.key
 
     @property
     def phrase(self):
@@ -708,7 +724,11 @@ class VoiceCommand:
 
     @phrase.setter
     def phrase(self, value):
-        self._phrase = value
+        if value:
+            value = value.casefold().strip()
+        if self._phrase != value:
+            self._phrase = value
+            self._key = hash(self._phrase)
 
     @property
     def callback(self) -> Callable[[VoiceCommand], None]:
@@ -720,6 +740,7 @@ class VoiceCommand:
 
     @property
     def owner(self) -> str:
+        """ owner of this command - this usually is the input item that owns this command in the voice device """
         return self._owner
 
     @owner.setter
@@ -733,7 +754,7 @@ class VoiceCommand:
 
 
     def __str__(self):
-        return f"VoiceCommand(key={self.key}, phrase={self.phrase})"
+        return f"VoiceCommand(key=[{self.key}], phrase=[{self.phrase}])"
 
 
 class CommandMatcher:
@@ -790,6 +811,7 @@ class CommandMatcher:
         self._callbacks = [] # list of callbacks
         self._buffer = deque()
         self._commands = []
+        self.verbose = gremlin.config.Configuration().verbose_mode_voice
 
         self.filler_words = {word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)}
 
@@ -859,8 +881,11 @@ class CommandMatcher:
         """gets the number of commands currently in the matcher"""
         return len(self._commands)
 
-    def addCommand(self, command: Union[VoiceCommand, str]):
-        """adds a single command to the matcher - duplicates are ignored
+    def addCommands(self, commands: list[VoiceCommand] | VoiceCommand):
+        """adds multiple commands to the matcher - duplicates are ignored"""
+        if isinstance(commands, VoiceCommand):
+            # singleton
+            commands = [commands]
 
         :param command: The command to add. Can be a VoiceCommand instance or a string representing the phrase.  If a voice command, callback will be called when a match occurs with the key.
         """
@@ -875,8 +900,6 @@ class CommandMatcher:
 
         self._update_commands()
 
-    def addCommands(self, commands: list[Union[VoiceCommand, str]]):
-        """adds multiple commands to the matcher - duplicates are ignored"""
         for command in commands:
             if isinstance(command, VoiceCommand):
                 vc = command
@@ -884,6 +907,9 @@ class CommandMatcher:
                 vc = VoiceCommand(command)
             vc.words = self._tokenize(vc.phrase)
             vc.meaningful_length = self._meaningful_length(vc.words)
+            if verbose:
+                syslog.info(f"Voice: Command: registered [{vc.phrase}] length: {vc.meaningful_length}")
+
             self._command_map[vc.key] = vc
             vc.registerCallback(self._handle_command_trigger)
         self._update_commands()
@@ -1014,6 +1040,7 @@ class CommandMatcher:
     # Exact matching
     # ---------------------------------------------------------
 
+
     def _find_exact_match(self, words):
         """
         Exact comparison while allowing filler words
@@ -1022,17 +1049,46 @@ class CommandMatcher:
 
         for command in self._commands:
             target = command.words
+            target_nonfiller_len = self._meaningful_length(target)
 
+            # Search all windows, not only suffixes.
             for start in range(len(words)):
-                window = words[start:]
+                nonfiller_seen = 0
+                for end in range(start + 1, len(words) + 1):
+                    w = words[end - 1]
+                    if not self._is_filler(w):
+                        nonfiller_seen += 1
 
-                if self._equal_ignoring_fillers(
-                    window,
-                    target,
-                ):
-                    return command, start
+                    # stop once we exceeded target meaningful length
+                    if nonfiller_seen > target_nonfiller_len:
+                        break
+
+                    window = words[start:end]
+                    if self._equal_ignoring_fillers(window, target):
+                        return command, start
 
         return None
+
+    # old
+    # def _find_exact_match(self, words):
+    #     """
+    #     Exact comparison while allowing filler words
+    #     to exist on either side.
+    #     """
+
+    #     for command in self._commands:
+    #         target = command.words
+
+    #         for start in range(len(words)):
+    #             window = words[start:]
+
+    #             if self._equal_ignoring_fillers(
+    #                 window,
+    #                 target,
+    #             ):
+    #                 return command, start
+
+    #     return None
 
     def _equal_ignoring_fillers(self, spoken, target):
         """
@@ -1302,7 +1358,7 @@ class Voice:
     def addCommand(self, command: VoiceCommand):
         """adds a single command to the matcher - duplicates are ignored"""
         if command is not None:
-            self._rolling_matcher.addCommand(command)
+            self._rolling_matcher.addCommands([command])
 
     def addCommands(self, commands: list):
         """adds multiple commands to the matcher - duplicates are ignored"""
