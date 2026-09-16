@@ -248,6 +248,9 @@ class CodeRunner:
             for mode_name in gremlin.profile.mode_list():
                 self.event_handler.addCallback(gremlin.joystick_handling.invalidDeviceGuid(), mode_name, None, lambda x: x, False)
 
+
+
+
             # reset functor latching
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
@@ -267,8 +270,26 @@ class CodeRunner:
                 graph_mode_node.parent = ec.graph
                 graph_mode_nodes[mode] = graph_mode_node
 
-            # Create input callbacks based on the profile's content
-            # profile.sync()
+            ## ensure voice inputs are in the input list
+            # vd = gremlin.ui.voice_device.VoiceData()
+            # device_node = profile.devices.get(gremlin.shared_state.voice_tab_guid)
+            # master_mode = gremlin.shared_state.master_mode
+            # for input_item in vd.values():
+            #     self.event_handler.registerInputItem(master_mode, input_item)
+            #     callbacks = []
+            #     for container in input_item.containers:
+            #         if not container.hasOutput():
+            #             syslog.warning(f"CALLBACK: device: Voice: input: {input_item.display_name}: warning: zero output container ignored")
+            #             continue
+            #         if not container.is_valid():
+            #             continue
+
+            #         callbacks.extend(container.generate_callbacks(graph_mode_node))
+
+            #     for cb_data in callbacks:
+            #         self.event_handler.addCallback(device_node.device_guid, master_mode, cb_data.event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
+
+
 
             verbose = gremlin.config.Configuration().verbose_mode_exec
             device_node: gremlin.base_profile.ProfileDeviceNode
@@ -281,8 +302,7 @@ class CodeRunner:
                         syslog.info(f"\t{str(device_node)}")
                     continue
 
-                if device.device_type == DeviceType.ModeControl:
-                    pass
+
                 device_name = device.name
                 if verbose:
                     syslog.info(f"CALLBACK: device: {str(device_node)}")
@@ -429,6 +449,7 @@ class CodeRunner:
             if config.VOICE_INPUT_ENABLED:
                 vd = gremlin.ui.voice_device.VoiceData()
                 input_item = vd.ptt_input_item
+
                 if input_item:
                     # voice device is latched to an input
                     event = gremlin.event_handler.Event(
@@ -451,6 +472,32 @@ class CodeRunner:
                         permanent = input_item.always_execute,
                         extra_data = event.extra_data
                     )
+
+                # mappings for voice inputs
+                for key, input_item in vd.items():
+
+
+                    # mapping callbacks for voice inputs
+                    callbacks = []
+                    for container in input_item.containers:
+                            if not container.is_valid():
+                                # test = container.is_valid()
+                                syslog.warning(
+                                    f"CALLBACK: device: Voice: input: {input_item.display_name}: "
+                                    f"warning: Incomplete container ignored "
+                                    f"(id={getattr(container, 'id', '?')})"
+                                )
+                                continue
+                            callbacks.extend(container.generate_callbacks())
+                    if callbacks:
+                        syslog.info(
+                            f"CALLBACK: Voice [{key}]: registered {len(callbacks)} "
+                            f"container callback(s)"
+                        )
+                    for cb_data in callbacks:
+                        vd.addCallback(input_item, cb_data.callback)
+
+
 
 
 

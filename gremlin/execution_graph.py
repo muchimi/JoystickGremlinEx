@@ -2215,9 +2215,10 @@ class ContainerCallback:
         execution graph until every entry has run or it is aborted.
         """
 
+        input_type = event.getInputType() # includes override types
+
         if event.is_axis:
-            input_type = event.event_type
-            match input_type:
+            match event.event_type:
                 case InputType.JoystickAxis:
                     # Prefer curved value when present; fall back so uncurved
                     # events (curve_value still None) still drive actions.
@@ -2231,9 +2232,9 @@ class ContainerCallback:
                     # nothing to do
                     return
 
-        elif event.event_type == InputType.JoystickHat:
+        elif input_type == InputType.JoystickHat:
             value = gremlin.actions.Value(event.value)
-        elif event.event_type in [
+        elif input_type in [
             InputType.JoystickButton,
             InputType.Midi,
             InputType.OpenSoundControl,
@@ -2245,6 +2246,7 @@ class ContainerCallback:
             InputType.ModeControl,
             InputType.State,
             InputType.OctaviIfr1,
+            InputType.Voice,
         ]:
             value = gremlin.actions.Value(event.is_pressed)
         else:
@@ -2290,8 +2292,6 @@ class ContainerCallback:
                     extra_data = event.extra_data
                 else:
                     extra_data.update(event.extra_data)
-                # if event.identifier == 23:
-                #     pass
                 ec.execute_node(node, event, shared_value, extra_data)
 
 

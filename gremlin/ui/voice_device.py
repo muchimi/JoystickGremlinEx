@@ -910,18 +910,76 @@ class VoiceData:
         self._last_event = None
         self._ptt_input_item = None  # input to use/monitor for PTT - can be a KeyboardInputItem, OSCInputItem, JoystickInputItem, etc...
 
+        self._voice_callbacks = {} # map of inputs to their associated voice callbacks
+        self._autorelease_delay = 0.250  # default delay for autorelease of voice commands (seconds)
+
         self._voice = Voice()
+        self._voice.registerCallback(self._handle_command_trigger)
 
         el = gremlin.event_handler.EventListener()
-        el.profile_start.connect(self._reset)
+        el.profile_start.connect(self._profile_start)
         el.profile_unloaded.connect(self._handle_profile_unload)
 
-    def getCommandsFromText(self, text: str) -> list:
+    def addCallback(self, input_item, callback):
+        """adds a voice callback for the given input item"""
+        if input_item not in self._voice_callbacks:
+            self._voice_callbacks[input_item] = []
+        self._voice_callbacks[input_item].append(callback)
+
+    def clearCallbacks(self, input_item):
+        """clears all voice callbacks for the given input item"""
+        self._voice_callbacks.clear()
+
+
+    def _handle_command_trigger(self, vc: VoiceCommand):
+        """handle a command trigger event"""
+        input_item = vc.owner
+        if input_item is None:
+            return
+
+        syslog.info(f"Command trigger! [{vc.phrase}]")
+
+        callbacks = self._voice_callbacks.get(input_item, [])
+        if not callbacks:
+            # nothing to trigger
+            return
+
+        # build press and release events for the voice command
+        event_press = gremlin.event_handler.Event(
+            event_type = input_item.input_type,
+            identifier = input_item.identifier,
+            device_guid = input_item.device_guid,
+            value = True,  # assuming this represents a press event
+            is_pressed = True,
+            override_input_type = InputType.JoystickButton,
+            extra_data = {"voice_command": vc},
+        )
+
+        event_release = event_press.release_event()
+
+        execute_press = self._get_trigger_callback(event_press, self._voice_callbacks.get(input_item, callbacks))
+        execute_release = self._get_trigger_callback(event_release, self._voice_callbacks.get(input_item, callbacks))
+
+        execute_press()
+        timer = threading.Timer(self._autorelease_delay, execute_release)
+        timer.start()
+
+
+
+    def _get_trigger_callback(self, event, callbacks):
+        return lambda : self._execute_trigger(event, callbacks)
+
+    def _execute_trigger(self, event, callbacks):
+        for callback in callbacks:
+            callback(event, value = event.is_pressed, extra_data = event.extra_data)
+
+    def getCommandsFromText(self, text: str, input_item) -> list:
         """gets the list of commands that match the given text"""
         if text:
+            assert input_item is not None, "Input item must be provided"
             phrases = [token.strip() for token in text.split("|")]
             phrases = set(token.casefold() for token in phrases if token)
-            commands = [VoiceCommand(phrase) for phrase in phrases]
+            commands = [VoiceCommand(phrase, owner=input_item) for phrase in phrases]
             return commands
         return []
 
@@ -933,7 +991,7 @@ class VoiceData:
         """updates the list of commands based on the current input items"""
         for input_item in self._data.values():
             text = input_item.text if hasattr(input_item, "text") else ""
-            commands = self.getCommandsFromText(text)
+            commands = self.getCommandsFromText(text, input_item)
             self._voice.addCommands(commands)
 
     def clearCommands(self):
@@ -971,7 +1029,6 @@ class VoiceData:
     def device_name(self, value: str):
         """sets the name of the selected audio device"""
         self.setAudioDevice(value)
-
 
     @property
     def device_index(self) -> int:
@@ -1295,6 +1352,15 @@ class VoiceData:
         if key in self._data:
             return self._data[key]
         return None
+
+    def items(self):
+        return self._data.items()
+
+    def values(self):
+        return self._data.values()
+
+    def keys(self):
+        return self._data.keys()
 
     def to_xml(self):
         """persists the voice input configuration data to XML"""

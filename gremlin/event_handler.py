@@ -2584,14 +2584,15 @@ class EventHandler(QtCore.QObject):
         """ gets the magic entry for an event or input item """
         input_type = event.event_type
         match input_type:
-            case InputType.Keyboard:
-                return json.dumps(event.identifier)
+
             case InputType.Mouse:
                 key = gremlin.keyboard.Key()
                 key.mouse_button = event.identifier
                 return json.dumps(key.index_tuple())
-            case InputType.KeyboardLatched:
-                return json.dumps(event.identifier)
+            case InputType.KeyboardLatched | InputType.Keyboard:
+                if hasattr(event.identifier,"key"):
+                    return json.dumps(event.identifier.key.message_key)
+                return event.identifier
             case InputType.State:
                 return event.identifier
             case _:
