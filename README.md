@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T53)
+- Fix: API: continued refactor of GEX threading to handle recent internal changes to Python 3.14 threading. The issue caused a slew of recent fatal errors in the Python's engine, namely _lock contention_ on the termination of threads which is a new behavior so they are now handled differently after some research on publicly posted solutions.
+- Change: API (Voice): continued work on the voice recognition module, command matching algorithm and integration of voice commands with the execution graph. Internal testing continues to go well.
+- Fix: UI: Fixed one instance of QT C++ desync.
+
+Notes: this patch does not include code updates for the overlay/streamdek modules and voice is still disabled in the packaged version as the feature is still in development.  A further patch will be issued when updates to these modules are ready.
+
 ### (m77T52)
 - Fix: API (Macro): legacy engine threading event rework due to Python 3.14 changes (could cause an internal Python exception) 
 - Fix: API: VJoy keep alive service: threading event rework due to Python 3.14. (could cause an internal Python exception)

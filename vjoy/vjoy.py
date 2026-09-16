@@ -1065,7 +1065,7 @@ class VJoyMonitor:
             if self._keep_alive_thread is not None and self._keep_alive_thread.is_alive():
                 self._keep_alive_running = False
                 self._keep_alive_abort_signal.set()
-                self._keep_alive_thread.join()
+                gremlin.util.safeJoin(self._keep_alive_thread)
             self._keep_alive_thread = None
             self._keep_alive_abort_signal = None
         self._keep_alive_started = False

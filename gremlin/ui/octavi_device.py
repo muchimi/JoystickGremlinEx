@@ -499,7 +499,7 @@ class OctaviInterface:
         if self._running:
             self._running = False
             # wait for the thread to finishi
-            self._thread.join()
+            gremlin.util.safeJoin(self._thread)
             self._thread = None
             syslog.info("OCTAVI: shutdown")
 

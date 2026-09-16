@@ -7450,9 +7450,9 @@ class AxesTimeline(QtWidgets.QGroupBox):
             time.sleep(self.interval)
 
     def unhook(self):
-        self._is_running = False
-        if self._thread and self._thread.is_alive():
-            self._thread.join()
+        if self._is_running:
+            self._is_running = False
+            gremlin.util.safeJoin(self._thread)
             self._thread = None
         gremlin.util.clear_layout(self.layout())
 
@@ -7522,9 +7522,8 @@ class TimeLinePlotWidget(QWidget):
     def unhook(self):
         """occurs on cleanup"""
         self._is_running = False
-        if self._thread.is_alive():
-            self._thread.join()
-            self._thread = None
+        gremlin.util.safeJoin(self._thread)
+        self._thread = None
 
     def resizeEvent(self, event):
         """Handles resizing this widget.
@@ -16539,16 +16538,17 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
             self.updateGeometry()
 
     def setWidget(self, widget: QWidget):
-        """sets the widget to be displayed"""
-        if self._widget is not None and Shiboken.isValid(self._widget):
-            self.removeWidget(self._widget)
-        if widget is not None and not Shiboken.isValid(widget):
-            self._widget = None
-            return
-        self._widget = widget
-        if widget is not None:
-            self.addWidget(widget)
-        self.updateGeometry()
+        if Shiboken.isValid(self):
+            """sets the widget to be displayed"""
+            if self._widget is not None and Shiboken.isValid(self._widget):
+                self.removeWidget(self._widget)
+            if widget is not None and not Shiboken.isValid(widget):
+                self._widget = None
+                return
+            self._widget = widget
+            if widget is not None:
+                self.addWidget(widget)
+            self.updateGeometry()
 
     def sizeHint(self):
         if self._widget and self._show_id:

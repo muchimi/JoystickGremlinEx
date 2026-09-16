@@ -138,8 +138,8 @@ class Repeater(QtCore.QObject):
         """Stops the event dispatch thread."""
         self.is_running = False
         self._start_timer.cancel()
-        if self._thread.is_alive():
-            self._thread.join()
+        gremlin.util.safeJoin(self._thread)
+        self._thread = None
 
     def run(self):
         """Starts the event dispatch thread."""
@@ -266,8 +266,7 @@ class PulseWorker:
 
             self._keep_running = False  # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
-            if self._thread.is_alive():
-                self._thread.join()
+            gremlin.util.safeJoin(self._thread)
             self._thread = None
             self._is_pulse = False  # true if we're pulsing
             self._is_interval = False  # true if we're waiting for the next pulse

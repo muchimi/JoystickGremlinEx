@@ -298,7 +298,7 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if self._thread and self._thread.is_alive():
             with self._lock:
                 self._is_running = False
-            self._thread.join()
+            gremlin.util.safeJoin(self._thread)
             self._thread = None
 
     def _initial_pulse(self):

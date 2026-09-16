@@ -77,6 +77,7 @@ class VoiceInputItem(InputItem):
         self._text = text
         self._phrases_map = {}  # map of phrase by hash value
         self._hooked = False
+        self._emit = True
 
         self._command_map = {}
 
@@ -115,8 +116,7 @@ class VoiceInputItem(InputItem):
         """builds voice commands from the input phrase if it has multiple phrases separated by '|'"""
         self._command_map.clear()
         if self._text:
-            phrases = re.split(r"\||\n|\r", self.text)
-            phrases = [item for item in phrases if item]
+            phrases = gremlin.util.phraseSplit(self._text)
             for phrase in phrases:
                 command = VoiceCommand(phrase=phrase, callback=self._handle_voice_trigger, owner=self)
                 self._command_map[command.key] = command
@@ -561,6 +561,9 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
                 )
                 layout.addWidget(state_selector_widget)
 
+            case InputType.Voice:
+                pass
+
             case InputType.OpenSoundControl:
                 layout.addWidget(gremlin.ui.ui_common.QLabel("OSC input not yet implemented"))
 
@@ -989,10 +992,9 @@ class VoiceData:
 
     def _update_commands(self):
         """updates the list of commands based on the current input items"""
+        self._voice.clearCommands()
         for input_item in self._data.values():
-            text = input_item.text if hasattr(input_item, "text") else ""
-            commands = self.getCommandsFromText(text, input_item)
-            self._voice.addCommands(commands)
+            self._voice.addCommands(input_item.commands)
 
     def clearCommands(self):
         """clears all commands from the matcher"""
@@ -1353,6 +1355,10 @@ class VoiceData:
             return self._data[key]
         return None
 
+    def getInputItems(self) -> dict:
+        """returns a list of all defined voice input items"""
+        return self._data
+
     def items(self):
         return self._data.items()
 
@@ -1479,24 +1485,25 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._is_edit = edit_mode  # edit mode vs new mode
         self.commands = []  # returned commands
 
-        main_layout = QtWidgets.QVBoxLayout()
-        self.setLayout(main_layout)
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.setLayout(self.main_layout)
 
-        self._config_widget, self._config_layout = gremlin.ui.ui_common.getGridContainer()
-        self.data = input_item
-        self.ref_data = ref_input_item  # reference state
+
+        self.input_item = input_item
+        self.ref_input_item = ref_input_item  # reference state
 
         self._text_widget = QtWidgets.QPlainTextEdit()
+        self._text_widget.textChanged.connect(self._handle_text_changed)
         # self._text_widget.setAcceptRichText(False)
         self._text_widget.setMinimumWidth(200)
-        self._text_widget.setPlainText(input_item.text)
+
 
         self._test_widget = QtWidgets.QPushButton("Test")
         self._test_widget.setToolTip("Tests the voice recognition")
         self._test_widget.setEnabled(False)
 
         self._description_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self._description_widget.setText(input_item._description)
+        self._description_widget.setText(input_item.description)
         self._description_widget.textChanged.connect(self._description_changed)
 
         # Removed autorelease widgets and containers as they are no longer needed
@@ -1505,23 +1512,22 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
-        row = 0
-        col = 0
 
-        self._config_layout.addWidget(QtWidgets.QLabel("Description:"), row, col)
-        self._config_layout.addWidget(self._description_widget, row, col + 1)
+        self.main_layout.addWidget(QtWidgets.QLabel("Voice Command(s):"))
+        self.main_layout.addWidget(self._text_widget)
 
-        row += 1
-        self._config_layout.addWidget(QtWidgets.QLabel("Voice Command:"), row, col)
-        row += 1
-        self._config_layout.addWidget(self._text_widget, row, col, 1, -1)
+        # status line
+        self.main_layout.addWidget(self._status_widget)
 
-        main_layout.addWidget(self._config_widget)
 
-        main_layout.addWidget(self._status_widget)
+        # description line (optional)
+        self.main_layout.addWidget(QtWidgets.QLabel("Description:"))
+        self.main_layout.addWidget(self._description_widget)
 
-        main_layout.addWidget(self._info_widget)
 
+        self.main_layout.addWidget(self._info_widget)
+
+        # buttons
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
@@ -1530,8 +1536,15 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
 
-        main_layout.addWidget(widget)
+        self.main_layout.addWidget(widget)
+
+
+        self._text_widget.setPlainText(input_item.text)
         self._update_ui()
+
+    def _handle_text_changed(self):
+        self._update_ui()
+
 
     @property
     def editMode(self) -> bool:
@@ -1550,7 +1563,7 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _validate(self):
         sd = VoiceData()
         msg = None
-        key = self.data.key
+        key = self.input_item.key
 
         # blank
         enabled = bool(key)
@@ -1563,8 +1576,8 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             msg = "Name cannot include spaces"
 
         if enabled:
-            voice = sd.getVoice(self.data.key)
-            if voice and self.ref_data and voice != self.ref_data:
+            voice = sd.getVoice(self.input_item.key)
+            if voice and self.ref_input_item and voice != self.ref_input_item:
                 enabled = False
                 msg = "Name is not case sensitive and must be unique."
 
@@ -1573,18 +1586,18 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     @QtCore.Slot()
     def _name_changed(self):
-        self.data.key = self._name_widget.text()
+        self.input_item.key = self._name_widget.text()
         self._validate()
 
     @QtCore.Slot()
     def _description_changed(self):
         description = self._description_widget.text()
-        self.data.setDescription(description)
+        self.input_item.setDescription(description)
 
     @QtCore.Slot(bool)
     def _default_changed(self, checked: bool):
         widget = self.sender()
-        self.data.default_value = widget.data
+        self.input_item.default_value = widget.data
 
     def _ok_button_cb(self):
         """ok button pressed"""
@@ -1592,14 +1605,14 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         voice_data = VoiceData()
         text = self._text_widget.toPlainText()
-        self.data.text = text
 
-        new_commands = voice_data.getCommandsFromText(self.data.text)
-        commands = voice_data.getCommands()  # defined commands in the profile
-
-        if not self._is_edit:
+        if text and not self._is_edit:
             # validate if not editing
-            matches = [vc for vc in new_commands for item in commands if item.hashedKey == vc.hashKey]
+            commands = voice_data.getCommands() # current commands defined in the profile
+
+            phrases = gremlin.util.phraseSplit(text)
+            matches = [vc for vc in commands for phrase in phrases if vc.phrase in phrases]
+
             if matches:
                 vc = matches[0]
                 gremlin.ui.ui_common.MessageBox(
@@ -1608,10 +1621,9 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 )
                 return
 
-        else:
-            gremlin.shared_state.pop_suspend_highlighting()
-            self.commands = commands
+        self.input_item.text = text
 
+        gremlin.shared_state.pop_suspend_highlighting()
         self.accept()
 
     def _cancel_button_cb(self):
@@ -1622,7 +1634,7 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _update_ui(self):
         """updates the dialog controls based on options"""
 
-        text = self.data.text
+        text = self.input_item.text
         if not text:
             self._status_widget.setText("Please enter one or more voice commands.")
         else:
@@ -2000,6 +2012,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _edit_item_cb(self, widget, index, input_item):
         """edit the state"""
         tmp_input_item = input_item.clone()
+
         tmp_input_item.suppressEvents()
         self._edit_dialog = VoiceInputItemConfigDialog(tmp_input_item, input_item, edit_mode=True, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
@@ -2017,8 +2030,8 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             verbose = gremlin.config.Configuration().verbose_mode_state
             edit_mode = self._edit_dialog.editMode
 
-            edited_input_item = self._edit_dialog.data
-            input_item = self._edit_dialog.ref_data if edit_mode else edited_input_item
+            edited_input_item = self._edit_dialog.input_item
+            input_item = self._edit_dialog.ref_input_item if edit_mode else edited_input_item
 
             voice_data = VoiceData()
 
@@ -2028,7 +2041,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 if verbose:
                     syslog.info(f"adding id: [{input_item.id}]  key: [{input_item.key}] at index [{index}]")
 
-                # change the state
+                # add the new input
                 voice_data.add(edited_input_item)
 
             else:

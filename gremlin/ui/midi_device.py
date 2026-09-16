@@ -917,7 +917,7 @@ class MidiInterface(QtCore.QObject):
                 if listener.is_alive():
                     listener.callback = None
                     listener.stop()
-                    listener.join()
+                    gremlin.util.safeJoin(listener)
 
         self._listeners.clear()  # clear the listeners dictionary
 

@@ -226,10 +226,11 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_stop(self):
         with self._lock:
-            self._is_running = False
-        if self._thread and self._thread.is_alive():
-            self._thread.join()
-            self._thread = None
+            if self._is_running:
+                self._is_running = False
+                gremlin.util.safeJoin(self._thread)
+                self._thread = None
+
 
     def process_event(
         self,
