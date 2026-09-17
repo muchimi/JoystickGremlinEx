@@ -105,6 +105,121 @@ def apply_gain(audio, gain_db):
         1.0,
     )
 
+class CommandTree:
+    """ tree of words for word matching against each command """
+    def __init__(self):
+        self.root = {}
+        self.COMMAND_END = "__END__"
+
+    def clear(self):
+        """Clears the entire command tree."""
+        self.root.clear()
+
+    def insert(self, command_words, command : VoiceCommand):
+        """Adds a list of sequential words to the trie."""
+        current = self.root
+        for word in command_words:
+            # Normalize to lowercase to make it case-insensitive
+            w = word.lower()
+            if w not in current:
+                current[w] = {}
+            current = current[w]
+        current[self.COMMAND_END] = command
+
+    def remove(self, command_words):
+        """Removes a list of sequential words from the trie."""
+        current = self.root
+        stack = []
+        for word in command_words:
+            w = word.lower()
+            if w in current:
+                stack.append((current, w))
+                current = current[w]
+            else:
+                return  # Command not found
+
+        if self.COMMAND_END in current:
+            del current[self.COMMAND_END]
+
+        # Clean up any empty dictionaries
+        while stack:
+            parent, key = stack.pop()
+            if not parent[key]:
+                del parent[key]
+
+    def search(self, incoming_words):
+        """Traverses the tree to find an exact sequential word match."""
+        current = self.root
+        for word in incoming_words:
+            w = word.lower()
+            if w in current:
+                current = current[w]
+            else:
+                return None # Path broke, no match
+
+        return current.get(self.COMMAND_END)
+
+    def search_sliding_window(self, incoming_words):
+        """
+        Slides a window across the text.
+        Returns the first longest matching command found.
+        """
+        n = len(incoming_words)
+
+        # 1. Slide the starting position of our window
+        for i in range(n):
+            current = self.root
+            best_match = None
+            words_consumed = 0
+
+            # 2. Try to match a sequence starting from index 'i'
+            for j in range(i, n):
+                w = incoming_words[j].lower()
+
+                if w in current:
+                    current = current[w]
+                    # If this node completes a command, remember it (greedy matching)
+                    if self.COMMAND_END in current:
+                        best_match = current[self.COMMAND_END]
+                        words_consumed = (j - i) + 1
+                else:
+                    # Path broke in the tree, stop looking down this specific branch
+                    break
+
+            # 3. If we found a match starting at index 'i', return it immediately
+            if best_match:
+                # matched_phrase = incoming_words[i : i + words_consumed]
+                return best_match
+                # return {
+                #     "command_id": best_match,
+                #     "matched_phrase": matched_phrase,
+                #     "start_index": i
+                # }
+
+        return None
+
+    def dump(self):
+        """Displays the entire tree structure as a readable text graph."""
+        syslog.info("Speech Tree Root")
+        self._dump_recursive(self.root, indent="")
+
+    def _dump_recursive(self, current_node, indent):
+        """Helper method to recursively print nodes with visual branching."""
+        keys = sorted(current_node.keys(), key=lambda x: (x == self.COMMAND_END, x))
+
+        for i, key in enumerate(keys):
+            # Check if this is the last item at the current depth for formatting lines
+            is_last = (i == len(keys) - 1)
+            marker = "└── " if is_last else "├── "
+            next_indent = indent + ("    " if is_last else "│   ")
+
+            if key == self.COMMAND_END:
+                # Highlight the command terminal node
+                syslog.info(f"{indent}{marker}🌟 Trigger -> {current_node[key]}")
+            else:
+                # Print the word node and step deeper into the tree
+                syslog.info(f"{indent}{marker}[{key}]")
+                self._dump_recursive(current_node[key], next_indent)
 
 class SpeechAudioProcessor:
     """
@@ -814,6 +929,9 @@ class CommandMatcher:
             max_extra_words (int, optional): Maximum allowed extra words. Defaults to 5.
             callback (Callable, optional): Callback function when a command is matched. Passes the recognized command.
         """
+
+        self.tree = CommandTree() # search tree for matching words
+
         self.fuzzy_match = fuzzy_match
         self.fuzzy_threshold = fuzzy_threshold
         self.word_threshold = word_threshold
@@ -826,6 +944,7 @@ class CommandMatcher:
         self._buffer = deque()
         self._commands = []
         self.verbose = gremlin.config.Configuration().verbose_mode_voice
+        self._started = False
 
         self.filler_words = {word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)}
 
@@ -837,6 +956,7 @@ class CommandMatcher:
                 vc = command
 
                 words = self._tokenize(vc.phrase)
+                self.tree.insert(words, vc)
 
                 vc.registerCallback(self._handle_command_trigger)
                 vc.meaningful_length = self._meaningful_length(words)
@@ -848,6 +968,21 @@ class CommandMatcher:
 
         if callback is not None:
             self.registerCallback(callback)
+
+    def start(self):
+        if not self._started:
+            self._started = True
+
+            syslog.info("Search Tree stats:")
+            syslog.info(f"\tCommands: {len(self._commands)}")
+            syslog.info(f"\tMax command words: {self._max_command_words}")
+            syslog.info("Search Tree:")
+            self.tree.dump()
+            pass
+
+    def stop(self):
+        self._buffer.clear()
+        self._started = False
 
     def registerCallback(self, callback):
         """Adds a callback to the list of callbacks."""
@@ -907,6 +1042,8 @@ class CommandMatcher:
                 syslog.info(f"Voice: Command: registered [{vc.phrase}] length: {vc.meaningful_length}")
 
             self._command_map[vc.key] = vc
+            self.tree.insert(vc.words, vc)
+
             vc.registerCallback(self._handle_command_trigger)
         self._update_commands()
 
@@ -919,6 +1056,7 @@ class CommandMatcher:
         if key in self._command_map:
             vc = self._command_map[key]
             vc.removeCallback(self._handle_command_trigger)
+            self.tree.remove(vc.words)
             del self._command_map[key]
             self._update_commands()
 
@@ -927,6 +1065,7 @@ class CommandMatcher:
         for vc in self._command_map.values():
             vc.removeCallback(self._handle_command_trigger)
         self._command_map.clear()
+        self.tree.clear()
         self._update_commands()
 
     def add_words(self, words):
@@ -960,7 +1099,24 @@ class CommandMatcher:
         words = list(self._buffer)
 
         if verbose:
-            syslog.info(f"\t buffer state: {words}")
+            syslog.info(f"\t current word buffer: {words}")
+
+
+        # tree search
+        start = 0
+
+        command = self.tree.search(words)
+        if not command:
+            command = self.tree.search_sliding_window(words)
+
+        if command:
+            self._consume_from(start)
+            if verbose:
+                syslog.info(f"\tTRIGGER: (tree) [{command.phrase}] ")
+            command.trigger()
+            return command
+
+        return None
 
         # exact matching
         exact = self._find_exact_match(words)
@@ -1529,6 +1685,9 @@ class Voice:
 
         self.recognizer.start()
 
+
+        self._rolling_matcher.start()
+
         with self._voice_lock:
             if self._suspend_stack == 0:  # not suspended
                 self._listening = True
@@ -1559,40 +1718,9 @@ class Voice:
             self._listen_thread = None
             self.recognizer.stop()
 
-    # def _listen_runner(self, abort_event: threading.Event):
-    #     """internal method run in a separate thread to handle listening"""
 
-    #     syslog.info("Voice listen runner started...")
+        self._rolling_matcher.stop()
 
-    #     def callback(indata, frames, time_info, status):
-    #         if status:
-    #             syslog.info(f"Audio: {status}")
-
-    #         with self._listen_lock:
-    #             if not self._listen_enabled:
-    #                 # not listening - ignore incoming audio
-    #                 return
-
-    #         audio = indata[:, 0]
-
-    #         output, info = self.processor.process(audio)
-
-    #         if self._recognize_stack == 0 and self._rolling_matcher.hasCommands():  # speech recognition enabled
-    #             # speech recognition enabled
-    #             speech_started = info["speech_started"]
-    #             speech_ended = info["speech_ended"]
-    #             if output is not None:
-    #                 # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
-    #                 self.recognizer.add_audio(output, speech_started, speech_ended)
-
-    #         # monitor mode
-    #         self.audioMonitor.emit(info)
-
-    #     stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype=np.float32, callback=callback)
-    #     with stream:
-    #         # Keep the stream open until the trigger key is pressed
-    #         while not abort_event.is_set():
-    #             time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
 
     def _listen_runner(self, abort_event: threading.Event):
         """Internal method run in a separate thread to handle listening."""

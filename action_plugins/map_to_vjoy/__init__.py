@@ -5878,6 +5878,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             is_remote = True
             is_local = False
 
+
         force_remote = event.force_remote
 
         auto_complete = True  # assume the functor completes this pass

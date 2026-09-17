@@ -49,6 +49,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T54)
+- Fix: API: configure file watching system after startup to avoid a QT warning message.
 
 
 

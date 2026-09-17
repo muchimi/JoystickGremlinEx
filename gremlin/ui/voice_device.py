@@ -75,6 +75,7 @@ class VoiceInputItem(InputItem):
     ):
 
         self._mode_object = self._get_master_mode_object()
+        self._command_map = {}
 
         super().__init__(
             mode_node=self._mode_object,
@@ -93,7 +94,7 @@ class VoiceInputItem(InputItem):
 
         self._data = data
 
-        self._command_map = {}
+
 
         self._description = description
 
@@ -117,7 +118,9 @@ class VoiceInputItem(InputItem):
     @property
     def commands(self) -> list[VoiceCommand]:
         """gets the list of voice commands in this voice input (updates based on text property)"""
-        return list(self._command_map.values())
+        if self._command_map:
+            return list(self._command_map.values())
+        return []
 
     def _update_commands(self):
         """builds voice commands from the input phrase if it has multiple phrases separated by '|'"""
@@ -223,7 +226,10 @@ class VoiceInputItem(InputItem):
 
     @property
     def display_name(self):
-        return "Voice Input"
+        commands = self.commands
+        if commands:
+            return f"Voice Input: {commands[0].phrase}"
+        return "Voice Input: no commands"
 
     @property
     def key(self) -> str:
@@ -933,10 +939,11 @@ class VoiceData:
         el.profile_start.connect(self._profile_start)
         el.profile_unloaded.connect(self._handle_profile_unload)
 
-    def registerGraphNode(self, input_item, input_node):
+    def registerGraphNode(self, input_item : InputItem, input_node : "gremlin.execution_graph.ExecutionGraphNode"):
         """registers an execution graph input node for the given input item"""
         if input_item not in self._node_map:
             self._node_map[input_item] = input_node
+            input_node.has_actions = input_item.hasActions # determines if the execution node is skipped or not at runtime
 
     def addCallback(self, input_item, callback):
         """adds a voice callback for the given input item"""
@@ -957,10 +964,10 @@ class VoiceData:
 
         syslog.info(f"Command trigger! [{vc.phrase}]")
 
-        # input_node = self._node_map.get(input_item)
-        # if input_node is None:
-        #     syslog.warning(f"No input node registered for input item: {input_item}")
-        #     return
+        input_node = self._node_map.get(input_item)
+        if input_node is None:
+            syslog.warning(f"No input node registered for input item: {input_item}")
+            return
 
         callback_key = input_item.callbackKey()
         callbacks = self._voice_callbacks.get(callback_key, [])
@@ -983,13 +990,14 @@ class VoiceData:
 
 
 
-        execute_press = self._get_trigger_callback(event_press, self._voice_callbacks.get(input_item, callbacks))
-        execute_release = self._get_trigger_callback(event_release, self._voice_callbacks.get(input_item, callbacks))
 
-        # self._execute_node(input_node, event_press)
-        execute_press()
-        #timer = threading.Timer(self._autorelease_delay, lambda: self._execute_node(input_node, event_release))
-        timer = threading.Timer(self._autorelease_delay, execute_release)
+        # execute_press = self._get_trigger_callback(event_press, self._voice_callbacks.get(input_item, callbacks))
+        # execute_release = self._get_trigger_callback(event_release, self._voice_callbacks.get(input_item, callbacks))
+
+        self._execute_node(input_node, event_press)
+        # execute_press()
+        timer = threading.Timer(self._autorelease_delay, self._get_execute_callback(input_node, event_release))
+        #timer = threading.Timer(self._autorelease_delay, execute_release)
         timer.start()
 
     def _get_trigger_callback(self, event, callbacks):

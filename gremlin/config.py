@@ -125,11 +125,19 @@ class Configuration(QtCore.QObject):
         self.getLastVersion()
         gremlin.shared_state.data_path = data_path
 
-        self.watcher = QtCore.QFileSystemWatcher([fname])
+        self._started = False
 
         self.reload()
 
-        self.watcher.fileChanged.connect(self.reload)
+
+    def start(self):
+        """ starts the file watcher """
+        if not self._started:
+            self._started = True
+            fname = self.get_config()
+            self.watcher = QtCore.QFileSystemWatcher([fname])
+            self.watcher.fileChanged.connect(self.reload)
+
 
     def setup_userprofile(self):
         """Initializes the data folder in the user's profile folder."""

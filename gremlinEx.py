@@ -5997,7 +5997,9 @@ if __name__ == "__main__":
 
     # disable dark mode for now while we sort icons in a future version
 
-    theme = gremlin.config.Configuration().theme
+    config = gremlin.config.Configuration()
+
+    theme = config.theme
     match theme:
         case "auto":
             gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
@@ -6022,6 +6024,9 @@ if __name__ == "__main__":
     icon = gremlin.util.load_icon("gex.ico")
     if icon:
         app.setWindowIcon(icon)
+
+    # config file watcher setup (must be after app is instantiated)
+    config.start()
 
     # set faster context switch for Python
     sys.setswitchinterval(0.001)
