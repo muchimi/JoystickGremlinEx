@@ -24,7 +24,7 @@ import logging
 import time
 from threading import Event, Lock, RLock, Thread
 from lxml import etree as ElementTree
-from gremlin.base_classes import FastQueue
+from gremlin.fastqueue import FastQueue
 from PySide6 import QtCore, QtWidgets
 
 import win32con

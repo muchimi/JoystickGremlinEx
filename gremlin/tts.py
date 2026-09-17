@@ -42,7 +42,7 @@ import gremlin.singleton_decorator
 import traceback
 
 # import queue
-from gremlin.base_classes import FastQueue
+from gremlin.fastqueue import FastQueue
 import gremlin.util
 from gremlin.sound import Sound, PlaybackOptions, PhraseData
 from gremlin.types import PlayMode

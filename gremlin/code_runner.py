@@ -474,8 +474,12 @@ class CodeRunner:
                     )
 
                 # mappings for voice inputs
+                vd.clearCallbacks()
                 for key, input_item in vd.items():
 
+                    input_node = ec.getInputItemNode(input_item)
+                    assert input_node is not None, f"Input node not found for input item: {input_item}"
+                    vd.registerGraphNode(input_item, input_node)
 
                     # mapping callbacks for voice inputs
                     callbacks = []

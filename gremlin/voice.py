@@ -1599,7 +1599,7 @@ class Voice:
 
         # if self.verbose:
         #     syslog.info("Voice listen runner started...")
-        audio_queue = queue.Queue(maxsize=64)
+        audio_queue = queue.Queue(maxsize=16) # use a small queue for real time reading to not block
 
         def callback(indata, frames, time_info, status):
             if status:
@@ -1626,8 +1626,8 @@ class Voice:
 
         with stream:
             while not abort_event.is_set():
-                if audio_queue.empty():
-                    continue
+                # do not use empty() as it blocks and can cause significant delays in real-time processing
+                # use the try/catch in case the queue is empty instead
                 try:
                     audio = audio_queue.get(timeout=0.1)
                 except queue.Empty:

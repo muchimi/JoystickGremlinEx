@@ -30,13 +30,13 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import itertools
-
+import queue
 
 from dinput import DeviceSummary
 
 
 import gremlin.base_classes
-from gremlin.base_classes import FastQueue
+from gremlin.fastqueue import FastQueue
 import gremlin.shared_state
 import gremlin.threading
 
@@ -1019,8 +1019,6 @@ class EventListener(QtCore.QObject):
 
         # clear the event queue
         self._event_queue.clear()
-        # while not self._event_queue.empty():
-        #     self._event_queue.get()
 
     def disconnect(self, signal: Signal | QtCore.Signal, slot: Callable):
         """attempts to disconnect a slot from a signal safely"""
@@ -1375,8 +1373,6 @@ class EventListener(QtCore.QObject):
 
     def _process_queue(self):
         """processes an item the keyboard buffer queue"""
-        if self._keyboard_queue.empty():
-            return
         items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
             if not self._keyboard_thread_running:
@@ -2375,7 +2371,6 @@ class EventHandler(QtCore.QObject):
         self.midi_callbacks = {}
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
-        self.voice_callbacks = {}
         self.state_callbacks = {}
         self._event_lookup = {}
         self.latched_functors = {}
@@ -3478,7 +3473,6 @@ class EventHandler(QtCore.QObject):
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
         self.state_callbacks = {}
-        self.voice_callbacks = {}
 
     def execute_event(self, event: Event, skip_execute=False):
         """main execution (runtime) event handler - queues trigger callbacks on event input

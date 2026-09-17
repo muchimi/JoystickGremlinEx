@@ -718,7 +718,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     def callbackKey(self):
         """callback key unique to the input type, input id"""
-        return (self._device_guid, self._input_type, self._input_id)
+        return (self._device_guid, self._input_type, self.input_id)
 
     @property
     def sortKey(self):
