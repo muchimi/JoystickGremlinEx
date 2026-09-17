@@ -49,6 +49,7 @@ from gremlin.types import DeviceType
 
 import gremlin.gated_handler
 from psygnal import Signal
+from gremlin.input_item import InputItem
 
 syslog = logging.getLogger("system")
 
@@ -957,6 +958,13 @@ class ExecutionContext:
         )
         return input_node
 
+    def getInputItemNode(self, input_item: InputItem):
+        """finds the input item corresponding to the callback key, None if not found"""
+        callback_key = input_item.callbackKey()
+        if callback_key in self.m_input_nodes:
+            return self.m_input_nodes[callback_key]
+        return None
+
     def findDeviceNode(self, device_guid):
         """gets the device node for the given device guid"""
         device_node = next((n for n in self.graph.children if n.nodeType == ExecutionGraphNodeType.Device and n.device.device_guid == device_guid), None)
@@ -1616,6 +1624,8 @@ class ExecutionContext:
                 m_input_node.input_item = input_item
                 m_input_node.mode = mode_name
                 self.m_input_nodes[input_key] = m_input_node
+                if input_item.input_type == InputType.Voice:
+                    syslog.info(f"added voice input node key: {input_key}")
             else:
                 m_input_node = self.m_input_nodes[input_key]
 

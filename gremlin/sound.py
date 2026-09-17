@@ -48,7 +48,7 @@ import logging
 import gremlin.singleton_decorator
 
 # import queue
-from gremlin.base_classes import FastQueue
+from gremlin.fastqueue import FastQueue
 import enum
 import time
 from psygnal import Signal

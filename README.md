@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T54)
+
+
+
 
 ### (m77T53)
 - Fix: API: continued refactor of GEX threading to handle recent internal changes to Python 3.14 threading. The issue caused a slew of recent fatal errors in the Python's engine, namely _lock contention_ on the termination of threads which is a new behavior so they are now handled differently after some research on publicly posted solutions.

@@ -1,5 +1,6 @@
 # -*- coding: utf-8; -*-
 
+# Based on original Joystick Gremlin work by Lionel Ott and other contributors - GremlinEx is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 from __future__ import annotations  # deprecated with python 3.14+
 from enum import Enum
@@ -72,15 +74,6 @@ class VoiceInputItem(InputItem):
         data=None,
     ):
 
-        assert key is None or isinstance(key, str), "key must be a string"
-        self._key = key  # ok if None (blank)
-        self._text = text
-        self._phrases_map = {}  # map of phrase by hash value
-        self._hooked = False
-        self._emit = True
-
-        self._command_map = {}
-
         self._mode_object = self._get_master_mode_object()
 
         super().__init__(
@@ -90,6 +83,20 @@ class VoiceInputItem(InputItem):
             override_input_type=InputType.JoystickButton,
             custom_input_id_handler=self._handle_input_id_callback,
         )
+        assert key is None or isinstance(key, str), "key must be a string"
+
+        self._key = key  # ok if None (blank)
+        self._text = text
+        self._phrases_map = {}  # map of phrase by hash value
+        self._hooked = False
+        self._emit = True
+
+        self._data = data
+
+        self._command_map = {}
+
+        self._description = description
+
 
         self._update_commands()
 
@@ -118,52 +125,54 @@ class VoiceInputItem(InputItem):
         if self._text:
             phrases = gremlin.util.phraseSplit(self._text)
             for phrase in phrases:
-                command = VoiceCommand(phrase=phrase, callback=self._handle_voice_trigger, owner=self)
+                # command = VoiceCommand(phrase=phrase, callback=self._handle_voice_trigger, owner=self)
+                command = VoiceCommand(phrase=phrase, owner=self)
                 self._command_map[command.key] = command
 
     def _handle_voice_trigger(self, vc):
         """called when the voice triggers a command - passes the command triggered"""
-        if vc.owner != self:
-            # not our command
-            return
-        if self._emit:
-            self._last_triggered_command = vc
-            syslog.info(f"VOICE: triggered [{self._key}] with phrase [{vc.phrase}]")
-            # handle the voice command here
-            event = gremlin.event_handler.Event(
-                event_type=InputType.Voice,
-                value=True,
-                is_pressed=True,
-                identifier=self,
-                device_guid=VoiceDeviceTabWidget.device_guid,
-                override_input_type=InputType.JoystickButton,
-                extra_data={"command": vc},
-            )
-            config = gremlin.config.Configuration()
-            el = gremlin.event_handler.EventListener()
-            el.queueJoystickEvent(event)
+        pass
+        # if vc.owner != self:
+        #     # not our command
+        #     return
+        # # if self._emit:
+        #     self._last_triggered_command = vc
+        #     syslog.info(f"VOICE: triggered [{self._key}] with phrase [{vc.phrase}]")
+        #     # handle the voice command here
+        #     event = gremlin.event_handler.Event(
+        #         event_type=InputType.Voice,
+        #         value=True,
+        #         is_pressed=True,
+        #         identifier=self,
+        #         device_guid=VoiceDeviceTabWidget.device_guid,
+        #         override_input_type=InputType.JoystickButton,
+        #         extra_data={"command": vc},
+        #     )
+        #     config = gremlin.config.Configuration()
+        #     el = gremlin.event_handler.EventListener()
+        #     el.queueJoystickEvent(event)
 
-            timer = threading.Timer(config.voice_command_release_delay, self._get_release_trigger_callback(vc))
-            timer.start()
+        #     timer = threading.Timer(config.voice_command_release_delay, self._get_release_trigger_callback(vc))
+        #     timer.start()
 
-    def _get_release_trigger_callback(self, vc):
-        return lambda: self._trigger_release_event(vc)
+    # def _get_release_trigger_callback(self, vc):
+    #     return lambda: self._trigger_release_event(vc)
 
-    def _trigger_release_event(self, vc: VoiceCommand):
-        if self._emit:
-            syslog.info(f"VOICE: released [{self._key}] with phrase [{vc.phrase}]")
-            # handle the voice command here
-            event = gremlin.event_handler.Event(
-                event_type=InputType.Voice,
-                value=True,
-                is_pressed=False,
-                identifier=self,
-                device_guid=VoiceDeviceTabWidget.device_guid,
-                override_input_type=InputType.JoystickButton,
-                extra_data={"command": vc},
-            )
-            el = gremlin.event_handler.EventListener()
-            el.queueJoystickEvent(event)
+    # def _trigger_release_event(self, vc: VoiceCommand):
+    #     if self._emit:
+    #         syslog.info(f"VOICE: released [{self._key}] with phrase [{vc.phrase}]")
+    #         # handle the voice command here
+    #         event = gremlin.event_handler.Event(
+    #             event_type=InputType.Voice,
+    #             value=True,
+    #             is_pressed=False,
+    #             identifier=self,
+    #             device_guid=VoiceDeviceTabWidget.device_guid,
+    #             override_input_type=InputType.JoystickButton,
+    #             extra_data={"command": vc},
+    #         )
+    #         el = gremlin.event_handler.EventListener()
+    #         el.queueJoystickEvent(event)
 
     def suppressEvents(self):
         """disable events"""
@@ -180,7 +189,8 @@ class VoiceInputItem(InputItem):
 
     def _handle_input_id_callback(self):
         """input id is self for a voice input"""
-        return self
+        return self._guid # unique input ID is the guid of this input item so it's unique
+
 
     def hook(self):
         """called when the state is being created - hooks into the event model"""
@@ -325,14 +335,13 @@ DEFAULT_AUDIO_DEVICE_MARKER = "__default__"
 class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
     """configuration dialog to select the voice input device and set speech recognition options"""
 
-    def __init__(self, mode: VoicePTTMode, input_item, device_name: str, device_index :int, parent=None):
+    def __init__(self, mode: VoicePTTMode, input_item, device_name: str, device_index: int, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
         self.setWindowTitle("Voice Input Configuration")
         self.setModal(True)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setLayout(self.main_layout)
-
 
         self._sound = Sound()
         self._voice = Voice()
@@ -454,12 +463,12 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @property
     def device_name(self) -> str:
-        """ name of the selected audio device """
+        """name of the selected audio device"""
         return self._device_name
 
     @property
     def device_index(self) -> int:
-        """ index of the selected audio device """
+        """index of the selected audio device"""
         return self._device_index
 
     def _get_mode_object(self):
@@ -902,6 +911,7 @@ class VoiceData:
     def __init__(self):
         self._data = {}
         self._id_map = {}
+        self._node_map = {} # map of input item to the corresponding execution graph input node
 
         self._device_name: str = None  # name of the selected audio device
         self._device_index: int = None  # index of the selected audio device
@@ -913,7 +923,7 @@ class VoiceData:
         self._last_event = None
         self._ptt_input_item = None  # input to use/monitor for PTT - can be a KeyboardInputItem, OSCInputItem, JoystickInputItem, etc...
 
-        self._voice_callbacks = {} # map of inputs to their associated voice callbacks
+        self._voice_callbacks = {}  # map of inputs to their associated voice callbacks
         self._autorelease_delay = 0.250  # default delay for autorelease of voice commands (seconds)
 
         self._voice = Voice()
@@ -923,16 +933,21 @@ class VoiceData:
         el.profile_start.connect(self._profile_start)
         el.profile_unloaded.connect(self._handle_profile_unload)
 
+    def registerGraphNode(self, input_item, input_node):
+        """registers an execution graph input node for the given input item"""
+        if input_item not in self._node_map:
+            self._node_map[input_item] = input_node
+
     def addCallback(self, input_item, callback):
         """adds a voice callback for the given input item"""
-        if input_item not in self._voice_callbacks:
-            self._voice_callbacks[input_item] = []
-        self._voice_callbacks[input_item].append(callback)
+        callback_key = input_item.callbackKey()
+        if callback_key not in self._voice_callbacks:
+            self._voice_callbacks[callback_key] = []
+        self._voice_callbacks[callback_key].append(callback)
 
-    def clearCallbacks(self, input_item):
+    def clearCallbacks(self):
         """clears all voice callbacks for the given input item"""
         self._voice_callbacks.clear()
-
 
     def _handle_command_trigger(self, vc: VoiceCommand):
         """handle a command trigger event"""
@@ -942,39 +957,55 @@ class VoiceData:
 
         syslog.info(f"Command trigger! [{vc.phrase}]")
 
-        callbacks = self._voice_callbacks.get(input_item, [])
+        # input_node = self._node_map.get(input_item)
+        # if input_node is None:
+        #     syslog.warning(f"No input node registered for input item: {input_item}")
+        #     return
+
+        callback_key = input_item.callbackKey()
+        callbacks = self._voice_callbacks.get(callback_key, [])
         if not callbacks:
             # nothing to trigger
             return
 
         # build press and release events for the voice command
         event_press = gremlin.event_handler.Event(
-            event_type = input_item.input_type,
-            identifier = input_item.identifier,
-            device_guid = input_item.device_guid,
-            value = True,  # assuming this represents a press event
-            is_pressed = True,
-            override_input_type = InputType.JoystickButton,
-            extra_data = {"voice_command": vc},
+            event_type=input_item.input_type,
+            identifier=input_item.identifier,
+            device_guid=input_item.device_guid,
+            value=True,  # assuming this represents a press event
+            is_pressed=True,
+            override_input_type=InputType.JoystickButton,
+            extra_data={"voice_command": vc},
         )
 
         event_release = event_press.release_event()
 
+
+
         execute_press = self._get_trigger_callback(event_press, self._voice_callbacks.get(input_item, callbacks))
         execute_release = self._get_trigger_callback(event_release, self._voice_callbacks.get(input_item, callbacks))
 
+        # self._execute_node(input_node, event_press)
         execute_press()
+        #timer = threading.Timer(self._autorelease_delay, lambda: self._execute_node(input_node, event_release))
         timer = threading.Timer(self._autorelease_delay, execute_release)
         timer.start()
 
-
-
     def _get_trigger_callback(self, event, callbacks):
-        return lambda : self._execute_trigger(event, callbacks)
+        return lambda: self._execute_trigger(event, callbacks)
+
+    def _get_execute_callback(self, input_node, event):
+        return lambda : self._execute_node(input_node, event)
 
     def _execute_trigger(self, event, callbacks):
         for callback in callbacks:
-            callback(event, value = event.is_pressed, extra_data = event.extra_data)
+            callback(event, value=event.is_pressed, extra_data=event.extra_data)
+
+    def _execute_node(self, input_node, event):
+        ec = gremlin.execution_graph.ExecutionContext()
+        # def execute_node(self, node: ExecutionGraphNode, event, value, extra_data: dict = None, manual=False, visited=None) -> bool:
+        ec.execute_node(node = input_node, event = event, value = event.is_pressed, extra_data=event.extra_data)
 
     def getCommandsFromText(self, text: str, input_item) -> list:
         """gets the list of commands that match the given text"""
@@ -1036,16 +1067,16 @@ class VoiceData:
     def device_index(self) -> int:
         """gets the index of the selected audio device"""
         return self._device_index
+
     @device_index.setter
     def device_index(self, value: int):
         """sets the index of the selected audio device"""
         self.setAudioDeviceIndex(value)
 
-    def setAudioDevice(self, device_name: str, index : int):
-        """ convenience to set both name and index in the same call (no validation) """
+    def setAudioDevice(self, device_name: str, index: int):
+        """convenience to set both name and index in the same call (no validation)"""
         self._device_name = device_name
         self._device_index = index
-
 
     def getAudioDeviceIndex(self, device_name: str | None = None) -> int:
         """gets the index of the selected audio device"""
@@ -1144,14 +1175,13 @@ class VoiceData:
         pass
 
     def _profile_start(self):
-        """occurs on profile start - sets up the monitoring loop for voice commands """
+        """occurs on profile start - sets up the monitoring loop for voice commands"""
         # set initial state of voice recognition
         self._update_listen_mode(False)
         self._last_event = None
 
-
-    def _update_listen_mode(self, is_pressed : bool):
-        """ updates the listening mode """
+    def _update_listen_mode(self, is_pressed: bool):
+        """updates the listening mode"""
 
         verbose = gremlin.config.Configuration().verbose_mode_voice
         verbose = True
@@ -1189,14 +1219,12 @@ class VoiceData:
                         syslog.info("Voice PTT: Off - disabled")
                     self._voice.setListen(False)
 
-
     def _profile_stop(self):
         """occurs on profile stop - tears down the monitoring loop for voice commands"""
         pass
 
-
-    def execute_callback(self, event : gremlin.event_handler.Event):
-        """ called when the latched input item is triggered by an event"""
+    def execute_callback(self, event: gremlin.event_handler.Event):
+        """called when the latched input item is triggered by an event"""
 
         if self._last_event and self._last_event.is_pressed == event.is_pressed:
             return
@@ -1207,7 +1235,7 @@ class VoiceData:
             # ignore axis events for push-to-talk
             return
         if event.event_type == InputType.JoystickHat:
-            is_pressed = event.value != (0,0)
+            is_pressed = event.value != (0, 0)
         else:
             is_pressed = event.is_pressed
 
@@ -1488,7 +1516,6 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
 
-
         self.input_item = input_item
         self.ref_input_item = ref_input_item  # reference state
 
@@ -1496,7 +1523,6 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._text_widget.textChanged.connect(self._handle_text_changed)
         # self._text_widget.setAcceptRichText(False)
         self._text_widget.setMinimumWidth(200)
-
 
         self._test_widget = QtWidgets.QPushButton("Test")
         self._test_widget.setToolTip("Tests the voice recognition")
@@ -1512,18 +1538,15 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
-
         self.main_layout.addWidget(QtWidgets.QLabel("Voice Command(s):"))
         self.main_layout.addWidget(self._text_widget)
 
         # status line
         self.main_layout.addWidget(self._status_widget)
 
-
         # description line (optional)
         self.main_layout.addWidget(QtWidgets.QLabel("Description:"))
         self.main_layout.addWidget(self._description_widget)
-
 
         self.main_layout.addWidget(self._info_widget)
 
@@ -1538,13 +1561,11 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self.main_layout.addWidget(widget)
 
-
         self._text_widget.setPlainText(input_item.text)
         self._update_ui()
 
     def _handle_text_changed(self):
         self._update_ui()
-
 
     @property
     def editMode(self) -> bool:
@@ -1608,7 +1629,7 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         if text and not self._is_edit:
             # validate if not editing
-            commands = voice_data.getCommands() # current commands defined in the profile
+            commands = voice_data.getCommands()  # current commands defined in the profile
 
             phrases = gremlin.util.phraseSplit(text)
             matches = [vc for vc in commands for phrase in phrases if vc.phrase in phrases]
@@ -1779,11 +1800,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         device_name = self._voice_data.device_name
         device_index = self._voice_data.device_index
 
-        self._config_dialog = VoiceSettingsDialog(mode=mode,
-                                                  input_item=input_item,
-                                                  device_name=device_name,
-                                                device_index=device_index,
-                                                parent=self)
+        self._config_dialog = VoiceSettingsDialog(mode=mode, input_item=input_item, device_name=device_name, device_index=device_index, parent=self)
         self._config_dialog.accepted.connect(self._handle_configure_accepted)
         self._config_dialog.show()
 
@@ -1794,7 +1811,6 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._voice_data.input_item = dialog.input_item
         self._voice_data.ptt_mode = dialog.mode
         self._voice_data.setAudioDevice(dialog.device_name, dialog.device_index)
-
 
     def _test_input_cb(self):
         """callback for the test input button"""
@@ -2059,7 +2075,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_item.text = edited_input_item.text
 
                 self.inputItemListModel.refresh()
-                self._filter_widget.updateCounts()
+                # self._filter_widget.updateCounts()
 
             index = self.inputItemListView.indexOf(input_item)
             syslog.info(f"selecting state index: [{index}] for [{input_item.input_id}]")
