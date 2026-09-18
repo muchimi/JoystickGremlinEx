@@ -49,6 +49,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T54)
+- Fix: API: configure file watching system after startup to avoid a QT warning message.
+- Fix: UI: exception (missing widget) when deleting certain containers.
+- Fix: State Container: does not refresh on action add/remove
+- Change: Voice: updated command matching tree.
+- Change: API: execution engine: added input node tracking and execution  
+
 
 
 

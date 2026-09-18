@@ -4994,6 +4994,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # notify of changes to this container
         self._fireChangeCallbacks()
 
+
+
         return index
 
     def ensureActionSet(self, count: int):
@@ -7056,6 +7058,7 @@ class ActionSetView(AbstractView):
         title_widgets: list[QtWidgets.QWidget] = [],
         header_widgets: list[QtWidgets.QWidget] = [],
         tail_widgets: list[QtWidgets.QWidget] = [],
+        separator: bool = False,
         parent=None,
     ):
         """
@@ -7070,6 +7073,7 @@ class ActionSetView(AbstractView):
         :param icon_size: optional icon size in pixels
         :param interact_callback: optional callback when the user interacts with the view sends (action_set: ActionSet, interaction: Interactions)
         :param interact_enabled: whether interactions are enabled for this view
+        :param separator: flag to indicate if a separator should be shown above
         :param action_interact_callback: optional callback when the user interacts with an action sends (action: Action, interaction: Interactions)
         :param action_interact_enabled: whether interactions are enabled for actions in this view
         :param index: the index of the item being interacted with
@@ -7095,6 +7099,7 @@ class ActionSetView(AbstractView):
         self._interact_callback = interact_callback
         self._has_interactions = bool(container.interaction_types)
         self._last_action_hash = None  # hash of action model to detect changes
+        self._separator = separator
 
         self._index = index  # index of the action set
 
@@ -7242,6 +7247,8 @@ class ActionSetView(AbstractView):
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
             self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
+
+
             self._stacked_widget.addWidget(self._container_widget)  # index 1
 
             self._action_widget = self._container_widget
@@ -7275,6 +7282,9 @@ class ActionSetView(AbstractView):
                     self._widget_map[action.id] = wrapped_widget
                     # add the new widget to the layout
                     self._container_layout.addWidget(wrapped_widget)
+
+                if self._separator:
+                    self._container_layout.insertWidget(0, gremlin.ui.ui_common.QHorizontalLine())
 
         finally:
             clipboard.enable()
@@ -8672,6 +8682,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         title_widgets: list[QtWidgets.QWidget] = [],
         header_widgets: list[QtWidgets.QWidget] = [],
         tail_widgets: list[QtWidgets.QWidget] = [],
+        separator: bool = False,
     ) -> gremlin.input_item.ActionSetView:
         """Adds an action widget to the action set (each step in the sequence is its own action set)
         :param action_set_data: data of the actions which form the action set
@@ -8682,6 +8693,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         :param index the index of the action set within the container
         :param header_widgets list of widgets to place in the header of the action set view
         :param tail_widgets list of widgets to place in the tail of the action set view
+        :param separator flag to indicate if a separator should be shown above
 
         :return wrapped widget
         """
@@ -8710,6 +8722,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             title_widgets=title_widgets,
             header_widgets=header_widgets,
             tail_widgets=tail_widgets,
+            separator=separator,
             parent=self,
         )
 
@@ -9369,6 +9382,7 @@ class ContainerView(AbstractView):
         self._input_item = input_item
         self._model = model
 
+
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"Creating container view for: {model.debug_name}")
@@ -9443,6 +9457,7 @@ class ContainerView(AbstractView):
         self._show_blank()
 
         self._drawn_once = False  # draw on demand only on first redraw
+
 
     def create_ui(self):
         """creates the UI for the container contents"""
@@ -9528,22 +9543,24 @@ class ContainerView(AbstractView):
             self._blank_widget.setVisible(message is not None)
 
     def _show_blank(self):
-        if self._stacked_widget.currentIndex() != 0:
-            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-            if verbose:
-                syslog.info(f"ContainerView: show blank [{self._input_item.display_name if self._input_item else 'no input'}]")
-            self._stacked_widget.setCurrentIndex(0)
+        if self._stacked_widget and Shiboken.isValid(self._stacked_widget):
+            if self._stacked_widget.currentIndex() != 0:
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+                if verbose:
+                    syslog.info(f"ContainerView: show blank [{self._input_item.display_name if self._input_item else 'no input'}]")
+                self._stacked_widget.setCurrentIndex(0)
 
     def _show_content(self):
         if self._model.count() == 0:
             # no containers to show
             self._show_blank()
         else:
-            if self._stacked_widget.currentIndex() != 1:
-                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-                if verbose:
-                    syslog.info(f"ContainerView: show content [{self._input_item.display_name if self._input_item else 'no input'}]")
-                self._stacked_widget.setCurrentIndex(1)
+            if self._stacked_widget and Shiboken.isValid(self._stacked_widget):
+                if self._stacked_widget.currentIndex() != 1:
+                    verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+                    if verbose:
+                        syslog.info(f"ContainerView: show content [{self._input_item.display_name if self._input_item else 'no input'}]")
+                    self._stacked_widget.setCurrentIndex(1)
 
     def redraw(self, force=False):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
@@ -9555,6 +9572,8 @@ class ContainerView(AbstractView):
         if not Shiboken.isValid(self):
             return
         if self._redraw_lock:
+            return
+        if not self._blank_widget or not self._stacked_widget or not Shiboken.isValid(self._stacked_widget) or not Shiboken.isValid(self._blank_widget):
             return
 
         try:
@@ -9609,7 +9628,8 @@ class ContainerView(AbstractView):
                     msg = f"Please add a container or action for <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{self.input_item.display_name}</span>"
                     if verbose:
                         syslog.info(f"container view redraw ui: {msg}  input item id: {self.input_item.id}")
-                    self._blank_widget.setText(msg)
+                    if self._blank_widget:
+                        self._blank_widget.setText(msg)
                     self._show_blank()
 
         finally:

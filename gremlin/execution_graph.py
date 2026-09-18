@@ -37,6 +37,7 @@ import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.input_item
+from gremlin.input_item import InputItem
 import gremlin.shared_state
 from gremlin.types import ActivationRule
 import anytree
@@ -121,8 +122,8 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
         self.mode: str = None  # mode the node is defined in
         self.exec_modes = []  # list of mode this node can execute in
         self.device = None  # mapped device if a device node
-        self.description = ""
-        self.has_actions = False  # assume the node has no child action somewhere down the tree
+        self._description = ""
+        self._has_actions = False  # assume the node has no child action somewhere down the tree
         self.link = None  # link to another node
         self.device_link = None  # link to the device node
         self.comment = None  # comment asociated with this node
@@ -132,8 +133,27 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     def id(self):
         return self._id
 
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, value: str):
+        self._description = value
+
+    @property
+    def has_actions(self):
+        return self._has_actions
+    @has_actions.setter
+    def has_actions(self, value: bool):
+        if self._has_actions != value:
+            self._has_actions = value
+            # also set all child nodes to also report actions
+            for child in self.children:
+                child.has_actions = value
+
     def node_string(self):
-        return f"{self.nodeType.name}: (node {self.id}) {self.description} has actions: {self.has_actions}"
+        return f"{self.nodeType.name}: (node {self.id}) description: {self.description} has actions: {self.has_actions}"
 
     def getFunctors(self):
         """gets the functors in the node"""
@@ -280,11 +300,22 @@ class ExecutionGraphInputNode(ExecutionGraphNode):
 
     def __init__(self):
         super().__init__(ExecutionGraphNodeType.InputItem)
-        self.input_item = None
+        self._input_item = None
+
+    @property
+    def input_item(self):
+        return self._input_item
+    @input_item.setter
+    def input_item(self, value):
+        self._input_item = value
+        if value:
+            self.description = f"Node: InputItemNode : {value.input_type} description: {self.input_item.display_name}"
+        else:
+            self.description = "Node: InputItemNode : None description: None"
 
     def to_string(self):
         stub = f"{self.input_item.display_name}"
-        return f"{self.node_string()} {stub}"
+        return f"Node: {self.input_item.input_type} description: {stub}"
 
 
 class ExecutionGraphConditionNode(BaseExecutionConditionNode):
@@ -525,6 +556,8 @@ class ExecutionContext:
         self._mode_tree = None
         self._mode_ancestors = {}  # map of mode branches by mode
         self._mode_descendants = {}  # map of mode children by mode
+        self._container_map = {}  # keyed by input item callback key, holds a list of the container nodes for that input item
+
         self.graph = None  # root node of execution tree
         self.graph_input_root = None  # root node of the input / action tree - maps individual inputs to modes and actions  unique input->mode->actions for that mode (only actions, not conditions)
         self.graph_input_map = {}  # map of input nodes keyed by callbackKey of input graph input nodes for fast lookup
@@ -965,6 +998,8 @@ class ExecutionContext:
             return self.m_input_nodes[callback_key]
         return None
 
+
+
     def findDeviceNode(self, device_guid):
         """gets the device node for the given device guid"""
         device_node = next((n for n in self.graph.children if n.nodeType == ExecutionGraphNodeType.Device and n.device.device_guid == device_guid), None)
@@ -977,6 +1012,15 @@ class ExecutionContext:
             mode_node = next((n for n in device_node.children if n.nodeType == ExecutionGraphNodeType.Mode and n.mode == mode), None)
             return mode_node
         return None
+
+    def findContainerNode(self, input_node: ExecutionGraphNode):
+        """finds the container node for the given input item"""
+        assert isinstance(input_node, ExecutionGraphNode) and input_node.nodeType == ExecutionGraphNodeType.InputItem, "Input node must be of type InputItem"
+        input_item = input_node.input_item
+        callback_key = input_item.callbackKey()
+        if callback_key in self._container_map:
+            return self._container_map[callback_key]
+        return []
 
     def hasInputType(self, input_type):
         """true if the execution tree contains mappings with input types of the specified type"""
@@ -1395,6 +1439,11 @@ class ExecutionContext:
             container_node.ref = container.id
             container_node.mode = mode_name
             container_node.description = f"Container type: [{container.__class__.__name__}] ID: [{container.id}]"
+            input_item = container.input_item
+            callback_key = input_item.callbackKey()
+            if callback_key not in self._container_map:
+                self._container_map[callback_key] = []
+            self._container_map[callback_key].append(container_node)
 
             # container functor - this is what calls the process_events() method on container functors
             functor = self._get_container_functor(container, container_node)
@@ -1925,7 +1974,7 @@ class ExecutionContext:
                 syslog.info(f"PERF: functor [{stub}] lapsed time (ms): {lapsed * 1000:0.3f}")
             return result
 
-    def has_action_for_mode(self, input_item: gremlin.input_item.InputItem, mode: str):
+    def has_action_for_mode(self, input_item: InputItem, mode: str):
         """true if the input item has a defined action for the given mode"""
         key = input_item.callbackKey()
         if key in self.graph_input_map:
@@ -2008,6 +2057,15 @@ class ExecutionContext:
                 syslog.info(f"{logTabs}EXEC:[{node.id}] name: [{node.nodeType.name}] description: {node.description}")
                 if node.is_condition:
                     syslog.info(f"{logTabs}\tCondition(s): [{node.to_string()}]")
+
+            if node.nodeType == ExecutionGraphNodeType.InputItem:
+                # handle input item node type
+                # find the container nodes for the input item
+                container_nodes = self.findContainerNode(node)
+                if container_nodes:
+                    for container_node in container_nodes:
+                        result = self.execute_node(container_node, event, value, extra_data, manual, visited)
+                return True # input item nodes always pass
 
             if node.nodeType in (ExecutionGraphNodeType.Group, ExecutionGraphNodeType.Gate, ExecutionGraphNodeType.Range):
                 # group type nodes: every subnode is executed regardless of the return value
