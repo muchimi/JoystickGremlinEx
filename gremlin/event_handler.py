@@ -2313,8 +2313,9 @@ class EventHandler(QtCore.QObject):
             # self._queue_start()
             self._update_mode_change(gremlin.shared_state.runtime_mode)
             self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
-
-            self._execute_thread = gremlin.threading.AbortableThreadX(target=self._execute_runner)
+            self._execute_thread_event = threading.Event()
+            self._execute_thread = threading.Thread(target = self._execute_runner, args=(self._execute_thread_event,))
+            
             self._execute_thread.name = "execute runner"
             self._execute_thread.start()
             syslog.info("EXEC: start")
@@ -2334,12 +2335,9 @@ class EventHandler(QtCore.QObject):
             current_profile = gremlin.shared_state.current_profile
             last_mode = gremlin.shared_state.runtime_mode
             current_profile.set_last_runtime_mode(last_mode)
-
-
-
-            if self._execute_thread.is_alive():
+            if self._execute_thread and self._execute_thread.is_alive():
                 syslog.info("EXEC: stopping execute runner thread")
-                self._execute_thread.stop()
+                self._execute_thread_event.set()
                 gremlin.util.safeJoin(self._execute_thread)
                 syslog.info("EXEC: execute runner thread stopped")
                 self._execute_thread = None
@@ -3194,11 +3192,11 @@ class EventHandler(QtCore.QObject):
             if config.verbose_mode_macro or config.verbose_mode_sequence:
                 syslog.info(f"MODE QUEUE: queue mode [{new_mode}] queue depth: [{len(self._change_mode_queue)}]")
 
-    def _execute_runner(self):
+    def _execute_runner(self, abort_event : threading.Event):
         """mode change runner - watches for mode change requests and changes mode if a mode change is allowed"""
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_macro or config.verbose_mode_sequence
-        while not self._execute_thread.stopped():
+        while not abort_event.is_set():
             if len(self._change_mode_queue):
                 if self.ModeChangeAllowed():
                     with self._lock:
@@ -3504,7 +3502,7 @@ class EventHandler(QtCore.QObject):
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_exec
         verbose_detailed = verbose and config.verbose_mode_extra
-        verbose = True
+        # verbose = True
 
         self.registry.update(event)  # record the event
 
@@ -3964,35 +3962,45 @@ class EventHandler(QtCore.QObject):
         else:
             return [c[0] for c in callback_list]
 
+    def _mode_lookup_chain(self, event: Event):
+        """Return ordered mode candidates including inherited parents for the event."""
+        mode_list = []
+        seen = set()
+
+        def add_mode(mode):
+            if mode and mode not in seen:
+                mode_list.append(mode)
+                seen.add(mode)
+
+        if event.extra_data:
+            add_mode(event.extra_data.get("mode"))
+            add_mode(event.extra_data.get("target_mode"))
+
+        add_mode(event.mode if event.mode else self.runtime_mode)
+
+        profile = gremlin.shared_state.current_profile
+        for mode in list(mode_list):
+            parent_mode = profile.get_parent_mode(mode) if profile is not None else None
+            while parent_mode:
+                add_mode(parent_mode)
+                parent_mode = profile.get_parent_mode(parent_mode) if profile is not None else None
+
+        return mode_list
+
     def _matching_functors(self, event) -> list:
         """gets the list of matching functors to call when an event occurs"""
         functors_list = []
-
-        # mode we're looking for
-        run_mode = event.mode if event.mode else self.runtime_mode
-
-        mode_list = [run_mode]
-        if event.extra_data:
-            if "mode" in event.extra_data:
-                mode_list = [event.extra_data["mode"]]
-            if "target_mode" in event.extra_data:
-                # override
-                mode_list.append(event.extra_data["target_mode"])
-        if event.extra_data and "mode" in event.extra_data:
-            # override
-            run_mode = event.extra_data["mode"]
-
         device_guid = event.device_guid
-        if device_guid in self.latched_functors:
-            for run_mode in mode_list:
-                modes = gremlin.shared_state.current_profile.getModeHierarchy(run_mode)
-                for mode in modes:
-                    if mode in self.latched_functors[device_guid]:
-                        key = event.callbackKey
-                        if key in self.latched_functors[device_guid][mode]:
-                            functors_list = self.latched_functors[device_guid][mode][key]
-                            if functors_list:
-                                break
+        if device_guid not in self.latched_functors:
+            return functors_list
+
+        for mode in self._mode_lookup_chain(event):
+            if mode in self.latched_functors[device_guid]:
+                key = event.callbackKey
+                if key in self.latched_functors[device_guid][mode]:
+                    functors_list = self.latched_functors[device_guid][mode][key]
+                    if functors_list:
+                        break
         return functors_list
 
     def _dump_matching_callbacks(self, event: Event, input_item):
@@ -4015,19 +4023,9 @@ class EventHandler(QtCore.QObject):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_details  # or config.verbose_mode_condition
-        mode = event.mode if event.mode else self.runtime_mode  # mode we're looking for
-        mode_list = [mode]
-        if event.extra_data:
-            if "mode" in event.extra_data:
-                # override
-                mode_list = [event.extra_data["mode"]]
-            if "target_mode" in event.extra_data:
-                # override
-                mode_list.append(event.extra_data["target_mode"])
-
         key = event.callbackKey
         device_guid = event.device_guid
-
+        mode_list = self._mode_lookup_chain(event)
 
         # Obtain callbacks matching the event
         callback_list = []
@@ -4036,24 +4034,24 @@ class EventHandler(QtCore.QObject):
         callback_found = False
         if device_guid in self.latched_callbacks:
             for mode in mode_list:
-                if mode in self.latched_callbacks[device_guid]:
-                    if key in self.latched_callbacks[device_guid][mode]:
-                        if input_item in self.latched_callbacks[device_guid][mode][key]:
-                            callback_list = self.latched_callbacks[device_guid][mode][key][input_item]
-                            callback_found = True
-                        if verbose:
-                            event = self.callback_key_map[key]
-                            self.dump_exectree(device_guid, mode, event)
+                device_modes = self.latched_callbacks.get(device_guid, {})
+                if mode in device_modes and key in device_modes[mode]:
+                    if input_item in device_modes[mode][key]:
+                        callback_list = device_modes[mode][key][input_item]
+                        callback_found = True
+                    if verbose:
+                        event = self.callback_key_map[key]
+                        self.dump_exectree(device_guid, mode, event)
 
-        if not callback_found:
-            if device_guid in self.callbacks:
-                for mode in mode_list:
-                    if mode in self.callbacks[device_guid]:
-                        if key in self.callbacks[device_guid][mode]:
-                            callback_list = self.callbacks[device_guid][mode][key]
-                            if verbose:
-                                event = self.callback_key_map[key]
-                                self.dump_exectree(device_guid, mode, event)
+        if not callback_found and device_guid in self.callbacks:
+            for mode in mode_list:
+                device_modes = self.callbacks.get(device_guid, {})
+                if mode in device_modes and key in device_modes[mode]:
+                    callback_list = device_modes[mode][key]
+                    if verbose:
+                        event = self.callback_key_map[key]
+                        self.dump_exectree(device_guid, mode, event)
+                    break
 
         if verbose:
             syslog.info(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
@@ -4093,26 +4091,13 @@ class EventHandler(QtCore.QObject):
                 import gremlin.execution_graph
 
                 ec = gremlin.execution_graph.ExecutionContext()  # current execution context
-                # search callbacks for mode hierarchy
                 keyid_source = key.index_tuple()  # use the scan code for now
                 keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
 
-                master_mode = gremlin.shared_state.master_mode
-                modes = [master_mode, self.runtime_mode]
-                profile = gremlin.shared_state.current_profile
-                visited = set()
-
-                for lookup_mode in modes:
-                    visited.add(lookup_mode)
-                    while lookup_mode is not None and lookup_mode not in visited:
-
-                        if lookup_mode in self.latched_keyboard_key_map[device_guid]:
-                            if keyid in self.latched_keyboard_key_map[device_guid][lookup_mode]:
-                                # callbacks = self.latched_keyboard_key_map[device_guid][lookup_mode][keyid]
-                                callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, lookup_mode)
-                                # ascend to the parent mode, if any
-                        lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
-
+                for lookup_mode in self._mode_lookup_chain(event):
+                    if lookup_mode in self.latched_keyboard_key_map[device_guid] and keyid in self.latched_keyboard_key_map[device_guid][lookup_mode]:
+                        callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, lookup_mode)
+                        break
 
         if callback_list:
             # Filter events when the system is paused

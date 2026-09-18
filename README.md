@@ -48,6 +48,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T55)
+- Change: PlaySound Action: exposed additional API features for sound playback options in the action.  Ability to set decibel threshold for removing detected low volume (silence) in played audio (.wav or generated TTS) - recommended threshold is -55dB,  trim options, optional delay if the blocking option is enabled to add a pause between sequential sounds and ability to sync settings globally in the profile to apply to other PlaySound actions without editing them one at at time.  
+- Change: API: event processing optimization path on very expensive mode hierarchy lookups that were adding CPU usage to match events to execution nodes.
+- Change: API: execution node functor lookup optimization and caching.
+- Change: Input Viewer: optimization pass on axis repeater updates and eliminate, where possible, unnecessary axis redraws as this window can have hundreds of updates to make.
+- Fix: 
+
 ### (m77T54A)
 - Change: API: sound: added audio sample auto-trim to trim silence at the start and end of a sample stream.
 - Change: API: sound: added caching of processed audio streams for faster playback.

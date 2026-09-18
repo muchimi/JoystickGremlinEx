@@ -3607,3 +3607,49 @@ class Configuration(QtCore.QObject):
     @voice_command_release_delay.setter
     def voice_command_release_delay(self, value: int):
         self._set_data("voice_command_release_delay", value)
+
+    @property
+    def audio_blocking(self) -> bool:
+        """returns true if audio blocking is enabled for play sound actions"""
+        return self._get_data("audio_blocking", False)
+
+    @audio_blocking.setter
+    def audio_blocking(self, value: bool):
+        self._set_data("audio_blocking", value)
+
+    @property
+    def audio_blocking_delay_ms(self) -> int:
+        """returns the blocking delay in milliseconds for play sound actions"""
+        return self._get_data("audio_blocking_delay_ms", 0)
+
+    @audio_blocking_delay_ms.setter
+    def audio_blocking_delay_ms(self, value: int):
+        self._set_data("audio_blocking_delay_ms", value)
+
+    @property
+    def audio_trim_all(self) -> bool:
+        """returns true if trimming all silence is enabled for play sound actions"""
+        return self._get_data("audio_trim_all", True)
+
+    @audio_trim_all.setter
+    def audio_trim_all(self, value: bool):
+        self._set_data("audio_trim_all", value)
+
+    @property
+    def audio_trim_end(self) -> bool:
+        """returns true if trimming silence at the end is enabled for play sound actions"""
+        return self._get_data("audio_trim_end", False)
+
+    @audio_trim_end.setter
+    def audio_trim_end(self, value: bool):
+        self._set_data("audio_trim_end", value)
+
+    @property
+    def audio_silence_threshold_db(self) -> float:
+        """returns the silence threshold in decibels for play sound actions"""
+        return self._get_data("audio_silence_threshold_db", -55.0)
+
+    @audio_silence_threshold_db.setter
+    def audio_silence_threshold_db(self, value: float):
+        self._set_data("audio_silence_threshold_db", value)
+

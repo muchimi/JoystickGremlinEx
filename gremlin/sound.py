@@ -59,13 +59,13 @@ from PySide6.QtMultimedia import QMediaDevices, QAudioOutput
 
 
 # EDataFlow enumeration
-E_RENDER = 0   # Playback
+E_RENDER = 0  # Playback
 E_CAPTURE = 1  # Recording
 
 # ERole enumeration
-E_CONSOLE = 0       # Games, system sounds, desktop apps
-E_MULTIMEDIA = 1    # Music, movies
-E_COMMUNICATIONS = 2 # Voice calls, Skype, Teams
+E_CONSOLE = 0  # Games, system sounds, desktop apps
+E_MULTIMEDIA = 1  # Music, movies
+E_COMMUNICATIONS = 2  # Voice calls, Skype, Teams
 
 
 syslog = logging.getLogger("system")
@@ -118,12 +118,13 @@ class PlaybackOptions:
         rate: float = None,
         timed_random: TimedRandomInt = TimedRandomInt(),
         blocking: bool = False,
-        trim_all : bool = True,
-        trim_end : bool = True,
+        trim_all: bool = True,
+        trim_end: bool = True,
         silence_threshold_db: float = -55.0,
         minimum_silence_ms: int = 100,
         keep_leading_ms: int = 0,
         keep_trailing_ms: int = 0,
+        blocking_delay_ms: int = 0,
     ):
         """playback options
 
@@ -139,6 +140,7 @@ class PlaybackOptions:
         :param minimum_silence_ms: only trim a leading or trailing silent region when it is at least this long
         :param keep_leading_ms: amount of silence to retain at the start of the audio
         :param keep_trailing_ms: amount of silence to retain after the last active frame
+        :param blocking_delay_ms: delay in milliseconds after the sound plays before blocking ends (only relevant if blocking is True)
         """
         self.key = key  # this is a GUID for PG mode, and the file name for SD mode
         self.sound_file = sound_file  # path to wave file to play
@@ -160,6 +162,7 @@ class PlaybackOptions:
         self.minimum_silence_ms = minimum_silence_ms
         self.keep_leading_ms = keep_leading_ms
         self.keep_trailing_ms = keep_trailing_ms
+        self.blocking_delay_ms = blocking_delay_ms
 
 
 class SoundEvent:
@@ -183,10 +186,57 @@ class SoundEvent:
         stop_previous: bool = False,
         rate: float = 1.0,
         timed_random: TimedRandomInt = TimedRandomInt(),
+        trim_all: bool = False,
+        trim_end: bool = False,
+        silence_threshold_db: float = -40.0,
+        minimum_silence_ms: int = 100,
+        keep_leading_ms: int = 0,
+        keep_trailing_ms: int = 0,
         blocking: bool = False,
+        blocking_delay_ms: int = 0,
     ):
+        """ parameters to play a single sound
+        :param key: unique identifier for the sound
+        :param sound_file: path to the sound file
+        :param device: playback device
+        :param loops: number of times to loop the sound
+        :param volume: playback volume
+        :param playback_ms: playback start position in milliseconds
+        :param fadein_ms: fade-in duration in milliseconds
+        :param fadeout_ms: fade-out duration in milliseconds
+        :param stop_previous: whether to stop previous sounds
+        :param rate: playback rate
+        :param timed_random: timed randomization for playback
+        :param trim_all: whether to trim all silence
+        :param trim_end: whether to trim silence at the end
+        :param silence_threshold_db: silence threshold in dB
+        :param minimum_silence_ms: minimum silence duration in milliseconds
+        :param keep_leading_ms: leading silence to keep in milliseconds
+        :param keep_trailing_ms: trailing silence to keep in milliseconds
+        :param blocking: whether playback should block until finished
+        :param blocking_delay_ms: delay in milliseconds after the sound plays before blocking ends (only relevant if blocking is True)
+
+        """
         data = PlaybackOptions(
-            key, sound_file, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate, timed_random=timed_random, blocking=blocking
+            key,
+            sound_file,
+            device,
+            loops,
+            volume,
+            playback_ms,
+            fadein_ms,
+            fadeout_ms,
+            stop_previous,
+            rate,
+            timed_random=timed_random,
+            trim_all=trim_all,
+            trim_end=trim_end,
+            silence_threshold_db=silence_threshold_db,
+            minimum_silence_ms=minimum_silence_ms,
+            keep_leading_ms=keep_leading_ms,
+            keep_trailing_ms=keep_trailing_ms,
+            blocking=blocking,
+            blocking_delay_ms=blocking_delay_ms,
         )
         return SoundEvent(action=SoundAction.Play, key=key, data=data)
 
@@ -316,7 +366,6 @@ class PhraseData:
         if self.managed:
             # GUID based sound file
             try:
-
                 sound_file = self._sound_file
                 if not sound_file:
                     voice_folder = hashString(self.voice)
@@ -638,19 +687,18 @@ class PhraseDataManager:
                 self.add_phrase(phrase)
 
 
-
 class SoundMonitor(QtCore.QObject):
-    """ monitoring object to detect audio output device changes including change in default device """
-    DeviceChanged = QtCore.Signal() # fires when the default audio output device changes
+    """monitoring object to detect audio output device changes including change in default device"""
+
+    DeviceChanged = QtCore.Signal()  # fires when the default audio output device changes
+
     def __init__(self):
         super().__init__()
         self.media_devices = None
         self.media_default = None
 
-
     def start(self):
         gremlin.util.InvokeUiMethod(self._start_ui)
-
 
     def _start_ui(self):
         # ensure on UI thread to avoid an issue with QT
@@ -670,9 +718,8 @@ class SoundMonitor(QtCore.QObject):
             self.media_devices = None
             self.media_default = None
 
-
     def _handle_audio_outputs_changed(self):
-        """ called when audio configuration has changed """
+        """called when audio configuration has changed"""
         new_default = self.media_devices.defaultAudioOutput()
         if new_default != self.media_default:
             # new default output device detected - abort all current playback tasks and update device list
@@ -684,8 +731,6 @@ class SoundMonitor(QtCore.QObject):
         # detect volume changes (if applicable)
 
 
-
-
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound:
     """wrapper class to play sounds via pygame and QT multimedia"""
@@ -694,18 +739,13 @@ class Sound:
         self._state_lock = threading.RLock()
         self._tasks_lock = threading.RLock()
 
-
         self._playback_cache = {}
-
 
         self.monitor = SoundMonitor()
         self.monitor.DeviceChanged.connect(self._handle_device_changed)
         self.monitor.start()
 
-
-        self._active_sounds = 0 # number of active sounds
-
-
+        self._active_sounds = 0  # number of active sounds
 
         # If running in a PyInstaller bundle, add the temporary folder to the PATH
         if hasattr(sys, "_MEIPASS"):
@@ -770,8 +810,6 @@ class Sound:
         self._is_paused = False  # true if queue processing is paused
         self._next_key = 0  # next key to use for each registered sound
 
-
-
         if USE_PG:
             pygame.init()
             pygame.mixer.init()
@@ -789,13 +827,12 @@ class Sound:
         self.verbose = config.verbose_mode_tts or config.verbose_mode_sound
 
     def _handle_device_changed(self):
-        """ called when the default audio output device changes """
+        """called when the default audio output device changes"""
         self._update_devices()
 
     def pushPlaybackEnabled(self):
         with self._tasks_lock:
             self._playback_enabled_stack += 1
-
 
     def popPlaybackEnabled(self):
         if self._playback_enabled_stack > 0:
@@ -804,11 +841,11 @@ class Sound:
 
     @property
     def playback_enabled(self):
-        """ true if playback is enabled"""
+        """true if playback is enabled"""
         return self._playback_enabled_stack == 0
 
     def _handle_audio_outputs_changed(self):
-        """ called when audio configuration has changed """
+        """called when audio configuration has changed"""
         new_default = self.media_devices.defaultAudioOutput()
         if new_default != self.media_default:
             # new default output device detected - abort all current playback tasks and update device list
@@ -817,11 +854,8 @@ class Sound:
 
             self._update_devices()
 
-
-
-
     def _update_devices(self):
-        """ updates the sound devices list """
+        """updates the sound devices list"""
         verbose = self.verbose
         # verbose = True
         # force an update
@@ -841,7 +875,7 @@ class Sound:
                     time.sleep(0.1)
 
                 self._sound_tasks.clear()
-                gc.collect() # forcibly terminate any dangling streams to avoid deadlocks on sd re-init
+                gc.collect()  # forcibly terminate any dangling streams to avoid deadlocks on sd re-init
                 sd._terminate()
                 sd._initialize()
                 self.device_map.clear()
@@ -885,11 +919,8 @@ class Sound:
                         self.input_device_name_to_id_map[name] = index
                         self.device_sample_rate_map[index] = samplerate
 
-
-
         finally:
             self.popPlaybackEnabled()
-
 
     @property
     def soundFolder(self) -> str:
@@ -974,7 +1005,7 @@ class Sound:
 
     @audio_device.setter
     def audio_device(self, name: str):
-        """ playback device setter """
+        """playback device setter"""
         index = self.findDeviceIndex(name)
         init_mixer = False
         if index is None:
@@ -995,7 +1026,6 @@ class Sound:
 
         if init_mixer:
             self.setPlaybackDevice(name)
-
 
     def findDevice(self, index: int):
         if index in self.device_map:
@@ -1052,10 +1082,10 @@ class Sound:
         """gets the name of the default audio device"""
 
         if USE_SD:
-            #self._update_devices()
+            # self._update_devices()
             _, index = sd.default.device
             # match by name because the host API may be different and we're looking for WASAPI devices specifically
-            default_device_name = sd.query_devices(index).get('name')
+            default_device_name = sd.query_devices(index).get("name")
             device_name = self._ensure_device(default_device_name)
             return device_name
         else:
@@ -1070,8 +1100,8 @@ class Sound:
         index = next((i for i, d in self.device_map.items() if d.description() == self.audio_device), None)
         return index
 
-    def getAudioDeviceIndexFor(self, name : str):
-        """ gets the index of the audio device with the given name """
+    def getAudioDeviceIndexFor(self, name: str):
+        """gets the index of the audio device with the given name"""
         index = next((i for i, d in self.device_map.items() if d.description() == name), None)
         return index
 
@@ -1101,9 +1131,8 @@ class Sound:
         if USE_PG:
             self.setPlaybackDevice(device.description())
         if USE_SD:
-            device = sd.query_devices(kind='output')
+            device = sd.query_devices(kind="output")
             self.setPlaybackDevice(device.name)
-
 
     def getDefaultInputDevice(self):
         """gets the default input device"""
@@ -1111,9 +1140,9 @@ class Sound:
             default_device = QtMultimedia.QMediaDevices.defaultAudioInput()
             return default_device.description()
         if USE_SD:
-            device = sd.query_devices(kind='input')
+            device = sd.query_devices(kind="input")
             if device:
-                return device['name']
+                return device["name"]
             return None
 
     def getDefaultInputDeviceIndex(self):
@@ -1123,9 +1152,8 @@ class Sound:
         return index
 
     def inputDevice(self) -> str:
-        """ currently selected input device"""
+        """currently selected input device"""
         return self._input_device
-
 
     def getInputDeviceIndex(self):
         """gets the index of the selected input device"""
@@ -1142,7 +1170,6 @@ class Sound:
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
 
-
     def soundStop(self):
         """terminate any active playbacks"""
         if USE_PG:
@@ -1151,7 +1178,6 @@ class Sound:
                 pygame.mixer.quit()  # we will re-init the mixer later
         elif USE_SD:
             # terminate the thread pools
-
 
             # Signal running streams to stop, then wait briefly for them to
             # notice. The playback callback checks _is_playback_enabled() on
@@ -1186,8 +1212,6 @@ class Sound:
                 with self._tasks_lock:
                     self._sound_tasks = []
 
-
-
     def _task_trim(self):
         """trims the task list of completed tasks"""
         with self._tasks_lock:
@@ -1204,9 +1228,9 @@ class Sound:
             matched_device = next((name for name in self.device_name_to_id_map if name.startswith(device_name)), None)
             if matched_device:
                 device_id = self.device_name_to_id_map[matched_device]
-                self.device_name_to_id_map[device_name] = device_id # add the partial name to the device list if truncated
+                self.device_name_to_id_map[device_name] = device_id  # add the partial name to the device list if truncated
                 return matched_device
-        return device_name # unchanged
+        return device_name  # unchanged
 
     def play_v0(self, filename: str, options: PlaybackOptions, blocking: bool = False):
         """plays a sound file via SD low level library"""
@@ -1231,7 +1255,7 @@ class Sound:
                     if matched_device:
                         device_id = self.device_name_to_id_map[matched_device]
                         device_samplerate = self.device_sample_rate_map[device_id]
-                        self.device_name_to_id_map[device_name] = device_id # add the partial name to the device list if truncated
+                        self.device_name_to_id_map[device_name] = device_id  # add the partial name to the device list if truncated
                     else:
                         # grab the default device
                         syslog.warning(f"SOUND: Device '{device_name}' not found, using default device")
@@ -1239,7 +1263,6 @@ class Sound:
                         device_id = device["index"]
                         device_samplerate = device["default_samplerate"]
                         device_name = device["name"]
-
 
             else:
                 # get the current default device
@@ -1344,8 +1367,8 @@ class Sound:
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
 
-
-    def _trim_silence(self,
+    def _trim_silence(
+        self,
         data: np.ndarray,
         samplerate: int,
         threshold_db: float = -55.0,
@@ -1378,9 +1401,7 @@ class Sound:
         # Convert dBFS to a linear amplitude.
         threshold = 10.0 ** (threshold_db / 20.0)
 
-        active_frames = np.flatnonzero(
-            frame_amplitude > threshold
-        )
+        active_frames = np.flatnonzero(frame_amplitude > threshold)
 
         # The complete sample is below the silence threshold.
         if active_frames.size == 0:
@@ -1390,21 +1411,13 @@ class Sound:
         last_active_frame = int(active_frames[-1]) + 1
 
         leading_silence_frames = first_active_frame
-        trailing_silence_frames = (
-            len(data) - last_active_frame
-        )
+        trailing_silence_frames = len(data) - last_active_frame
 
-        minimum_silence_frames = round(
-            minimum_silence_ms * samplerate / 1000
-        )
+        minimum_silence_frames = round(minimum_silence_ms * samplerate / 1000)
 
-        keep_leading_frames = round(
-            keep_leading_ms * samplerate / 1000
-        )
+        keep_leading_frames = round(keep_leading_ms * samplerate / 1000)
 
-        keep_trailing_frames = round(
-            keep_trailing_ms * samplerate / 1000
-        )
+        keep_trailing_frames = round(keep_trailing_ms * samplerate / 1000)
 
         start_frame = 0
         end_frame = len(data)
@@ -1423,7 +1436,8 @@ class Sound:
 
         return data[start_frame:end_frame]
 
-    def _trim_trailing_silence(self,
+    def _trim_trailing_silence(
+        self,
         data: np.ndarray,
         samplerate: int,
         threshold_db: float = -55.0,
@@ -1448,9 +1462,7 @@ class Sound:
             axis=1,
         )
 
-        active_frames = np.flatnonzero(
-            frame_amplitude > threshold
-        )
+        active_frames = np.flatnonzero(frame_amplitude > threshold)
 
         # The entire sample is silent.
         if active_frames.size == 0:
@@ -1459,9 +1471,7 @@ class Sound:
         last_active_frame = int(active_frames[-1]) + 1
         trailing_frames = len(data) - last_active_frame
 
-        minimum_silence_frames = round(
-            minimum_silence_ms * samplerate / 1000
-        )
+        minimum_silence_frames = round(minimum_silence_ms * samplerate / 1000)
 
         # Do not trim extremely short natural tails.
         if trailing_frames < minimum_silence_frames:
@@ -1469,9 +1479,7 @@ class Sound:
 
         # Keep a few milliseconds after the detected sound to avoid creating
         # an abrupt cutoff.
-        keep_frames = round(
-            keep_ms * samplerate / 1000
-        )
+        keep_frames = round(keep_ms * samplerate / 1000)
 
         trim_position = min(
             len(data),
@@ -1500,46 +1508,31 @@ class Sound:
             device_id = None
 
             if requested_device:
-                device_id = self.device_name_to_id_map.get(
-                    requested_device
-                )
+                device_id = self.device_name_to_id_map.get(requested_device)
 
                 if device_id is None:
                     matched_name = next(
-                        (
-                            name
-                            for name in self.device_name_to_id_map
-                            if name.startswith(requested_device)
-                        ),
+                        (name for name in self.device_name_to_id_map if name.startswith(requested_device)),
                         None,
                     )
 
                     if matched_name is not None:
-                        device_id = self.device_name_to_id_map[
-                            matched_name
-                        ]
+                        device_id = self.device_name_to_id_map[matched_name]
 
                         # Cache the abbreviated device name.
-                        self.device_name_to_id_map[
-                            requested_device
-                        ] = device_id
+                        self.device_name_to_id_map[requested_device] = device_id
                     else:
                         syslog.warning(
-                            "SOUND: Device '%s' not found; "
-                            "using default device",
+                            "SOUND: Device '%s' not found; using default device",
                             requested_device,
                         )
 
             if device_id is None:
                 device = sd.query_devices(kind="output")
                 device_id = int(device["index"])
-                device_samplerate = int(
-                    device["default_samplerate"]
-                )
+                device_samplerate = int(device["default_samplerate"])
             else:
-                device_samplerate = int(
-                    self.device_sample_rate_map[device_id]
-                )
+                device_samplerate = int(self.device_sample_rate_map[device_id])
 
             loops = int(options.loops or 0)
 
@@ -1560,9 +1553,9 @@ class Sound:
                 options.fadein_ms,
                 options.fadeout_ms,
                 options.silence_threshold_db,  # Silence threshold
-                options.minimum_silence_ms,   # Minimum trailing silence
-                options.keep_leading_ms,    # Retained head
-                options.keep_trailing_ms,    # Retained tail
+                options.minimum_silence_ms,  # Minimum trailing silence
+                options.keep_leading_ms,  # Retained head
+                options.keep_trailing_ms,  # Retained tail
             )
 
             with self._tasks_lock:
@@ -1578,29 +1571,27 @@ class Sound:
                         dtype="float32",
                         always_2d=True,
                     )
-                    source_samplerate = int(
-                        sound_file.samplerate
-                    )
+                    source_samplerate = int(sound_file.samplerate)
 
                 # trim silence
                 if options.trim_all:
                     # trim leading and trailing silence
                     data = self._trim_silence(
-                        data = data,
-                        samplerate = source_samplerate,
-                        threshold_db = options.silence_threshold_db,
-                        minimum_silence_ms = options.minimum_silence_ms,
-                        keep_leading_ms = options.keep_leading_ms,
-                        keep_trailing_ms = options.keep_trailing_ms,
+                        data=data,
+                        samplerate=source_samplerate,
+                        threshold_db=options.silence_threshold_db,
+                        minimum_silence_ms=options.minimum_silence_ms,
+                        keep_leading_ms=options.keep_leading_ms,
+                        keep_trailing_ms=options.keep_trailing_ms,
                     )
                 elif options.trim_end:
                     data = self._trim_trailing_silence(
-                        data = data,
-                        samplerate = source_samplerate,
-                        threshold_db = options.silence_threshold_db,
-                        minimum_silence_ms = options.minimum_silence_ms,
-                        keep_leading_ms = options.keep_leading_ms,
-                        keep_trailing_ms = options.keep_trailing_ms,
+                        data=data,
+                        samplerate=source_samplerate,
+                        threshold_db=options.silence_threshold_db,
+                        minimum_silence_ms=options.minimum_silence_ms,
+                        keep_leading_ms=options.keep_leading_ms,
+                        keep_trailing_ms=options.keep_trailing_ms,
                     )
 
                 if data.size == 0:
@@ -1614,9 +1605,7 @@ class Sound:
                     rate = float(rate)
 
                     if rate <= 0:
-                        raise ValueError(
-                            "Playback rate must be greater than zero"
-                        )
+                        raise ValueError("Playback rate must be greater than zero")
 
                     if rate != 1.0:
                         data = pyrb.time_stretch(
@@ -1650,11 +1639,7 @@ class Sound:
                 duration_ms = options.playback_ms
 
                 if duration_ms is not None and duration_ms > 0:
-                    maximum_frames = round(
-                        duration_ms
-                        * device_samplerate
-                        / 1000
-                    )
+                    maximum_frames = round(duration_ms * device_samplerate / 1000)
                     data = data[:maximum_frames]
 
                 if data.size == 0:
@@ -1685,11 +1670,7 @@ class Sound:
                 if fade_in_ms is not None and fade_in_ms > 0:
                     fade_frames = min(
                         total_frames,
-                        round(
-                            fade_in_ms
-                            * device_samplerate
-                            / 1000
-                        ),
+                        round(fade_in_ms * device_samplerate / 1000),
                     )
 
                     if fade_frames > 0:
@@ -1708,11 +1689,7 @@ class Sound:
                 if fade_out_ms is not None and fade_out_ms > 0:
                     fade_frames = min(
                         total_frames,
-                        round(
-                            fade_out_ms
-                            * device_samplerate
-                            / 1000
-                        ),
+                        round(fade_out_ms * device_samplerate / 1000),
                     )
 
                     if fade_frames > 0:
@@ -1765,9 +1742,8 @@ class Sound:
             )
             return None
 
-
     def _play_runner_v0(self, data, device_id, loops):
-        """ play sound stream - one runner per stream """
+        """play sound stream - one runner per stream"""
         try:
             if self.verbose:
                 syslog.info(f"playing sound - device [{device_id}]...")
@@ -1775,7 +1751,7 @@ class Sound:
             with self._tasks_lock:
                 self._active_sounds += 1
             for _ in range(loops):
-                event = threading.Event() # specific to the worker thread
+                event = threading.Event()  # specific to the worker thread
                 current_frame = 0
 
                 def callback(outdata, frames, time, status):
@@ -1790,14 +1766,9 @@ class Sound:
                         event.set()
                     current_frame += chunksize
 
-
                 stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim, dtype=data.dtype)
                 with stream:
                     event.wait()  # wait until playback is finished
-
-
-
-
 
         except sd.CallbackStop:
             event.set()
@@ -1863,9 +1834,7 @@ class Sound:
                 nonlocal current_loop
 
                 if status.output_underflow:
-                    syslog.warning(
-                        "SOUND: Output underflow"
-                    )
+                    syslog.warning("SOUND: Output underflow")
 
                 if not self._is_playback_enabled():
                     outdata.fill(0)
@@ -1876,12 +1845,8 @@ class Sound:
                 # Fill the complete PortAudio block. A block can cross loop
                 # boundaries without adding silence.
                 while output_position < frames:
-                    available_frames = (
-                        total_frames - current_frame
-                    )
-                    required_frames = (
-                        frames - output_position
-                    )
+                    available_frames = total_frames - current_frame
+                    required_frames = frames - output_position
 
                     copy_count = min(
                         available_frames,
@@ -1889,18 +1854,10 @@ class Sound:
                     )
 
                     if copy_count > 0:
-                        output_end = (
-                            output_position + copy_count
-                        )
-                        input_end = (
-                            current_frame + copy_count
-                        )
+                        output_end = output_position + copy_count
+                        input_end = current_frame + copy_count
 
-                        outdata[
-                            output_position:output_end
-                        ] = data[
-                            current_frame:input_end
-                        ]
+                        outdata[output_position:output_end] = data[current_frame:input_end]
 
                         output_position = output_end
                         current_frame = input_end
@@ -1910,13 +1867,11 @@ class Sound:
 
                         if current_loop >= loops:
                             if output_position < frames:
-                                outdata[
-                                    output_position:
-                                ].fill(0)
+                                outdata[output_position:].fill(0)
 
                             # PortAudio plays already-buffered frames, then
                             # calls finished_callback.
-                            raise sd.CallbackStop
+                            raise sd.CallbackStop # @IgnoreException
 
                         current_frame = 0
 
@@ -1940,7 +1895,6 @@ class Sound:
         finally:
             with self._tasks_lock:
                 self._active_sounds -= 1
-
 
     def addPhrase(self, phrase: PhraseData) -> PhraseData:
         """registers a single phrase - ignored if already registered - returns the cached phrase if the phrase already exists"""
@@ -3017,7 +2971,7 @@ class EdgeTTS:
         edge_rate = f"{int(rate):+}%"
         edge_pitch = f"{pitch:+}Hz"
         # edge_volume = f"{int(volume):+}%"
-        edge_volume = "+0%" # change volume on playback
+        edge_volume = "+0%"  # change volume on playback
 
         return self.generateWav(tts_file=tts_file, text=phrase.text, voice=voice, rate=edge_rate, pitch=edge_pitch, volume=edge_volume)
 
