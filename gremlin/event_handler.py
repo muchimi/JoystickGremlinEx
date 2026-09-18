@@ -297,11 +297,24 @@ class Event:
         device_guid = self.device_guid
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
-        if self.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
-            return (self.device_guid, self.event_type.value, data, 1 if data[1] else 0)
+        if self.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+            identifier = self.identifier
+            input_type = InputType.KeyboardLatched
+            if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+                key = identifier.key
+                data = (key.scan_code, key.is_extended)
+                input_type = InputType.KeyboardLatched
+            elif isinstance(identifier, gremlin.keyboard.Key):
+                input_type = InputType.KeyboardLatched
+                data = (identifier.scan_code, identifier.is_extended)
+            elif isinstance(identifier, gremlin.types.MouseButton):
+                identifier = gremlin.keyboard.key_from_mousebutton(identifier)
+                data = (identifier.scan_code, identifier.is_extended)
+            else:
+                data = (identifier.scan_code, identifier.is_extended) if isinstance(identifier, gremlin.keyboard.Key) else identifier
+            return (self.device_guid, input_type, data, 1 if data[1] else 0)
         else:
-            return (device_guid, self.event_type.value, self.identifier, 0)
+            return (device_guid, self.event_type, self.identifier, 0)
 
     def __hash__(self):
         """Computes the hash value of this event.
@@ -2778,7 +2791,8 @@ class EventHandler(QtCore.QObject):
 
         valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap()  # list of valid joystick devices
         input_item = None
-        latched = False
+        latched = event is not None and event.event_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Mouse)
+        action_data = None
         if extra_data:
             if "input_item" in extra_data:
                 input_item = extra_data["input_item"]
@@ -2786,8 +2800,8 @@ class EventHandler(QtCore.QObject):
                 latched = extra_data["latched"]
             if "action_data" in extra_data:
                 action_data = extra_data["action_data"]
-        else:
-            action_data = None
+
+
 
         if latched:
             # latched entry only
@@ -2820,7 +2834,7 @@ class EventHandler(QtCore.QObject):
             return
 
         if event:
-            if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+            if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
                 assert input_item is not None, "adding a lacthed input requires passing the input item to addCallback()"
                 verbose = gremlin.config.Configuration().verbose_mode_keyboard
                 # verbose = True
@@ -3490,7 +3504,7 @@ class EventHandler(QtCore.QObject):
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_exec
         verbose_detailed = verbose and config.verbose_mode_extra
-        # verbose = True
+        verbose = True
 
         self.registry.update(event)  # record the event
 
@@ -3508,6 +3522,9 @@ class EventHandler(QtCore.QObject):
 
             input_item: gremlin.input_item.InputItem = None
             callback: Callable = None
+
+            # if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+            #     pass
 
             data = self._matching_input_item(mode, event)
             if isinstance(data, LatchedCallbackData):
