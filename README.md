@@ -48,6 +48,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T54A)
+- Change: API: sound: added audio sample auto-trim to trim silence at the start and end of a sample stream.
+- Change: API: sound: added caching of processed audio streams for faster playback.
+- Change: API: sound: changed blocking audio playback behavior to avoid audio stream close/reopen latency and to bypass pooled threading
+- Fix: API: mouse buttons not triggering.
+
 ### (m77T54)
 - Fix: API: configure file watching system after startup to avoid a QT warning message.
 - Fix: UI: exception (missing widget) when deleting certain containers.

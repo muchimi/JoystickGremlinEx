@@ -53,6 +53,7 @@ import enum
 import time
 from psygnal import Signal
 from gremlin.types import PlaybackMode, PlayMode
+from fractions import Fraction
 
 from PySide6.QtMultimedia import QMediaDevices, QAudioOutput
 
@@ -117,6 +118,12 @@ class PlaybackOptions:
         rate: float = None,
         timed_random: TimedRandomInt = TimedRandomInt(),
         blocking: bool = False,
+        trim_all : bool = True,
+        trim_end : bool = True,
+        silence_threshold_db: float = -55.0,
+        minimum_silence_ms: int = 100,
+        keep_leading_ms: int = 0,
+        keep_trailing_ms: int = 0,
     ):
         """playback options
 
@@ -126,6 +133,12 @@ class PlaybackOptions:
         :param playback_ms: time for the playback in milliseconds, 0 to disable.  If provided, plays the sound only for the specified number of milliseconds.
         :param fadein_ms: time in milliseconds for the time for the sound to fade in - if the sound is too short, it may never reach max volume
         :param fadeout_ms: time in milliseconds for the time for the sound to fade out
+        :param trim_all: whether to trim silence at the start and end of the audio
+        :param trim_end: whether to trim silence at the end of the audio
+        :param silence_threshold_db: frames below this dBFS level are considered silent
+        :param minimum_silence_ms: only trim a leading or trailing silent region when it is at least this long
+        :param keep_leading_ms: amount of silence to retain at the start of the audio
+        :param keep_trailing_ms: amount of silence to retain after the last active frame
         """
         self.key = key  # this is a GUID for PG mode, and the file name for SD mode
         self.sound_file = sound_file  # path to wave file to play
@@ -141,6 +154,12 @@ class PlaybackOptions:
         self.stop_previous = stop_previous
         self.rate = rate  # playback rate (1.0 = normal)
         self.blocking = blocking  # whether playback should block until finished
+        self.trim_all = trim_all
+        self.trim_end = trim_end
+        self.silence_threshold_db = silence_threshold_db
+        self.minimum_silence_ms = minimum_silence_ms
+        self.keep_leading_ms = keep_leading_ms
+        self.keep_trailing_ms = keep_trailing_ms
 
 
 class SoundEvent:
@@ -676,7 +695,7 @@ class Sound:
         self._tasks_lock = threading.RLock()
 
 
-
+        self._playback_cache = {}
 
 
         self.monitor = SoundMonitor()
@@ -1189,7 +1208,7 @@ class Sound:
                 return matched_device
         return device_name # unchanged
 
-    def play(self, filename: str, options: PlaybackOptions, blocking: bool = False):
+    def play_v0(self, filename: str, options: PlaybackOptions, blocking: bool = False):
         """plays a sound file via SD low level library"""
         try:
             if not self.playback_enabled:
@@ -1325,7 +1344,429 @@ class Sound:
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
 
-    def _play_runner(self, data, device_id, loops):
+
+    def _trim_silence(self,
+        data: np.ndarray,
+        samplerate: int,
+        threshold_db: float = -55.0,
+        minimum_silence_ms: float = 20.0,
+        keep_leading_ms: float = 3.0,
+        keep_trailing_ms: float = 3.0,
+    ) -> np.ndarray:
+        """
+        Trim leading and trailing silence
+        :param data: Audio in frames × channels format with float values normally between -1.0 and 1.0.
+        :param samplerate: Audio sample rate in Hz.
+        :param threshold_db: Frames below this dBFS level are considered silent.
+        :param minimum_silence_ms: Only trim a leading or trailing silent region when it is at least this long.
+        :param keep_leading_ms: Amount of silence to retain before the first active frame.
+        :param keep_trailing_ms: Amount of silence to retain after the last active frame.
+        """
+
+        if data.size == 0:
+            return data
+
+        # Support both mono one-dimensional data and frames × channels.
+        if data.ndim == 1:
+            frame_amplitude = np.abs(data)
+        else:
+            frame_amplitude = np.max(
+                np.abs(data),
+                axis=1,
+            )
+
+        # Convert dBFS to a linear amplitude.
+        threshold = 10.0 ** (threshold_db / 20.0)
+
+        active_frames = np.flatnonzero(
+            frame_amplitude > threshold
+        )
+
+        # The complete sample is below the silence threshold.
+        if active_frames.size == 0:
+            return data[:0]
+
+        first_active_frame = int(active_frames[0])
+        last_active_frame = int(active_frames[-1]) + 1
+
+        leading_silence_frames = first_active_frame
+        trailing_silence_frames = (
+            len(data) - last_active_frame
+        )
+
+        minimum_silence_frames = round(
+            minimum_silence_ms * samplerate / 1000
+        )
+
+        keep_leading_frames = round(
+            keep_leading_ms * samplerate / 1000
+        )
+
+        keep_trailing_frames = round(
+            keep_trailing_ms * samplerate / 1000
+        )
+
+        start_frame = 0
+        end_frame = len(data)
+
+        if leading_silence_frames >= minimum_silence_frames:
+            start_frame = max(
+                0,
+                first_active_frame - keep_leading_frames,
+            )
+
+        if trailing_silence_frames >= minimum_silence_frames:
+            end_frame = min(
+                len(data),
+                last_active_frame + keep_trailing_frames,
+            )
+
+        return data[start_frame:end_frame]
+
+    def _trim_trailing_silence(self,
+        data: np.ndarray,
+        samplerate: int,
+        threshold_db: float = -55.0,
+        minimum_silence_ms: float = 20.0,
+        keep_ms: float = 3.0,
+    ) -> np.ndarray:
+        """Remove silence from the end of an audio sample.
+
+        Audio is expected in frames * channels format with float values
+        between -1.0 and 1.0.
+        """
+
+        if data.size == 0:
+            return data
+
+        # Convert the dBFS threshold to a linear amplitude.
+        threshold = 10.0 ** (threshold_db / 20.0)
+
+        # A frame is active when any channel exceeds the threshold.
+        frame_amplitude = np.max(
+            np.abs(data),
+            axis=1,
+        )
+
+        active_frames = np.flatnonzero(
+            frame_amplitude > threshold
+        )
+
+        # The entire sample is silent.
+        if active_frames.size == 0:
+            return data[:0]
+
+        last_active_frame = int(active_frames[-1]) + 1
+        trailing_frames = len(data) - last_active_frame
+
+        minimum_silence_frames = round(
+            minimum_silence_ms * samplerate / 1000
+        )
+
+        # Do not trim extremely short natural tails.
+        if trailing_frames < minimum_silence_frames:
+            return data
+
+        # Keep a few milliseconds after the detected sound to avoid creating
+        # an abrupt cutoff.
+        keep_frames = round(
+            keep_ms * samplerate / 1000
+        )
+
+        trim_position = min(
+            len(data),
+            last_active_frame + keep_frames,
+        )
+
+        return data[:trim_position]
+
+    def play(
+        self,
+        filename: str,
+        options: PlaybackOptions,
+        blocking: bool = False,
+    ):
+        """Prepare and play a sound file."""
+
+        if not self.playback_enabled:
+            return None
+
+        try:
+            with self._tasks_lock:
+                self._task_trim()
+
+            # Resolve the requested output device.
+            requested_device = options.device
+            device_id = None
+
+            if requested_device:
+                device_id = self.device_name_to_id_map.get(
+                    requested_device
+                )
+
+                if device_id is None:
+                    matched_name = next(
+                        (
+                            name
+                            for name in self.device_name_to_id_map
+                            if name.startswith(requested_device)
+                        ),
+                        None,
+                    )
+
+                    if matched_name is not None:
+                        device_id = self.device_name_to_id_map[
+                            matched_name
+                        ]
+
+                        # Cache the abbreviated device name.
+                        self.device_name_to_id_map[
+                            requested_device
+                        ] = device_id
+                    else:
+                        syslog.warning(
+                            "SOUND: Device '%s' not found; "
+                            "using default device",
+                            requested_device,
+                        )
+
+            if device_id is None:
+                device = sd.query_devices(kind="output")
+                device_id = int(device["index"])
+                device_samplerate = int(
+                    device["default_samplerate"]
+                )
+            else:
+                device_samplerate = int(
+                    self.device_sample_rate_map[device_id]
+                )
+
+            loops = int(options.loops or 0)
+
+            if loops <= 0:
+                return None
+
+            # Include the modification time so changing the file invalidates
+            # the cached audio.
+            file_stat = os.stat(filename)
+
+            cache_key = (
+                os.path.abspath(filename),
+                file_stat.st_mtime_ns,
+                device_samplerate,
+                options.rate,
+                options.volume,
+                options.playback_ms,
+                options.fadein_ms,
+                options.fadeout_ms,
+                options.silence_threshold_db,  # Silence threshold
+                options.minimum_silence_ms,   # Minimum trailing silence
+                options.keep_leading_ms,    # Retained head
+                options.keep_trailing_ms,    # Retained tail
+            )
+
+            with self._tasks_lock:
+                if not hasattr(self, "_playback_cache"):
+                    self._playback_cache = {}
+
+                data = self._playback_cache.get(cache_key)
+
+            if data is None:
+                # Load audio as frames × channels.
+                with sf.SoundFile(filename) as sound_file:
+                    data = sound_file.read(
+                        dtype="float32",
+                        always_2d=True,
+                    )
+                    source_samplerate = int(
+                        sound_file.samplerate
+                    )
+
+                # trim silence
+                if options.trim_all:
+                    # trim leading and trailing silence
+                    data = self._trim_silence(
+                        data = data,
+                        samplerate = source_samplerate,
+                        threshold_db = options.silence_threshold_db,
+                        minimum_silence_ms = options.minimum_silence_ms,
+                        keep_leading_ms = options.keep_leading_ms,
+                        keep_trailing_ms = options.keep_trailing_ms,
+                    )
+                elif options.trim_end:
+                    data = self._trim_trailing_silence(
+                        data = data,
+                        samplerate = source_samplerate,
+                        threshold_db = options.silence_threshold_db,
+                        minimum_silence_ms = options.minimum_silence_ms,
+                        keep_leading_ms = options.keep_leading_ms,
+                        keep_trailing_ms = options.keep_trailing_ms,
+                    )
+
+                if data.size == 0:
+                    return None
+
+                # Apply pitch-preserving playback-rate adjustment before
+                # resampling to the output device rate.
+                rate = options.rate
+
+                if rate is not None:
+                    rate = float(rate)
+
+                    if rate <= 0:
+                        raise ValueError(
+                            "Playback rate must be greater than zero"
+                        )
+
+                    if rate != 1.0:
+                        data = pyrb.time_stretch(
+                            data,
+                            source_samplerate,
+                            rate,
+                        )
+
+                # Resample to the output device's native rate.
+                if source_samplerate != device_samplerate:
+                    ratio = Fraction(
+                        device_samplerate,
+                        source_samplerate,
+                    ).limit_denominator(1000)
+
+                    data = signal.resample_poly(
+                        data,
+                        up=ratio.numerator,
+                        down=ratio.denominator,
+                        axis=0,
+                    )
+
+                # Normalize the processed data before modifying it in place.
+                data = np.ascontiguousarray(
+                    data,
+                    dtype=np.float32,
+                )
+
+                # Limit playback duration after rate conversion and
+                # resampling.
+                duration_ms = options.playback_ms
+
+                if duration_ms is not None and duration_ms > 0:
+                    maximum_frames = round(
+                        duration_ms
+                        * device_samplerate
+                        / 1000
+                    )
+                    data = data[:maximum_frames]
+
+                if data.size == 0:
+                    return None
+
+                # Apply volume without converting through int16.
+                volume = options.volume
+
+                if volume is not None and volume >= 0:
+                    np.multiply(
+                        data,
+                        np.float32(volume / 100.0),
+                        out=data,
+                    )
+
+                    np.clip(
+                        data,
+                        -1.0,
+                        1.0,
+                        out=data,
+                    )
+
+                total_frames = len(data)
+
+                # Apply fade-in to the beginning.
+                fade_in_ms = options.fadein_ms
+
+                if fade_in_ms is not None and fade_in_ms > 0:
+                    fade_frames = min(
+                        total_frames,
+                        round(
+                            fade_in_ms
+                            * device_samplerate
+                            / 1000
+                        ),
+                    )
+
+                    if fade_frames > 0:
+                        fade = np.linspace(
+                            0.0,
+                            1.0,
+                            fade_frames,
+                            dtype=np.float32,
+                        )
+
+                        data[:fade_frames] *= fade[:, None]
+
+                # Apply fade-out to the end.
+                fade_out_ms = options.fadeout_ms
+
+                if fade_out_ms is not None and fade_out_ms > 0:
+                    fade_frames = min(
+                        total_frames,
+                        round(
+                            fade_out_ms
+                            * device_samplerate
+                            / 1000
+                        ),
+                    )
+
+                    if fade_frames > 0:
+                        fade = np.linspace(
+                            1.0,
+                            0.0,
+                            fade_frames,
+                            dtype=np.float32,
+                        )
+
+                        data[-fade_frames:] *= fade[:, None]
+
+                data = np.ascontiguousarray(
+                    data,
+                    dtype=np.float32,
+                )
+
+                # Cached data must not be modified by a playback worker.
+                data.setflags(write=False)
+
+                with self._tasks_lock:
+                    self._playback_cache[cache_key] = data
+
+            if blocking:
+                # Run synchronously without thread-pool scheduling latency.
+                self._play_runner(
+                    data=data,
+                    device_id=device_id,
+                    loops=loops,
+                    samplerate=device_samplerate,
+                )
+                return None
+
+            with self._tasks_lock:
+                task = self.pool.submit(
+                    self._play_runner,
+                    data,
+                    device_id,
+                    loops,
+                    device_samplerate,
+                )
+                self._sound_tasks.append(task)
+
+            return task
+
+        except Exception:
+            syslog.exception(
+                "SOUND: Unable to play '%s'",
+                filename,
+            )
+            return None
+
+
+    def _play_runner_v0(self, data, device_id, loops):
         """ play sound stream - one runner per stream """
         try:
             if self.verbose:
@@ -1372,6 +1813,134 @@ class Sound:
                 pass
             with self._tasks_lock:
                 self._active_sounds -= 1
+
+    def _play_runner(
+        self,
+        data: np.ndarray,
+        device_id: int,
+        loops: int,
+        samplerate: int,
+    ) -> None:
+        """Play audio and wait for its final buffered frame."""
+
+        if data.size == 0 or loops <= 0:
+            return
+
+        # Normalize to frames × channels.
+        if data.ndim == 1:
+            data = data[:, None]
+
+        data = np.ascontiguousarray(
+            data,
+            dtype=np.float32,
+        )
+
+        total_frames = len(data)
+        channels = data.shape[1]
+
+        current_frame = 0
+        current_loop = 0
+
+        playback_finished = threading.Event()
+
+        with self._tasks_lock:
+            self._active_sounds += 1
+
+        try:
+            if self.verbose:
+                syslog.info(
+                    "SOUND: Playing on device [%s]",
+                    device_id,
+                )
+
+            def callback(
+                outdata,
+                frames,
+                time_info,
+                status,
+            ):
+                nonlocal current_frame
+                nonlocal current_loop
+
+                if status.output_underflow:
+                    syslog.warning(
+                        "SOUND: Output underflow"
+                    )
+
+                if not self._is_playback_enabled():
+                    outdata.fill(0)
+                    raise sd.CallbackAbort
+
+                output_position = 0
+
+                # Fill the complete PortAudio block. A block can cross loop
+                # boundaries without adding silence.
+                while output_position < frames:
+                    available_frames = (
+                        total_frames - current_frame
+                    )
+                    required_frames = (
+                        frames - output_position
+                    )
+
+                    copy_count = min(
+                        available_frames,
+                        required_frames,
+                    )
+
+                    if copy_count > 0:
+                        output_end = (
+                            output_position + copy_count
+                        )
+                        input_end = (
+                            current_frame + copy_count
+                        )
+
+                        outdata[
+                            output_position:output_end
+                        ] = data[
+                            current_frame:input_end
+                        ]
+
+                        output_position = output_end
+                        current_frame = input_end
+
+                    if current_frame >= total_frames:
+                        current_loop += 1
+
+                        if current_loop >= loops:
+                            if output_position < frames:
+                                outdata[
+                                    output_position:
+                                ].fill(0)
+
+                            # PortAudio plays already-buffered frames, then
+                            # calls finished_callback.
+                            raise sd.CallbackStop
+
+                        current_frame = 0
+
+            with sd.OutputStream(
+                callback=callback,
+                finished_callback=playback_finished.set,
+                device=device_id,
+                samplerate=samplerate,
+                channels=channels,
+                dtype="float32",
+                latency="low",
+            ):
+                playback_finished.wait()
+
+        except Exception:
+            syslog.exception(
+                "SOUND: Playback failed on device [%s]",
+                device_id,
+            )
+
+        finally:
+            with self._tasks_lock:
+                self._active_sounds -= 1
+
 
     def addPhrase(self, phrase: PhraseData) -> PhraseData:
         """registers a single phrase - ignored if already registered - returns the cached phrase if the phrase already exists"""

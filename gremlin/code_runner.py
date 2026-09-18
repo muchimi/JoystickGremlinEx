@@ -270,27 +270,6 @@ class CodeRunner:
                 graph_mode_node.parent = ec.graph
                 graph_mode_nodes[mode] = graph_mode_node
 
-            ## ensure voice inputs are in the input list
-            # vd = gremlin.ui.voice_device.VoiceData()
-            # device_node = profile.devices.get(gremlin.shared_state.voice_tab_guid)
-            # master_mode = gremlin.shared_state.master_mode
-            # for input_item in vd.values():
-            #     self.event_handler.registerInputItem(master_mode, input_item)
-            #     callbacks = []
-            #     for container in input_item.containers:
-            #         if not container.hasOutput():
-            #             syslog.warning(f"CALLBACK: device: Voice: input: {input_item.display_name}: warning: zero output container ignored")
-            #             continue
-            #         if not container.is_valid():
-            #             continue
-
-            #         callbacks.extend(container.generate_callbacks(graph_mode_node))
-
-            #     for cb_data in callbacks:
-            #         self.event_handler.addCallback(device_node.device_guid, master_mode, cb_data.event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
-
-
-
             verbose = gremlin.config.Configuration().verbose_mode_exec
             device_node: gremlin.base_profile.ProfileDeviceNode
             for device_node in profile.devices.values():
@@ -783,9 +762,6 @@ class CodeRunner:
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False
-        # self.event_handler.runtime_mode_changed.disconnect(
-        #     self._vjoy_curves.runtime_mode_changed
-        # )
 
         # Empty callback registry
         gremlin.input_devices.callback_registry.clear()
@@ -833,15 +809,6 @@ class CodeRunner:
         ec = gremlin.execution_graph.ExecutionContext()
         ec.clear()
 
-        # gc.collect()
-
-    # def _handle_sentry(self):
-    #     ''' sentry event '''
-
-    #     syslog.info("Sentry event")
-    #     gc.collect()
-    #     self._sentry_timer = threading.Timer(self._sentry_tick, self._handle_sentry)
-    #     self._sentry_timer.start()
 
     def _reset_state(self):
         """Resets all states to their default values."""
