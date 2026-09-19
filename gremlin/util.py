@@ -1971,8 +1971,12 @@ class InvokeUiMethod(QtCore.QObject):
 
 def is_ui_thread():
     """true if the current thread is the UI thread"""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        # Import / early init — no Qt app yet; treat as safe for sync work
+        return True
     current_thread = QtCore.QThread.currentThread()
-    ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
+    ui_thread = app.thread()
     return current_thread == ui_thread
 
 

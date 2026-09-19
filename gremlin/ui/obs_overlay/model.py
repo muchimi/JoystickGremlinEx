@@ -47,6 +47,7 @@ WIDGET_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_graph",
     "axis_bars",
     "axis_stick_square",
@@ -64,6 +65,8 @@ WIDGET_TYPES = (
     "input_display",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
     "panel",  # legacy alias of shape
     "axis_dial",  # legacy alias of axis_radial
@@ -80,6 +83,7 @@ PALETTE_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_stick_square",
     "axis_crosshair",
     "axis_stick_circle",
@@ -92,15 +96,17 @@ PALETTE_TYPES = (
     "input_display",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
 )
 
 PALETTE_GROUPS = (
     ("Buttons", ("button", "hat", "switch_4way", "switch_2way", "switch_3way")),
-    ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder")),
+    ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
-    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "streamdeck")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck")),
 )
 
 DEFAULT_SIZES = {
@@ -109,6 +115,7 @@ DEFAULT_SIZES = {
     "axis_fader": (40, 180),
     "axis_radial": (150, 150),
     "axis_encoder": (150, 150),
+    "axis_paddle": (160, 160),
     "axis_graph": (420, 180),
     "axis_bars": (220, 180),
     "axis_dial": (150, 150),
@@ -119,7 +126,7 @@ DEFAULT_SIZES = {
     "button": (88, 32),
     "hat": (108, 108),
     "switch_4way": (120, 120),
-    "switch_2way": (48, 96),
+    "switch_2way": (100, 100),
     "switch_3way": (48, 120),
     "label": (140, 28),
     "sys_stats": (220, 88),
@@ -127,6 +134,8 @@ DEFAULT_SIZES = {
     "input_display": (560, 220),
     "shape": (280, 160),
     "image": (200, 120),
+    "application": (480, 270),
+    "remote_view": (480, 270),
     "streamdeck": (320, 208),
     "panel": (280, 160),
 }
@@ -137,6 +146,7 @@ DEFAULT_LABELS = {
     "axis_fader": "",
     "axis_radial": "",
     "axis_encoder": "",
+    "axis_paddle": "",
     "axis_graph": "",
     "axis_bars": "",
     "axis_dial": "",
@@ -155,6 +165,8 @@ DEFAULT_LABELS = {
     "input_display": "",
     "shape": "",
     "image": "",
+    "application": "",
+    "remote_view": "Remote",
     "streamdeck": "",
     "panel": "",
 }
@@ -234,6 +246,21 @@ def default_style(widget_type: str) -> dict[str, Any]:
         style.update({"indicator_size": 10.0, "show_label": False, "needle_width": 14.0, "radio_steps": 11})
     elif widget_type == "axis_encoder":
         style.update({"show_label": False, "needle_width": 0.0, "radio_steps": 16})
+    elif widget_type == "axis_paddle":
+        style.update(
+            {
+                "show_label": False,
+                "fill": "#6a6f78",
+                "fill_on": "#c4c8d0",
+                "border": "#1a1d22",
+                "indicator": "#2a2e36",
+                "indicator_size": 18.0,
+                "paddle_start_deg": 0.0,
+                "paddle_end_deg": 70.0,
+                "paddle_direction": "cw",
+                "paddle_image": "",
+            }
+        )
     elif widget_type == "axis_graph":
         style.update(
             {
@@ -305,6 +332,12 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "font_size": 10,
                 "shape": "rounded",
                 "corner_radius": 5.0,
+                "appearance_mode": "press",
+                "appearance_state": "",
+                "appearance_state_id": "",
+                "image_path": "",
+                "image_path_on": "",
+                "image_keep_aspect": True,
             }
         )
     elif widget_type == "hat":
@@ -333,18 +366,23 @@ def default_style(widget_type: str) -> dict[str, Any]:
     elif widget_type == "switch_2way":
         style.update(
             {
+                "switch_appearance": "arrows",
                 "fill": "#1a2230",
                 "fill_on": "#ff6b35",
                 "border": "#3a4a62",
                 "border_on": "#ffcc66",
+                "border_width": 2.0,
+                "indicator": "#2a3548",
+                "indicator_size": 28.0,
                 "orientation": "vertical",
-                "indicator_size": 10.0,
                 "show_label": False,
-                "show_axis_labels": True,
-                "axis_label_n": "I",
-                "axis_label_s": "O",
-                "axis_label_e": "O",
-                "axis_label_w": "I",
+                "show_axis_labels": False,
+                "axis_label_n": "N",
+                "axis_label_s": "S",
+                "axis_label_e": "E",
+                "axis_label_w": "W",
+                "track": "#0b1220",
+                "crosshair": "#5a6a84",
             }
         )
     elif widget_type == "switch_3way":
@@ -455,6 +493,33 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_keep_aspect": True,
             }
         )
+    elif widget_type == "application":
+        style.update(
+            {
+                "fill": "#0a0c10",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "window_title": "",
+                "window_exe": "",
+                "image_keep_aspect": True,
+            }
+        )
+    elif widget_type == "remote_view":
+        style.update(
+            {
+                "fill": "#0a0c10",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "remote_client_id": 0,
+                "image_keep_aspect": True,
+            }
+        )
     elif widget_type == "streamdeck":
         style.update(
             {
@@ -498,6 +563,7 @@ NO_CORNER_RADIUS_TYPES = (
     "axis_radial",
     "axis_dial",
     "axis_encoder",
+    "axis_paddle",
     "axis_crosshair",
     "axis_stick_circle",
 )
@@ -507,6 +573,7 @@ SINGLE_AXIS_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_dial",
 )
 SERIES_WIDGET_TYPES = ("axis_graph", "axis_bars")
@@ -515,6 +582,8 @@ NO_BINDING_WIDGET_TYPES = (
     "panel",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
     "axis_mouse",
     "axis_graph",
@@ -531,11 +600,11 @@ NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
 
 SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way")
 SWITCH_4WAY_POSITIONS = ("n", "e", "s", "w", "center")
-SWITCH_2WAY_POSITIONS = ("a", "b")
+SWITCH_2WAY_POSITIONS = ("a", "center", "b")
 SWITCH_3WAY_POSITIONS = ("up", "center", "down")
 SWITCH_POSITION_TITLES = {
     "switch_4way": (("n", "North"), ("e", "East"), ("s", "South"), ("w", "West"), ("center", "Center")),
-    "switch_2way": (("a", "Position 1"), ("b", "Position 2")),
+    "switch_2way": (("a", "North / Position 1"), ("center", "Center"), ("b", "South / Position 2")),
     "switch_3way": (("up", "Up"), ("center", "Center"), ("down", "Down")),
 }
 _SWITCH_POSITION_ALIASES = {
@@ -569,7 +638,7 @@ def switch_positions(widget_type: str | None) -> tuple[str, ...]:
 
 def switch_rest_position(widget_type: str | None) -> str | None:
     kind = canonical_widget_type(widget_type or "")
-    if kind in ("switch_4way", "switch_3way"):
+    if kind in ("switch_4way", "switch_3way", "switch_2way"):
         return "center"
     return None
 
@@ -582,7 +651,42 @@ def normalize_switch_appearance(value) -> str:
     raw = str(value or "").strip().casefold()
     if raw in ("arcs", "arc"):
         return "arcs"
+    if raw in ("bars", "bar", "slots", "slot", "toggle"):
+        return "bars"
     return "arrows"
+
+
+def normalize_paddle_direction(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("ccw", "counterclockwise", "counter-clockwise", "anticlockwise"):
+        return "ccw"
+    return "cw"
+
+
+def switch_2way_cardinal_slots(item: dict[str, Any] | None) -> tuple[str, str]:
+    """Visual cardinal slots for a 2-way: vertical N/S, horizontal W/E."""
+    vertical = ((item or {}).get("style") or {}).get("orientation") or "vertical"
+    if str(vertical).casefold() == "horizontal":
+        return ("w", "e")
+    return ("n", "s")
+
+
+def switch_2way_value_to_cardinal(item: dict[str, Any] | None, value: str) -> str:
+    first, second = switch_2way_cardinal_slots(item)
+    if value == "a":
+        return first
+    if value == "b":
+        return second
+    return ""
+
+
+def switch_2way_cardinal_to_value(item: dict[str, Any] | None, cardinal: str) -> str:
+    first, second = switch_2way_cardinal_slots(item)
+    if cardinal == first:
+        return "a"
+    if cardinal == second:
+        return "b"
+    return ""
 
 
 def switch_binding(item: dict[str, Any] | None, position: str) -> dict[str, Any]:
@@ -697,7 +801,9 @@ def default_binding(axis_id: int = 1) -> dict[str, Any]:
         "input_type": "axis",
         "input_id": int(axis_id),
         "state_name": "",
+        "state_id": "",
         "mode_name": "",
+        "mode_id": "",
         "invert": False,
         "keys": [],
     }
@@ -969,7 +1075,9 @@ def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
         "kind": normalize_visibility_kind(kind),
         "when": "on",
         "mode_name": "",
+        "mode_id": "",
         "state_name": "",
+        "state_id": "",
         "device_guid": "",
         "device_name": "",
         "vjoy_id": 0,
@@ -994,7 +1102,9 @@ def normalize_visibility(raw) -> dict[str, Any]:
         item["kind"] = normalize_visibility_kind(item.get("kind"))
         item["when"] = "off" if str(item.get("when") or "on").casefold() == "off" else "on"
         item["mode_name"] = str(item.get("mode_name") or "")
+        item["mode_id"] = str(item.get("mode_id") or "")
         item["state_name"] = str(item.get("state_name") or "")
+        item["state_id"] = str(item.get("state_id") or "")
         item["device_guid"] = str(item.get("device_guid") or "")
         item["device_name"] = str(item.get("device_name") or "")
         try:
@@ -1106,13 +1216,26 @@ def button_appearance_mode(item: dict[str, Any] | None) -> str:
 def button_appearance_state_name(item: dict[str, Any] | None) -> str:
     """GEX state name when button appearance follows a state (ON/OFF fills)."""
     style = (item or {}).get("style") if isinstance(item, dict) else None
-    if isinstance(style, dict):
-        name = str(style.get("appearance_state") or style.get("appearance_state_name") or "").strip()
-        if name:
-            return name
-    if isinstance(item, dict):
-        return str(item.get("appearance_state") or item.get("appearance_state_name") or "").strip()
-    return ""
+    holder = style if isinstance(style, dict) else (item if isinstance(item, dict) else None)
+    if not isinstance(holder, dict):
+        return ""
+    sid = str(holder.get("appearance_state_id") or "").strip()
+    name = str(holder.get("appearance_state") or holder.get("appearance_state_name") or "").strip()
+    if sid or name:
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            state = sd.getStateById(sid) if sid else None
+            if state is None and name:
+                state = sd.getState(name)
+            if state is not None:
+                holder["appearance_state"] = state.key
+                holder["appearance_state_id"] = str(state.id)
+                return state.key
+        except Exception:
+            pass
+    return name
 
 
 def canonical_widget_type(widget_type: str) -> str:
@@ -1242,7 +1365,54 @@ class OverlayScene(QtCore.QObject):
         self._dirty = False
         self._save_later_pending = False
         self._sorted_cache: list[dict[str, Any]] | None = None
+        self._identity_hooks = False
         self._reset_default_pages(emit=False)
+        self._bind_identity_hooks()
+
+    def _bind_identity_hooks(self):
+        """Keep overlay state/mode names in sync with JG Ex unique IDs."""
+        if self._identity_hooks:
+            return
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            sd.key_changed.connect(self._on_identity_changed)
+            sd.crud.connect(self._on_identity_changed)
+        except Exception:
+            pass
+        try:
+            import gremlin.event_handler
+
+            el = gremlin.event_handler.EventListener()
+            el.mode_name_changed.connect(self._on_identity_changed)
+        except Exception:
+            pass
+        self._identity_hooks = True
+
+    def _on_identity_changed(self, *args):
+        if getattr(gremlin.shared_state, "profile_loading", False):
+            return
+        # Must rewrite cached names while StateData still has the old key
+        # (update_key deletes it after this signal returns).
+        if gremlin.util.is_ui_thread():
+            self.sync_identity_refs(emit=False)
+            return
+        gremlin.util.InvokeUiMethod(self._on_identity_changed_ui)
+
+    def _on_identity_changed_ui(self):
+        self.sync_identity_refs(emit=False)
+
+    def sync_identity_refs(self, emit: bool = False) -> bool:
+        """Rewrite cached state/mode names from unique IDs. Returns True if anything changed."""
+        from .bindings import sync_scene_identity_refs
+
+        changed = sync_scene_identity_refs(self)
+        if changed:
+            self._dirty = True
+            if emit:
+                self._emit()
+        return changed
 
     def _reset_default_pages(self, emit: bool = True):
         page = default_page("Overlay")
@@ -1553,7 +1723,7 @@ class OverlayScene(QtCore.QObject):
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
         if widget_type in SWITCH_WIDGET_TYPES:
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
-            if widget_type == "switch_4way":
+            if widget_type in ("switch_4way", "switch_2way"):
                 style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
         else:
             item["bindings"] = {}
@@ -1588,7 +1758,7 @@ class OverlayScene(QtCore.QObject):
             y.pop("input_id_y", None)
             y.pop("invert_y", None)
         elif widget_type in XY_WIDGET_TYPES:
-            for key in ("source", "device_guid", "device_name", "vjoy_id", "state_name"):
+            for key in ("source", "device_guid", "device_name", "vjoy_id", "state_name", "state_id", "mode_name", "mode_id"):
                 if x.get(key) not in (None, ""):
                     y[key] = x.get(key)
             y["input_type"] = "axis"
@@ -1730,6 +1900,8 @@ class OverlayScene(QtCore.QObject):
             from .shapes import button_uses_shape_path
 
             keep_size = button_uses_shape_path(item)
+        if old_type == "image" and widget_type in ("button", "axis_paddle"):
+            keep_size = True
         if (
             not keep_size
             and old_size
@@ -1739,6 +1911,18 @@ class OverlayScene(QtCore.QObject):
             item["w"], item["h"] = int(new_size[0]), int(new_size[1])
         item["type"] = widget_type
         item["style"] = new_style
+        if old_type == "image" and widget_type == "button":
+            new_style["show_label"] = False
+            new_style["image_path"] = str(old_style.get("image_path") or "")
+            new_style.setdefault("image_keep_aspect", True)
+            item["label"] = ""
+        elif old_type == "image" and widget_type == "axis_paddle":
+            new_style["show_label"] = False
+            new_style["paddle_image"] = str(old_style.get("image_path") or "")
+            paddle_defaults = default_style("axis_paddle")
+            new_style["fill"] = paddle_defaults.get("fill")
+            new_style["fill_on"] = paddle_defaults.get("fill_on")
+            item["label"] = ""
         if widget_uses_series(widget_type):
             item["series"] = normalize_graph_series(item.get("series"))
             if not item["series"]:
@@ -1774,7 +1958,7 @@ class OverlayScene(QtCore.QObject):
         if widget_type in SWITCH_WIDGET_TYPES:
             previous = saved_bindings if old_kind == "switch" else None
             item["bindings"] = normalize_switch_bindings(widget_type, previous)
-            if widget_type == "switch_4way":
+            if widget_type in ("switch_4way", "switch_2way"):
                 new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
             if old_kind == "button":
                 first = next(iter(switch_positions(widget_type)), None)
@@ -2194,7 +2378,7 @@ class OverlayScene(QtCore.QObject):
         for key, value in fields.items():
             if key == "style":
                 item["style"].update(value)
-                if item.get("type") == "switch_4way" and "switch_appearance" in (value or {}):
+                if item.get("type") in ("switch_4way", "switch_2way") and "switch_appearance" in (value or {}):
                     item["style"]["switch_appearance"] = normalize_switch_appearance(
                         item["style"].get("switch_appearance")
                     )
@@ -2295,6 +2479,7 @@ class OverlayScene(QtCore.QObject):
                     pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
             self.from_dict(data)
+            self.sync_identity_refs(emit=False)
             self._dirty = False
             self._undo.clear()
             self._redo.clear()

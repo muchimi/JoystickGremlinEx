@@ -18,6 +18,7 @@
 
 import ctypes
 from ctypes import wintypes
+import queue
 import threading
 import gremlin.singleton_decorator
 import win32api
@@ -284,9 +285,89 @@ def process_keyboard_event(n_code, w_param, l_param):
 
 
 _mouse_wheel_state = {}  # holds the current state (pressed) of the wheel button
-_mouse_wheel_delay = 0.5  # mouse wheel delay in ms
+_mouse_wheel_delay = 0.5  # mouse wheel auto-release delay in seconds
 _mouse_x = None
 _mouxe_y = None
+
+# Wheel Timer objects must not be created/started from the low-level mouse hook
+# (ctypes callback). On Python 3.14 that raises RuntimeError("thread.__init__()
+# not called") and floods the hook, which stalls input and can freeze the UI.
+_wheel_cmd_queue: queue.SimpleQueue | None = None
+_wheel_worker: threading.Thread | None = None
+_wheel_worker_stop = threading.Event()
+_wheel_lock = threading.RLock()
+
+
+def _ensure_wheel_worker():
+    """Start the background wheel-release scheduler if needed."""
+    global _wheel_cmd_queue, _wheel_worker
+    if _wheel_worker is not None and _wheel_worker.is_alive():
+        return
+    _wheel_worker_stop.clear()
+    _wheel_cmd_queue = queue.SimpleQueue()
+    _wheel_worker = threading.Thread(
+        target=_wheel_worker_loop,
+        name="mouse-wheel-release",
+        daemon=True,
+    )
+    _wheel_worker.start()
+
+
+def _wheel_worker_loop():
+    """Owns threading.Timer create/cancel/start for wheel auto-releases."""
+    global _mouse_wheel_timer
+    q = _wheel_cmd_queue
+    while not _wheel_worker_stop.is_set():
+        try:
+            cmd = q.get(timeout=0.5)
+        except queue.Empty:
+            continue
+        if cmd is None:
+            break
+        op = cmd[0]
+        if op == "arm":
+            button_id = cmd[1]
+            delay = float(cmd[2]) if len(cmd) > 2 else _mouse_wheel_delay
+            with _wheel_lock:
+                old = _mouse_wheel_timer.get(button_id)
+                if old is not None:
+                    try:
+                        old.cancel()
+                    except RuntimeError:
+                        pass
+                timer = threading.Timer(delay, _queue_wheel_release, args=(button_id,))
+                _mouse_wheel_timer[button_id] = timer
+                try:
+                    timer.start()
+                except RuntimeError:
+                    _mouse_wheel_timer[button_id] = None
+                    # Last resort: release immediately so mappings do not stick.
+                    _queue_wheel_release(button_id)
+        elif op == "cancel":
+            button_id = cmd[1]
+            with _wheel_lock:
+                old = _mouse_wheel_timer.get(button_id)
+                if old is not None:
+                    try:
+                        old.cancel()
+                    except RuntimeError:
+                        pass
+                    _mouse_wheel_timer[button_id] = None
+        elif op == "stop":
+            break
+
+
+def _arm_wheel_release(button_id):
+    """Schedule a wheel auto-release from a normal Python thread (not the hook)."""
+    _ensure_wheel_worker()
+    if _wheel_cmd_queue is not None:
+        _wheel_cmd_queue.put(("arm", button_id, _mouse_wheel_delay))
+
+
+def _cancel_wheel_release(button_id):
+    _ensure_wheel_worker()
+    if _wheel_cmd_queue is not None:
+        _wheel_cmd_queue.put(("cancel", button_id))
 
 
 _is_runtime = False  # true if in runtime
@@ -439,27 +520,8 @@ def process_mouse_event(n_code, w_param, l_param):
                 else:
                     _mouse_wheel_state[button_id] = True  # mark pressed
 
-                # if _mouse_wheel_timer[button_id]:
-                #     # cancel current timer. Guarded: on Python 3.14 Timer.cancel()
-                #     # can raise "cannot notify on un-acquired lock" when called
-                #     # from the ctypes mouse-hook callback, which otherwise loops
-                #     # forever and stalls event processing (vJoy output included).
-                #     try:
-                #         _mouse_wheel_timer[button_id].cancel()
-
-                #     except Exception as e:
-                #         pass
-
-
-
-                # # new timer
-
-                # _mouse_wheel_timer[button_id] = threading.Timer(
-                #     _mouse_wheel_delay, lambda: _queue_wheel_release(button_id)
-                # )
-                # _mouse_wheel_timer[button_id].start()
-
-                _schedule_wheel_release(button_id)
+                # Arm/cancel Timers on a worker thread - never from this ctypes hook.
+                _arm_wheel_release(button_id)
 
                 # release the paired wheel button if needed
                 if _mouse_wheel_state[release_button_id]:
@@ -489,16 +551,18 @@ def _queue_wheel_release(button_id):
     """queues a mouse wheel release event"""
     global g_mouse_callbacks, _mouse_wheel_timer, _mouse_wheel_state
     verbose = False
-    if _mouse_wheel_state[button_id]:
+    if _mouse_wheel_state.get(button_id):
         if verbose:
             syslog.info(f"wheel release {button_id}")
         _mouse_wheel_state[button_id] = False
-        if _mouse_wheel_timer[button_id]:
-            # cancel the timer (guarded against Python 3.14 lock RuntimeError)
-            try:
-                _mouse_wheel_timer[button_id].cancel()
-            except RuntimeError:
-                pass
+        with _wheel_lock:
+            timer = _mouse_wheel_timer.get(button_id)
+            if timer is not None:
+                try:
+                    timer.cancel()
+                except RuntimeError:
+                    pass
+                _mouse_wheel_timer[button_id] = None
 
         evt = MouseEvent(button_id, False, False)
         for cb in g_mouse_callbacks:
@@ -632,6 +696,7 @@ class MouseHook:
         _mouse_wheel_delay = (
             gremlin.config.Configuration().mouse_wheel_autorelease_delay
         )
+        _ensure_wheel_worker()
 
         # get mouse swap setting from Windows
         SM_SWAPBUTTON = 23
@@ -744,14 +809,24 @@ class MouseHook:
 
     def _stop_timers(self):
         # stop any mouse event timers
-        global _mouse_wheel_timer
-        for id in _mouse_wheel_timer:
-            if _mouse_wheel_timer[id]:
-                try:
-                    _mouse_wheel_timer[id].cancel()
-                except RuntimeError:
-                    pass
-                _mouse_wheel_timer[id] = None
+        global _mouse_wheel_timer, _wheel_cmd_queue, _wheel_worker
+        with _wheel_lock:
+            for id in list(_mouse_wheel_timer.keys()):
+                if _mouse_wheel_timer[id]:
+                    try:
+                        _mouse_wheel_timer[id].cancel()
+                    except RuntimeError:
+                        pass
+                    _mouse_wheel_timer[id] = None
+        _wheel_worker_stop.set()
+        if _wheel_cmd_queue is not None:
+            try:
+                _wheel_cmd_queue.put(None)
+            except Exception:
+                pass
+        if _wheel_worker is not None and _wheel_worker.is_alive():
+            _wheel_worker.join(timeout=1.0)
+        _wheel_worker = None
 
     def _listen(self):
         """Configures the hook and starts listening."""

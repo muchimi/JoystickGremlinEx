@@ -1019,13 +1019,7 @@ class DILL:
                 try:
                     os.unlink(debug_path)
                 except Exception:
-                    syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
-                    exit(1)
-
-                    # syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
-                    # while os.path.isfile(debug_path):
-                    #     debug_path = f"dill_debug_{index}.txt"
-                    #     index += 1
+                    syslog.warning(f"DILL: unable to truncate debug file: {debug_path}")
 
             dll_version = get_dll_version(_dll_path)
             DILL.version = dll_version

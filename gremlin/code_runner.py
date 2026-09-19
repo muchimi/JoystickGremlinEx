@@ -597,6 +597,12 @@ class CodeRunner:
             # ensure remote gremlin client connected
             gremlin.remote.remote_server.start()
             gremlin.remote.remote_client.start()
+            try:
+                from gremlin.remote_video import sync_publisher_with_runtime
+
+                sync_publisher_with_runtime()
+            except Exception:
+                pass
 
             # listen to MIDI
             if config.midi_enabled:
@@ -784,6 +790,12 @@ class CodeRunner:
         # restore the startup mode and profile
         gremlin.shared_state.is_running = False
         gremlin.windows_event_hook.setRunning(False)
+        try:
+            from gremlin.remote_video import sync_publisher_with_runtime
+
+            sync_publisher_with_runtime()
+        except Exception:
+            pass
 
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)

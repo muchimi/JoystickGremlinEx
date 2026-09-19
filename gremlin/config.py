@@ -1249,6 +1249,121 @@ class Configuration(QtCore.QObject):
             self._set_data("server_port", value)
 
     @property
+    def remote_video_enabled(self) -> bool:
+        """Client: send screen/app video return feed to the master."""
+        return bool(self._get_data("remote_video_enabled", False))
+
+    @remote_video_enabled.setter
+    def remote_video_enabled(self, value: bool):
+        self._set_data("remote_video_enabled", bool(value))
+
+    @property
+    def remote_video_port(self) -> int:
+        return int(self._get_data("remote_video_port", 6013) or 6013)
+
+    @remote_video_port.setter
+    def remote_video_port(self, value):
+        try:
+            port = int(value)
+        except (TypeError, ValueError):
+            return
+        if 4096 <= port <= 65535:
+            self._set_data("remote_video_port", port)
+
+    @property
+    def remote_video_source(self) -> str:
+        value = str(self._get_data("remote_video_source", "screen") or "screen").casefold()
+        return "window" if value in ("window", "app", "application") else "screen"
+
+    @remote_video_source.setter
+    def remote_video_source(self, value):
+        key = str(value or "screen").casefold()
+        self._set_data("remote_video_source", "window" if key in ("window", "app", "application") else "screen")
+
+    @property
+    def remote_video_monitor_index(self) -> int:
+        try:
+            return max(0, int(self._get_data("remote_video_monitor_index", 0) or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    @remote_video_monitor_index.setter
+    def remote_video_monitor_index(self, value):
+        try:
+            self._set_data("remote_video_monitor_index", max(0, int(value)))
+        except (TypeError, ValueError):
+            pass
+
+    @property
+    def remote_video_window_title(self) -> str:
+        return str(self._get_data("remote_video_window_title", "") or "")
+
+    @remote_video_window_title.setter
+    def remote_video_window_title(self, value):
+        self._set_data("remote_video_window_title", str(value or ""))
+
+    @property
+    def remote_video_max_width(self) -> int:
+        try:
+            return max(320, min(3840, int(self._get_data("remote_video_max_width", 960) or 960)))
+        except (TypeError, ValueError):
+            return 960
+
+    @remote_video_max_width.setter
+    def remote_video_max_width(self, value):
+        try:
+            self._set_data("remote_video_max_width", max(320, min(3840, int(value))))
+        except (TypeError, ValueError):
+            pass
+
+    @property
+    def remote_video_fps(self) -> int:
+        try:
+            return max(1, min(30, int(self._get_data("remote_video_fps", 12) or 12)))
+        except (TypeError, ValueError):
+            return 12
+
+    @remote_video_fps.setter
+    def remote_video_fps(self, value):
+        try:
+            self._set_data("remote_video_fps", max(1, min(30, int(value))))
+        except (TypeError, ValueError):
+            pass
+
+    @property
+    def remote_video_quality(self) -> int:
+        """JPEG quality 1–100 (also used as quality hint for future codecs)."""
+        try:
+            return max(1, min(100, int(self._get_data("remote_video_quality", 55) or 55)))
+        except (TypeError, ValueError):
+            return 55
+
+    @remote_video_quality.setter
+    def remote_video_quality(self, value):
+        try:
+            self._set_data("remote_video_quality", max(1, min(100, int(value))))
+        except (TypeError, ValueError):
+            pass
+
+    @property
+    def remote_video_encoder(self) -> str:
+        value = str(self._get_data("remote_video_encoder", "auto") or "auto").casefold()
+        if value in ("jpeg", "jpg", "mjpeg"):
+            return "jpeg"
+        if value in ("h264", "nvenc", "amf", "qsv"):
+            return value
+        return "auto"
+
+    @remote_video_encoder.setter
+    def remote_video_encoder(self, value):
+        key = str(value or "auto").casefold()
+        if key in ("jpeg", "jpg", "mjpeg"):
+            key = "jpeg"
+        elif key not in ("auto", "h264", "nvenc", "amf", "qsv"):
+            key = "auto"
+        self._set_data("remote_video_encoder", key)
+
+    @property
     def broadcast_host_ip(self):
         """host for the broadcast server"""
         return self._get_data("broadcast_host_ip", "127.0.0.1")
@@ -1956,6 +2071,17 @@ class Configuration(QtCore.QObject):
             self.changed.emit("show_input_axis", value)
 
     @property
+    def afcs_show_live_while_running(self):
+        """Show AFCS designer live meters while a profile is active."""
+        return bool(self._get_data("afcs_show_live_while_running", False))
+
+    @afcs_show_live_while_running.setter
+    def afcs_show_live_while_running(self, value):
+        current = self.afcs_show_live_while_running
+        if current != bool(value):
+            self._set_data("afcs_show_live_while_running", bool(value))
+
+    @property
     def input_viewer_disables_repeaters(self):
         return self._get_data("input_viewer_disables_repeaters", False)
 
@@ -2303,7 +2429,7 @@ class Configuration(QtCore.QObject):
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl
-            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay:
+            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs:
                 input_type = InputType.NotSet
                 input_id = None
                 save_input_id = None

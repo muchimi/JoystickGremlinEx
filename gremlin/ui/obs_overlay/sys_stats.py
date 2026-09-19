@@ -551,6 +551,7 @@ class ManualCounterTracker:
 
     def __init__(self):
         self._state: dict[str, dict[str, Any]] = {}
+        self._persist_dirty = False
 
     def retain(self, keys: set[str] | None):
         if not keys:
@@ -559,6 +560,12 @@ class ManualCounterTracker:
         for ident in list(self._state):
             if ident not in keys:
                 self._state.pop(ident, None)
+
+    def take_persist_dirty(self) -> bool:
+        """True once since last call if any manual tally changed (for overlay save)."""
+        dirty = self._persist_dirty
+        self._persist_dirty = False
+        return dirty
 
     def sample(self, item: dict[str, Any] | None, entry: dict[str, Any] | None) -> int:
         if not item or not entry:
@@ -581,6 +588,7 @@ class ManualCounterTracker:
             st = {"inc": False, "dec": False, "reset": False, "value": persisted}
             self._state[key] = st
         current = int(st.get("value") or 0)
+        before = current
         from .bindings import binding_is_configured, read_toggle_active
 
         reset_bind = entry.get("binding_z")
@@ -617,6 +625,8 @@ class ManualCounterTracker:
             if isinstance(live, dict) and str(live.get("id") or "") == entry_id:
                 live["value"] = current
                 break
+        if current != before:
+            self._persist_dirty = True
         return current
 
 

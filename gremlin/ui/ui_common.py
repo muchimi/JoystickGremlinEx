@@ -15560,6 +15560,7 @@ class RemoteClientWidget(QWidget):
 
         self.config: gremlin.remote.RemoteConfig = config
         self.config.client_changed.connect(self._handle_client_changed)
+        self._refresh_pending = False
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -15719,17 +15720,31 @@ class RemoteClientWidget(QWidget):
     def _handle_client_changed(self):
         """update on client change"""
         # syslog.info("remote config client change")
-        if Shiboken.isValid(self):
-            self.refreshClients()
-        else:
+        if not Shiboken.isValid(self):
             # unregister if called and we're deleted already
             self.config.unregisterClientChangeCallback(self._handle_client_changed)
+            return
+        # Debounce: identify replies from several peers used to rebuild the
+        # checkbox flow on every packet and hard-crash Qt (0xC0000005).
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
+        QtCore.QTimer.singleShot(100, self._deferred_refresh_clients)
+
+    def _deferred_refresh_clients(self):
+        self._refresh_pending = False
+        if not Shiboken.isValid(self):
+            return
+        self.refreshClients()
 
     def _handle_custom_changed(self, checked: bool):
         self.config.isCustom = checked
         self._update_ui()
 
     def _handle_identify(self, widget):
+        # Ensure UDP listener + send socket are up (needed after Options/version folder changes).
+        gremlin.remote.remote_server.start()
+        gremlin.remote.remote_client.start()
         gremlin.remote.remote_client.requestIdentify()
 
     def _handle_client_response(self, data: gremlin.remote.PacketData):
@@ -15800,9 +15815,12 @@ class RemoteClientWidget(QWidget):
 
     def _trigger_identify(self):
         """refreshes the list of network clients"""
-        el = gremlin.event_handler.EventListener()
-        el.remote_control_identify.emit()
-
+        try:
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_identify.emit()
+        except Exception as err:
+            syslog.error(f"REMOTE: identify request failed: {err}")
+        # Do not rebuild UI here — wait for debounced client_changed after replies.
     def _handle_select_all(self, widget):
         """selects all widgets"""
         self.config.selectAll()

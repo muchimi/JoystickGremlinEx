@@ -289,6 +289,7 @@ class DeviceType(IntEnum):
     StreamDeck = 12  # Elgato Stream Deck via plugin bridge
     Voice = 13  # voice special device
     Overlay = 14  # OBS / on-screen overlay designer tab
+    Afcs = 15  # AFCS visual axis-flow designer tab
 
     @staticmethod
     def isFixedInput(value: DeviceType) -> bool:
@@ -307,6 +308,7 @@ class DeviceType(IntEnum):
             DeviceType.Settings,
             DeviceType.Plugins,
             DeviceType.Overlay,
+            DeviceType.Afcs,
         )
 
     @staticmethod
@@ -352,6 +354,7 @@ _DeviceType_to_display_name = {
     DeviceType.StreamDeck: "Stream Deck",
     DeviceType.Voice: "Voice",
     DeviceType.Overlay: "Overlay",
+    DeviceType.Afcs: "AFCS",
 }
 
 _DeviceType_to_string_lookup = {
@@ -370,6 +373,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.StreamDeck: "streamdeck",
     DeviceType.Voice: "voice",
     DeviceType.Overlay: "overlay",
+    DeviceType.Afcs: "afcs",
 }
 
 
@@ -389,6 +393,7 @@ _DeviceType_to_enum_lookup = {
     "streamdeck": DeviceType.StreamDeck,
     "voice": DeviceType.Voice,
     "overlay": DeviceType.Overlay,
+    "afcs": DeviceType.Afcs,
 }
 
 
@@ -1126,6 +1131,7 @@ class TabDeviceType(int, Enum):
     StreamDeck = 14
     Voice = 15
     Overlay = 16
+    Afcs = 17
 
 
 class GamePadOutput(Enum):

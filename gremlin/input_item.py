@@ -3303,16 +3303,17 @@ class InputItemListModel(AbstractCallbackModel):
         else:
             super().clear(emit=emit)
 
-    def _handle_sort(self, items) -> tuple:
-        """returns a sort list for the items if a custom handler was not provided"""
-        # sort by input sortkey
-        if self._can_sort:
-            data = [(item, item.sortKey) for item in items]
-            data.sort(key=lambda x: x[1])
-            # sequence the list
-            indices = (data.index(x) for x in data)
-            return indices
-        return None  # unchanged
+    def _handle_sort(self, items) -> list:
+        """returns new indices for items ordered by sortKey (for applySort)."""
+        items = list(items)
+        if not items:
+            return []
+        # ordered[new_pos] = old_pos
+        ordered = sorted(range(len(items)), key=lambda i: items[i].sortKey)
+        indices = [0] * len(items)
+        for new_pos, old_pos in enumerate(ordered):
+            indices[old_pos] = new_pos
+        return indices
 
     @property
     def display_name(self) -> str:
@@ -9396,6 +9397,11 @@ class ContainerView(AbstractView):
 
         super().__init__(model, parent=parent)
 
+        self._cleaned = False
+        self._blank_widget = None
+        self._widget_map = {}
+        self._drawn_once = False
+
         self.pushSuspended()  # suspend updates
 
         # Create required UI items
@@ -9417,16 +9423,37 @@ class ContainerView(AbstractView):
 
     def _cleanup_ui(self):
         """widget cleanup"""
-        self._clear_widgets()
+        if getattr(self, "_cleaned", False):
+            return
+        self._cleaned = True
+        try:
+            if getattr(self, "_model", None) is not None:
+                self._model.removeCallback(self._handle_model_changed)
+        except Exception:
+            pass
+        self._clear_widgets(show_blank=False)
         gremlin.util.clear_widget_references(self)
 
-    def _clear_widgets(self):
+    def _clear_widgets(self, show_blank=True):
         """clears the scroll area widgets"""
         widgets = list(self._widget_map.values())
-        for widget in widgets:
-            gremlin.util.delete_widget(widget)
         self._widget_map.clear()
-        self._show_blank()
+        for widget in widgets:
+            try:
+                widget.closed.disconnect()
+            except Exception:
+                pass
+            gremlin.util.delete_widget(widget)
+        if show_blank and not getattr(self, "_cleaned", False):
+            self._show_blank()
+
+    def _is_alive(self) -> bool:
+        return (
+            not getattr(self, "_cleaned", False)
+            and Shiboken.isValid(self)
+            and getattr(self, "_blank_widget", None) is not None
+            and Shiboken.isValid(self._blank_widget)
+        )
 
     def _create_ui(self):
         # use a two page widget - one that shows blank content, the other that shows the contents
@@ -9469,6 +9496,9 @@ class ContainerView(AbstractView):
     def create_ui(self):
         """creates the UI for the container contents"""
         import gremlin.util
+
+        if not self._is_alive():
+            return
 
         assert self._input_item is not None, "Input item not associated with container"
         assert self._model is not None, "Model must be associated with container"
@@ -9550,24 +9580,28 @@ class ContainerView(AbstractView):
             self._blank_widget.setVisible(message is not None)
 
     def _show_blank(self):
-        if self._stacked_widget and Shiboken.isValid(self._stacked_widget):
-            if self._stacked_widget.currentIndex() != 0:
-                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-                if verbose:
-                    syslog.info(f"ContainerView: show blank [{self._input_item.display_name if self._input_item else 'no input'}]")
-                self._stacked_widget.setCurrentIndex(0)
+        stacked = getattr(self, "_stacked_widget", None)
+        if stacked is None or not Shiboken.isValid(stacked):
+            return
+        if stacked.currentIndex() != 0:
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+            if verbose:
+                syslog.info(f"ContainerView: show blank [{self._input_item.display_name if self._input_item else 'no input'}]")
+            stacked.setCurrentIndex(0)
 
     def _show_content(self):
+        stacked = getattr(self, "_stacked_widget", None)
+        if stacked is None or not Shiboken.isValid(stacked):
+            return
         if self._model.count() == 0:
             # no containers to show
             self._show_blank()
         else:
-            if self._stacked_widget and Shiboken.isValid(self._stacked_widget):
-                if self._stacked_widget.currentIndex() != 1:
-                    verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-                    if verbose:
-                        syslog.info(f"ContainerView: show content [{self._input_item.display_name if self._input_item else 'no input'}]")
-                    self._stacked_widget.setCurrentIndex(1)
+            if stacked.currentIndex() != 1:
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+                if verbose:
+                    syslog.info(f"ContainerView: show content [{self._input_item.display_name if self._input_item else 'no input'}]")
+                stacked.setCurrentIndex(1)
 
     def redraw(self, force=False):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
@@ -9576,7 +9610,7 @@ class ContainerView(AbstractView):
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
 
-        if not Shiboken.isValid(self):
+        if not self._is_alive():
             return
         if self._redraw_lock:
             return
@@ -9611,10 +9645,10 @@ class ContainerView(AbstractView):
                         syslog.info(f"\t[{container_count}] containers to display")
                     # display container widgets in the defined order
                     for model_index, container in self.model.getFilteredMap():
-                        assert container is not None, f"Invalid data at model index [{model_index}]"
-                        assert container.id in self._widget_map, (
-                            f"ContainerView model and UI are not synchronized: widget not found for container id [{container.id}]"
-                        )
+                        if container is None or container.id not in self._widget_map:
+                            self.create_ui()
+                            self._show_content()
+                            return
 
                         # widget already exist, re-order if needed
                         widget = self._widget_map[container.id]
@@ -9635,14 +9669,12 @@ class ContainerView(AbstractView):
                     msg = f"Please add a container or action for <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{self.input_item.display_name}</span>"
                     if verbose:
                         syslog.info(f"container view redraw ui: {msg}  input item id: {self.input_item.id}")
-                    if self._blank_widget:
+                    if self._blank_widget is not None and Shiboken.isValid(self._blank_widget):
                         self._blank_widget.setText(msg)
                     self._show_blank()
 
         finally:
             self._redraw_lock = False
-            if Shiboken.isValid(self):
-                assert len(self._widget_map) == self.model.count(), "ContainerView model and UI are not synchronized (mismatched items)"
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -9659,6 +9691,8 @@ class ContainerView(AbstractView):
         gremlin.util.InvokeUiMethod(self._delete_container_ui, container)
 
     def _delete_container_ui(self, container):
+        if not self._is_alive():
+            return
         if gremlin.ui.ui_common.ConfirmBox("Delete this container?"):
             container.clear()  # delete all actions in the container
             self.model.remove(container)

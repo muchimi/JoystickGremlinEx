@@ -41,6 +41,8 @@ added_files = [
     ("icons","icons"),
     ("gremlin/ui/streamdeck_icon_library", "gremlin/ui/streamdeck_icon_library"),
 ]
+if os.path.isdir("gremlin/ui/obs_overlay/assets"):
+    added_files.append(("gremlin/ui/obs_overlay/assets", "gremlin/ui/obs_overlay/assets"))
 
 added_files.extend(action_plugins_files)
 added_files.extend(icon_files)
@@ -114,7 +116,17 @@ a = Analysis(
         "gremlin.ui.obs_overlay.templates",
         "gremlin.ui.obs_overlay.touch",
         "gremlin.ui.obs_overlay.widgets",
-        ] +  collect_submodules('encodings'),
+        "gremlin.remote_video",
+        "gremlin.ui.afcs",
+        "gremlin.ui.afcs.designer",
+        "gremlin.ui.afcs.model",
+        "gremlin.ui.afcs.nodes",
+        "gremlin.ui.afcs.ops",
+        "gremlin.ui.afcs.runtime",
+        "OdenGraphQt",
+        "qtpy",
+        "av",
+        ] +  collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt'),
     hookspath=None,
     runtime_hooks=None,
     excludes=["torch",

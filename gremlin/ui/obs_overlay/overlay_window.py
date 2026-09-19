@@ -17,6 +17,8 @@ import math
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 
+import gremlin.shared_state
+
 from .bindings import OverlayValueBus, widget_accepts_touch, widget_conditions_match
 from .model import DEFAULT_GUIDE_COLOR, OVERLAY_WINDOW_TITLE, OverlayScene, is_interactive_overlay, is_onscreen_mode, normalize_background_mode, overlay_window_title
 from .qt_guard import alive
@@ -532,7 +534,11 @@ class OverlayView(QtWidgets.QWidget):
             conditions_ok = widget_conditions_match(item)
             if not self.interactive and not conditions_ok:
                 continue
-            value = self.bus.value_for(item)
+            # Designer tab: never mirror live inputs while a profile is running.
+            if self.interactive and gremlin.shared_state.is_running:
+                value = None
+            else:
+                value = self.bus.value_for(item)
             if self.interactive and not conditions_ok:
                 painter.save()
                 painter.setOpacity(0.32)

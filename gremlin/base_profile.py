@@ -2599,8 +2599,7 @@ class Profile:
                 profile_modes = self.get_modes()
                 if device_guid not in self.devices:
                     device_node = ProfileDeviceNode(self)
-                    device_node.device_guid = device_guid
-                    device_node.name = device.name
+                    self._attach_device_summary(device_node, device_guid, device.device_type, device.name)
                     self.devices[device_guid] = device_node
                 else:
                     device_node = self.devices[device_guid]
@@ -3424,6 +3423,8 @@ class Profile:
             return len(plugins) > 0
         elif device_guid == gremlin.shared_state.overlay_tab_guid:
             return True
+        elif device_guid == gremlin.shared_state.afcs_tab_guid:
+            return True
         elif device_guid == gremlin.shared_state.keyboard_tab_guid:
             look_for_containers = False
 
@@ -3775,13 +3776,16 @@ class Profile:
 
         node.name = new_mode
 
-        # mode device objects
+        # mode device objects — ProfileModeNode.id is unchanged; only the name moves
         mode: ProfileModeNode
         for device in self.devices.values():
             for mode in device.modes.values():
                 if mode.name == old_mode:
                     # if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
                     mode.name = new_mode
+
+        el = gremlin.event_handler.EventListener()
+        el.mode_name_changed.emit(old_mode, new_mode)
 
         return True
 
@@ -4603,6 +4607,34 @@ class Profile:
             # return the xml string
             return etree.tostring(tree)
 
+    def _attach_device_summary(
+        self,
+        node: ProfileDeviceNode,
+        device_guid: dinput.GUID,
+        device_type: DeviceType = None,
+        device_name: str = None,
+    ) -> None:
+        """Bind a live or placeholder DeviceSummary onto a profile device node.
+
+        ProfileDeviceNode.device_guid is derived from the summary and cannot be
+        assigned directly.
+        """
+        summary = gremlin.joystick_handling.getDevice(device_guid)
+        if summary is None:
+            summary = dinput.DeviceSummary()
+            summary.device_guid = device_guid
+            if device_name:
+                summary.name = device_name
+            summary.setConnected(False)
+            if device_type == DeviceType.VJoy:
+                summary.setVirtual(True)
+                summary.device_type = DeviceType.VJoy
+            elif device_type is not None:
+                summary.device_type = device_type
+        node.device = summary
+        if device_name:
+            node.name = device_name
+
     def get_device_modes(self, device_guid: dinput.GUID, device_type: DeviceType, device_name: str = None) -> ProfileDeviceNode:
         """Returns the modes associated with the given device.
 
@@ -4611,25 +4643,13 @@ class Profile:
         :param device_name the name of the device
         :return all modes for the specified device
         """
-        if device_type == DeviceType.VJoy:
-            if device_guid not in self.vjoy_devices:
-                # Create the device
-                device = ProfileDeviceNode(self)
-                device.name = device_name
-                device.device_guid = device_guid
-                device.type = DeviceType.VJoy
-                self.vjoy_devices[device_guid] = device
-            return self.vjoy_devices[device_guid]
-
-        else:
-            if device_guid not in self.devices:
-                # Create the device
-                device = ProfileDeviceNode(self)
-                device.name = device_name
-                device.device_guid = device_guid
-
-                self.devices[device_guid] = device
-            return self.devices[device_guid]
+        device_guid = gremlin.util.parse_guid(device_guid)
+        bucket = self.vjoy_devices if device_type == DeviceType.VJoy else self.devices
+        if device_guid not in bucket:
+            node = ProfileDeviceNode(self)
+            self._attach_device_summary(node, device_guid, device_type, device_name)
+            bucket[device_guid] = node
+        return bucket[device_guid]
 
     def empty(self):
         """Returns whether or not a profile is empty.
@@ -4843,6 +4863,12 @@ class Profile:
                     import gremlin.ui.obs_overlay as obs_overlay
 
                     obs_overlay.persist_for_profile(self, dest_xml=use_name)
+                except Exception:
+                    pass
+                try:
+                    import gremlin.ui.afcs as afcs
+
+                    afcs.persist_for_profile(self, dest_xml=use_name)
                 except Exception:
                     pass
                 # Stream Deck page names live in the sidecar JSON, not the XML.

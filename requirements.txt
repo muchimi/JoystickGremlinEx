@@ -21,6 +21,7 @@ graphviz >= 0.21
 sounddevice
 soundfile
 numpy
+av>=12.0.0
 scipy
 psutil
 pyrubberband
