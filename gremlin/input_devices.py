@@ -102,7 +102,8 @@ class PeriodicRegistry:
         """Creates a new instance."""
         self._registry = {}
         self._running = False
-        self._thread = threading.Thread(target=self._thread_loop, daemon=False)
+        self._thread_event = threading.Event()
+        self._thread = None
         self._queue = []
         self._plugins = []
 
@@ -112,18 +113,23 @@ class PeriodicRegistry:
         if len(self._registry) == 0:
             return
 
+        if self._running:
+            return
+
         # Only create a new thread and start it if the thread is not
         # currently running
         self._running = True
-        if not self._thread.is_alive():
-            self._thread = threading.Thread(target=self._thread_loop, daemon=False)
-            self._thread.start()
+        self._thread_event.clear()
+        self._thread = threading.Thread(target=self._thread_runner, daemon=False)
+        self._thread.start()
 
     def stop(self):
         """Stops the event loop."""
-        self._running = False
-        if self._thread.is_alive():
-            self._thread.join()
+        if self._running:
+            self._running = False
+            self._thread_event.set()
+            gremlin.util.safeJoin(self._thread)
+            self._thread = None
 
     def add(self, callback, interval):
         """Adds a function to execute periodically.
@@ -153,7 +159,7 @@ class PeriodicRegistry:
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-    def _thread_loop(self):
+    def _thread_runner(self):
         """Main execution loop run in a separate thread."""
         import uuid
 
@@ -172,7 +178,7 @@ class PeriodicRegistry:
             heapq.heappush(self._queue, (value, node_id))
 
         # Main thread loop
-        while self._running:
+        while not self._thread_event.is_set():
             # Process all events that require running
             if self._queue:
                 while self._queue[0][0] < time.time():

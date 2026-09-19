@@ -4758,12 +4758,20 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             value=self.config.ReportShowFolder,
         )
 
+        self.show_profile_tree_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Show profile tree",
+            tooltip="Opens the profile tree dialog after the report is generated",
+            callback=self._handle_show_profile_tree_changed,
+            value=self.config.ReportShowProfileTree,
+        )
+
         self.main_layout.addWidget(label)
         widgets = [
             self.pdf_widget,
             self.svg_widget,
             self.open_files_widget,
             self.show_files_widget,
+            self.show_profile_tree_widget,
             gremlin.ui.ui_common.QHorizontalLine(),
         ]
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
@@ -4796,6 +4804,10 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
     def _handle_show_folder_changed(self, checked: bool):
         self.config.ReportShowFolder = checked
 
+    @QtCore.Slot(bool)
+    def _handle_show_profile_tree_changed(self, checked: bool):
+        self.config.ReportShowProfileTree = checked
+
     @QtCore.Slot()
     def _ok_button_cb(self):
         import gremlin.reporting
@@ -4809,6 +4821,12 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         options.show_folder = self.config.ReportShowFolder
 
         report.generate(options)
+
+        if self.config.ReportShowProfileTree:
+            profile = gremlin.shared_state.current_profile
+            if profile is not None and getattr(profile, "graph", None) is not None:
+                profile.graph.show_tree_dialog(self)
+
         self.close()
 
     @QtCore.Slot()

@@ -27,7 +27,9 @@ class AbortableThread(threading.Thread, QtCore.QObject):
     """killable thread"""
 
     def __init__(self, *args, **kwargs):
-
+        # Ensure the underlying Python thread object is initialized before any
+        # subclass logic or start() is used. This avoids the common runtime error
+        # where a thread is started before Thread.__init__ has run.
         QtCore.QObject.__init__(self)
         threading.Thread.__init__(self, *args, **kwargs)
 
@@ -41,6 +43,13 @@ class AbortableThread(threading.Thread, QtCore.QObject):
         eh.shutdown.connect(self.stop)
         self._stop_event = threading.Event()
         self._shutdown_requested = False
+        self._initialized = True
+
+    def start(self, *args, **kwargs):
+        # Guard against accidental reuse of a partially initialized object.
+        if not getattr(self, "_initialized", False):
+            raise RuntimeError("AbortableThread was not fully initialized before start() was called")
+        return super().start(*args, **kwargs)
 
     def reset(self):
         """reset the thread"""
@@ -57,9 +66,10 @@ class AbortableThread(threading.Thread, QtCore.QObject):
 class AbortableThreadX(threading.Thread):
     """killable thread"""
 
-    def __init__(self, target=None, eh=None):
-
-        super().__init__(target=target)
+    def __init__(self, target=None, eh=None, *args, **kwargs):
+        # Ensure the Python thread object is fully initialized before any subclass
+        # logic or start() is used.
+        threading.Thread.__init__(self, *args, target=target, **kwargs)
 
         if not eh:
             import gremlin.event_handler
@@ -70,6 +80,12 @@ class AbortableThreadX(threading.Thread):
 
         # self._stop_event = threading.Event()
         self._shutdown_requested = False
+        self._initialized = True
+
+    def start(self, *args, **kwargs):
+        if not getattr(self, "_initialized", False):
+            raise RuntimeError("AbortableThreadX was not fully initialized before start() was called")
+        return super().start(*args, **kwargs)
 
     def reset(self):
         """reset the thread"""

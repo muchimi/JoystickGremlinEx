@@ -21,7 +21,7 @@ import os
 import random
 import string
 import sys
-
+import json
 
 import dinput
 
@@ -248,6 +248,9 @@ class CodeRunner:
             for mode_name in gremlin.profile.mode_list():
                 self.event_handler.addCallback(gremlin.joystick_handling.invalidDeviceGuid(), mode_name, None, lambda x: x, False)
 
+
+
+
             # reset functor latching
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
@@ -267,9 +270,6 @@ class CodeRunner:
                 graph_mode_node.parent = ec.graph
                 graph_mode_nodes[mode] = graph_mode_node
 
-            # Create input callbacks based on the profile's content
-            # profile.sync()
-
             verbose = gremlin.config.Configuration().verbose_mode_exec
             device_node: gremlin.base_profile.ProfileDeviceNode
             for device_node in profile.devices.values():
@@ -281,8 +281,7 @@ class CodeRunner:
                         syslog.info(f"\t{str(device_node)}")
                     continue
 
-                if device.device_type == DeviceType.ModeControl:
-                    pass
+
                 device_name = device.name
                 if verbose:
                     syslog.info(f"CALLBACK: device: {str(device_node)}")
@@ -421,9 +420,67 @@ class CodeRunner:
                     event = gremlin.event_handler.Event(
                         event_type=InputType.State, device_guid=state_device_guid, identifier=input_item.input_id, extra_data={"input_item": input_item}
                     )
-                    magic = event.identifier
+                    magic = eh.getMagic(event)
                     self.event_handler.registerMappedInput(state_device_guid, master_mode, InputType.State, magic, input_item)
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
+
+            # setup callbacks for voice input items if a trigger is identified
+            if config.VOICE_INPUT_ENABLED:
+                vd = gremlin.ui.voice_device.VoiceData()
+                input_item = vd.ptt_input_item
+
+                if input_item:
+                    # voice device is latched to an input
+                    event = gremlin.event_handler.Event(
+                        event_type=input_item.input_type,
+                        device_guid=input_item.device_guid,
+                        identifier=input_item.input_id,
+                        extra_data={"input_item": input_item}
+                    )
+                    callback = vd.execute_callback # what to call
+                    magic = eh.getMagic(event)
+
+                    self.event_handler.registerMappedInput(input_item.device_guid, master_mode, input_item.input_type, magic, input_item)
+
+
+                    self.event_handler.addCallback(
+                        device_guid = input_item.device_guid,
+                        mode = master_mode,
+                        event = event,
+                        callback = callback,
+                        permanent = input_item.always_execute,
+                        extra_data = event.extra_data
+                    )
+
+                # mappings for voice inputs
+                vd.clearCallbacks()
+                for key, input_item in vd.items():
+
+                    input_node = ec.getInputItemNode(input_item)
+                    assert input_node is not None, f"Input node not found for input item: {input_item}"
+                    vd.registerGraphNode(input_item, input_node)
+
+                    # mapping callbacks for voice inputs
+                    callbacks = []
+                    for container in input_item.containers:
+                            if not container.is_valid():
+                                # test = container.is_valid()
+                                syslog.warning(
+                                    f"CALLBACK: device: Voice: input: {input_item.display_name}: "
+                                    f"warning: Incomplete container ignored "
+                                    f"(id={getattr(container, 'id', '?')})"
+                                )
+                                continue
+                            callbacks.extend(container.generate_callbacks())
+                    if callbacks:
+                        syslog.info(
+                            f"CALLBACK: Voice [{key}]: registered {len(callbacks)} "
+                            f"container callback(s)"
+                        )
+                    for cb_data in callbacks:
+                        vd.addCallback(input_item, cb_data.callback)
+
+
 
 
 
@@ -449,7 +506,6 @@ class CodeRunner:
                     continue
 
                 device_id = device_node.device_id
-
 
                 # set axes
                 for id in range(1, device_node.axis_count + 1):
@@ -712,9 +768,6 @@ class CodeRunner:
 
         el.keyboard_event.disconnect(kb.keyboard_event)
         el.gremlin_active = False
-        # self.event_handler.runtime_mode_changed.disconnect(
-        #     self._vjoy_curves.runtime_mode_changed
-        # )
 
         # Empty callback registry
         gremlin.input_devices.callback_registry.clear()
@@ -768,15 +821,6 @@ class CodeRunner:
         ec = gremlin.execution_graph.ExecutionContext()
         ec.clear()
 
-        # gc.collect()
-
-    # def _handle_sentry(self):
-    #     ''' sentry event '''
-
-    #     syslog.info("Sentry event")
-    #     gc.collect()
-    #     self._sentry_timer = threading.Timer(self._sentry_tick, self._handle_sentry)
-    #     self._sentry_timer.start()
 
     def _reset_state(self):
         """Resets all states to their default values."""

@@ -158,6 +158,7 @@ class RPCGremlin:
         self._port = config.server_port
         self._server = None
         self._running = False
+        self._thread_event = threading.Event()
         self._thread = None
         self._server_thread = None
         self._keep_running = False
@@ -165,7 +166,7 @@ class RPCGremlin:
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
 
-    def _run(self):
+    def _thread_runner(self):
         import struct
 
         syslog.info("Starting gremlin listener...")
@@ -181,10 +182,10 @@ class RPCGremlin:
             syslog.info(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
             self._keep_running = True
             self._running = True
-            while self._keep_running:
-                time.sleep(1)
-        except Exception as err:
-            syslog.error(f"RPC: listener failed: {err}")
+            while not self._thread_event.is_set() and self._keep_running:
+                time.sleep(0.5)
+        except Exception:
+            pass
 
         self._server.shutdown()
         self._server.server_close()
@@ -217,7 +218,9 @@ class RPCGremlin:
                 syslog.info(f"Remote proxy VJOY [{key}] ok")
             except Exception:
                 pass
-        self._thread = threading.Thread(target=self._run, daemon=False)
+        self._thread_event.clear()
+        self._thread = threading.Thread(target=self._thread_runner, daemon=False)
+        self._thread.name = "RPCRunner"
         self._thread.start()
 
         self._running = True
@@ -229,8 +232,8 @@ class RPCGremlin:
 
         # stop the server loop
         self._keep_running = False
-        if self._thread.is_alive():
-            self._thread.join()
+        self._thread_event.set()
+        gremlin.util.safeJoin(self._thread)
         self._thread = None
 
         syslog.info("Gremlin RPC server stopped...")
@@ -326,8 +329,10 @@ class RemoteClient:
         self._sock = None
         # unique ID of this client
         self._id = get_guid()
-        self._alive_thread = None
-        self._alive_thread_stop_requested = False
+
+        # self._alive_thread = None
+        # self._alive_thread_event = threading.Event()
+        # self._alive_thread_stop_requested = False
         self._started = False
 
         self._callbacks = {}  # map of callbacks by client ID
@@ -420,14 +425,16 @@ class RemoteClient:
             except Exception as e:
                 pass
 
-            if self._alive_thread:
-                syslog.info("Alive stop requested...")
+            # if self._alive_thread:
+            #     syslog.info("Alive stop requested...")
 
-                self._alive_thread_stop_requested = True
-                if self._alive_thread.is_alive():
-                    self._alive_thread.join()
-                syslog.info("Alive thread stopped")
-                self._alive_thread = None
+            #     self._alive_thread_stop_requested = True
+            #     self._alive_thread_event.set()
+
+            #     gremlin.util.safeJoin(self._alive_thread)
+
+            #     syslog.info("Alive thread stopped")
+            #     self._alive_thread = None
 
             if self._sock:
                 self._sock.close()

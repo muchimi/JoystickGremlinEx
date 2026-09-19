@@ -267,7 +267,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         tab_ids = list(tab_map.keys())
         d_list = []
         max_index = len(devices)
-        dev : dinput.DeviceSummary
+        dev: dinput.DeviceSummary
         for dev in devices:
             if dev.disabled:
                 continue
@@ -326,7 +326,6 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         device: dinput.DeviceSummary
         for device in self._devices:
-
             device_name = gremlin.joystick_handling.getDeviceName(device.device_guid)
             box = QtWidgets.QGroupBox(device_name)
             layout = QtWidgets.QVBoxLayout()
@@ -434,10 +433,6 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             self.main_layout.addWidget(box)
 
-
-
-
-
             for key, widget in self._selector_widgets.items():
                 if Shiboken.isValid(widget):
                     checked = widget.isChecked()
@@ -445,10 +440,6 @@ class VisualizationSelector(QtWidgets.QWidget):
                         callback = self._selector_callbacks.get(key, None)
                         if callback:
                             callback()
-
-
-
-
 
     def _handle_visualizer_action(self, widget):
         if not Shiboken.isValid(widget):
@@ -615,7 +606,6 @@ class VisualizerWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self._id = gremlin.util.get_guid()
 
-
         self._debug_visuals = False
         self._parent_width = None
         self._parent_height = None
@@ -773,7 +763,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent =  parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.setStyleSheet("QGroupBox { border: 0px }")  # turn group box borders off
 
@@ -787,6 +777,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self.vis_selector.clear.connect(self._clear)
         self._visualizer_widgets = {}  # created joystick visualizer widgets by key - if not in this list or None, not created - excludes state and keyboard visualizers
         self._visualizer_width: int = None  # width of the visualizers
+        self._layout_width: int = None  # last width applied to visualizers to avoid redundant work
         self._viewer_widget_map = {}  # holds all the view items
 
         self._lock = threading.Lock()
@@ -992,12 +983,10 @@ States can be toggled by clicking on the state button.  Expression states will u
     @property
     def visualizerWidth(self) -> int:
         """returns the width of the visualizer widgets"""
-        if not self._visualizer_width:
+        if self._visualizer_width is None:
             self.views.adjustSize()
             self.views.update()
-            width = self.views.width()
-            self._visualizer_width = width
-
+            self._visualizer_width = self.views.width()
         return self._visualizer_width
 
     def _handle_view_resized(self, old_size: QtCore.QSize, new_size: QtCore.QSize):
@@ -1094,7 +1083,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         devices = [device for device in devices if device.connected and not device.disabled]
         verbose = False
 
-        device : DeviceSummary
+        device: DeviceSummary
         for device in devices:
             if verbose:
                 syslog.info(
@@ -1139,7 +1128,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         else:
             width = self.views.width()
 
-
+        if width == self._layout_width:
+            return
+        self._layout_width = width
 
         if self._state_visualizer_widget:
             if not Shiboken.isValid(self._state_visualizer_widget):
@@ -1150,12 +1141,12 @@ States can be toggled by clicking on the state button.  Expression states will u
             if not Shiboken.isValid(self._keyboard_visualizer_widget):
                 return
             self._keyboard_visualizer_widget.setFixedWidth(width)
-            
+
+        target_width = max(0, width - margin)
         for widget in self._viewer_widget_map.values():
             sub_widget = widget.widget
-            # widget.setFixedWidth(width)
-            if sub_widget:
-                sub_widget.setFixedWidth(width - margin)
+            if sub_widget and sub_widget.width() != target_width:
+                sub_widget.setFixedWidth(target_width)
 
     def _add_widget(self, device: DeviceSummary, visualization: VisualizationType, description: str = None):
         vc = VisualizationConfig()
@@ -1176,7 +1167,6 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _clear_all(self):
         """clears all items"""
 
-
         vc = VisualizationConfig()
         for key in self._viewer_widget_map:
             device = vc.getDevice(key)
@@ -1188,7 +1178,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.saveStateState(False)
         self.load_viewer_widgets()  # reload devices
 
-    def saveKeyboardState(self, value : bool = None):
+    def saveKeyboardState(self, value: bool = None):
         """saves the keyboard state"""
         vc = VisualizationConfig()
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.keyboard_tab_guid)
@@ -1196,7 +1186,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             value = self._keyboard_visible
         vc.setValue(vc.keyboard_key, device, VisualizationType.Keyboard, value)
 
-    def saveStateState(self, value : bool = None):
+    def saveStateState(self, value: bool = None):
         """saves the state visualizer state"""
         vc = VisualizationConfig()
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.state_tab_guid)
@@ -1479,7 +1469,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             layout.addWidget(self.keyboard_widget)
 
             self.keyboard_widget.hook()
-            self._keyboard_visualizer_widget = widget # gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+            self._keyboard_visualizer_widget = widget  # gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
             self._keyboard_visible = True
 
             # if self._visualizer_width:
@@ -1553,7 +1543,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._state_visible = True
         self._state_visualizer_widget.populateState()
         self._update_ui()
-        #self.views.updateGeometry()
+        # self.views.updateGeometry()
 
         # store the state
         self.saveStateState()

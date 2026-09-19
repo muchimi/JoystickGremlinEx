@@ -326,7 +326,8 @@ def vjoy_devices(connected_only=True):  # -> list[DeviceSummary]:
     global _vjoy_devices_map, _all_vjoy_devices_map
     with _device_registry_lock:
         if connected_only:
-            device_list = list(_vjoy_devices_map.values())
+            device_list = [dev for dev in _all_vjoy_devices_map.values() if dev.connected]
+            pass
         else:
             device_list = list(_all_vjoy_devices_map.values())
 

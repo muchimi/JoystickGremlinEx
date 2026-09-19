@@ -1005,9 +1005,7 @@ class VJoyMonitor:
         self._keep_alive_running = False
         self._keep_alive_started = False
         self._keep_alive_thread = None
-        self._keep_alive_abort_signal = None
-        # self._start_keep_alive()
-
+        self._keep_alive_abort_signal = threading.Event()
 
         self._vjoy_id_list = []
 
@@ -1050,7 +1048,7 @@ class VJoyMonitor:
             return
         self._keep_alive_started = True
         self._keep_alive_running = True
-        self._keep_alive_abort_signal = threading.Event()
+        self._keep_alive_abort_signal.clear()
         self._keep_alive_thread = threading.Thread(target=self._keep_alive_runner)
         self._keep_alive_thread.name = "VJOY keepalive"
         self._keep_alive_thread.start()
@@ -1067,7 +1065,7 @@ class VJoyMonitor:
             if self._keep_alive_thread is not None and self._keep_alive_thread.is_alive():
                 self._keep_alive_running = False
                 self._keep_alive_abort_signal.set()
-                self._keep_alive_thread.join()
+                gremlin.util.safeJoin(self._keep_alive_thread)
             self._keep_alive_thread = None
             self._keep_alive_abort_signal = None
         self._keep_alive_started = False

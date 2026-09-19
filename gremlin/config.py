@@ -39,14 +39,17 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
-#VOICE_INPUT_ENABLED = True
-VOICE_INPUT_ENABLED = False # turn off for production while voice input is being tested
+
+VOICE_INPUT_ENABLED = "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
     changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
+
+    VOICE_INPUT_ENABLED = VOICE_INPUT_ENABLED
 
     def get_config(self) -> str:
         """local config file (version based)"""
@@ -121,11 +124,17 @@ class Configuration(QtCore.QObject):
         self.getLastVersion()
         gremlin.shared_state.data_path = data_path
 
-        self.watcher = QtCore.QFileSystemWatcher([fname])
+        self._started = False
 
         self.reload()
 
-        self.watcher.fileChanged.connect(self.reload)
+    def start(self):
+        """starts the file watcher"""
+        if not self._started:
+            self._started = True
+            fname = self.get_config()
+            self.watcher = QtCore.QFileSystemWatcher([fname])
+            self.watcher.fileChanged.connect(self.reload)
 
     def setup_userprofile(self):
         """Initializes the data folder in the user's profile folder."""
@@ -356,20 +365,24 @@ class Configuration(QtCore.QObject):
         fname = self.get_config()
 
         # Attempt to load the configuration file if this fails set
-        # default empty values.
+        # default empty values while preserving a backup of the broken file.
         load_successful = False
+        data = self._data if isinstance(self._data, dict) else self._init_data()
         if os.path.isfile(fname):
             if not self._is_blank(fname):
                 with open(fname, "r", encoding="utf-8") as hdl:
                     try:
-                        # decoder = json.JSONDecoder()
-                        # decoder.decode(hdl.read())
                         data = json.load(hdl)
                         load_successful = True
                     except ValueError:
-                        pass
+                        self._archive_broken_config(fname, "invalid JSON while reloading config")
+                        data = self._data if isinstance(self._data, dict) else self._init_data()
+                    except Exception as err:
+                        syslog.warning(f"CONFIG: issue loading {fname}: {err}")
+                        self._archive_broken_config(fname, "read error while reloading config")
+                        data = self._data if isinstance(self._data, dict) else self._init_data()
         if not load_successful:
-            data = self._init_data()
+            data = self._data if isinstance(self._data, dict) else self._init_data()
 
         # Ensure required fields are present and if they are missing
         # add empty ones.
@@ -409,30 +422,38 @@ class Configuration(QtCore.QObject):
         if self._last_profile_reload is not None and time.time() - self._last_profile_reload < 1:
             return
 
-        self._profile_data = {}
-
         fname = self._profile_config_fname
         if not fname:
             return  # nothing to load
 
-        # Attempt to load the configuration file if this fails set
-        # default empty values.
-        data = None
-        lock1 = filelock.FileLock(f"{fname}.lock")
-        with lock1:
-            if os.path.isfile(fname) and os.path.getsize(fname):
-                with open(fname, "r", encoding="utf-8") as hdl:
-                    try:
-                        # decoder = json.JSONDecoder()
-                        # self._profile_data = decoder.decode(hdl.read())
-                        data = json.load(hdl)
-                    except ValueError as e:
-                        print(f"Error loading JSON from {fname}: {e}")
-                        data = None
-                        pass
-                    hdl.close()
+        previous_profile_data = self._profile_data if isinstance(self._profile_data, dict) else {}
+        self._profile_data = previous_profile_data.copy()
 
-        if data:
+        # Attempt to load the configuration file if this fails set
+        # default empty values while preserving a backup of the broken file.
+        data = previous_profile_data.copy()
+        try:
+            lock1 = filelock.FileLock(f"{fname}.lock")
+            with lock1:
+                if os.path.isfile(fname) and os.path.getsize(fname):
+                    with open(fname, "r", encoding="utf-8") as hdl:
+                        try:
+                            data = json.load(hdl)
+                        except ValueError as e:
+                            syslog.warning(f"CONFIG: invalid JSON in profile config {fname}: {e}")
+                            self._archive_broken_config(fname, "invalid JSON while reloading profile config")
+                            data = previous_profile_data.copy()
+                        except Exception as err:
+                            syslog.warning(f"CONFIG: unable to read profile config {fname}: {err}")
+                            self._archive_broken_config(fname, "read error while reloading profile config")
+                            data = previous_profile_data.copy()
+                        finally:
+                            hdl.close()
+        except (filelock.Timeout, OSError, PermissionError, RuntimeError) as err:
+            syslog.warning(f"CONFIG: profile config lock/read failed for {fname}: {err}")
+            data = previous_profile_data.copy()
+
+        if isinstance(data, dict):
             self._profile_data = data
 
         # Keep in-memory cache only. Re-saving here used to rewrite the sidecar and
@@ -465,6 +486,51 @@ class Configuration(QtCore.QObject):
             tmp_file += ext
         return tmp_file
 
+    def _archive_broken_config(self, fname: str, reason: str = "invalid JSON"):
+        """Move a broken config aside so the active config file is not destroyed."""
+        if not fname or not os.path.isfile(fname):
+            return
+
+        folder, filename = os.path.split(fname)
+        stem, ext = os.path.splitext(filename)
+        backup = os.path.join(folder, f"{stem}.corrupt{ext}")
+        counter = 1
+        while os.path.exists(backup):
+            backup = os.path.join(folder, f"{stem}.corrupt.{counter}{ext}")
+            counter += 1
+
+        try:
+            os.replace(fname, backup)
+            syslog.warning(f"CONFIG: archived broken config file {fname} to {backup} ({reason})")
+        except OSError:
+            try:
+                shutil.copy2(fname, backup)
+                os.unlink(fname)
+                syslog.warning(f"CONFIG: copied broken config file {fname} to {backup} ({reason})")
+            except Exception as ex:
+                syslog.error(f"CONFIG: could not archive broken config {fname}: {ex}")
+
+    def _write_json_atomic(self, fname: str, payload: dict):
+        """Write JSON atomically without deleting the current file on a failed replace."""
+        tmp = self.getTemporaryFile(".json")
+        try:
+            with open(tmp, "w", encoding="utf-8") as hdl:
+                encoder = json.JSONEncoder(sort_keys=True, indent=4)
+                hdl.write(encoder.encode(payload))
+                hdl.flush()
+                os.fsync(hdl.fileno())
+
+            os.replace(tmp, fname)
+            return True
+        except Exception as ex:
+            syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
+            if os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+            return False
+
     def _save_ui(self, fname: str = None, save_profile: bool = False):
         """Writes the version specific configuration file to disk."""
         if not self._lock.acquire(blocking=False):
@@ -475,22 +541,18 @@ class Configuration(QtCore.QObject):
         tmp = os.path.join(data_path, "temp")
         os.makedirs(tmp, exist_ok=True)
 
-        tmp = self.getTemporaryFile(".json")
         is_error = False
         try:
             if not fname:
                 fname = self.get_config()
-            # get a temp file name
-            with open(tmp, "w", encoding="utf-8") as hdl:
-                encoder = json.JSONEncoder(sort_keys=True, indent=4)
-                hdl.write(encoder.encode(self._data))
-                hdl.flush()
-                hdl.close()
+            if not self._write_json_atomic(fname, self._data):
+                is_error = True
 
             self._last_version_path = self.data_path()
             last_version_file = os.path.join(self._profile_path, "version.json")
             try:
-                json.dump({"last_version_path": self._last_version_path}, open(last_version_file, "w", encoding="utf-8"))
+                with open(last_version_file, "w", encoding="utf-8") as hdl:
+                    json.dump({"last_version_path": self._last_version_path}, hdl, indent=4)
             except Exception as ex:
                 syslog.error(f"CONFIG: unable to write last version file: {last_version_file}")
                 syslog.error(ex)
@@ -500,17 +562,10 @@ class Configuration(QtCore.QObject):
             syslog.error(ex)
             is_error = True
         finally:
-            if not is_error:
-                try:
-                    if os.path.isfile(fname):
-                        os.unlink(fname)
-                    shutil.copy(tmp, fname)
-                    os.unlink(tmp)
-                except Exception as ex:
-                    syslog.error(f"CONFIG: unable to overwrite file: {fname}")
-                    syslog.error(ex)
-
             self._lock.release()
+
+        if is_error:
+            syslog.warning(f"CONFIG: keeping existing config at {fname} because the write failed")
 
         if save_profile:
             self._save_profile_ui()
@@ -534,43 +589,49 @@ class Configuration(QtCore.QObject):
             return
         try:
             fname = self._profile_config_fname
-            tmp = gremlin.util.getTemporaryFile(".json")
+            if not fname:
+                return
 
-            if fname:
-                # Merge with on-disk sidecar. _profile_data often only holds last_input /
-                # selection fields; a blind overwrite previously deleted unrelated keys
-                # such as streamdeck_pages (page names) and wiped them on every tab click.
-                merged = {}
-                if os.path.isfile(fname) and os.path.getsize(fname):
-                    try:
-                        with open(fname, "r", encoding="utf-8") as hdl:
-                            loaded = json.load(hdl)
-                        if isinstance(loaded, dict):
-                            merged = loaded
-                    except Exception as err:
-                        syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
-                if isinstance(self._profile_data, dict):
-                    merged.update(self._profile_data)
-                else:
-                    merged = dict(merged)
-                self._profile_data = merged
+            # Merge with on-disk sidecar. _profile_data often only holds last_input /
+            # selection fields; a blind overwrite previously deleted unrelated keys
+            # such as streamdeck_pages (page names) and wiped them on every tab click.
+            merged = {}
+            if os.path.isfile(fname) and os.path.getsize(fname):
+                try:
+                    with open(fname, "r", encoding="utf-8") as hdl:
+                        loaded = json.load(hdl)
+                    if isinstance(loaded, dict):
+                        merged = loaded
+                except Exception as err:
+                    syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
+            if isinstance(self._profile_data, dict):
+                merged.update(self._profile_data)
+            else:
+                merged = dict(merged)
+            self._profile_data = merged
 
+            try:
+                tmp = gremlin.util.getTemporaryFile(".json")
                 lock1 = filelock.FileLock(f"{tmp}.lock")
                 lock2 = filelock.FileLock(f"{fname}.lock")
                 with lock1:
                     with open(tmp, "w", encoding="utf-8") as hdl:
                         encoder = json.JSONEncoder(sort_keys=True, indent=4)
                         hdl.write(encoder.encode(merged))
-                        hdl.close()
-
+                        hdl.flush()
+                        os.fsync(hdl.fileno())
                     with lock2:
-                        if os.path.isfile(fname):
-                            os.unlink(fname)
-                        shutil.copy(tmp, fname)
-                    os.unlink(tmp)
-        except Exception as ex:
-            syslog.error(f"CONFIG: unable to save profile: {fname}")
-            syslog.error(ex)
+                        os.replace(tmp, fname)
+            except (filelock.Timeout, OSError, PermissionError, RuntimeError) as ex:
+                syslog.warning(f"CONFIG: could not save profile config {fname} due to lock/write error: {ex}")
+                if os.path.exists(tmp):
+                    try:
+                        os.unlink(tmp)
+                    except OSError:
+                        pass
+            except Exception as ex:
+                syslog.error(f"CONFIG: unable to save profile: {fname}")
+                syslog.error(ex)
         finally:
             self._lock.release()
 
@@ -1927,6 +1988,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_voice(self):
         """true if verbose mode for voice"""
+        return True
         return self.verbose and VerboseMode.Voice in self.verbose_mode
 
     @osc_enabled.setter
@@ -3292,6 +3354,14 @@ class Configuration(QtCore.QObject):
         self._set_data("ReportShowFolder", value)
 
     @property
+    def ReportShowProfileTree(self) -> bool:
+        return self._get_data("ReportShowProfileTree", False)
+
+    @ReportShowProfileTree.setter
+    def ReportShowProfileTree(self, value: bool):
+        self._set_data("ReportShowProfileTree", value)
+
+    @property
     def TTSDefaultVoiceIndex(self) -> int:
         return self._get_data("TTSDefaultVoiceIndex", 0)
 
@@ -3714,9 +3784,54 @@ class Configuration(QtCore.QObject):
 
     @property
     def voice_command_release_delay(self) -> int:
-        """ delay in milliseconds before releasing a voice command event """
+        """delay in milliseconds before releasing a voice command event"""
         return self._get_data("voice_command_release_delay", 250)  # default to 250 ms
 
     @voice_command_release_delay.setter
     def voice_command_release_delay(self, value: int):
         self._set_data("voice_command_release_delay", value)
+
+    @property
+    def audio_blocking(self) -> bool:
+        """returns true if audio blocking is enabled for play sound actions"""
+        return self._get_data("audio_blocking", False)
+
+    @audio_blocking.setter
+    def audio_blocking(self, value: bool):
+        self._set_data("audio_blocking", value)
+
+    @property
+    def audio_blocking_delay_ms(self) -> int:
+        """returns the blocking delay in milliseconds for play sound actions"""
+        return self._get_data("audio_blocking_delay_ms", 0)
+
+    @audio_blocking_delay_ms.setter
+    def audio_blocking_delay_ms(self, value: int):
+        self._set_data("audio_blocking_delay_ms", value)
+
+    @property
+    def audio_trim_all(self) -> bool:
+        """returns true if trimming all silence is enabled for play sound actions"""
+        return self._get_data("audio_trim_all", True)
+
+    @audio_trim_all.setter
+    def audio_trim_all(self, value: bool):
+        self._set_data("audio_trim_all", value)
+
+    @property
+    def audio_trim_end(self) -> bool:
+        """returns true if trimming silence at the end is enabled for play sound actions"""
+        return self._get_data("audio_trim_end", False)
+
+    @audio_trim_end.setter
+    def audio_trim_end(self, value: bool):
+        self._set_data("audio_trim_end", value)
+
+    @property
+    def audio_silence_threshold_db(self) -> float:
+        """returns the silence threshold in decibels for play sound actions"""
+        return self._get_data("audio_silence_threshold_db", -55.0)
+
+    @audio_silence_threshold_db.setter
+    def audio_silence_threshold_db(self, value: float):
+        self._set_data("audio_silence_threshold_db", value)

@@ -30,11 +30,13 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import itertools
+import queue
+
 from dinput import DeviceSummary
 
 
 import gremlin.base_classes
-from gremlin.base_classes import FastQueue
+from gremlin.fastqueue import FastQueue
 import gremlin.shared_state
 import gremlin.threading
 
@@ -216,11 +218,10 @@ class Event:
 
     @property
     def event_pressed(self):
-        """ gets the pressed value for a button or hat """
+        """gets the pressed value for a button or hat"""
         if self.event_type == InputType.JoystickHat:
-            return self.value != (0,0)
+            return self.value != (0, 0)
         return self.is_pressed
-
 
     def set_extra_data(self, key: str, value: any):
         if not self.extra_data:
@@ -295,11 +296,24 @@ class Event:
         device_guid = self.device_guid
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
-        if self.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            data = (self.identifier.scan_code, self.identifier.is_extended) if isinstance(self.identifier, gremlin.keyboard.Key) else self.identifier
-            return (self.device_guid, self.event_type.value, data, 1 if data[1] else 0)
+        if self.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+            identifier = self.identifier
+            input_type = InputType.KeyboardLatched
+            if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+                key = identifier.key
+                data = (key.scan_code, key.is_extended)
+                input_type = InputType.KeyboardLatched
+            elif isinstance(identifier, gremlin.keyboard.Key):
+                input_type = InputType.KeyboardLatched
+                data = (identifier.scan_code, identifier.is_extended)
+            elif isinstance(identifier, gremlin.types.MouseButton):
+                identifier = gremlin.keyboard.key_from_mousebutton(identifier)
+                data = (identifier.scan_code, identifier.is_extended)
+            else:
+                data = (identifier.scan_code, identifier.is_extended) if isinstance(identifier, gremlin.keyboard.Key) else identifier
+            return (self.device_guid, input_type, data, 1 if data[1] else 0)
         else:
-            return (device_guid, self.event_type.value, self.identifier, 0)
+            return (device_guid, self.event_type, self.identifier, 0)
 
     def __hash__(self):
         """Computes the hash value of this event.
@@ -436,7 +450,6 @@ class Event:
         self.is_pressed = state["is_pressed"]
         self.action_id = state["action_id"]
         self.force_remote = state["force_remote"]
-
 
 
 class DeviceChangeEvent:
@@ -849,6 +862,9 @@ class EventListener(QtCore.QObject):
         self._device_change_pending = False  # true if a device change occured while suppressed
 
         self._running = True
+        self._run_thread = None
+        self._keep_alive_thread = None
+        self._event_thread = None
 
         self._process_device_change_lock = threading.Lock()
 
@@ -874,15 +890,9 @@ class EventListener(QtCore.QObject):
         self.profile_after_start.connect(self._handle_profile_started)
         self.config_option_changed.connect(self._handle_options_changed)
 
-        self._run_event = threading.Event()
-        self._run_thread = Thread(target=self._run)
-        self._run_thread.name = "EVENT run"
-        self._run_thread.start()
-
-        self._keep_alive_event = threading.Event()
-        self._keep_alive_thread = threading.Thread(target=self._keep_alive, daemon=False)
-        self._keep_alive_thread.name = "EVENT heartbeat"
-        self._keep_alive_thread.start()
+        self._run_event = threading.Event()  # thread abort flag for run thread
+        self._keep_alive_event = threading.Event()  # thread abort flag for keep alive thread
+        self._event_event = threading.Event()  # thread abort flag for event runner thread
 
         self._vjoy_callbacks = []
         self._debounce_map = {}
@@ -901,18 +911,22 @@ class EventListener(QtCore.QObject):
         self.vjoy_event.connect(self._handle_vjoy_event)  # hook internal vjoy events generated whenever something is output to vjoy
 
         self._ui_joystick_event_callbacks = []  # callbacks for joystick event runner
+        self._mode_lookup_cache = {}
+        self._mode_lookup_cache_lock = threading.RLock()
 
         # setup the event queue for joystick events
         self._event_queue: FastQueue[Event] = FastQueue[Event](name="event listener queue")  # queue.Queue() # holds the queue of events waiting to be processed
         self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
-        self._event_thread = gremlin.threading.AbortableThreadX(target=self._event_runner, eh=self)
-        self._event_thread.name = "EVENTLISTENER listener"
-        self._event_thread.start()
+
         self.joystick_event_ui.connect(self._fireUIJoystickEventCallbacks_ui, QtCore.Qt.ConnectionType.QueuedConnection)  # no wait signal for speed
 
         self.profile_unload.connect(self.reset)  # reset data on profile unload before a new profile is loaded
 
         self._handle_options_changed()  # load verbose modes
+
+        self.startRunThread()
+        self.startKeepAlive()
+        self.startEventThread()
 
     def pushDeviceChangeSuppression(self):
         """increments the device change suppression counter"""
@@ -969,23 +983,29 @@ class EventListener(QtCore.QObject):
         else:
             self._event_queue.put(event)
 
-    # @ignore_function
     def _event_runner(self) -> None:
-        """Process inbound joystick events."""
+        """Process inbound joystick event thread worker"""
 
         event_queue = self._event_queue
-        event_thread = self._event_thread
 
         joystick_event_emit = self.joystick_event.emit
         joystick_event_ui_emit = self.joystick_event_ui.emit
         axis_state_change_emit = self.axis_state_change.emit
         button_state_change_emit = self.button_state_change.emit
 
-        while not event_thread.stopped():
-            event_list = event_queue.getNowait()
-            if not event_list:
-                time.sleep(0)
+        while not self._event_event.is_set():
+            try:
+                event_list = event_queue.get(timeout=0.01)
+                if not isinstance(event_list, list):
+                    event_list = [event_list]
+            except FastQueue.Empty:
                 continue
+            except Exception:
+                continue
+
+            if not event_list:
+                continue
+
             event_list = _coalesce_axis_batch(event_list)
             for event in event_list:
                 joystick_event_emit(event)
@@ -996,7 +1016,6 @@ class EventListener(QtCore.QObject):
                         axis_state_change_emit(event)
                     else:
                         button_state_change_emit(event)
-                time.sleep(0)
 
     def _fireUIJoystickEventCallbacks(self, event):
         # run the UI callbacks on the UI thread
@@ -1011,11 +1030,10 @@ class EventListener(QtCore.QObject):
     def reset(self):
         self._vjoy_events.clear()
         self._vjoy_callbacks.clear()
+        self._mode_lookup_cache.clear()
 
         # clear the event queue
         self._event_queue.clear()
-        # while not self._event_queue.empty():
-        #     self._event_queue.get()
 
     def disconnect(self, signal: Signal | QtCore.Signal, slot: Callable):
         """attempts to disconnect a slot from a signal safely"""
@@ -1027,6 +1045,51 @@ class EventListener(QtCore.QObject):
         except Exception as e:
             pass
 
+    def startKeepAlive(self):
+        """Starts the keep alive thread if it is not already running"""
+        if self._keep_alive_thread is None:
+            self._keep_alive_event.clear()
+            self._keep_alive_thread = threading.Thread(target=self._keep_alive, daemon=False)
+            self._keep_alive_thread.name = "EVENT heartbeat"
+            self._keep_alive_thread.start()
+
+    def stopKeepAlive(self):
+        """Stops the keep alive thread if is running"""
+        if self._keep_alive_thread is not None:
+            self._keep_alive_event.set()
+            gremlin.util.safeJoin(self._keep_alive_thread)
+            self._keep_alive_thread = None
+
+    def startRunThread(self):
+        """Starts the run thread if it is not already running"""
+        if self._run_thread is None:
+            self._run_event.clear()
+            self._run_thread = threading.Thread(target=self._run, daemon=False)
+            self._run_thread.name = "EVENT run"
+            self._run_thread.start()
+
+    def stopRunThread(self):
+        """Stops the run thread if it is running"""
+        if self._run_thread is not None:
+            self._run_event.set()
+            gremlin.util.safeJoin(self._run_thread)
+            self._run_thread = None
+
+    def startEventThread(self):
+        """Starts the event thread if it is not already running"""
+        if self._event_thread is None:
+            self._event_event.clear()
+            self._event_thread = threading.Thread(target=self._event_runner, daemon=False)
+            self._event_thread.name = "EVENT listener"
+            self._event_thread.start()
+
+    def stopEventThread(self):
+        """Stops the event thread if it is running"""
+        if self._event_thread is not None:
+            self._event_event.set()
+            gremlin.util.safeJoin(self._event_thread)
+            self._event_thread = None
+
     @QtCore.Slot()
     def _shutdown_handler(self):
         """terminate threads"""
@@ -1035,23 +1098,10 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
 
         verbose = config.verbose_mode_inputs
-        if self._keep_alive_thread:
-            self._keep_alive_event.set()
-            self._keep_alive_thread.join()
-            self._keep_alive_thread = None
 
-        if self._run_thread:
-            self._run_event.set()
-            self._run_thread.join()
-            self._run_thread = None
-
-        # event runner
-        if self._event_thread.is_alive():
-            if verbose:
-                syslog.info("EVENTLISTENER: listen stop")
-            self._event_thread.stop()
-            self._event_thread.join()
-            self._event_thread = None
+        self.stopKeepAlive()
+        self.stopRunThread()
+        self.stopEventThread()
 
         # mark all events processed
         self._event_queue.clear()
@@ -1337,8 +1387,6 @@ class EventListener(QtCore.QObject):
 
     def _process_queue(self):
         """processes an item the keyboard buffer queue"""
-        if self._keyboard_queue.empty():
-            return
         items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
             if not self._keyboard_thread_running:
@@ -1448,14 +1496,13 @@ class EventListener(QtCore.QObject):
         self.disableMouse()
 
         # send the shutdown trigger to all code parts
-        if self._run_thread is not None:
-            # terminate run thread
-            self._run_event.set()
-            self._run_thread.join()
+        self.stopEventThread()
 
         # stop heart beat
-        self._keep_alive_event.set()
-        self._keep_alive_thread.join()
+        self.stopKeepAlive()
+
+        # stop run thread
+        self.stopRunThread()
 
         self.request_activate.emit(False)
         try:
@@ -2165,7 +2212,7 @@ class EventListener(QtCore.QObject):
         for dev_info in gremlin.joystick_handling.joystick_devices():
             self._load_calibrations(dev_info)
 
-    def _load_calibrations(self, device : DeviceSummary):
+    def _load_calibrations(self, device: DeviceSummary):
         """Loads the calibration data for the given joystick.
         :param device: DeviceSummary object representing the joystick device.
         """
@@ -2240,6 +2287,8 @@ class EventHandler(QtCore.QObject):
         self._execute_queue = []  # list of items to execute
         self._execute_thread = None
         self._execute_running = False
+        self._mode_lookup_cache = {}
+        self._mode_lookup_cache_lock = threading.RLock()
 
         # map of callbacks evaluated to see if a mode change can occur keyed by a unique key
         # actions that need to approve a mode change register a callback hook and unique ID that succeeds (bool = True) if the mode change is allowed
@@ -2263,8 +2312,9 @@ class EventHandler(QtCore.QObject):
             # self._queue_start()
             self._update_mode_change(gremlin.shared_state.runtime_mode)
             self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
+            self._execute_thread_event = threading.Event()
+            self._execute_thread = threading.Thread(target=self._execute_runner, args=(self._execute_thread_event,))
 
-            self._execute_thread = gremlin.threading.AbortableThreadX(target=self._execute_runner)
             self._execute_thread.name = "execute runner"
             self._execute_thread.start()
             syslog.info("EXEC: start")
@@ -2284,13 +2334,12 @@ class EventHandler(QtCore.QObject):
             current_profile = gremlin.shared_state.current_profile
             last_mode = gremlin.shared_state.runtime_mode
             current_profile.set_last_runtime_mode(last_mode)
-
-            if self._execute_thread.is_alive():
+            if self._execute_thread and self._execute_thread.is_alive():
                 syslog.info("EXEC: stopping execute runner thread")
-                self._execute_thread.stop()
+                self._execute_thread_event.set()
+                gremlin.util.safeJoin(self._execute_thread)
                 syslog.info("EXEC: execute runner thread stopped")
-                self._execute_thread.join()
-                syslog.info("EXEC: stop")
+                self._execute_thread = None
 
     def registerModeValidator(self, callback: Callable):
         assert callback is not None and callable(callback), "Callback must provided and be a callable "
@@ -2321,6 +2370,7 @@ class EventHandler(QtCore.QObject):
             syslog.info("EventHandler: reset()")
 
         self.process_callbacks = True
+        self._mode_lookup_cache.clear()
         self.callbacks = {}
         self.callback_key_map = {}  # map of event callbackKey to event
         self.input_item_map = {}  # map of input items keyed by device_guid, mode, input_type, input_id
@@ -2453,6 +2503,7 @@ class EventHandler(QtCore.QObject):
         # regular event
         import gremlin.util
         import gremlin.input_item
+
         if isinstance(device_guid, str):
             # convert to GUID
             device_guid = gremlin.util.parse_guid(device_guid)
@@ -2512,10 +2563,7 @@ class EventHandler(QtCore.QObject):
             self.latched_functors[device_guid][mode][key].append(functor)
             if verbose:
                 device_name = gremlin.joystick_handling.getDeviceName(device_guid)
-                syslog.info(
-                    f"Added latched functor: {device_name} mode: {mode} key: [{key}] "
-                    f"input: [{input_item.display_name}] event: [{str(event)}]"
-                )
+                syslog.info(f"Added latched functor: {device_name} mode: {mode} key: [{key}] input: [{input_item.display_name}] event: [{str(event)}]")
 
         # m76T185-style joystick merge latch: functors list only. Do not call
         # addCallback(latched=True) — that path owns latched_input_map and asserts
@@ -2579,6 +2627,23 @@ class EventHandler(QtCore.QObject):
             stub = ""
         return f"key device: [{key_device.name}][{key_device.device_id}] type: {InputType(key_event_type).name} data: [{key_data}] latched: [{latched}] {stub}"
 
+    def getMagic(self, event):
+        """gets the magic entry for an event or input item"""
+        input_type = event.event_type
+        match input_type:
+            case InputType.Mouse:
+                key = gremlin.keyboard.Key()
+                key.mouse_button = event.identifier
+                return json.dumps(key.index_tuple())
+            case InputType.KeyboardLatched | InputType.Keyboard:
+                if hasattr(event.identifier, "key"):
+                    return json.dumps(event.identifier.key.message_key)
+                return event.identifier
+            case InputType.State:
+                return event.identifier
+            case _:
+                return event.identifier
+
     def _matching_input_item(self, mode, event):
         """gets the matching input item from the event"""
 
@@ -2587,24 +2652,7 @@ class EventHandler(QtCore.QObject):
 
         device_guid = event.device_guid
         input_type = event.event_type
-        match input_type:
-            case InputType.Keyboard:
-                input_type = InputType.KeyboardLatched
-                magic = json.dumps(event.identifier)
-            case InputType.Mouse:
-                input_type = InputType.KeyboardLatched
-                key = gremlin.keyboard.Key()
-                key.mouse_button = event.identifier
-                magic = json.dumps(key.index_tuple())
-
-            case InputType.KeyboardLatched:
-                magic = json.dumps(event.identifier)
-            case InputType.State:
-                mode = gremlin.shared_state.master_mode # states use master mode
-                magic = event.identifier
-            case _:
-                magic = event.identifier
-
+        magic = self.getMagic(event)
 
         key = event.callbackKey
         # verbose = True
@@ -2612,14 +2660,25 @@ class EventHandler(QtCore.QObject):
         if verbose:
             self._dump_latched_input_map()
 
+        # match on master modes and the mode
+        master_mode = gremlin.shared_state.master_mode
+        modes = [master_mode, mode]
+        profile = gremlin.shared_state.current_profile
+        visited = set()
+
         # check latched inputs (these are not real inputs but registered) - check before normal inputs to give latched inputs priority
         if device_guid in self.latched_input_map:
-            if mode in self.latched_input_map[device_guid]:
-                if key in self.latched_input_map[device_guid][mode]:
-                    if verbose:
-                        key_stub = self._callback_key_stub(key)
-                        syslog.info(f"**** LATCH MATCH INPUT ITEM: magic: [{magic}] key: {key_stub} ")
-                    return self.latched_input_map[device_guid][mode][key]
+            for lookup_mode in modes:
+                while lookup_mode and lookup_mode not in visited:
+                    visited.add(lookup_mode)
+                    if lookup_mode in self.latched_input_map[device_guid]:
+                        if key in self.latched_input_map[device_guid][lookup_mode]:
+                            if verbose:
+                                key_stub = self._callback_key_stub(key)
+                                syslog.info(f"**** LATCH MATCH INPUT ITEM: magic: [{magic}] key: {key_stub} ")
+                            return self.latched_input_map[device_guid][lookup_mode][key]
+                    # ascend to the parent mode, if any
+                    lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
 
         if verbose:
             key_stub = self._callback_key_stub(key)
@@ -2632,38 +2691,37 @@ class EventHandler(QtCore.QObject):
             # fall back to parent modes here (mirrors build_event_lookup, which
             # only propagates inheritance into the callbacks maps, not this one).
 
-            lookup_mode = mode
-            profile = gremlin.shared_state.current_profile
-            visited = set()
-            while lookup_mode and lookup_mode not in visited:
-                visited.add(lookup_mode)
-                mode_map = self.input_item_map[device_guid].get(lookup_mode)
-                if mode_map and input_type in mode_map:
-                    if magic in mode_map[input_type]:
-                        if verbose:
-                            syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
-                        return mode_map[input_type][magic]
-                    # State events: fall back to message_key match (object identity
-                    # can miss after profile reload / clone).
-                    if input_type == InputType.State:
-                        want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
-                        if want:
-                            for mapped_magic, mapped_item in mode_map[input_type].items():
-                                mapped_key = getattr(mapped_magic, "message_key", None) or getattr(
-                                    mapped_item, "message_key", None
-                                ) or getattr(mapped_item, "key", None)
-                                if mapped_key == want:
-                                    if verbose:
-                                        syslog.info(
-                                            f"Match Input: state by key [{want}] (mode: {lookup_mode})"
-                                        )
-                                    return mapped_item
-                    elif verbose:
-                        syslog.info("available magic values for this input are: ")
-                        for m in mode_map[input_type]:
-                            syslog.info(f"\t{m}")
-                # ascend to the parent mode, if any
-                lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None else None
+            for lookup_mode in modes:
+                visited.clear()
+                while lookup_mode and lookup_mode not in visited:
+                    visited.add(lookup_mode)
+                    mode_map = self.input_item_map[device_guid].get(lookup_mode)
+                    if mode_map and input_type in mode_map:
+                        if magic in mode_map[input_type]:
+                            if verbose:
+                                syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
+                            return mode_map[input_type][magic]
+                        # State events: fall back to message_key match (object identity
+                        # can miss after profile reload / clone).
+                        if input_type == InputType.State:
+                            want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
+                            if want:
+                                for mapped_magic, mapped_item in mode_map[input_type].items():
+                                    mapped_key = (
+                                        getattr(mapped_magic, "message_key", None)
+                                        or getattr(mapped_item, "message_key", None)
+                                        or getattr(mapped_item, "key", None)
+                                    )
+                                    if mapped_key == want:
+                                        if verbose:
+                                            syslog.info(f"Match Input: state by key [{want}] (mode: {lookup_mode})")
+                                        return mapped_item
+                        elif verbose:
+                            syslog.info("available magic values for this input are: ")
+                            for m in mode_map[input_type]:
+                                syslog.info(f"\t{m}")
+                    # ascend to the parent mode, if any
+                    lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
 
         if verbose:
             syslog.info(f"Match input: **no match**: {input_type} {magic}")
@@ -2723,7 +2781,8 @@ class EventHandler(QtCore.QObject):
 
         valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap()  # list of valid joystick devices
         input_item = None
-        latched = False
+        latched = event is not None and event.event_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Mouse)
+        action_data = None
         if extra_data:
             if "input_item" in extra_data:
                 input_item = extra_data["input_item"]
@@ -2731,8 +2790,6 @@ class EventHandler(QtCore.QObject):
                 latched = extra_data["latched"]
             if "action_data" in extra_data:
                 action_data = extra_data["action_data"]
-        else:
-            action_data = None
 
         if latched:
             # latched entry only
@@ -2765,7 +2822,7 @@ class EventHandler(QtCore.QObject):
             return
 
         if event:
-            if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
+            if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
                 assert input_item is not None, "adding a lacthed input requires passing the input item to addCallback()"
                 verbose = gremlin.config.Configuration().verbose_mode_keyboard
                 # verbose = True
@@ -3125,11 +3182,11 @@ class EventHandler(QtCore.QObject):
             if config.verbose_mode_macro or config.verbose_mode_sequence:
                 syslog.info(f"MODE QUEUE: queue mode [{new_mode}] queue depth: [{len(self._change_mode_queue)}]")
 
-    def _execute_runner(self):
+    def _execute_runner(self, abort_event: threading.Event):
         """mode change runner - watches for mode change requests and changes mode if a mode change is allowed"""
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_macro or config.verbose_mode_sequence
-        while not self._execute_thread.stopped():
+        while not abort_event.is_set():
             if len(self._change_mode_queue):
                 if self.ModeChangeAllowed():
                     with self._lock:
@@ -3449,9 +3506,13 @@ class EventHandler(QtCore.QObject):
             # list of callbacks
             m_list = []
             f_list = []
+            v_list = []
 
             input_item: gremlin.input_item.InputItem = None
             callback: Callable = None
+
+            # if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+            #     pass
 
             data = self._matching_input_item(mode, event)
             if isinstance(data, LatchedCallbackData):
@@ -3514,10 +3575,9 @@ class EventHandler(QtCore.QObject):
                 InputType.KeyboardLatched,
                 InputType.Mouse,
             ):
-
                 el = EventListener()
 
-                def keyPressed(key : gremlin.keyboard.Key):
+                def keyPressed(key: gremlin.keyboard.Key):
                     """gets the key pressed state for a given key"""
                     nonlocal el
                     index = key.index_tuple()
@@ -3609,7 +3669,6 @@ class EventHandler(QtCore.QObject):
 
                         is_latched = all(keyPressed(key) for key in latched_keys)
                         if is_latched:
-
                             latch_found = True
                             latch_key = input_item.key
                             if callback:
@@ -3619,8 +3678,13 @@ class EventHandler(QtCore.QObject):
                                 # get callbacks for that input item
                                 m_list = self._matching_latched_callbacks(event, latch_key)
 
-                            if m_list:
+                            # check voice latching if latching on keyboard
+                            if config.VOICE_INPUT_ENABLED:
+                                v_list = self._matching_voice_callbacks(event, latch_key, input_item)
+                                if v_list:
+                                    m_list.extend(v_list)
 
+                            if m_list:
                                 # record the press event for the release when
                                 self._keyboard_callback_map[latch_key] = m_list
 
@@ -3726,6 +3790,12 @@ class EventHandler(QtCore.QObject):
 
                 if verbose_detailed and not (m_list or f_list):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+
+            # check for matching voice recognition trigger
+            if config.VOICE_INPUT_ENABLED and not v_list:
+                v_list = self._matching_voice_callbacks(event, None, input_item)
+                if v_list:
+                    m_list.extend(v_list)
 
             if not skip_execute and (m_list or f_list):
                 # self._queue_add(event, m_list, f_list)
@@ -3867,10 +3937,7 @@ class EventHandler(QtCore.QObject):
 
             verbose = gremlin.config.Configuration().verbose_mode_state
             if verbose and not callback_list:
-                syslog.info(
-                    f"STATE: state: [{key}] mode: [{self.runtime_mode}] has no "
-                    "callbacks. This is normal if state has no mappings."
-                )
+                syslog.info(f"STATE: state: [{key}] mode: [{self.runtime_mode}] has no callbacks. This is normal if state has no mappings.")
 
         # Filter events when the system is paused
         if not self.process_callbacks:
@@ -3878,35 +3945,59 @@ class EventHandler(QtCore.QObject):
         else:
             return [c[0] for c in callback_list]
 
+    def _mode_lookup_chain(self, event: Event):
+        """Return ordered mode candidates including inherited parents for the event."""
+        extra = event.extra_data or {}
+        mode_key = (
+            id(gremlin.shared_state.current_profile),
+            event.mode if event.mode else self.runtime_mode,
+            extra.get("mode"),
+            extra.get("target_mode"),
+        )
+
+        with self._mode_lookup_cache_lock:
+            cached = self._mode_lookup_cache.get(mode_key)
+            if cached is not None:
+                return list(cached)
+
+        mode_list = []
+        seen = set()
+
+        def add_mode(mode):
+            if mode and mode not in seen:
+                mode_list.append(mode)
+                seen.add(mode)
+
+        add_mode(extra.get("mode"))
+        add_mode(extra.get("target_mode"))
+        add_mode(event.mode if event.mode else self.runtime_mode)
+
+        profile = gremlin.shared_state.current_profile
+        for mode in list(mode_list):
+            parent_mode = profile.get_parent_mode(mode) if profile is not None else None
+            while parent_mode:
+                add_mode(parent_mode)
+                parent_mode = profile.get_parent_mode(parent_mode) if profile is not None else None
+
+        with self._mode_lookup_cache_lock:
+            self._mode_lookup_cache[mode_key] = tuple(mode_list)
+
+        return mode_list
+
     def _matching_functors(self, event) -> list:
         """gets the list of matching functors to call when an event occurs"""
         functors_list = []
-
-        # mode we're looking for
-        run_mode = event.mode if event.mode else self.runtime_mode
-
-        mode_list = [run_mode]
-        if event.extra_data:
-            if "mode" in event.extra_data:
-                mode_list = [event.extra_data["mode"]]
-            if "target_mode" in event.extra_data:
-                # override
-                mode_list.append(event.extra_data["target_mode"])
-        if event.extra_data and "mode" in event.extra_data:
-            # override
-            run_mode = event.extra_data["mode"]
-
         device_guid = event.device_guid
-        if device_guid in self.latched_functors:
-            for run_mode in mode_list:
-                modes = gremlin.shared_state.current_profile.getModeHierarchy(run_mode)
-                for mode in modes:
-                    if mode in self.latched_functors[device_guid]:
-                        key = event.callbackKey
-                        if key in self.latched_functors[device_guid][mode]:
-                            functors_list = self.latched_functors[device_guid][mode][key]
-                            if functors_list:
-                                break
+        if device_guid not in self.latched_functors:
+            return functors_list
+
+        for mode in self._mode_lookup_chain(event):
+            if mode in self.latched_functors[device_guid]:
+                key = event.callbackKey
+                if key in self.latched_functors[device_guid][mode]:
+                    functors_list = self.latched_functors[device_guid][mode][key]
+                    if functors_list:
+                        break
         return functors_list
 
     def _dump_matching_callbacks(self, event: Event, input_item):
@@ -3929,56 +4020,64 @@ class EventHandler(QtCore.QObject):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_details  # or config.verbose_mode_condition
-        mode = event.mode if event.mode else self.runtime_mode  # mode we're looking for
-        mode_list = [mode]
-        if event.extra_data:
-            if "mode" in event.extra_data:
-                # override
-                mode_list = [event.extra_data["mode"]]
-            if "target_mode" in event.extra_data:
-                # override
-                mode_list.append(event.extra_data["target_mode"])
-
         key = event.callbackKey
         device_guid = event.device_guid
-        key = event.callbackKey
+        mode_list = self._mode_lookup_chain(event)
 
-        # Obtain callbacks matching the event
         callback_list = []
-
-        # check latched callbacks
         callback_found = False
-        if device_guid in self.latched_callbacks:
+
+        latched = self.latched_callbacks.get(device_guid)
+        if latched is not None:
             for mode in mode_list:
-                if mode in self.latched_callbacks[device_guid]:
-                    if key in self.latched_callbacks[device_guid][mode]:
-                        if input_item in self.latched_callbacks[device_guid][mode][key]:
-                            callback_list = self.latched_callbacks[device_guid][mode][key][input_item]
-                            callback_found = True
-                        if verbose:
-                            event = self.callback_key_map[key]
-                            self.dump_exectree(device_guid, mode, event)
+                device_modes = latched.get(mode)
+                if device_modes is None:
+                    continue
+                mode_callbacks = device_modes.get(key)
+                if mode_callbacks is None:
+                    continue
+                if input_item in mode_callbacks:
+                    callback_list = mode_callbacks[input_item]
+                    callback_found = True
+                    if verbose:
+                        event_info = self.callback_key_map[key]
+                        self.dump_exectree(device_guid, mode, event_info)
+                    break
+                if verbose:
+                    event_info = self.callback_key_map[key]
+                    self.dump_exectree(device_guid, mode, event_info)
 
         if not callback_found:
-            if device_guid in self.callbacks:
+            device_modes_map = self.callbacks.get(device_guid)
+            if device_modes_map is not None:
                 for mode in mode_list:
-                    if mode in self.callbacks[device_guid]:
-                        if key in self.callbacks[device_guid][mode]:
-                            callback_list = self.callbacks[device_guid][mode][key]
-                            if verbose:
-                                event = self.callback_key_map[key]
-                                self.dump_exectree(device_guid, mode, event)
+                    mode_callbacks = device_modes_map.get(mode)
+                    if mode_callbacks is None:
+                        continue
+                    callback_list = mode_callbacks.get(key, [])
+                    if callback_list:
+                        if verbose:
+                            event_info = self.callback_key_map[key]
+                            self.dump_exectree(device_guid, mode, event_info)
+                        break
 
         if verbose:
             syslog.info(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")
 
-        # Filter events when the system is paused
-        if callback_list:
-            if not self.process_callbacks:
-                return [c[0] for c in callback_list if c[1]]
-            else:
-                return [c[0] for c in callback_list]
+        if not callback_list:
+            return []
 
+        if not self.process_callbacks:
+            return [c[0] for c in callback_list if c[1]]
+        return [c[0] for c in callback_list]
+
+    def _matching_voice_callbacks(self, event, latch_key, input_item):
+        # matches input to voice callbacks
+        import gremlin.ui.voice_device
+
+        vd = gremlin.ui.voice_device.VoiceData()
+        if vd.input_item == input_item:
+            return [vd.execute_callback]
         return []
 
     def _matching_latched_callbacks(self, event, key):
@@ -3998,15 +4097,13 @@ class EventHandler(QtCore.QObject):
                 import gremlin.execution_graph
 
                 ec = gremlin.execution_graph.ExecutionContext()  # current execution context
-                # search callbacks for mode hierarchy
                 keyid_source = key.index_tuple()  # use the scan code for now
                 keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
-                mode = self.runtime_mode
-                if device_guid in self.latched_keyboard_key_map:
-                    if mode in self.latched_keyboard_key_map[device_guid]:
-                        if keyid in self.latched_keyboard_key_map[device_guid][mode]:
-                            # callbacks = self.latched_keyboard_key_map[device_guid][mode][keyid]
-                            callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, mode)
+
+                for lookup_mode in self._mode_lookup_chain(event):
+                    if lookup_mode in self.latched_keyboard_key_map[device_guid] and keyid in self.latched_keyboard_key_map[device_guid][lookup_mode]:
+                        callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, lookup_mode)
+                        break
 
         if callback_list:
             # Filter events when the system is paused
@@ -5097,23 +5194,22 @@ class JoystickEventProcessor:
             if mode in self._listener_callbacks[source]:
                 if device_guid in self._listener_callbacks[source][mode]:
                     if input_type in self._listener_callbacks[source][mode][device_guid]:
-                        if -1 in self._listener_callbacks[source][mode][device_guid][input_type]:
-                            for callback in self._listener_callbacks[source][mode][device_guid][input_type][-1]:
+                        source_callbacks = self._listener_callbacks[source][mode][device_guid][input_type]
+                        if -1 in source_callbacks:
+                            for callback in source_callbacks[-1]:
                                 if verbose:
                                     syslog.info(
                                         f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}"
                                     )
                                 callback(event)
-                                time.sleep(0)
 
-                        if input_id_key in self._listener_callbacks[source][mode][device_guid][input_type]:
-                            for callback in self._listener_callbacks[source][mode][device_guid][input_type][input_id_key]:
+                        if input_id_key in source_callbacks:
+                            for callback in source_callbacks[input_id_key]:
                                 if verbose:
                                     syslog.info(
                                         f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}"
                                     )
                                 callback(event)
-                                time.sleep(0)
 
     @QtCore.Slot(Event)
     def process_event_ui(self, event: Event):

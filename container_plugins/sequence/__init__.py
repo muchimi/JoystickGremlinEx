@@ -62,10 +62,11 @@ class SequenceMode(IntEnum):
 
     @staticmethod
     def fromString(mode_str: str) -> SequenceMode:
-        for mode in SequenceMode:
-            if mode.name.casefold() == mode_str.casefold():
-                return mode
-        raise ValueError(f"Invalid sequence mode string: {mode_str}")
+        key = mode_str.casefold()
+        try:
+            return _SEQUENCE_MODE_LOOKUP[key]
+        except KeyError as err:
+            raise ValueError(f"Invalid sequence mode string: {mode_str}") from err
 
 
 class SequenceRepeatMode(IntEnum):
@@ -81,13 +82,17 @@ class SequenceRepeatMode(IntEnum):
 
     @staticmethod
     def fromString(mode_str: str) -> SequenceRepeatMode:
-        mode_str = mode_str.casefold()
-        if mode_str == "repeat":
-            mode_str = "loop"
-        for mode in SequenceRepeatMode:
-            if mode.name.casefold() == mode_str:
-                return mode
-        raise ValueError(f"Invalid sequence repeat mode string: {mode_str}")
+        key = mode_str.casefold()
+        if key == "repeat":
+            key = "loop"
+        try:
+            return _SEQUENCE_REPEAT_MODE_LOOKUP[key]
+        except KeyError as err:
+            raise ValueError(f"Invalid sequence repeat mode string: {mode_str}") from err
+
+
+_SEQUENCE_MODE_LOOKUP = {mode.name.casefold(): mode for mode in SequenceMode}
+_SEQUENCE_REPEAT_MODE_LOOKUP = {mode.name.casefold(): mode for mode in SequenceRepeatMode}
 
 
 @SingletonDecorator
@@ -962,50 +967,35 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.container_modified.emit()
 
     def _handle_interaction(self, interaction: Interactions, index: int, widget: ActionSetView):
-        """Handles interaction icons being pressed on the individual actions.
-
-        :param widget the action widget on which an action was invoked
-        :param index the index of the action widget
-        :param interaction the type of action being invoked
-        """
-        # Find the index of the widget that gets modified
-        # index = self._get_widget_index(widget)
-
+        """Handles interaction icons being pressed on the individual actions."""
         if index == -1:
             syslog.warning("Unable to find widget specified for interaction, not doing anything.")
             return
 
-        # Perform action
+        action_sets = self.container.action_sets
+        last_index = len(action_sets) - 1
+
         match interaction:
             case Interactions.Up:
                 if index > 0:
-                    self.container.action_sets.swap(index, index - 1)
+                    action_sets.swap(index, index - 1)
             case Interactions.Down:
-                if index < len(self.container.action_sets) - 1:
-                    self.container.action_sets.swap(index, index + 1)
+                if index < last_index:
+                    action_sets.swap(index, index + 1)
             case Interactions.Top:
                 if index > 0:
-                    self.container.action_sets.swap(index, 0)
-
+                    action_sets.swap(index, 0)
             case Interactions.Bottom:
-                if index < len(self.container.action_sets) - 1:
-                    self.container.action_sets.swap(index, len(self.container.action_sets) - 1)
-
+                if index < last_index:
+                    action_sets.swap(index, last_index)
             case Interactions.Delete:
-                del self.container.action_sets[index]
-        if interaction == Interactions.Up:
-            if index > 0:
-                self.container.action_sets.swap(index, index - 1)
-        if interaction == Interactions.Down:
-            if index < len(self.container.action_sets) - 1:
-                self.container.action_sets.swap(index, index + 1)
-
-        if interaction == Interactions.Delete:
-            self.container.action_sets.removeAt(index)
+                if 0 <= index <= last_index:
+                    action_sets.removeAt(index)
+            case _:
+                return
 
         if Shiboken.isValid(self):
             self.container_modified.emit()
-
         self._update_action_sets()
 
     def _get_window_title(self):
@@ -1129,8 +1119,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 if self._verbose:
                     syslog.info("SEQUENCE: affinity: stop sequence runner due to mode change")
                 self.action_data._is_running = False
-                if self.action_data._thread.is_alive():
-                    self.action_data._thread.join()
+                gremlin.util.safeJoin(self.action_data._thread)
+
                 self.action_data._thread = None
 
         # reset
@@ -1160,7 +1150,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: stop wiggle sequence runner")
             self.action_data._is_running = False
-            self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             self.action_data._thread = None
             # reduce concurrency count
             gs = GlobalSequence()
@@ -1188,8 +1178,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: normal mode: stop sequence runner")
             self.action_data._is_running = False
-            if self.action_data._thread.is_alive():
-                self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()
@@ -1217,8 +1206,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if self._verbose:
                 syslog.info("SEQUENCE: stepped mode: stop sequence runner")
             self.action_data._is_running = False
-            if self.action_data._thread.is_alive():
-                self.action_data._thread.join()
+            gremlin.util.safeJoin(self.action_data._thread)
             # reduce concurrency count
             gs = GlobalSequence()
             gs.popSequence()

@@ -97,8 +97,9 @@ class FileWatcher(QtCore.QObject):
     def stop(self):
         """Terminates the thread monitoring files."""
         self._is_running = False
-        if self._watch_thread.is_alive():
-            self._watch_thread.join()
+        gremlin.util.safeJoin(self._watch_thread)
+        self._watch_thread = None
+
 
     def _monitor(self):
         """Continuously monitors files for change."""
@@ -2964,3 +2965,29 @@ def clearFolder(folder_path: str):
         except Exception as ex:
             syslog.error(f"Unable to clear folder: {folder_path} - {str(ex)}")
     return False
+
+
+def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
+    """ safely join a thread while guarding against intermittent runtime lock errors
+        started with some versions of Python 3.14 - handles daemon threads
+    """
+    if thread is None:
+        return
+    try:
+        if thread.is_alive() and not thread.daemon:
+            # Only join the thread if it is alive and not a daemon thread
+            thread.join(timeout=timeout)
+    except RuntimeError as ex:
+        pass
+
+
+    return
+
+def phraseSplit(phrase: str) -> list[str]:
+    """Splits a phrase into segments based on |, newline, or carriage return + newline or <br> tags."""
+    if not phrase:
+        return []
+    pattern = r'\||\n|\r\n|<br\s*/?>'
+    phrase = phrase.casefold().strip()
+    result = [item.strip() for item in re.split(pattern, phrase) if item.strip()]
+    return result

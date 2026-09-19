@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 
 
+import gc
 import hashlib
 import os
 import html
@@ -60,19 +61,17 @@ from comtypes import CLSCTX_ALL
 
 # avoid the avalanche of warnings from pycaw
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="pycaw")
 from pycaw.pycaw import DEVICE_STATE, AudioUtilities, IAudioEndpointVolume, EDataFlow, IMMEndpoint, IMMDeviceEnumerator  # noqa: E402
-from pycaw.constants import CLSID_MMDeviceEnumerator # noqa: E402
+from pycaw.constants import CLSID_MMDeviceEnumerator  # noqa: E402
+
 
 class PROPERTYKEY(comtypes.Structure):
-    _fields_ = [
-        ("fmtid", GUID),
-        ("pid", comtypes.wintypes.DWORD)
-    ]
+    _fields_ = [("fmtid", GUID), ("pid", comtypes.wintypes.DWORD)]
 
-PKEY_Device_FriendlyName = PROPERTYKEY(
-    GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14
-)
+
+PKEY_Device_FriendlyName = PROPERTYKEY(GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14)
 
 
 # usage
@@ -113,6 +112,121 @@ def apply_gain(audio, gain_db):
         1.0,
     )
 
+class CommandTree:
+    """ tree of words for word matching against each command """
+    def __init__(self):
+        self.root = {}
+        self.COMMAND_END = "__END__"
+
+    def clear(self):
+        """Clears the entire command tree."""
+        self.root.clear()
+
+    def insert(self, command_words, command : VoiceCommand):
+        """Adds a list of sequential words to the trie."""
+        current = self.root
+        for word in command_words:
+            # Normalize to lowercase to make it case-insensitive
+            w = word.lower()
+            if w not in current:
+                current[w] = {}
+            current = current[w]
+        current[self.COMMAND_END] = command
+
+    def remove(self, command_words):
+        """Removes a list of sequential words from the trie."""
+        current = self.root
+        stack = []
+        for word in command_words:
+            w = word.lower()
+            if w in current:
+                stack.append((current, w))
+                current = current[w]
+            else:
+                return  # Command not found
+
+        if self.COMMAND_END in current:
+            del current[self.COMMAND_END]
+
+        # Clean up any empty dictionaries
+        while stack:
+            parent, key = stack.pop()
+            if not parent[key]:
+                del parent[key]
+
+    def search(self, incoming_words):
+        """Traverses the tree to find an exact sequential word match."""
+        current = self.root
+        for word in incoming_words:
+            w = word.lower()
+            if w in current:
+                current = current[w]
+            else:
+                return None # Path broke, no match
+
+        return current.get(self.COMMAND_END)
+
+    def search_sliding_window(self, incoming_words):
+        """
+        Slides a window across the text.
+        Returns the first longest matching command found.
+        """
+        n = len(incoming_words)
+
+        # 1. Slide the starting position of our window
+        for i in range(n):
+            current = self.root
+            best_match = None
+            words_consumed = 0
+
+            # 2. Try to match a sequence starting from index 'i'
+            for j in range(i, n):
+                w = incoming_words[j].lower()
+
+                if w in current:
+                    current = current[w]
+                    # If this node completes a command, remember it (greedy matching)
+                    if self.COMMAND_END in current:
+                        best_match = current[self.COMMAND_END]
+                        words_consumed = (j - i) + 1
+                else:
+                    # Path broke in the tree, stop looking down this specific branch
+                    break
+
+            # 3. If we found a match starting at index 'i', return it immediately
+            if best_match:
+                # matched_phrase = incoming_words[i : i + words_consumed]
+                return best_match
+                # return {
+                #     "command_id": best_match,
+                #     "matched_phrase": matched_phrase,
+                #     "start_index": i
+                # }
+
+        return None
+
+    def dump(self):
+        """Displays the entire tree structure as a readable text graph."""
+        syslog.info("Speech Tree Root")
+        self._dump_recursive(self.root, indent="")
+
+    def _dump_recursive(self, current_node, indent):
+        """Helper method to recursively print nodes with visual branching."""
+        keys = sorted(current_node.keys(), key=lambda x: (x == self.COMMAND_END, x))
+
+        for i, key in enumerate(keys):
+            # Check if this is the last item at the current depth for formatting lines
+            is_last = (i == len(keys) - 1)
+            marker = "└── " if is_last else "├── "
+            next_indent = indent + ("    " if is_last else "│   ")
+
+            if key == self.COMMAND_END:
+                # Highlight the command terminal node
+                syslog.info(f"{indent}{marker}🌟 Trigger -> {current_node[key]}")
+            else:
+                # Print the word node and step deeper into the tree
+                syslog.info(f"{indent}{marker}[{key}]")
+                self._dump_recursive(current_node[key], next_indent)
 
 class SpeechAudioProcessor:
     """
@@ -493,15 +607,20 @@ class SpeechRecognizer:
         self._running = False
         self._abort_event = threading.Event()
 
+        self.verbose = True
+
     def start(self):
         """Start the recognition thread."""
         if self._running:
             return
+        # if self.verbose:
+        #     syslog.info("Recog: starting recognition thread")
         self._running = True
         self._abort_event.clear()
         self._thread = threading.Thread(
             target=self._worker,
             args=(self._abort_event,),
+            daemon=True,
         )
 
         self._thread.name = "SpeechRecognizer"
@@ -509,11 +628,13 @@ class SpeechRecognizer:
 
     def stop(self):
         """Stop the recognition thread."""
-        self._running = False
-        self._abort_event.set()
-        self._queue.put(None)
-
-        self._thread.join(timeout=2.0)
+        if self._running:
+            # if self.verbose:
+            #     syslog.info("Recog: stopping recognition thread")
+            self._running = False
+            self._abort_event.set()
+            self._queue.put(None)
+            gremlin.util.safeJoin(self._thread)
 
     def add_audio(
         self,
@@ -538,7 +659,8 @@ class SpeechRecognizer:
                 .copy()
             )
 
-        # syslog.info(f"adding audio to recognize queue started: {speech_started}, ended: {speech_ended}")
+        # if self.verbose:
+        #     syslog.info(f"adding audio to recognize queue started: {speech_started}, ended: {speech_ended}")
         self._queue.put(
             (
                 audio,
@@ -552,11 +674,13 @@ class SpeechRecognizer:
     # ---------------------------------------------------------
 
     def _worker(self, abort_event):
-
+        # verbose = self.verbose
+        # if verbose:
+        #     syslog.info("Recog: worker thread runner started")
         while not abort_event.is_set():
             item = self._queue.get()
-
-            # syslog.info(f"Recog: has data: {item is not None}")
+            # if verbose:
+            #     syslog.info(f"Recog: has data: {item is not None}")
 
             if item is None:
                 # got signal break
@@ -566,7 +690,9 @@ class SpeechRecognizer:
             audio, started, ended = item
 
             if started:
-                # syslog.info("Recog: SPEECH STARTED")
+                # Speech has started
+                # if verbose:
+                #     syslog.info("Recog: SPEECH STARTED")
                 self._audio.clear()
 
             if audio is not None:
@@ -574,8 +700,13 @@ class SpeechRecognizer:
                 self._audio.append(audio)
 
             if ended:
-                # syslog.info("Recog: SPEECH ENDED")
+                # Speech has ended
+                # if verbose:
+                #     syslog.info("Recog: SPEECH ENDED")
                 self._recognize()
+
+        # if verbose:
+        #     syslog.info("Recog: worker thread runner stopped")
 
     # ---------------------------------------------------------
     # Recognition
@@ -604,16 +735,16 @@ class SpeechRecognizer:
         segments, info = self.model.transcribe(
             audio,
             language="en",
-            # Your own VAD already determined the utterance.
-            vad_filter=False,
-            beam_size=1,
+            vad_filter=True,
+            beam_size=2,
             condition_on_previous_text=False,
         )
         words = []
         for segment in segments:
             text = segment.text.strip().casefold()
             if text:
-                syslog.info(f"Processing segment: {text}")
+                if self.verbose:
+                    syslog.info(f"Processing segment: {text}")
                 words.extend([w.strip(string.punctuation) for w in text.split()])
 
         if words and self.callback:
@@ -658,27 +789,74 @@ DEFAULT_FILLER_WORDS = {
 class VoiceCommand:
     """holds voice command information including a callback called when the command is triggered"""
 
-    def __init__(self, phrase, callback=None, key=None, owner=None):
-        self.key = key if key is not None else gremlin.util.get_guid()
-        self.phrase = phrase.casefold().strip() if phrase is not None else None
-        self.callback = callback
+    def __init__(self, phrase, callback=None, owner=None):
+        self._key = None
+        self._phrase = None
+        self._callbacks = []  # list of callbacks
+        if callback is not None:
+            self.registerCallback(callback)
         self.owner = owner
-        self.meaningful_length = None
+        self._meaningful_length = None
+        if phrase:
+            self.phrase = phrase
+        self._update_key()
+
+    def _validate_phrase(self, phrase: str):
+        if not phrase:
+            info = "Phrase cannot be empty"
+            return False, info
+        phrase = phrase.casefold().strip()
+        if not isinstance(phrase, str):
+            info = "Phrase must be a string"
+            return False, info
+        splits = gremlin.util.phraseSplit(phrase)
+        if len(splits) > 1:
+            info = f"Phrase contains multiple segments [{splits}]"
+            return False, info
+        return True, "Phrase is valid"
+
+    def registerCallback(self, callback):
+        """Adds a callback to the list of callbacks."""
+        if callback is not None and callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """Removes a callback from the list of callbacks."""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def clearCallbacks(self):
+        """Clears all callbacks from the list of callbacks."""
+        self._callbacks.clear()
 
     @property
     def key(self) -> str:
+        """unique key for this command - based on the phrase or id"""
+        if self._key is None:
+            self._update_key()
         return self._key
 
     @key.setter
     def key(self, value):
-        self._key = value
+        raise ValueError("Key is readonly")
+
+    def _update_key(self):
+        """updates the unique key value for the command"""
+        # key depends on the phrase and not the owner because voice recognition would not know otherwise, in the case of duplicate
+        # phrases, which input to trigger.  This is checked when inputs are added.
+        if self._phrase is not None:
+            self._key = hash(self._phrase)
+        else:
+            self._key = hash(self._id)
+
+    @property
+    def id(self):
+        """id of this object - changes for ever instance and not persisted"""
+        return self._id
 
     @property
     def hashKey(self) -> str:
-        """ unique hash for the phrase in the command """
-        if self.phrase is None:
-            return None
-        return hash(self.phrase)
+        return self.key
 
     @property
     def phrase(self):
@@ -686,18 +864,24 @@ class VoiceCommand:
 
     @phrase.setter
     def phrase(self, value):
-        self._phrase = value
+        result, info = self._validate_phrase(value)
+        if not result:
+            raise ValueError(info)
+        if self._phrase != value:
+            self._phrase = value
+            self._key = hash(self._phrase)
 
     @property
-    def callback(self) -> Callable[[VoiceCommand], None]:
-        return self._callback
+    def callbacks(self) -> list[Callable[[VoiceCommand], None]]:
+        return self._callbacks
 
-    @callback.setter
-    def callback(self, value):
-        self._callback = value
+    @callbacks.setter
+    def callbacks(self, value):
+        self._callbacks = value
 
     @property
     def owner(self) -> str:
+        """owner of this command - this usually is the input item that owns this command in the voice device"""
         return self._owner
 
     @owner.setter
@@ -705,12 +889,12 @@ class VoiceCommand:
         self._owner = value
 
     def trigger(self):
-        """triggers the command callback"""
-        if self.callback is not None:
-            self.callback(self)
+        """triggers the registered callbacks for the voice command"""
+        for callback in self._callbacks:
+            callback(self)
 
     def __str__(self):
-        return f"VoiceCommand(key={self.key}, phrase={self.phrase})"
+        return f"VoiceCommand(key=[{self.key}], phrase=[{self.phrase}])"
 
 
 class CommandMatcher:
@@ -733,7 +917,7 @@ class CommandMatcher:
         *,
         filler_words=None,
         fuzzy_match=True,
-        fuzzy_threshold=95,
+        fuzzy_threshold=89,
         word_threshold=60,
         gap_penalty=25,
         filler_penalty=2,
@@ -741,6 +925,24 @@ class CommandMatcher:
         max_extra_words=5,
         callback: Callable = None,
     ):
+        """
+        Initializes the CommandMatcher with the given commands and matching parameters.
+
+        Args:
+            commands (list): List of VoiceCommand instances or command strings.
+            filler_words (set, optional): Set of filler words to ignore. Defaults to None.
+            fuzzy_match (bool, optional): Enable fuzzy matching. Defaults to True.
+            fuzzy_threshold (int, optional): Threshold for fuzzy matching. Defaults to 89.
+            word_threshold (int, optional): Threshold for individual word matching. Defaults to 60.
+            gap_penalty (int, optional): Penalty for gaps in matching. Defaults to 25.
+            filler_penalty (int, optional): Penalty for filler words. Defaults to 2.
+            swap_penalty (int, optional): Penalty for adjacent word swaps. Defaults to 10.
+            max_extra_words (int, optional): Maximum allowed extra words. Defaults to 5.
+            callback (Callable, optional): Callback function when a command is matched. Passes the recognized command.
+        """
+
+        self.tree = CommandTree() # search tree for matching words
+
         self.fuzzy_match = fuzzy_match
         self.fuzzy_threshold = fuzzy_threshold
         self.word_threshold = word_threshold
@@ -749,28 +951,68 @@ class CommandMatcher:
         self.swap_penalty = swap_penalty
         self.max_extra_words = max_extra_words
         self.callback = callback  # called when a command is matched
+        self._callbacks = []  # list of callbacks
         self._buffer = deque()
         self._commands = []
+        self.verbose = gremlin.config.Configuration().verbose_mode_voice
+        self._started = False
 
         self.filler_words = {word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)}
 
         self._command_map = {}  # holds the commands
         if commands:
             for command in commands:
-                if isinstance(command, VoiceCommand):
-                    vc = command
-                else:
-                    # command as a string
-                    vc = VoiceCommand(command)
+                assert isinstance(command, VoiceCommand), "Command must be a VoiceCommand instance"
+                assert command.owner is not None, "VoiceCommand must have an owner"
+                vc = command
 
                 words = self._tokenize(vc.phrase)
+                self.tree.insert(words, vc)
 
+                vc.registerCallback(self._handle_command_trigger)
                 vc.meaningful_length = self._meaningful_length(words)
                 vc.words = words
 
                 self._command_map[vc.key] = vc
 
             self._update_commands()
+
+        if callback is not None:
+            self.registerCallback(callback)
+
+    def start(self):
+        if not self._started:
+            self._started = True
+
+            syslog.info("Search Tree stats:")
+            syslog.info(f"\tCommands: {len(self._commands)}")
+            syslog.info(f"\tMax command words: {self._max_command_words}")
+            syslog.info("Search Tree:")
+            self.tree.dump()
+            pass
+
+    def stop(self):
+        self._buffer.clear()
+        self._started = False
+
+    def registerCallback(self, callback):
+        """Adds a callback to the list of callbacks."""
+        if callback is not None and callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """Removes a callback from the list of callbacks."""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def clearCallbacks(self):
+        """Clears all callbacks from the list of callbacks."""
+        self._callbacks.clear()
+
+    def _handle_command_trigger(self, command: VoiceCommand):
+        # fire the command callback, passes the command
+        for callback in self._callbacks:
+            callback(command)
 
     def hasCommands(self):
         return bool(self._commands)
@@ -797,35 +1039,44 @@ class CommandMatcher:
         """gets the number of commands currently in the matcher"""
         return len(self._commands)
 
-    def addCommand(self, command: Union[VoiceCommand, str]):
-        """ adds a single command to the matcher - duplicates are ignored
+    def addCommands(self, commands: list[VoiceCommand] | VoiceCommand):
+        """adds multiple commands to the matcher - duplicates are ignored"""
+        if isinstance(commands, VoiceCommand):
+            # singleton
+            commands = [commands]
 
-        :param command: The command to add. Can be a VoiceCommand instance or a string representing the phrase.  If a voice command, callback will be called when a match occurs with the key.
-        """
-        if isinstance(command, VoiceCommand):
-            vc = command
-        else:
-            vc = VoiceCommand(command)
-        vc.words = self._tokenize(vc.phrase)
-        vc.meaningful_length = self._meaningful_length(vc.words)
-        self._command_map[vc.key] = vc
-        self._update_commands()
-
-    def addCommands(self, commands: list[Union[VoiceCommand, str]]):
-        """ adds multiple commands to the matcher - duplicates are ignored """
-        for command in commands:
-            if isinstance(command, VoiceCommand):
-                vc = command
-            else:
-                vc = VoiceCommand(command)
+        for vc in commands:
+            assert isinstance(vc, VoiceCommand), "command must be a VoiceCommand instance"
             vc.words = self._tokenize(vc.phrase)
             vc.meaningful_length = self._meaningful_length(vc.words)
+            if self.verbose:
+                syslog.info(f"Voice: Command: registered [{vc.phrase}] length: {vc.meaningful_length}")
+
             self._command_map[vc.key] = vc
-        self.addCommand(command)
+            self.tree.insert(vc.words, vc)
+
+            vc.registerCallback(self._handle_command_trigger)
+        self._update_commands()
+
+    def removeCommand(self, command: Union[VoiceCommand, str]):
+        """removes a single command from the matcher"""
+        if isinstance(command, VoiceCommand):
+            key = command.key
+        else:
+            key = VoiceCommand(command).key
+        if key in self._command_map:
+            vc = self._command_map[key]
+            vc.removeCallback(self._handle_command_trigger)
+            self.tree.remove(vc.words)
+            del self._command_map[key]
+            self._update_commands()
 
     def clearCommands(self):
         """clears all commands from the matcher"""
+        for vc in self._command_map.values():
+            vc.removeCallback(self._handle_command_trigger)
         self._command_map.clear()
+        self.tree.clear()
         self._update_commands()
 
     def add_words(self, words):
@@ -842,14 +1093,41 @@ class CommandMatcher:
 
         """
 
+        verbose = self.verbose
+
+        if verbose:
+            syslog.info(f"Match: added word [{word}]")
+
         word = self._clean_word(word)
+
+        if verbose:
+            syslog.info(f"\t clean word: [{word}]")
 
         if not word:
             return None
 
         self._buffer.append(word)
-
         words = list(self._buffer)
+
+        if verbose:
+            syslog.info(f"\t current word buffer: {words}")
+
+
+        # tree search
+        start = 0
+
+        command = self.tree.search(words)
+        if not command:
+            command = self.tree.search_sliding_window(words)
+
+        if command:
+            self._consume_from(start)
+            if verbose:
+                syslog.info(f"\tTRIGGER: (tree) [{command.phrase}] ")
+            command.trigger()
+            return command
+
+        return None
 
         # exact matching
         exact = self._find_exact_match(words)
@@ -858,6 +1136,9 @@ class CommandMatcher:
             command, start = exact
 
             self._consume_from(start)
+
+            if verbose:
+                syslog.info(f"\tTRIGGER: (exact) [{command.phrase}] starting at index [{start}]")
 
             command.trigger()
             return command
@@ -873,6 +1154,9 @@ class CommandMatcher:
 
         for command in self._commands:
             target = command.words
+
+            if verbose:
+                syslog.info(f"\tmatch against command: [{command.phrase}]")
 
             target_length = len(target)
 
@@ -904,9 +1188,14 @@ class CommandMatcher:
                     best_command = command
                     best_start = start
 
-        if best_command is not None and best_score >= self.fuzzy_threshold:
+                if verbose:
+                    syslog.info(f"Fuzzy match candidate: [{command.phrase}] with score [{score}]")
+
+        if best_command is not None:  # and best_score >= self.fuzzy_threshold:
             self._consume_from(best_start)
 
+            if verbose:
+                syslog.info(f"\tTRIGGER: [{best_command.phrase}] with score [{best_score}]")
             best_command.trigger()
             return best_command
 
@@ -936,32 +1225,119 @@ class CommandMatcher:
         """
         Exact comparison while allowing filler words
         to exist on either side.
+
+        Matching is done in two passes:
+            1) full exact matches
+            2) partial prefix matches (command-length aware)
         """
+
+        verbose = self.verbose
+
+        # pass 1: full exact matches only
+        for command in self._commands:
+            target = command.words
+            target_nonfiller_len = self._meaningful_length(target)
+
+            if verbose:
+                syslog.info(f"\texact match: checking command: [{command.phrase}]")
+            # Search all windows, not only suffixes.
+            for start in range(len(words)):
+                nonfiller_seen = 0
+                for end in range(start + 1, len(words) + 1):
+                    w = words[end - 1]
+                    if not self._is_filler(w):
+                        nonfiller_seen += 1
+
+                    # stop once we exceeded target meaningful length
+                    if nonfiller_seen > target_nonfiller_len:
+                        break
+
+                    window = words[start:end]
+                    if self._equal_ignoring_fillers(window, target):
+                        return command, start
+
+        # pass 2: partial prefix matches with a minimum meaningful coverage
+        best_partial = None
+        best_partial_len = 0
 
         for command in self._commands:
             target = command.words
+            target_nonfiller_len = self._meaningful_length(target)
+
+            if target_nonfiller_len <= 0:
+                continue
+
+            min_partial_len = 1 if target_nonfiller_len == 1 else max(2, int(np.ceil(target_nonfiller_len * 0.6)))
 
             for start in range(len(words)):
-                window = words[start:]
+                nonfiller_seen = 0
 
-                if self._equal_ignoring_fillers(
-                    window,
-                    target,
-                ):
-                    return command, start
+                for end in range(start + 1, len(words) + 1):
+                    w = words[end - 1]
+                    if not self._is_filler(w):
+                        nonfiller_seen += 1
+
+                    if nonfiller_seen > target_nonfiller_len:
+                        break
+
+                    if nonfiller_seen < min_partial_len:
+                        continue
+
+                    window = words[start:end]
+                    if self._prefix_equal_ignoring_fillers(window, target):
+                        if nonfiller_seen > best_partial_len:
+                            best_partial_len = nonfiller_seen
+                            best_partial = (command, start)
+                            if verbose:
+                                syslog.info(f"\tpartial exact match: [{command.phrase}] start [{start}] words [{nonfiller_seen}/{target_nonfiller_len}]")
+
+        if best_partial is not None:
+            return best_partial
 
         return None
+
+    # old
+    # def _find_exact_match(self, words):
+    #     """
+    #     Exact comparison while allowing filler words
+    #     to exist on either side.
+    #     """
+
+    #     for command in self._commands:
+    #         target = command.words
+
+    #         for start in range(len(words)):
+    #             window = words[start:]
+
+    #             if self._equal_ignoring_fillers(
+    #                 window,
+    #                 target,
+    #             ):
+    #                 return command, start
+
+    #     return None
 
     def _equal_ignoring_fillers(self, spoken, target):
         """
         Compare two word sequences after removing filler words.
         """
-
         spoken = [word for word in spoken if not self._is_filler(word)]
-
         target = [word for word in target if not self._is_filler(word)]
 
         return spoken == target
+
+    def _prefix_equal_ignoring_fillers(self, spoken, target):
+        """True when spoken meaningful words are a prefix of target meaningful words."""
+        spoken = [word for word in spoken if not self._is_filler(word)]
+        target = [word for word in target if not self._is_filler(word)]
+
+        if not spoken:
+            return False
+
+        if len(spoken) > len(target):
+            return False
+
+        return spoken == target[: len(spoken)]
 
     # ---------------------------------------------------------
     # Dynamic matching
@@ -1166,14 +1542,18 @@ class Voice:
     def __init__(
         self,
         commands: list = None,
-        fuzzy_match=False,
-        fuzzy_threshold=95,
+        fuzzy_match=True,
+        fuzzy_threshold=89,
     ):
         os.environ["HF_HUB_VERBOSITY"] = "error"
+        self.verbose = gremlin.config.Configuration().verbose_mode_voice
         self._voice_lock = threading.RLock()
         self._audio_lock = threading.RLock()  # lock when adding new recognized words
         self._model_size = "small"  # "base" #  possible models: "tiny", "base", "small", "medium", "large-v3"
         self._listening = False  # true if actively listening for voice input
+        self._listen_enabled = False  # true if listening is enabled while monitoring
+        self._listen_lock = threading.RLock()
+
         self._suspend_stack = 0  # > 1 if listening suspended
         self._recognize_stack = 0  # > 1 if recognition is suspended
         self._listen_thread = None  # thread for listening to voice input
@@ -1187,19 +1567,38 @@ class Voice:
         self._new_word = False  # flag to indicate if a new word has been added
         self._volume = 0.0  # default volume level (system microphone level)
 
-        self._rolling_matcher = CommandMatcher(commands=commands, fuzzy_match=fuzzy_match, fuzzy_threshold=fuzzy_threshold)
+        self._callbacks = []
+
+        self._rolling_matcher = CommandMatcher(
+            commands=commands, fuzzy_match=fuzzy_match, fuzzy_threshold=fuzzy_threshold, callback=self._handle_command_trigger
+        )
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
         el.profile_stop.connect(self.stop)
 
+    def registerCallback(self, callback):
+        """register a callback to be invoked when a command is triggered"""
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)
+
+    def removeCallback(self, callback):
+        """remove a previously registered callback"""
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
+
+    def _handle_command_trigger(self, command: VoiceCommand):
+        """trigger all registered callbacks with the given command  when that command is triggered"""
+        for callback in self._callbacks:
+            callback(command)
+
     def addCommand(self, command: VoiceCommand):
-        """ adds a single command to the matcher - duplicates are ignored """
+        """adds a single command to the matcher - duplicates are ignored"""
         if command is not None:
-            self._rolling_matcher.addCommand(command)
+            self._rolling_matcher.addCommands([command])
 
     def addCommands(self, commands: list):
-        """ adds multiple commands to the matcher - duplicates are ignored """
+        """adds multiple commands to the matcher - duplicates are ignored"""
         self._rolling_matcher.addCommands(commands)
 
     def getCommands(self) -> list:
@@ -1235,6 +1634,18 @@ class Voice:
             elif self._recognize_stack > 0:
                 self._recognize_stack -= 1
 
+    def setListen(self, enable: bool):
+        """enable or disable listening while monitoring"""
+        with self._listen_lock:
+            self._listen_enabled = enable
+        if self.verbose:
+            syslog.info(f"Voice: Listening set to {'enabled' if enable else 'disabled'}")
+
+    def listenEnabled(self) -> bool:
+        """returns whether listening is currently enabled"""
+        with self._listen_lock:
+            return self._listen_enabled
+
     def test(self):
 
         # channels=1 ensures mono audio, and dtype='float32' matches Whisper's expected input
@@ -1249,7 +1660,21 @@ class Voice:
         if self._listening:
             return  # already listening
 
+        if not gremlin.config.VOICE_INPUT_ENABLED:
+            # disabled
+            return
+
+        commands = self.getCommands()
+        if not commands:
+            # no commands to process - do not start listener
+            return
+
         syslog.info("Starting voice input...")
+
+        if self.verbose:
+            syslog.info("List of defined voice commands:")
+            for command in commands:
+                syslog.info(f"\t{command.words}")
 
         self.processor = SpeechAudioProcessor(
             sample_rate=SAMPLE_RATE,
@@ -1271,13 +1696,16 @@ class Voice:
 
         self.recognizer.start()
 
+
+        self._rolling_matcher.start()
+
         with self._voice_lock:
             if self._suspend_stack == 0:  # not suspended
                 self._listening = True
                 self._abort_event.clear()
                 if self._listen_thread is None or not self._listen_thread.is_alive():
                     self._abort_event = threading.Event()
-                    self._listen_thread = threading.Thread(target=self._listen_runner, args=(self._abort_event,))
+                    self._listen_thread = threading.Thread(target=self._listen_runner, args=(self._abort_event,), daemon=True)
                     self._listen_thread.name = "VoiceListen"
                     self._listen_thread.start()
             else:
@@ -1296,40 +1724,72 @@ class Voice:
         with self._voice_lock:
             self._listening = False
             self._abort_event.set()
-            self._listen_thread.join(timeout=2)
+            gremlin.util.safeJoin(self._listen_thread)
+
             self._listen_thread = None
             self.recognizer.stop()
 
-    def _listen_runner(self, abort_event: threading.Event):
-        """internal method run in a separate thread to handle listening"""
 
-        syslog.info("Voice listen runner started...")
+        self._rolling_matcher.stop()
+
+
+    def _listen_runner(self, abort_event: threading.Event):
+        """Internal method run in a separate thread to handle listening."""
+
+        # if self.verbose:
+        #     syslog.info("Voice listen runner started...")
+        audio_queue = queue.Queue(maxsize=16) # use a small queue for real time reading to not block
 
         def callback(indata, frames, time_info, status):
             if status:
-                syslog.info(f"Audio: {status}")
+                if status.input_overflow:
+                    syslog.warning("Audio input overflow")
+                else:
+                    syslog.info("Audio: %s", status)
 
-            audio = indata[:, 0]
+            try:
+                # Input buffers are reused after the callback returns.
+                audio_queue.put_nowait(indata[:, 0].copy())
+            except queue.Full:
+                # Drop audio rather than blocking the real-time callback.
+                syslog.warning("Audio processing queue full; dropping block")
 
-            output, info = self.processor.process(audio)
+        stream = sd.InputStream(
+            samplerate=SAMPLE_RATE,
+            channels=1,
+            dtype=np.float32,
+            callback=callback,
+            blocksize=0,
+            latency="high",
+        )
 
-            if self._recognize_stack == 0 and self._rolling_matcher.hasCommands():  # speech recognition enabled
-                # speech recognition enabled
-                speech_started = info["speech_started"]
-                speech_ended = info["speech_ended"]
-                if output is not None:
-                    # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
-                    self.recognizer.add_audio(output, speech_started, speech_ended)
-
-            # monitor mode
-            self.audioMonitor.emit(info)
-
-        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype=np.float32, callback=callback)
         with stream:
-            # Keep the stream open until the trigger key is pressed
             while not abort_event.is_set():
-                time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
+                # do not use empty() as it blocks and can cause significant delays in real-time processing
+                # use the try/catch in case the queue is empty instead
+                try:
+                    audio = audio_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
 
+                with self._listen_lock:
+                    listen_enabled = self._listen_enabled
+
+                if not listen_enabled:
+                    # if self.verbose:
+                    #     syslog.info("Voice listen runner: listening disabled")
+                    continue
+
+                output, info = self.processor.process(audio)
+
+                if self._recognize_stack == 0 and self._rolling_matcher.hasCommands() and output is not None:
+                    self.recognizer.add_audio(
+                        output,
+                        info["speech_started"],
+                        info["speech_ended"],
+                    )
+
+                self.audioMonitor.emit(info)
 
     def getVolume(self, target_name: str = None) -> float:
         if gremlin.util.is_ui_thread():
@@ -1337,6 +1797,7 @@ class Voice:
 
         # non UI thread
         value = None
+
         def default_callback(volume: float):
             nonlocal value
             value = volume
@@ -1349,7 +1810,7 @@ class Voice:
         return value
 
     def _get_qmedia_device(self, target_name: str = None):
-        """gets the QMediaDevice for the given device, use None for the default device  """
+        """gets the QMediaDevice for the given device, use None for the default device"""
         gremlin.util.assert_ui_thread()
 
         device = None
@@ -1374,8 +1835,7 @@ class Voice:
             return default_device.description()
         return ""
 
-
-    def _get_volume_ui(self, target_name: str = None, callback : Callable = None) -> float:
+    def _get_volume_ui(self, target_name: str = None, callback: Callable = None) -> float:
         """gets the system volume 0 to 100 for the input device
 
         :param target_name: The name of the target input device (microphone). If None, the default microphone is used.
@@ -1398,72 +1858,76 @@ class Voice:
             callback(percent_volume)
         return percent_volume
 
-
-
-
     def setVolume(self, percent: float, target_name: str = None):
-        """ sets the input device volume level """
-        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name) # must be on UI thread to avoid COM issues
-
+        """sets the input device volume level"""
+        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name)  # must be on UI thread to avoid COM issues
 
     def _set_volume_com(self, device_name: str, volume_scalar: float) -> bool:
-        """sets the volume for the specified device using COM interfaces
+        """Set the volume of a matching active input device."""
 
-        :param device_name: The name of the target input device (microphone).
-        :param volume_scalar: The desired volume level as a scalar (0.0 to 1.0).
-        :return: True if the volume was successfully set, False otherwise.
-        """
+        if not 0.0 <= volume_scalar <= 1.0:
+            raise ValueError("volume_scalar must be between 0.0 and 1.0")
+
+        com_initialized = False
 
         try:
-            comtypes.CoInitialize()  # Initialize COM library for this thread
+            comtypes.CoInitialize()
+            com_initialized = True
 
+            def set_volume() -> bool:
+                enumerator = comtypes.CoCreateInstance(
+                    CLSID_MMDeviceEnumerator,
+                    interface=IMMDeviceEnumerator,
+                    clsctx=comtypes.CLSCTX_INPROC_SERVER,
+                )
 
-            # 1. Create the base Windows device enumerator
-            enumerator = comtypes.CoCreateInstance(
-                CLSID_MMDeviceEnumerator,
-                IMMDeviceEnumerator,
-                comtypes.CLSCTX_INPROC_SERVER
-            )
+                collection = enumerator.EnumAudioEndpoints(
+                    EDataFlow.eCapture.value,
+                    DEVICE_STATE.ACTIVE.value,
+                )
 
-            # 2. Get only active CAPTURE (input) devices (1 = eCapture)
-            # This prevents scanning rendering devices or disconnected endpoints
-            collection = enumerator.EnumAudioEndpoints(
-                EDataFlow.eCapture.value,
-                DEVICE_STATE.ACTIVE.value
-            )
+                target_device = None
 
-            count = collection.GetCount()
+                for index in range(collection.GetCount()):
+                    device = collection.Item(index)
+                    wrapped_device = AudioUtilities.CreateDevice(device)
 
-            target_dev = None
+                    if device_name.casefold() in wrapped_device.FriendlyName.casefold():
+                        target_device = device
+                        break
 
+                if target_device is None:
+                    print(f"Device matching {device_name!r} not found.")
+                    return False
 
-            # 3. Loop raw pointers directly (extremely fast)
-            for i in range(count):
-                dev = collection.Item(i)
+                interface = target_device.Activate(
+                    IAudioEndpointVolume._iid_,
+                    comtypes.CLSCTX_ALL,
+                    None,
+                )
+                endpoint_volume = cast(
+                    interface,
+                    POINTER(IAudioEndpointVolume),
+                )
 
-                # Open property store to get the string name
-                wrapped_device = AudioUtilities.CreateDevice(dev)
-                friendly_name = wrapped_device.FriendlyName
+                endpoint_volume.SetMasterVolumeLevelScalar(volume_scalar, None)
+                return True
 
-                if device_name.lower() in friendly_name.lower():
-                    target_dev = dev
-                    break
+            result = set_volume()
 
-            if not target_dev:
-                print(f"Device matching '{device_name}' not found.")
-                return False
+            # Ensure any cyclic wrapper objects are finalized while COM is active.
+            gc.collect()
+            return result
 
-            # 4. Activate volume control interface directly
-            interface = target_dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-
-            volume.SetMasterVolumeLevelScalar(volume_scalar, None)
-            return True
-        except Exception as e:
-            print(f"An error occurred while setting the volume: {e}")
+        except Exception as exc:
+            print(f"An error occurred while setting the volume: {exc}")
             return False
+
         finally:
-            comtypes.CoUninitialize()  # Uninitialize COM library for this thread
+            if com_initialized:
+                # Ensure any cyclic wrapper objects are finalized while COM is active.
+                gc.collect()
+                comtypes.CoUninitialize()
 
     def _set_volume_ui(self, percent: float, target_name: str = None):
         """sets the input device volume level
@@ -1501,4 +1965,3 @@ class Voice:
         #     volume = cast(interface, POINTER(IAudioEndpointVolume))
         #     volume.SetMasterVolumeLevelScalar(level_scalar, None)
         # syslog.info(f"VOICE: Microphone volume set to {percent}%  device: {target_name}")
-

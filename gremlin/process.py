@@ -127,8 +127,7 @@ class ProcessMonitor(QtCore.QObject):
         syslog = logging.getLogger("system")
         syslog.info("PROC: shutdown")
         if self._update_thread is not None:
-            if self._update_thread.is_alive():
-                self._update_thread.join()
+            gremlin.util.safeJoin(self._update_thread)
             self._update_thread = None
 
     def _update(self):

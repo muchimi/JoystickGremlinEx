@@ -1022,7 +1022,7 @@ class SimConnect:
             with self._thread_lock:
                 self._running = False  # kill the thread loop
             if self._runThread and self._runThread != threading.current_thread():
-                self._runThread.join()
+                gremlin.util.safeJoin(self._runThread)
 
             # this also resets the flags
             self._runThread = None

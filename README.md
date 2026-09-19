@@ -48,11 +48,50 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T55)
+- Change: PlaySound Action: exposed additional API features for sound playback options in the action.  Ability to set decibel threshold for removing detected low volume (silence) in played audio (.wav or generated TTS) - recommended threshold is -55dB,  trim options, optional delay if the blocking option is enabled to add a pause between sequential sounds and ability to sync settings globally in the profile to apply to other PlaySound actions without editing them one at at time.  
+- Change: API: event processing optimization path on very expensive mode hierarchy lookups that were adding CPU usage to match events to execution nodes.
+- Change: API: execution node functor lookup optimization and caching.
+- Change: Input Viewer: optimization pass on axis repeater updates and eliminate, where possible, unnecessary axis redraws as this window can have hundreds of updates to make.
+- Fix: Macro Action: Vjoy selector - exclude ghost vjoy devices
+- Fix: API: prevent configuration (and sidecar) file corruption on file contention/crash/data errors
+
+### (m77T54A)
+- Change: API: sound: added audio sample auto-trim to trim silence at the start and end of a sample stream.
+- Change: API: sound: added caching of processed audio streams for faster playback.
+- Change: API: sound: changed blocking audio playback behavior to avoid audio stream close/reopen latency and to bypass pooled threading
+- Fix: API: mouse buttons not triggering.
+
+### (m77T54)
+- Fix: API: configure file watching system after startup to avoid a QT warning message.
+- Fix: UI: exception (missing widget) when deleting certain containers.
+- Fix: State Container: does not refresh on action add/remove
+- Change: Voice: updated command matching tree.
+- Change: API: execution engine: added input node tracking and execution  
+
+
+
+
+
+### (m77T53)
+- Fix: API: continued refactor of GEX threading to handle recent internal changes to Python 3.14 threading. The issue caused a slew of recent fatal errors in the Python's engine, namely _lock contention_ on the termination of threads which is a new behavior so they are now handled differently after some research on publicly posted solutions.
+- Change: API (Voice): continued work on the voice recognition module, command matching algorithm and integration of voice commands with the execution graph. Internal testing continues to go well.
+- Fix: UI: Fixed one instance of QT C++ desync.
+
+Notes: this patch does not include code updates for the overlay/streamdek modules and voice is still disabled in the packaged version as the feature is still in development.  A further patch will be issued when updates to these modules are ready.
+
+### (m77T52)
+- Fix: API (Macro): legacy engine threading event rework due to Python 3.14 changes (could cause an internal Python exception) 
+- Fix: API: VJoy keep alive service: threading event rework due to Python 3.14. (could cause an internal Python exception)
+- Fix: API: centralized magic values to ensure consistency across all callback registrations.
+- Change: Added new dependencies for upcoming modules.
+
 ### (m77T51)
 - Fix: OBS Overlay: (experimental) - enhancements, thread safety and various fixes (courtesy Lolo350)
 - Fix: Streamdeck Device: (experimental) - polish + paste/splitter stability.  (courtesy Lolo350)
 - Fix: UI : various fixes.
 - Fix: API: refactor low level mouse wheel release handling to avoid Python 3.14 threading library issues with timers due to the use of internal events in Python that could cause internal lock issues.
+- Change: API: use of high resolution mouse wheel events (support for high resolution devices).
 
 ### (m77T50)
 - New: OBS Overlay: (experimental) Module courtesy Lolo350. This module allows to design and show an overlay module for OBS with chroma-key support suitable for streaming or showing inputs real-time. Many thanks to Lolo350 for including this feature in GEX.

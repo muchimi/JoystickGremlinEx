@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,13 +49,13 @@ class RawInputCon:
     RI_MOUSE_BUTTON_2_UP = 0x0008
     RI_MOUSE_BUTTON_3_DOWN = 0x0010 # middle
     RI_MOUSE_BUTTON_3_UP = 0x0020
-    RI_MOUSE_BUTTON_4_DOWN = 0x0040 
+    RI_MOUSE_BUTTON_4_DOWN = 0x0040
     RI_MOUSE_BUTTON_4_UP = 0x0080
-    RI_MOUSE_BUTTON_5_DOWN = 0x0100 
+    RI_MOUSE_BUTTON_5_DOWN = 0x0100
     RI_MOUSE_BUTTON_5_UP = 0x0200
     RI_MOUSE_WHEEL = 0x400 # up/down wheel
     RI_MOUSE_HWHEEL = 0x0800 # left/right wheel
-    
+
     # Constants derived from WinSDK headers.
     RIDEV_INPUTSINK = 0x00000100
     RID_HEADER = 0x10000005
@@ -222,7 +222,7 @@ class RawInputData():
         data.button = button
         data.is_pressed = is_pressed
         return data
-    
+
     @property
     def button_id(self) -> int:
         return int(self.button)
@@ -234,7 +234,7 @@ class RawInputData():
     #     data.button = button
     #     data.direction = direction
     #     return data
-    
+
     @staticmethod
     def Motion(dx : int, dy : int):
         data = RawInputData()
@@ -242,8 +242,8 @@ class RawInputData():
         data.dx = dx
         data.dy = dy
         return data
-    
-    
+
+
 
 def handle_raw_input(lparam):
     ''' called when a raw mouse input is received '''
@@ -252,7 +252,7 @@ def handle_raw_input(lparam):
         raw_input_data = RAWINPUT()
         raw_input_size = w.UINT(ct.sizeof(raw_input_data))
 
-        # convert to the delta values 
+        # convert to the delta values
         GetRawInputData(HRAWINPUT(lparam), RawInputCon.RID_INPUT, ct.byref(raw_input_data), ct.byref(raw_input_size), ct.sizeof(RAWINPUTHEADER))
         if raw_input_data.header.dwType == RawInputCon.RIM_TYPEMOUSE:
             # raw input is a mouse
@@ -274,11 +274,11 @@ def handle_raw_input(lparam):
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_2_DOWN:
                     packets.append(RawInputData.Button(gremlin.types.MouseButton.Right, True))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_2_UP:
-                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Right, False))                    
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Right, False))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_3_DOWN:
                     packets.append(RawInputData.Button(gremlin.types.MouseButton.Middle, True))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_3_UP:
-                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Middle, False))                    
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Middle, False))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_4_DOWN:
                     packets.append(RawInputData.Button(gremlin.types.MouseButton.Forward, True))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_4_UP:
@@ -286,7 +286,7 @@ def handle_raw_input(lparam):
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_5_DOWN:
                     packets.append(RawInputData.Button(gremlin.types.MouseButton.Back, True))
             if buttonflag & RawInputCon.RI_MOUSE_BUTTON_5_UP:
-                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Back, False))     
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Back, False))
             if buttonflag & RawInputCon.RI_MOUSE_WHEEL:
                 direction = data.usButtonData
                 if direction == 120:
@@ -298,8 +298,8 @@ def handle_raw_input(lparam):
                 if direction == 120:
                     packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelLeft, True))
                 else:
-                    packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelRight, True)) 
-        
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelRight, True))
+
             # run the callbacks
             if packets:
                 for callback in _raw_input_callbacks:
@@ -307,9 +307,9 @@ def handle_raw_input(lparam):
 
 
 
-                
 
-@WNDPROC 
+
+@WNDPROC
 def raw_input_wnd_proc(hwnd, msg, wparam, lparam):
     ''' custom message loop message processor '''
     if msg == RawInputCon.WM_INPUT:
@@ -332,11 +332,11 @@ def registerHook(callback):
     if _raw_input_hooked:
         # already hooked
         return
-    
+
     verbose = gremlin.config.Configuration().verbose_mode_remote
     if verbose:
         syslog.info("KVM: start")
-    
+
     # start the message loop if not started
     _raw_input_hooked = True
     _raw_input_running = True
@@ -344,7 +344,7 @@ def registerHook(callback):
     _raw_input_thread.name = "raw input runner"
     _raw_input_thread.start()
 
-    
+
 def _raw_input_runner():
     ''' raw input message loop - each thread gets its own message loop'''
     global _raw_input_hooked, _raw_input_hwnd, _raw_input_thread, _raw_input_running, _raw_input_callbacks, _raw_input_thread_id
@@ -399,13 +399,11 @@ def rawInputShutdown():
             syslog.info("KVM: shutdown")
 
         # wait for the dispatch to finish
-        if _raw_input_thread.is_alive():
-            # wait for quit message to have been processed
-            _raw_input_thread.join()
+        gremlin.util.safeJoin(_raw_input_thread)
+   
         _raw_input_thread = None
         _raw_input_hwnd = None
-        _raw_input_hooked = False 
-        
+        _raw_input_hooked = False
 
-     
-        
+
+

@@ -637,7 +637,7 @@ class KeyboardHook:
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
-            self._listen_thread.join()
+            gremlin.util.safeJoin(self._listen_thread)
             # Recreate thread so we can launch it again
             self._listen_thread = threading.Thread(target=self._listen, daemon=True)
 
@@ -793,7 +793,7 @@ class MouseHook:
         if self._running:
             self._running = False
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
-            self._listen_thread.join()
+            gremlin.util.safeJoin(self._listen_thread)
             # Recreate thread so we can launch it again
             self._listen_thread = None
             self._stop_timers()
@@ -804,8 +804,7 @@ class MouseHook:
 
         syslog.info("MOUSE: shutdown")
         if self._listen_thread:
-            if self._listen_thread.is_alive():
-                self._listen_thread.join()
+            gremlin.util.safeJoin(self._listen_thread)
             self._listen_thread = None
 
     def _stop_timers(self):

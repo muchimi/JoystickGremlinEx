@@ -342,9 +342,10 @@ class MouseController:
 
     def stop(self):
         """Stops the thread that sends motion events."""
-        if self._thread and self._thread.is_alive():
+        if self._thread:
             self._stop.set()
-            self._thread.join()
+            gremlin.util.safeJoin(self._thread)
+            self._thread = None
             syslog.info("MOUSE CONTROL: stop")
 
     def _control_loop(self):

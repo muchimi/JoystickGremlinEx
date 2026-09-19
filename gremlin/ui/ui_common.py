@@ -1907,34 +1907,36 @@ class DeviceWidgetTracker:
         self._widget_cache = {}
         self.any_mode = "[any]"
 
-    def registerWidget(self, widget, device_guid, mode, input_type, input_id, key):
-        if not mode:
-            mode = self.any_mode
+    @staticmethod
+    def _normalize_device_guid(device_guid):
         if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid not in self._widget_cache:
-            self._widget_cache[device_guid] = {}
-        if mode not in self._widget_cache[device_guid]:
-            self._widget_cache[device_guid][mode] = {}
-        if input_type not in self._widget_cache[device_guid][mode]:
-            self._widget_cache[device_guid][mode][input_type] = {}
-        if input_id not in self._widget_cache[device_guid][mode][input_type]:
-            self._widget_cache[device_guid][mode][input_type][input_id] = {}
+            return gremlin.util.normalize_guid(device_guid)
+        return device_guid
 
-        self._widget_cache[device_guid][mode][input_type][input_id][key] = widget
+    def registerWidget(self, widget, device_guid, mode, input_type, input_id, key):
+        mode = mode or self.any_mode
+        device_guid = self._normalize_device_guid(device_guid)
+        by_mode = self._widget_cache.setdefault(device_guid, {})
+        by_input_type = by_mode.setdefault(mode, {})
+        by_input_id = by_input_type.setdefault(input_type, {})
+        by_key = by_input_id.setdefault(input_id, {})
+        by_key[key] = widget
 
     def unregisterWidget(self, device_guid, mode, input_type, input_id, key):
-        if not mode:
-            mode = self.any_mode
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._widget_cache:
-            for mode in self._widget_cache[device_guid]:
-                if input_type in self._widget_cache[device_guid][mode]:
-                    if input_id in self._widget_cache[device_guid][mode][input_type]:
-                        if self._widget_cache[device_guid][mode][input_type][input_id]:
-                            if key in self._widget_cache[device_guid][mode][input_type][input_id]:
-                                self._widget_cache[device_guid][mode][input_type][input_id][key] = None
+        mode = mode or self.any_mode
+        device_guid = self._normalize_device_guid(device_guid)
+        by_mode = self._widget_cache.get(device_guid)
+        if not by_mode:
+            return
+        by_input_type = by_mode.get(mode)
+        if not by_input_type:
+            return
+        by_input_id = by_input_type.get(input_type)
+        if not by_input_id:
+            return
+        inner = by_input_id.get(input_id)
+        if inner is not None and key in inner:
+            inner[key] = None
 
     def clear(self):
         self._widget_cache = {}
@@ -1943,30 +1945,28 @@ class DeviceWidgetTracker:
             syslog.info("DEVICE WIDGET TRACKER: clear()")
 
     def getWidget(self, device_guid, mode, input_type, input_id, key):
-        if not mode:
-            mode = self.any_mode
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._widget_cache:
-            for mode in self._widget_cache[device_guid]:
-                if input_type in self._widget_cache[device_guid][mode]:
-                    if input_id in self._widget_cache[device_guid][mode][input_type]:
-                        if key in self._widget_cache[device_guid][mode][input_type][input_id]:
-                            return self._widget_cache[device_guid][mode][input_type][input_id][key]
+        mode = mode or self.any_mode
+        device_guid = self._normalize_device_guid(device_guid)
+        by_mode = self._widget_cache.get(device_guid)
+        if not by_mode:
+            return None
+        by_input_type = by_mode.get(mode)
+        if not by_input_type:
+            return None
+        by_input_id = by_input_type.get(input_type)
+        if not by_input_id:
+            return None
+        by_key = by_input_id.get(input_id)
+        if by_key is None:
+            return None
+        return by_key.get(key)
 
     def getCache(self, device_guid, mode, input_type):
-        if not mode:
-            mode = self.any_mode
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._widget_cache:
-            for mode in self._widget_cache[device_guid]:
-                if input_type in self._widget_cache[device_guid][mode]:
-                    return self._widget_cache[device_guid][mode][input_type]
-        self._widget_cache[device_guid] = {}
-        self._widget_cache[device_guid][mode] = {}
-        self._widget_cache[device_guid][mode][input_type] = {}
-        return self._widget_cache[device_guid][mode][input_type]
+        mode = mode or self.any_mode
+        device_guid = self._normalize_device_guid(device_guid)
+        by_mode = self._widget_cache.setdefault(device_guid, {})
+        by_input_type = by_mode.setdefault(mode, {})
+        return by_input_type.setdefault(input_type, {})
 
 
 @SingletonDecorator
@@ -1984,11 +1984,27 @@ class StateTracker:
         el.update_input_state.connect(self._update_input_state)
         self._queue = []
 
+    @staticmethod
+    def _normalize_device_guid(device_guid):
+        if not isinstance(device_guid, str):
+            return gremlin.util.normalize_guid(device_guid)
+        return device_guid
+
     def _key(self, input_id):
         if hasattr(input_id, "message_key"):
             # item has a special key to use for indexing input ID
             return input_id.message_key
         return str(input_id)
+
+    def _lookup_widget(self, cache, device_guid, input_type, input_id):
+        device_guid = self._normalize_device_guid(device_guid)
+        by_input_type = cache.get(device_guid)
+        if not by_input_type:
+            return None
+        widget_map = by_input_type.get(input_type)
+        if not widget_map:
+            return None
+        return widget_map.get(self._key(input_id))
 
     def registerButtonState(self, widget, device_guid, input_type, input_id):
         if not isinstance(device_guid, str):
@@ -2118,29 +2134,25 @@ class StateTracker:
 
         from shiboken6 import Shiboken
 
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        # syslog = logging.getLogger("system")
-        # device_name = gremlin.shared_state.get_device_name(device_guid)
-        if device_guid in self._button_cache:
-            if input_type in self._button_cache[device_guid]:
-                key = self._key(input_id)
-                if key in self._button_cache[device_guid][input_type]:
-                    widget = self._button_cache[device_guid][input_type][key]
-                    if Shiboken.isValid(widget) and widget.enabled:
-                        match input_type:
-                            case InputType.JoystickButton:
-                                if hasattr(widget, "_update_value"):
-                                    widget._update_value(state)
-                            case InputType.JoystickHat:
-                                if hasattr(widget, "_update_hat"):
-                                    widget._update_hat(state)
-                            case InputType.OpenSoundControl:
-                                if hasattr(widget, "_update_value"):
-                                    widget._update_value(state)
-                            case InputType.Midi:
-                                if hasattr(widget, "_update_value"):
-                                    widget._update_value(state)
+        widget = self._lookup_widget(self._button_cache, device_guid, input_type, input_id)
+        if widget is None:
+            return
+        if not Shiboken.isValid(widget) or not widget.enabled:
+            return
+
+        match input_type:
+            case InputType.JoystickButton:
+                if hasattr(widget, "_update_value"):
+                    widget._update_value(state)
+            case InputType.JoystickHat:
+                if hasattr(widget, "_update_hat"):
+                    widget._update_hat(state)
+            case InputType.OpenSoundControl:
+                if hasattr(widget, "_update_value"):
+                    widget._update_value(state)
+            case InputType.Midi:
+                if hasattr(widget, "_update_value"):
+                    widget._update_value(state)
 
     def _store_state(self, device_guid, input_type, input_id, state):
         """stores the last button state for the given input"""
@@ -2175,47 +2187,28 @@ class StateTracker:
         if gremlin.shared_state.is_repeater_suspended():
             return
 
-        device_guid = event.device_guid
+        device_guid = self._normalize_device_guid(event.device_guid)
         input_type = event.event_type
         input_id = event.identifier
         value = event.value
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._axis_cache:
-            if input_type in self._axis_cache[device_guid]:
-                key = self._key(input_id)
-                if key in self._axis_cache[device_guid][input_type]:
-                    widget = self._axis_cache[device_guid][input_type][key]
-                    try:
-                        if Shiboken.isValid(widget) and widget.enabled and hasattr(widget, "_update_value"):
-                            widget._update_value(value)
-                    except Exception:
-                        # discarded by QT - ignore
-                        pass
+
+        widget = self._lookup_widget(self._axis_cache, device_guid, input_type, input_id)
+        if widget is None:
+            return
+
+        try:
+            if Shiboken.isValid(widget) and widget.enabled and hasattr(widget, "_update_value"):
+                widget._update_value(value)
+        except Exception:
+            # discarded by QT - ignore
+            pass
 
     def getButtonWidget(self, device_guid, input_type, input_id):
         """gets the widget registered for a button state tracking"""
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._button_cache:
-            if input_type in self._button_cache[device_guid]:
-                key = self._key(input_id)
-                if key in self._button_cache[device_guid][input_type]:
-                    widget = self._button_cache[device_guid][input_type][key]
-                    return widget
-
-        return None
+        return self._lookup_widget(self._button_cache, device_guid, input_type, input_id)
 
     def getAxisWidget(self, device_guid, input_type, input_id):
-        if not isinstance(device_guid, str):
-            device_guid = gremlin.util.normalize_guid(device_guid)
-        if device_guid in self._axis_cache:
-            if input_type in self._axis_cache[device_guid]:
-                key = self._key(input_id)
-                if key in self._axis_cache[device_guid][input_type]:
-                    widget = self._axis_cache[device_guid][input_type][key]
-                    return widget
-        return None
+        return self._lookup_widget(self._axis_cache, device_guid, input_type, input_id)
 
     @QtCore.Slot(object, object, object)
     def _select_input_completed(self, device_guid, input_type, input_id):
@@ -2238,27 +2231,27 @@ class StateTracker:
         """updates all the state widgets related to a single device based on stored state"""
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
-            # buttons
-        if device_guid in self._button_cache:
-            for input_type in self._button_cache[device_guid]:
-                for key in self._button_cache[device_guid][input_type]:
-                    widget = self._button_cache[device_guid][input_type][key]
+
+        # buttons
+        button_by_type = self._button_cache.get(device_guid)
+        if button_by_type:
+            for input_type, widget_map in button_by_type.items():
+                for key, widget in widget_map.items():
                     if not Shiboken.isValid(widget):
                         continue
                     input_id = widget.input_id
-                    # get the current state
                     state = self._get_device_state(device_guid, input_type, input_id)
                     if state is not None:
                         self._update_widget(device_guid, input_type, input_id, state)
+
         # axes
-        if device_guid in self._axis_cache:
-            for input_type in self._axis_cache[device_guid]:
-                for key in self._axis_cache[device_guid][input_type]:
-                    widget = self._axis_cache[device_guid][input_type][key]
+        axis_by_type = self._axis_cache.get(device_guid)
+        if axis_by_type:
+            for input_type, widget_map in axis_by_type.items():
+                for key, widget in widget_map.items():
                     if not Shiboken.isValid(widget):
                         continue
                     input_id = widget.input_id
-                    # get the current state
                     state = self._get_device_state(device_guid, input_type, input_id)
                     if state is not None:
                         self._update_widget(device_guid, input_type, input_id, state)
@@ -3412,19 +3405,36 @@ class JoystickSelector(AbstractInputSelector):
 class VJoySelector(AbstractInputSelector):
     """Widget allowing the selection of vJoy inputs."""
 
-    def __init__(self, change_cb, valid_types, invalid_ids={}, parent=None):
+    def __init__(self, change_cb, valid_types, invalid_ids={}, parent=None, show_connected_only=True):
         """Creates a widget to select a vJoy output.
 
         :param change_cb callback to execute when the widget changes
         :param valid_types the input type to present in the selection
         :param invalid_ids list of vid values of vjoy devices to not consider
+        :param show_connected_only: if True, only connected vJoy devices are shown.
+            If False, only vJoy devices configured as input are shown.
         :param parent of this widget
+        :param show_connected_only: if True, only connected vJoy devices are shown.
+            If False, only vJoy devices configured as input are shown.
         """
         self.invalid_ids = invalid_ids
+        self.show_connected_only = show_connected_only
         super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
 
     def _initialize(self):
-        potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(connected_only=False), key=lambda x: x.vjoy_id)
+        if self.show_connected_only:
+            potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(connected_only=True), key=lambda x: x.vjoy_id)
+        else:
+            profile = gremlin.shared_state.current_profile
+            configured_input_vids = set()
+            if profile is not None and hasattr(profile, "settings"):
+                configured_input_vids = set(profile.settings.getVjoyAsInputList())
+            potential_devices = [
+                dev
+                for dev in sorted(gremlin.joystick_handling.vjoy_devices(connected_only=False), key=lambda x: x.vjoy_id)
+                if dev.vjoy_id in configured_input_vids
+            ]
+
         for dev in potential_devices:
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,
@@ -5291,8 +5301,6 @@ class QIconPushButton(QDataPushButton):
             syslog.error(f"Exception: {e}")
             syslog.error(traceback.format_exc())
 
-
-
     def on_press(self):
         """override when mouse is pressed"""
         super().on_press()
@@ -5324,24 +5332,21 @@ class NoKeyboardPushButton(QIconPushButton):
 
 
 class QIconButton(QIconPushButton):
-    def __init__(self, text=None,
-                  icon: str = None,
-                  icon_size=24,
-                  data=None,
-                  parent=None,
-                  tooltip=None,
-                  callback: Callable = None,
-                  callbackEx: Callable = None,
-                  checkable=False):
-        super().__init__(text=text,
-                         icon=icon,
-                         icon_size=icon_size,
-                         data=data,
-                         parent=parent,
-                         tooltip=tooltip,
-                         callback=callback,
-                         callbackEx=callbackEx,
-                         checkable = checkable)
+    def __init__(
+        self,
+        text=None,
+        icon: str = None,
+        icon_size=24,
+        data=None,
+        parent=None,
+        tooltip=None,
+        callback: Callable = None,
+        callbackEx: Callable = None,
+        checkable=False,
+    ):
+        super().__init__(
+            text=text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, checkable=checkable
+        )
 
 
 class QReorderToolbar(QWidget):
@@ -5983,6 +5988,12 @@ class QProgressBar(QWidget):
         self._percent = {}  # percent valuess of the progress bar by value index
         self._colors = {}  # color gradient assigned to a specific channel
         self._row_count = 1  # display rows by default
+        self._last_percent_signature = None
+        self._last_colors_signature = None
+        self._pending_value = None
+        self._render_timer = QtCore.QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.timeout.connect(self._flush_pending_value_ui)
 
         self._start_color = {}  # color for each value band (start gradient)
         self._end_color = {}  # color for each value band (end gradient)
@@ -6272,9 +6283,35 @@ class QProgressBar(QWidget):
         self._max_range = max
         self._update_value()
 
+    @staticmethod
+    def _normalize_value_key(value):
+        return _normalize_axis_value_key(value)
+
     def setValue(self, value: float | list):
         if value is not None:
-            gremlin.util.InvokeUiMethod(self._set_value_ui, value)
+            gremlin.util.InvokeUiMethod(self._queue_value_ui, value)
+
+    def _queue_value_ui(self, value):
+        assert gremlin.util.is_ui_thread(), "must be on ui thread"
+        if not Shiboken.isValid(self):
+            self._valid = False
+            return
+
+        if value is None:
+            return
+
+        if self._value is not None and self._normalize_value_key(value) == self._normalize_value_key(self._value):
+            return
+
+        self._pending_value = value
+        if not self._render_timer.isActive():
+            self._render_timer.start(0)
+
+    def _flush_pending_value_ui(self):
+        value = self._pending_value
+        self._pending_value = None
+        if value is not None:
+            self._set_value_ui(value)
 
     def _set_value_ui(self, value):
         import gremlin.event_handler
@@ -6282,6 +6319,9 @@ class QProgressBar(QWidget):
         assert gremlin.util.is_ui_thread(), "must be on ui thread"
         if not Shiboken.isValid(self):
             self._valid = False
+            return
+
+        if self._value is not None and self._normalize_value_key(value) == self._normalize_value_key(self._value):
             return
 
         if isinstance(value, gremlin.event_handler.AxisValues):
@@ -6328,8 +6368,9 @@ class QProgressBar(QWidget):
             values = self._value
         else:
             values = [self._value]
-        self._percent.clear()
-        self._colors.clear()
+
+        new_percent = {}
+        new_colors = {}
         start_index = 0
         end_index = 0
         index = 0
@@ -6339,7 +6380,7 @@ class QProgressBar(QWidget):
             c1 = self._start_color[start_index]
             c2 = self._end_color[end_index]
             if value is None:
-                self._percent[index] = None
+                new_percent[index] = None
             else:
                 if hasattr(value, "__iter__"):
                     # sublist of values, like merged data
@@ -6353,14 +6394,14 @@ class QProgressBar(QWidget):
                 else:
                     subvalues = [value]
                 for value in subvalues:
-                    self._percent[index] = gremlin.util.scale_to_range(
+                    new_percent[index] = gremlin.util.scale_to_range(
                         value,
                         source_min=self._min_range,
                         source_max=self._max_range,
                         target_min=0.0,
                         target_max=1.0,
                     )
-                    self._colors[index] = (c1, c2)
+                    new_colors[index] = (c1, c2)
 
                     # round robin the colors
                     if bump_start:
@@ -6376,15 +6417,25 @@ class QProgressBar(QWidget):
                     # next channel
                     index += 1
 
-        self.updateGeometry()  # indicate desired size changed
+        percent_signature = tuple(new_percent.items())
+        colors_signature = tuple(new_colors.items())
+        changed = percent_signature != self._last_percent_signature or colors_signature != self._last_colors_signature
+
+        self._percent = new_percent
+        self._colors = new_colors
 
         count = len(self._percent)
         if count != self._row_count:
             self._row_count = count
+            self.updateGeometry()
             self.sizeChanged.emit()
+        elif changed:
+            self.updateGeometry()
 
-        # self.setVisible(True)
-        self.update()  # repaint
+        if changed:
+            self._last_percent_signature = percent_signature
+            self._last_colors_signature = colors_signature
+            self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -6454,6 +6505,18 @@ class QProgressBar(QWidget):
         # syslog.info("progress paint end")
 
         # syslog.info(f"X: {x} y: {y} w: {w} h: {h} v:{v} value: {self._percent:0.3f}")
+
+
+def _normalize_axis_value_key(value):
+    import gremlin.event_handler
+
+    if value is None:
+        return None
+    if isinstance(value, gremlin.event_handler.AxisValues):
+        return tuple(value.toList(strip=False))
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return value
 
 
 _hook_registry = {}  # registers hook list [hook_id]
@@ -6648,6 +6711,9 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
 
         if self._state_change_callback:
             self._state_change_callback(values)
+
+        if self._value is not None and self._normalize_value_key(values) == self._normalize_value_key(self._value):
+            return
 
         self._set_value_ui(values)
 
@@ -7055,15 +7121,27 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         if event.source == EventSourceType.Virtual:
             value = event.value
             if input_id in self.axis_widgets:
+                current = self.axis_widgets[input_id].value()
+                if self.axis_widgets[input_id]._normalize_value_key(current) == self.axis_widgets[input_id]._normalize_value_key(value):
+                    return
                 self.axis_widgets[input_id].setValue(value)
             if input_id in self.value_label_widgets:
+                current = self.value_label_widgets[input_id].value()
+                if current == value:
+                    return
                 self.value_label_widgets[input_id].setValue(value)
         else:
             values = astate.getAxisValues(event.device_guid, input_id, event.value)
             if values is not None:
                 if input_id in self.axis_widgets:
+                    current = self.axis_widgets[input_id].value()
+                    if _normalize_axis_value_key(current) == _normalize_axis_value_key(values):
+                        return
                     self.axis_widgets[input_id].setValue(values)
                 if input_id in self.value_label_widgets:
+                    current = self.value_label_widgets[input_id].value()
+                    if current == values.actual:
+                        return
                     self.value_label_widgets[input_id].setValue(values.actual)
 
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
@@ -7450,9 +7528,9 @@ class AxesTimeline(QtWidgets.QGroupBox):
             time.sleep(self.interval)
 
     def unhook(self):
-        self._is_running = False
-        if self._thread and self._thread.is_alive():
-            self._thread.join()
+        if self._is_running:
+            self._is_running = False
+            gremlin.util.safeJoin(self._thread)
             self._thread = None
         gremlin.util.clear_layout(self.layout())
 
@@ -7522,9 +7600,8 @@ class TimeLinePlotWidget(QWidget):
     def unhook(self):
         """occurs on cleanup"""
         self._is_running = False
-        if self._thread.is_alive():
-            self._thread.join()
-            self._thread = None
+        gremlin.util.safeJoin(self._thread)
+        self._thread = None
 
     def resizeEvent(self, event):
         """Handles resizing this widget.
@@ -9143,7 +9220,7 @@ class QDelayWidget(QWidget):
         label=None,
         tooltip=None,
         show_zero=False,
-        shortcut_map : {str,float}= None,
+        shortcut_map: {str, float} = None,
     ):
         """
         Delay widget for specifying a time interval in milliseconds or seconds.
@@ -10343,12 +10420,8 @@ class QSplitTabWidget(QDataWidget):
         self._right_scroll_area.setObjectName("QSplitTabRightScroll")
         self._right_scroll_area.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._right_scroll_area.setWidgetResizable(True)
-        self._right_scroll_area.setHorizontalScrollBarPolicy(
-            QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
-        self._right_scroll_area.setVerticalScrollBarPolicy(
-            QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
-        )
+        self._right_scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._right_scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         # Scroll viewport may shrink; content keeps its minimumSizeHint so an
         # H-scrollbar appears instead of crushing the mapping toolbar.
         self._right_scroll_area.setMinimumWidth(0)
@@ -10466,11 +10539,7 @@ class QSplitTabWidget(QDataWidget):
     def _resolve_splitter_sizes(self, width: int) -> list[int]:
         """Scale remembered / shared / default sizes to the current tab width."""
         sizes = self._last_sizes
-        if (
-            (not sizes or len(sizes) < 2 or sum(sizes) <= 0)
-            and self._share_splitter_sizes
-            and QSplitTabWidget._shared_splitter_sizes
-        ):
+        if (not sizes or len(sizes) < 2 or sum(sizes) <= 0) and self._share_splitter_sizes and QSplitTabWidget._shared_splitter_sizes:
             sizes = QSplitTabWidget._shared_splitter_sizes
         if not sizes or len(sizes) < 2 or sum(sizes) <= 0:
             return self._default_splitter_sizes(width)
@@ -10512,11 +10581,7 @@ class QSplitTabWidget(QDataWidget):
         # Re-apply remembered sizes when Qt's layout drifted (e.g. mid-split on
         # tab switch). Skip when already correct to avoid paste/rebuild churn.
         sizes = self._splitter.sizes()
-        need = (
-            not self._last_sizes
-            or len(sizes) < 2
-            or abs(sum(sizes) - width) > 2
-        )
+        need = not self._last_sizes or len(sizes) < 2 or abs(sum(sizes) - width) > 2
         if not need and self._last_sizes and len(sizes) >= 2 and sum(self._last_sizes) > 0:
             # Detect ~50/50 snap after device switch with Ignored right pane.
             expected = self._resolve_splitter_sizes(width)
@@ -13276,6 +13341,7 @@ class QExecuteWidget(QWidget):
         self._release_callback = release_callback
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         widget = getHContainer([self._press_widget, self._release_widget], label=label, widget_only=True)
         self.main_layout.addWidget(widget)
@@ -16190,9 +16256,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
             self.setObjectName(name)
 
         # Target only this container instead of every descendant QWidget.
-        self.setStyleSheet(
-            "AutoHideStackedWidget { background: transparent; }"
-        )
+        self.setStyleSheet("AutoHideStackedWidget { background: transparent; }")
 
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
@@ -16379,6 +16443,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
     def _cleanup_ui(self) -> None:
         self.setWidget(None)
 
+
 class AutoHideStackedWidgetOld(QtWidgets.QStackedWidget):
     """stacked widget that automatically hides itself if no widget is set"""
 
@@ -16557,16 +16622,17 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
             self.updateGeometry()
 
     def setWidget(self, widget: QWidget):
-        """sets the widget to be displayed"""
-        if self._widget is not None and Shiboken.isValid(self._widget):
-            self.removeWidget(self._widget)
-        if widget is not None and not Shiboken.isValid(widget):
-            self._widget = None
-            return
-        self._widget = widget
-        if widget is not None:
-            self.addWidget(widget)
-        self.updateGeometry()
+        if Shiboken.isValid(self):
+            """sets the widget to be displayed"""
+            if self._widget is not None and Shiboken.isValid(self._widget):
+                self.removeWidget(self._widget)
+            if widget is not None and not Shiboken.isValid(widget):
+                self._widget = None
+                return
+            self._widget = widget
+            if widget is not None:
+                self.addWidget(widget)
+            self.updateGeometry()
 
     def sizeHint(self):
         if self._widget and self._show_id:
@@ -17055,29 +17121,20 @@ class QAudioLevelMeter(QWidget):
 
     @Slot(float)
     def setLevel(self, level_db):
-        level_db = max(
-            self.min_db,
-            min(self.max_db, float(level_db))
-        )
+        level_db = max(self.min_db, min(self.max_db, float(level_db)))
 
         self._level_db = level_db
 
         if level_db > self._peak_db:
             self._peak_db = level_db
         else:
-            self._peak_db = max(
-                self.min_db,
-                self._peak_db - self._peak_decay
-            )
+            self._peak_db = max(self.min_db, self._peak_db - self._peak_decay)
 
         self.update()
 
     @Slot(float)
     def setThreshold(self, threshold_db):
-        self._threshold_db = max(
-            self.min_db,
-            min(self.max_db, float(threshold_db))
-        )
+        self._threshold_db = max(self.min_db, min(self.max_db, float(threshold_db)))
 
         self.update()
 
@@ -17086,10 +17143,7 @@ class QAudioLevelMeter(QWidget):
         """
         Convenience method for updating both in one signal.
         """
-        self._threshold_db = max(
-            self.min_db,
-            min(self.max_db, float(threshold_db))
-        )
+        self._threshold_db = max(self.min_db, min(self.max_db, float(threshold_db)))
 
         self.setLevel(level_db)
 
@@ -17098,25 +17152,16 @@ class QAudioLevelMeter(QWidget):
         self.update()
 
     def _db_to_y(self, db, top, height):
-        normalized = (
-            db - self.min_db
-        ) / (
-            self.max_db - self.min_db
-        )
+        normalized = (db - self.min_db) / (self.max_db - self.min_db)
 
-        normalized = max(
-            0.0,
-            min(1.0, normalized)
-        )
+        normalized = max(0.0, min(1.0, normalized))
 
         return top + height * (1.0 - normalized)
 
     def paintEvent(self, event):
         painter = QPainter(self)
 
-        painter.setRenderHint(
-            QPainter.RenderHint.Antialiasing
-        )
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = self.rect()
 
@@ -17126,50 +17171,20 @@ class QAudioLevelMeter(QWidget):
         meter_top = 6
         meter_bottom = 6
 
-        meter_width = (
-            rect.width()
-            - label_width
-            - meter_left
-            - 4
-        )
+        meter_width = rect.width() - label_width - meter_left - 4
 
-        meter_height = (
-            rect.height()
-            - meter_top
-            - meter_bottom
-        )
+        meter_height = rect.height() - meter_top - meter_bottom
 
-        meter_right = (
-            meter_left + meter_width
-        )
+        meter_right = meter_left + meter_width
 
+        painter.fillRect(rect, self.palette().window())
 
-        painter.fillRect(
-            rect,
-            self.palette().window()
-        )
-
-        painter.fillRect(
-            meter_left,
-            meter_top,
-            meter_width,
-            meter_height,
-            QColor(30, 30, 30)
-        )
-
+        painter.fillRect(meter_left, meter_top, meter_width, meter_height, QColor(30, 30, 30))
 
         # Current level
-        level_y = self._db_to_y(
-            self._level_db,
-            meter_top,
-            meter_height
-        )
+        level_y = self._db_to_y(self._level_db, meter_top, meter_height)
 
-        bottom_y = self._db_to_y(
-            self.min_db,
-            meter_top,
-            meter_height
-        )
+        bottom_y = self._db_to_y(self.min_db, meter_top, meter_height)
 
         level_height = bottom_y - level_y
 
@@ -17182,20 +17197,10 @@ class QAudioLevelMeter(QWidget):
         else:
             color = QColor(60, 200, 90)
 
-        painter.fillRect(
-            meter_left + 2,
-            int(level_y),
-            meter_width - 4,
-            int(level_height),
-            color
-        )
+        painter.fillRect(meter_left + 2, int(level_y), meter_width - 4, int(level_height), color)
 
         # VAD threshold marker
-        threshold_y = self._db_to_y(
-            self._threshold_db,
-            meter_top,
-            meter_height
-        )
+        threshold_y = self._db_to_y(self._threshold_db, meter_top, meter_height)
 
         threshold_pen = QPen(
             QColor(80, 170, 255),
@@ -17213,49 +17218,21 @@ class QAudioLevelMeter(QWidget):
         )
 
         # Peak marker
-        peak_y = self._db_to_y(
-            self._peak_db,
-            meter_top,
-            meter_height
-        )
+        peak_y = self._db_to_y(self._peak_db, meter_top, meter_height)
 
-        painter.setPen(
-            QPen(
-                QColor(245, 245, 245),
-                2
-            )
-        )
+        painter.setPen(QPen(QColor(245, 245, 245), 2))
 
-        painter.drawLine(
-            meter_left + 1,
-            int(peak_y),
-            meter_right - 1,
-            int(peak_y)
-        )
+        painter.drawLine(meter_left + 1, int(peak_y), meter_right - 1, int(peak_y))
 
         # Border
-        painter.setPen(
-            QColor(100, 100, 100)
-        )
+        painter.setPen(QColor(100, 100, 100))
 
-        painter.drawRect(
-            meter_left,
-            meter_top,
-            meter_width,
-            meter_height
-        )
+        painter.drawRect(meter_left, meter_top, meter_width, meter_height)
 
         # dB scale
-        painter.setFont(
-            QFont(
-                painter.font().family(),
-                8
-            )
-        )
+        painter.setFont(QFont(painter.font().family(), 8))
 
-        painter.setPen(
-            self.palette().text().color()
-        )
+        painter.setPen(self.palette().text().color())
 
         scale_values = [
             0,
@@ -17269,32 +17246,14 @@ class QAudioLevelMeter(QWidget):
         ]
 
         for db in scale_values:
-            if not (
-                self.min_db
-                <= db
-                <= self.max_db
-            ):
+            if not (self.min_db <= db <= self.max_db):
                 continue
 
-            y = self._db_to_y(
-                db,
-                meter_top,
-                meter_height
-            )
+            y = self._db_to_y(db, meter_top, meter_height)
 
-            painter.drawLine(
-                meter_right + 2,
-                int(y),
-                meter_right + 5,
-                int(y)
-            )
+            painter.drawLine(meter_right + 2, int(y), meter_right + 5, int(y))
 
-            painter.drawText(
-                meter_right + 7,
-                int(y + 4),
-                f"{db}"
-            )
-
+            painter.drawText(meter_right + 7, int(y + 4), f"{db}")
 
 
 class QVolumeKnob(QWidget):
@@ -17314,7 +17273,7 @@ class QVolumeKnob(QWidget):
     _START_ANGLE = 225.0
     _SWEEP_ANGLE = 270.0
 
-    def __init__(self, value : float = 50, callback : Callable[[int], None] = None, parent: QWidget | None = None) -> None:
+    def __init__(self, value: float = 50, callback: Callable[[int], None] = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._value = value
         self._muted = False
@@ -17381,6 +17340,7 @@ class QVolumeKnob(QWidget):
 
     def sizeHint(self):  # noqa: N802 - Qt API naming
         from PySide6.QtCore import QSize
+
         return QSize(150, 170)
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -17393,8 +17353,7 @@ class QVolumeKnob(QWidget):
         knob = QRectF((self.width() - side) / 2, 10, side, side)
         center = knob.center()
         radius = side / 2
-        ring = QRectF(center.x() - radius * 0.82, center.y() - radius * 0.82,
-                      radius * 1.64, radius * 1.64)
+        ring = QRectF(center.x() - radius * 0.82, center.y() - radius * 0.82, radius * 1.64, radius * 1.64)
 
         # Outer body and subtle inner face.
         painter.setPen(QPen(QColor("#111827"), max(2.0, side * 0.025)))
@@ -17406,26 +17365,21 @@ class QVolumeKnob(QWidget):
         painter.drawEllipse(inner)
 
         # Background and active arcs. Qt's angles are counter-clockwise.
-        arc_pen = QPen(QColor("#566171"), max(4.0, side * 0.055), Qt.PenStyle.SolidLine,
-                       Qt.PenCapStyle.RoundCap)
+        arc_pen = QPen(QColor("#566171"), max(4.0, side * 0.055), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(arc_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawArc(ring, int(-45 * 16), int(-self._SWEEP_ANGLE * 16))
 
         shown_value = self.effectiveValue()
         active_color = QColor("#77808c") if self._muted else QColor("#35c6f4")
-        painter.setPen(QPen(active_color, arc_pen.widthF(), Qt.PenStyle.SolidLine,
-                            Qt.PenCapStyle.RoundCap))
+        painter.setPen(QPen(active_color, arc_pen.widthF(), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawArc(ring, int(-45 * 16), int(-self._SWEEP_ANGLE * shown_value / 100 * 16))
 
         # Indicator line.
         angle = math.radians(self._START_ANGLE - self._SWEEP_ANGLE * shown_value / 100)
-        line_start = QPointF(center.x() + math.cos(angle) * radius * 0.23,
-                             center.y() - math.sin(angle) * radius * 0.23)
-        line_end = QPointF(center.x() + math.cos(angle) * radius * 0.58,
-                           center.y() - math.sin(angle) * radius * 0.58)
-        painter.setPen(QPen(active_color, max(3.0, side * 0.04), Qt.PenStyle.SolidLine,
-                            Qt.PenCapStyle.RoundCap))
+        line_start = QPointF(center.x() + math.cos(angle) * radius * 0.23, center.y() - math.sin(angle) * radius * 0.23)
+        line_end = QPointF(center.x() + math.cos(angle) * radius * 0.58, center.y() - math.sin(angle) * radius * 0.58)
+        painter.setPen(QPen(active_color, max(3.0, side * 0.04), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawLine(line_start, line_end)
 
         text = "MUTED" if self._muted else f"{self._value}%"
@@ -17455,9 +17409,7 @@ class QVolumeKnob(QWidget):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if self._dragging:
-            delta = (self._drag_origin.y() - event.position().y()) + (
-                event.position().x() - self._drag_origin.x()
-            )
+            delta = (self._drag_origin.y() - event.position().y()) + (event.position().x() - self._drag_origin.x())
             value = self._drag_value + round(delta * 100 / self._drag_pixels_per_full_range)
             self.setValue(value)
             event.accept()
@@ -17509,7 +17461,7 @@ class QVolumeKnob(QWidget):
 
 
 class QDataRepeaterWidget(QtWidgets.QWidget):
-    def __init__(self, value : float = 0.0, decimals: int = 0, prefix: str = None, suffix : str = None, parent=None):
+    def __init__(self, value: float = 0.0, decimals: int = 0, prefix: str = None, suffix: str = None, parent=None):
         super().__init__(parent)
         self._prefix = prefix
         self._suffix = suffix
@@ -17553,5 +17505,3 @@ class QDataRepeaterWidget(QtWidgets.QWidget):
 
     def value(self) -> float:
         return self._value
-
-

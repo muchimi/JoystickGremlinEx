@@ -37,6 +37,7 @@ import logging
 import gremlin.sound
 from gremlin.sound import Sound, PhraseData, EdgeTTSVoice, SoundEvent
 import enum
+from shiboken6 import Shiboken
 
 # import gremlin.ktts
 import gremlin.tts
@@ -45,6 +46,7 @@ import random
 import time
 from gremlin.types import PlaybackMode, PlayMode
 import shutil
+
 
 # Sentinel for the "follow the Windows default output device" option shown at
 # the top of the playback device dropdown. When selected, audio_device is set
@@ -156,7 +158,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                 "3s": 3,
                 "5s": 5,
             },
-            is_seconds=True, # display as seconds
+            is_seconds=True,  # display as seconds
             tooltip="Cooldown time in seconds to suppress duplicate TTS playback.",
         )
 
@@ -164,8 +166,26 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             "Sync", callback=self._handle_tts_sync_cooldown, tooltip="Synchronize the cooldown for duplicate TTS playback to the entire profile."
         )
 
+        self.stop_widget = gremlin.ui.ui_common.QDataCheckbox(
+                    "Stop previous audio",
+                    value=self.action_data.stop_previous,
+                    callback=self._handle_stop_audio_changed,
+                    tooltip="If checked, any other audio currently playing will stop before playing this sample.",
+                )
+
+
         cooldown_container = gremlin.ui.ui_common.getHContainer(
-            [self.tts_suppress_enabled_widget, "(ms):", self.tts_suppress_cooldown_widget, self.tts_sync_cooldown_widget, "||"], widget_only=True
+            [
+                self.stop_widget,
+                gremlin.ui.ui_common.QHorizontalSeparator(),
+                self.tts_suppress_enabled_widget,
+                gremlin.ui.ui_common.QHorizontalSeparator(),
+                "Delay (ms):",
+                self.tts_suppress_cooldown_widget,
+                self.tts_sync_cooldown_widget,
+                "||",
+            ],
+            widget_only=True,
         )
 
         self.tts_file_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_file_delete, tooltip="Delete the audio file")
@@ -288,7 +308,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             (self.tts_save_widget, 100),
         ]
 
-        playback_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        playback_group = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.tts_text_container = gremlin.ui.ui_common.getVContainer(["Text:", self.tts_text_widget], widget_only=True)
 
@@ -337,7 +357,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._handle_play)
 
-        widgets = []
+        widgets = ["Multi mode:"]
         for mode in PlaybackMode:
             checked = mode == self.action_data.playback_mode
             match mode:
@@ -356,7 +376,11 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                 gremlin.ui.ui_common.QDataRadioButton(label=label, tooltip=tooltip, value=checked, callbackEx=self._handle_playback_mode_changed, data=mode)
             )
 
-        self.playback_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        phrase_playback_group = gremlin.ui.ui_common.getHContainer(
+            widgets,
+            widget_only=True,
+            tooltip="When multiple sounds or phrases are played by this actions, determines how these sounds are played.\nRound-robin cycles through available samples in sequence, Random picks a random sample, and Timed Random picks a random sample at timed intervals.",
+        )
 
         self.loops_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=1,
@@ -397,18 +421,66 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Maximum time in seconds the sample has to play.\nThe sample will be cut short if the specified time is shorter than the normal sample play time.\nUse 0 to disable (default).",
         )
 
-        self.stop_widget = gremlin.ui.ui_common.QDataCheckbox(
-            "Stop previous audio",
-            value=self.action_data.stop_previous,
-            callback=self._handle_stop_audio_changed,
-            tooltip="If checked, any other audio playing will stop before playing this sample.",
-        )
 
         self.block_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Block playback",
             value=self.action_data.blocking,
             callback=self._handle_blocking_changed,
-            tooltip="If checked, the playback will block until the audio finishes so playbacks will not be concurrent",
+            tooltip="If enabled, the playback will prevent the next sound from playing until the current audio finishes.",
+        )
+
+        self.block_delay_widget = gremlin.ui.ui_common.QDelayWidget(
+            value=self.action_data.blocking_delay_ms,
+            callback=self._handle_block_delay_changed,
+            show_zero=True,
+            label="Blocking delay (ms):",
+            tooltip="Delay in milliseconds after sound plays when blocking is enabled.  Set to 0 for no delay.",
+        )
+
+        block_sync_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Sync", tooltip="Apply the block setting to all PlaySound actions", callback=self._handle_block_sync
+        )
+
+        block_group = gremlin.ui.ui_common.getHContainer(
+            [ self.block_widget, gremlin.ui.ui_common.QHorizontalSeparator(), self.block_delay_widget, block_sync_widget, "||"], widget_only=True
+        )
+
+        value = not (self.action_data.trim_all or self.action_data.trim_end)
+        self.trim_none_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "None", tooltip="Do not trim any silence from the audio", callback=self._handle_trim_none, value=value
+        )
+        self.trim_all_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "All", tooltip="Trim silence from both the beginning and end of the audio", callback=self._handle_trim_all, value=self.action_data.trim_all
+        )
+        self.trim_end_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "End", tooltip="Trim silence from the end of the audio only", callback=self._handle_trim_end, value=self.action_data.trim_end
+        )
+
+        trim_sync_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Sync", tooltip="Apply this audio trim setting to all PlaySound actions", callback=self._handle_trim_sync
+        )
+
+        self.trim_threshold_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value=self.action_data.silence_threshold_db,
+            min_range=-80,
+            max_range=0,
+            tooltip="Set the silence threshold in decibels. Audio quieter than this level will be considered silence.\nNormal range is -55dB to -60dB. Too high of a value will cause sound to cut out.",
+            callback=self._handle_trim_threshold,
+        )
+
+        trim_group = gremlin.ui.ui_common.getHContainer(
+            [
+                "Silence Trim:",
+                self.trim_none_widget,
+                self.trim_all_widget,
+                self.trim_end_widget,
+                "Threshold (dB):",
+                self.trim_threshold_widget,
+                trim_sync_widget,
+                "||",
+            ],
+            widget_only=True,
+            tooltip="Select how silence is trimmed from the audio. 'None' keeps all silence or low volume audio in the audio sample.\n'All' trims silence from both the beginning and end, and 'End' trims only the end.",
         )
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
@@ -463,9 +535,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self.playback_file_container = gremlin.ui.ui_common.getHContainer(widgets, "Sound file:", widget_only=True)
 
-        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget, self.stop_widget, self.block_widget]
+        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget]
 
-        playback_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        volume_playback_group = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         widgets = [
             "Max playback (s):",
@@ -474,8 +546,6 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             self.fadein_widget,
             "Fade-out (ms)",
             self.fadeout_widget,
-            self.playback_mode_widget,
-            playback_container,
         ]
 
         options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -514,7 +584,11 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         container_widgets.append(self.tts_container_widget)
 
         container_widgets.append(options_container)
-        container_widgets.append(playback_widget)
+        container_widgets.append(trim_group)
+        container_widgets.append(volume_playback_group)
+        container_widgets.append(phrase_playback_group)
+        container_widgets.append(playback_group)
+        container_widgets.append(block_group)
         container_widgets.append(cooldown_container)
         container_widgets.append(self._execute_widget)
         container_widgets.append(self.status_container)
@@ -528,6 +602,70 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._sync_etts_locale()  # sync locale with selected speaker
 
         self._update_ui()
+
+    def _handle_block_delay_changed(self, value: int):
+        self.action_data.blocking_delay_ms = value
+
+    def _handle_block_sync(self):
+        # sync the block settings to all play-sound and the configuration
+        result = gremlin.ui.ui_common.ConfirmBox("Synchronize block settings with entire profile?")
+        if result:
+            config = gremlin.config.Configuration()
+            config.audio_blocking_delay_ms = self.action_data.blocking_delay_ms
+            config.audio_blocking = self.action_data.blocking
+
+            extra_data = {"blocking_delay_ms": self.action_data.blocking_delay_ms, "count": 0}
+            profile = gremlin.shared_state.current_profile
+            profile.filter_actions("play-sound", callback=self._handle_block_sync_callback, extra_data=extra_data)
+
+            count = extra_data["count"]
+            if count:
+                gremlin.ui.ui_common.MessageBoxInfo(prompt=f"Updated {count} actions with synchronized block settings.", parent=gremlin.shared_state.ui)
+
+    def _handle_block_sync_callback(self, action: PlaySound, extra_data: dict):  # noqa: F821
+        if action != self:
+            action.blocking_delay_ms = extra_data.get("blocking_delay_ms", 0)
+            extra_data["count"] += 1
+
+    def _handle_trim_sync(self):
+        result = gremlin.ui.ui_common.ConfirmBox("Synchronize trim settings with entire profile?")
+        if result:
+            config = gremlin.config.Configuration()
+            config.audio_trim_all = self.action_data.trim_all
+            config.audio_trim_end = self.action_data.trim_end
+            config.audio_silence_threshold_db = self.action_data.silence_threshold_db
+
+            extra_data = {"trim_all": self.action_data.trim_all, "trim_end": self.action_data.trim_end, "count": 0}
+            profile = gremlin.shared_state.current_profile
+            profile.filter_actions("play-sound", callback=self._handle_trim_sync_callback, extra_data=extra_data)
+
+            count = extra_data["count"]
+            if count:
+                gremlin.ui.ui_common.MessageBoxInfo(prompt=f"Updated {count} actions with synchronized trim settings.", parent=gremlin.shared_state.ui)
+
+    def _handle_trim_sync_callback(self, action: PlaySound, extra_data: dict):  # noqa: F821
+        if action != self:
+            action.trim_all = extra_data.get("trim_all", False)
+            action.trim_end = extra_data.get("trim_end", False)
+            extra_data["count"] += 1
+
+    def _handle_trim_threshold(self, value: int):
+        self.action_data.silence_threshold_db = value
+
+    def _handle_trim_none(self, checked : bool):
+        if checked:
+            self.action_data.trim_all = False
+            self.action_data.trim_end = False
+
+    def _handle_trim_all(self, checked : bool):
+        if checked:
+            self.action_data.trim_all = True
+            self.action_data.trim_end = True
+
+    def _handle_trim_end(self, checked : bool):
+        if checked:
+            self.action_data.trim_all = False
+            self.action_data.trim_end = True
 
     def _handle_playback_default_changed(self, value: bool):
         self.action_data.playback_default = value
@@ -716,7 +854,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._update_ui()
 
     def _handle_tts_suppress_cooldown_changed(self, value: int):
-        self.action_data._tts_suppress_cooldown = value / 1000 # to seconds
+        self.action_data._tts_suppress_cooldown = value / 1000  # to seconds
 
     @QtCore.Slot(bool)
     def _handle_folder_play_changed(self, checked: bool):
@@ -742,6 +880,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.pytts_volume = value
 
     def _update_ui(self):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.tts_save_widget):
+            return
 
         device_enabled = not self.action_data.playback_default
         self.audio_container.setVisible(device_enabled)
@@ -773,6 +913,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         generate_visible = mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS)
         self.generate_widget.setVisible(generate_visible)
         self.auto_generate_widget.setVisible(generate_visible)
+
+        enabled = self.action_data.blocking
+        self.block_delay_widget.setEnabled(enabled)
 
         match mode:
             # case PlayMode.CoquiAI:
@@ -1467,7 +1610,14 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self._etts_speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER  # speaker for Edge TTS
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
-        self.blocking = False  # whether playback should block until finished
+        self.blocking = config.audio_blocking  # whether playback should block until finished
+        self.blocking_delay = config.audio_blocking_delay_ms  # blocking delay in ms (this is an optional pause after the sound finishes playing when blocked)
+        self.trim_all = True  # controls if the audio is trimmed for silence at the beginning and end
+        self.trim_end = True  # controls if the audio is trimmed for silence at the end (when trim_all is not set)
+        self.silence_threshold_db: float = -55.0  # threshold in dB to consider as silence
+        self.minimum_silence_ms: int = 100  # minimum duration of silence to be considered for trimming
+        self.keep_leading_ms: int = 0  # amount of leading silence to keep
+        self.keep_trailing_ms: int = 0  # amount of trailing silence to keep
         self._tts_file = None  # sound file for TTS
         self.pytts_speed: int = 100  # words per minute, 100 is the default
         self.pytts_volume: int = 100  # volume, 0 to 100
@@ -1822,7 +1972,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if self.tts_suppress_duplicate:
             if phrase:
                 hash_key = phrase.key if phrase else None
-            syslog.info(f"phrase text: {phrase.text}  hash: {hash_key}")
+            # syslog.info(f"phrase text: {phrase.text}  hash: {hash_key}")
             key = hash_key
 
             if self.last_phrase_key:
@@ -1879,6 +2029,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 stop_previous=self.stop_previous,
                 rate=self.playback_rate,
                 blocking=blocking,
+                blocking_delay_ms=self.blocking_delay,
+                trim_all=self.trim_all,
+                trim_end=self.trim_end,
+                silence_threshold_db=self.silence_threshold_db,
+                minimum_silence_ms=self.minimum_silence_ms,
+                keep_leading_ms=self.keep_leading_ms,
+                keep_trailing_ms=self.keep_trailing_ms,
             )
             actions.append(action)
 
@@ -2065,6 +2222,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.auto_generate = safe_read(node, "auto-generate", bool, True)
         pbm = safe_read(node, "playback-mode", str, PlaybackMode.RoundRobin.name)
         self.playback_mode = PlaybackMode[pbm]
+        self.blocking_delay_ms = safe_read(node, "blocking-delay-ms", int, 0)
+        self.trim_all = safe_read(node, "trim-all", bool, True)
+        self.trim_end = safe_read(node, "trim-end", bool, False)
+        self.silence_threshold_db = safe_read(node, "silence-threshold-db", float, -55.0)
+        self.minimum_silence_ms = safe_read(node, "minimum-silence-ms", int, 100)
+        self.keep_leading_ms = safe_read(node, "keep-leading-ms", int, 0)
+        self.keep_trailing_ms = safe_read(node, "keep-trailing-ms", int, 0)
 
         self._playback_default = safe_read(node, "playback-default", bool, True)
 
@@ -2120,6 +2284,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
         node.set("auto-generate", safe_format(self.auto_generate, bool))
         node.set("tts-sup-dup", safe_format(self._tts_suppress_duplicate, bool))
         node.set("tts-cool-dup", safe_format(self._tts_suppress_cooldown, float))
+        node.set("blocking-delay-ms", safe_format(self.blocking_delay_ms, int))
+        node.set("trim-all", safe_format(self.trim_all, bool))
+        node.set("trim-end", safe_format(self.trim_end, bool))
+        node.set("silence-threshold-db", safe_format(self.silence_threshold_db, float))
+        node.set("minimum-silence-ms", safe_format(self.minimum_silence_ms, int))
+        node.set("keep-leading-ms", safe_format(self.keep_leading_ms, int))
+        node.set("keep-trailing-ms", safe_format(self.keep_trailing_ms, int))
         return node
 
     def _is_valid(self):

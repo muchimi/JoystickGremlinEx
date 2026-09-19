@@ -59,6 +59,8 @@ class StateContainerWidget(AbstractContainerWidget):
         if not Shiboken.isValid(self):
             return
 
+        self._action_set_widgets = {}
+
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if verbose_ui:
             syslog.info("StateContainerWidget: create action UI start")
@@ -108,39 +110,29 @@ class StateContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(widget)
         w3 = widget
 
-        has_actions = False
-        for action_set in self.container.action_sets:
-            if action_set:
-                has_actions = True
-                break
+        self.container.create_or_delete_virtual_button()
 
-        if has_actions:
-            action_sets = [action_set for action_set in self.container.action_sets if action_set]
-            assert len(action_sets) == 1, "invalid action set count - expected a single action set"
-
-            self.container.create_or_delete_virtual_button()
-            widget = self._create_action_set_widget(action_sets[0], "State", ContainerViewTypes.Action)
-
-            self.action_layout.addWidget(widget)
-            widget.redraw()
-            widget.model.data_changed.connect(self.container_modified.emit)
+        input_item = self.container.input_item
+        if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
+            action_selector = ActionSelector(
+                gremlin.types.DeviceType.VJoy,
+                input_item,
+            )
         else:
-            input_item = self.container.input_item
-            if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
-                action_selector = ActionSelector(
-                    gremlin.types.DeviceType.VJoy,
-                    input_item,
-                )
-            else:
-                action_selector = ActionSelector(
-                    input_item.get_input_type(),
-                    input_item,
-                )
-            action_selector.action_added.connect(self._add_action)
-            action_selector.action_paste.connect(self._paste_action)
-            action_selector.inputItem = self.container
+            action_selector = ActionSelector(
+                input_item.get_input_type(),
+                input_item,
+            )
+        action_selector.action_added.connect(self._add_action)
+        action_selector.action_paste.connect(self._paste_action)
+        action_selector.inputItem = self.container
 
-            self.action_layout.addWidget(action_selector)
+        self.action_layout.addWidget(action_selector)
+
+        self.action_set_layout = QtWidgets.QVBoxLayout()
+        self.action_layout.addLayout(self.action_set_layout)
+
+        self._update_action_sets()
 
         self.populate_selector()
 
@@ -148,6 +140,30 @@ class StateContainerWidget(AbstractContainerWidget):
 
         if verbose_ui:
             syslog.info("StateContainerWidget: create action UI completed")
+
+    def _update_action_sets(self):
+            """Updates the action sets in the UI."""
+            if not Shiboken.isValid(self):
+                return
+
+            # Clear existing action set widgets
+            for widget in self._action_set_widgets.values():
+                widget.hide()
+                self.action_set_layout.removeWidget(widget)
+                gremlin.util.delete_widget(widget)
+            self._action_set_widgets.clear()
+
+            # Recreate action set widgets
+            action_sets = [action_set for action_set in self.container.action_sets if action_set]
+            for i, action_set in enumerate(action_sets):
+                widget = self._create_action_set_widget(action_set,
+                                                        None,
+                                                        ContainerViewTypes.Action,
+                                                        index = i)
+                self._action_set_widgets[i] = widget
+                self.action_set_layout.addWidget(widget)
+                widget.redraw()
+                widget.model.data_changed.connect(self.container_modified.emit)
 
     def _handle_execute_changed(self, widget, checked: bool):
         if checked:
@@ -226,6 +242,8 @@ class StateContainerWidget(AbstractContainerWidget):
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
+        self._update_action_sets()
+
     def _paste_action(self, action, container):
         """paste action"""
 
@@ -234,6 +252,8 @@ class StateContainerWidget(AbstractContainerWidget):
         self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
+
+        self._update_action_sets()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
