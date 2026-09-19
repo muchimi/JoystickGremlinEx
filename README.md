@@ -55,6 +55,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: API: eliminate duplicated warnings when remote control is not enabled. 
 - Change: API: change from NodeGraphQt to OdenGraphQT (for QT graphics node library).
 - Change: API: add hugging face library (for voice model download).
+- Fix: merged PRR for overlay module (courtesy Lolo350)
 
 ### (m77T55)
 - Change: PlaySound Action: exposed additional API features for sound playback options in the action.  Ability to set decibel threshold for removing detected low volume (silence) in played audio (.wav or generated TTS) - recommended threshold is -55dB,  trim options, optional delay if the blocking option is enabled to add a pause between sequential sounds and ability to sync settings globally in the profile to apply to other PlaySound actions without editing them one at at time.  
