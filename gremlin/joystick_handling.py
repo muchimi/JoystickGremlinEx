@@ -514,16 +514,29 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
         match device.device_type:
             case DeviceType.VJoy | DeviceType.Maestro | DeviceType.Joystick:
                 if device.button_count:
-                    if device.is_virtual and device.vjoy_id:
-                        # query the vjoy interface rather than dinput
-                        button = VJoyProxy()[device.vjoy_id].button(input_id)
+                    vid = device.vjoy_id
+                    try:
+                        vid = int(vid)
+                    except (TypeError, ValueError):
+                        vid = 0
+                    # vJoy IDs are 1–16. -1 is the DeviceSummary default and is
+                    # truthy in Python, so "if vjoy_id" is not a valid check.
+                    if device.is_virtual and 1 <= vid <= 16:
+                        try:
+                            button = VJoyProxy()[vid].button(input_id)
+                        except Exception as exc:
+                            syslog.warning(
+                                "GetButton(): vjoy [%s] button [%s] unavailable: %s",
+                                vid,
+                                input_id,
+                                exc,
+                            )
+                            return False
                         if button:
                             return button.is_pressed
-                        else:
-                            syslog.warning(f"GetButton(): invalid vjoy [{device.vjoy_id}] button [{input_id}] not found")
-                        # invalid button
+                        syslog.warning(f"GetButton(): invalid vjoy [{vid}] button [{input_id}] not found")
                         return False
-                # physical device
+                # physical / disconnected / maestro without a vJoy id
                 return device.get_button(input_id)
             case DeviceType.Osc:
                 if hasattr(input_id, "message"):
