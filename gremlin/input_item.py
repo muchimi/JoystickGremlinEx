@@ -550,6 +550,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._message_key = None  # message key for this input (device_guid, input_type, input_id)
 
         self._custom_sort_callback = None
+        self._valid_container_names_cache = None
 
         self._latched_input_ids = set()  # set of input ids that are latched for this input item
 
@@ -712,7 +713,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         # joystick inputs only - returns id of axis or button
         # if self._input_id is not None and hasattr(self._input_id, "message_key"):
         #     return self._input_id.message_key
-        if self._message_key:
+        if self._message_key is not None:
             return self._message_key
         return self._input_id
 
@@ -748,8 +749,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def hasActions(self) -> bool:
         """true if the input item has at least one action"""
-        for container in self.containers:
-            for action_set in container.action_sets:
+        containers = self.containers
+        if not containers:
+            return False
+        for container in containers:
+            action_sets = container.action_sets
+            if not action_sets:
+                continue
+            for action_set in action_sets:
                 if action_set:
                     return True
         return False
@@ -917,6 +924,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if self._initialized:
             self._update_input()
 
+    def setInputType(self, value: InputType):
+        """Sets the input type and invalidates the container cache."""
+        super().setInputType(value)
+        self._valid_container_names_cache = None
+
     def getInputType(self):
         """gets the input type or the override input type"""
         if hasattr(self._input_id, "getOverrideInputType"):
@@ -932,6 +944,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def setOverrideInputType(self, input_type):
         """sets the override input type"""
         self._override_input_type = input_type
+        self._valid_container_names_cache = None
         self._update_input()
 
     def getOverrideInputType(self):
@@ -1024,18 +1037,20 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     def get_valid_container_list(self):
         """Returns a list of valid containers for this input"""
+        if self._valid_container_names_cache is not None:
+            return list(self._valid_container_names_cache)
+
         container_list = []
+        input_type = self.input_type
+        override_type = self.getOverrideInputType()
         for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
-            input_type = self.input_type
-            override_type = self.getOverrideInputType()
             if not entry.input_types or input_type in entry.input_types or override_type in entry.input_types:
-                # if no input types provided, all are ok
-                if entry.axis_only:
-                    # container requires an axis
-                    if not self.is_axis:
-                        continue
+                if entry.axis_only and not self.is_axis:
+                    continue
                 container_list.append(entry.name)
-        return sorted(container_list)
+
+        self._valid_container_names_cache = tuple(sorted(container_list))
+        return list(self._valid_container_names_cache)
 
     def _update_input(self):
         """updates input name and registers an axis input if needed"""
@@ -4317,61 +4332,53 @@ class InputItemListView(AbstractView):
         pass
 
     def _handle_widget_selection_changed(self, widget: InputItemWidget):
-        # selection change can take a while if the UI has to create new components
-        if widget.selected and widget.index != self._current_index:
-            # only process selection if not selected and not already current
-            wm = WorkManager()
-            wm.submit(callback=self._handle_widget_selection_changed_worker, args=widget)
+        """Handle a widget selection change without the extra worker queue/busy-wait loop."""
+        if widget is None or not widget.selected or widget.index == self._current_index:
+            return
+
+        if gremlin.util.is_ui_thread():
+            self._execute_widget_selection_changed(widget)
+        else:
+            gremlin.util.InvokeUiMethod(self._execute_widget_selection_changed, widget)
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str = "update"):
         """called when the input item widget reports a mapping change for its associated input item"""
         if self.mapping_changed_handler:
             self.mapping_changed_handler(widget.input_item, operation)
 
-    def _handle_widget_selection_changed_worker(self, args):
-        """called when a widget in the list changes selection state (selected or unselected)"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
-        if verbose:
-            syslog.info("select input start")
-        self._selecting_flag = True
-        gremlin.util.InvokeUiMethod(self._execute_widget_selection_changed, args)
-        while self._selecting_flag:
-            QThread.sleep(0)  # workers are on QThread, not regular threads
-        if verbose:
-            syslog.info("select input complete")
-
     def _execute_widget_selection_changed(self, widget: InputItemWidget):
+        if gremlin.shared_state.is_running:
+            return
+        assert gremlin.util.is_ui_thread(), "must run on Ui thread"
 
-        try:
-            if gremlin.shared_state.is_running:
-                return
-            assert gremlin.util.is_ui_thread(), "must run on Ui thread"
-            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-            if verbose:
-                syslog.info(
-                    f"InputListView: input widget selected callback: [{widget.input_item.device_name}] [{widget.input_item.display_name}]  selected [{widget.selected}]"
-                )
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(
+                f"InputListView: input widget selected callback: [{widget.input_item.device_name}] [{widget.input_item.display_name}]  selected [{widget.selected}]"
+            )
 
-            if widget.selected:
-                # handle selected
-                config = gremlin.config.Configuration()
-                verbose = config.verbose_mode_inputs or config.verbose_mode_ui
-                index = widget.index
-                # deselect the old item in the list
-                if self._current_index != index:
-                    old_widget = self._last_selected_widget
-                    if old_widget:
-                        old_widget.setSelected(False, False)  # de-select old
-                        self.item_selected.emit(self._current_index, False)  # trigger the event
+        if not widget.selected:
+            return
 
-                    self._current_index = index  # update to the new selected index in the list
-                    self._last_selected_widget = widget  # store the new reference
-                    if verbose:
-                        syslog.info(f"InputItemListView: trigger selection for index [{index}]")
-                    self._fireSelectionChangeCallbacks(old_widget, widget, emit=False)  # handle callbacks for selection change
-                    self.item_selected.emit(index, True)  # trigger the list selection
-        finally:
-            self._selecting_flag = False
+        index = widget.index
+        if self._current_index == index:
+            return
+
+        old_widget = self._last_selected_widget
+        if old_widget is not None and old_widget is not widget:
+            old_widget.setSelected(False, False)
+            self.item_selected.emit(self._current_index, False)
+
+        self._current_index = index
+        self._last_selected_widget = widget
+
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_inputs or config.verbose_mode_ui
+        if verbose:
+            syslog.info(f"InputItemListView: trigger selection for index [{index}]")
+
+        self._fireSelectionChangeCallbacks(old_widget, widget, emit=False)
+        self.item_selected.emit(index, True)
 
     def selectItemAt(self, index, emit=True, force=False, user_selected=False):
         """selects an input by index"""

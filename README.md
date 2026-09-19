@@ -53,7 +53,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API: event processing optimization path on very expensive mode hierarchy lookups that were adding CPU usage to match events to execution nodes.
 - Change: API: execution node functor lookup optimization and caching.
 - Change: Input Viewer: optimization pass on axis repeater updates and eliminate, where possible, unnecessary axis redraws as this window can have hundreds of updates to make.
-- Fix: 
+- Fix: Macro Action: Vjoy selector - exclude ghost vjoy devices
+- Fix: API: prevent configuration (and sidecar) file corruption on file contention/crash/data errors
 
 ### (m77T54A)
 - Change: API: sound: added audio sample auto-trim to trim silence at the start and end of a sample stream.

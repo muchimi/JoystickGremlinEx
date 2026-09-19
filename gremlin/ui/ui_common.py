@@ -3405,19 +3405,36 @@ class JoystickSelector(AbstractInputSelector):
 class VJoySelector(AbstractInputSelector):
     """Widget allowing the selection of vJoy inputs."""
 
-    def __init__(self, change_cb, valid_types, invalid_ids={}, parent=None):
+    def __init__(self, change_cb, valid_types, invalid_ids={}, parent=None, show_connected_only=True):
         """Creates a widget to select a vJoy output.
 
         :param change_cb callback to execute when the widget changes
         :param valid_types the input type to present in the selection
         :param invalid_ids list of vid values of vjoy devices to not consider
+        :param show_connected_only: if True, only connected vJoy devices are shown.
+            If False, only vJoy devices configured as input are shown.
         :param parent of this widget
+        :param show_connected_only: if True, only connected vJoy devices are shown.
+            If False, only vJoy devices configured as input are shown.
         """
         self.invalid_ids = invalid_ids
+        self.show_connected_only = show_connected_only
         super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
 
     def _initialize(self):
-        potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(connected_only=False), key=lambda x: x.vjoy_id)
+        if self.show_connected_only:
+            potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(connected_only=True), key=lambda x: x.vjoy_id)
+        else:
+            profile = gremlin.shared_state.current_profile
+            configured_input_vids = set()
+            if profile is not None and hasattr(profile, "settings"):
+                configured_input_vids = set(profile.settings.getVjoyAsInputList())
+            potential_devices = [
+                dev
+                for dev in sorted(gremlin.joystick_handling.vjoy_devices(connected_only=False), key=lambda x: x.vjoy_id)
+                if dev.vjoy_id in configured_input_vids
+            ]
+
         for dev in potential_devices:
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,
