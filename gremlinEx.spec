@@ -105,7 +105,7 @@ a = Analysis(
         "huggingface_hub",
         "pycaw",
         "pycountry",
-        "nodegraphQT",
+        "OdenGraphQt",
         "gremlin.ui.obs_overlay",
         "gremlin.ui.obs_overlay.bindings",
         "gremlin.ui.obs_overlay.designer",
