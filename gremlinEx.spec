@@ -102,6 +102,7 @@ a = Analysis(
         "pyrubberband",
         "pydub",
         "faster_whisper",
+        "huggingface_hub",
         "pycaw",
         "pycountry",
         "nodegraphQT",

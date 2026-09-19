@@ -4771,9 +4771,14 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             self.svg_widget,
             self.open_files_widget,
             self.show_files_widget,
-            self.show_profile_tree_widget,
-            gremlin.ui.ui_common.QHorizontalLine(),
         ]
+
+        if __debug__:
+            widgets.append(self.show_profile_tree_widget)
+
+        widgets.append(gremlin.ui.ui_common.QHorizontalLine())
+
+
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
         widget.setContentsMargins(4, 0, 0, 0)
         self.main_layout.addWidget(widget)

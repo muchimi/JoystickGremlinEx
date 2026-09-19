@@ -346,6 +346,8 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self.setWindowTitle("Voice Input Configuration")
         self.setModal(True)
 
+        config = gremlin.config.Configuration()
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setLayout(self.main_layout)
 
@@ -401,8 +403,21 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout.addWidget(widget)
 
+
+
+
         # computed data
         widget = gremlin.ui.ui_common.getHContainer([self._gain_widget, "||"], widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+
+        # voice model
+         # possible models: "tiny", "base", "small", "medium", "large-v3"
+        models = ["tiny", "base", "small", "medium", "large-v3"]
+        self._model_selector = gremlin.ui.ui_common.QDataComboBox(source=models, value=config.voice_model_name, callback=self._handle_model_change)
+
+        widget = gremlin.ui.ui_common.getHContainer(["Voice model:", self._model_selector, "||"], widget_only=True)
         self.main_layout.addWidget(widget)
 
         # listen mode for PTT
@@ -832,6 +847,11 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
                 return
         finally:
             self._update_ui()
+
+    def _handle_model_change(self, value: str):
+        """handle changes to the voice model selection"""
+        config = gremlin.config.Configuration()
+        config.voice_model_name = value
 
 
 class VoicePTTMode(Enum):

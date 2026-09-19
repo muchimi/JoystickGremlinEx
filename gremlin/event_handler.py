@@ -33,7 +33,7 @@ import itertools
 import queue
 
 from dinput import DeviceSummary
-
+from gremlin.filter import EMAFilter
 
 import gremlin.base_classes
 from gremlin.fastqueue import FastQueue
@@ -1713,6 +1713,10 @@ class EventListener(QtCore.QObject):
             self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
 
         data: DInputData = self._debounce_map[vendor_id][product_id][input_type][input_id]
+
+        if event.input_type == dinput.InputType.Axis and not data.process_input(event.value):
+            # not not process input
+            return True
 
         if not data.debounce:
             # do not filter
@@ -4474,6 +4478,11 @@ class DInputData:
         self.last_time = None
         self.value = None
         self.debounce = True
+        self.filter = EMAFilter()
+
+    def process_input(self, raw_value):
+        """determins if the axis should be processed - returns None if should be ignored"""
+        return self.filter.process_input(raw_value)
 
 
 @gremlin.singleton_decorator.SingletonDecorator

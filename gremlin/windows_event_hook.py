@@ -319,7 +319,7 @@ def _wheel_worker_loop():
     q = _wheel_cmd_queue
     while not _wheel_worker_stop.is_set():
         try:
-            cmd = q.get(timeout=0.5)
+            cmd = q.get(timeout=0.5) # @IgnoreException
         except queue.Empty:
             continue
         if cmd is None:

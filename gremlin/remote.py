@@ -162,6 +162,7 @@ class RPCGremlin:
         self._thread = None
         self._server_thread = None
         self._keep_running = False
+        self._warning_issued = False
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
@@ -208,7 +209,9 @@ class RPCGremlin:
 
         config = gremlin.config.Configuration()
         if not config.remoteEnabled():
-            syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
+            if not self._warning_issued:
+                syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
+                self._warning_issued = True
             return
 
         # Pre-acquire connected vJoy devices for remote receive (also opens on demand later)
@@ -227,6 +230,7 @@ class RPCGremlin:
 
     def stop(self):
         """stops the loop"""
+        self._warning_issued = False
         if not self._running:
             return
 
@@ -249,6 +253,7 @@ class RemoteServer(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._rpc = None
         self._started = False
+        self._warning_issued = False
 
         el = gremlin.event_handler.EventListener()
         el.remote_control_socket_timeout.connect(self._handle_socket_timeout)
@@ -263,7 +268,9 @@ class RemoteServer(QtCore.QObject):
         # Clients need it to receive commands. Either remote flag is enough.
         self._enabled = bool(config.remoteEnabled())
         if not self._enabled:
-            syslog.info("Gremlin RPC server not started (remote control/broadcast disabled in Options)")
+            if not self._warning_issued:
+                self._warning_issued = True
+                syslog.info("REMOTE CONTROL: RPC server not started (remote control/broadcast disabled in Options)")
             return
         # Allow retry if a prior start claimed success but the listener never came up.
         if self._rpc is not None and not self._rpc.running:
@@ -281,12 +288,15 @@ class RemoteServer(QtCore.QObject):
             syslog.info("Gremlin RPC server started...")
             self._started = True
         else:
-            syslog.error("Gremlin RPC server failed to start listener")
+            if not self._warning_issued:
+                self._warning_issued = True
+                syslog.error("Gremlin RPC server failed to start listener")
             self._started = False
             self._rpc = None
 
     def stop(self):
         """stop listening"""
+        self._warning_issued = False
         if self._rpc:
             self._rpc.stop()
             self._started = False

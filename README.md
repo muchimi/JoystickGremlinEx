@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T56)
+- New: anti-spam EMA filter applied to axis inputs aimed directly at devices that spam axis data like Azeron or Wooting and others clogging up the input queues. The filter reduces CPU usage by only processing meaningful data based on prior data, as well as the interval between signals. The filter only applies to axis data, smooths the data in 10ms intervals using a low overhead low-pass EMA algorithm (exponential moving average) and discards signals that too rapid while taking the signal into account.
+- Change: API (Voice): ability to select the AI model (small recommended for now).  
+- Change: API (Voice): automatic download for AI model at runtime, local cache in sounds/managed/model folder.
+- Fix: API: eliminate duplicated warnings when remote control is not enabled. 
+- Change: API: change from NodeGraphQt to OdenGraphQT (for QT graphics node library).
+- Change: API: add hugging face library (for voice model download).
+
 ### (m77T55)
 - Change: PlaySound Action: exposed additional API features for sound playback options in the action.  Ability to set decibel threshold for removing detected low volume (silence) in played audio (.wav or generated TTS) - recommended threshold is -55dB,  trim options, optional delay if the blocking option is enabled to add a pause between sequential sounds and ability to sync settings globally in the profile to apply to other PlaySound actions without editing them one at at time.  
 - Change: API: event processing optimization path on very expensive mode hierarchy lookups that were adding CPU usage to match events to execution nodes.

@@ -34,10 +34,11 @@ from __future__ import annotations  # deprecated with python 3.14+
 import logging
 
 
+
 import gremlin.joystick_handling
 import dinput
 import enum
-from enum import auto
+from enum import Enum, auto
 import anytree
 from anytree import NodeMixin
 
@@ -50,7 +51,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 
-from NodeGraphQt import NodeGraph, BaseNode, BaseNodeCircle, BaseNodeSVG
+from OdenGraphQt import NodeGraph, BaseNode
 
 
 from PySide6 import QtCore, QtWidgets
@@ -112,6 +113,14 @@ class ProfileBaseNode(ABC, NodeMixin):
     def to_xml(self):
         """returns a XML node"""
         pass
+
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, value):
+        self._description = value
 
 
 class ProfileRootNode(ProfileBaseNode):
@@ -246,59 +255,130 @@ class RemapData:
         self.target_device: DeviceSummary = target_device  # target device to remap to
         self.device_node: ProfileDeviceNode = device_node  # source device node
 
-class GraphInputItemNode(BaseNode):
+
+class GraphConnectionDirection(Enum):
+    INPUT = 1
+    OUTPUT = 2
+class GraphConnectionPoint:
+    """represents a connection between nodes in the profile tree"""
+
+    def __init__(self,
+                 direction : GraphConnectionDirection,
+                 name : str = None,
+                 multi : bool = False,
+                 index : int = None):
+        self.id = gremlin.util.get_guid()
+        self.direction = direction
+        self.name = name
+        self.index = index
+        self.multi = multi
+
+
+
+class GraphBaseNode(BaseNode):
+    """represents a base node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "base"
+
+    def __init__(self,
+                 name : str = None,
+                 inputs : GraphConnectionPoint | list [GraphConnectionPoint] = None,
+                 outputs : GraphConnectionPoint | list [GraphConnectionPoint] = None):
+
+
+        super().__init__()
+        self._input_map = {}
+        self._output_map = {}
+
+         # Add a text input field
+        self.add_text_input(
+            name='node_name',
+            placeholder_text='Not Specified'
+        )
+
+        if isinstance(inputs, GraphConnectionPoint):
+            inputs = [inputs]
+        if isinstance(outputs, GraphConnectionPoint):
+            outputs = [outputs]
+
+        if inputs:
+            for input in inputs:
+                self._input_map[input.id] = input
+                if input.index is None:
+                    input.index = len(self._input_map)
+                self.add_input(input.name, multi_input=input.multi)
+
+
+        if outputs:
+            for output in outputs:
+                self._output_map[output.id] = output
+                if output.index is None:
+                    output.index = len(self._output_map)
+                self.add_output(output.name, multi_output=output.multi)
+
+    def connect(self, target_node : GraphBaseNode, source_output_index : int = 0, target_input_index : int = 0):
+        """ connects this node's output to the target node's input """
+        self.set_output(source_output_index, target_node.input(target_input_index))
+
+    @property
+    def nodeName(self):
+        return self.get_property('node_name')
+    @nodeName.setter
+    def nodeName(self, name: str):
+        self.set_property('node_name', name)
+
+
+
+
+    @staticmethod
+    def instanceName(node):
+        # Return the fully qualified node name based on the class name
+        return f"{GraphBaseNode.__identifier__}.{node.__class__.__name__}"
+
+
+
+class GraphInputItemNode(GraphBaseNode):
     """represents an input item node in the profile tree"""
-    __identifier__  = "gex.nodes"
-    NODE_NAME = "input_item"
     def __init__(self):
-        super().__init__()
 
-        self.add_input("Device", multi_input=False)
-        self.add_output("Container", multi_output=True)
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Device", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Container", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
 
 
-class GraphDeviceNode(BaseNode):
+class GraphDeviceNode(GraphBaseNode):
     """represents a device node in the profile tree"""
-    __identifier__  = "gex.nodes"
-    NODE_NAME = "device"
 
     def __init__(self):
-        super().__init__()
 
-        self.add_input("Profile", multi_input=False)
-        self.add_output("Device", multi_output=True)
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Profile", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Device", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
 
-class GraphProfileNode(BaseNode):
+class GraphProfileNode(GraphBaseNode):
     """represents a profile node in the profile tree"""
-    __identifier__  = "gex.nodes"
-    NODE_NAME = "profile"
+
 
     def __init__(self):
-        super().__init__()
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Profile", multi=True)
+        super().__init__(outputs=c1)
 
-        self.add_output("Profile", multi_output=True)
-
-class GraphModeNode(BaseNode):
+class GraphModeNode(GraphBaseNode):
     """represents a mode node in the profile tree"""
-    __identifier__  = "gex.nodes"
-    NODE_NAME = "mode"
 
     def __init__(self):
-        super().__init__()
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Profile", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Mode", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
 
-        self.add_input("Profile", multi_input=False)
-        self.add_output("Mode", multi_output=True)
-
-class GraphContainerNode(BaseNode):
+class GraphContainerNode(GraphBaseNode):
     """represents a container node in the profile tree"""
-    __identifier__  = "gex.nodes"
-    NODE_NAME = "container"
+
 
     def __init__(self):
-        super().__init__()
-
-        self.add_input("Input", multi_input=False)
-        self.add_output("Action", multi_output=True)
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Input", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Action", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
 
 
 class GraphActionNode(BaseNode):
@@ -307,10 +387,9 @@ class GraphActionNode(BaseNode):
     NODE_NAME = "action"
 
     def __init__(self):
-        super().__init__()
-
-        self.add_input("Container", multi_input=False)
-        self.add_output("Action", multi_output=True)
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Container", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Action", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
 
 
 class ProfileTreeDialogUI(ui_common.BaseDialogUi):
@@ -380,7 +459,6 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
         root_label = "Profile"
         root_node = self._node_graph.create_node("gex.nodes.GraphProfileNode", root_label)
-        root_node.set_name(root_label)
         root_node.set_pos(0, 0)
         self._node_map[self._graph.root] = root_node
 
@@ -393,32 +471,42 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
             return
 
         child_nodes = list(graph.children)
+        child : ProfileBaseNode
         for index, child in enumerate(child_nodes):
+            instance = None
             match child.nodeType:
                 case ProfileNodeType.Profile:
-                    label = "GraphProfileNode"
+                    instance = GraphProfileNode
 
                 case ProfileNodeType.Device:
-                    label = "GraphDeviceNode"
+                    instance = GraphDeviceNode
 
                 case ProfileNodeType.Input:
-                    label = "GraphInputItemNode"
+                    instance = GraphInputItemNode
+
 
                 case ProfileNodeType.Container:
-                    label = "GraphContainerNode"
+                    instance = GraphContainerNode
+
 
                 case ProfileNodeType.Action:
-                    label = "GraphActionNode"
+                    instance = GraphActionNode
+
                 case ProfileNodeType.Mode:
-                    label = "GraphModeNode"
+                    instance = GraphModeNode
+
                 case _:
                     continue
-            name = self._node_label(child)
-            child_node = self._node_graph.create_node(f"gex.nodes.{label}", name)
+
+            instance_name = instance.type_
+            child_node = self._node_graph.create_node(instance_name)
+            child_node.nodeName = child.description
             child_node.set_pos(offset_x * (index + 1), offset_y + (index * 120))
-            parent_graph_node = self._node_map.get(parent_node)
+
+            parent_graph_node : GraphBaseNode = self._node_map.get(parent_node)
             if parent_graph_node:
-                parent_graph_node.set_output(0, child_node.input(0))
+                parent_graph_node.connect(child_node)
+
             self._node_map[child] = child_node
 
             self._recursive_add(child, child_node, offset_x, offset_y + 140)

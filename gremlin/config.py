@@ -3835,3 +3835,14 @@ class Configuration(QtCore.QObject):
     @audio_silence_threshold_db.setter
     def audio_silence_threshold_db(self, value: float):
         self._set_data("audio_silence_threshold_db", value)
+
+
+    @property
+    def voice_model_name(self) -> str:
+        """returns the name of the voice model"""
+        # possible models: "tiny", "base", "small", "medium", "large-v3"
+        return self._get_data("voice_model_name", "base")
+
+    @voice_model_name.setter
+    def voice_model_name(self, value: str):
+        self._set_data("voice_model_name", value)
