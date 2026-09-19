@@ -411,7 +411,7 @@ class MacroManager(QtCore.QObject):
             # state (avoids waiting on a half-torn-down primitive)
             self._abort_event.clear()
             self._schedule_event.clear()
-            self._run_scheduler_thread = Thread(target=self._run_scheduler, args=(self._abort_event,))
+            self._run_scheduler_thread = Thread(target=self._run_scheduler, args=(self._abort_event,), daemon=True)
             self._run_scheduler_thread.name = "Macro scheduler"
             # self._run_scheduler_thread.daemon = True
             self._run_scheduler_thread.start()

@@ -50,6 +50,8 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 
+from NodeGraphQt import NodeGraph, BaseNode, BaseNodeCircle, BaseNodeSVG
+
 
 from PySide6 import QtCore, QtWidgets
 
@@ -243,6 +245,210 @@ class RemapData:
         self.source_device: DeviceSummary = source_device  # source device from the input
         self.target_device: DeviceSummary = target_device  # target device to remap to
         self.device_node: ProfileDeviceNode = device_node  # source device node
+
+class GraphInputItemNode(BaseNode):
+    """represents an input item node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "input_item"
+    def __init__(self):
+        super().__init__()
+
+        self.add_input("Device", multi_input=False)
+        self.add_output("Container", multi_output=True)
+
+
+class GraphDeviceNode(BaseNode):
+    """represents a device node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "device"
+
+    def __init__(self):
+        super().__init__()
+
+        self.add_input("Profile", multi_input=False)
+        self.add_output("Device", multi_output=True)
+
+class GraphProfileNode(BaseNode):
+    """represents a profile node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "profile"
+
+    def __init__(self):
+        super().__init__()
+
+        self.add_output("Profile", multi_output=True)
+
+class GraphModeNode(BaseNode):
+    """represents a mode node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "mode"
+
+    def __init__(self):
+        super().__init__()
+
+        self.add_input("Profile", multi_input=False)
+        self.add_output("Mode", multi_output=True)
+
+class GraphContainerNode(BaseNode):
+    """represents a container node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "container"
+
+    def __init__(self):
+        super().__init__()
+
+        self.add_input("Input", multi_input=False)
+        self.add_output("Action", multi_output=True)
+
+
+class GraphActionNode(BaseNode):
+    """represents an action node in the profile tree"""
+    __identifier__  = "gex.nodes"
+    NODE_NAME = "action"
+
+    def __init__(self):
+        super().__init__()
+
+        self.add_input("Container", multi_input=False)
+        self.add_output("Action", multi_output=True)
+
+
+class ProfileTreeDialogUI(ui_common.BaseDialogUi):
+    """dialog that renders the profile tree in a NodeGraphQt graph view"""
+
+    def __init__(self, graph: ProfileGraph, parent=None):
+        super().__init__(self.__class__.__name__, parent=parent)
+        self._graph = graph
+        self._node_graph = None
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setWindowTitle("Profile Tree")
+        self._node_map = {} # map of profile nodes to graph nodes
+
+        self._fallback_widget = QtWidgets.QLabel(
+            "NodeGraphQt is not installed or unavailable. Install the optional 'nodegraphqt' package to view the profile tree."
+        )
+        self._fallback_widget.setWordWrap(True)
+        self._fallback_widget.setVisible(False)
+        self.main_layout.addWidget(self._fallback_widget)
+
+
+        try:
+
+
+            self._node_graph = NodeGraph()
+
+
+            # registered example nodes.
+            self._node_graph.register_nodes(
+                [
+                    GraphProfileNode,
+                    GraphDeviceNode,
+                    GraphInputItemNode,
+                    GraphContainerNode,
+                    GraphActionNode,
+                    GraphModeNode,
+                ]
+            )
+
+
+            registered_types = self._node_graph.registered_nodes()
+            syslog.info("Registered node types:")
+            for node_type in registered_types:
+                syslog.info(f"Registered node type: {node_type}")
+
+            self._node_graph_widget = self._node_graph.widget
+            self._node_graph.set_layout_direction(1)
+            self._node_graph_widget.setMinimumSize(700, 500)
+            self.main_layout.addWidget(self._node_graph_widget)
+
+
+            self._build_tree()
+        except Exception as exc:  # pragma: no cover - optional dependency may be missing
+            syslog.warning(f"ProfileTreeDialogUI: unable to initialize NodeGraphQt: {exc}")
+            self._fallback_widget.setVisible(True)
+            close_button = QtWidgets.QPushButton("Close")
+            close_button.clicked.connect(self.close)
+            self.main_layout.addWidget(close_button)
+
+    def _build_tree(self):
+        if self._node_graph is None:
+            return
+
+        #self._node_graph.clear_session()
+
+
+
+        root_label = "Profile"
+        root_node = self._node_graph.create_node("gex.nodes.GraphProfileNode", root_label)
+        root_node.set_name(root_label)
+        root_node.set_pos(0, 0)
+        self._node_map[self._graph.root] = root_node
+
+        self._recursive_add(graph=self._graph.root, parent_node=self._graph.root, offset_x=220, offset_y=0)
+
+        # self._node_graph.auto_layout_nodes()
+
+    def _recursive_add(self, graph : ProfileGraph, parent_node, offset_x: int, offset_y: int):
+        if graph is None:
+            return
+
+        child_nodes = list(graph.children)
+        for index, child in enumerate(child_nodes):
+            match child.nodeType:
+                case ProfileNodeType.Profile:
+                    label = "GraphProfileNode"
+
+                case ProfileNodeType.Device:
+                    label = "GraphDeviceNode"
+
+                case ProfileNodeType.Input:
+                    label = "GraphInputItemNode"
+
+                case ProfileNodeType.Container:
+                    label = "GraphContainerNode"
+
+                case ProfileNodeType.Action:
+                    label = "GraphActionNode"
+                case ProfileNodeType.Mode:
+                    label = "GraphModeNode"
+                case _:
+                    continue
+            name = self._node_label(child)
+            child_node = self._node_graph.create_node(f"gex.nodes.{label}", name)
+            child_node.set_pos(offset_x * (index + 1), offset_y + (index * 120))
+            parent_graph_node = self._node_map.get(parent_node)
+            if parent_graph_node:
+                parent_graph_node.set_output(0, child_node.input(0))
+            self._node_map[child] = child_node
+
+            self._recursive_add(child, child_node, offset_x, offset_y + 140)
+
+    @staticmethod
+    def _node_label(node) -> str:
+        if node.nodeType == ProfileNodeType.Device:
+            name = getattr(node, "device_name", None) or getattr(node, "name", None) or "Device"
+            return f"Device: {name}"
+        if node.nodeType == ProfileNodeType.Mode:
+            return f"Mode: {getattr(node, 'name', 'Unknown')}"
+        if node.nodeType == ProfileNodeType.InputType:
+            input_type = getattr(node, "input_type", None)
+            return f"Input Type: {input_type.name if input_type else 'Unknown'}"
+        if node.nodeType == ProfileNodeType.Input:
+            input_item = getattr(node, "input_item", None)
+            display_name = getattr(input_item, "display_name", None)
+            if display_name:
+                return f"Input: {display_name}"
+            return f"Input: {getattr(node, 'input_id', 'Unknown')}"
+        if node.nodeType == ProfileNodeType.Container:
+            container = getattr(node, "container", None)
+            if container is not None:
+                return f"Container: {getattr(container, 'name', container.__class__.__name__)}"
+            return "Container"
+        if node.nodeType == ProfileNodeType.Action:
+            return "Action"
+        if node.nodeType == ProfileNodeType.MergedAxis:
+            return "Merged Axis"
+        return str(node.nodeType).split(".")[-1]
 
 
 class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
@@ -1493,6 +1699,12 @@ class ProfileGraph:
     def remap(self):
         """show the remap dialog"""
         dialog = DeviceRemapDialogUI(self)
+        gremlin.util.centerDialog(dialog)
+        dialog.exec()
+
+    def show_tree_dialog(self, parent=None):
+        """show the profile tree in a NodeGraphQt view"""
+        dialog = ProfileTreeDialogUI(self, parent=parent)
         gremlin.util.centerDialog(dialog)
         dialog.exec()
 

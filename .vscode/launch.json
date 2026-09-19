@@ -15,6 +15,12 @@
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
             //"justMyCode": false,
             "justMyCode": true,
+            // "rules": [
+            //     {
+            //         "path": "${workspaceFolder}/gremlin/sound.py",
+            //         "include": false
+            //     }
+            // ],
             "subProcess": false,
             "args": ["--nmh"],
             //"args": ["--np"],
