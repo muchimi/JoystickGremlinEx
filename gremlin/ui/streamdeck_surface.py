@@ -220,7 +220,141 @@ def appearance_mode(item) -> str:
     return "state" if mode == "state" else "press"
 
 
+def _state_id_str(value) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def _state_ids_equal(left, right) -> bool:
+    a = _state_id_str(left)
+    b = _state_id_str(right)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    na = a.replace("-", "").replace("{", "").replace("}", "").casefold()
+    nb = b.replace("-", "").replace("{", "").replace("}", "").casefold()
+    return bool(na) and na == nb
+
+
+def find_gex_state(state_id=None, state_name=None):
+    """Resolve a GEX state by unique ID, then by name."""
+    try:
+        import gremlin.ui.state_device as state_device
+
+        sd = state_device.StateData()
+    except Exception:
+        return None
+    sid = _state_id_str(state_id)
+    if sid:
+        state = sd.getStateById(sid)
+        if state is not None:
+            return state
+    name = str(state_name or "").strip()
+    if name:
+        return sd.getState(name)
+    return None
+
+
+def sync_appearance_state_fields(item) -> bool:
+    """Rewrite cached appearance state name from the unique ID. Returns True if changed."""
+    if item is None:
+        return False
+    sid = _state_id_str(getattr(item, "appearance_state_id", None) or getattr(item, "_appearance_state_id", None))
+    name = _state_id_str(getattr(item, "appearance_state", None) or getattr(item, "_appearance_state", None))
+    if not sid and not name:
+        return False
+    state = find_gex_state(sid, name)
+    if state is None:
+        return False
+    new_id = _state_id_str(state.id)
+    new_name = state.key
+    changed = False
+    current_id = _state_id_str(getattr(item, "_appearance_state_id", None) or getattr(item, "appearance_state_id", None))
+    current_name = _state_id_str(getattr(item, "_appearance_state", None) or getattr(item, "appearance_state", None))
+    if current_id != new_id:
+        if hasattr(item, "_appearance_state_id"):
+            item._appearance_state_id = new_id
+        elif hasattr(item, "appearance_state_id"):
+            item.appearance_state_id = new_id
+        changed = True
+    if current_name != new_name:
+        if hasattr(item, "_appearance_state"):
+            item._appearance_state = new_name
+        elif hasattr(item, "appearance_state"):
+            item.appearance_state = new_name
+        changed = True
+    return changed
+
+
+def rewrite_state_expression(text, old_name: str, new_name: str) -> str:
+    """Rewrite $(state:old) tokens in a title/image expression."""
+    raw = text if isinstance(text, str) else ""
+    if not raw or not old_name or old_name == new_name:
+        return raw
+    old = str(old_name).strip()
+    new = str(new_name).strip()
+    if not old or not new:
+        return raw
+
+    def _repl(match):
+        kind = match.group(1) or ""
+        name = (match.group(2) or "").strip()
+        if kind.casefold() == "state" and name.casefold() == old.casefold():
+            return f"$({kind}:{new})"
+        return match.group(0)
+
+    return _EXPR_RE.sub(_repl, raw)
+
+
+def sync_streamdeck_state_refs(items, old_name: str = "", new_name: str = "") -> bool:
+    """Keep Stream Deck appearance / expression state links on unique IDs."""
+    changed = False
+    for item in items or []:
+        if sync_appearance_state_fields(item):
+            changed = True
+        if old_name and new_name and old_name != new_name:
+            for attr in (
+                "title",
+                "text_line2",
+                "text_line3",
+                "title_pressed",
+                "text_line2_pressed",
+                "text_line3_pressed",
+                "title_expr",
+                "image_expr",
+            ):
+                current = getattr(item, attr, None)
+                rewritten = rewrite_state_expression(current, old_name, new_name)
+                if rewritten != current:
+                    setattr(item, attr, rewritten)
+                    changed = True
+    try:
+        store = SurfaceVariableStore()
+        for meta in (store._vars or {}).values():
+            if not isinstance(meta, dict):
+                continue
+            alias = meta.get("state_alias") or ""
+            alias_id = meta.get("state_alias_id") or ""
+            if old_name and new_name and str(alias).casefold() == str(old_name).casefold():
+                alias = new_name
+            state = find_gex_state(alias_id, alias)
+            if state is None:
+                if old_name and new_name and alias != meta.get("state_alias"):
+                    meta["state_alias"] = alias
+                    changed = True
+                continue
+            sid = _state_id_str(state.id)
+            if meta.get("state_alias") != state.key or _state_id_str(meta.get("state_alias_id")) != sid:
+                meta["state_alias"] = state.key
+                meta["state_alias_id"] = sid
+                changed = True
+    except Exception:
+        pass
+    return changed
+
+
 def appearance_state_name(item) -> str:
+    sync_appearance_state_fields(item)
     return str(getattr(item, "appearance_state", None) or "").strip()
 
 
@@ -231,15 +365,12 @@ def appearance_follows_state(item) -> bool:
 
 def appearance_state_is_on(item) -> bool:
     """True when the GEX state driving this key's look is currently ON."""
+    sid = _state_id_str(getattr(item, "appearance_state_id", None) or getattr(item, "_appearance_state_id", None))
     name = appearance_state_name(item)
-    if not name:
+    state = find_gex_state(sid, name)
+    if state is None:
         return False
-    try:
-        import gremlin.ui.state_device as state_device
-
-        return bool(state_device.StateData().getValue(name))
-    except Exception:
-        return False
+    return bool(getattr(state, "value", False))
 
 
 def has_pressed_appearance(item) -> bool:
@@ -578,6 +709,7 @@ class SurfaceVariableStore(QtCore.QObject):
                     "default": meta.get("default", meta.get("value", "")),
                     "description": meta.get("description") or "",
                     "state_alias": meta.get("state_alias") or "",
+                    "state_alias_id": meta.get("state_alias_id") or "",
                 }
         self.variables_changed.emit()
 
@@ -655,6 +787,7 @@ class SurfaceVariableStore(QtCore.QObject):
             "default": default,
             "description": description or "",
             "state_alias": state_alias or "",
+            "state_alias_id": "",
         }
         self.persist_to_profile()
         self.variables_changed.emit()
@@ -671,38 +804,35 @@ class SurfaceVariableStore(QtCore.QObject):
             return
         meta = self._vars[name]
         for k, v in kwargs.items():
-            if k in ("type", "default", "description", "state_alias", "value"):
+            if k in ("type", "default", "description", "state_alias", "state_alias_id", "value"):
                 meta[k] = v
         self.persist_to_profile()
         self.variables_changed.emit()
 
     def _sync_aliases_from_states(self):
-        try:
-            import gremlin.ui.state_device as state_device
-
-            sd = state_device.StateData()
-        except Exception:
-            return
         for name, meta in self._vars.items():
             alias = (meta.get("state_alias") or "").strip()
-            if not alias:
+            alias_id = (meta.get("state_alias_id") or "").strip()
+            if not alias and not alias_id:
                 continue
-            st = sd.getState(alias)
+            st = find_gex_state(alias_id, alias)
             if st is not None:
+                meta["state_alias"] = st.key
+                meta["state_alias_id"] = _state_id_str(st.id)
                 meta["value"] = getattr(st, "value", meta.get("value"))
 
     def _push_alias_to_state(self, name: str):
         meta = self._vars.get(name) or {}
         alias = (meta.get("state_alias") or "").strip()
-        if not alias:
+        alias_id = (meta.get("state_alias_id") or "").strip()
+        if not alias and not alias_id:
             return
         try:
-            import gremlin.ui.state_device as state_device
-
-            sd = state_device.StateData()
-            st = sd.getState(alias)
+            st = find_gex_state(alias_id, alias)
             if st is not None:
                 st.value = meta.get("value")
+                meta["state_alias"] = st.key
+                meta["state_alias_id"] = _state_id_str(st.id)
         except Exception:
             pass
 

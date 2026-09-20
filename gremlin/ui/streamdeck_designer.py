@@ -1147,6 +1147,21 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            sd.key_changed.connect(self._on_gex_state_identity_changed)
+            sd.crud.connect(self._on_gex_state_identity_changed)
+            self._bridge_hooks.extend(
+                [
+                    (sd.key_changed, self._on_gex_state_identity_changed),
+                    (sd.crud, self._on_gex_state_identity_changed),
+                ]
+            )
+        except Exception:
+            pass
+
         self.refresh()
         self._apply_runtime_lock(bool(gremlin.shared_state.is_running))
 
@@ -1524,11 +1539,11 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._appearance_state_label = QtWidgets.QLabel("State")
         driver_layout.addWidget(self._appearance_state_label)
         self._appearance_state_combo = QtWidgets.QComboBox()
-        self._appearance_state_combo.setEditable(True)
+        self._appearance_state_combo.setEditable(False)
         self._appearance_state_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         self._appearance_state_combo.setMinimumWidth(120)
         self._appearance_state_combo.setToolTip("GEX state that drives State ON / State OFF appearance")
-        self._appearance_state_combo.currentTextChanged.connect(self._on_appearance_state_ui)
+        self._appearance_state_combo.currentIndexChanged.connect(self._on_appearance_state_ui)
         driver_layout.addWidget(self._appearance_state_combo, 1)
         states_row.addWidget(driver_host)
 
@@ -2417,6 +2432,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 "bg_color_pressed": "",
                 "appearance_mode": "press",
                 "appearance_state": "",
+                "appearance_state_id": "",
                 "step_mode": "all",
                 "step_wrap": True,
                 "linked_page": 0,
@@ -2777,15 +2793,48 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._rebuild_pages()
         self._rebuild_grid()
 
-    def _gex_state_names(self) -> list[str]:
-        try:
-            import gremlin.ui.state_device as state_device
+    def _on_gex_state_identity_changed(self, *args):
+        if getattr(gremlin.shared_state, "profile_loading", False):
+            return
+        item = self._selected_item()
+        if item is None:
+            return
+        self._populate_appearance_state_combo(
+            getattr(item, "appearance_state_id", "") or "",
+            getattr(item, "appearance_state", "") or "",
+        )
 
-            names = [str(n) for n in (state_device.StateData().getStateNames() or []) if str(n).strip()]
-            names.sort(key=lambda s: s.casefold())
-            return names
-        except Exception:
-            return []
+    def _populate_appearance_state_combo(self, selected_id: str = "", selected_name: str = ""):
+        combo = getattr(self, "_appearance_state_combo", None)
+        if combo is None or not Shiboken.isValid(combo):
+            return
+        from gremlin.ui.streamdeck_surface import find_gex_state
+
+        resolved = find_gex_state(selected_id, selected_name)
+        selected_id = str(resolved.id).strip() if resolved is not None else str(selected_id or "").strip()
+        index = 0
+        with QtCore.QSignalBlocker(combo):
+            combo.clear()
+            combo.addItem("", "")
+            try:
+                import gremlin.ui.state_device as state_device
+
+                states = list(state_device.StateData().getStates().values())
+            except Exception:
+                states = []
+            states.sort(key=lambda s: str(getattr(s, "key", "")).casefold())
+            for state in states:
+                sid = str(state.id).strip()
+                combo.addItem(state.key, sid)
+                if selected_id and sid == selected_id:
+                    index = combo.count() - 1
+                elif not selected_id and resolved is not None and state.key == resolved.key:
+                    index = combo.count() - 1
+            if index == 0 and (selected_id or str(selected_name or "").strip()):
+                label = (resolved.key if resolved is not None else str(selected_name or selected_id)).strip()
+                combo.addItem(f"{label} (missing)", selected_id)
+                index = combo.count() - 1
+            combo.setCurrentIndex(index)
 
     def _current_appearance_driver(self) -> str:
         combo = getattr(self, "_appearance_mode_combo", None)
@@ -2893,26 +2942,6 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if bg_p is not None and Shiboken.isValid(bg_p):
             bg_p.setToolTip("State ON background color" if use_state else "Pressed background color")
 
-    def _populate_appearance_state_combo(self, selected: str = ""):
-        combo = getattr(self, "_appearance_state_combo", None)
-        if combo is None or not Shiboken.isValid(combo):
-            return
-        names = self._gex_state_names()
-        selected = (selected or "").strip()
-        with QtCore.QSignalBlocker(combo):
-            combo.clear()
-            combo.addItem("")
-            for name in names:
-                combo.addItem(name)
-            if selected:
-                idx = combo.findText(selected)
-                if idx < 0:
-                    combo.addItem(selected)
-                    idx = combo.findText(selected)
-                combo.setCurrentIndex(max(0, idx))
-            else:
-                combo.setCurrentIndex(0)
-
     def _on_appearance_mode_ui(self, *_args):
         item = self._selected_item()
         if item is None:
@@ -2936,7 +2965,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         combo = getattr(self, "_appearance_state_combo", None)
         if combo is None or not Shiboken.isValid(combo):
             return
-        item.appearance_state = (combo.currentText() or "").strip()
+        sid = str(combo.currentData() or "").strip()
+        name = combo.currentText().replace(" (missing)", "").strip() if sid else ""
+        item.bind_appearance_state(sid, name)
         self._refresh_cell_contents()
         bridge = self._bridge()
         if bridge.get_active_page(self._device_id) == self._edit_page:
@@ -2958,7 +2989,10 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             with QtCore.QSignalBlocker(mode_combo):
                 idx = mode_combo.findData(mode)
                 mode_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        self._populate_appearance_state_combo(getattr(item, "appearance_state", "") or "")
+        self._populate_appearance_state_combo(
+            getattr(item, "appearance_state_id", "") or "",
+            getattr(item, "appearance_state", "") or "",
+        )
         if Shiboken.isValid(self._title_edit):
             lines = [
                 item.title or "",
@@ -3160,7 +3194,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             item.appearance_mode = str(mode_combo.currentData() or "press")
         state_combo = getattr(self, "_appearance_state_combo", None)
         if state_combo is not None and Shiboken.isValid(state_combo):
-            item.appearance_state = (state_combo.currentText() or "").strip()
+            sid = str(state_combo.currentData() or "").strip()
+            name = state_combo.currentText().replace(" (missing)", "").strip() if sid else ""
+            item.bind_appearance_state(sid, name)
         self._refresh_cell_contents()
         bridge = self._bridge()
         if bridge.get_active_page(self._device_id) == self._edit_page:
@@ -3374,6 +3410,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                     "bg_color_pressed": "",
                     "appearance_mode": "press",
                     "appearance_state": "",
+                    "appearance_state_id": "",
                     "step_mode": "all",
                     "step_wrap": True,
                 }
@@ -3584,6 +3621,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             item.sync_pressed_style_from_released()
             item.appearance_mode = "press"
             item.appearance_state = ""
+            item.appearance_state_id = ""
             item.step_mode = "all"
             item.step_index = 0
             item.linked_page = 0

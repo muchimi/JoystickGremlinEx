@@ -1138,6 +1138,100 @@ class OptionsDialog(ui_common.BaseDialogUi):
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
 
+        # Video return (client → master) — gated under remote control of this client.
+        self._remote_video_group = QtWidgets.QGroupBox("Video return to master")
+        video_layout = QtWidgets.QVBoxLayout(self._remote_video_group)
+        self.enable_remote_video_widget = QtWidgets.QCheckBox("Send video feed back to master")
+        self.enable_remote_video_widget.setChecked(bool(self.config.remote_video_enabled))
+        self.enable_remote_video_widget.setToolTip(
+            "When enabled, this client publishes a screen or application capture for Overlay Remote View widgets on the master. "
+            "Publishing runs only while a profile is active and stops when the profile is deactivated. "
+            "Requires remote control of this client. Opens TCP port 6013 while running — allow it in the firewall."
+        )
+        self.enable_remote_video_widget.clicked.connect(self._enable_remote_video)
+        video_layout.addWidget(self.enable_remote_video_widget)
+
+        self.remote_video_source_widget = QtWidgets.QComboBox()
+        self.remote_video_source_widget.addItem("Entire screen", "screen")
+        self.remote_video_source_widget.addItem("Application window", "window")
+        src = self.config.remote_video_source
+        self.remote_video_source_widget.setCurrentIndex(1 if src == "window" else 0)
+        self.remote_video_source_widget.currentIndexChanged.connect(self._remote_video_source_changed)
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_source_widget, "Source:", widget_only=True))
+
+        self.remote_video_monitor_widget = QtWidgets.QComboBox()
+        self._refresh_remote_video_monitors()
+        self.remote_video_monitor_widget.currentIndexChanged.connect(self._remote_video_monitor_changed)
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_monitor_widget, "Screen:", widget_only=True))
+
+        self.remote_video_window_widget = QtWidgets.QComboBox()
+        self.remote_video_window_widget.setEditable(True)
+        self._refresh_remote_video_windows()
+        self.remote_video_window_widget.setCurrentText(self.config.remote_video_window_title or "")
+        self.remote_video_window_widget.currentTextChanged.connect(self._remote_video_window_changed)
+        refresh_windows = gremlin.ui.ui_common.QDataPushButton("Refresh")
+        refresh_windows.clicked.connect(self._refresh_remote_video_windows)
+        win_row, _ = gremlin.ui.ui_common.getHContainer(
+            [self.remote_video_window_widget, refresh_windows],
+            "Application:",
+        )
+        video_layout.addWidget(win_row)
+
+        self.remote_video_max_width_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value=self.config.remote_video_max_width,
+            callback=self._remote_video_max_width_changed,
+            min_range=320,
+            max_range=3840,
+            tooltip="Longest edge width of the published stream (height scales).",
+        )
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_max_width_widget, "Max width:", widget_only=True))
+
+        self.remote_video_fps_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value=self.config.remote_video_fps,
+            callback=self._remote_video_fps_changed,
+            min_range=1,
+            max_range=30,
+            tooltip="Target frames per second (1–30). Lower values reduce load on the client PC.",
+        )
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_fps_widget, "FPS:", widget_only=True))
+
+        self.remote_video_quality_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value=self.config.remote_video_quality,
+            callback=self._remote_video_quality_changed,
+            min_range=1,
+            max_range=100,
+            tooltip="JPEG quality (1–100). Lower = less CPU/bandwidth on the client.",
+        )
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_quality_widget, "Quality:", widget_only=True))
+
+        self.remote_video_encoder_widget = QtWidgets.QComboBox()
+        for label, key in (
+            ("Auto (H.264, JPEG fallback)", "auto"),
+            ("H.264 software (x264)", "h264"),
+            ("NVIDIA NVENC", "nvenc"),
+            ("AMD AMF", "amf"),
+            ("Intel QSV", "qsv"),
+            ("JPEG / MJPEG", "jpeg"),
+        ):
+            self.remote_video_encoder_widget.addItem(label, key)
+        enc = self.config.remote_video_encoder
+        idx = max(0, self.remote_video_encoder_widget.findData(enc))
+        self.remote_video_encoder_widget.setCurrentIndex(idx)
+        self.remote_video_encoder_widget.currentIndexChanged.connect(self._remote_video_encoder_changed)
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_encoder_widget, "Encoder:", widget_only=True))
+
+        self.remote_video_port_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value=self.config.remote_video_port,
+            callback=self._remote_video_port_changed,
+            min_range=4096,
+            max_range=65535,
+            tooltip="TCP port this client listens on for the master's Overlay Remote View connection.",
+        )
+        video_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.remote_video_port_widget, "Video port:", widget_only=True))
+
+        page_layout.addWidget(self._remote_video_group)
+        self._sync_remote_video_controls()
+
         host_widget = gremlin.ui.ui_common.QLineEdit(text=gremlin.remote.remote_control.hostName, readonly=True)
         widget = gremlin.ui.ui_common.getHContainer(
             host_widget,
@@ -1218,6 +1312,7 @@ Client GremlinEx machines on the local subnet must match the server port number.
 Only enable the client remote control on a client.
 Only enable the server control on the master GremlinEx machine.
 There should only be one GremlinEx master server on the subnet.
+Video return (optional) uses a separate TCP port (default 6013) from client to master Overlay widgets.
 """
 
         info_box = ui_common.QInfoBox(msg)
@@ -2893,6 +2988,132 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         """updates remote control flag"""
         self.config.enable_remote_control = clicked
         self.config.save()
+        self._sync_remote_video_controls()
+        try:
+            from gremlin.remote_video import sync_publisher_with_runtime
+
+            sync_publisher_with_runtime()
+        except Exception:
+            pass
+
+    @QtCore.Slot(bool)
+    def _enable_remote_video(self, clicked):
+        self.config.remote_video_enabled = bool(clicked)
+        self.config.save()
+        self._sync_remote_video_controls()
+        try:
+            from gremlin.remote_video import sync_publisher_with_runtime
+
+            sync_publisher_with_runtime()
+        except Exception:
+            pass
+        try:
+            import gremlin.remote
+
+            gremlin.remote.remote_client.requestIdentify()
+        except Exception:
+            pass
+
+    def _sync_remote_video_controls(self):
+        enabled = bool(self.config.enable_remote_control)
+        group = getattr(self, "_remote_video_group", None)
+        if group is not None:
+            group.setEnabled(enabled)
+        video_on = enabled and bool(self.config.remote_video_enabled)
+        is_window = self.config.remote_video_source == "window"
+        for name in (
+            "remote_video_source_widget",
+            "remote_video_monitor_widget",
+            "remote_video_window_widget",
+            "remote_video_max_width_widget",
+            "remote_video_fps_widget",
+            "remote_video_quality_widget",
+            "remote_video_encoder_widget",
+            "remote_video_port_widget",
+        ):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.setEnabled(video_on)
+        mon = getattr(self, "remote_video_monitor_widget", None)
+        win = getattr(self, "remote_video_window_widget", None)
+        if mon is not None:
+            mon.setEnabled(video_on and not is_window)
+        if win is not None:
+            win.setEnabled(video_on and is_window)
+
+    def _refresh_remote_video_monitors(self):
+        from gremlin.remote_video import list_monitors
+
+        widget = getattr(self, "remote_video_monitor_widget", None)
+        if widget is None:
+            return
+        current = self.config.remote_video_monitor_index
+        with QtCore.QSignalBlocker(widget):
+            widget.clear()
+            for index, label in list_monitors():
+                widget.addItem(label, index)
+            idx = widget.findData(current)
+            widget.setCurrentIndex(idx if idx >= 0 else 0)
+
+    def _refresh_remote_video_windows(self):
+        from gremlin.remote_video import list_top_windows
+
+        widget = getattr(self, "remote_video_window_widget", None)
+        if widget is None:
+            return
+        current = widget.currentText() if widget.isEditable() else (self.config.remote_video_window_title or "")
+        with QtCore.QSignalBlocker(widget):
+            widget.clear()
+            for _hwnd, title in list_top_windows():
+                widget.addItem(title)
+            if current:
+                widget.setCurrentText(current)
+
+    @QtCore.Slot(int)
+    def _remote_video_source_changed(self, _index: int):
+        key = self.remote_video_source_widget.currentData()
+        self.config.remote_video_source = key
+        self.config.save()
+        self._sync_remote_video_controls()
+
+    @QtCore.Slot(int)
+    def _remote_video_monitor_changed(self, _index: int):
+        data = self.remote_video_monitor_widget.currentData()
+        if data is not None:
+            self.config.remote_video_monitor_index = int(data)
+            self.config.save()
+
+    @QtCore.Slot(str)
+    def _remote_video_window_changed(self, text: str):
+        self.config.remote_video_window_title = text
+        self.config.save()
+
+    def _remote_video_max_width_changed(self, value: int):
+        self.config.remote_video_max_width = value
+        self.config.save()
+
+    def _remote_video_fps_changed(self, value: int):
+        self.config.remote_video_fps = value
+        self.config.save()
+
+    def _remote_video_quality_changed(self, value: int):
+        self.config.remote_video_quality = value
+        self.config.save()
+
+    @QtCore.Slot(int)
+    def _remote_video_encoder_changed(self, _index: int):
+        self.config.remote_video_encoder = self.remote_video_encoder_widget.currentData()
+        self.config.save()
+
+    def _remote_video_port_changed(self, value: int):
+        self.config.remote_video_port = value
+        self.config.save()
+        try:
+            from gremlin.remote_video import sync_publisher_with_runtime
+
+            sync_publisher_with_runtime()
+        except Exception:
+            pass
 
     @QtCore.Slot(bool)
     def _enable_remote_broadcast(self, clicked):
@@ -4550,9 +4771,14 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             self.svg_widget,
             self.open_files_widget,
             self.show_files_widget,
-            self.show_profile_tree_widget,
-            gremlin.ui.ui_common.QHorizontalLine(),
         ]
+
+        if __debug__:
+            widgets.append(self.show_profile_tree_widget)
+
+        widgets.append(gremlin.ui.ui_common.QHorizontalLine())
+
+
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
         widget.setContentsMargins(4, 0, 0, 0)
         self.main_layout.addWidget(widget)

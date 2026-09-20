@@ -451,6 +451,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         # "press" → released/pressed; "state" → state OFF/ON (same field sets).
         self._appearance_mode = "press"  # press | state
         self._appearance_state = ""  # GEX state name when mode == state
+        self._appearance_state_id = ""  # unique GEX state id (name is a cache)
         self._step_mode = "all"  # all | advance | latch
         self._step_index = 0
         self._step_wrap = True
@@ -856,6 +857,26 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
     def appearance_state(self, value: str):
         self._appearance_state = (value or "").strip()
 
+    @property
+    def appearance_state_id(self) -> str:
+        return self._appearance_state_id or ""
+
+    @appearance_state_id.setter
+    def appearance_state_id(self, value: str):
+        self._appearance_state_id = str(value or "").strip()
+
+    def bind_appearance_state(self, state_id=None, state_name=None):
+        """Link appearance to a GEX state by unique ID, with name as display cache."""
+        from gremlin.ui.streamdeck_surface import find_gex_state
+
+        state = find_gex_state(state_id, state_name)
+        if state is None:
+            self._appearance_state_id = str(state_id or "").strip()
+            self._appearance_state = str(state_name or "").strip()
+            return
+        self._appearance_state_id = str(state.id).strip()
+        self._appearance_state = state.key
+
     def sync_pressed_style_from_released(self):
         """Copy released style into pressed (used when loading profiles without pressed style)."""
         self._font_family_pressed = self._font_family
@@ -902,6 +923,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
             "bg_color_pressed": self.bg_color_pressed,
             "appearance_mode": self.appearance_mode,
             "appearance_state": self.appearance_state,
+            "appearance_state_id": self.appearance_state_id,
             "step_mode": self.step_mode,
             "step_wrap": self.step_wrap,
             "linked_page": self.linked_page,
@@ -917,6 +939,13 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         # Older clipboards omit linked_page — treat as unlinked.
         if "linked_page" not in data:
             self.linked_page = 0
+        if "appearance_state" in data or "appearance_state_id" in data:
+            if "appearance_state_id" not in data and not data.get("appearance_state"):
+                self._appearance_state_id = ""
+            else:
+                from gremlin.ui.streamdeck_surface import sync_appearance_state_fields
+
+                sync_appearance_state_fields(self)
 
     @property
     def step_mode(self) -> str:
@@ -1023,7 +1052,11 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         else:
             self.sync_pressed_style_from_released()
         self.appearance_mode = safe_read(node, "appearance-mode", str, "press")
-        self.appearance_state = safe_read(node, "appearance-state", str, "")
+        self._appearance_state = safe_read(node, "appearance-state", str, "")
+        self._appearance_state_id = safe_read(node, "appearance-state-id", str, "")
+        from gremlin.ui.streamdeck_surface import sync_appearance_state_fields
+
+        sync_appearance_state_fields(self)
         self.step_mode = safe_read(node, "step-mode", str, "all")
         self.step_index = safe_read(node, "step-index", int, 0)
         self.step_wrap = safe_read(node, "step-wrap", bool, True)
@@ -1139,6 +1172,8 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
             node.set("appearance-mode", self.appearance_mode)
         if self.appearance_state:
             node.set("appearance-state", self.appearance_state)
+        if self.appearance_state_id:
+            node.set("appearance-state-id", self.appearance_state_id)
         if self.step_mode != "all":
             node.set("step-mode", self.step_mode)
             node.set("step-index", str(self.step_index))
@@ -1218,6 +1253,71 @@ class StreamDeckBridge(QtCore.QObject):
             el.profile_loaded.connect(self._load_page_metadata)
         except Exception:
             pass
+        self._state_ref_hooks = False
+        self._hook_state_refs()
+
+    def _hook_state_refs(self):
+        """Keep Stream Deck state appearance/links on unique GEX IDs."""
+        if self._state_ref_hooks:
+            return
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            sd.key_changed.connect(self._on_state_identity_changed)
+            sd.crud.connect(self._on_state_identity_changed)
+            sd.changed.connect(self._on_state_value_changed)
+        except Exception:
+            return
+        self._state_ref_hooks = True
+
+    def _iter_all_streamdeck_items(self):
+        profile = gremlin.shared_state.current_profile
+        if profile is None:
+            return
+        devices = getattr(profile, "devices", None) or {}
+        for device in devices.values():
+            modes = getattr(device, "modes", None) or {}
+            for mode in modes.values():
+                try:
+                    config = mode.getConfig(InputType.StreamDeck) or {}
+                except Exception:
+                    continue
+                for item in config.values():
+                    if isinstance(item, StreamDeckInputItem):
+                        yield item
+
+    def _on_state_identity_changed(self, *args):
+        if getattr(gremlin.shared_state, "profile_loading", False):
+            return
+        old_name = new_name = ""
+        if len(args) >= 3:
+            old_name = str(args[1] or "")
+            new_name = str(args[2] or "")
+        if gremlin.util.is_ui_thread():
+            self._sync_state_refs(old_name, new_name)
+            return
+        gremlin.util.InvokeUiMethod(self._sync_state_refs, old_name, new_name)
+
+    def _sync_state_refs(self, old_name: str = "", new_name: str = ""):
+        from gremlin.ui.streamdeck_surface import sync_streamdeck_state_refs
+
+        items = list(self._iter_all_streamdeck_items())
+        # Must run while StateData still has the old key (key_changed fires before delete).
+        sync_streamdeck_state_refs(items, old_name, new_name)
+        self._repaint_connected_devices()
+
+    def _on_state_value_changed(self, *_args):
+        if getattr(gremlin.shared_state, "profile_loading", False):
+            return
+        if gremlin.util.is_ui_thread():
+            self._repaint_connected_devices()
+            return
+        gremlin.util.InvokeUiMethod(self._repaint_connected_devices)
+
+    def _repaint_connected_devices(self):
+        for device_id in list(self._devices.keys()):
+            self._schedule_paint(device_id)
 
     @property
     def started(self) -> bool:
@@ -1407,6 +1507,7 @@ class StreamDeckBridge(QtCore.QObject):
         gremlin.util.InvokeUiMethod(self._emit_page_metadata_changed)
 
     def _emit_page_metadata_changed(self):
+        self._sync_state_refs()
         for device_id in list(self._page_names.keys()) + list(self._devices.keys()):
             if not device_id:
                 continue

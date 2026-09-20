@@ -491,31 +491,49 @@ class Color:
         return "#374438" if gremlin.shared_state.is_dark_theme else "#829784"
 
     @staticmethod
-    def ansiRed():
+    def ansiRed(bold=False):
+        if bold:
+            return "\033[1;91m"
         return "\033[91m"
 
     @staticmethod
-    def ansiGreen():
+    def ansiGreen(bold=False):
+        if bold:
+            return "\033[1;92m"
         return "\033[92m"
 
     @staticmethod
-    def ansiBlue():
+    def ansiBold():
+        return "\x1b[1m"
+
+    @staticmethod
+    def ansiBlue(bold=False):
+        if bold:
+            return "\033[1;94m"
         return "\033[94m"
 
     @staticmethod
-    def ansiYellow():
+    def ansiYellow(bold=False):
+        if bold:
+            return "\033[1;93m"
         return "\033[93m"
 
     @staticmethod
-    def ansiMagenta():
+    def ansiMagenta(bold=False):
+        if bold:
+            return "\033[1;95m"
         return "\033[95m"
 
     @staticmethod
-    def ansiCyan():
+    def ansiCyan(bold=False):
+        if bold:
+            return "\033[1;96m"
         return "\033[96m"
 
     @staticmethod
-    def ansiWhite():
+    def ansiWhite(bold=False):
+        if bold:
+            return "\033[1;97m"
         return "\033[97m"
 
     @staticmethod
@@ -13806,6 +13824,7 @@ class QWarningWidget(QWidget):
         split: bool = False,
         tooltip: str = None,
         icon: QIcon = None,
+        autohide: bool = False,
         parent=None,
     ):
         super().__init__(parent)
@@ -13825,18 +13844,36 @@ class QWarningWidget(QWidget):
         widget, _ = getHContainer([left_panel, right_panel], alignment=QtCore.Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(widget)
         self._text = text
-        if self.toolTip:
-            self.toolTip = tooltip
+        if tooltip:
+            self.setToolTip(tooltip)
+        self._auto_hide = autohide
+        if autohide:
+            self.setVisible(False)
+
+    def _update_ui(self):
+        if self._auto_hide:
+            # only manage visiblity if flag is set
+            visible = bool(self._label_widget.text()) if self._split else bool(self._icon_widget.text())
+            self.setVisible(visible)
+
+
 
     def text(self) -> str:
         return self._text
 
     def setText(self, text: str):
+        """ sets the text of the widget """
+        gremlin.util.InvokeUiMethod(self._set_text_ui, text)
+
+    def _set_text_ui(self, text: str):
         if self._split:
             self._label_widget.setText(text)
         else:
             self._icon_widget.setText(text)
         self._text = text
+        self._update_ui()
+
+
 
     def hasText(self) -> bool:
         return bool(self._text)
@@ -15560,6 +15597,7 @@ class RemoteClientWidget(QWidget):
 
         self.config: gremlin.remote.RemoteConfig = config
         self.config.client_changed.connect(self._handle_client_changed)
+        self._refresh_pending = False
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -15719,17 +15757,31 @@ class RemoteClientWidget(QWidget):
     def _handle_client_changed(self):
         """update on client change"""
         # syslog.info("remote config client change")
-        if Shiboken.isValid(self):
-            self.refreshClients()
-        else:
+        if not Shiboken.isValid(self):
             # unregister if called and we're deleted already
             self.config.unregisterClientChangeCallback(self._handle_client_changed)
+            return
+        # Debounce: identify replies from several peers used to rebuild the
+        # checkbox flow on every packet and hard-crash Qt (0xC0000005).
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
+        QtCore.QTimer.singleShot(100, self._deferred_refresh_clients)
+
+    def _deferred_refresh_clients(self):
+        self._refresh_pending = False
+        if not Shiboken.isValid(self):
+            return
+        self.refreshClients()
 
     def _handle_custom_changed(self, checked: bool):
         self.config.isCustom = checked
         self._update_ui()
 
     def _handle_identify(self, widget):
+        # Ensure UDP listener + send socket are up (needed after Options/version folder changes).
+        gremlin.remote.remote_server.start()
+        gremlin.remote.remote_client.start()
         gremlin.remote.remote_client.requestIdentify()
 
     def _handle_client_response(self, data: gremlin.remote.PacketData):
@@ -15800,9 +15852,12 @@ class RemoteClientWidget(QWidget):
 
     def _trigger_identify(self):
         """refreshes the list of network clients"""
-        el = gremlin.event_handler.EventListener()
-        el.remote_control_identify.emit()
-
+        try:
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_identify.emit()
+        except Exception as err:
+            syslog.error(f"REMOTE: identify request failed: {err}")
+        # Do not rebuild UI here — wait for debounced client_changed after replies.
     def _handle_select_all(self, widget):
         """selects all widgets"""
         self.config.selectAll()

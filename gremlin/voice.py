@@ -26,10 +26,15 @@ import sys
 import re
 import string
 from typing import Callable, Union
+import warnings
+import json
+from pathlib import Path
+
 
 import comtypes
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
+from pyttsx3 import voice
 import gremlin.util
 from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, hashString
 from collections import deque
@@ -37,6 +42,9 @@ import queue
 import sounddevice as sd
 import numpy as np
 from faster_whisper import WhisperModel
+from faster_whisper.utils import download_model
+
+
 from PySide6.QtMultimedia import QAudioInput, QMediaDevices, QAudioOutput
 import threading
 import logging
@@ -44,7 +52,11 @@ import os
 import numpy as np
 import time
 import concurrent.futures
-from rapidfuzz import process, fuzz
+try:
+    from rapidfuzz import process, fuzz
+except ImportError:
+    process = None
+    fuzz = None
 from psygnal import Signal
 
 import sounddevice as sd
@@ -239,7 +251,7 @@ class SpeechAudioProcessor:
     def __init__(
         self,
         sample_rate=16000,
-        blocksize=1600,
+        blocksize=1600, # 100ms at 16kHz
         # AGC
         target_db=-20.0,
         max_gain_db=20.0,
@@ -575,7 +587,7 @@ class SpeechAudioProcessor:
 class SpeechRecognizer:
     def __init__(
         self,
-        model_size="small.en",
+        model_size="base",
         sample_rate=16000,
         device="cpu",
         compute_type="int8",
@@ -584,11 +596,27 @@ class SpeechRecognizer:
         self.sample_rate = sample_rate
         self.callback = callback
 
+        voice = Voice()
+
+
+        if WhisperModel is None:
+            raise RuntimeError(
+                "faster_whisper is not installed — cannot start speech recognition"
+            )
+
+        # convert the model path to something whisper recognizes
+        model_path = str(Path(voice._local_model_path).resolve())
+
+        # get the model name form the downloaded model
+        model_name = self._get_whisper_model_name(model_path)
+        syslog.info(f"Voice: Using model: {model_name}")
+
         self.model = WhisperModel(
-            model_size,
+            model_path,
             device=device,
             compute_type=compute_type,
-        )
+            local_files_only=True,
+       )
 
         self._queue = queue.Queue()
 
@@ -597,6 +625,21 @@ class SpeechRecognizer:
         self._abort_event = threading.Event()
 
         self.verbose = True
+
+    def _get_whisper_model_name(self, model_path):
+        # Check model.json if available
+        config_path = os.path.join(model_path, "model.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # Some CTranslate2 models store source specs in metadata
+                if "model_type" in data:
+                    return data.get("model_type")
+
+        # Fallback: Use the parent directory name
+        return os.path.basename(os.path.normpath(model_path))
+
+
 
     def start(self):
         """Start the recognition thread."""
@@ -1535,10 +1578,29 @@ class Voice:
         fuzzy_threshold=89,
     ):
         os.environ["HF_HUB_VERBOSITY"] = "error"
-        self.verbose = gremlin.config.Configuration().verbose_mode_voice
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_voice
         self._voice_lock = threading.RLock()
         self._audio_lock = threading.RLock()  # lock when adding new recognized words
-        self._model_size = "small"  # "base" #  possible models: "tiny", "base", "small", "medium", "large-v3"
+        self._model_size = config.voice_model_name  # possible models: "tiny", "base", "small", "medium", "large-v3"
+        self._model_valid = False
+        folder = os.path.join(gremlin.shared_state.data_path,"sounds","managed","models",self._model_size)
+        if not os.path.exists(folder):
+            os.makedirs(folder) # create
+        self._local_model_path = os.path.join(folder, self._model_size)
+        if not os.path.exists(self._local_model_path):
+            syslog.info(f"Voice: downloading voice recognition model [{self._model_size}]...")
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning,module="huggingface_hub")
+                download_model(self._model_size, self._local_model_path)
+                syslog.info("Voice: downloaded voice recognition model.")
+
+        if not os.path.exists(self._local_model_path):
+            syslog.error(f"Voice: failed to find voice recognition model [{self._model_size}].")
+        else:
+            self._model_valid = True
+
+
         self._listening = False  # true if actively listening for voice input
         self._listen_enabled = False  # true if listening is enabled while monitoring
         self._listen_lock = threading.RLock()
@@ -1565,6 +1627,14 @@ class Voice:
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
         el.profile_stop.connect(self.stop)
+
+    @property
+    def model_valid(self):
+        return self._model_valid
+
+    @property
+    def model_path(self):
+        return self._local_model_path
 
     def registerCallback(self, callback):
         """register a callback to be invoked when a command is triggered"""
@@ -1653,6 +1723,10 @@ class Voice:
             # disabled
             return
 
+        if not self._model_valid:
+            syslog.error("Voice: cannot start listening because the voice recognition model is not valid.")
+            return
+
         commands = self.getCommands()
         if not commands:
             # no commands to process - do not start listener
@@ -1676,7 +1750,7 @@ class Voice:
         )
 
         self.recognizer = SpeechRecognizer(
-            model_size="small.en",
+            model_size=self._model_size,
             sample_rate=SAMPLE_RATE,
             device="cpu",
             compute_type="int8",
@@ -1757,7 +1831,7 @@ class Voice:
                 # do not use empty() as it blocks and can cause significant delays in real-time processing
                 # use the try/catch in case the queue is empty instead
                 try:
-                    audio = audio_queue.get(timeout=0.1)
+                    audio = audio_queue.get(timeout=0.1) # @IgnoreException
                 except queue.Empty:
                     continue
 

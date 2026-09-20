@@ -1623,6 +1623,17 @@ class StateData:
         """locates a state by id, None if not found"""
         if id in self._id_map:
             return self._id_map[id]
+        sid = str(id).strip() if id is not None else ""
+        if not sid:
+            return None
+        compact = sid.replace("-", "").replace("{", "").replace("}", "").casefold()
+        for key, state in self._id_map.items():
+            raw = str(key)
+            if raw == sid or str(getattr(state, "id", "")) == sid:
+                return state
+            other = raw.replace("-", "").replace("{", "").replace("}", "").casefold()
+            if compact and other == compact:
+                return state
         return None
 
     def setValue(self, key: str, value, emit=True, force=False):
@@ -3166,13 +3177,13 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         if not self._filter:
             return True  # ok
-        item: StateInputItem = input_item.input_id
-        key = item.key
+        item = getattr(input_item, "input_id", input_item)
+        key = getattr(item, "key", None)
         if not key:
             # no key = match
             return True
 
-        key = item.key.casefold().strip()
+        key = str(key).casefold().strip()
         if self._filter in key:
             return True
         return fnmatch.fnmatch(key, self._filter)
@@ -3322,6 +3333,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
                 # change the state
                 sd.add(edited_input_item)
+                self._filter_widget.updateCounts()
 
             else:
                 # edit an existing state
@@ -3346,12 +3358,22 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_item.autorelease_mode = edited_input_item.autorelease_mode
                 input_item.autorelease_trigger_mode = edited_input_item.autorelease_trigger_mode
 
+                # List view reuses the existing card when the model identity is
+                # unchanged, so name/description/category must be applied in place.
+                card = input_item.getInputWidget()
+                if card is None:
+                    card = self.inputItemListView.getWidgetAt(index)
+                self._apply_state_list_card(card, input_item)
+
                 self.inputItemListModel.refresh()
                 self._filter_widget.updateCounts()
 
             index = self.inputItemListView.indexOf(input_item)
+            if index < 0:
+                index = self.inputItemListModel.indexOf(input_item)
             syslog.info(f"selecting state index: [{index}] for [{input_item.input_id}]")
-            self.selectInputItemIndex(index)
+            if index >= 0:
+                self.selectInputItemIndex(index)
 
             el = gremlin.event_handler.EventListener()
             el.device_mapping_changed.emit(self._device_id)
@@ -3374,15 +3396,24 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             current_selection = self.inputItemListModel.data(index)
 
         self.inputItemListModel.sort(self._sort_callback)
+        self.inputItemListView.redraw()
 
         if current_selection:
-            # reselect the saved item - because the inputs were likely recreated - we can't compare the old with the new
-            # so we need to find the matching data packet
-            self.selectInputItemIndex(current_selection.index)
+            # reselect the saved item
+            new_index = self.inputItemListModel.indexOf(current_selection)
+            if new_index >= 0:
+                self.selectInputItemIndex(new_index)
 
     def _sort_callback(self, items: list):
-        """callback for sorting inputs in this device"""
-        items.sort(key=lambda x: x.input_id.key.casefold() if x.input_id.key else "")
+        """callback for sorting inputs in this device — returns sorted items"""
+        items = list(items)
+
+        def _key(item):
+            state = getattr(item, "input_id", item)
+            key = getattr(state, "key", None)
+            return key.casefold() if key else ""
+
+        items.sort(key=_key)
         return items
 
     def _close_item_cb(self, widget, index, data):
@@ -3410,6 +3441,30 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def display_name(self, input_id):
         """returns the name for the given input ID"""
         return input_id.display_name
+
+    def _state_list_title(self, input_item: StateInputItem) -> str:
+        if gremlin.config.Configuration().show_container_id:
+            return f"State: [{input_item.key}] [{input_item.id}]"
+        return f"State: [{input_item.key}]"
+
+    def _apply_state_list_card(self, widget, input_item: StateInputItem):
+        """Paint name/description/category/default onto an existing list card."""
+        if widget is None or not Shiboken.isValid(widget):
+            return
+        widget.setTitle(self._state_list_title(input_item))
+        widget.clearWidgets()
+        if input_item.description:
+            widget.addWidget(QtWidgets.QLabel(f"{input_item.description}"))
+        category_name = input_item.category_name
+        if category_name:
+            widget.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
+        if input_item.expression:
+            icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
+            expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data=input_item)
+            widget.addWidget(expression_widget)
+            StateData().expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))
+        else:
+            widget.addWidget(QtWidgets.QLabel(f"Default: {input_item.display_value}"))
 
     def _index_for_key(self, input_id):
         """returns the index of the selected input id"""
@@ -3467,30 +3522,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget.create_action_icons(data)
         input_item: StateInputItem = data
 
-        sd = StateData()
-
-        title = f"State: [{input_item.key}] [{input_item.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_item.key}]"
-        widget.setTitle(title)
         widget.enable_edit()
         widget.enable_close()
-        widget.clearWidgets()
-
-        if input_item.description:
-            widget.addWidget(QtWidgets.QLabel(f"{input_item.description}"))
-
-        category_name = input_item.category_name
-        if category_name:
-            widget.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
-
-        if input_item.expression:
-            icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
-            expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data=data)
-            widget.addWidget(expression_widget)
-            # cause the widget to update if the state expression changes
-            sd.expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))
-        else:
-            widget.addWidget(QtWidgets.QLabel(f"Default: {input_item.display_value}"))
-
+        self._apply_state_list_card(widget, input_item)
         widget.setIcon("mdi.state-machine")
 
         # remember what widget is at what index

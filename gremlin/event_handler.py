@@ -33,7 +33,7 @@ import itertools
 import queue
 
 from dinput import DeviceSummary
-
+from gremlin.filter import EMAFilter
 
 import gremlin.base_classes
 from gremlin.fastqueue import FastQueue
@@ -861,6 +861,8 @@ class EventListener(QtCore.QObject):
         self._device_change_suppressed = 0  # suppression counter for device change events
         self._device_change_pending = False  # true if a device change occured while suppressed
 
+
+
         self._running = True
         self._run_thread = None
         self._keep_alive_thread = None
@@ -896,6 +898,7 @@ class EventListener(QtCore.QObject):
 
         self._vjoy_callbacks = []
         self._debounce_map = {}
+        self._button_debounce_seconds =  0.01
 
         self._hat_state = {}  # list of map positions (device_id, input_id), position_tuple, if blank - not set
 
@@ -1675,87 +1678,186 @@ class EventListener(QtCore.QObject):
 
         return True  # process
 
-    def _dinput_event_filter(self, device: dinput.DeviceSummary, event: dinput.InputEvent) -> bool:
-        """filters dinput events
-        :return: True if the event should be filtered out, False otherwise
+    def _dinput_event_filter(
+        self,
+        device: dinput.DeviceSummary,
+        event: dinput.InputEvent,
+    ) -> bool:
+        """Filter DirectInput axis, button, and hat events.
+
+        Axis events are processed through the EMA filter
+        Button and hat events use time-based state-change debounce.
+
+        :param device: The DirectInput device generating the event.
+        :param event: The DirectInput event to be filtered.
+
+        :returns:
+            True when the event should be discarded.
+            False when the event should be processed.
         """
 
         if device.disabled:
-            # filter disabled inputs
             return True
 
-        vendor_id = device.vendor_id
-        product_id = device.product_id
-        input_type = event.input_type.value
-        # if isinstance(input_type, Enum):
-        #     input_type = input_type.value[0]
-        # try:
-        #     input_type = event.input_type.value[0]
-        # except Exception:
-        #     input_type = event.input_type
+        event_type = event.input_type
         input_id = event.input_index
-        if vendor_id not in self._debounce_map:
-            self._debounce_map[vendor_id] = {}
-            self._debounce_map[vendor_id][product_id] = {}
-            self._debounce_map[vendor_id][product_id][input_type] = {}
-            self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
-
-        elif product_id not in self._debounce_map[vendor_id]:
-            self._debounce_map[vendor_id][product_id] = {}
-            self._debounce_map[vendor_id][product_id][input_type] = {}
-            self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
-
-        elif input_type not in self._debounce_map[vendor_id][product_id]:
-            self._debounce_map[vendor_id][product_id][input_type] = {}
-            self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
-
-        elif input_id not in self._debounce_map[vendor_id][product_id][input_type]:
-            self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
-
-        data: DInputData = self._debounce_map[vendor_id][product_id][input_type][input_id]
-
-        if not data.debounce:
-            # do not filter
-            return False
-
-        now = time.perf_counter()
-
-        # filter axis on deviation and buttons on time
-        if data.value is None:
-            # initial button/hat event - do not filter
-            data.last_time = now
-            data.value = event.value
-            return False
-
-        # if event.input_type != dinput.InputType.Axis:
-        #     syslog.info(f"Event: [{device.name}]: {event}")
-
         value = event.value
-        match event.input_type:
-            case dinput.InputType.Axis:  # joystick
-                value_threshold = 0.01
-                if abs(value - data.value) >= value_threshold:
-                    # axis deviation sufficient to trigger
-                    data.time = now
-                    data.value = value
-                    return False
 
-            case dinput.InputType.Button | dinput.InputType.Hat:
-                # button or hat
+        # A GUID prevents two controllers with the same vendor and product
+        # IDs from sharing filter/debounce state.
+        device_id = getattr(device, "device_guid", None)
 
-                lapsed = now - data.last_time
-                time_threshold = 0.01
-                # syslog.info(f"event: {event} lapsed time: {lapsed} threshold: {time_threshold} value changed: {value != data.value} lapsed: {lapsed > time_threshold}")
-                if value != data.value and lapsed > time_threshold:
-                    # button changed and sufficient time passed
-                    data.time = now
-                    data.value = value
-                    # syslog.info("\tnot filtered")
-                    return False
+        if device_id is None:
+            device_id = getattr(device, "guid", None)
 
-        # filter
+        if device_id is None:
+            # Fallback for DeviceSummary implementations without a GUID.
+            device_id = (
+                device.vendor_id,
+                device.product_id,
+            )
 
-        return True
+        key = (
+            device_id,
+            event_type,
+            input_id,
+        )
+
+        data = self._debounce_map.get(key)
+        if data is None:
+            data = DInputData()
+            self._debounce_map[key] = data
+            return False # process event
+
+
+        if event_type == dinput.InputType.Axis:
+            # EMA filter for axis events.
+            return not data.process_input(value)
+
+
+        if event_type in (
+            dinput.InputType.Button,
+            dinput.InputType.Hat,
+        ):
+            # discard repeated reports of the currently accepted state
+            if data.value is not None and value == data.value:
+                return True
+
+            now = time.perf_counter()
+
+            # When debounce is disabled, accept the event while keeping the
+            # stored state current.
+            if not data.debounce:
+                data.value = value
+                data.last_time = now
+                return False
+
+            # Always accept the first state received for this input.
+            if data.value is None:
+                data.value = value
+                data.last_time = now
+                return False
+
+            # Suppress a state transition that occurs too soon after the last
+            # accepted transition.
+            if (
+                now - data.last_time
+                <= self._button_debounce_seconds
+            ):
+                return True
+
+            data.value = value
+            data.last_time = now
+            return False
+
+        # Pass through input types that do not require filtering.
+        return False
+
+    # def _dinput_event_filter_v0(self, device: dinput.DeviceSummary, event: dinput.InputEvent) -> bool:
+    #     """filters dinput events
+    #     :return: True if the event should be filtered out, False otherwise
+    #     """
+
+    #     if device.disabled:
+    #         # filter disabled inputs
+    #         return True
+
+    #     vendor_id = device.vendor_id
+    #     product_id = device.product_id
+    #     input_type = event.input_type.value
+    #     # if isinstance(input_type, Enum):
+    #     #     input_type = input_type.value[0]
+    #     # try:
+    #     #     input_type = event.input_type.value[0]
+    #     # except Exception:
+    #     #     input_type = event.input_type
+    #     input_id = event.input_index
+    #     if vendor_id not in self._debounce_map:
+    #         self._debounce_map[vendor_id] = {}
+    #         self._debounce_map[vendor_id][product_id] = {}
+    #         self._debounce_map[vendor_id][product_id][input_type] = {}
+    #         self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
+
+    #     elif product_id not in self._debounce_map[vendor_id]:
+    #         self._debounce_map[vendor_id][product_id] = {}
+    #         self._debounce_map[vendor_id][product_id][input_type] = {}
+    #         self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
+
+    #     elif input_type not in self._debounce_map[vendor_id][product_id]:
+    #         self._debounce_map[vendor_id][product_id][input_type] = {}
+    #         self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
+
+    #     elif input_id not in self._debounce_map[vendor_id][product_id][input_type]:
+    #         self._debounce_map[vendor_id][product_id][input_type][input_id] = DInputData()
+
+    #     data: DInputData = self._debounce_map[vendor_id][product_id][input_type][input_id]
+
+    #     if event.input_type == dinput.InputType.Axis and not data.process_input(event.value):
+    #         # not not process input
+    #         return True
+
+    #     if not data.debounce:
+    #         # do not filter
+    #         return False
+
+    #     now = time.perf_counter()
+
+    #     # filter axis on deviation and buttons on time
+    #     if data.value is None:
+    #         # initial button/hat event - do not filter
+    #         data.last_time = now
+    #         data.value = event.value
+    #         return False
+
+    #     # if event.input_type != dinput.InputType.Axis:
+    #     #     syslog.info(f"Event: [{device.name}]: {event}")
+
+    #     value = event.value
+    #     match event.input_type:
+    #         case dinput.InputType.Axis:  # joystick
+    #             value_threshold = 0.01
+    #             if abs(value - data.value) >= value_threshold:
+    #                 # axis deviation sufficient to trigger
+    #                 data.time = now
+    #                 data.value = value
+    #                 return False
+
+    #         case dinput.InputType.Button | dinput.InputType.Hat:
+    #             # button or hat
+
+    #             lapsed = now - data.last_time
+    #             time_threshold = 0.01
+    #             # syslog.info(f"event: {event} lapsed time: {lapsed} threshold: {time_threshold} value changed: {value != data.value} lapsed: {lapsed > time_threshold}")
+    #             if value != data.value and lapsed > time_threshold:
+    #                 # button changed and sufficient time passed
+    #                 data.time = now
+    #                 data.value = value
+    #                 # syslog.info("\tnot filtered")
+    #                 return False
+
+    #     # filter
+
+    #     return True
 
     def _dinput_event_handler(self, data):
         """Callback for joystick events.
@@ -4474,6 +4576,11 @@ class DInputData:
         self.last_time = None
         self.value = None
         self.debounce = True
+        self.filter = EMAFilter()
+
+    def process_input(self, raw_value):
+        """determins if the axis should be processed - returns None if should be ignored"""
+        return self.filter.process_input(raw_value)
 
 
 @gremlin.singleton_decorator.SingletonDecorator

@@ -247,7 +247,7 @@ class ModuleManagementController(QtCore.QObject):
                     f"plugin {instance.parent.file_name} : {var.label}"
                 )
                 layout.addWidget(QtWidgets.QLabel(var.label))
-        layout.addStretch()
+        # Do not addStretch() — it fights the scroll area and hides overflow.
 
     @QtCore.Slot()
     def _update_instance_name_cb(self):
@@ -388,12 +388,24 @@ This is due to the way dynamic module loading and packaging works in Python.
         self.left_panel_widget, self.left_panel_layout = gremlin.ui.ui_common.getVContainer(widgets, no_stretch=True)
 
         # Create the right panel which will show the parameters of a
-        # selected module instance
+        # selected module instance (scrollable — plugins can have many rows)
         self.right_panel_widget = QtWidgets.QWidget()
-        self.right_panel_widget.setLayout(QtWidgets.QVBoxLayout())
+        right_layout = QtWidgets.QVBoxLayout(self.right_panel_widget)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        self.right_panel_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Preferred,
+            QtWidgets.QSizePolicy.Policy.Minimum,
+        )
+        self.right_scroll = QtWidgets.QScrollArea()
+        self.right_scroll.setWidgetResizable(True)
+        self.right_scroll.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.right_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.right_scroll.setWidget(self.right_panel_widget)
 
         self.addWidget(self.left_panel_widget)
-        self.addWidget(self.right_panel_widget)
+        self.addWidget(self.right_scroll)
 
 
 
