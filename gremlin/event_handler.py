@@ -1731,8 +1731,10 @@ class EventListener(QtCore.QObject):
 
 
         if event_type == dinput.InputType.Axis:
-            # EMA filter for axis events.
-            return not data.process_input(value)
+            # EMA filter for axis events. Only None means drop — never use
+            # truthiness, or an exact center sample (0) is discarded.
+            return data.process_input(value) is None
+
 
 
         if event_type in (

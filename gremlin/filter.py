@@ -19,6 +19,10 @@ import time
 
 
 class EMAFilter:
+    # ~1.5% of a ±32767 DirectInput axis — large enough to catch flick-release
+    # to center without defeating the spam throttle for micro-jitter.
+    _LARGE_JUMP_RAW = 500.0
+
     def __init__(self, smoothing_factor=0.25, change_threshold=0.01, min_interval_ms=10):
         """
         Optimized filter for rapid stream axis data.
@@ -39,29 +43,39 @@ class EMAFilter:
         """
         Processes an incoming axis data point.
         Returns the filtered value if it represents a meaningful event, otherwise returns None.
+
+        Callers must treat only ``None`` as filtered-out — never truthiness —
+        because a valid center sample is ``0``.
         """
         current_time = time.time()
-
-        # 1. Temporal Throttle: Drop events arriving too fast (e.g., thousands of times/sec)
-        if current_time - self.last_process_time < self.min_interval:
-            return None
-
-        self.last_process_time = current_time
+        raw_value = float(raw_value)
 
         # Initialize base value if this is the first data point
         if self.smoothed_value is None:
             self.smoothed_value = raw_value
             self.last_sent_value = raw_value
+            self.last_process_time = current_time
             return raw_value
 
-        # 2. Math Filter: Low-Pass Exponential Moving Average (EMA)
-        # Smooths out extreme micro-spikes/jitter immediately
+        # Always fold the sample into the smoother so throttled centers are not lost.
         self.smoothed_value = (self.alpha * raw_value) + ((1.0 - self.alpha) * self.smoothed_value)
 
-        # 3. Delta Variance Filter: Block propagation if the change is negligible
         delta = abs(self.smoothed_value - self.last_sent_value)
-        if delta >= self.threshold:
-            self.last_sent_value = self.smoothed_value
-            return self.smoothed_value
+        raw_delta = abs(raw_value - self.last_sent_value)
+        # Rapid release often lands inside the throttle window; never drop a big jump.
+        large_jump = raw_delta >= self._LARGE_JUMP_RAW
 
-        return None
+        throttled = (current_time - self.last_process_time) < self.min_interval
+        if throttled and not large_jump:
+            return None
+
+        if delta < self.threshold and not large_jump:
+            return None
+
+        self.last_process_time = current_time
+        # Prefer the latest raw sample on large jumps so return-to-center settles exactly.
+        out = raw_value if large_jump else self.smoothed_value
+        self.last_sent_value = out
+        if large_jump:
+            self.smoothed_value = out
+        return out
