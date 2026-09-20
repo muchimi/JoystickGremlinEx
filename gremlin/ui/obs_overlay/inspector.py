@@ -1105,13 +1105,6 @@ class OverlayInspector(QtWidgets.QWidget):
         self._rotation_slider(form, item)
         self._lock_position_row(form, item)
 
-        self._style_bool(
-            form,
-            item,
-            "auto_scale_font",
-            "Scale font with size",
-            tooltip="Keep the same relative font size when this widget is resized.",
-        )
         self._build_visibility(item)
 
         label_form = self._section("Label")
@@ -1394,13 +1387,6 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(key.upper(), spin)
         self._rotation_slider(form, item)
         self._lock_position_row(form, item)
-        self._style_bool(
-            form,
-            item,
-            "auto_scale_font",
-            "Scale font with size",
-            tooltip="Keep the same relative font size when this widget is resized.",
-        )
         self._build_visibility(item)
 
         label_form = self._section("Label")
@@ -3608,6 +3594,14 @@ class OverlayInspector(QtWidgets.QWidget):
         label = "Axis font" if prefix else "Font"
         form.addRow(label, combo)
         form.addRow(f"{label} size", style_row)
+        if not prefix:
+            self._style_bool(
+                form,
+                item,
+                "auto_scale_font",
+                "Scale font with size",
+                tooltip="Keep the same relative font size when this widget is resized.",
+            )
 
         shadow_on = bool(item["style"].get(f"{prefix}font_shadow", False))
         shadow_row = QtWidgets.QWidget()
