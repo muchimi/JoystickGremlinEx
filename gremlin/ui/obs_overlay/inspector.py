@@ -91,7 +91,7 @@ from .palettes import (
     palette_type,
     update_palette,
 )
-from .widgets import effective_font_size, qcolor, widget_rotation_deg
+from .widgets import effective_font_size, qcolor, resolve_font_shadow, _shadow_offset_xy, widget_rotation_deg
 
 CANVAS_TOGGLE_ID = "__canvas_toggle__"
 syslog = logging.getLogger("system")
@@ -3609,33 +3609,165 @@ class OverlayInspector(QtWidgets.QWidget):
                 tooltip="Keep the same relative font size when this widget is resized.",
             )
 
-        shadow_on = bool(item["style"].get(f"{prefix}font_shadow", False))
-        shadow_row = QtWidgets.QWidget()
-        shadow_layout = QtWidgets.QHBoxLayout(shadow_row)
-        shadow_layout.setContentsMargins(0, 0, 0, 0)
-        shadow_layout.setSpacing(6)
+        shadow = resolve_font_shadow(item.get("style") or {}, prefix)
+        shadow_on = bool(shadow.get("on"))
+        shadow_head = QtWidgets.QWidget()
+        shadow_head_layout = QtWidgets.QHBoxLayout(shadow_head)
+        shadow_head_layout.setContentsMargins(0, 0, 0, 0)
+        shadow_head_layout.setSpacing(6)
         shadow_box = QtWidgets.QCheckBox()
         shadow_box.setChecked(shadow_on)
         shadow_box.setToolTip("Draw a drop shadow behind the text.")
-        shadow_box.toggled.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow": self._style(wid, **{k: v}))
         shadow_color = ColorButton(item["style"].get(f"{prefix}font_shadow_color") or "#80000000")
         shadow_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_color": self._style(wid, **{k: v}))
-        dx = QtWidgets.QSpinBox()
-        dx.setRange(-20, 20)
-        dx.setValue(int(item["style"].get(f"{prefix}font_shadow_dx") or 2))
-        dx.setPrefix("X ")
-        dx.valueChanged.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_dx": self._style(wid, **{k: int(v)}))
-        dy = QtWidgets.QSpinBox()
-        dy.setRange(-20, 20)
-        dy.setValue(int(item["style"].get(f"{prefix}font_shadow_dy") or 2))
-        dy.setPrefix("Y ")
-        dy.valueChanged.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_dy": self._style(wid, **{k: int(v)}))
-        shadow_layout.addWidget(shadow_box)
-        shadow_layout.addWidget(shadow_color)
-        shadow_layout.addWidget(dx)
-        shadow_layout.addWidget(dy)
-        shadow_layout.addStretch()
-        form.addRow(f"{label} shadow", shadow_row)
+        shadow_head_layout.addWidget(shadow_box)
+        shadow_head_layout.addWidget(shadow_color)
+        shadow_head_layout.addStretch()
+        form.addRow(f"{label} shadow", shadow_head)
+
+        angle_row = QtWidgets.QWidget()
+        angle_layout = QtWidgets.QHBoxLayout(angle_row)
+        angle_layout.setContentsMargins(0, 0, 0, 0)
+        angle_layout.setSpacing(6)
+        dial = QtWidgets.QDial()
+        dial.setRange(0, 359)
+        dial.setWrapping(True)
+        dial.setNotchesVisible(True)
+        dial.setFixedSize(48, 48)
+        dial.setToolTip("Shadow direction. 0° = right, 90° = up.")
+        dial.setValue(int(round(float(shadow.get("angle") or 135.0))) % 360)
+        angle_spin = QtWidgets.QSpinBox()
+        angle_spin.setRange(0, 359)
+        angle_spin.setSuffix("°")
+        angle_spin.setValue(int(round(float(shadow.get("angle") or 135.0))) % 360)
+        angle_spin.setMaximumWidth(72)
+        angle_layout.addWidget(dial)
+        angle_layout.addWidget(angle_spin)
+        angle_layout.addStretch()
+        form.addRow("Angle", angle_row)
+
+        def _apply_shadow_geometry(angle=None, distance=None, spread=None, size=None, wid=item["id"], pfx=prefix):
+            style = dict((self.scene.widget_by_id(wid) or item).get("style") or {})
+            cur = resolve_font_shadow(style, pfx)
+            ang = float(cur["angle"] if angle is None else angle) % 360.0
+            dist = max(0.0, float(cur["distance"] if distance is None else distance))
+            spr = max(0.0, min(100.0, float(cur["spread"] if spread is None else spread)))
+            sz = max(0.0, float(cur["size"] if size is None else size))
+            dx, dy = _shadow_offset_xy(ang, dist)
+            self._style(
+                wid,
+                **{
+                    f"{pfx}font_shadow_angle": ang,
+                    f"{pfx}font_shadow_distance": dist,
+                    f"{pfx}font_shadow_spread": spr,
+                    f"{pfx}font_shadow_size": sz,
+                    f"{pfx}font_shadow_dx": int(round(dx)),
+                    f"{pfx}font_shadow_dy": int(round(dy)),
+                },
+            )
+
+        def _sync_angle(v, dial_w=dial, spin_w=angle_spin):
+            value = int(v) % 360
+            for w in (dial_w, spin_w):
+                w.blockSignals(True)
+                w.setValue(value)
+                w.blockSignals(False)
+            _apply_shadow_geometry(angle=value)
+
+        dial.valueChanged.connect(_sync_angle)
+        angle_spin.valueChanged.connect(_sync_angle)
+
+        def _shadow_slider(title, value, lo, hi, suffix, tooltip, apply_key):
+            row = QtWidgets.QWidget()
+            layout = QtWidgets.QHBoxLayout(row)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(6)
+            slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+            slider.setRange(lo, hi)
+            slider.setValue(int(value))
+            spin = QtWidgets.QSpinBox()
+            spin.setRange(lo, hi)
+            spin.setValue(int(value))
+            spin.setMaximumWidth(88)
+            if suffix:
+                spin.setSuffix(suffix)
+            row.setToolTip(tooltip)
+            slider.setToolTip(tooltip)
+            spin.setToolTip(tooltip)
+
+            def _from_slider(v, box=spin, key=apply_key):
+                box.blockSignals(True)
+                box.setValue(v)
+                box.blockSignals(False)
+                _apply_shadow_geometry(**{key: float(v)})
+
+            def _from_spin(v, bar=slider, key=apply_key):
+                bar.blockSignals(True)
+                bar.setValue(v)
+                bar.blockSignals(False)
+                _apply_shadow_geometry(**{key: float(v)})
+
+            slider.valueChanged.connect(_from_slider)
+            spin.valueChanged.connect(_from_spin)
+            layout.addWidget(slider, 1)
+            layout.addWidget(spin)
+            form.addRow(title, row)
+            return row, slider, spin
+
+        dist_row, dist_slider, dist_spin = _shadow_slider(
+            "Distance",
+            int(round(float(shadow.get("distance") or 0))),
+            0,
+            40,
+            " px",
+            "How far the shadow is offset from the text.",
+            "distance",
+        )
+        spread_row, spread_slider, spread_spin = _shadow_slider(
+            "Spread",
+            int(round(float(shadow.get("spread") or 0))),
+            0,
+            100,
+            " %",
+            "How much of the shadow stays solid before it softens (0–100%).",
+            "spread",
+        )
+        size_row, size_slider, size_spin = _shadow_slider(
+            "Size",
+            int(round(float(shadow.get("size") or 0))),
+            0,
+            40,
+            " px",
+            "Soft blur radius of the shadow edge.",
+            "size",
+        )
+
+        shadow_widgets = [
+            shadow_color,
+            dial,
+            angle_spin,
+            dist_row,
+            dist_slider,
+            dist_spin,
+            spread_row,
+            spread_slider,
+            spread_spin,
+            size_row,
+            size_slider,
+            size_spin,
+        ]
+
+        def _set_shadow_enabled(on):
+            for w in shadow_widgets:
+                w.setEnabled(bool(on))
+
+        shadow_box.toggled.connect(
+            lambda on, wid=item["id"], pfx=prefix: (
+                self._style(wid, **{f"{pfx}font_shadow": bool(on)}),
+                _set_shadow_enabled(on),
+            )
+        )
+        _set_shadow_enabled(shadow_on)
 
         stroke_w = float(item["style"].get(f"{prefix}font_stroke_width") or 0)
         stroke_row = QtWidgets.QWidget()

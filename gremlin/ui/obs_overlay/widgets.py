@@ -162,6 +162,126 @@ def set_fill_and_outline(painter: QtGui.QPainter, fill, border, width, default_f
     )
 
 
+def _shadow_offset_xy(angle_deg: float, distance: float) -> tuple[float, float]:
+    """0° = right, 90° = up (screen Y is down)."""
+    rad = math.radians(float(angle_deg) % 360.0)
+    dist = max(0.0, float(distance))
+    return dist * math.cos(rad), -dist * math.sin(rad)
+
+
+def resolve_font_shadow(style: dict[str, Any] | None, prefix: str = "") -> dict[str, Any]:
+    """Normalize font shadow style; migrates legacy dx/dy into angle/distance."""
+    style = style or {}
+    on = bool(_font_flag(style, "font_shadow", prefix, False))
+    color = qcolor(_font_flag(style, "font_shadow_color", prefix, "#80000000"), "#80000000")
+    angle_raw = _font_flag(style, "font_shadow_angle", prefix, None)
+    distance_raw = _font_flag(style, "font_shadow_distance", prefix, None)
+    try:
+        dx_legacy = float(_font_flag(style, "font_shadow_dx", prefix, 2) or 0)
+    except (TypeError, ValueError):
+        dx_legacy = 2.0
+    try:
+        dy_legacy = float(_font_flag(style, "font_shadow_dy", prefix, 2) or 0)
+    except (TypeError, ValueError):
+        dy_legacy = 2.0
+
+    if angle_raw is None or distance_raw is None:
+        distance = math.hypot(dx_legacy, dy_legacy)
+        angle = (math.degrees(math.atan2(-dy_legacy, dx_legacy)) % 360.0) if distance > 1e-6 else 135.0
+    else:
+        try:
+            angle = float(angle_raw) % 360.0
+        except (TypeError, ValueError):
+            angle = 135.0
+        try:
+            distance = max(0.0, float(distance_raw))
+        except (TypeError, ValueError):
+            distance = 3.0
+
+    try:
+        spread = max(0.0, min(100.0, float(_font_flag(style, "font_shadow_spread", prefix, 0) or 0)))
+    except (TypeError, ValueError):
+        spread = 0.0
+    try:
+        size = max(0.0, float(_font_flag(style, "font_shadow_size", prefix, 0) or 0))
+    except (TypeError, ValueError):
+        size = 0.0
+
+    dx, dy = _shadow_offset_xy(angle, distance)
+    return {
+        "on": on,
+        "color": color,
+        "angle": angle,
+        "distance": distance,
+        "spread": spread,
+        "size": size,
+        "dx": dx,
+        "dy": dy,
+        "extent": distance + size + (size * spread / 100.0),
+    }
+
+
+def _draw_text_at(painter: QtGui.QPainter, text: str, rect, point, flags: int, ox: float, oy: float):
+    if rect is not None:
+        painter.drawText(rect.translated(ox, oy), flags, text)
+    elif point is not None:
+        painter.drawText(point + QtCore.QPointF(ox, oy), text)
+
+
+def _paint_font_shadow(
+    painter: QtGui.QPainter,
+    text: str,
+    font: QtGui.QFont,
+    shadow: dict[str, Any],
+    rect,
+    point,
+    flags: int,
+    path: QtGui.QPainterPath | None = None,
+):
+    """Hard or soft drop shadow. Spread expands the opaque core; size softens the edge."""
+    if not shadow.get("on"):
+        return
+    dx = float(shadow.get("dx") or 0)
+    dy = float(shadow.get("dy") or 0)
+    size = float(shadow.get("size") or 0)
+    spread = float(shadow.get("spread") or 0)
+    base = QtGui.QColor(shadow.get("color") or "#80000000")
+    soft = size * (1.0 - spread / 100.0)
+    core_boost = size * (spread / 100.0)
+
+    def _fill(color: QtGui.QColor, ox: float, oy: float):
+        if path is not None:
+            shadow_path = QtGui.QPainterPath(path)
+            shadow_path.translate(ox, oy)
+            painter.fillPath(shadow_path, color)
+        else:
+            painter.setPen(color)
+            _draw_text_at(painter, text, rect, point, flags, ox, oy)
+
+    if soft < 0.5 and core_boost < 0.5:
+        _fill(base, dx, dy)
+        return
+
+    layers = max(1, min(10, int(math.ceil(soft)) + 1))
+    ring = max(8, min(16, layers * 2))
+    for layer in range(layers, 0, -1):
+        t = layer / float(layers)
+        radius = soft * t
+        sample = QtGui.QColor(base)
+        sample.setAlphaF(max(0.02, base.alphaF() * (0.55 / (layers * max(1, ring // 4))) * (1.1 - t)))
+        for i in range(ring):
+            a = (2.0 * math.pi * i) / ring
+            _fill(sample, dx + radius * math.cos(a), dy + radius * math.sin(a))
+    if core_boost > 0.05:
+        core = QtGui.QColor(base)
+        steps = max(4, min(12, int(math.ceil(core_boost)) + 2))
+        for i in range(steps):
+            a = (2.0 * math.pi * i) / steps
+            r = core_boost * 0.35
+            _fill(core, dx + r * math.cos(a), dy + r * math.sin(a))
+    _fill(base, dx, dy)
+
+
 def _draw_text_ex(
     painter: QtGui.QPainter,
     text: str,
@@ -178,10 +298,7 @@ def _draw_text_ex(
     style = style or {}
     flags = int(QtCore.Qt.AlignCenter if flags is None else flags)
     fill = qcolor(color, "#f4efe4")
-    dx = float(_font_flag(style, "font_shadow_dx", prefix, 2) or 0)
-    dy = float(_font_flag(style, "font_shadow_dy", prefix, 2) or 0)
-    shadow_on = bool(_font_flag(style, "font_shadow", prefix, False))
-    shadow_color = qcolor(_font_flag(style, "font_shadow_color", prefix, "#80000000"), "#80000000")
+    shadow = resolve_font_shadow(style, prefix)
     try:
         stroke_w = float(_font_flag(style, "font_stroke_width", prefix, 0) or 0)
     except (TypeError, ValueError):
@@ -202,19 +319,11 @@ def _draw_text_ex(
             y = point.y() if point is not None else 0.0
         path = QtGui.QPainterPath()
         path.addText(QtCore.QPointF(x, y), font, text)
-        if shadow_on:
-            shadow_path = QtGui.QPainterPath(path)
-            shadow_path.translate(dx, dy)
-            painter.fillPath(shadow_path, shadow_color)
+        _paint_font_shadow(painter, text, font, shadow, rect, point, flags, path=path)
         painter.strokePath(path, _pen(stroke_color, stroke_w))
         painter.fillPath(path, fill)
     else:
-        if shadow_on:
-            painter.setPen(shadow_color)
-            if rect is not None:
-                painter.drawText(rect.translated(dx, dy), flags, text)
-            elif point is not None:
-                painter.drawText(point + QtCore.QPointF(dx, dy), text)
+        _paint_font_shadow(painter, text, font, shadow, rect, point, flags, path=None)
         painter.setPen(fill)
         if rect is not None:
             painter.drawText(rect, flags, text)
@@ -488,10 +597,8 @@ def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
     if _font_flag(style, "font_shadow", "", False) or _font_flag(style, "font_shadow", "axis_label_", False):
         extra = max(
             extra,
-            abs(float(_font_flag(style, "font_shadow_dx", "", 2) or 0)),
-            abs(float(_font_flag(style, "font_shadow_dy", "", 2) or 0)),
-            abs(float(_font_flag(style, "font_shadow_dx", "axis_label_", 2) or 0)),
-            abs(float(_font_flag(style, "font_shadow_dy", "axis_label_", 2) or 0)),
+            float(resolve_font_shadow(style, "").get("extent") or 0),
+            float(resolve_font_shadow(style, "axis_label_").get("extent") or 0),
         )
     try:
         extra = max(extra, float(_font_flag(style, "font_stroke_width", "", 0) or 0), float(_font_flag(style, "font_stroke_width", "axis_label_", 0) or 0))
