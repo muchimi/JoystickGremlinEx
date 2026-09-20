@@ -47,6 +47,8 @@ class ModuleManagementController(QtCore.QObject):
 
         # stores a map of instance widgets by instance
         self.instance_widget_map = {}
+        # Instance currently shown in the right-hand configure pane (or None)
+        self._configured_instance = None
 
         self.view.add_module.connect(self.new_module)
         self.refresh_module_list()
@@ -84,13 +86,25 @@ class ModuleManagementController(QtCore.QObject):
 
     def remove_module(self, file_name):
         # Remove the module from the model
+        removed = None
         for i, module in enumerate(self.profile_data.plugins):
             if module.file_name == file_name:
+                removed = module
                 del self.profile_data.plugins[i]
                 break
 
+        # Drop instance-widget map entries for this module
+        if removed is not None:
+            for instance in list(removed.instances):
+                self.instance_widget_map.pop(instance, None)
+            if (
+                self._configured_instance is not None
+                and getattr(self._configured_instance, "parent", None) is removed
+            ):
+                self._clear_instance_pane()
+
         # Remove corresponding UI element
-        for module_widget in self.view.module_list.widget_list:
+        for module_widget in list(self.view.module_list.widget_list):
             if module_widget.get_module_name() == file_name:
                 self.view.module_list.remove_module(module_widget)
 
@@ -105,6 +119,8 @@ class ModuleManagementController(QtCore.QObject):
 
     def refresh_module_list(self):
         # Empty module list and then add one module at a time
+        self._clear_instance_pane()
+        self.instance_widget_map.clear()
         self.view.module_list.clear()
         for plugin in self.profile_data.plugins:
             self.view.module_list.add_module(
@@ -114,8 +130,21 @@ class ModuleManagementController(QtCore.QObject):
     def remove_instance(self, instance, widget):
         # Remove model
         del instance.parent.instances[instance.parent.instances.index(instance)]
+        self.instance_widget_map.pop(instance, None)
+        if self._configured_instance is instance:
+            self._clear_instance_pane()
         # Remove view
         widget.parent().remove_instance(widget)
+
+    def _clear_instance_pane(self):
+        """Clear the right-hand instance configure pane."""
+        self._configured_instance = None
+        panel = getattr(self.view, "right_panel_widget", None)
+        if panel is None or not Shiboken.isValid(panel):
+            return
+        layout = panel.layout()
+        if layout is not None:
+            gremlin.ui.ui_common.clear_layout(layout)
 
     def rename_instance(self, instance, widget, name):
         instance.name = name
@@ -178,6 +207,7 @@ class ModuleManagementController(QtCore.QObject):
 
         layout = self.view.right_panel_widget.layout()
         gremlin.ui.ui_common.clear_layout(layout)
+        self._configured_instance = instance
 
 
         # add the name of the instance being configured
