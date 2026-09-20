@@ -36,6 +36,12 @@ from gremlin.ui.obs_overlay.model import (
     normalize_overlay_keys,
     normalize_toggle_binding,
 )
+from gremlin.ui.obs_overlay.visibility_logic import (
+    assign_condition_letters,
+    default_join_expression,
+    effective_visibility_expression,
+)
+from gremlin.ui.obs_overlay.visibility_preview import BooleanOperatorsDialog, VisibilityPreviewDialog
 
 from .model import AfcsDocument, decode_when, default_node, encode_when
 from .nodes import (
@@ -365,6 +371,9 @@ def _condition_summary(vis: dict) -> str:
     phrases = [_condition_phrase(cond) for cond in vis.get("conditions") or []]
     if not phrases:
         return "Always applied (no conditions)."
+    expression = str(vis.get("expression") or "").strip()
+    if expression:
+        return f"Runs when {expression}."
     join = " and " if (vis.get("join") or "all") == "all" else " or "
     return f"If {join.join(phrases)} then this node runs."
 
@@ -399,7 +408,7 @@ def _button_choices(device) -> list[tuple[int, str]]:
 
 
 class NodeConditionWidget(QtWidgets.QWidget):
-    """Overlay-style AND/OR conditions. Unmet conditions skip the node."""
+    """Same boolean expression conditions as Overlay visibility."""
 
     changed = QtCore.Signal(object)
 
@@ -408,6 +417,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         self._vis = decode_when(None)
         self._building = False
         self._listen_dialog = None
+        self._expression_edit: QtWidgets.QLineEdit | None = None
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         box = QtWidgets.QGroupBox("Conditions")
@@ -416,6 +426,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
     def set_value(self, raw) -> None:
         self._vis = decode_when(raw)
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._rebuild()
 
     def _is_alive(self) -> bool:
@@ -428,6 +439,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         if self._building:
             return
         self._vis = decode_when(self._vis)
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self.changed.emit(dict(self._vis))
         if rebuild:
             self._rebuild()
@@ -437,28 +449,50 @@ class NodeConditionWidget(QtWidgets.QWidget):
         try:
             gremlin.util.clear_layout(self._form)
             vis = self._vis
-            join = QtWidgets.QComboBox()
-            join.addItem("All of these (AND)", "all")
-            join.addItem("Any of these (OR)", "any")
-            join.setCurrentIndex(1 if (vis.get("join") or "all") == "any" else 0)
-            join.setToolTip("All = every condition must be true. Any = at least one condition must be true.")
-            join.currentIndexChanged.connect(self._on_join)
-            self._form.addRow("Match", join)
+            vis["conditions"] = assign_condition_letters(list(vis.get("conditions") or []))
+
+            expr = QtWidgets.QLineEdit()
+            expr.setText(str(vis.get("expression") or ""))
+            expr.setPlaceholderText("A AND (B OR C)")
+            expr.setToolTip(
+                "Use letters A, B, C... for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
+                "Leave empty to require every condition (AND)."
+            )
+            expr.editingFinished.connect(self._on_expression_finished)
+            self._expression_edit = expr
+            preview = QtWidgets.QPushButton("Preview")
+            preview.setToolTip("Show a Venn diagram, boolean algebra, and truth table for this expression.")
+            preview.clicked.connect(self._preview_expression)
+            expr_row = QtWidgets.QWidget()
+            expr_layout = QtWidgets.QHBoxLayout(expr_row)
+            expr_layout.setContentsMargins(0, 0, 0, 0)
+            expr_layout.addWidget(expr, 1)
+            expr_layout.addWidget(preview)
+            self._form.addRow("Expression", expr_row)
+
+            ops = QtWidgets.QPushButton("Boolean operators")
+            ops.setToolTip("Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.")
+            ops.clicked.connect(self._show_boolean_operators)
+            self._form.addRow("", ops)
+
             hint = QtWidgets.QLabel(_condition_summary(vis))
             hint.setWordWrap(True)
             self._form.addRow(hint)
             note = QtWidgets.QLabel(
-                "If conditions fail, this node is skipped and the in (or in_a) signal flows through. "
-                "An output does not write. Empty conditions always apply."
+                "Each condition gets a letter (A, B, C...). The node is skipped when the expression is false "
+                "(in / in_a passthrough; outputs do not write). Empty conditions always apply."
             )
             note.setWordWrap(True)
             self._form.addRow(note)
+
             for cond in vis.get("conditions") or []:
                 self._form.addRow(self._condition_box(cond))
+
             add_kind = QtWidgets.QComboBox()
             for value, label in _CONDITION_KINDS:
                 add_kind.addItem(label, value)
             add_btn = QtWidgets.QPushButton("Add condition")
+            add_btn.setToolTip("Add a mode, state, or input. It is assigned the next letter (A, B, C...).")
             add_btn.clicked.connect(lambda _=False, box=add_kind: self._add_condition(str(box.currentData() or "mode")))
             add_row = QtWidgets.QWidget()
             add_layout = QtWidgets.QHBoxLayout(add_row)
@@ -469,19 +503,43 @@ class NodeConditionWidget(QtWidgets.QWidget):
         finally:
             self._building = False
 
-    def _on_join(self) -> None:
-        combo = self.sender()
-        if not isinstance(combo, QtWidgets.QComboBox):
+    def _on_expression_finished(self) -> None:
+        box = self._expression_edit
+        if box is None:
             return
-        self._vis["join"] = str(combo.currentData() or "all")
+        self._vis["expression"] = str(box.text() or "")
         self._emit(rebuild=True)
+
+    def _preview_expression(self) -> None:
+        if self._expression_edit is not None:
+            self._vis["expression"] = str(self._expression_edit.text() or "")
+        vis = decode_when(self._vis)
+        legend = []
+        for cond in vis.get("conditions") or []:
+            letter = str(cond.get("letter") or "").strip().upper()
+            if letter:
+                legend.append((letter, _condition_phrase(cond)))
+        expression = effective_visibility_expression(vis)
+        dialog = VisibilityPreviewDialog(expression, legend, parent=self)
+        dialog.exec()
+
+    def _show_boolean_operators(self) -> None:
+        dialog = BooleanOperatorsDialog(parent=self)
+        dialog.exec()
 
     def _add_condition(self, kind: str) -> None:
         self._vis.setdefault("conditions", []).append(default_visibility_condition(kind))
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
+        if not str(self._vis.get("expression") or "").strip():
+            letters = [str(c.get("letter") or "") for c in self._vis["conditions"]]
+            self._vis["expression"] = default_join_expression(letters, "all")
         self._emit(rebuild=True)
 
     def _remove_condition(self, cond_id: str) -> None:
-        self._vis["conditions"] = [c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)]
+        self._vis["conditions"] = [
+            c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)
+        ]
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._emit(rebuild=True)
 
     def _set_condition(self, cond_id: str, rebuild: bool = False, **fields) -> None:
@@ -493,7 +551,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             return
 
     def _condition_box(self, cond: dict) -> QtWidgets.QGroupBox:
-        box = QtWidgets.QGroupBox(_condition_phrase(cond))
+        letter = str(cond.get("letter") or "").strip().upper()
+        phrase = _condition_phrase(cond)
+        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
         cond_id = str(cond.get("id") or "")
         kind = str(cond.get("kind") or "mode").casefold()
@@ -650,6 +710,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
 
 def _vjoy_output_devices() -> list:
+
     devices = [
         device
         for device in gremlin.joystick_handling.vjoy_devices(connected_only=False)

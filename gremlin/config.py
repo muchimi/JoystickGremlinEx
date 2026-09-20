@@ -582,6 +582,23 @@ class Configuration(QtCore.QObject):
         else:
             self._save_profile_ui()
 
+    @staticmethod
+    def _streamdeck_pages_custom_count(pages) -> int:
+        """How many non-generic Stream Deck page labels a sidecar blob holds."""
+        if not isinstance(pages, dict):
+            return 0
+        count = 0
+        for meta in pages.values():
+            if not isinstance(meta, dict):
+                continue
+            names = meta.get("names") or {}
+            if not isinstance(names, dict):
+                continue
+            for pk, pv in names.items():
+                if pv and str(pv) != f"Page {pk}":
+                    count += 1
+        return count
+
     def _save_profile_ui(self):
         """saves to the profile specific config file"""
         if not self._lock.acquire(blocking=False):
@@ -604,10 +621,22 @@ class Configuration(QtCore.QObject):
                         merged = loaded
                 except Exception as err:
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
+            disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
             if isinstance(self._profile_data, dict):
                 merged.update(self._profile_data)
             else:
                 merged = dict(merged)
+            # Critical: after a version-folder port / empty load, _profile_data can
+            # carry streamdeck_pages={} and update() would clobber rich on-disk names.
+            mem_pages = merged.get("streamdeck_pages")
+            disk_custom = self._streamdeck_pages_custom_count(disk_pages)
+            mem_custom = self._streamdeck_pages_custom_count(mem_pages)
+            if disk_custom > 0 and mem_custom < disk_custom:
+                merged["streamdeck_pages"] = disk_pages
+                syslog.info(
+                    "CONFIG: preserved on-disk streamdeck_pages "
+                    f"(disk_custom={disk_custom}, memory_custom={mem_custom})"
+                )
             self._profile_data = merged
 
             try:

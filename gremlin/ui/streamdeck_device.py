@@ -1662,9 +1662,29 @@ class StreamDeckBridge(QtCore.QObject):
             if hasattr(profile, "_readConfig"):
                 cfg = dict(profile._readConfig(force=True) or {})
             payload = dict(cfg.get(STREAMDECK_PAGES_CONFIG_KEY) or {})
+            prior_payload = dict(payload)
             device_ids = [device_id] if device_id else sorted(
                 set(list(self._page_names.keys()) + list(self._page_order.keys()))
             )
+            # Empty memory + empty device list must not rewrite streamdeck_pages to {}.
+            if not device_ids:
+                return
+
+            def _custom_count(blob: dict) -> int:
+                total = 0
+                for meta in (blob or {}).values():
+                    if not isinstance(meta, dict):
+                        continue
+                    names = meta.get("names") or {}
+                    if not isinstance(names, dict):
+                        continue
+                    total += sum(
+                        1
+                        for pk, pv in names.items()
+                        if pv and str(pv) != f"Page {pk}"
+                    )
+                return total
+
             for did in device_ids:
                 if not did:
                     continue
@@ -1689,6 +1709,14 @@ class StreamDeckBridge(QtCore.QObject):
                 if existing_custom > 0 and new_custom == 0:
                     continue
                 payload[did] = {"order": order, "names": names}
+            prior_custom = _custom_count(prior_payload)
+            new_total = _custom_count(payload)
+            if prior_custom > 0 and new_total == 0:
+                syslog.warning(
+                    "STREAMDECK: refused to persist empty page metadata over "
+                    f"{prior_custom} custom name(s)"
+                )
+                return
             profile._setConfig(STREAMDECK_PAGES_CONFIG_KEY, payload)
         except Exception as err:
             syslog.error(f"STREAMDECK: persist page metadata failed: {err}")
