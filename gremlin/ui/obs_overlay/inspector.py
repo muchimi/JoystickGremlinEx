@@ -2287,9 +2287,6 @@ class OverlayInspector(QtWidgets.QWidget):
         mode.addItem("Permanent (while condition holds)", "permanent")
         mode.addItem("Temporary (after trigger)", "temporary")
         mode.setCurrentIndex(1 if blink.get("mode") == "temporary" else 0)
-        mode.currentIndexChanged.connect(
-            lambda _i, box=mode, wid=item["id"]: self._set_blink(wid, mode=str(box.currentData() or "permanent"))
-        )
         form.addRow("Duration mode", mode)
         dur = QtWidgets.QDoubleSpinBox()
         dur.setRange(0.1, 30.0)
@@ -2297,9 +2294,18 @@ class OverlayInspector(QtWidgets.QWidget):
         dur.setSuffix(" s")
         dur.setValue(float(blink.get("duration_s") or 1.0))
         dur.setToolTip("How long a temporary blink lasts after Off→On, On→Off, or a matching state change.")
-        dur.setEnabled(str(blink.get("mode") or "permanent") == "temporary" or blink.get("off_to_on") or blink.get("on_to_off"))
         dur.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, duration_s=float(v)))
         form.addRow("Temporary for", dur)
+
+        def _sync_temporary_enabled(box=mode, spin=dur):
+            spin.setEnabled(str(box.currentData() or "permanent") == "temporary")
+
+        def _on_duration_mode(_i, box=mode, wid=item["id"]):
+            self._set_blink(wid, mode=str(box.currentData() or "permanent"))
+            _sync_temporary_enabled()
+
+        mode.currentIndexChanged.connect(_on_duration_mode)
+        _sync_temporary_enabled()
 
         hz = QtWidgets.QDoubleSpinBox()
         hz.setRange(0.2, 12.0)
