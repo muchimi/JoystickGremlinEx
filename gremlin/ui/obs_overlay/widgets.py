@@ -2055,7 +2055,7 @@ def _draw_mouse_icon(painter: QtGui.QPainter, center: QtCore.QPointF, nx: float,
     painter.drawPath(body)
     painter.setPen(_pen(color.lighter(130), 1.2))
     painter.drawPath(seam)
-    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
+    painter.setBrush(fill)
     painter.drawPath(wheel)
     painter.restore()
 
