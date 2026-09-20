@@ -110,6 +110,7 @@ a = Analysis(
         "gremlin.ui.obs_overlay.bindings",
         "gremlin.ui.obs_overlay.blink",
         "gremlin.ui.obs_overlay.designer",
+        "gremlin.ui.obs_overlay.gradient",
         "gremlin.ui.obs_overlay.host_window",
         "gremlin.ui.obs_overlay.inspector",
         "gremlin.ui.obs_overlay.model",

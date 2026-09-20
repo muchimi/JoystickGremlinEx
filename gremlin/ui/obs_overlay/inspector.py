@@ -91,55 +91,184 @@ from .palettes import (
     palette_type,
     update_palette,
 )
-from .widgets import effective_font_size, qcolor, resolve_font_shadow, _shadow_offset_xy, widget_rotation_deg
+from .widgets import effective_font_size, qcolor, resolve_font_shadow, resolve_widget_shadow, _shadow_offset_xy, widget_rotation_deg
 
 CANVAS_TOGGLE_ID = "__canvas_toggle__"
 syslog = logging.getLogger("system")
 
 
 class ColorButton(QtWidgets.QPushButton):
-    color_changed = QtCore.Signal(str)
+    """Solid color or gradient value swatch. Emits str hex or gradient dict."""
+
+    color_changed = QtCore.Signal(object)
 
     def __init__(self, value="#ffffff", parent=None, preserve_transparent: bool = False):
         super().__init__(parent)
         self.setObjectName("overlayColorSwatch")
-        self._value = value or "#ffffff"
+        self._value = value if value is not None else "#ffffff"
         self._preserve_transparent = bool(preserve_transparent)
         self.setFixedHeight(24)
         self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setStyleSheet("#overlayColorSwatch { border: none; background: transparent; }")
         self.clicked.connect(self._pick)
         self._refresh()
 
-    def set_value(self, value: str):
-        self._value = value or "#ffffff"
+    def set_value(self, value):
+        self._value = value if value is not None else "#ffffff"
         self._refresh()
 
-    def value(self) -> str:
+    def value(self):
         return self._value
 
     def _refresh(self):
-        color = qcolor(self._value)
-        # Object-name selector so this does not leak onto QColorDialog buttons.
-        self.setStyleSheet(
-            f"#overlayColorSwatch {{ background:{color.name(QtGui.QColor.HexArgb)}; border:1px solid #444; border-radius:3px; }}"
-        )
-        self.setToolTip(self._value)
+        from .gradient import gradient_preview_color, is_gradient
+
+        if is_gradient(self._value):
+            tip = "Gradient"
+        else:
+            tip = str(self._value)
+        self.setToolTip(tip)
+        self.update()
+
+    def paintEvent(self, event):
+        from .gradient import is_gradient, paint_gradient_spectrum
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        rect = QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(rect, 3, 3)
+        painter.setClipPath(path)
+        if is_gradient(self._value):
+            paint_gradient_spectrum(painter, rect, self._value)
+        else:
+            color = qcolor(self._value)
+            if color.alpha() < 255:
+                # Checkerboard under translucent solids
+                painter.fillRect(rect, QtGui.QColor("#2a2a2a"))
+                tile = 5
+                light = QtGui.QColor("#3a3a3a")
+                for y in range(int(rect.top()), int(rect.bottom()), tile):
+                    for x in range(int(rect.left()), int(rect.right()), tile):
+                        if ((x // tile) + (y // tile)) % 2 == 0:
+                            painter.fillRect(x, y, tile, tile, light)
+            painter.fillRect(rect, color)
+        painter.setClipping(False)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#444444"), 1))
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawRoundedRect(rect, 3, 3)
+        painter.end()
 
     def _pick(self):
-        chosen = QtWidgets.QColorDialog.getColor(
-            qcolor(self._value),
-            self.window() or self.parentWidget() or self,
-            "Select color",
-            QtWidgets.QColorDialog.DontUseNativeDialog | QtWidgets.QColorDialog.ShowAlphaChannel,
+        import copy
+
+        from .gradient import (
+            GradientEditorDialog,
+            default_gradient,
+            gradient_preview_color,
+            is_gradient,
+            normalize_gradient,
         )
-        if chosen.isValid():
-            previous = qcolor(self._value)
-            # Transparent defaults keep alpha at 0 in the picker; bump so fill/border actually show.
-            if not self._preserve_transparent and previous.alpha() == 0 and chosen.alpha() == 0:
-                chosen.setAlpha(255)
-            self._value = chosen.name(QtGui.QColor.HexArgb)
+
+        parent = self.window() or self.parentWidget() or self
+        if is_gradient(self._value):
+            initial = qcolor(gradient_preview_color(self._value))
+        else:
+            initial = qcolor(self._value)
+        dialog = QtWidgets.QColorDialog(initial, parent)
+        dialog.setWindowTitle("Select color")
+        dialog.setOption(QtWidgets.QColorDialog.DontUseNativeDialog, True)
+        dialog.setOption(QtWidgets.QColorDialog.ShowAlphaChannel, True)
+
+        last_gradient = copy.deepcopy(self._value) if is_gradient(self._value) else None
+
+        gradient_enable = QtWidgets.QCheckBox("Gradient", dialog)
+        gradient_enable.setChecked(is_gradient(self._value))
+        gradient_enable.setToolTip("Use a gradient fill instead of a solid color. Uncheck to return to a solid color.")
+
+        gradient_btn = QtWidgets.QPushButton("Edit gradient…", dialog)
+        gradient_btn.setToolTip("Open the gradient editor (linear / radial, stops, angle, scale).")
+        gradient_btn.setEnabled(gradient_enable.isChecked())
+
+        def _apply_value(value):
+            self._value = value
             self._refresh()
             self.color_changed.emit(self._value)
+
+        def _solid_from_dialog():
+            chosen = dialog.currentColor()
+            if not chosen.isValid():
+                if last_gradient is not None:
+                    chosen = qcolor(gradient_preview_color(last_gradient))
+                else:
+                    chosen = qcolor("#ffffffff")
+            previous = qcolor(self._value if not is_gradient(self._value) else "#00000000")
+            if not self._preserve_transparent and previous.alpha() == 0 and chosen.alpha() == 0:
+                chosen.setAlpha(255)
+            return chosen.name(QtGui.QColor.HexArgb)
+
+        def _on_gradient_toggled(on):
+            nonlocal last_gradient
+            if on:
+                seed = dialog.currentColor().name(QtGui.QColor.HexArgb)
+                if last_gradient is None:
+                    last_gradient = default_gradient(seed)
+                _apply_value(normalize_gradient(last_gradient, seed_color=seed))
+                gradient_btn.setEnabled(True)
+            else:
+                if is_gradient(self._value):
+                    last_gradient = copy.deepcopy(self._value)
+                _apply_value(_solid_from_dialog())
+                gradient_btn.setEnabled(False)
+
+        def _open_gradient():
+            nonlocal last_gradient
+            seed = dialog.currentColor().name(QtGui.QColor.HexArgb)
+            original = copy.deepcopy(self._value)
+            current = self._value if is_gradient(self._value) else (last_gradient or default_gradient(seed))
+            editor = GradientEditorDialog(current, seed_color=seed, parent=dialog)
+
+            def _preview(grad):
+                _apply_value(normalize_gradient(grad, seed_color=seed))
+
+            editor.preview_changed.connect(_preview)
+            _preview(editor.result_gradient())
+            accepted = editor.exec() == QtWidgets.QDialog.Accepted
+            if accepted:
+                grad = normalize_gradient(editor.result_gradient(), seed_color=seed)
+                last_gradient = copy.deepcopy(grad)
+                gradient_enable.blockSignals(True)
+                gradient_enable.setChecked(True)
+                gradient_enable.blockSignals(False)
+                gradient_btn.setEnabled(True)
+                _apply_value(grad)
+                dialog.reject()
+            else:
+                _apply_value(original)
+
+        gradient_enable.toggled.connect(_on_gradient_toggled)
+        gradient_btn.clicked.connect(_open_gradient)
+
+        host = QtWidgets.QWidget(dialog)
+        host_layout = QtWidgets.QVBoxLayout(host)
+        host_layout.setContentsMargins(0, 6, 0, 0)
+        host_layout.setSpacing(4)
+        host_layout.addWidget(gradient_enable)
+        host_layout.addWidget(gradient_btn)
+
+        layout = dialog.layout()
+        if isinstance(layout, QtWidgets.QGridLayout):
+            layout.addWidget(host, layout.rowCount(), 0, 1, layout.columnCount())
+        elif layout is not None:
+            layout.addWidget(host)
+
+        if dialog.exec() != QtWidgets.QDialog.Accepted:
+            return
+        # Keep an active gradient; OK on the solid picker must not wipe it.
+        if gradient_enable.isChecked() and is_gradient(self._value):
+            _apply_value(normalize_gradient(self._value))
+            return
+        _apply_value(_solid_from_dialog())
 
 
 class PaletteSwatch(QtWidgets.QPushButton):
@@ -167,16 +296,20 @@ class PaletteSwatch(QtWidgets.QPushButton):
         self.clicked.connect(lambda _=False: self.apply_requested.emit())
 
     def paintEvent(self, event):
+        from .gradient import is_gradient, paint_gradient_spectrum
+
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
         rect = self.rect().adjusted(2, 2, -3, -3)
-        fill = qcolor(self._colors.get("fill"), "#121826")
-        accent = qcolor(
-            self._colors.get("fill_on") or self._colors.get("indicator") or self._colors.get("fill_bar") or self._colors.get("border"),
-            "#888888",
-        )
-        outline = qcolor(self._colors.get("border") or self._colors.get("indicator"), "#555555")
-        if fill.alpha() <= 0:
+        fill_value = self._colors.get("fill")
+        fill = qcolor(fill_value if not is_gradient(fill_value) else "#121826", "#121826")
+        accent_raw = self._colors.get("fill_on") or self._colors.get("indicator") or self._colors.get("fill_bar") or self._colors.get("border")
+        accent = qcolor(accent_raw if not is_gradient(accent_raw) else "#888888", "#888888")
+        outline_raw = self._colors.get("border") or self._colors.get("indicator")
+        outline = qcolor(outline_raw if not is_gradient(outline_raw) else "#555555", "#555555")
+        if is_gradient(fill_value):
+            paint_gradient_spectrum(painter, QtCore.QRectF(rect), fill_value)
+        elif fill.alpha() <= 0:
             painter.fillRect(rect, QtGui.QColor("#2a2a2a"))
             painter.setPen(QtGui.QPen(accent if accent.alpha() > 0 else QtGui.QColor("#888888"), 2))
             painter.drawLine(rect.topLeft() + QtCore.QPoint(1, 1), rect.bottomRight() - QtCore.QPoint(1, 1))
@@ -371,6 +504,86 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
             pass
 
 
+class CollapsibleSection(QtWidgets.QWidget):
+    """Inspector group with a title header and up/down arrow to show or hide the body."""
+
+    toggled = QtCore.Signal(bool)  # True when expanded
+
+    def __init__(self, title: str, expanded: bool = True, parent=None):
+        super().__init__(parent)
+        self._title = title
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 2, 0, 6)
+        root.setSpacing(0)
+
+        self._toggle = QtWidgets.QToolButton()
+        self._toggle.setObjectName("overlaySectionToggle")
+        self._toggle.setCheckable(True)
+        self._toggle.setChecked(bool(expanded))
+        self._toggle.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self._toggle.setAutoRaise(True)
+        self._toggle.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        self._toggle.setStyleSheet(
+            "#overlaySectionToggle {"
+            "  font-weight: bold;"
+            "  text-align: left;"
+            "  padding: 6px 8px;"
+            "  border: none;"
+            "  border-radius: 0;"
+            "  background-color: #2a2a2a;"
+            "}"
+            "#overlaySectionToggle:hover {"
+            "  border-radius: 0;"
+            "  background-color: #333333;"
+            "}"
+            "#overlaySectionToggle:checked,"
+            "#overlaySectionToggle:pressed {"
+            "  border-radius: 0;"
+            "  background-color: #2a2a2a;"
+            "}"
+        )
+        self._toggle.setText(title)
+        self._apply_arrow(bool(expanded))
+        self._toggle.setToolTip("Collapse or expand this section.")
+        self._toggle.toggled.connect(self._on_toggled)
+
+        self._body = QtWidgets.QWidget()
+        self._form = QtWidgets.QFormLayout(self._body)
+        self._form.setLabelAlignment(QtCore.Qt.AlignRight)
+        # Gap between the header fill and the first row of controls.
+        self._form.setContentsMargins(12, 10, 0, 0)
+        self._form.setVerticalSpacing(6)
+        self._body.setVisible(bool(expanded))
+
+        root.addWidget(self._toggle)
+        root.addWidget(self._body)
+
+    def form(self) -> QtWidgets.QFormLayout:
+        return self._form
+
+    def title(self) -> str:
+        return self._title
+
+    def is_expanded(self) -> bool:
+        return bool(self._toggle.isChecked())
+
+    def set_expanded(self, expanded: bool):
+        expanded = bool(expanded)
+        if self._toggle.isChecked() == expanded:
+            self._body.setVisible(expanded)
+            self._apply_arrow(expanded)
+            return
+        self._toggle.setChecked(expanded)
+
+    def _apply_arrow(self, expanded: bool):
+        self._toggle.setArrowType(QtCore.Qt.DownArrow if expanded else QtCore.Qt.RightArrow)
+
+    def _on_toggled(self, expanded: bool):
+        self._body.setVisible(bool(expanded))
+        self._apply_arrow(bool(expanded))
+        self.toggled.emit(bool(expanded))
+
+
 class OverlayInspector(QtWidgets.QWidget):
     """Property panel for canvas + selected widget."""
 
@@ -385,6 +598,8 @@ class OverlayInspector(QtWidgets.QWidget):
         self._last_rebuild_ids: list[str] = []
         self._pending_scroll = (0, 0)
         self._scroll_restore_tries = 0
+        self._section_collapsed: dict[str, bool] = {}
+        self._collapsible_sections: list[CollapsibleSection] = []
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         scroll = QtWidgets.QScrollArea()
@@ -577,6 +792,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
     def _clear(self):
         layout = self._form
+        self._collapsible_sections = []
         if layout is None:
             return
         try:
@@ -599,13 +815,59 @@ class OverlayInspector(QtWidgets.QWidget):
         except RuntimeError:
             return
 
-    def _section(self, title: str) -> QtWidgets.QFormLayout:
-        box = QtWidgets.QGroupBox(title)
-        form = QtWidgets.QFormLayout(box)
-        form.setLabelAlignment(QtCore.Qt.AlignRight)
+    def _add_expand_collapse_toolbar(self):
+        """Expand all / Collapse all sits above Geometry (and other sections)."""
+        if self._form is None:
+            return
+        row = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 4)
+        layout.setSpacing(6)
+        expand_btn = QtWidgets.QPushButton("Expand all")
+        expand_btn.setToolTip("Expand every collapsible section in this panel.")
+        expand_btn.clicked.connect(self._expand_all_sections)
+        collapse_btn = QtWidgets.QPushButton("Collapse all")
+        collapse_btn.setToolTip("Collapse every collapsible section in this panel.")
+        collapse_btn.clicked.connect(self._collapse_all_sections)
+        layout.addWidget(expand_btn)
+        layout.addWidget(collapse_btn)
+        layout.addStretch()
+        self._form.addWidget(row)
+
+    def _expand_all_sections(self):
+        for section in list(self._collapsible_sections):
+            try:
+                section.set_expanded(True)
+                self._section_collapsed[section.title()] = False
+            except RuntimeError:
+                continue
+
+    def _collapse_all_sections(self):
+        for section in list(self._collapsible_sections):
+            try:
+                section.set_expanded(False)
+                self._section_collapsed[section.title()] = True
+            except RuntimeError:
+                continue
+
+    def _section(self, title: str, collapsible: bool | None = None) -> QtWidgets.QFormLayout:
+        """Add a titled section. Geometry stays fixed; all other sections fold."""
+        if collapsible is None:
+            collapsible = title != "Geometry"
+        if not collapsible:
+            box = QtWidgets.QGroupBox(title)
+            form = QtWidgets.QFormLayout(box)
+            form.setLabelAlignment(QtCore.Qt.AlignRight)
+            if self._form is not None:
+                self._form.addWidget(box)
+            return form
+        expanded = not bool(self._section_collapsed.get(title, False))
+        section = CollapsibleSection(title, expanded=expanded)
+        section.toggled.connect(lambda on, t=title: self._section_collapsed.__setitem__(t, not bool(on)))
+        self._collapsible_sections.append(section)
         if self._form is not None:
-            self._form.addWidget(box)
-        return form
+            self._form.addWidget(section)
+        return section.form()
 
     def rebuild(self):
         if not self._is_alive():
@@ -697,6 +959,7 @@ class OverlayInspector(QtWidgets.QWidget):
             return
 
     def _build_canvas(self):
+        self._add_expand_collapse_toolbar()
         form = self._section("Canvas")
         canvas = self.scene.canvas
         page = self.scene.active_page() or {}
@@ -1064,6 +1327,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self.rebuild()
 
     def _build_widget(self, item: dict):
+        self._add_expand_collapse_toolbar()
         form = self._section("Geometry")
         if self._multi:
             types = sorted({(w.get("type") or "").replace("_", " ") for w in self.scene.selected_widgets()})
@@ -1376,6 +1640,7 @@ class OverlayInspector(QtWidgets.QWidget):
     def _build_mixed(self, items: list[dict]):
         types = {item.get("type") for item in items}
         item = items[0]
+        self._add_expand_collapse_toolbar()
         form = self._section("Geometry")
         form.addRow("Selection", QtWidgets.QLabel(f"{len(items)} grouped widgets"))
         form.addRow("Types", QtWidgets.QLabel(", ".join(sorted((t or "").replace("_", " ") for t in types))))
@@ -1462,6 +1727,7 @@ class OverlayInspector(QtWidgets.QWidget):
         else:
             include_radius = not types <= set(NO_CORNER_RADIUS_TYPES) and not types <= {"switch_4way"}
             self._border_appearance(look, item, include_radius=include_radius)
+        self._style_widget_shadow(look, item)
         self._build_blink(item)
 
     def _visibility_for(self, item: dict) -> dict:
@@ -2088,7 +2354,7 @@ class OverlayInspector(QtWidgets.QWidget):
         layout.addStretch()
         return host
 
-    def _current_palette_colors(self) -> dict[str, str]:
+    def _current_palette_colors(self) -> dict:
         items = self.scene.selected_widgets()
         if not items:
             return extract_colors({}, "button")
@@ -2191,6 +2457,7 @@ class OverlayInspector(QtWidgets.QWidget):
         elif widget_type not in ("label", "shape", "panel", "image", "application", "streamdeck"):
             include_radius = widget_type not in NO_CORNER_RADIUS_TYPES and widget_type != "switch_4way"
             self._border_appearance(look, item, include_radius=include_radius)
+        self._style_widget_shadow(look, item)
         if widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
             self._build_binding(item)
         self._build_blink(item)
@@ -3609,7 +3876,105 @@ class OverlayInspector(QtWidgets.QWidget):
                 tooltip="Keep the same relative font size when this widget is resized.",
             )
 
-        shadow = resolve_font_shadow(item.get("style") or {}, prefix)
+        self._style_drop_shadow(
+            form,
+            item,
+            enabled_key=f"{prefix}font_shadow",
+            color_key=f"{prefix}font_shadow_color",
+            angle_key=f"{prefix}font_shadow_angle",
+            distance_key=f"{prefix}font_shadow_distance",
+            spread_key=f"{prefix}font_shadow_spread",
+            size_key=f"{prefix}font_shadow_size",
+            dx_key=f"{prefix}font_shadow_dx",
+            dy_key=f"{prefix}font_shadow_dy",
+            row_label=f"{label} shadow",
+            resolve=lambda style, pfx=prefix: resolve_font_shadow(style, pfx),
+            tip="Draw a drop shadow behind the text.",
+        )
+
+        stroke_w = float(item["style"].get(f"{prefix}font_stroke_width") or 0)
+        stroke_row = QtWidgets.QWidget()
+        stroke_layout = QtWidgets.QHBoxLayout(stroke_row)
+        stroke_layout.setContentsMargins(0, 0, 0, 0)
+        stroke_layout.setSpacing(6)
+        stroke_box = QtWidgets.QCheckBox()
+        stroke_box.setChecked(stroke_w > 0)
+        stroke_box.setToolTip("Outline the letters. Width is in pixels.")
+        stroke_color = ColorButton(item["style"].get(f"{prefix}font_stroke_color") or "#000000")
+        stroke_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_stroke_color": self._style(wid, **{k: v}))
+        stroke_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        stroke_slider.setRange(1, 12)
+        stroke_slider.setValue(max(1, int(round(stroke_w)) or 2))
+        stroke_spin = QtWidgets.QSpinBox()
+        stroke_spin.setRange(1, 12)
+        stroke_spin.setSuffix(" px")
+        stroke_spin.setValue(max(1, int(round(stroke_w)) or 2))
+
+        def _set_stroke(width, wid=item["id"], enabled=True):
+            self._style(wid, **{f"{prefix}font_stroke_width": float(width) if enabled else 0.0})
+
+        def _stroke_toggled(on, slider=stroke_slider, spin=stroke_spin):
+            slider.setEnabled(on)
+            spin.setEnabled(on)
+            _set_stroke(spin.value(), enabled=on)
+
+        stroke_box.toggled.connect(_stroke_toggled)
+        stroke_slider.valueChanged.connect(lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True)))
+        stroke_spin.valueChanged.connect(lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True)))
+        stroke_slider.setEnabled(stroke_w > 0)
+        stroke_spin.setEnabled(stroke_w > 0)
+        stroke_layout.addWidget(stroke_box)
+        stroke_layout.addWidget(stroke_color)
+        stroke_layout.addWidget(stroke_slider, 1)
+        stroke_layout.addWidget(stroke_spin)
+        form.addRow(f"{label} stroke", stroke_row)
+
+    def _style_widget_shadow(self, form, item: dict):
+        """Appearance drop shadow for the widget body (same controls as font shadow)."""
+        self._look_heading(form, "Shadow")
+        self._style_drop_shadow(
+            form,
+            item,
+            enabled_key="shadow",
+            color_key="shadow_color",
+            angle_key="shadow_angle",
+            distance_key="shadow_distance",
+            spread_key="shadow_spread",
+            size_key="shadow_size",
+            dx_key="shadow_dx",
+            dy_key="shadow_dy",
+            row_label="Shadow",
+            resolve=lambda style: resolve_widget_shadow(style),
+            tip="Draw a drop shadow behind the widget body.",
+            distance_default=6,
+            size_default=8,
+            distance_max=80,
+            size_max=80,
+        )
+
+    def _style_drop_shadow(
+        self,
+        form,
+        item: dict,
+        *,
+        enabled_key: str,
+        color_key: str,
+        angle_key: str,
+        distance_key: str,
+        spread_key: str,
+        size_key: str,
+        dx_key: str,
+        dy_key: str,
+        row_label: str,
+        resolve,
+        tip: str,
+        distance_default: float = 3,
+        size_default: float = 0,
+        distance_max: int = 40,
+        size_max: int = 40,
+    ):
+        style = item.get("style") or {}
+        shadow = resolve(style)
         shadow_on = bool(shadow.get("on"))
         shadow_head = QtWidgets.QWidget()
         shadow_head_layout = QtWidgets.QHBoxLayout(shadow_head)
@@ -3617,13 +3982,13 @@ class OverlayInspector(QtWidgets.QWidget):
         shadow_head_layout.setSpacing(6)
         shadow_box = QtWidgets.QCheckBox()
         shadow_box.setChecked(shadow_on)
-        shadow_box.setToolTip("Draw a drop shadow behind the text.")
-        shadow_color = ColorButton(item["style"].get(f"{prefix}font_shadow_color") or "#80000000")
-        shadow_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_color": self._style(wid, **{k: v}))
+        shadow_box.setToolTip(tip)
+        shadow_color = ColorButton(style.get(color_key) or "#80000000")
+        shadow_color.color_changed.connect(lambda v, wid=item["id"], k=color_key: self._style(wid, **{k: v}))
         shadow_head_layout.addWidget(shadow_box)
         shadow_head_layout.addWidget(shadow_color)
         shadow_head_layout.addStretch()
-        form.addRow(f"{label} shadow", shadow_head)
+        form.addRow(row_label, shadow_head)
 
         angle_row = QtWidgets.QWidget()
         angle_layout = QtWidgets.QHBoxLayout(angle_row)
@@ -3646,9 +4011,15 @@ class OverlayInspector(QtWidgets.QWidget):
         angle_layout.addStretch()
         form.addRow("Angle", angle_row)
 
-        def _apply_shadow_geometry(angle=None, distance=None, spread=None, size=None, wid=item["id"], pfx=prefix):
-            style = dict((self.scene.widget_by_id(wid) or item).get("style") or {})
-            cur = resolve_font_shadow(style, pfx)
+        def _apply_shadow_geometry(
+            angle=None,
+            distance=None,
+            spread=None,
+            size=None,
+            wid=item["id"],
+        ):
+            cur_style = dict((self.scene.widget_by_id(wid) or item).get("style") or {})
+            cur = resolve(cur_style)
             ang = float(cur["angle"] if angle is None else angle) % 360.0
             dist = max(0.0, float(cur["distance"] if distance is None else distance))
             spr = max(0.0, min(100.0, float(cur["spread"] if spread is None else spread)))
@@ -3657,12 +4028,12 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style(
                 wid,
                 **{
-                    f"{pfx}font_shadow_angle": ang,
-                    f"{pfx}font_shadow_distance": dist,
-                    f"{pfx}font_shadow_spread": spr,
-                    f"{pfx}font_shadow_size": sz,
-                    f"{pfx}font_shadow_dx": int(round(dx)),
-                    f"{pfx}font_shadow_dy": int(round(dy)),
+                    angle_key: ang,
+                    distance_key: dist,
+                    spread_key: spr,
+                    size_key: sz,
+                    dx_key: int(round(dx)),
+                    dy_key: int(round(dy)),
                 },
             )
 
@@ -3716,11 +4087,11 @@ class OverlayInspector(QtWidgets.QWidget):
 
         dist_row, dist_slider, dist_spin = _shadow_slider(
             "Distance",
-            int(round(float(shadow.get("distance") or 0))),
+            int(round(float(shadow.get("distance") if shadow.get("distance") is not None else distance_default))),
             0,
-            40,
+            int(distance_max),
             " px",
-            "How far the shadow is offset from the text.",
+            "How far the shadow is offset.",
             "distance",
         )
         spread_row, spread_slider, spread_spin = _shadow_slider(
@@ -3729,16 +4100,16 @@ class OverlayInspector(QtWidgets.QWidget):
             0,
             100,
             " %",
-            "How much of the shadow stays solid before it softens (0–100%).",
+            "How far the shadow grows outward before the blur (0–100% of Size).",
             "spread",
         )
         size_row, size_slider, size_spin = _shadow_slider(
             "Size",
-            int(round(float(shadow.get("size") or 0))),
+            int(round(float(shadow.get("size") if shadow.get("size") is not None else size_default))),
             0,
-            40,
+            int(size_max),
             " px",
-            "Soft blur radius of the shadow edge.",
+            "Soft blur radius of the shadow.",
             "size",
         )
 
@@ -3762,49 +4133,12 @@ class OverlayInspector(QtWidgets.QWidget):
                 w.setEnabled(bool(on))
 
         shadow_box.toggled.connect(
-            lambda on, wid=item["id"], pfx=prefix: (
-                self._style(wid, **{f"{pfx}font_shadow": bool(on)}),
+            lambda on, wid=item["id"], key=enabled_key: (
+                self._style(wid, **{key: bool(on)}),
                 _set_shadow_enabled(on),
             )
         )
         _set_shadow_enabled(shadow_on)
-
-        stroke_w = float(item["style"].get(f"{prefix}font_stroke_width") or 0)
-        stroke_row = QtWidgets.QWidget()
-        stroke_layout = QtWidgets.QHBoxLayout(stroke_row)
-        stroke_layout.setContentsMargins(0, 0, 0, 0)
-        stroke_layout.setSpacing(6)
-        stroke_box = QtWidgets.QCheckBox()
-        stroke_box.setChecked(stroke_w > 0)
-        stroke_box.setToolTip("Outline the letters. Width is in pixels.")
-        stroke_color = ColorButton(item["style"].get(f"{prefix}font_stroke_color") or "#000000")
-        stroke_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_stroke_color": self._style(wid, **{k: v}))
-        stroke_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        stroke_slider.setRange(1, 12)
-        stroke_slider.setValue(max(1, int(round(stroke_w)) or 2))
-        stroke_spin = QtWidgets.QSpinBox()
-        stroke_spin.setRange(1, 12)
-        stroke_spin.setSuffix(" px")
-        stroke_spin.setValue(max(1, int(round(stroke_w)) or 2))
-
-        def _set_stroke(width, wid=item["id"], enabled=True):
-            self._style(wid, **{f"{prefix}font_stroke_width": float(width) if enabled else 0.0})
-
-        def _stroke_toggled(on, slider=stroke_slider, spin=stroke_spin):
-            slider.setEnabled(on)
-            spin.setEnabled(on)
-            _set_stroke(spin.value(), enabled=on)
-
-        stroke_box.toggled.connect(_stroke_toggled)
-        stroke_slider.valueChanged.connect(lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True)))
-        stroke_spin.valueChanged.connect(lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True)))
-        stroke_slider.setEnabled(stroke_w > 0)
-        stroke_spin.setEnabled(stroke_w > 0)
-        stroke_layout.addWidget(stroke_box)
-        stroke_layout.addWidget(stroke_color)
-        stroke_layout.addWidget(stroke_slider, 1)
-        stroke_layout.addWidget(stroke_spin)
-        form.addRow(f"{label} stroke", stroke_row)
 
     def _build_toggle_binding(self):
         binding = normalize_toggle_binding(self.scene.canvas.get("toggle_binding"))

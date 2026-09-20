@@ -28,9 +28,32 @@ from .shapes import button_uses_shape_path, normalize_shape_kind, shape_path, us
 
 
 def qcolor(value, default="#ffffff") -> QtGui.QColor:
-    color = QtGui.QColor(value if value else default)
+    """Parse a solid color. Gradient dicts resolve to their first stop (or default)."""
+    if isinstance(value, QtGui.QColor):
+        return value if value.isValid() else QtGui.QColor(default)
+    if isinstance(value, dict):
+        # Overlay gradients are stored as {"type":"gradient", "stops":[{"color":...}, ...]}.
+        if str(value.get("type") or "").casefold() == "gradient":
+            stops = value.get("stops")
+            if isinstance(stops, list):
+                for stop in stops:
+                    if isinstance(stop, dict) and stop.get("color"):
+                        value = stop.get("color")
+                        break
+                else:
+                    value = default
+            else:
+                value = default
+        else:
+            value = default
+    try:
+        color = QtGui.QColor(value if value not in (None, "") else default)
+    except (TypeError, ValueError):
+        color = QtGui.QColor()
     if not color.isValid():
         color = QtGui.QColor(default)
+        if not color.isValid():
+            color = QtGui.QColor("#ffffff")
     return color
 
 
@@ -148,9 +171,26 @@ def _outline_pen(
     return _pen(border, w)
 
 
-def set_fill_and_outline(painter: QtGui.QPainter, fill, border, width, default_fill="#121826", default_border="#2c3a52"):
-    fill_c = qcolor(fill, default_fill)
-    painter.setBrush(QtCore.Qt.NoBrush if fill_c.alpha() <= 0 else QtGui.QBrush(fill_c))
+def set_fill_and_outline(
+    painter: QtGui.QPainter,
+    fill,
+    border,
+    width,
+    default_fill="#121826",
+    default_border="#2c3a52",
+    rect=None,
+):
+    from .gradient import gradient_preview_color, is_gradient, paint_value_brush
+
+    if is_gradient(fill):
+        target = QtCore.QRectF(rect) if rect is not None else QtCore.QRectF(painter.clipBoundingRect())
+        if target.isEmpty():
+            target = QtCore.QRectF(0, 0, 100, 100)
+        painter.setBrush(paint_value_brush(fill, target, default_fill))
+        fill_c = qcolor(gradient_preview_color(fill), default_fill)
+    else:
+        fill_c = qcolor(fill, default_fill)
+        painter.setBrush(QtCore.Qt.NoBrush if fill_c.alpha() <= 0 else QtGui.QBrush(fill_c))
     painter.setPen(
         _outline_pen(
             border,
@@ -208,6 +248,8 @@ def resolve_font_shadow(style: dict[str, Any] | None, prefix: str = "") -> dict[
         size = 0.0
 
     dx, dy = _shadow_offset_xy(angle, distance)
+    # Dirty-rect padding: offset + blur (spread expansion is capped in the painter).
+    expand = min(size * (spread / 100.0), size, 24.0)
     return {
         "on": on,
         "color": color,
@@ -217,7 +259,7 @@ def resolve_font_shadow(style: dict[str, Any] | None, prefix: str = "") -> dict[
         "size": size,
         "dx": dx,
         "dy": dy,
-        "extent": distance + size + (size * spread / 100.0),
+        "extent": distance + min(size, 48.0) + expand,
     }
 
 
@@ -226,6 +268,17 @@ def _draw_text_at(painter: QtGui.QPainter, text: str, rect, point, flags: int, o
         painter.drawText(rect.translated(ox, oy), flags, text)
     elif point is not None:
         painter.drawText(point + QtCore.QPointF(ox, oy), text)
+
+
+def _expand_path(path: QtGui.QPainterPath, expand: float) -> QtGui.QPainterPath:
+    """Grow a filled path outward (round join) for shadow spread."""
+    if expand <= 0.25 or path.isEmpty():
+        return QtGui.QPainterPath(path)
+    stroker = QtGui.QPainterPathStroker()
+    stroker.setWidth(float(expand) * 2.0)
+    stroker.setJoinStyle(QtCore.Qt.RoundJoin)
+    stroker.setCapStyle(QtCore.Qt.RoundCap)
+    return path.united(stroker.createStroke(path))
 
 
 def _paint_font_shadow(
@@ -238,48 +291,80 @@ def _paint_font_shadow(
     flags: int,
     path: QtGui.QPainterPath | None = None,
 ):
-    """Hard or soft drop shadow. Spread expands the opaque core; size softens the edge."""
+    """Drop shadow.
+
+    Size = blur radius (px). Spread = modest silhouette growth before blur
+    (0–100% of Size, capped). Softness is approximated by faint offset stamps —
+    never by scaling the shape up (that created a huge black slab).
+    """
     if not shadow.get("on"):
         return
     dx = float(shadow.get("dx") or 0)
     dy = float(shadow.get("dy") or 0)
-    size = float(shadow.get("size") or 0)
-    spread = float(shadow.get("spread") or 0)
+    blur = max(0.0, float(shadow.get("size") or 0))
+    spread = max(0.0, min(100.0, float(shadow.get("spread") or 0)))
+    # Keep spread from exploding into a giant opaque pad behind the widget.
+    expand = min(blur * (spread / 100.0), max(0.0, blur), 24.0)
+    soft = min(blur, 48.0)
     base = QtGui.QColor(shadow.get("color") or "#80000000")
-    soft = size * (1.0 - spread / 100.0)
-    core_boost = size * (spread / 100.0)
-
-    def _fill(color: QtGui.QColor, ox: float, oy: float):
-        if path is not None:
-            shadow_path = QtGui.QPainterPath(path)
-            shadow_path.translate(ox, oy)
-            painter.fillPath(shadow_path, color)
-        else:
-            painter.setPen(color)
-            _draw_text_at(painter, text, rect, point, flags, ox, oy)
-
-    if soft < 0.5 and core_boost < 0.5:
-        _fill(base, dx, dy)
+    if base.alpha() <= 0:
         return
 
-    layers = max(1, min(10, int(math.ceil(soft)) + 1))
-    ring = max(8, min(16, layers * 2))
+    def _fill_text(color: QtGui.QColor, ox: float, oy: float):
+        painter.setPen(color)
+        _draw_text_at(painter, text, rect, point, flags, ox, oy)
+
+    if path is not None:
+        shape = _expand_path(path, expand)
+        painter.save()
+        painter.setPen(QtCore.Qt.NoPen)
+        if soft < 0.5:
+            stamp = QtGui.QPainterPath(shape)
+            stamp.translate(dx, dy)
+            painter.fillPath(stamp, base)
+            painter.restore()
+            return
+        # Soft edge: same-sized stamps at small offsets (box/gaussian approx).
+        layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
+        ring = max(8, min(14, 6 + layers))
+        for layer in range(layers, 0, -1):
+            t = layer / float(layers)
+            radius = soft * t
+            falloff = math.exp(-3.2 * t * t)
+            sample = QtGui.QColor(base)
+            # Keep stamps very faint so overlaps only soften the rim.
+            sample.setAlphaF(min(0.12, base.alphaF() * falloff * (0.55 / layers)))
+            for i in range(ring):
+                a = (2.0 * math.pi * i) / ring
+                stamp = QtGui.QPainterPath(shape)
+                stamp.translate(dx + radius * math.cos(a), dy + radius * math.sin(a))
+                painter.fillPath(stamp, sample)
+        core = QtGui.QPainterPath(shape)
+        core.translate(dx, dy)
+        core_color = QtGui.QColor(base)
+        core_color.setAlphaF(min(0.55, base.alphaF() * 0.75))
+        painter.fillPath(core, core_color)
+        painter.restore()
+        return
+
+    # Text (no path): same offset-stamp approach.
+    if soft < 0.5 and expand < 0.5:
+        _fill_text(base, dx, dy)
+        return
+    layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
+    ring = max(8, min(14, 6 + layers))
     for layer in range(layers, 0, -1):
         t = layer / float(layers)
-        radius = soft * t
+        radius = soft * t + expand * 0.25
+        falloff = math.exp(-3.2 * t * t)
         sample = QtGui.QColor(base)
-        sample.setAlphaF(max(0.02, base.alphaF() * (0.55 / (layers * max(1, ring // 4))) * (1.1 - t)))
+        sample.setAlphaF(min(0.14, base.alphaF() * falloff * (0.6 / layers)))
         for i in range(ring):
             a = (2.0 * math.pi * i) / ring
-            _fill(sample, dx + radius * math.cos(a), dy + radius * math.sin(a))
-    if core_boost > 0.05:
-        core = QtGui.QColor(base)
-        steps = max(4, min(12, int(math.ceil(core_boost)) + 2))
-        for i in range(steps):
-            a = (2.0 * math.pi * i) / steps
-            r = core_boost * 0.35
-            _fill(core, dx + r * math.cos(a), dy + r * math.sin(a))
-    _fill(base, dx, dy)
+            _fill_text(sample, dx + radius * math.cos(a), dy + radius * math.sin(a))
+    core = QtGui.QColor(base)
+    core.setAlphaF(min(0.7, base.alphaF() * 0.85))
+    _fill_text(core, dx, dy)
 
 
 def _draw_text_ex(
@@ -332,11 +417,76 @@ def _draw_text_ex(
     painter.restore()
 
 
-def fill_brush(value, default="#121826"):
+def fill_brush(value, default="#121826", rect=None):
+    from .gradient import is_gradient, paint_value_brush
+
+    if is_gradient(value):
+        target = QtCore.QRectF(rect) if rect is not None else QtCore.QRectF(0, 0, 100, 100)
+        return paint_value_brush(value, target, default)
     color = qcolor(value, default)
     if color.alpha() <= 0:
         return QtCore.Qt.NoBrush
     return color
+
+
+def resolve_widget_shadow(style: dict[str, Any] | None) -> dict[str, Any]:
+    """Widget body drop shadow (Appearance), same params as font shadow."""
+    style = style or {}
+    mapped = {
+        "font_shadow": style.get("shadow"),
+        "font_shadow_color": style.get("shadow_color"),
+        "font_shadow_angle": style.get("shadow_angle"),
+        "font_shadow_distance": style.get("shadow_distance"),
+        "font_shadow_spread": style.get("shadow_spread"),
+        "font_shadow_size": style.get("shadow_size"),
+        "font_shadow_dx": style.get("shadow_dx"),
+        "font_shadow_dy": style.get("shadow_dy"),
+    }
+    return resolve_font_shadow(mapped, "")
+
+
+def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
+    """Approximate filled body used for widget drop shadows."""
+    rect = widget_rect(item)
+    style = item.get("style") or {}
+    path = QtGui.QPainterPath()
+    wtype = str(item.get("type") or "")
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    circular = wtype in {
+        "axis_stick_circle",
+        "axis_radial",
+        "axis_dial",
+        "axis_encoder",
+        "hat",
+        "axis_radio",
+    }
+    if uses_shape_geometry(item):
+        try:
+            shaped = shape_path(item)
+            if shaped is not None and not shaped.isEmpty():
+                return shaped
+        except Exception:
+            pass
+    if circular or (wtype == "button" and normalize_shape_kind(style.get("shape")) in ("circle", "ellipse")):
+        path.addEllipse(rect)
+    elif radius > 0.05:
+        path.addRoundedRect(rect, radius, radius)
+    else:
+        path.addRect(rect)
+    return path
+
+
+def paint_widget_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any]):
+    shadow = resolve_widget_shadow(item.get("style"))
+    if not shadow.get("on"):
+        return
+    path = widget_body_path(item)
+    if path.isEmpty():
+        return
+    _paint_font_shadow(painter, "", QtGui.QFont(), shadow, None, None, int(QtCore.Qt.AlignCenter), path=path)
 
 
 def _border_w(style: dict[str, Any] | None, default: float = 2.0) -> float:
@@ -600,6 +750,8 @@ def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
             float(resolve_font_shadow(style, "").get("extent") or 0),
             float(resolve_font_shadow(style, "axis_label_").get("extent") or 0),
         )
+    if style.get("shadow"):
+        extra = max(extra, float(resolve_widget_shadow(style).get("extent") or 0))
     try:
         extra = max(extra, float(_font_flag(style, "font_stroke_width", "", 0) or 0), float(_font_flag(style, "font_stroke_width", "axis_label_", 0) or 0))
     except (TypeError, ValueError):
@@ -641,17 +793,19 @@ def _rounded(rect: QtCore.QRectF, radius: float) -> QtGui.QPainterPath:
 
 
 def paint_shape(painter: QtGui.QPainter, item: dict[str, Any], value):
+    from .gradient import is_gradient
+
     style = item.get("style") or {}
     rect = widget_rect(item)
     kind = normalize_shape_kind(style.get("shape_kind"))
     painter.save()
     painter.setOpacity(_opacity(style))
-    set_fill_and_outline(painter, style.get("fill"), style.get("border"), _border_w(style), "#101820")
-    fill = qcolor(style.get("fill"), "#101820")
+    fill_value = style.get("fill")
+    set_fill_and_outline(painter, fill_value, style.get("border"), _border_w(style), "#101820", rect=rect)
     closed = bool(style.get("shape_closed")) if kind == "line" else True
     if kind == "line" and not closed:
         painter.setBrush(QtCore.Qt.NoBrush)
-    elif fill.alpha() <= 0:
+    elif not is_gradient(fill_value) and qcolor(fill_value, "#101820").alpha() <= 0:
         painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawPath(shape_path(item))
     _draw_label(painter, item, rect)
@@ -723,15 +877,17 @@ def _button_outline_path(item: dict[str, Any], rect: QtCore.QRectF) -> QtGui.QPa
 
 
 def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
+    from .gradient import is_gradient
+
     style = item.get("style") or {}
     rect = widget_rect(item)
     painter.save()
     painter.setOpacity(_opacity(style))
-    fill = qcolor(style.get("fill"), "#00000000")
+    fill_value = style.get("fill")
     border_w = _border_w(style, 0)
-    if fill.alpha() > 0:
+    if is_gradient(fill_value) or qcolor(fill_value, "#00000000").alpha() > 0:
         painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(fill)
+        painter.setBrush(fill_brush(fill_value, "#00000000", rect=rect))
         painter.drawRect(rect)
     path = style.get("image_path") or ""
     pixmap = _widget_image_pixmap(path)
@@ -768,7 +924,7 @@ def paint_remote_view(painter: QtGui.QPainter, item: dict[str, Any], value):
         radius = 0.0
     border_w = _border_w(style)
     painter.setPen(_pen(style.get("border"), border_w))
-    painter.setBrush(qcolor(style.get("fill"), "#0a0c10"))
+    painter.setBrush(fill_brush(style.get("fill"), "#0a0c10", rect=rect))
     if radius > 0.05:
         painter.drawRoundedRect(rect, radius, radius)
     else:
@@ -824,7 +980,7 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
         radius = 0.0
     border_w = _border_w(style)
     painter.setPen(_pen(style.get("border"), border_w))
-    painter.setBrush(qcolor(style.get("fill"), "#0a0c10"))
+    painter.setBrush(fill_brush(style.get("fill"), "#0a0c10", rect=rect))
     if radius > 0.05:
         painter.drawRoundedRect(rect, radius, radius)
     else:
@@ -945,6 +1101,8 @@ def _streamdeck_message_rect(painter: QtGui.QPainter, item: dict[str, Any], rect
 
 def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Draw a connected Stream Deck key grid (and Plus dials) on the overlay."""
+    from .gradient import is_gradient
+
     style = item.get("style") or {}
     rect = widget_rect(item)
     painter.save()
@@ -953,7 +1111,9 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
 
     radius = float(style.get("corner_radius") or 0)
-    fill = qcolor(style.get("fill"), "#1a1d22")
+    fill_value = style.get("fill")
+    fill = qcolor(fill_value, "#1a1d22")
+    has_fill = is_gradient(fill_value) or fill.alpha() > 0
     border_w = _border_w(style, 0)
     show_bezel = bool(style.get("show_bezel", True))
     if show_bezel:
@@ -961,7 +1121,7 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
             painter.setPen(_pen(style.get("border"), border_w))
         else:
             painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(fill if fill.alpha() > 0 else QtCore.Qt.NoBrush)
+        painter.setBrush(fill_brush(fill_value, "#1a1d22", rect=rect) if has_fill else QtCore.Qt.NoBrush)
         if radius > 0:
             painter.drawRoundedRect(rect, radius, radius)
         else:
@@ -970,9 +1130,9 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
             clip = QtGui.QPainterPath()
             clip.addRoundedRect(rect, radius, radius)
             painter.setClipPath(clip)
-    elif fill.alpha() > 0:
+    elif has_fill:
         painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(fill)
+        painter.setBrush(fill_brush(fill_value, "#1a1d22", rect=rect))
         painter.drawRect(rect)
 
     try:
@@ -1103,14 +1263,17 @@ def paint_panel(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 def paint_label(painter: QtGui.QPainter, item: dict[str, Any], value):
+    from .gradient import is_gradient
+
     style = item.get("style") or {}
     rect = widget_rect(item)
     painter.save()
     painter.setOpacity(_opacity(style))
-    fill = qcolor(style.get("fill"), "#00000000")
+    fill_value = style.get("fill")
+    fill = qcolor(fill_value if not is_gradient(fill_value) else "#ffffffff", "#00000000")
     border_w = _border_w(style, 0)
-    if fill.alpha() > 0 or border_w > 0 or fill.alpha() <= 0:
-        set_fill_and_outline(painter, style.get("fill"), style.get("border"), border_w, "#00000000")
+    if is_gradient(fill_value) or fill.alpha() > 0 or border_w > 0 or fill.alpha() <= 0:
+        set_fill_and_outline(painter, fill_value, style.get("border"), border_w, "#00000000", rect=rect)
         radius = float(style.get("corner_radius") or 0)
         if radius > 0:
             painter.drawRoundedRect(rect, radius, radius)
@@ -1137,7 +1300,7 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     outline = _button_outline_path(item, rect)
     painter.save()
     painter.setOpacity(_opacity(style))
-    set_fill_and_outline(painter, fill, border, _border_w(style), "#3a1518")
+    set_fill_and_outline(painter, fill, border, _border_w(style), "#3a1518", rect=rect)
     painter.drawPath(outline)
     if not image.isNull():
         painter.save()
@@ -1296,7 +1459,7 @@ def paint_axis_bar(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -1360,7 +1523,7 @@ def paint_axis_radio(painter: QtGui.QPainter, item: dict[str, Any], value):
             cell = QtCore.QRectF(rect.x(), rect.y() + i * (cell_h + gap), rect.width(), cell_h)
             on = i == (steps - 1 - idx)
             painter.setPen(_pen(style.get("border_on") if on else style.get("border"), _border_w(style, 1.5)))
-            painter.setBrush(qcolor(style.get("fill_on") if on else style.get("fill"), "#121826"))
+            painter.setBrush(fill_brush(style.get("fill_on") if on else style.get("fill"), "#121826", rect=cell))
             painter.drawRoundedRect(cell, 3, 3)
     else:
         cell_w = (rect.width() - gap * (steps - 1)) / steps
@@ -1368,7 +1531,7 @@ def paint_axis_radio(painter: QtGui.QPainter, item: dict[str, Any], value):
             cell = QtCore.QRectF(rect.x() + i * (cell_w + gap), rect.y(), cell_w, rect.height())
             on = i == idx
             painter.setPen(_pen(style.get("border_on") if on else style.get("border"), _border_w(style, 1.5)))
-            painter.setBrush(qcolor(style.get("fill_on") if on else style.get("fill"), "#121826"))
+            painter.setBrush(fill_brush(style.get("fill_on") if on else style.get("fill"), "#121826", rect=cell))
             painter.drawRoundedRect(cell, 3, 3)
     _caption(painter, item, rect, vertical)
     painter.restore()
@@ -1387,7 +1550,7 @@ def paint_axis_fader(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     radius = float(style.get("corner_radius") or 4)
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill") or style.get("track"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill") or style.get("track"), "#121826", rect=rect))
     painter.drawRoundedRect(rect, radius, radius)
     inner = rect.adjusted(3, 3, -3, -3)
     t = (axis + 1.0) / 2.0
@@ -1408,7 +1571,7 @@ def paint_axis_fader(painter: QtGui.QPainter, item: dict[str, Any], value):
         thumb = QtCore.QRectF(x, inner.y(), thumb_w, inner.height())
         filled = QtCore.QRectF(inner.x(), inner.y(), max(0.0, thumb.left() - inner.left()), inner.height())
     painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(qcolor(style.get("fill_bar"), "#ff6b35"))
+    painter.setBrush(fill_brush(style.get("fill_bar"), "#ff6b35", rect=filled))
     painter.drawRect(filled)
     painter.setPen(_pen(style.get("grid"), style.get("grid_width") or 1.2))
     if vertical:
@@ -1420,7 +1583,7 @@ def paint_axis_fader(painter: QtGui.QPainter, item: dict[str, Any], value):
             gx = inner.left() + inner.width() * (i / steps)
             painter.drawLine(QtCore.QPointF(gx, inner.top()), QtCore.QPointF(gx, inner.bottom()))
     painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(qcolor(style.get("fill_on") or style.get("indicator"), "#ff5a3c"))
+    painter.setBrush(fill_brush(style.get("fill_on") or style.get("indicator"), "#ff5a3c", rect=thumb))
     painter.drawRect(thumb)
     painter.setClipping(False)
     painter.setPen(_pen(style.get("border"), _border_w(style)))
@@ -1747,7 +1910,7 @@ def paint_axis_stick_square(painter: QtGui.QPainter, item: dict[str, Any], value
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     try:
         radius = max(0.0, float(style.get("corner_radius")))
     except (TypeError, ValueError):
@@ -1780,7 +1943,7 @@ def paint_axis_stick_circle(painter: QtGui.QPainter, item: dict[str, Any], value
     side = min(rect.width(), rect.height())
     circle = QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side)
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     painter.drawEllipse(circle)
     radius = min(circle.width(), circle.height()) / 2.0
     _draw_angle_lines(painter, circle.center(), radius, style)
@@ -1805,7 +1968,7 @@ def paint_axis_crosshair(painter: QtGui.QPainter, item: dict[str, Any], value):
     side = min(rect.width(), rect.height())
     circle = QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side)
     painter.setPen(_pen(style.get("border"), _border_w(style, 1.5)))
-    painter.setBrush(qcolor(style.get("fill"), "#0a1220"))
+    painter.setBrush(fill_brush(style.get("fill"), "#0a1220", rect=circle))
     painter.drawEllipse(circle)
     radius = min(circle.width(), circle.height()) / 2.0
     _draw_angle_lines(painter, circle.center(), radius, style)
@@ -1892,7 +2055,7 @@ def _draw_mouse_icon(painter: QtGui.QPainter, center: QtCore.QPointF, nx: float,
     painter.drawPath(body)
     painter.setPen(_pen(color.lighter(130), 1.2))
     painter.drawPath(seam)
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     painter.drawPath(wheel)
     painter.restore()
 
@@ -1906,7 +2069,7 @@ def paint_axis_mouse(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     radius = _corner_radius(style)
     painter.drawRoundedRect(rect, radius, radius)
     inner = _inner_rect(rect, style)
@@ -1955,7 +2118,7 @@ def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -2061,7 +2224,7 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -2184,6 +2347,7 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
+    from .gradient import is_gradient
     from .sys_stats import sample_counter_widget
 
     style = item.get("style") or {}
@@ -2192,10 +2356,11 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.save()
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
-    fill = qcolor(style.get("fill"), "#121826")
+    fill_value = style.get("fill")
     border_w = _border_w(style, 0)
-    if fill.alpha() > 0 or border_w > 0 or fill.alpha() <= 0:
-        set_fill_and_outline(painter, style.get("fill"), style.get("border"), border_w, "#00000000")
+    fill_alpha = 255 if is_gradient(fill_value) else qcolor(fill_value, "#121826").alpha()
+    if fill_alpha > 0 or border_w > 0 or fill_alpha <= 0:
+        set_fill_and_outline(painter, fill_value, style.get("border"), border_w, "#00000000", rect=rect)
         if radius > 0:
             painter.drawPath(_rounded(rect, radius))
         else:
@@ -2301,7 +2466,7 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         side = min(rect.width(), rect.height())
         dial = QtCore.QRectF(rect.center().x() - side / 2.0, rect.center().y() - side / 2.0, side, side)
         painter.setPen(_pen(style.get("border"), _border_w(style)))
-        painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+        painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
         painter.drawEllipse(dial)
         cx, cy = dial.center().x(), dial.center().y()
         radius = side / 2.0 - max(4.0, _border_w(style) + 2.0)
@@ -2362,7 +2527,7 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         )
     else:
         radius = _corner_radius(style, 8.0)
-        set_fill_and_outline(painter, style.get("fill"), style.get("border"), _border_w(style))
+        set_fill_and_outline(painter, style.get("fill"), style.get("border"), _border_w(style), rect=rect)
         if radius > 0:
             painter.drawPath(_rounded(rect, radius))
         else:
@@ -2388,7 +2553,7 @@ def paint_hat(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     radius = float(style.get("corner_radius") or 8)
     painter.drawRoundedRect(rect, radius, radius)
     cx, cy = rect.center().x(), rect.center().y()
@@ -2660,7 +2825,7 @@ def _map_unit_rect(bounds: QtCore.QRectF, x: float, y: float, w: float, h: float
 def _paint_input_keycap(painter: QtGui.QPainter, rect: QtCore.QRectF, style: dict[str, Any], label: str, pressed: bool, font: QtGui.QFont):
     radius = min(_corner_radius(style, 6.0), rect.width() * 0.28, rect.height() * 0.28)
     fill, border = _input_key_colors(style, pressed)
-    set_fill_and_outline(painter, fill, border, max(1.0, _border_w(style)))
+    set_fill_and_outline(painter, fill, border, max(1.0, _border_w(style)), rect=rect)
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -2929,10 +3094,12 @@ def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value):
     item = blink_paint_item(item, value) or item
     fn = _PAINTERS.get(item.get("type"), paint_button)
     if abs(widget_rotation_deg(item)) < 0.001:
+        paint_widget_drop_shadow(painter, item)
         fn(painter, item, value)
         return
     painter.save()
     apply_widget_rotation(painter, item)
+    paint_widget_drop_shadow(painter, item)
     fn(painter, item, value)
     painter.restore()
 
