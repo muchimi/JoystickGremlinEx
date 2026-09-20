@@ -16288,6 +16288,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         self.data = data
         self._name = name
         self._size_update_pending = False
+        self._updating_size = False
 
         if name:
             self.setObjectName(name)
@@ -16376,11 +16377,9 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
 
         self._widget.ensurePolished()
 
+        # Read layout hints only — invalidate/activate here re-enters via
+        # LayoutRequest/Resize and freezes the UI thread.
         layout = self._widget.layout()
-        if layout is not None:
-            layout.invalidate()
-            layout.activate()
-
         minimum = self._widget.minimumSizeHint()
 
         if not minimum.isValid():
@@ -16402,9 +16401,6 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         self._widget.ensurePolished()
 
         layout = self._widget.layout()
-        if layout is not None:
-            layout.activate()
-
         hint = self._widget.sizeHint()
 
         if not hint.isValid():
@@ -16423,42 +16419,51 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         if not Shiboken.isValid(self):
             return
         self._size_update_pending = False
+        if self._updating_size:
+            return
+        self._updating_size = True
+        try:
+            if self._widget is None:
+                self.setMinimumSize(0, 0)
+                self.setMaximumHeight(0)
+                self.hide()
+            else:
+                self.show()
 
-        if self._widget is None:
-            self.setMinimumSize(0, 0)
-            self.setMaximumHeight(0)
-            self.hide()
-        else:
-            self.show()
+                # Restore the maximum height used by the empty state.
+                self.setMaximumHeight(QWIDGETSIZE_MAX)
+                minimum = self._contentMinimumSize()
+                if self.minimumSize() != minimum:
+                    self.setMinimumSize(minimum)
 
-            # Restore the maximum height used by the empty state.
-            self.setMaximumHeight(QWIDGETSIZE_MAX)
-            self.setMinimumSize(self._contentMinimumSize())
+            self.updateGeometry()
+            parent = self.parentWidget()
+            if parent is not None:
+                parent.updateGeometry()
 
-        self.updateGeometry()
-
-        parent = self.parentWidget()
-        if parent is not None:
-            parent_layout = parent.layout()
-
-            if parent_layout is not None:
-                parent_layout.invalidate()
-                parent_layout.activate()
-
-        self.sizeChanged.emit()
+            self.sizeChanged.emit()
+        finally:
+            self._updating_size = False
 
     def eventFilter(
         self,
         watched: QtCore.QObject,
         event: QtCore.QEvent,
     ) -> bool:
-        if watched is self._widget and event.type() in (
-            QtCore.QEvent.Type.LayoutRequest,
-            QtCore.QEvent.Type.Resize,
-            QtCore.QEvent.Type.Show,
-            QtCore.QEvent.Type.Hide,
-            QtCore.QEvent.Type.StyleChange,
-            QtCore.QEvent.Type.FontChange,
+        # Ignore Resize: our own setMinimumSize/updateGeometry causes it and
+        # would otherwise form a permanent layout feedback loop.
+        if (
+            not self._updating_size
+            and not self._size_update_pending
+            and watched is self._widget
+            and event.type()
+            in (
+                QtCore.QEvent.Type.LayoutRequest,
+                QtCore.QEvent.Type.Show,
+                QtCore.QEvent.Type.Hide,
+                QtCore.QEvent.Type.StyleChange,
+                QtCore.QEvent.Type.FontChange,
+            )
         ):
             self.refreshSize()
 
