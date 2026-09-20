@@ -75,15 +75,29 @@ def palette_type(widget_type: str | None) -> str:
     return widget_type or "button"
 
 
-def extract_colors(style: dict[str, Any] | None, widget_type: str | None = None) -> dict[str, str]:
+def _coerce_palette_color(value: Any, fallback: Any = "#ffffff") -> Any:
+    """Keep gradient dicts intact; normalize everything else to a hex string."""
+    from .gradient import is_gradient, normalize_gradient
+
+    if is_gradient(value):
+        return normalize_gradient(value)
+    if value in (None, ""):
+        value = fallback
+    if is_gradient(value):
+        return normalize_gradient(value)
+    if isinstance(value, dict):
+        # Unknown structured color — fall back rather than str(dict).
+        value = fallback if not isinstance(fallback, dict) else "#ffffff"
+    return str(value or "#ffffff")
+
+
+def extract_colors(style: dict[str, Any] | None, widget_type: str | None = None) -> dict[str, Any]:
+    """Extract palette color slots. Values are hex strings or gradient dicts."""
     style = style or {}
     fallback = default_style(palette_type(widget_type))
     colors = {}
     for key in COLOR_KEYS:
-        value = style.get(key)
-        if value in (None, ""):
-            value = fallback.get(key)
-        colors[key] = str(value or "#ffffff")
+        colors[key] = _coerce_palette_color(style.get(key), fallback.get(key))
     return colors
 
 
@@ -157,7 +171,7 @@ def list_palettes(widget_type: str) -> list[dict[str, Any]]:
     return list_builtin_palettes(widget_type) + list_user_palettes(widget_type)
 
 
-def update_palette(widget_type: str, palette_id: str, colors: dict[str, str], label: str | None = None) -> str:
+def update_palette(widget_type: str, palette_id: str, colors: dict[str, Any], label: str | None = None) -> str:
     kind = palette_type(widget_type)
     palette_id = str(palette_id or uuid.uuid4())
     if palette_id in BUILTIN_IDS:
@@ -183,7 +197,7 @@ def update_palette(widget_type: str, palette_id: str, colors: dict[str, str], la
     return palette_id
 
 
-def add_palette(widget_type: str, colors: dict[str, str]) -> str:
+def add_palette(widget_type: str, colors: dict[str, Any]) -> str:
     return update_palette(widget_type, str(uuid.uuid4()), colors, label="Saved palette")
 
 

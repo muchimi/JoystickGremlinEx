@@ -113,11 +113,13 @@ class GraphOverlayTracker:
             hist = self._histories.setdefault(ident, [])
             if binding_is_configured(series):
                 value = read_axis(series, series.get("input_id"), bool(series.get("invert")))
-                hist.append((now, float(value)))
+                value = float(value)
+                if not hist or abs(hist[-1][1] - value) >= 0.005 or (now - hist[-1][0]) >= 0.033:
+                    hist.append((now, value))
             while hist and hist[0][0] < cutoff:
                 hist.pop(0)
             last = hist[-1][1] if hist else None
-            fingerprint.append((series_id, last, len(hist)))
+            fingerprint.append((series_id, round(last, 3) if last is not None else None, int(now * 30)))
         return tuple(fingerprint)
 
     def history(self, widget_id: str, series_id: str) -> list[tuple[float, float]]:
