@@ -48,6 +48,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T57)
+- Change: further optimization of input filtering for axis and button/hat inputs
+- Fix: UI (Voice): missing reference on initial default device query
+- Fix: UI (Voice): clear button looking for a filter that does not exist
+- Fix: UI (Voice): sort button does not visually sort inputs
+- Fix: API (Voice): clear known commands on profile reload
+
 ### (m77T56)
 - New: anti-spam EMA filter applied to axis inputs aimed directly at devices that spam axis data like Azeron or Wooting and others clogging up the input queues. The filter reduces CPU usage by only processing meaningful data based on prior data, as well as the interval between signals. The filter only applies to axis data, smooths the data in 10ms intervals using a low overhead low-pass EMA algorithm (exponential moving average) and discards signals that too rapid while taking the signal into account.
 - Change: API (Voice): ability to select the AI model (small recommended for now).  

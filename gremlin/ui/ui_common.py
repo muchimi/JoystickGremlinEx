@@ -491,31 +491,49 @@ class Color:
         return "#374438" if gremlin.shared_state.is_dark_theme else "#829784"
 
     @staticmethod
-    def ansiRed():
+    def ansiRed(bold=False):
+        if bold:
+            return "\033[1;91m"
         return "\033[91m"
 
     @staticmethod
-    def ansiGreen():
+    def ansiGreen(bold=False):
+        if bold:
+            return "\033[1;92m"
         return "\033[92m"
 
     @staticmethod
-    def ansiBlue():
+    def ansiBold():
+        return "\x1b[1m"
+
+    @staticmethod
+    def ansiBlue(bold=False):
+        if bold:
+            return "\033[1;94m"
         return "\033[94m"
 
     @staticmethod
-    def ansiYellow():
+    def ansiYellow(bold=False):
+        if bold:
+            return "\033[1;93m"
         return "\033[93m"
 
     @staticmethod
-    def ansiMagenta():
+    def ansiMagenta(bold=False):
+        if bold:
+            return "\033[1;95m"
         return "\033[95m"
 
     @staticmethod
-    def ansiCyan():
+    def ansiCyan(bold=False):
+        if bold:
+            return "\033[1;96m"
         return "\033[96m"
 
     @staticmethod
-    def ansiWhite():
+    def ansiWhite(bold=False):
+        if bold:
+            return "\033[1;97m"
         return "\033[97m"
 
     @staticmethod
@@ -13806,6 +13824,7 @@ class QWarningWidget(QWidget):
         split: bool = False,
         tooltip: str = None,
         icon: QIcon = None,
+        autohide: bool = False,
         parent=None,
     ):
         super().__init__(parent)
@@ -13825,18 +13844,36 @@ class QWarningWidget(QWidget):
         widget, _ = getHContainer([left_panel, right_panel], alignment=QtCore.Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(widget)
         self._text = text
-        if self.toolTip:
-            self.toolTip = tooltip
+        if tooltip:
+            self.setToolTip(tooltip)
+        self._auto_hide = autohide
+        if autohide:
+            self.setVisible(False)
+
+    def _update_ui(self):
+        if self._auto_hide:
+            # only manage visiblity if flag is set
+            visible = bool(self._label_widget.text()) if self._split else bool(self._icon_widget.text())
+            self.setVisible(visible)
+
+
 
     def text(self) -> str:
         return self._text
 
     def setText(self, text: str):
+        """ sets the text of the widget """
+        gremlin.util.InvokeUiMethod(self._set_text_ui, text)
+
+    def _set_text_ui(self, text: str):
         if self._split:
             self._label_widget.setText(text)
         else:
             self._icon_widget.setText(text)
         self._text = text
+        self._update_ui()
+
+
 
     def hasText(self) -> bool:
         return bool(self._text)

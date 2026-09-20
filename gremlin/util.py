@@ -2640,19 +2640,47 @@ def save_xml(file_name, root):
     return file_name
 
 
-def ansiText(value, color=None):
-    """converts a value to an ansi colored expression"""
+def ansiText(value, color=None, bold=False):
+    """converts a value to an ansi colored expression
+        """
     import gremlin.ui.ui_common
 
     ansiReset = gremlin.ui.ui_common.Color.ansiReset()
     if not color and isinstance(value, bool):
         if value:
-            ansiColor = gremlin.ui.ui_common.Color.ansiYellow()
+            ansiColor = gremlin.ui.ui_common.Color.ansiYellow(bold)
         else:
-            ansiColor = gremlin.ui.ui_common.Color.ansiGreen()
+            ansiColor = gremlin.ui.ui_common.Color.ansiGreen(bold)
     else:
-        ansiColor = color
+        match color:
+            case "red":
+                ansiColor = gremlin.ui.ui_common.Color.ansiRed(bold)
+            case "green":
+                ansiColor = gremlin.ui.ui_common.Color.ansiGreen(bold)
+            case "yellow":
+                ansiColor = gremlin.ui.ui_common.Color.ansiYellow(bold)
+            case "blue":
+                ansiColor = gremlin.ui.ui_common.Color.ansiBlue(bold)
+            case "magenta":
+                ansiColor = gremlin.ui.ui_common.Color.ansiMagenta(bold)
+            case "cyan":
+                ansiColor = gremlin.ui.ui_common.Color.ansiCyan(bold)
+            case "white":
+                ansiColor = gremlin.ui.ui_common.Color.ansiWhite(bold)
+            case "black":
+                ansiColor = gremlin.ui.ui_common.Color.ansiBlack(bold)
+            case _:
+                ansiColor = color
+
     return f"{ansiColor}{value}{ansiReset}"
+
+def ansiBold(value : str):
+    """converts a value to an ansi bold expression"""
+    import gremlin.ui.ui_common
+
+    ansiReset = gremlin.ui.ui_common.Color.ansiReset()
+    ansiBold = gremlin.ui.ui_common.Color.ansiBold()
+    return f"{ansiBold}{value}{ansiReset}"
 
 
 def triplets(items):

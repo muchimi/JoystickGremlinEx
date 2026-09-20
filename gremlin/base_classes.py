@@ -960,6 +960,8 @@ class AbstractCallbackModel(AbstractModel):
 
     """
 
+    sorted = Signal() # fires when the model is sorted
+
     def __init__(
         self,
         change_callback: Callable = None,
@@ -1644,6 +1646,7 @@ class AbstractCallbackModel(AbstractModel):
 
         if emit:
             self._fireChanged()
+            self.sorted.emit()
             self._notify_changed(data=self, operation="sort")
 
     def setFilteredEnabled(self, value: bool, emit=True):

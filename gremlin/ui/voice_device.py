@@ -352,6 +352,7 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self.setLayout(self.main_layout)
 
         self._sound = Sound()
+        self._voice_data = VoiceData()
         self._voice = Voice()
         self._started = False  # true if monitoring started
 
@@ -374,9 +375,8 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self._view_meter = gremlin.ui.ui_common.QAudioLevelMeter()
 
         # input selector
-        voice_data = VoiceData()
         source = self._get_audio_source()
-        index = voice_data.getAudioDeviceIndex()
+        index = self._voice_data.getAudioDeviceIndex()
         self._input_selector = gremlin.ui.ui_common.QDataComboBox(source=source, value=index, callback=self._handle_audio_change)
 
         self._default_name_widget = QtWidgets.QLabel()
@@ -473,6 +473,12 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_ui()
         self._update_volume()
         self._update_volume_monitor()
+
+    @property
+    def voice_data(self):
+        if not self._voice_data:
+            self._voice_data = VoiceData()
+        return self._voice_data
 
     @property
     def mode(self):
@@ -808,9 +814,11 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         index = self._input_selector.currentData()
         if index == DEFAULT_AUDIO_DEVICE_INDEX:
             if not self._device_name:
-                self._device_name = self._voice_data.getDefaultAudioDevice()
+                self._device_name = self.voice_data.getDefaultAudioDevice()
             return self._device_name
         return self._input_selector.currentText()
+
+
 
     def _update_audio_devices(self):
         # update the list of available audio devices
@@ -819,15 +827,14 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
             self._input_selector.clear()
 
             source = [("Default device", DEFAULT_AUDIO_DEVICE_INDEX)]
-            source += self._voice_data.getAudioDevicePairs()
+            source += self.voice_data.getAudioDevicePairs()
 
             for device, index in source:
                 self._input_selector.addItem(device, index)
 
     def _get_audio_source(self):
-        voice_data = VoiceData()
         source = [("Default device", DEFAULT_AUDIO_DEVICE_INDEX)]
-        source += voice_data.getAudioDevicePairs()
+        source += self.voice_data.getAudioDevicePairs()
         return source
 
     def _handle_audio_change(self, value: int):
@@ -835,11 +842,11 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         try:
             if value == DEFAULT_AUDIO_DEVICE_INDEX:
                 # follow the Windows default output device at playback time
-                self._device_name = self._voice_data.getDefaultAudioDevice()
+                self._device_name = self.voice_data.getDefaultAudioDevice()
                 self._device_name = self._device_name
                 self._device_index = DEFAULT_AUDIO_DEVICE_INDEX
                 return
-            device_name = self._voice_data.getAudioDeviceFromIndex(value)
+            device_name = self.voice_data.getAudioDeviceFromIndex(value)
 
             if device_name is not None:
                 self._device_name = device_name
@@ -1274,9 +1281,11 @@ class VoiceData:
 
         self._data = {}
         self._id_map = {}
+        self._voice.clearCommands()
         verbose = gremlin.config.Configuration().verbose_mode_voice
         if verbose:
             syslog.info("VOICE: clear data")
+
 
     def _register(self, key: str, text=None, description=None) -> VoiceInputItem:
         """registers a new voice input"""
@@ -1652,15 +1661,26 @@ class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         """ok button pressed"""
         # ensure the defined phrases are unique and not already used
 
-        voice_data = VoiceData()
+
         text = self._text_widget.toPlainText()
 
         if text and not self._is_edit:
             # validate if not editing
-            commands = voice_data.getCommands()  # current commands defined in the profile
 
+            # look for duplicate phrases within the input text
+            matches = None
             phrases = gremlin.util.phraseSplit(text)
-            matches = [vc for vc in commands for phrase in phrases if vc.phrase in phrases]
+            phrase_set = set(phrases)
+            if len(phrase_set) != len(phrases):
+                matches = [phrase for phrase in phrases if phrases.count(phrase) > 1]
+
+            if not matches:
+                # compare against other commands in the profile
+                commands = VoiceData().getCommands()  # current commands defined in the profile
+                if commands:
+                    matches = [vc for vc in commands for phrase in phrases if vc.phrase in phrases]
+
+
 
             if matches:
                 vc = matches[0]
@@ -1766,6 +1786,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         )
 
         self.setInputItemListModel(model)
+        model.sorted.connect(self._handle_model_sorted)
 
         # clear and add buttons to add/clear all states
         clear_button = gremlin.ui.ui_common.ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
@@ -1776,6 +1797,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         button_container_layout.addWidget(clear_button)
 
         test_button = gremlin.ui.ui_common.QDataPushButton("Test", callback=self._test_input_cb)
+        test_button.setVisible(False) # turn off for now
         button_container_layout.addWidget(test_button)
 
         # configure button
@@ -1820,6 +1842,10 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def _handle_model_sorted(self):
+        """callback for when the model is sorted"""
+        self.inputItemListView.redraw(True)
 
     def _handle_configure(self):
         """callback for the configure button"""
@@ -2138,7 +2164,8 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _sort_callback(self, items: list):
         """callback for sorting inputs in this device"""
-        items.sort(key=lambda x: x.input_id.key.casefold() if x.input_id.key else "")
+        if items:
+            items.sort(key=lambda vc: vc.text.casefold() if vc.text else "")
         return items
 
     def _close_item_cb(self, widget, index, data):
@@ -2158,7 +2185,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.inputItemListModel.clear()
 
-        self._filter_widget.updateCounts()
+
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()

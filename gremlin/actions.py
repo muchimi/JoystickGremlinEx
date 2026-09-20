@@ -111,7 +111,7 @@ class KeyboardCondition(AbstractCondition):
     particular key is pressed or released.
     """
 
-    def __init__(self, scan_code, is_extended, comparison, input_item=None, container_condition=False, target = None):
+    def __init__(self, scan_code, is_extended, comparison, input_item=None, container_condition=False, target=None):
         """Creates a new instance.
 
         :param scan_code the scan code of the key to evaluate
@@ -144,8 +144,7 @@ class KeyboardCondition(AbstractCondition):
 
         key = self.input_item
         if not key:
-            return True # no key = pass
-
+            return True  # no key = pass
 
         key_pressed = key.latched
         if self.comparison == "pressed":
@@ -169,7 +168,7 @@ class KeyboardCondition(AbstractCondition):
 class StateCondition(AbstractCondition):
     """Condition verifying a state"""
 
-    def __init__(self, condition, container_condition=False, target : AbstractContainer | AbstractAction = None):
+    def __init__(self, condition, container_condition=False, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param key: name of the state
@@ -180,7 +179,6 @@ class StateCondition(AbstractCondition):
 
         self.key = condition.key
         self.ignore_release = condition.ignore_release
-
 
     def __call__(self, event, value, extra_data=None):
         # default call
@@ -209,7 +207,7 @@ class StateCondition(AbstractCondition):
         if value is None:
             # success if the state is not found
             if verbose:
-                syslog.info(f"{logtabs}{state_stub} - condition return state: PASS")
+                syslog.info(f"{logtabs}{state_stub} - condition return state: {gremlin.util.ansiText('PASS', 'green', True)}")
             return True
 
         state = False
@@ -222,7 +220,7 @@ class StateCondition(AbstractCondition):
             state = True
 
         if verbose:
-            syslog.info(f"{logtabs}{state_stub} - condition return state: {'PASS' if state else 'FAIL'}")
+            syslog.info(f"{logtabs}{state_stub} - condition return state: {gremlin.util.ansiText('PASS', 'green', True) if state else gremlin.util.ansiText('FAIL', 'red', True)}")
         return state
 
     def condition_name(self) -> str:
@@ -268,7 +266,7 @@ class ModeCondition(AbstractCondition):
         if current_mode is None:
             # success if the mode is not found
             if verbose:
-                syslog.info(f"{logtabs}ModeCondition: key: [N/A] condition return state: PASS")
+                syslog.info(f"{logtabs}ModeCondition: key: [N/A] condition return state: {gremlin.util.ansiText('PASS', 'green', True)}")
             return True
 
         state = False
@@ -282,7 +280,7 @@ class ModeCondition(AbstractCondition):
 
         if verbose:
             syslog.info(
-                f"{logtabs}ModeCondition: pressed {value} current mode [{current_mode}] test mode: [{self.mode}] - condition return state: {'PASS' if state else 'FAIL'}"
+                f"{logtabs}ModeCondition: pressed {value} current mode [{current_mode}] test mode: [{self.mode}] - condition return state: {gremlin.util.ansiText('PASS', 'green', True) if state else gremlin.util.ansiText('FAIL', 'red', True)}"
             )
         return state
 
@@ -929,19 +927,21 @@ def convert_condition(condition):
         return condition
 
     if isinstance(condition, gremlin.ui.keyboard_device.BaseKeyboardCondition):
-        return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison, input_item = condition.input_item, target = condition.target)
+        return gremlin.actions.KeyboardCondition(
+            condition.scan_code, condition.is_extended, condition.comparison, input_item=condition.input_item, target=condition.target
+        )
 
     elif isinstance(condition, gremlin.ui.joystick_device.BaseJoystickCondition):
-        return gremlin.actions.JoystickCondition(condition, target = condition.target)
+        return gremlin.actions.JoystickCondition(condition, target=condition.target)
 
     elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
-        return gremlin.actions.VJoyCondition(condition, target = condition.target)
+        return gremlin.actions.VJoyCondition(condition, target=condition.target)
 
     elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
-        return gremlin.actions.InputActionCondition(condition.comparison, target = condition.target)
+        return gremlin.actions.InputActionCondition(condition.comparison, target=condition.target)
     elif isinstance(condition, gremlin.ui.state_device.BaseStateCondition):
-        return gremlin.actions.StateCondition(condition, target = condition.target)
+        return gremlin.actions.StateCondition(condition, target=condition.target)
     elif isinstance(condition, gremlin.input_item.BaseModeCondition):
-        return gremlin.actions.ModeCondition(condition, target = condition.target)
+        return gremlin.actions.ModeCondition(condition, target=condition.target)
 
     assert False, f"Invalid base condition to convert: {type(condition).__name__}"

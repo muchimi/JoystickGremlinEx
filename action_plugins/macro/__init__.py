@@ -1967,30 +1967,35 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         self.macro.exclusive = action.exclusive
         self.macro.repeat = action.repeat
         self.client_list = [0]  # list of remote clients, default to any
+        self.verbose = gremlin.config.Configuration().verbose_mode_macro
 
     def profile_start(self):
         self.client_list = self.action_data.remote_config
+        self.verbose = gremlin.config.Configuration().verbose_mode_macro
 
     def process_event(self, event, value, extra_data=None):
 
         trigger = self.action_data.execute_on_press and event.is_pressed or self.action_data.execute_on_release and not event.is_pressed
 
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_macro
+        verbose = self.verbose
 
         if verbose:
-            syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")
+            syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} trigger: [{trigger}] event: [{str(event)}")
 
-        if not event.is_pressed:
+        if not trigger: # event.is_pressed:
             if self.action_data.auto_stop and self.macro.state == gremlin.macro.MacroState.Running:
+                if verbose:
+                    syslog.info(f"\t{gremlin.util.ansiText('auto_stop triggered, terminating macro', 'magenta', True)}")
                 MacroFunctor.manager.terminate_macro(self.macro)  # terminate existing running macro on release
 
         if not trigger:
             # do not execute
+            if verbose:
+                syslog.info("\tskipping execution")
             return True
 
         if verbose:
-            syslog.info("\texecute")
+            syslog.info(f"\t{gremlin.util.ansiText('execute macro', 'green', True)}")
 
         if self.action_data.auto_restart and self.macro.state == gremlin.macro.MacroState.Running:
             MacroFunctor.manager.terminate_macro(self.macro)  # terminate existing running macro for restart
@@ -1998,8 +2003,12 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         # queue the macro
         MacroFunctor.manager.queue_macro(self.macro)
         if isinstance(self.macro.repeat, gremlin.macro.HoldRepeat):
-            release_event = event.release_event()
-            gremlin.input_devices.CallbackActions().register_callback(lambda: self.process_event(release_event, value, extra_data), event, release_event)
+            if self.action_data.auto_stop:
+                # stop on release
+                if verbose:
+                    syslog.info("\tregistering callback for release event for auto-stop mode")
+                release_event = event.release_event()
+                gremlin.input_devices.CallbackActions().register_callback(lambda: self.process_event(release_event, value, extra_data), event, release_event)
         return True
 
 
@@ -2015,13 +2024,7 @@ To send complex sequences, please look at the sequence container."""
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
 
-    # override allowed input types if different from default
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
+
 
     functor = MacroFunctor
     widget = MacroWidget
@@ -2041,7 +2044,7 @@ To send complex sequences, please look at the sequence container."""
         self.execute_on_press = True  # true if macro executes on input press/change
         self.execute_on_release = False  # true if macro executs on input release
         self.auto_restart = False  # true if the macro an auto-restart if retriggered before it finishes
-        self.auto_stop = False  # true if the macro should stop when the input is released
+        self.auto_stop = False  # true if the macro should auto stop when the input is released
 
     def display_name(self):
         """returns a display string for the current configuration"""

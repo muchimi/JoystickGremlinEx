@@ -4120,7 +4120,7 @@ class InputItemListView(AbstractView):
             return  # don't redraw
 
         hash_key = self.model.hashKey()
-        changed = (hash_key != self._model_hash) or self.modelChanged()
+        changed = force or (hash_key != self._model_hash) or self.modelChanged()
         if not changed:
             return  # no changes detected, skip redraw
         self._model_hash = hash_key
