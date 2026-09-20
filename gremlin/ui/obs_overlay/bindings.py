@@ -21,6 +21,13 @@ import gremlin.util
 from gremlin.singleton_decorator import SingletonDecorator
 
 from .qt_guard import alive, on_ui
+from .visibility_logic import (
+    VisibilityExprError,
+    default_join_expression,
+    eval_visibility_node,
+    normalize_letter,
+    parse_visibility_expression,
+)
 
 from .model import (
     NO_BINDING_WIDGET_TYPES,
@@ -699,11 +706,25 @@ def widget_conditions_match(item: dict[str, Any] | None) -> bool:
     configured = [c for c in conditions if visibility_condition_configured(c)]
     if not configured:
         return True
-    results = [evaluate_visibility_condition(c) for c in configured]
-    join = str(vis.get("join") or "all").casefold()
-    if join == "any":
-        return any(results)
-    return all(results)
+    env = {}
+    for cond in conditions:
+        letter = normalize_letter(cond.get("letter"))
+        if not letter:
+            continue
+        env[letter] = evaluate_visibility_condition(cond) if visibility_condition_configured(cond) else False
+    expression = str(vis.get("expression") or "").strip()
+    if not expression:
+        letters = [normalize_letter(c.get("letter")) for c in configured]
+        expression = default_join_expression(letters, str(vis.get("join") or "all"))
+    if not expression:
+        return True
+    try:
+        node = parse_visibility_expression(expression)
+    except VisibilityExprError:
+        return False
+    if node is None:
+        return True
+    return eval_visibility_node(node, env)
 
 
 def widget_is_live_visible(item: dict[str, Any] | None) -> bool:
@@ -1192,6 +1213,16 @@ class OverlayValueBus(QtCore.QObject):
             from .sys_stats import SysStatsSampler
 
             SysStatsSampler().tick()
+        from .mouse_track import MouseOverlayTracker
+        from .graph_track import GraphOverlayTracker
+        from .stopwatch_track import StopwatchOverlayTracker
+        from .input_display import KeyboardMouseTracker
+        from .sys_stats import ManualCounterTracker
+        from .app_view import ApplicationViewTracker
+        from gremlin.remote_video import RemoteVideoHub
+        from .blink import OverlayBlinkTracker, blink_is_armed
+
+        blink_tracker = OverlayBlinkTracker()
         changed_ids = []
         mouse_ids = set()
         graph_keys = set()
@@ -1232,18 +1263,13 @@ class OverlayValueBus(QtCore.QObject):
                 continue
             value = read_widget_value(item)
             live = widget_is_live_visible(item)
-            if self._cache.get(widget_id) != value or self._visible_cache.get(widget_id) != live:
+            blink_dirty = False
+            if blink_is_armed(item.get("blink")):
+                blink_dirty = blink_tracker.observe(item, value)
+            if self._cache.get(widget_id) != value or self._visible_cache.get(widget_id) != live or blink_dirty:
                 self._cache[widget_id] = value
                 self._visible_cache[widget_id] = live
                 changed_ids.append(widget_id)
-        from .mouse_track import MouseOverlayTracker
-        from .graph_track import GraphOverlayTracker
-        from .stopwatch_track import StopwatchOverlayTracker
-        from .input_display import KeyboardMouseTracker
-        from .sys_stats import ManualCounterTracker
-        from .app_view import ApplicationViewTracker
-        from gremlin.remote_video import RemoteVideoHub
-
         MouseOverlayTracker().retain(mouse_ids)
         GraphOverlayTracker().retain(graph_keys)
         StopwatchOverlayTracker().retain(stopwatch_ids)

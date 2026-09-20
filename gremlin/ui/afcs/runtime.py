@@ -20,7 +20,7 @@ from gremlin.ui.obs_overlay.bindings import binding_is_configured, read_axis, re
 from gremlin.util import clamp
 
 from .model import AfcsDocument, when_is_active
-from .ops import LagLeadState, OverrideState, apply_deadzone, apply_limiter, limiter_gain, merge_values, normalize_limiter_range, normalize_limiter_shape
+from .ops import LagLeadState, OverrideState, apply_deadzone, apply_input_display_range, apply_limiter, limiter_gain, merge_values, normalize_limiter_range, normalize_limiter_shape
 
 syslog = logging.getLogger("system")
 
@@ -105,6 +105,41 @@ def _enrollment_axis(source_name: str, enrollments) -> tuple[str, int]:
     return "", 0
 
 
+def _input_display_names(props: dict[str, Any], enrollments=None) -> tuple:
+    names = [props.get("source_name"), props.get("device_name")]
+    source_name = str(props.get("source_name") or "").strip()
+    guid = str(props.get("device_guid") or "")
+    try:
+        axis_id = int(props.get("axis_id") or 0)
+    except (TypeError, ValueError):
+        axis_id = 0
+    for entry in enrollments or []:
+        if str(entry.get("name") or "") != source_name:
+            continue
+        names.append(entry.get("name"))
+        names.append(entry.get("device_name"))
+        guid = guid or str(entry.get("device_guid") or "")
+        if not axis_id:
+            try:
+                axis_id = int(entry.get("axis_id") or 0)
+            except (TypeError, ValueError):
+                axis_id = 0
+        break
+    if axis_id:
+        try:
+            names.append(gremlin.joystick_handling.get_axis_name(axis_id))
+        except Exception:
+            pass
+        try:
+            device = gremlin.joystick_handling.getDevice(guid)
+            getter = getattr(device, "get_axis_name", None) if device is not None else None
+            if callable(getter):
+                names.append(getter(axis_id))
+        except Exception:
+            pass
+    return tuple(names)
+
+
 def _read_input(node: dict[str, Any], bus: AfcsBus, enrollments=None) -> float:
     props = node.get("props") or {}
     source_name = str(props.get("source_name") or "").strip()
@@ -124,9 +159,7 @@ def _read_input(node: dict[str, Any], bus: AfcsBus, enrollments=None) -> float:
             guid = guid or enrolled_guid
             axis_id = axis_id or enrolled_axis
         value = _physical_axis(guid, axis_id)
-    if props.get("invert"):
-        value = -value
-    return clamp(float(value))
+    return apply_input_display_range(value, props, _input_display_names(props, enrollments))
 
 
 def _write_output(

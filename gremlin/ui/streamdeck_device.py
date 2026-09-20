@@ -399,7 +399,22 @@ def should_show_streamdeck_tab(device_guid, profile=None) -> bool:
     if compare_guid(device_guid, gremlin.shared_state.streamdeck_tab_guid):
         return legacy_streamdeck_tab_needed(profile)
     bridge = StreamDeckBridge()
-    return bridge.is_guid_connected(device_guid)
+    if bridge.is_guid_connected(device_guid):
+        return True
+    # Profile XML / sidecar already know this deck — don't wait for the plugin
+    # handshake (that handshake used to force a full device-tab rebuild).
+    if bridge.device_id_for_guid(device_guid):
+        return True
+    profile = profile or gremlin.shared_state.current_profile
+    if profile is None:
+        return False
+    try:
+        node = profile.getDeviceNode(device_guid, autocreate=False)
+        if node is not None and node.hasInputItems():
+            return True
+    except Exception:
+        pass
+    return False
 
 
 class StreamDeckInputItem(gremlin.input_item.InputItem):
@@ -1493,6 +1508,13 @@ class StreamDeckBridge(QtCore.QObject):
                         continue
             if name_map:
                 self._page_names[device_id] = name_map
+        # Register sidecar decks so tabs exist before the Elgato plugin connects.
+        try:
+            for device_id in list(self._page_names.keys()) + list(self._page_order.keys()):
+                if device_id:
+                    ensure_streamdeck_special_device(device_id)
+        except Exception:
+            pass
         # Reconnect: bind orphaned sidecar blobs to live decks that lack metadata.
         try:
             live_ids = list(self._devices.keys())
@@ -2359,6 +2381,11 @@ class StreamDeckBridge(QtCore.QObject):
         if gremlin.shared_state.is_running:
             return
         try:
+            ui = gremlin.shared_state.ui
+            if ui is not None and (getattr(ui, "_creating_tabs", False) or gremlin.shared_state.is_tab_loading):
+                # Fold into the in-flight / coalesced rebuild instead of nesting one.
+                ui._tabs_rebuild_pending = True
+                return
             el = gremlin.event_handler.EventListener()
             el.refresh_devices.emit()
         except Exception as err:
@@ -2397,7 +2424,31 @@ class StreamDeckBridge(QtCore.QObject):
             # Only rebuild tabs when a deck appears or its display name changes.
             if previous is None or previous.get("name") != name:
                 self._migrate_legacy_inputs_for_device(device_id)
-                self._request_tab_refresh()
+                ui = gremlin.shared_state.ui
+                tab_index = -1
+                if ui is not None:
+                    try:
+                        tab_index = ui.getTabIndexForDevice(guid)
+                    except Exception:
+                        tab_index = -1
+                if tab_index is not None and tab_index >= 0:
+                    if name and previous is not None and previous.get("name") != name:
+                        try:
+                            ui.ui.devices_tab_header_widget.setTabText(tab_index, name)
+                        except Exception:
+                            pass
+                else:
+                    # Sidecar/profile already registered this id: the in-flight tab
+                    # pass will add it. A new live id still needs one coalesced rebuild.
+                    known = device_id in self._page_names or device_id in self._page_order
+                    loading = bool(
+                        ui is not None
+                        and (getattr(ui, "_creating_tabs", False) or gremlin.shared_state.is_tab_loading)
+                    )
+                    if known and loading:
+                        pass
+                    else:
+                        self._request_tab_refresh()
             try:
                 self._adopt_orphan_page_metadata([device_id] if device_id else None)
                 self._dedupe_live_page_metadata()

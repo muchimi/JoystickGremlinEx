@@ -461,6 +461,23 @@ class OverlayView(QtWidgets.QWidget):
             self._nudge_scroll((old_origin.x() - origin.x()) * z, (old_origin.y() - origin.y()) * z)
         self.setFixedSize(zw, zh)
 
+    def center_on_scene_rect(self, rect: QtCore.QRectF):
+        """Scroll the designer so *rect* sits in the middle of the viewport."""
+        parent = self.parent()
+        while parent is not None and not isinstance(parent, QtWidgets.QScrollArea):
+            parent = parent.parent()
+        if not isinstance(parent, QtWidgets.QScrollArea) or not alive(parent):
+            return
+        z = self._zoom if self.interactive else 1.0
+        origin = self._scene_origin
+        cx = (rect.center().x() - origin.x()) * z
+        cy = (rect.center().y() - origin.y()) * z
+        viewport = parent.viewport()
+        if viewport is None:
+            return
+        parent.horizontalScrollBar().setValue(int(round(cx - viewport.width() / 2.0)))
+        parent.verticalScrollBar().setValue(int(round(cy - viewport.height() / 2.0)))
+
     def _nudge_scroll(self, dx: float, dy: float):
         parent = self.parent()
         while parent is not None and not isinstance(parent, QtWidgets.QScrollArea):
@@ -530,6 +547,13 @@ class OverlayView(QtWidgets.QWidget):
             if not dirty.intersects(scene_clip):
                 continue
             if not item.get("visible", True):
+                if self.interactive:
+                    painter.save()
+                    apply_widget_rotation(painter, item)
+                    painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1.2, QtCore.Qt.DashLine))
+                    painter.setBrush(QtCore.Qt.NoBrush)
+                    painter.drawRect(widget_rect(item).adjusted(0.5, 0.5, -0.5, -0.5))
+                    painter.restore()
                 continue
             conditions_ok = widget_conditions_match(item)
             if not self.interactive and not conditions_ok:
@@ -832,6 +856,11 @@ class OverlayWindow(QtWidgets.QWidget):
         layout.addWidget(self.view)
         self._drag_origin = None
         self._applying_flags = False
+        self._host_hwnd = 0
+        self._host_attached = False
+        self._host_timer = QtCore.QTimer(self)
+        self._host_timer.setInterval(250)
+        self._host_timer.timeout.connect(self._sync_host_attach)
         self.setMouseTracking(True)
         self.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, True)
         self.drag_bar.installEventFilter(self)
@@ -902,6 +931,7 @@ class OverlayWindow(QtWidgets.QWidget):
             self._apply_click_through(click_through)
         if live_window_is_layered(self.page_canvas):
             _extend_frame_into_client(self)
+        self._start_host_follow()
 
     def detach_from_scene(self):
         if self._scene_connected:
@@ -919,9 +949,13 @@ class OverlayWindow(QtWidgets.QWidget):
         if view is not None and Shiboken.isValid(view):
             view.release_touch()
             view.detach_bus()
+        self._stop_host_follow()
+        self._detach_host()
         super().hideEvent(event)
 
     def closeEvent(self, event):
+        self._stop_host_follow()
+        self._detach_host()
         self.detach_from_scene()
         super().closeEvent(event)
 
@@ -952,6 +986,9 @@ class OverlayWindow(QtWidgets.QWidget):
             canvas.get("show_drag_bar"),
             canvas.get("chroma_color"),
             canvas.get("interactive"),
+            canvas.get("attach_to_window"),
+            canvas.get("attach_window_title"),
+            canvas.get("attach_window_exe"),
         )
 
     def _sync_page_title(self):
@@ -981,7 +1018,7 @@ class OverlayWindow(QtWidgets.QWidget):
             _center_on_screen(self)
 
     def _record_window_position(self):
-        if self._applying_flags or is_onscreen_mode(self.page_canvas):
+        if self._applying_flags or is_onscreen_mode(self.page_canvas) or self._host_attached:
             return
         self.scene.record_page_position(self.x(), self.y(), page_id=self.page_id, emit=False)
         self._chrome_sig = self._chrome_signature()
@@ -1002,10 +1039,12 @@ class OverlayWindow(QtWidgets.QWidget):
             return
         self._applying_flags = True
         try:
+            self._detach_host()
             self._chrome_sig = self._chrome_signature()
             self._sync_page_title()
             onscreen = is_onscreen_mode(self.page_canvas)
             interactive = is_interactive_overlay(self.page_canvas)
+            attach = bool(self.page_canvas.get("attach_to_window"))
             visible = self.isVisible()
             if onscreen:
                 flags = (
@@ -1014,7 +1053,11 @@ class OverlayWindow(QtWidgets.QWidget):
                     | QtCore.Qt.WindowStaysOnTopHint
                     | QtCore.Qt.Tool
                 )
-                if not interactive:
+                if attach:
+                    flags = QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint
+                    if not interactive:
+                        flags |= QtCore.Qt.WindowDoesNotAcceptFocus
+                elif not interactive:
                     flags |= QtCore.Qt.WindowDoesNotAcceptFocus | QtCore.Qt.WindowTransparentForInput
                 self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
                 self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, not interactive)
@@ -1028,15 +1071,18 @@ class OverlayWindow(QtWidgets.QWidget):
                     self.setWindowFlags(flags)
                     self._sync_page_title()
                 self.drag_bar.setVisible(False)
-                apply_onscreen_geometry(self.scene, emit=False, page_id=self.page_id)
-                info = resolve_overlay_screen(self.page_canvas)
                 if Shiboken.isValid(self.view):
                     self.view._sync_paint_mode()
                     self.view._apply_size()
-                if info:
-                    self.setGeometry(info["x"], info["y"], info["width"], info["height"])
-                else:
+                if attach:
                     self.adjustSize()
+                else:
+                    apply_onscreen_geometry(self.scene, emit=False, page_id=self.page_id)
+                    info = resolve_overlay_screen(self.page_canvas)
+                    if info:
+                        self.setGeometry(info["x"], info["y"], info["width"], info["height"])
+                    else:
+                        self.adjustSize()
             else:
                 layered = live_window_is_layered(self.page_canvas)
                 flags = QtCore.Qt.Window | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint
@@ -1060,6 +1106,8 @@ class OverlayWindow(QtWidgets.QWidget):
                     self.setWindowFlags(flags)
                     self._sync_page_title()
                 show_bar = bool(self.page_canvas.get("show_drag_bar", True)) or layered
+                if self.page_canvas.get("attach_to_window"):
+                    show_bar = False
                 self.drag_bar.setVisible(show_bar)
                 chroma = chroma_fill_color(self.page_canvas)
                 bar = chroma if chroma.alpha() > 80 else QtGui.QColor("#8a93a3")
@@ -1068,7 +1116,8 @@ class OverlayWindow(QtWidgets.QWidget):
                     self.view._sync_paint_mode()
                     self.view._apply_size()
                 self.adjustSize()
-                self._restore_or_center()
+                if not self.page_canvas.get("attach_to_window"):
+                    self._restore_or_center()
             if visible and flags_changed and Shiboken.isValid(self):
                 self.show()
             if Shiboken.isValid(self):
@@ -1077,6 +1126,8 @@ class OverlayWindow(QtWidgets.QWidget):
                 _extend_frame_into_client(self)
         finally:
             self._applying_flags = False
+        if Shiboken.isValid(self):
+            self._sync_host_attach()
 
     def _apply_click_through(self, enabled: bool):
         if sys.platform != "win32":
@@ -1109,6 +1160,67 @@ class OverlayWindow(QtWidgets.QWidget):
             user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020)
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: click-through style failed: {err}")
+
+    def _start_host_follow(self):
+        if sys.platform != "win32" or not Shiboken.isValid(self):
+            return
+        if not self._host_timer.isActive():
+            self._host_timer.start()
+        self._sync_host_attach()
+
+    def _stop_host_follow(self):
+        timer = getattr(self, "_host_timer", None)
+        if timer is not None and timer.isActive():
+            timer.stop()
+
+    def _sync_host_attach(self):
+        if sys.platform != "win32" or not Shiboken.isValid(self) or self._applying_flags:
+            return
+        canvas = self.page_canvas
+        want = bool(canvas.get("attach_to_window"))
+        title = str(canvas.get("attach_window_title") or "").strip()
+        exe = str(canvas.get("attach_window_exe") or "").strip()
+        if not want or (not title and not exe) or not self.isVisible():
+            self._detach_host()
+            return
+        from .app_view import resolve_application_hwnd
+        from .host_window import attach_overlay_hwnd, place_overlay_in_host
+
+        host = resolve_application_hwnd(title, exe, self._host_hwnd)
+        if not host:
+            self._detach_host()
+            return
+        hwnd = int(self.winId())
+        if not hwnd:
+            return
+        if not self._host_attached or host != self._host_hwnd:
+            self._detach_host()
+            if not attach_overlay_hwnd(hwnd, host):
+                return
+            self._host_hwnd = host
+            self._host_attached = True
+        cw = int(canvas.get("width") or self.width() or 1)
+        ch = int(canvas.get("height") or self.height() or 1)
+        place_overlay_in_host(hwnd, host, cw, ch)
+        if live_window_is_layered(canvas):
+            _extend_frame_into_client(self)
+        self._apply_click_through(is_onscreen_mode(canvas) and not is_interactive_overlay(canvas))
+
+    def _detach_host(self):
+        if not self._host_attached:
+            self._host_hwnd = 0
+            return
+        try:
+            from .host_window import detach_overlay_hwnd
+
+            if Shiboken.isValid(self):
+                hwnd = int(self.winId())
+                if hwnd:
+                    detach_overlay_hwnd(hwnd)
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: host detach failed: {err}")
+        self._host_attached = False
+        self._host_hwnd = 0
 
     def _view_scene_pos(self, event: QtGui.QMouseEvent) -> QtCore.QPointF | None:
         local = self.view.mapFrom(self, event.position().toPoint())

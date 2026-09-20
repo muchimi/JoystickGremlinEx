@@ -24,7 +24,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 
 from .bindings import binding_is_configured, read_toggle_active, toggle_follows_level
 from .designer import OverlayDesignerWidget
-from .model import OverlayScene, is_onscreen_mode, normalize_background_mode
+from .model import OverlayScene, is_onscreen_mode, normalize_background_mode, _overlay_payload_has_content
 from .overlay_window import OverlayWindow, apply_onscreen_geometry
 from .widgets import live_window_is_layered
 
@@ -94,12 +94,24 @@ class OverlayManager:
         if not self.scene.dirty:
             return True
         try:
+            payload = self.scene.to_dict()
+            if not _overlay_payload_has_content(payload):
+                existing = self.scene.read_stored_layout()
+                if _overlay_payload_has_content(existing):
+                    syslog.info("OBS OVERLAY: skip flush of empty default over saved layout")
+                    self.scene._dirty = False
+                    return True
             return bool(self.scene.save_owned() or self.scene.save_to_profile())
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: flush before profile event failed: {err}")
             return False
 
     def _on_profile_loaded_ui(self):
+        if self.scene.belongs_to_profile():
+            # Already showing this profile. Flush edits; do not reload from disk
+            # (that used to drop in-memory changes that had not hit JSON yet).
+            self._flush_dirty_scene()
+            return
         self._flush_dirty_scene()
         self._load_current_profile_scene()
 
@@ -112,8 +124,11 @@ class OverlayManager:
         self._flush_dirty_scene()
         self._stop_runtime_toggle()
         self.hide_overlay()
-        # New Profile never emits profile_loaded; drop the previous layout now
-        # so the designer does not keep showing it on the empty profile.
+        # current_profile is often None during the swap. Reloading then resets
+        # the scene to an empty default; the following profile_loaded flush
+        # could write that empty layout over the profile that is about to load.
+        if gremlin.shared_state.current_profile is None:
+            return
         self._load_current_profile_scene()
 
     def _on_tabs_loaded(self):
@@ -217,7 +232,7 @@ class OverlayManager:
         if self.scene.belongs_to_profile():
             return
         if self.scene.dirty and not self._flush_dirty_scene():
-            # Keep the in-memory layout rather than reloading a stale sidecar.
+            # Keep the in-memory layout rather than reloading a stale profile JSON.
             return
         self._load_current_profile_scene()
 
@@ -373,11 +388,11 @@ def persist_for_profile(profile, dest_xml: str | None = None) -> bool:
     try:
         if OverlayManager.instance is None:
             return False
-        scene = OverlayManager().scene
-        current = gremlin.shared_state.current_profile
-        if current is not profile:
-            return False
-        return scene.save_to_profile(profile, dest_xml=dest_xml)
+        scene = OverlayManager.instance.scene
+        ok = scene.save_to_profile(profile, dest_xml=dest_xml)
+        if not ok:
+            syslog.warning("OBS OVERLAY: profile save did not write the overlay layout")
+        return ok
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: persist on profile save failed: {err}")
         return False

@@ -13,6 +13,7 @@ import copy
 import json
 import logging
 import os
+import time
 import uuid
 from typing import Any
 
@@ -21,6 +22,9 @@ from psygnal import Signal
 
 import gremlin.shared_state
 import gremlin.util
+
+from .blink import default_blink, normalize_blink
+from .visibility_logic import assign_condition_letters
 
 syslog = logging.getLogger("system")
 
@@ -172,6 +176,25 @@ DEFAULT_LABELS = {
 }
 
 
+def widget_display_name(item: dict[str, Any] | None) -> str:
+    """Inspector/pane name: explicit name, else on-screen label, else type."""
+    if not item:
+        return "Widget"
+    name = str(item.get("name") or "").strip()
+    if name:
+        return name
+    label = str(item.get("label") or "").strip()
+    if label:
+        return label
+    widget_type = str(item.get("type") or "widget")
+    fallback = DEFAULT_LABELS.get(widget_type) or widget_type.replace("_", " ").title()
+    return fallback or "Widget"
+
+
+def widget_is_locked(item: dict[str, Any] | None) -> bool:
+    return bool(item and item.get("locked"))
+
+
 def _new_id() -> str:
     return str(uuid.uuid4())
 
@@ -197,10 +220,28 @@ def default_style(widget_type: str) -> dict[str, Any]:
         "font_family": "Segoe UI",
         "font_size": 11,
         "font_bold": True,
+        "font_italic": False,
+        "font_underline": False,
+        "font_strike": False,
+        "font_shadow": False,
+        "font_shadow_color": "#80000000",
+        "font_shadow_dx": 2,
+        "font_shadow_dy": 2,
+        "font_stroke_width": 0,
+        "font_stroke_color": "#000000",
         "font_color": "#f4efe4",
         "axis_label_font_family": "Segoe UI",
         "axis_label_font_size": 11,
         "axis_label_font_bold": True,
+        "axis_label_font_italic": False,
+        "axis_label_font_underline": False,
+        "axis_label_font_strike": False,
+        "axis_label_font_shadow": False,
+        "axis_label_font_shadow_color": "#80000000",
+        "axis_label_font_shadow_dx": 2,
+        "axis_label_font_shadow_dy": 2,
+        "axis_label_font_stroke_width": 0,
+        "axis_label_font_stroke_color": "#000000",
         "axis_label_font_color": "#f4efe4",
         "label_offset_x": 0,
         "label_offset_y": 0,
@@ -1055,7 +1096,7 @@ VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard")
 
 
 def default_visibility() -> dict[str, Any]:
-    return {"join": "all", "conditions": []}
+    return {"join": "all", "expression": "", "conditions": []}
 
 
 def normalize_visibility_kind(kind) -> str:
@@ -1072,6 +1113,7 @@ def normalize_visibility_kind(kind) -> str:
 def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
     return {
         "id": _new_id(),
+        "letter": "",
         "kind": normalize_visibility_kind(kind),
         "when": "on",
         "mode_name": "",
@@ -1092,6 +1134,7 @@ def normalize_visibility(raw) -> dict[str, Any]:
         return vis
     join = str(raw.get("join") or "all").casefold()
     vis["join"] = "any" if join == "any" else "all"
+    vis["expression"] = str(raw.get("expression") or "")
     seen: set[str] = set()
     conditions: list[dict[str, Any]] = []
     for cond in raw.get("conditions") or []:
@@ -1101,6 +1144,7 @@ def normalize_visibility(raw) -> dict[str, Any]:
         item.update({key: cond[key] for key in item.keys() if key in cond})
         item["kind"] = normalize_visibility_kind(item.get("kind"))
         item["when"] = "off" if str(item.get("when") or "on").casefold() == "off" else "on"
+        item["letter"] = str(item.get("letter") or "")
         item["mode_name"] = str(item.get("mode_name") or "")
         item["mode_id"] = str(item.get("mode_id") or "")
         item["state_name"] = str(item.get("state_name") or "")
@@ -1121,7 +1165,7 @@ def normalize_visibility(raw) -> dict[str, Any]:
             item["id"] = _new_id()
         seen.add(item["id"])
         conditions.append(item)
-    vis["conditions"] = conditions
+    vis["conditions"] = assign_condition_letters(conditions)
     return vis
 
 
@@ -1139,6 +1183,9 @@ def default_canvas() -> dict[str, Any]:
         "show_drag_bar": True,
         "show_on_profile_start": False,
         "interactive": False,
+        "attach_to_window": False,
+        "attach_window_title": "",
+        "attach_window_exe": "",
         "toggle_binding": default_toggle_binding(),
         "monitor_index": 0,
         "monitor_name": "",
@@ -1261,10 +1308,13 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "z": 0,
         "rotation": 0,
         "label": DEFAULT_LABELS.get(widget_type, ""),
+        "name": "",
         "visible": True,
+        "locked": False,
         "visibility": default_visibility(),
         "group": "",
         "style": default_style(widget_type),
+        "blink": default_blink(),
         "binding": default_binding(1),
         "binding_y": default_binding(2),
         "bindings": {},
@@ -1317,11 +1367,18 @@ def profile_display_name(profile=None) -> str:
 
 
 def overlay_path_for_profile(profile=None) -> str | None:
-    """Optional sidecar JSON next to the profile XML (fallback / export)."""
+    """Suggested filename for Export overlay (not stored automatically)."""
     fname = profile_xml_path(profile)
     if not fname:
         return None
     return gremlin.util.swap_ext(fname, "overlay.json")
+
+
+def profile_json_path(profile=None, dest_xml: str | None = None) -> str | None:
+    fname = dest_xml or profile_xml_path(profile)
+    if not fname:
+        return None
+    return gremlin.util.swap_ext(fname, "json")
 
 
 def _same_profile_path(left: str | None, right: str | None) -> bool:
@@ -1448,6 +1505,9 @@ class OverlayScene(QtCore.QObject):
             canvas.update(raw)
         canvas["background_mode"] = normalize_background_mode(canvas.get("background_mode"))
         canvas["toggle_binding"] = normalize_toggle_binding(canvas.get("toggle_binding"))
+        canvas["attach_to_window"] = bool(canvas.get("attach_to_window"))
+        canvas["attach_window_title"] = str(canvas.get("attach_window_title") or "").strip()
+        canvas["attach_window_exe"] = str(canvas.get("attach_window_exe") or "").strip()
         normalize_guides(canvas)
         return canvas
 
@@ -1657,6 +1717,7 @@ class OverlayScene(QtCore.QObject):
         self._sync_active_aliases()
         return {
             "version": SCENE_VERSION,
+            "saved_at": time.time(),
             "active_page_id": self.active_page_id,
             "pages": copy.deepcopy(self.pages),
         }
@@ -1702,6 +1763,9 @@ class OverlayScene(QtCore.QObject):
         style.update(raw.get("style") or {})
         item["style"] = style
         item["visibility"] = normalize_visibility(raw.get("visibility"))
+        item["name"] = str(item.get("name") or raw.get("name") or "")
+        item["locked"] = bool(raw.get("locked") if "locked" in raw else item.get("locked"))
+        item["blink"] = normalize_blink(raw.get("blink") if "blink" in raw else item.get("blink"))
         item["series"] = normalize_graph_series(raw.get("series") if widget_uses_series(widget_type) else [])
         if widget_uses_series(widget_type) and not item["series"]:
             item["series"] = [default_graph_series(0)]
@@ -2253,6 +2317,7 @@ class OverlayScene(QtCore.QObject):
         x_edges: tuple[str, ...] | None = None,
         y_edges: tuple[str, ...] | None = None,
         mode: str = "move",
+        previous: tuple[float, float, float, float] | None = None,
     ) -> tuple[float, float, float, float]:
         guides = self.canvas.get("guides") or []
         if not guides:
@@ -2267,7 +2332,7 @@ class OverlayScene(QtCore.QObject):
         vertical = [float(g.get("position") or 0) * cw for g in guides if g.get("axis") == "v"]
         horizontal = [float(g.get("position") or 0) * ch for g in guides if g.get("axis") == "h"]
 
-        def _best(current: dict[str, float], targets: list[float]):
+        def _best(current: dict[str, float], targets: list[float], previous: dict[str, float] | None = None):
             best_dist = threshold + 1.0
             best = None
             for name, value in current.items():
@@ -2276,6 +2341,18 @@ class OverlayScene(QtCore.QObject):
                     if dist < best_dist:
                         best_dist = dist
                         best = (name, target)
+            if best is None or previous is None:
+                return best
+            name, target = best
+            old = previous.get(name)
+            if old is None:
+                return best
+            new = current.get(name)
+            if new is None:
+                return best
+            unstick = max(2.0, threshold * 0.25)
+            if abs(new - target) > abs(old - target) + 0.01 and abs(new - target) >= unstick:
+                return None
             return best
 
         x_map = {}
@@ -2285,7 +2362,17 @@ class OverlayScene(QtCore.QObject):
             x_map["center"] = x + w / 2.0
         if "right" in x_edges:
             x_map["right"] = x + w
-        hit = _best(x_map, vertical) if vertical else None
+        prev_x = None
+        if previous is not None:
+            px, py, pw, ph = previous
+            prev_x = {}
+            if "left" in x_edges:
+                prev_x["left"] = px
+            if "center" in x_edges:
+                prev_x["center"] = px + pw / 2.0
+            if "right" in x_edges:
+                prev_x["right"] = px + pw
+        hit = _best(x_map, vertical, prev_x) if vertical else None
         if hit:
             edge, target = hit
             if mode == "resize":
@@ -2312,7 +2399,17 @@ class OverlayScene(QtCore.QObject):
             y_map["center"] = y + h / 2.0
         if "bottom" in y_edges:
             y_map["bottom"] = y + h
-        hit = _best(y_map, horizontal) if horizontal else None
+        prev_y = None
+        if previous is not None:
+            px, py, pw, ph = previous
+            prev_y = {}
+            if "top" in y_edges:
+                prev_y["top"] = py
+            if "center" in y_edges:
+                prev_y["center"] = py + ph / 2.0
+            if "bottom" in y_edges:
+                prev_y["bottom"] = py + ph
+        hit = _best(y_map, horizontal, prev_y) if horizontal else None
         if hit:
             edge, target = hit
             if mode == "resize":
@@ -2333,9 +2430,9 @@ class OverlayScene(QtCore.QObject):
                     y = target - h / 2.0
         return x, y, w, h
 
-    def snap_selection_to_guides(self):
+    def snap_selection_to_guides(self, previous: tuple[float, float, float, float] | None = None):
         primary = self.primary_selection()
-        if not primary:
+        if not primary or widget_is_locked(primary):
             return
         nx, ny, nw, nh = self.snap_geom_to_guides(
             float(primary["x"]),
@@ -2343,6 +2440,7 @@ class OverlayScene(QtCore.QObject):
             float(primary["w"]),
             float(primary["h"]),
             mode="move",
+            previous=previous,
         )
         dx = int(round(nx - float(primary["x"])))
         dy = int(round(ny - float(primary["y"])))
@@ -2350,7 +2448,7 @@ class OverlayScene(QtCore.QObject):
             return
         for widget_id in self.selected_ids:
             item = self.widget_by_id(widget_id)
-            if not item:
+            if not item or widget_is_locked(item):
                 continue
             item["x"] = int(item["x"]) + dx
             item["y"] = int(item["y"]) + dy
@@ -2358,16 +2456,24 @@ class OverlayScene(QtCore.QObject):
     def move_selected(self, dx: int, dy: int, snap: bool = True):
         if not self.selected_ids:
             return
+        primary = self.primary_selection()
+        previous = None
+        if primary:
+            previous = (float(primary["x"]), float(primary["y"]), float(primary["w"]), float(primary["h"]))
+        moved = False
         for widget_id in self.selected_ids:
             item = self.widget_by_id(widget_id)
-            if not item:
+            if not item or widget_is_locked(item):
                 continue
             nx = item["x"] + dx
             ny = item["y"] + dy
             item["x"] = self.snap_value(nx) if snap else int(nx)
             item["y"] = self.snap_value(ny) if snap else int(ny)
+            moved = True
+        if not moved:
+            return
         if snap:
-            self.snap_selection_to_guides()
+            self.snap_selection_to_guides(previous=previous)
         self._dirty = True
         self._emit()
 
@@ -2396,6 +2502,12 @@ class OverlayScene(QtCore.QObject):
                 item["bindings"] = normalize_switch_bindings(item.get("type"), current)
             elif key == "visibility":
                 item["visibility"] = normalize_visibility(value)
+            elif key == "blink":
+                item["blink"] = normalize_blink(value)
+            elif key == "name":
+                item["name"] = str(value or "")
+            elif key == "locked":
+                item["locked"] = bool(value)
             elif key == "series":
                 item["series"] = normalize_graph_series(value)
             elif key == "keys":
@@ -2450,44 +2562,65 @@ class OverlayScene(QtCore.QObject):
             return False
         return _same_profile_path(self._profile_key, path)
 
+    def read_stored_layout(self, profile=None, dest_xml: str | None = None) -> dict[str, Any] | None:
+        """Overlay dict from the profile JSON, or None."""
+        profile = profile or gremlin.shared_state.current_profile
+        path = dest_xml or profile_xml_path(profile) or self._profile_key
+        config_path = profile_json_path(profile, dest_xml=path)
+        if not config_path or not os.path.isfile(config_path):
+            return None
+        try:
+            with open(config_path, "r", encoding="utf-8") as handle:
+                loaded = json.load(handle) or {}
+            if not isinstance(loaded, dict):
+                return None
+            candidate = loaded.get(OVERLAY_CONFIG_KEY)
+            return candidate if isinstance(candidate, dict) else None
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: profile overlay read failed: {err}")
+            return None
+
     def load_for_profile(self, profile=None) -> bool:
         profile = profile or gremlin.shared_state.current_profile
         self._undo.clear()
         self._redo.clear()
         self.selected_ids = []
         path = profile_xml_path(profile)
-        self._profile_key = path
-        self._path = overlay_path_for_profile(profile)
+        json_path = profile_json_path(profile)
         data = None
         if profile is not None:
             try:
-                # force=True: never trust a stale in-memory cache that predates
-                # a page-rename autosave written by another code path.
                 cfg = profile._readConfig(force=True) or {}
                 candidate = cfg.get(OVERLAY_CONFIG_KEY)
                 if isinstance(candidate, dict):
                     data = candidate
             except Exception as err:
                 syslog.warning(f"OBS OVERLAY: profile overlay read failed: {err}")
-        sidecar = self._read_sidecar(self._path)
-        if _overlay_payload_has_content(sidecar) and not _overlay_payload_has_content(data):
-            data = sidecar
-            if profile is not None and isinstance(data, dict):
-                try:
-                    profile._setConfig(OVERLAY_CONFIG_KEY, data)
-                except Exception:
-                    pass
+        if not isinstance(data, dict) or not (data.get("pages") or data.get("widgets") or data.get("canvas")):
+            data = self.read_stored_layout(profile)
+        # One-time import of a leftover .overlay.json from older builds.
+        if not _overlay_payload_has_content(data):
+            legacy = self._read_json_file(overlay_path_for_profile(profile))
+            if isinstance(legacy, dict) and (legacy.get("pages") or legacy.get("widgets") or legacy.get("canvas")):
+                data = legacy
+                if profile is not None:
+                    try:
+                        profile._setConfig(OVERLAY_CONFIG_KEY, data)
+                    except Exception:
+                        pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
+            self._profile_key = path
+            self._path = json_path
             self.from_dict(data)
             self.sync_identity_refs(emit=False)
             self._dirty = False
             self._undo.clear()
             self._redo.clear()
             return True
-        # No stored layout. If the profile path is temporarily missing but we still
-        # have unsaved edits (e.g. a page rename), keep them instead of wiping.
-        if not path and self._dirty and self.pages:
+        if not path and (self._dirty or _overlay_payload_has_content(self.to_dict())):
             return False
+        self._profile_key = path
+        self._path = json_path
         self._reset_default_pages(emit=True)
         self._dirty = False
         return False
@@ -2507,7 +2640,7 @@ class OverlayScene(QtCore.QObject):
 
     def save(self, path: str | None = None) -> bool:
         if path:
-            return self._write_sidecar(path, self.to_dict())
+            return self._write_json_file(path, self.to_dict())
         return self.save_to_profile()
 
     def save_to_profile(self, profile=None, dest_xml: str | None = None) -> bool:
@@ -2517,17 +2650,24 @@ class OverlayScene(QtCore.QObject):
             syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
             return False
         data = self.to_dict()
-        # Merge into the profile JSON on disk. Avoid profile._setConfig here:
-        # it asserts UI thread and can fail during tab-switch / nested Qt events,
-        # which previously left widgets unsaved.
         ok = self._persist_files(path, data)
         if ok:
             self._profile_key = path
-            self._path = gremlin.util.swap_ext(path, "overlay.json")
-            if profile is not None and getattr(profile, "_config_data_read", False):
+            self._path = gremlin.util.swap_ext(path, "json")
+            if profile is not None:
                 cfg = getattr(profile, "_config_data", None)
+                if not isinstance(cfg, dict):
+                    cfg = {}
+                    try:
+                        profile._config_data = cfg
+                    except Exception:
+                        pass
                 if isinstance(cfg, dict):
                     cfg[OVERLAY_CONFIG_KEY] = copy.deepcopy(data)
+                    try:
+                        profile._config_data_read = True
+                    except Exception:
+                        pass
             syslog.info(f"OBS OVERLAY: saved layout {gremlin.util.toUrl(self._path)}")
         return ok
 
@@ -2559,7 +2699,7 @@ class OverlayScene(QtCore.QObject):
             return self.save_to_profile()
         return self._persist_files(self._profile_key, self.to_dict())
 
-    def _write_sidecar(self, path: str, data: dict[str, Any]) -> bool:
+    def _write_json_file(self, path: str, data: dict[str, Any]) -> bool:
         try:
             folder = os.path.dirname(path)
             if folder and not os.path.isdir(folder):
@@ -2571,7 +2711,7 @@ class OverlayScene(QtCore.QObject):
             syslog.error(f"OBS OVERLAY: failed to save layout {path}: {err}")
             return False
 
-    def _read_sidecar(self, path: str | None) -> dict[str, Any] | None:
+    def _read_json_file(self, path: str | None) -> dict[str, Any] | None:
         if not path or not os.path.isfile(path):
             return None
         try:
@@ -2579,7 +2719,7 @@ class OverlayScene(QtCore.QObject):
                 data = json.load(handle)
             return data if isinstance(data, dict) else None
         except Exception as err:
-            syslog.warning(f"OBS OVERLAY: failed to load sidecar {path}: {err}")
+            syslog.warning(f"OBS OVERLAY: failed to load layout {path}: {err}")
             return None
 
     def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
@@ -2597,23 +2737,20 @@ class OverlayScene(QtCore.QObject):
             except Exception as err:
                 syslog.error(f"OBS OVERLAY: could not merge overlay into {config_path}: {err}")
                 merged = None
-        wrote_config = False
-        if merged is not None:
-            merged[OVERLAY_CONFIG_KEY] = data
-            try:
-                folder = os.path.dirname(config_path)
-                if folder and not os.path.isdir(folder):
-                    os.makedirs(folder, exist_ok=True)
-                with open(config_path, "w", encoding="utf-8") as handle:
-                    json.dump(merged, handle, indent=4, sort_keys=True)
-                wrote_config = True
-            except Exception as err:
-                syslog.error(f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}")
-        sidecar_ok = self._write_sidecar(gremlin.util.swap_ext(profile_xml, "overlay.json"), data)
-        if wrote_config or sidecar_ok:
+        if merged is None:
+            return False
+        merged[OVERLAY_CONFIG_KEY] = data
+        try:
+            folder = os.path.dirname(config_path)
+            if folder and not os.path.isdir(folder):
+                os.makedirs(folder, exist_ok=True)
+            with open(config_path, "w", encoding="utf-8") as handle:
+                json.dump(merged, handle, indent=4, sort_keys=True)
             self._dirty = False
             return True
-        return False
+        except Exception as err:
+            syslog.error(f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}")
+            return False
 
     @property
     def dirty(self) -> bool:

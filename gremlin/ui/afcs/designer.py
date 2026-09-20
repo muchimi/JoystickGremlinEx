@@ -1417,7 +1417,10 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             current_display = normalize_input_display_range(node.get_property("display_range"))
             index = display.findData(current_display)
             display.setCurrentIndex(index if index >= 0 else 0)
-            display.setToolTip("GEX always stores axes as −1..+1. 0 to 100% draws that as a left-to-right bar like the main UI throttle repeater. Centered is a stick ±100 bar.")
+            display.setToolTip(
+                "Invert first, then this range is the node's output. Hardware is always −1..+1. "
+                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps ±1. Auto uses throttle/slider names like GEX."
+            )
             display.currentIndexChanged.connect(lambda _i, n=node, box=display: self._set_node_prop(n, "display_range", box.currentData()))
             self._inspector_form.addRow("Display", display)
             listen = QtWidgets.QPushButton("Listen for physical axis...")
@@ -1733,8 +1736,12 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                         "range_mode": graph_node.get_property("range_mode"),
                         "display_range": graph_node.get_property("display_range"),
                     }
+                    names = self._meter_names_for_node(graph_node)
+                    centered = meter_is_centered(kind, props, names)
                     if hasattr(meter, "set_centered"):
-                        meter.set_centered(meter_is_centered(kind, props, self._meter_names_for_node(graph_node)))
+                        meter.set_centered(centered)
+                    if hasattr(meter, "set_unit_unipolar"):
+                        meter.set_unit_unipolar(kind == "input" and not centered)
                     meter.set_value(float(values.get(afcs_id, 0.0)) if live else 0.0)
                 except Exception:
                     pass
