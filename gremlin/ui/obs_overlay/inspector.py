@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
@@ -63,6 +64,7 @@ from .model import (
     normalize_visibility,
     serialize_overlay_key,
     switch_channel,
+    widget_display_name,
     widget_is_switch,
     widget_uses_series,
 )
@@ -76,6 +78,8 @@ from .shapes import (
     shape_kind_tooltip,
 )
 from .overlay_window import apply_onscreen_geometry, list_overlay_screens, resolve_overlay_screen
+from .visibility_logic import assign_condition_letters, default_join_expression, effective_visibility_expression
+from .visibility_preview import BooleanOperatorsDialog, VisibilityPreviewDialog
 from .palettes import (
     BUILTIN_IDS,
     COLOR_KEYS,
@@ -513,6 +517,9 @@ class OverlayInspector(QtWidgets.QWidget):
             canvas.get("monitor_index"),
             canvas.get("monitor_name"),
             canvas.get("interactive"),
+            canvas.get("attach_to_window"),
+            canvas.get("attach_window_title"),
+            canvas.get("attach_window_exe"),
         )
 
     def _maybe_rebuild(self):
@@ -829,6 +836,65 @@ class OverlayInspector(QtWidgets.QWidget):
             drag.toggled.connect(lambda v: self._set_canvas("show_drag_bar", v))
             form.addRow("Overlay drag bar", drag)
 
+        attach = QtWidgets.QCheckBox()
+        attach.setChecked(bool(canvas.get("attach_to_window")))
+        attach.setToolTip(
+            "Parents the live overlay to the chosen window so Discord application share "
+            "(and similar window capture) can include it. Screen share already shows a separate overlay. "
+            "Use windowed or borderless; exclusive full-screen and some game captures still omit it."
+        )
+        attach.toggled.connect(lambda v: self._set_canvas("attach_to_window", bool(v)))
+        form.addRow("Include in app share", attach)
+        if sys.platform == "win32":
+            from .app_view import list_application_windows, window_choice_label
+
+            current_title = str(canvas.get("attach_window_title") or "").strip()
+            current_exe = str(canvas.get("attach_window_exe") or "").strip()
+            box = QtWidgets.QComboBox()
+            box.setEnabled(bool(canvas.get("attach_to_window")))
+            box.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            box.setMinimumContentsLength(24)
+            box.addItem("(none)", ("", ""))
+            selected = 0
+            from .model import OVERLAY_WINDOW_TITLE
+
+            for window in list_application_windows():
+                title = str(window.get("title") or "")
+                exe = str(window.get("exe") or "")
+                if title.startswith(OVERLAY_WINDOW_TITLE):
+                    continue
+                box.addItem(window_choice_label(title, exe), (title, exe))
+                if title == current_title and (not current_exe or exe.casefold() == current_exe.casefold()):
+                    selected = box.count() - 1
+            if current_title and selected == 0:
+                box.addItem(f"{current_title}  (not running)", (current_title, current_exe))
+                selected = box.count() - 1
+            box.setCurrentIndex(selected)
+
+            def _on_attach_window(_index, combo=box):
+                data = combo.currentData() or ("", "")
+                title, exe = data if isinstance(data, tuple) else ("", "")
+                self._set_canvas("attach_window_title", str(title or ""))
+                self._set_canvas("attach_window_exe", str(exe or ""))
+
+            box.currentIndexChanged.connect(_on_attach_window)
+            attach.toggled.connect(box.setEnabled)
+            form.addRow("Application window", box)
+            refresh = QtWidgets.QPushButton("Refresh windows")
+            refresh.setToolTip("Re-scan visible top-level windows.")
+            refresh.clicked.connect(lambda _=False: QtCore.QTimer.singleShot(0, self.rebuild))
+            form.addRow(refresh)
+            hint = QtWidgets.QLabel(
+                "Discord application share captures that program only. Pin the overlay inside the game window, "
+                "then share that game. If the game is not running, the overlay stays a normal window (screen share still works)."
+            )
+            hint.setWordWrap(True)
+            form.addRow(hint)
+        else:
+            hint = QtWidgets.QLabel("Pinning the overlay into another application is available on Windows.")
+            hint.setWordWrap(True)
+            form.addRow(hint)
+
         reset = QtWidgets.QPushButton("Reset position")
         if onscreen:
             reset.setToolTip("Use the primary monitor if the saved display is gone.")
@@ -1006,6 +1072,11 @@ class OverlayInspector(QtWidgets.QWidget):
         else:
             type_label = QtWidgets.QLabel(item.get("type", "").replace("_", " "))
             form.addRow("Type", type_label)
+            name = QtWidgets.QLineEdit(str(item.get("name") or ""))
+            name.setPlaceholderText(widget_display_name({**item, "name": ""}))
+            name.setToolTip("Name in the selection pane. The on-screen caption stays under Label.")
+            name.editingFinished.connect(lambda wid=item["id"], box=name: self._update(wid, name=box.text().strip()))
+            form.addRow("Name", name)
             canvas_w = max(1, int(self.scene.canvas.get("width") or 1280))
             canvas_h = max(1, int(self.scene.canvas.get("height") or 720))
             self._slider_int(
@@ -1032,6 +1103,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(key.upper(), spin)
 
         self._rotation_slider(form, item)
+        self._lock_position_row(form, item)
 
         self._style_bool(
             form,
@@ -1321,6 +1393,7 @@ class OverlayInspector(QtWidgets.QWidget):
             spin.valueChanged.connect(lambda v, k=key, wid=item["id"]: self._update(wid, **{k: int(v)}))
             form.addRow(key.upper(), spin)
         self._rotation_slider(form, item)
+        self._lock_position_row(form, item)
         self._style_bool(
             form,
             item,
@@ -1403,6 +1476,7 @@ class OverlayInspector(QtWidgets.QWidget):
         else:
             include_radius = not types <= set(NO_CORNER_RADIUS_TYPES) and not types <= {"switch_4way"}
             self._border_appearance(look, item, include_radius=include_radius)
+        self._build_blink(item)
 
     def _visibility_for(self, item: dict) -> dict:
         return normalize_visibility(item.get("visibility") if isinstance(item.get("visibility"), dict) else default_visibility())
@@ -1411,6 +1485,9 @@ class OverlayInspector(QtWidgets.QWidget):
         phrases = [self._visibility_condition_phrase(cond) for cond in vis.get("conditions") or []]
         if not phrases:
             return "Always shown on the live overlay (no conditions)."
+        expression = str(vis.get("expression") or "").strip()
+        if expression:
+            return f"Shown when {expression}."
         join = " and " if (vis.get("join") or "all") == "all" else " or "
         return f"If {join.join(phrases)} then display."
 
@@ -1462,20 +1539,40 @@ class OverlayInspector(QtWidgets.QWidget):
         vis_box.stateChanged.connect(lambda _s, wid=item["id"], box=vis_box: self._on_bool(box, wid, field="visible"))
         form.addRow("Visible", vis_box)
 
-        join = QtWidgets.QComboBox()
-        join.addItem("All of these (AND)", "all")
-        join.addItem("Any of these (OR)", "any")
-        join.setCurrentIndex(1 if (vis.get("join") or "all") == "any" else 0)
-        join.setToolTip("All = every condition must be true. Any = at least one condition must be true.")
-        join.currentIndexChanged.connect(
-            lambda _i, box=join, wid=item["id"]: self._set_visibility(wid, rebuild=True, join=str(box.currentData() or "all"))
+        expr = QtWidgets.QLineEdit()
+        expr.setText(str(vis.get("expression") or ""))
+        expr.setPlaceholderText("A AND (B OR C)")
+        expr.setToolTip(
+            "Use letters A, B, C… for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
+            "Leave empty to require every condition (AND)."
         )
-        form.addRow("Match", join)
+        expr.editingFinished.connect(
+            lambda wid=item["id"], box=expr: self._set_visibility(wid, expression=box.text())
+        )
+        preview = QtWidgets.QPushButton("Preview")
+        preview.setToolTip("Show a Venn diagram, boolean algebra, and truth table for this expression.")
+        preview.clicked.connect(
+            lambda _=False, it=item, box=expr: self._preview_visibility(it, box.text())
+        )
+        expr_row = QtWidgets.QWidget()
+        expr_layout = QtWidgets.QHBoxLayout(expr_row)
+        expr_layout.setContentsMargins(0, 0, 0, 0)
+        expr_layout.addWidget(expr, 1)
+        expr_layout.addWidget(preview)
+        form.addRow("Expression", expr_row)
+
+        ops = QtWidgets.QPushButton("Boolean operators")
+        ops.setToolTip("Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.")
+        ops.clicked.connect(lambda _=False: self._show_boolean_operators())
+        form.addRow("", ops)
 
         hint = QtWidgets.QLabel(self._visibility_summary(vis))
         hint.setWordWrap(True)
         form.addRow(hint)
-        note = QtWidgets.QLabel("The live overlay hides the widget when conditions fail. The designer keeps a faded copy so you can still edit it.")
+        note = QtWidgets.QLabel(
+            "Each condition gets a letter (A, B, C…). The live overlay hides the widget when the expression is false. "
+            "The designer keeps a faded copy so you can still edit it."
+        )
         note.setWordWrap(True)
         form.addRow(note)
 
@@ -1489,6 +1586,7 @@ class OverlayInspector(QtWidgets.QWidget):
         add_kind.addItem("vJoy button", "vjoy")
         add_kind.addItem("Keyboard/mouse", "keyboard")
         add_btn = QtWidgets.QPushButton("Add condition")
+        add_btn.setToolTip("Add a mode, state, or input. It is assigned the next letter (A, B, C…).")
         add_btn.clicked.connect(
             lambda _=False, wid=item["id"], box=add_kind: self._add_visibility_condition(wid, str(box.currentData() or "mode"))
         )
@@ -1500,7 +1598,9 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Add", add_row)
 
     def _visibility_condition_box(self, item: dict, cond: dict) -> QtWidgets.QGroupBox:
-        box = QtWidgets.QGroupBox(self._visibility_condition_phrase(cond))
+        letter = str(cond.get("letter") or "").strip().upper()
+        phrase = self._visibility_condition_phrase(cond)
+        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         cond_id = str(cond.get("id") or "")
@@ -1652,6 +1752,23 @@ class OverlayInspector(QtWidgets.QWidget):
         if rebuild:
             self.rebuild()
 
+    def _preview_visibility(self, item: dict, expression_text: str | None = None):
+        vis = self._visibility_for(item)
+        if expression_text is not None:
+            vis["expression"] = str(expression_text)
+            self._set_visibility(item["id"], expression=str(expression_text))
+        legend = []
+        for cond in vis.get("conditions") or []:
+            letter = str(cond.get("letter") or "").strip().upper() or "?"
+            legend.append((letter, self._visibility_condition_phrase(cond)))
+        expression = effective_visibility_expression(vis)
+        dialog = VisibilityPreviewDialog(expression, legend, parent=self)
+        dialog.exec()
+
+    def _show_boolean_operators(self):
+        dialog = BooleanOperatorsDialog(parent=self)
+        dialog.exec()
+
     def _set_visibility_condition(self, widget_id: str, cond_id: str, rebuild: bool = False, **fields):
         if self._building:
             return
@@ -1681,6 +1798,10 @@ class OverlayInspector(QtWidgets.QWidget):
         self.scene.push_undo()
         vis = self._visibility_for(item)
         vis.setdefault("conditions", []).append(default_visibility_condition(kind))
+        vis["conditions"] = assign_condition_letters(vis["conditions"])
+        if not str(vis.get("expression") or "").strip():
+            letters = [str(c.get("letter") or "") for c in vis["conditions"]]
+            vis["expression"] = default_join_expression(letters, "all")
         self._update(widget_id, visibility=vis)
         self.rebuild()
 
@@ -2086,6 +2207,134 @@ class OverlayInspector(QtWidgets.QWidget):
             self._border_appearance(look, item, include_radius=include_radius)
         if widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
             self._build_binding(item)
+        self._build_blink(item)
+
+    def _lock_position_row(self, form, item: dict):
+        lock_box = QtWidgets.QCheckBox()
+        self._set_bool_widget(
+            lock_box,
+            [bool(w.get("locked")) for w in self.scene.selected_widgets()] or [bool(item.get("locked"))],
+        )
+        lock_box.setToolTip("Lock position and size. The widget can still be selected and restyled.")
+        lock_box.stateChanged.connect(lambda _s, wid=item["id"], box=lock_box: self._on_bool(box, wid, field="locked"))
+        form.addRow("Lock position", lock_box)
+
+    def _blink_for(self, item: dict) -> dict:
+        from .blink import normalize_blink
+
+        return normalize_blink(item.get("blink"))
+
+    def _set_blink(self, widget_id: str, rebuild: bool = False, **fields):
+        if self._building:
+            return
+        from .blink import normalize_blink
+
+        ids = list(self._edit_ids or [widget_id])
+        self.scene._suspend += 1
+        try:
+            for wid in ids:
+                item = self.scene.widget_by_id(wid)
+                if not item:
+                    continue
+                blink = normalize_blink(item.get("blink"))
+                blink.update(fields)
+                self.scene.apply_widget_update(wid, blink=normalize_blink(blink))
+        finally:
+            self.scene._suspend = max(0, self.scene._suspend - 1)
+            self.scene._dirty = True
+            self.scene._emit()
+        if rebuild:
+            self.rebuild()
+
+    def _build_blink(self, item: dict):
+        from .blink import blink_is_armed
+
+        blink = self._blink_for(item)
+        form = self._section("Blinking")
+        hint = QtWidgets.QLabel(
+            "Off by default. While blinking, the widget swaps Off and On appearance. "
+            "Check one or more triggers. Temporary runs for the duration after a trigger; Permanent keeps blinking while the condition holds."
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+        def _box(key, title, tooltip):
+            box = QtWidgets.QCheckBox()
+            values = [bool((w.get("blink") or {}).get(key)) for w in self.scene.selected_widgets()] or [bool(blink.get(key))]
+            self._set_bool_widget(box, values)
+            box.setToolTip(tooltip)
+            box.stateChanged.connect(
+                lambda _s, wid=item["id"], k=key, b=box: self._on_blink_flag(b, wid, k)
+            )
+            form.addRow(title, box)
+
+        _box("off_to_on", "Off → On", "Blink when the widget turns on.")
+        _box("on_to_off", "On → Off", "Blink when the widget turns off.")
+        _box("while_on", "While on", "Blink for as long as the widget is on.")
+        _box("while_off", "While off", "Blink for as long as the widget is off.")
+        _box("state", "GEX state", "Blink while a Joystick Gremlin Ex state is on or off.")
+
+        state_row = QtWidgets.QWidget()
+        state_layout = QtWidgets.QHBoxLayout(state_row)
+        state_layout.setContentsMargins(0, 0, 0, 0)
+        state_combo = QtWidgets.QComboBox()
+        populate_overlay_state_combo(state_combo, blink.get("state_id"), blink.get("state_name"))
+        state_combo.setEnabled(bool(blink.get("state")))
+        state_combo.currentIndexChanged.connect(
+            lambda _i, box=state_combo, wid=item["id"]: self._set_blink(
+                wid, **{k: v for k, v in overlay_state_combo_fields(box).items() if k in ("state_id", "state_name")}
+            )
+        )
+        when = QtWidgets.QComboBox()
+        when.addItem("is on", "on")
+        when.addItem("is off", "off")
+        when.setCurrentIndex(1 if str(blink.get("state_when") or "on") == "off" else 0)
+        when.setEnabled(bool(blink.get("state")))
+        when.currentIndexChanged.connect(
+            lambda _i, box=when, wid=item["id"]: self._set_blink(wid, state_when=str(box.currentData() or "on"))
+        )
+        state_layout.addWidget(state_combo, 1)
+        state_layout.addWidget(when)
+        form.addRow("State", state_row)
+
+        mode = QtWidgets.QComboBox()
+        mode.addItem("Permanent (while condition holds)", "permanent")
+        mode.addItem("Temporary (after trigger)", "temporary")
+        mode.setCurrentIndex(1 if blink.get("mode") == "temporary" else 0)
+        mode.currentIndexChanged.connect(
+            lambda _i, box=mode, wid=item["id"]: self._set_blink(wid, mode=str(box.currentData() or "permanent"))
+        )
+        form.addRow("Duration mode", mode)
+        dur = QtWidgets.QDoubleSpinBox()
+        dur.setRange(0.1, 30.0)
+        dur.setSingleStep(0.1)
+        dur.setSuffix(" s")
+        dur.setValue(float(blink.get("duration_s") or 1.0))
+        dur.setToolTip("How long a temporary blink lasts after Off→On, On→Off, or a matching state change.")
+        dur.setEnabled(str(blink.get("mode") or "permanent") == "temporary" or blink.get("off_to_on") or blink.get("on_to_off"))
+        dur.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, duration_s=float(v)))
+        form.addRow("Temporary for", dur)
+
+        hz = QtWidgets.QDoubleSpinBox()
+        hz.setRange(0.2, 12.0)
+        hz.setSingleStep(0.1)
+        hz.setSuffix(" Hz")
+        hz.setValue(float(blink.get("hz") or 2.0))
+        hz.setToolTip("How many times per second the off/on appearance swaps.")
+        hz.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, hz=float(v)))
+        form.addRow("Frequency", hz)
+        if not blink_is_armed(blink):
+            note = QtWidgets.QLabel("No blink triggers are on.")
+            note.setWordWrap(True)
+            form.addRow(note)
+
+    def _on_blink_flag(self, box: QtWidgets.QCheckBox, widget_id: str, key: str):
+        if self._building:
+            return
+        if box.isTristate() and box.checkState() == QtCore.Qt.PartiallyChecked:
+            return
+        box.setTristate(False)
+        self._set_blink(widget_id, rebuild=key == "state", **{key: box.isChecked()})
 
     def _grid_appearance(self, form, item: dict):
         self._look_heading(form, "Grid")
@@ -3301,6 +3550,9 @@ class OverlayInspector(QtWidgets.QWidget):
         family_key = f"{prefix}font_family"
         size_key = f"{prefix}font_size"
         bold_key = f"{prefix}font_bold"
+        italic_key = f"{prefix}font_italic"
+        underline_key = f"{prefix}font_underline"
+        strike_key = f"{prefix}font_strike"
         combo = QtWidgets.QFontComboBox()
         family = item["style"].get(family_key) or item["style"].get("font_family") or "Segoe UI"
         combo.setCurrentFont(QtGui.QFont(family))
@@ -3314,13 +3566,113 @@ class OverlayInspector(QtWidgets.QWidget):
         size.setToolTip("Drawn font size. Updates while the widget is resized when Scale font with size is on.")
         size.valueChanged.connect(lambda v, wid=item["id"], k=size_key: self._style(wid, **{k: int(v)}))
         self._bind_live(size, lambda it=item, k=size_key: effective_font_size(it, k))
-        bold = QtWidgets.QCheckBox()
-        bold.setChecked(bool(item["style"].get(bold_key, item["style"].get("font_bold", True))))
-        bold.toggled.connect(lambda v, wid=item["id"], k=bold_key: self._style(wid, **{k: v}))
+        style_row = QtWidgets.QWidget()
+        style_layout = QtWidgets.QHBoxLayout(style_row)
+        style_layout.setContentsMargins(0, 0, 0, 0)
+        style_layout.setSpacing(4)
+        style_layout.addWidget(size)
+        for key, letter, tooltip, default in (
+            (bold_key, "B", "Bold", True),
+            (italic_key, "I", "Italic", False),
+            (underline_key, "U", "Underline", False),
+            (strike_key, "S", "Strikethrough", False),
+        ):
+            btn = QtWidgets.QToolButton()
+            btn.setText(letter)
+            btn.setCheckable(True)
+            btn.setToolTip(tooltip)
+            btn.setFixedWidth(26)
+            if letter == "B":
+                font = btn.font()
+                font.setBold(True)
+                btn.setFont(font)
+            elif letter == "I":
+                font = btn.font()
+                font.setItalic(True)
+                btn.setFont(font)
+            elif letter == "U":
+                btn.setStyleSheet("text-decoration: underline;")
+            elif letter == "S":
+                btn.setStyleSheet("text-decoration: line-through;")
+            fallback = bool(item["style"].get(key, item["style"].get(key.replace(prefix, "", 1) if prefix else key, default)))
+            if prefix and key not in item["style"] and key.replace(prefix, "") in ("font_bold",):
+                fallback = bool(item["style"].get("font_bold", True))
+            btn.setChecked(bool(item["style"].get(key, fallback if key == bold_key else item["style"].get(key, default))))
+            if key == bold_key:
+                btn.setChecked(bool(item["style"].get(bold_key, item["style"].get("font_bold", True))))
+            else:
+                btn.setChecked(bool(item["style"].get(key, False)))
+            btn.toggled.connect(lambda v, wid=item["id"], k=key: self._style(wid, **{k: v}))
+            style_layout.addWidget(btn)
+        style_layout.addStretch()
         label = "Axis font" if prefix else "Font"
         form.addRow(label, combo)
-        form.addRow(f"{label} size", size)
-        form.addRow(f"{label} bold", bold)
+        form.addRow(f"{label} size", style_row)
+
+        shadow_on = bool(item["style"].get(f"{prefix}font_shadow", False))
+        shadow_row = QtWidgets.QWidget()
+        shadow_layout = QtWidgets.QHBoxLayout(shadow_row)
+        shadow_layout.setContentsMargins(0, 0, 0, 0)
+        shadow_layout.setSpacing(6)
+        shadow_box = QtWidgets.QCheckBox()
+        shadow_box.setChecked(shadow_on)
+        shadow_box.setToolTip("Draw a drop shadow behind the text.")
+        shadow_box.toggled.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow": self._style(wid, **{k: v}))
+        shadow_color = ColorButton(item["style"].get(f"{prefix}font_shadow_color") or "#80000000")
+        shadow_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_color": self._style(wid, **{k: v}))
+        dx = QtWidgets.QSpinBox()
+        dx.setRange(-20, 20)
+        dx.setValue(int(item["style"].get(f"{prefix}font_shadow_dx") or 2))
+        dx.setPrefix("X ")
+        dx.valueChanged.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_dx": self._style(wid, **{k: int(v)}))
+        dy = QtWidgets.QSpinBox()
+        dy.setRange(-20, 20)
+        dy.setValue(int(item["style"].get(f"{prefix}font_shadow_dy") or 2))
+        dy.setPrefix("Y ")
+        dy.valueChanged.connect(lambda v, wid=item["id"], k=f"{prefix}font_shadow_dy": self._style(wid, **{k: int(v)}))
+        shadow_layout.addWidget(shadow_box)
+        shadow_layout.addWidget(shadow_color)
+        shadow_layout.addWidget(dx)
+        shadow_layout.addWidget(dy)
+        shadow_layout.addStretch()
+        form.addRow(f"{label} shadow", shadow_row)
+
+        stroke_w = float(item["style"].get(f"{prefix}font_stroke_width") or 0)
+        stroke_row = QtWidgets.QWidget()
+        stroke_layout = QtWidgets.QHBoxLayout(stroke_row)
+        stroke_layout.setContentsMargins(0, 0, 0, 0)
+        stroke_layout.setSpacing(6)
+        stroke_box = QtWidgets.QCheckBox()
+        stroke_box.setChecked(stroke_w > 0)
+        stroke_box.setToolTip("Outline the letters. Width is in pixels.")
+        stroke_color = ColorButton(item["style"].get(f"{prefix}font_stroke_color") or "#000000")
+        stroke_color.color_changed.connect(lambda v, wid=item["id"], k=f"{prefix}font_stroke_color": self._style(wid, **{k: v}))
+        stroke_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        stroke_slider.setRange(1, 12)
+        stroke_slider.setValue(max(1, int(round(stroke_w)) or 2))
+        stroke_spin = QtWidgets.QSpinBox()
+        stroke_spin.setRange(1, 12)
+        stroke_spin.setSuffix(" px")
+        stroke_spin.setValue(max(1, int(round(stroke_w)) or 2))
+
+        def _set_stroke(width, wid=item["id"], enabled=True):
+            self._style(wid, **{f"{prefix}font_stroke_width": float(width) if enabled else 0.0})
+
+        def _stroke_toggled(on, slider=stroke_slider, spin=stroke_spin):
+            slider.setEnabled(on)
+            spin.setEnabled(on)
+            _set_stroke(spin.value(), enabled=on)
+
+        stroke_box.toggled.connect(_stroke_toggled)
+        stroke_slider.valueChanged.connect(lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True)))
+        stroke_spin.valueChanged.connect(lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True)))
+        stroke_slider.setEnabled(stroke_w > 0)
+        stroke_spin.setEnabled(stroke_w > 0)
+        stroke_layout.addWidget(stroke_box)
+        stroke_layout.addWidget(stroke_color)
+        stroke_layout.addWidget(stroke_slider, 1)
+        stroke_layout.addWidget(stroke_spin)
+        form.addRow(f"{label} stroke", stroke_row)
 
     def _build_toggle_binding(self):
         binding = normalize_toggle_binding(self.scene.canvas.get("toggle_binding"))

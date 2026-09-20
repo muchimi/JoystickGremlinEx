@@ -160,7 +160,7 @@ def names_look_unipolar(*parts) -> bool:
 
 
 def meter_is_centered(kind: str, props: dict | None = None, names=()) -> bool:
-    """True when a live meter should draw −100..+100 instead of 0..100 like GEX."""
+    """True when an input stays −1..+1 (stick). False remaps to 0..1 (throttle)."""
     props = props or {}
     key = str(kind or "").casefold()
     if key == "limiter":
@@ -173,6 +173,18 @@ def meter_is_centered(kind: str, props: dict | None = None, names=()) -> bool:
             return True
         return not names_look_unipolar(*names)
     return True
+
+
+def apply_input_display_range(value: float, props: dict | None = None, names=()) -> float:
+    """Invert the GEX −1..+1 axis, then remap to 0..1 when Display is unipolar."""
+    current = clamp(float(value))
+    props = props or {}
+    if props.get("invert"):
+        current = -current
+    if meter_is_centered("input", props, names):
+        return clamp(current)
+    mapped = scale_to_range(current, -1.0, 1.0, 0.0, 1.0)
+    return clamp(0.0 if mapped is None else float(mapped), 0.0, 1.0)
 
 
 def normalize_limiter_shape(value) -> str:
@@ -377,7 +389,7 @@ class LagLeadState:
 
 
 NODE_HELP = {
-    "input": "Named AFCS axis from Map to AFCS, or a listened physical axis. Invert flips the sign before anything downstream.",
+    "input": "Named AFCS axis from Map to AFCS, or a listened physical axis. Invert flips the GEX −1..+1 sign first. Display then sets the node output: 0 to 100% remaps to 0..1 (idle at 0), Centered keeps −1..+1, Auto follows throttle/slider names like GEX.",
     "merge": "Combines two axes with the same math as Map to VJoy.",
     "curve": "Remaps the axis with the GEX response-curve editor. Double-click the node to edit.",
     "limiter": "Shapes throw from a limiter axis. Linear scales the slope with the live limiter. Bezier keeps full corners and pulls the handles toward a flat center as the limiter drops. Min-max follows 1:1 through the center, then clips at whatever the limiter axis is reading — 100% is full travel, 0% is locked at center, and every value in between is a live ceiling. Wire the signal to in and the controller to limit. 0 to 100% uses a slider or throttle; −100 to 100% inverts when the limiter is negative.",

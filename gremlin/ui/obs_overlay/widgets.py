@@ -74,25 +74,160 @@ def effective_font_size(item: dict[str, Any] | None, key: str = "font_size", def
     return _scaled_font_px(style, key, item, default)
 
 
-def _make_font(family: str | None, size, bold: bool) -> QtGui.QFont:
+def _make_font(family: str | None, size, bold: bool, italic: bool = False, underline: bool = False, strike: bool = False) -> QtGui.QFont:
     font = QtGui.QFont()
     font.setFamily(family or "Segoe UI")
     font.setPixelSize(max(6, int(size or 11)))
     font.setBold(bool(bold))
+    font.setItalic(bool(italic))
+    font.setUnderline(bool(underline))
+    font.setStrikeOut(bool(strike))
     font.setStyleStrategy(QtGui.QFont.PreferAntialias)
     return font
 
 
-def _font(style: dict[str, Any], item: dict[str, Any] | None = None) -> QtGui.QFont:
-    return _make_font(style.get("font_family"), _scaled_font_px(style, "font_size", item), style.get("font_bold", True))
+def _font_flag(style: dict[str, Any], name: str, prefix: str = "", default=False):
+    key = f"{prefix}{name}" if prefix else name
+    if key in style:
+        return style.get(key, default)
+    return style.get(name, default)
+
+
+def _font(style: dict[str, Any], item: dict[str, Any] | None = None, prefix: str = "") -> QtGui.QFont:
+    size_key = f"{prefix}font_size" if prefix else "font_size"
+    family = style.get(f"{prefix}font_family") if prefix else style.get("font_family")
+    if prefix:
+        family = family or style.get("font_family")
+    return _make_font(
+        family,
+        _scaled_font_px(style, size_key, item),
+        _font_flag(style, "font_bold", prefix, True),
+        _font_flag(style, "font_italic", prefix, False),
+        _font_flag(style, "font_underline", prefix, False),
+        _font_flag(style, "font_strike", prefix, False),
+    )
 
 
 def _axis_label_font(style: dict[str, Any], item: dict[str, Any] | None = None) -> QtGui.QFont:
-    return _make_font(
-        style.get("axis_label_font_family") or style.get("font_family"),
-        _scaled_font_px(style, "axis_label_font_size", item),
-        style.get("axis_label_font_bold", style.get("font_bold", True)),
+    return _font(style, item, prefix="axis_label_")
+
+
+def _painter_is_designer(painter: QtGui.QPainter | None) -> bool:
+    """True when painting the Overlay tab canvas (not the live overlay window)."""
+    try:
+        device = painter.device() if painter is not None else None
+    except Exception:
+        return False
+    return bool(getattr(device, "interactive", False))
+
+
+def _outline_pen(
+    border,
+    width,
+    fill_color: QtGui.QColor,
+    default_border="#2c3a52",
+    designer: bool = False,
+) -> QtGui.QPen:
+    """Pen for a shape. Designer-only ghost when fill and border are both transparent."""
+    try:
+        w = float(width)
+    except (TypeError, ValueError):
+        w = 2.0
+    border_c = qcolor(border, default_border)
+    if border_c.alpha() <= 0:
+        if designer and fill_color.alpha() <= 0:
+            ghost = QtGui.QPen(QtGui.QColor("#ffffff"))
+            ghost.setWidthF(max(1.0, w))
+            ghost.setStyle(QtCore.Qt.DashLine)
+            ghost.setJoinStyle(QtCore.Qt.RoundJoin)
+            ghost.setCapStyle(QtCore.Qt.RoundCap)
+            return ghost
+        return QtGui.QPen(QtCore.Qt.NoPen)
+    if fill_color.alpha() <= 0:
+        return _pen(border_c, max(1.0, w) if designer else w)
+    return _pen(border, w)
+
+
+def set_fill_and_outline(painter: QtGui.QPainter, fill, border, width, default_fill="#121826", default_border="#2c3a52"):
+    fill_c = qcolor(fill, default_fill)
+    painter.setBrush(QtCore.Qt.NoBrush if fill_c.alpha() <= 0 else QtGui.QBrush(fill_c))
+    painter.setPen(
+        _outline_pen(
+            border,
+            width,
+            fill_c,
+            default_border,
+            designer=_painter_is_designer(painter),
+        )
     )
+
+
+def _draw_text_ex(
+    painter: QtGui.QPainter,
+    text: str,
+    target,
+    font: QtGui.QFont,
+    color,
+    style: dict[str, Any] | None = None,
+    prefix: str = "",
+    flags: int | None = None,
+):
+    """Draw widget text with optional shadow and pixel stroke."""
+    if not text:
+        return
+    style = style or {}
+    flags = int(QtCore.Qt.AlignCenter if flags is None else flags)
+    fill = qcolor(color, "#f4efe4")
+    dx = float(_font_flag(style, "font_shadow_dx", prefix, 2) or 0)
+    dy = float(_font_flag(style, "font_shadow_dy", prefix, 2) or 0)
+    shadow_on = bool(_font_flag(style, "font_shadow", prefix, False))
+    shadow_color = qcolor(_font_flag(style, "font_shadow_color", prefix, "#80000000"), "#80000000")
+    try:
+        stroke_w = float(_font_flag(style, "font_stroke_width", prefix, 0) or 0)
+    except (TypeError, ValueError):
+        stroke_w = 0.0
+    stroke_color = qcolor(_font_flag(style, "font_stroke_color", prefix, "#000000"), "#000000")
+    painter.save()
+    painter.setFont(font)
+    rect = target if isinstance(target, QtCore.QRectF) else None
+    point = target if isinstance(target, QtCore.QPointF) else None
+    if stroke_w > 0:
+        metrics = QtGui.QFontMetricsF(font)
+        if rect is not None:
+            br = metrics.boundingRect(text)
+            x = rect.center().x() - br.width() / 2.0 - br.left()
+            y = rect.center().y() + (metrics.ascent() - metrics.descent()) / 2.0
+        else:
+            x = point.x() if point is not None else 0.0
+            y = point.y() if point is not None else 0.0
+        path = QtGui.QPainterPath()
+        path.addText(QtCore.QPointF(x, y), font, text)
+        if shadow_on:
+            shadow_path = QtGui.QPainterPath(path)
+            shadow_path.translate(dx, dy)
+            painter.fillPath(shadow_path, shadow_color)
+        painter.strokePath(path, _pen(stroke_color, stroke_w))
+        painter.fillPath(path, fill)
+    else:
+        if shadow_on:
+            painter.setPen(shadow_color)
+            if rect is not None:
+                painter.drawText(rect.translated(dx, dy), flags, text)
+            elif point is not None:
+                painter.drawText(point + QtCore.QPointF(dx, dy), text)
+        painter.setPen(fill)
+        if rect is not None:
+            painter.drawText(rect, flags, text)
+        elif point is not None:
+            painter.drawText(point, text)
+    painter.restore()
+
+
+def fill_brush(value, default="#121826"):
+    color = qcolor(value, default)
+    if color.alpha() <= 0:
+        return QtCore.Qt.NoBrush
+    return color
 
 
 def _border_w(style: dict[str, Any] | None, default: float = 2.0) -> float:
@@ -113,7 +248,10 @@ def _pen(color, width=1.0) -> QtGui.QPen:
         w = 1.0
     if w <= 0:
         return QtGui.QPen(QtCore.Qt.NoPen)
-    pen = QtGui.QPen(qcolor(color))
+    pen_color = qcolor(color)
+    if pen_color.alpha() <= 0:
+        return QtGui.QPen(QtCore.Qt.NoPen)
+    pen = QtGui.QPen(pen_color)
     pen.setWidthF(w)
     pen.setJoinStyle(QtCore.Qt.RoundJoin)
     pen.setCapStyle(QtCore.Qt.RoundCap)
@@ -342,9 +480,24 @@ def _draw_crosshairs(painter: QtGui.QPainter, bounds: QtCore.QRectF, style: dict
 def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
     """Widget bounds plus label overflow, for partial updates."""
     rect = widget_rotated_bounds(item).toAlignedRect()
-    pad = max(28, _scaled_font_px(item.get("style") or {}, "font_size", item) + 12)
+    style = item.get("style") or {}
+    pad = max(28, _scaled_font_px(style, "font_size", item) + 12)
     if abs(widget_rotation_deg(item)) >= 0.001:
         pad = max(pad, 36)
+    extra = 0
+    if _font_flag(style, "font_shadow", "", False) or _font_flag(style, "font_shadow", "axis_label_", False):
+        extra = max(
+            extra,
+            abs(float(_font_flag(style, "font_shadow_dx", "", 2) or 0)),
+            abs(float(_font_flag(style, "font_shadow_dy", "", 2) or 0)),
+            abs(float(_font_flag(style, "font_shadow_dx", "axis_label_", 2) or 0)),
+            abs(float(_font_flag(style, "font_shadow_dy", "axis_label_", 2) or 0)),
+        )
+    try:
+        extra = max(extra, float(_font_flag(style, "font_stroke_width", "", 0) or 0), float(_font_flag(style, "font_stroke_width", "axis_label_", 0) or 0))
+    except (TypeError, ValueError):
+        pass
+    pad = max(pad, int(extra) + 12)
     return rect.adjusted(-pad, -pad, pad, pad)
 
 
@@ -363,16 +516,14 @@ def _draw_label(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCore.QRec
         text = item.get("label") or ""
     if not text:
         return
-    painter.save()
-    painter.setPen(qcolor(color or style.get("font_color"), "#f4efe4"))
-    painter.setFont(_font(style, item))
     label_rect = rect.adjusted(
         float(style.get("label_offset_x") or 0),
         float(style.get("label_offset_y") or 0),
         float(style.get("label_offset_x") or 0),
         float(style.get("label_offset_y") or 0),
     )
-    painter.drawText(label_rect, int(QtCore.Qt.AlignCenter), text)
+    painter.save()
+    _draw_text_ex(painter, text, label_rect, _font(style, item), color or style.get("font_color"), style)
     painter.restore()
 
 
@@ -388,13 +539,13 @@ def paint_shape(painter: QtGui.QPainter, item: dict[str, Any], value):
     kind = normalize_shape_kind(style.get("shape_kind"))
     painter.save()
     painter.setOpacity(_opacity(style))
-    painter.setPen(_pen(style.get("border"), _border_w(style)))
+    set_fill_and_outline(painter, style.get("fill"), style.get("border"), _border_w(style), "#101820")
     fill = qcolor(style.get("fill"), "#101820")
     closed = bool(style.get("shape_closed")) if kind == "line" else True
     if kind == "line" and not closed:
         painter.setBrush(QtCore.Qt.NoBrush)
-    else:
-        painter.setBrush(fill)
+    elif fill.alpha() <= 0:
+        painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawPath(shape_path(item))
     _draw_label(painter, item, rect)
     painter.restore()
@@ -573,7 +724,6 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawRect(rect)
 
     tracker = ApplicationViewTracker()
-    tracker.sample(item)
     pixmap = tracker.pixmap(item)
     if pixmap is not None and not pixmap.isNull():
         keep = bool(style.get("image_keep_aspect", True))
@@ -852,12 +1002,8 @@ def paint_label(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     fill = qcolor(style.get("fill"), "#00000000")
     border_w = _border_w(style, 0)
-    if fill.alpha() > 0 or border_w > 0:
-        if border_w > 0:
-            painter.setPen(_pen(style.get("border"), border_w))
-        else:
-            painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(fill if fill.alpha() > 0 else QtCore.Qt.NoBrush)
+    if fill.alpha() > 0 or border_w > 0 or fill.alpha() <= 0:
+        set_fill_and_outline(painter, style.get("fill"), style.get("border"), border_w, "#00000000")
         radius = float(style.get("corner_radius") or 0)
         if radius > 0:
             painter.drawRoundedRect(rect, radius, radius)
@@ -884,8 +1030,7 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     outline = _button_outline_path(item, rect)
     painter.save()
     painter.setOpacity(_opacity(style))
-    painter.setPen(_pen(border, _border_w(style)))
-    painter.setBrush(qcolor(fill, "#3a1518"))
+    set_fill_and_outline(painter, fill, border, _border_w(style), "#3a1518")
     painter.drawPath(outline)
     if not image.isNull():
         painter.save()
@@ -910,14 +1055,20 @@ def _axis_label_spread(style: dict[str, Any]) -> float:
         return 1.0
 
 
-def _draw_axis_label_at(painter: QtGui.QPainter, text: str, x: float, y: float, metrics: QtGui.QFontMetrics):
+def _draw_axis_label_at(painter: QtGui.QPainter, text: str, x: float, y: float, font: QtGui.QFont, style: dict[str, Any], item: dict[str, Any] | None = None):
     if not text:
         return
+    metrics = QtGui.QFontMetricsF(font)
     bounds = metrics.tightBoundingRect(text)
-    # tightBoundingRect is relative to the baseline; place ink centered on (x, y).
-    painter.drawText(
-        QtCore.QPointF(x - bounds.x() - bounds.width() / 2.0, y - bounds.y() - bounds.height() / 2.0),
+    rect = QtCore.QRectF(x - bounds.width() / 2.0, y - bounds.height() / 2.0, max(1.0, bounds.width()), max(1.0, bounds.height()))
+    _draw_text_ex(
+        painter,
         text,
+        rect,
+        font,
+        style.get("axis_label_font_color") or style.get("font_color"),
+        style,
+        prefix="axis_label_",
     )
 
 
@@ -926,9 +1077,8 @@ def _draw_axis_labels(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCor
     if not style.get("show_axis_labels", True):
         return
     painter.save()
-    painter.setPen(qcolor(style.get("axis_label_font_color") or style.get("font_color"), "#f4efe4"))
-    painter.setFont(_axis_label_font(style, item))
-    metrics = painter.fontMetrics()
+    font = _axis_label_font(style, item)
+    metrics = QtGui.QFontMetrics(font)
     spread = _axis_label_spread(style)
     edge_pad = max(0.0, _border_w(style)) * 0.5 + 4.0
     cx = rect.center().x()
@@ -945,13 +1095,13 @@ def _draw_axis_labels(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCor
     if ns:
         north = style.get("axis_label_n") or ""
         south = style.get("axis_label_s") or ""
-        _draw_axis_label_at(painter, north, cx, cy - spread * _reach(north, True), metrics)
-        _draw_axis_label_at(painter, south, cx, cy + spread * _reach(south, True), metrics)
+        _draw_axis_label_at(painter, north, cx, cy - spread * _reach(north, True), font, style, item)
+        _draw_axis_label_at(painter, south, cx, cy + spread * _reach(south, True), font, style, item)
     if ew:
         east = style.get("axis_label_e") or ""
         west = style.get("axis_label_w") or ""
-        _draw_axis_label_at(painter, west, cx - spread * _reach(west, False), cy, metrics)
-        _draw_axis_label_at(painter, east, cx + spread * _reach(east, False), cy, metrics)
+        _draw_axis_label_at(painter, west, cx - spread * _reach(west, False), cy, font, style, item)
+        _draw_axis_label_at(painter, east, cx + spread * _reach(east, False), cy, font, style, item)
     painter.restore()
 
 
@@ -1039,7 +1189,7 @@ def paint_axis_bar(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -1490,7 +1640,7 @@ def paint_axis_stick_square(painter: QtGui.QPainter, item: dict[str, Any], value
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     try:
         radius = max(0.0, float(style.get("corner_radius")))
     except (TypeError, ValueError):
@@ -1523,7 +1673,7 @@ def paint_axis_stick_circle(painter: QtGui.QPainter, item: dict[str, Any], value
     side = min(rect.width(), rect.height())
     circle = QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side)
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     painter.drawEllipse(circle)
     radius = min(circle.width(), circle.height()) / 2.0
     _draw_angle_lines(painter, circle.center(), radius, style)
@@ -1635,7 +1785,7 @@ def _draw_mouse_icon(painter: QtGui.QPainter, center: QtCore.QPointF, nx: float,
     painter.drawPath(body)
     painter.setPen(_pen(color.lighter(130), 1.2))
     painter.drawPath(seam)
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     painter.drawPath(wheel)
     painter.restore()
 
@@ -1649,7 +1799,7 @@ def paint_axis_mouse(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     radius = _corner_radius(style)
     painter.drawRoundedRect(rect, radius, radius)
     inner = _inner_rect(rect, style)
@@ -1684,6 +1834,9 @@ def _format_graph_tick(value: float, unit: str) -> str:
     return f"{text}{unit}" if unit else text
 
 
+_BAR_UNSET = object()
+
+
 def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Scrolling time plot of one or more physical / vJoy axes."""
     from .graph_track import GraphOverlayTracker, graph_period_s, graph_series_label, graph_unit, graph_value_range
@@ -1692,10 +1845,10 @@ def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
     rect = widget_rect(item)
     radius = _corner_radius(style, 6.0)
     painter.save()
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -1798,10 +1951,10 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
     rect = widget_rect(item)
     radius = _corner_radius(style, 6.0)
     painter.save()
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
@@ -1861,16 +2014,28 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
 
     count = max(1, len(series))
     gap = 6.0
+    percents = {}
+    if isinstance(value, tuple):
+        for entry in value:
+            if isinstance(entry, tuple) and len(entry) >= 2:
+                percents[str(entry[0])] = entry[1]
+
+    def _bar_percent(series_item):
+        series_id = str(series_item.get("id") or "")
+        cached = percents.get(series_id, _BAR_UNSET)
+        if cached is not _BAR_UNSET:
+            return 0.0 if cached is None else float(cached)
+        if binding_is_configured(series_item):
+            raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
+            return axis_display_percent(raw, series_is_centered(series_item))
+        return 0.0
+
     painter.setPen(QtCore.Qt.NoPen)
     if vertical:
         bar_w = max(6.0, (plot.width() - gap * (count - 1)) / count)
         for index, series_item in enumerate(series):
             x = plot.left() + index * (bar_w + gap)
-            percent = 0.0
-            if binding_is_configured(series_item):
-                raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
-                percent = axis_display_percent(raw, series_is_centered(series_item))
-            percent = max(vmin, min(vmax, percent))
+            percent = max(vmin, min(vmax, _bar_percent(series_item)))
             y_val = plot.bottom() - ((percent - vmin) / span) * plot.height()
             y_zero = plot.bottom() - ((0.0 - vmin) / span) * plot.height()
             y_zero = max(plot.top(), min(plot.bottom(), y_zero))
@@ -1883,11 +2048,7 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
         bar_h = max(6.0, (plot.height() - gap * (count - 1)) / count)
         for index, series_item in enumerate(series):
             y = plot.top() + index * (bar_h + gap)
-            percent = 0.0
-            if binding_is_configured(series_item):
-                raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
-                percent = axis_display_percent(raw, series_is_centered(series_item))
-            percent = max(vmin, min(vmax, percent))
+            percent = max(vmin, min(vmax, _bar_percent(series_item)))
             x_val = plot.left() + ((percent - vmin) / span) * plot.width()
             x_zero = plot.left() + ((0.0 - vmin) / span) * plot.width()
             x_zero = max(plot.left(), min(plot.right(), x_zero))
@@ -1926,9 +2087,8 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     fill = qcolor(style.get("fill"), "#121826")
     border_w = _border_w(style, 0)
-    if fill.alpha() > 0 or border_w > 0:
-        painter.setPen(_pen(style.get("border"), border_w) if border_w > 0 else QtCore.Qt.NoPen)
-        painter.setBrush(fill if fill.alpha() > 0 else QtCore.Qt.NoBrush)
+    if fill.alpha() > 0 or border_w > 0 or fill.alpha() <= 0:
+        set_fill_and_outline(painter, style.get("fill"), style.get("border"), border_w, "#00000000")
         if radius > 0:
             painter.drawPath(_rounded(rect, radius))
         else:
@@ -1953,17 +2113,19 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
             cell = QtCore.QRectF(inner.left(), inner.top() + index * cell_h, cell_w, cell_h)
         else:
             cell = QtCore.QRectF(inner.left() + index * cell_w, inner.top(), cell_w, cell_h)
-        painter.setPen(qcolor(color, "#f4efe4"))
         if caption_on and caption:
             cap_font = QtGui.QFont(base_font)
             cap_font.setPixelSize(max(8, int(round(_scaled_font_px(style, "font_size", item, 22) * 0.42))))
             cap_font.setBold(True)
-            painter.setFont(cap_font)
             cap_h = QtGui.QFontMetrics(cap_font).height()
-            painter.drawText(
-                QtCore.QRectF(cell.left(), cell.top(), cell.width(), min(cap_h, cell.height() * 0.45)),
-                int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
+            _draw_text_ex(
+                painter,
                 caption,
+                QtCore.QRectF(cell.left(), cell.top(), cell.width(), min(cap_h, cell.height() * 0.45)),
+                cap_font,
+                color,
+                style,
+                flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
             )
             value_rect = QtCore.QRectF(
                 cell.left(),
@@ -1973,8 +2135,7 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
             )
         else:
             value_rect = cell
-        painter.setFont(base_font)
-        painter.drawText(value_rect, int(QtCore.Qt.AlignCenter), str(text or ""))
+        _draw_text_ex(painter, str(text or ""), value_rect, base_font, color, style)
     if style.get("show_label", False):
         _draw_label(painter, item, rect)
     painter.restore()
@@ -2033,7 +2194,7 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         side = min(rect.width(), rect.height())
         dial = QtCore.QRectF(rect.center().x() - side / 2.0, rect.center().y() - side / 2.0, side, side)
         painter.setPen(_pen(style.get("border"), _border_w(style)))
-        painter.setBrush(qcolor(style.get("fill"), "#121826"))
+        painter.setBrush(fill_brush(style.get("fill"), "#121826"))
         painter.drawEllipse(dial)
         cx, cy = dial.center().x(), dial.center().y()
         radius = side / 2.0 - max(4.0, _border_w(style) + 2.0)
@@ -2084,22 +2245,29 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         digital_font = _font(style, item)
         digital_font.setPixelSize(max(8, int(round(_scaled_font_px(style, "font_size", item, 22) * 0.38))))
         painter.setFont(digital_font)
-        painter.drawText(
-            QtCore.QRectF(cx - radius * 0.55, cy + radius * 0.28, radius * 1.1, radius * 0.28),
-            int(QtCore.Qt.AlignCenter),
+        _draw_text_ex(
+            painter,
             format_stopwatch(elapsed, fmt),
+            QtCore.QRectF(cx - radius * 0.55, cy + radius * 0.28, radius * 1.1, radius * 0.28),
+            digital_font,
+            style.get("font_color"),
+            style,
         )
     else:
         radius = _corner_radius(style, 8.0)
-        painter.setPen(_pen(style.get("border"), _border_w(style)))
-        painter.setBrush(qcolor(style.get("fill"), "#121826"))
+        set_fill_and_outline(painter, style.get("fill"), style.get("border"), _border_w(style))
         if radius > 0:
             painter.drawPath(_rounded(rect, radius))
         else:
             painter.drawRect(rect)
-        painter.setPen(qcolor(style.get("needle_second_color") if running else style.get("font_color"), "#f4efe4"))
-        painter.setFont(_font(style, item))
-        painter.drawText(rect, int(QtCore.Qt.AlignCenter), format_stopwatch(elapsed, fmt))
+        _draw_text_ex(
+            painter,
+            format_stopwatch(elapsed, fmt),
+            rect,
+            _font(style, item),
+            style.get("needle_second_color") if running else style.get("font_color"),
+            style,
+        )
         if style.get("show_label", False):
             _draw_label(painter, item, rect)
     painter.restore()
@@ -2113,7 +2281,7 @@ def paint_hat(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
-    painter.setBrush(qcolor(style.get("fill"), "#121826"))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826"))
     radius = float(style.get("corner_radius") or 8)
     painter.drawRoundedRect(rect, radius, radius)
     cx, cy = rect.center().x(), rect.center().y()
@@ -2385,17 +2553,14 @@ def _map_unit_rect(bounds: QtCore.QRectF, x: float, y: float, w: float, h: float
 def _paint_input_keycap(painter: QtGui.QPainter, rect: QtCore.QRectF, style: dict[str, Any], label: str, pressed: bool, font: QtGui.QFont):
     radius = min(_corner_radius(style, 6.0), rect.width() * 0.28, rect.height() * 0.28)
     fill, border = _input_key_colors(style, pressed)
-    painter.setPen(_pen(border, max(1.0, _border_w(style))))
-    painter.setBrush(fill)
+    set_fill_and_outline(painter, fill, border, max(1.0, _border_w(style)))
     if radius > 0:
         painter.drawPath(_rounded(rect, radius))
     else:
         painter.drawRect(rect)
     if not label:
         return
-    painter.setPen(qcolor(style.get("font_color"), "#f4efe4"))
-    painter.setFont(font)
-    painter.drawText(rect, int(QtCore.Qt.AlignCenter), label)
+    _draw_text_ex(painter, label, rect, font, style.get("font_color"), style)
 
 
 def _paint_mouse_region(painter: QtGui.QPainter, path: QtGui.QPainterPath, style: dict[str, Any], pressed: bool, selected: bool, label: str, font: QtGui.QFont):
@@ -2652,6 +2817,9 @@ _PAINTERS = {
 def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value):
     if not item.get("visible", True):
         return
+    from .blink import blink_paint_item
+
+    item = blink_paint_item(item, value) or item
     fn = _PAINTERS.get(item.get("type"), paint_button)
     if abs(widget_rotation_deg(item)) < 0.001:
         fn(painter, item, value)

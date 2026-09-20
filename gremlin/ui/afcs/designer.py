@@ -36,6 +36,12 @@ from gremlin.ui.obs_overlay.model import (
     normalize_overlay_keys,
     normalize_toggle_binding,
 )
+from gremlin.ui.obs_overlay.visibility_logic import (
+    assign_condition_letters,
+    default_join_expression,
+    effective_visibility_expression,
+)
+from gremlin.ui.obs_overlay.visibility_preview import BooleanOperatorsDialog, VisibilityPreviewDialog
 
 from .model import AfcsDocument, decode_when, default_node, encode_when
 from .nodes import (
@@ -66,6 +72,19 @@ from .runtime import curve_from_xml, curve_to_xml
 syslog = logging.getLogger("system")
 
 _NODE_CLIPBOARD: dict | None = None
+
+# Match OdenGraphQt ViewerEnum.GRID_SIZE so snap lines up with the drawn grid.
+_AFCS_GRID_SIZE = 50
+
+
+def _snap_coord(value: float, size: float = _AFCS_GRID_SIZE) -> float:
+    step = float(size) if size else 1.0
+    return round(float(value) / step) * step
+
+
+def _snap_xy(x: float, y: float) -> tuple[float, float]:
+    return _snap_coord(x), _snap_coord(y)
+
 
 try:
     from OdenGraphQt import NodeGraph as _OdenNodeGraph
@@ -163,6 +182,8 @@ else:
         def __init__(self, *args, **kwargs):
             self._afcs_node_created = None
             self._afcs_property_changed = None
+            self._afcs_snap_enabled = None
+            self._afcs_nodes_moved = None
             super().__init__(*args, **kwargs)
             self.node_created = _AfcsHook(self, "_afcs_node_created")
             self.property_changed = _AfcsHook(self, "_afcs_property_changed")
@@ -171,6 +192,71 @@ else:
             self.node_selected = _AfcsHook(self)
             self.node_double_clicked = _AfcsHook(self)
             self.node_selection_changed = _AfcsHook(self)
+            self._afcs_install_drag_snap()
+
+        def _afcs_install_drag_snap(self) -> None:
+            """Snap selected nodes to the grid while the left mouse button drags them."""
+            viewer = self.viewer()
+            if viewer is None or getattr(viewer, "_afcs_drag_snap_installed", False):
+                return
+            original = viewer.mouseMoveEvent
+
+            def _mouse_move(event, _original=original, _viewer=viewer, _graph=self):
+                _original(event)
+                _graph._afcs_snap_drag_selection(_viewer)
+
+            viewer.mouseMoveEvent = _mouse_move
+            viewer._afcs_drag_snap_installed = True
+
+        def _afcs_snap_enabled_now(self) -> bool:
+            enabled = self._afcs_snap_enabled
+            return bool(callable(enabled) and enabled())
+
+        def _afcs_snap_drag_selection(self, viewer=None) -> None:
+            if not self._afcs_snap_enabled_now():
+                return
+            viewer = viewer or self.viewer()
+            if viewer is None or not getattr(viewer, "LMB_state", False):
+                return
+            rubber = getattr(viewer, "_rubber_band", None)
+            if rubber is not None and getattr(rubber, "isActive", False):
+                return
+            if getattr(viewer, "ALT_state", False) or getattr(viewer, "MMB_state", False):
+                return
+            try:
+                nodes = viewer.selected_nodes() or []
+            except Exception:
+                return
+            for node_view in nodes:
+                try:
+                    x, y = node_view.xy_pos
+                    sx, sy = _snap_xy(float(x), float(y))
+                    if abs(sx - float(x)) > 1e-6 or abs(sy - float(y)) > 1e-6:
+                        node_view.xy_pos = [sx, sy]
+                except Exception:
+                    continue
+
+        def _on_nodes_moved(self, node_data):
+            """Snap top-left corners before OdenGraphQt commits the move into the undo stack."""
+            if self._afcs_snap_enabled_now() and node_data:
+                for node_view in list(node_data.keys()):
+                    try:
+                        x, y = node_view.xy_pos
+                        sx, sy = _snap_xy(float(x), float(y))
+                        if abs(sx - float(x)) > 1e-6 or abs(sy - float(y)) > 1e-6:
+                            node_view.xy_pos = [sx, sy]
+                            node = self.model.nodes.get(node_view.id)
+                            if node is not None:
+                                node.model.pos = [sx, sy]
+                    except Exception:
+                        pass
+            super()._on_nodes_moved(node_data)
+            hook = getattr(self, "_afcs_nodes_moved", None)
+            if callable(hook):
+                try:
+                    hook()
+                except Exception:
+                    pass
 
 
 class ActivationBindingWidget(QtWidgets.QWidget):
@@ -365,6 +451,9 @@ def _condition_summary(vis: dict) -> str:
     phrases = [_condition_phrase(cond) for cond in vis.get("conditions") or []]
     if not phrases:
         return "Always applied (no conditions)."
+    expression = str(vis.get("expression") or "").strip()
+    if expression:
+        return f"Runs when {expression}."
     join = " and " if (vis.get("join") or "all") == "all" else " or "
     return f"If {join.join(phrases)} then this node runs."
 
@@ -399,7 +488,7 @@ def _button_choices(device) -> list[tuple[int, str]]:
 
 
 class NodeConditionWidget(QtWidgets.QWidget):
-    """Overlay-style AND/OR conditions. Unmet conditions skip the node."""
+    """Same boolean expression conditions as Overlay visibility."""
 
     changed = QtCore.Signal(object)
 
@@ -408,6 +497,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         self._vis = decode_when(None)
         self._building = False
         self._listen_dialog = None
+        self._expression_edit: QtWidgets.QLineEdit | None = None
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         box = QtWidgets.QGroupBox("Conditions")
@@ -416,6 +506,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
     def set_value(self, raw) -> None:
         self._vis = decode_when(raw)
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._rebuild()
 
     def _is_alive(self) -> bool:
@@ -428,6 +519,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         if self._building:
             return
         self._vis = decode_when(self._vis)
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self.changed.emit(dict(self._vis))
         if rebuild:
             self._rebuild()
@@ -437,28 +529,50 @@ class NodeConditionWidget(QtWidgets.QWidget):
         try:
             gremlin.util.clear_layout(self._form)
             vis = self._vis
-            join = QtWidgets.QComboBox()
-            join.addItem("All of these (AND)", "all")
-            join.addItem("Any of these (OR)", "any")
-            join.setCurrentIndex(1 if (vis.get("join") or "all") == "any" else 0)
-            join.setToolTip("All = every condition must be true. Any = at least one condition must be true.")
-            join.currentIndexChanged.connect(self._on_join)
-            self._form.addRow("Match", join)
+            vis["conditions"] = assign_condition_letters(list(vis.get("conditions") or []))
+
+            expr = QtWidgets.QLineEdit()
+            expr.setText(str(vis.get("expression") or ""))
+            expr.setPlaceholderText("A AND (B OR C)")
+            expr.setToolTip(
+                "Use letters A, B, C... for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
+                "Leave empty to require every condition (AND)."
+            )
+            expr.editingFinished.connect(self._on_expression_finished)
+            self._expression_edit = expr
+            preview = QtWidgets.QPushButton("Preview")
+            preview.setToolTip("Show a Venn diagram, boolean algebra, and truth table for this expression.")
+            preview.clicked.connect(self._preview_expression)
+            expr_row = QtWidgets.QWidget()
+            expr_layout = QtWidgets.QHBoxLayout(expr_row)
+            expr_layout.setContentsMargins(0, 0, 0, 0)
+            expr_layout.addWidget(expr, 1)
+            expr_layout.addWidget(preview)
+            self._form.addRow("Expression", expr_row)
+
+            ops = QtWidgets.QPushButton("Boolean operators")
+            ops.setToolTip("Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.")
+            ops.clicked.connect(self._show_boolean_operators)
+            self._form.addRow("", ops)
+
             hint = QtWidgets.QLabel(_condition_summary(vis))
             hint.setWordWrap(True)
             self._form.addRow(hint)
             note = QtWidgets.QLabel(
-                "If conditions fail, this node is skipped and the in (or in_a) signal flows through. "
-                "An output does not write. Empty conditions always apply."
+                "Each condition gets a letter (A, B, C...). The node is skipped when the expression is false "
+                "(in / in_a passthrough; outputs do not write). Empty conditions always apply."
             )
             note.setWordWrap(True)
             self._form.addRow(note)
+
             for cond in vis.get("conditions") or []:
                 self._form.addRow(self._condition_box(cond))
+
             add_kind = QtWidgets.QComboBox()
             for value, label in _CONDITION_KINDS:
                 add_kind.addItem(label, value)
             add_btn = QtWidgets.QPushButton("Add condition")
+            add_btn.setToolTip("Add a mode, state, or input. It is assigned the next letter (A, B, C...).")
             add_btn.clicked.connect(lambda _=False, box=add_kind: self._add_condition(str(box.currentData() or "mode")))
             add_row = QtWidgets.QWidget()
             add_layout = QtWidgets.QHBoxLayout(add_row)
@@ -469,19 +583,43 @@ class NodeConditionWidget(QtWidgets.QWidget):
         finally:
             self._building = False
 
-    def _on_join(self) -> None:
-        combo = self.sender()
-        if not isinstance(combo, QtWidgets.QComboBox):
+    def _on_expression_finished(self) -> None:
+        box = self._expression_edit
+        if box is None:
             return
-        self._vis["join"] = str(combo.currentData() or "all")
+        self._vis["expression"] = str(box.text() or "")
         self._emit(rebuild=True)
+
+    def _preview_expression(self) -> None:
+        if self._expression_edit is not None:
+            self._vis["expression"] = str(self._expression_edit.text() or "")
+        vis = decode_when(self._vis)
+        legend = []
+        for cond in vis.get("conditions") or []:
+            letter = str(cond.get("letter") or "").strip().upper()
+            if letter:
+                legend.append((letter, _condition_phrase(cond)))
+        expression = effective_visibility_expression(vis)
+        dialog = VisibilityPreviewDialog(expression, legend, parent=self)
+        dialog.exec()
+
+    def _show_boolean_operators(self) -> None:
+        dialog = BooleanOperatorsDialog(parent=self)
+        dialog.exec()
 
     def _add_condition(self, kind: str) -> None:
         self._vis.setdefault("conditions", []).append(default_visibility_condition(kind))
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
+        if not str(self._vis.get("expression") or "").strip():
+            letters = [str(c.get("letter") or "") for c in self._vis["conditions"]]
+            self._vis["expression"] = default_join_expression(letters, "all")
         self._emit(rebuild=True)
 
     def _remove_condition(self, cond_id: str) -> None:
-        self._vis["conditions"] = [c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)]
+        self._vis["conditions"] = [
+            c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)
+        ]
+        self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._emit(rebuild=True)
 
     def _set_condition(self, cond_id: str, rebuild: bool = False, **fields) -> None:
@@ -493,7 +631,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             return
 
     def _condition_box(self, cond: dict) -> QtWidgets.QGroupBox:
-        box = QtWidgets.QGroupBox(_condition_phrase(cond))
+        letter = str(cond.get("letter") or "").strip().upper()
+        phrase = _condition_phrase(cond)
+        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
         cond_id = str(cond.get("id") or "")
         kind = str(cond.get("kind") or "mode").casefold()
@@ -650,6 +790,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
 
 def _vjoy_output_devices() -> list:
+
     devices = [
         device
         for device in gremlin.joystick_handling.vjoy_devices(connected_only=False)
@@ -705,6 +846,10 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._loading = False
         self._graph = None
         self._cleaned = False
+        self._snapping = False
+        self._segment_focus = None
+        self._segment_gen = 0
+        self._segment_suspend = False
 
         root = QtWidgets.QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
@@ -727,6 +872,21 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._show_live_box.setToolTip("When a profile is running, live meters stay off unless this is checked. They always show while the profile is stopped.")
         self._show_live_box.toggled.connect(self._on_show_live_toggled)
         left_layout.addWidget(self._show_live_box)
+        self._snap_box = QtWidgets.QCheckBox("Snap to grid")
+        self._snap_box.setChecked(bool(gremlin.config.Configuration().afcs_snap_to_grid))
+        self._snap_box.setToolTip(
+            "When checked, dragging a node snaps its top-left corner to the nearest canvas grid point."
+        )
+        self._snap_box.toggled.connect(self._on_snap_toggled)
+        left_layout.addWidget(self._snap_box)
+        self._segment_box = QtWidgets.QCheckBox("Show selected segment only")
+        self._segment_box.setChecked(bool(gremlin.config.Configuration().afcs_show_selected_segment_only))
+        self._segment_box.setToolTip(
+            "When checked, selecting a node keeps its signal path visible "
+            "(upstream feeders and downstream consumers). Shift-click other nodes to add their paths too."
+        )
+        self._segment_box.toggled.connect(self._on_segment_toggled)
+        left_layout.addWidget(self._segment_box)
         left_layout.addWidget(QtWidgets.QLabel("Flight modes"))
         self._mode_list = QtWidgets.QListWidget()
         self._mode_list.currentRowChanged.connect(self._on_mode_row)
@@ -786,11 +946,14 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._graph.register_nodes(list(AFCS_NODE_CLASSES))
             self._graph._afcs_node_created = self._on_graph_changed
             self._graph._afcs_property_changed = self._on_property_changed
+            self._graph._afcs_snap_enabled = self._snap_enabled
+            self._graph._afcs_nodes_moved = self._capture_graph
             self._graph.nodes_deleted.connect(self._on_graph_changed)
             self._graph.port_connected.connect(self._on_graph_changed)
             self._graph.port_disconnected.connect(self._on_graph_changed)
             self._graph.node_double_clicked.connect(self._on_double_click)
             self._graph.node_selected.connect(self._on_node_selected)
+            self._graph.node_selection_changed.connect(self._on_selection_changed)
             self._bind_edit_actions()
             center_layout.addWidget(self._graph.widget, 1)
         top.addWidget(center)
@@ -924,14 +1087,25 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             return
         mode_id = item.data(QtCore.Qt.UserRole)
         previous = self.document.data.get("active_mode_id")
-        if self._graph is not None and previous and previous != mode_id:
-            self._capture_graph(previous)
-        self.document.set_active_mode(mode_id)
-        mode = self.document.mode_by_id(mode_id)
-        if mode:
-            self._activation.set_binding(mode.get("activation"))
-        self._load_graph()
-        self._rebuild_inspector(None)
+        self._segment_suspend = True
+        self._segment_gen = getattr(self, "_segment_gen", 0) + 1
+        self._segment_focus = None
+        try:
+            if self._graph is not None and previous and previous != mode_id:
+                # Must fully unhide before clear_session or pipes/nodes can leak into the next mode.
+                self._force_all_nodes_visible()
+                self._capture_graph(previous)
+            self.document.set_active_mode(mode_id)
+            mode = self.document.mode_by_id(mode_id)
+            if mode:
+                self._activation.set_binding(mode.get("activation"))
+            self._load_graph()
+            self._rebuild_inspector(None)
+        finally:
+            self._segment_suspend = False
+            self._segment_gen = getattr(self, "_segment_gen", 0) + 1
+            self._segment_focus = None
+            self._apply_segment_visibility()
 
     def _add_mode(self) -> None:
         if self._graph is not None:
@@ -996,7 +1170,10 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if mode is None:
             return
         count = len(mode.get("nodes") or [])
-        spec = default_node(kind, x=80 + count * 40, y=80 + count * 60)
+        x, y = 80 + count * 40, 80 + count * 60
+        if self._snap_enabled():
+            x, y = _snap_xy(float(x), float(y))
+        spec = default_node(kind, x=x, y=y)
         if kind == "output":
             vjoy_id, axis_id = self._next_output_target(mode)
             spec["props"]["vjoy_id"] = vjoy_id
@@ -1056,9 +1233,18 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
     def _selected_afcs_nodes(self, fallback=None) -> list:
         if self._graph is None:
             return []
-        selected = [node for node in self._graph.selected_nodes() if node is not None and hasattr(node, "AFCS_KIND")]
+        try:
+            selected = [
+                node for node in (self._graph.selected_nodes() or [])
+                if node is not None and hasattr(node, "AFCS_KIND")
+            ]
+        except Exception:
+            selected = []
         if selected:
             return selected
+        focus = getattr(self, "_segment_focus", None)
+        if focus is not None and hasattr(focus, "AFCS_KIND"):
+            return [focus]
         if fallback is not None and hasattr(fallback, "AFCS_KIND"):
             return [fallback]
         return []
@@ -1097,8 +1283,12 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                     continue
                 new_spec = copy.deepcopy(spec)
                 new_spec["id"] = str(uuid.uuid4())
-                new_spec["x"] = float(spec.get("x") or 0) + offset
-                new_spec["y"] = float(spec.get("y") or 0) + offset
+                x = float(spec.get("x") or 0) + offset
+                y = float(spec.get("y") or 0) + offset
+                if self._snap_enabled():
+                    x, y = _snap_xy(x, y)
+                new_spec["x"] = x
+                new_spec["y"] = y
                 if kind == "output":
                     props = new_spec.setdefault("props", {})
                     try:
@@ -1215,9 +1405,13 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
     def _load_graph(self) -> None:
         if self._graph is None:
             return
+        was_suspended = bool(getattr(self, "_segment_suspend", False))
+        self._segment_suspend = True
+        self._segment_focus = None
         self._loading = True
         try:
             self._graph.clear_session()
+            self._purge_orphan_pipes()
             mode = self.document.mode_by_id(self._current_mode_id())
             if mode is None:
                 return
@@ -1234,6 +1428,13 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                     push_undo=False,
                 )
                 self._apply_spec(graph_node, spec)
+                # New nodes must start visible even if a prior mode left the scene filtered.
+                try:
+                    graph_node.model.set_property("visible", True)
+                    if graph_node.view is not None:
+                        graph_node.view.visible = True
+                except Exception:
+                    pass
                 created[spec["id"]] = graph_node
             for conn in mode.get("connections") or []:
                 src = created.get(conn["from"])
@@ -1253,9 +1454,16 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 self._graph._undo_stack.clear()
             except Exception:
                 pass
+            self._purge_orphan_pipes()
         finally:
             self._loading = False
-        self._refresh_meters()
+            # Invalidate selection timers queued during clear_session/clear_selection.
+            self._segment_gen = getattr(self, "_segment_gen", 0) + 1
+            self._segment_focus = None
+            if not was_suspended:
+                self._segment_suspend = False
+                self._apply_segment_visibility()
+            self._refresh_meters()
 
     def _graph_nodes(self) -> list:
         if self._graph is None:
@@ -1354,12 +1562,13 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self.document.save_later()
 
     def _on_graph_changed(self, *args) -> None:
-        if self._loading:
+        if self._loading or getattr(self, "_segment_suspend", False):
             return
         self._capture_graph()
+        self._apply_segment_visibility()
 
     def _on_property_changed(self, node, name, value) -> None:
-        if self._loading or name in ("live_meter", "live_curve"):
+        if self._loading or name in ("live_meter", "live_curve", "visible"):
             return
         self._capture_graph()
 
@@ -1376,7 +1585,59 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
 
     def _on_node_selected(self, node) -> None:
+        if getattr(self, "_segment_suspend", False) or self._loading:
+            self._rebuild_inspector(node)
+            return
+        self._segment_gen = getattr(self, "_segment_gen", 0) + 1
+        if node is not None and hasattr(node, "AFCS_KIND"):
+            self._segment_focus = node
+            # Only force-select when the scene has no selection yet (embedded widget click).
+            # Calling set_selected during Shift multi-select can wipe the other nodes.
+            try:
+                current = list(self._graph.selected_nodes() or []) if self._graph is not None else []
+                if not current:
+                    node.set_selected(True)
+            except Exception:
+                pass
+        else:
+            self._segment_focus = None
         self._rebuild_inspector(node)
+        self._apply_segment_visibility()
+
+    def _on_selection_changed(self, selected=None, _deselected=None) -> None:
+        if getattr(self, "_segment_suspend", False) or self._loading:
+            return
+        self._segment_gen = getattr(self, "_segment_gen", 0) + 1
+        gen = self._segment_gen
+        seeds = [n for n in (selected or []) if n is not None and hasattr(n, "AFCS_KIND")]
+        if seeds:
+            self._segment_focus = seeds[0]
+        # Apply now (seeds/focus), then once more after Qt finishes selection updates.
+        self._apply_segment_visibility()
+        QtCore.QTimer.singleShot(0, lambda g=gen: self._after_selection_changed(g))
+
+    def _after_selection_changed(self, gen=None) -> None:
+        if getattr(self, "_cleaned", False) or self._graph is None:
+            return
+        if getattr(self, "_segment_suspend", False) or self._loading:
+            return
+        if gen is not None and gen != getattr(self, "_segment_gen", 0):
+            return
+        selected = self._selected_afcs_nodes()
+        if selected:
+            self._segment_focus = selected[0]
+        else:
+            focus = getattr(self, "_segment_focus", None)
+            alive = False
+            if focus is not None:
+                try:
+                    alive = focus in self._graph_nodes()
+                except Exception:
+                    alive = False
+            if not alive:
+                self._segment_focus = None
+                self._rebuild_inspector(None)
+        self._apply_segment_visibility()
 
     def _rebuild_inspector(self, node) -> None:
         gremlin.util.clear_layout(self._inspector_form)
@@ -1417,7 +1678,10 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             current_display = normalize_input_display_range(node.get_property("display_range"))
             index = display.findData(current_display)
             display.setCurrentIndex(index if index >= 0 else 0)
-            display.setToolTip("GEX always stores axes as −1..+1. 0 to 100% draws that as a left-to-right bar like the main UI throttle repeater. Centered is a stick ±100 bar.")
+            display.setToolTip(
+                "Invert first, then this range is the node's output. Hardware is always −1..+1. "
+                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps ±1. Auto uses throttle/slider names like GEX."
+            )
             display.currentIndexChanged.connect(lambda _i, n=node, box=display: self._set_node_prop(n, "display_range", box.currentData()))
             self._inspector_form.addRow("Display", display)
             listen = QtWidgets.QPushButton("Listen for physical axis...")
@@ -1650,6 +1914,287 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
         self._rebuild_inspector(node)
 
+
+    def _on_snap_toggled(self, checked: bool) -> None:
+        gremlin.config.Configuration().afcs_snap_to_grid = bool(checked)
+        if checked:
+            self._snap_all_nodes()
+
+    def _snap_enabled(self) -> bool:
+        box = getattr(self, "_snap_box", None)
+        if box is not None:
+            return bool(box.isChecked())
+        return bool(gremlin.config.Configuration().afcs_snap_to_grid)
+
+    def _on_segment_toggled(self, checked: bool) -> None:
+        gremlin.config.Configuration().afcs_show_selected_segment_only = bool(checked)
+        self._apply_segment_visibility()
+
+    def _segment_enabled(self) -> bool:
+        box = getattr(self, "_segment_box", None)
+        if box is not None:
+            return bool(box.isChecked())
+        return bool(gremlin.config.Configuration().afcs_show_selected_segment_only)
+
+    def _port_peers(self, node, *, upstream: bool) -> list:
+        """Nodes linked through input ports (upstream) or output ports (downstream)."""
+        peers = []
+        if node is None:
+            return peers
+        try:
+            ports = (node.input_ports() if upstream else node.output_ports()) or []
+        except Exception:
+            ports = []
+        for port in ports:
+            try:
+                connected = port.connected_ports() or []
+            except Exception:
+                connected = []
+            for other in connected:
+                try:
+                    peer = other.node()
+                except Exception:
+                    peer = None
+                if peer is not None and hasattr(peer, "AFCS_KIND"):
+                    peers.append(peer)
+        return peers
+
+    def _chain_node_ids(self, seeds) -> set[str]:
+        """Directed signal paths for every seed (Shift-multi-select unions them)."""
+        wanted: set[str] = set()
+
+        def _walk(start_nodes, *, upstream: bool) -> None:
+            stack = [n for n in start_nodes if n is not None and hasattr(n, "AFCS_KIND")]
+            seen: set[str] = set()
+            while stack:
+                node = stack.pop()
+                node_id = str(getattr(node, "id", "") or "")
+                if not node_id or node_id in seen:
+                    continue
+                seen.add(node_id)
+                wanted.add(node_id)
+                for peer in self._port_peers(node, upstream=upstream):
+                    peer_id = str(getattr(peer, "id", "") or "")
+                    if peer_id and peer_id not in seen:
+                        stack.append(peer)
+
+        for seed in seeds or []:
+            if seed is None or not hasattr(seed, "AFCS_KIND"):
+                continue
+            seed_id = str(getattr(seed, "id", "") or "")
+            if seed_id:
+                wanted.add(seed_id)
+            _walk([seed], upstream=True)
+            _walk([seed], upstream=False)
+        return wanted
+
+    def _force_all_nodes_visible(self) -> None:
+        """Bypass segment logic and force every AFCS node + pipe visible (mode switch)."""
+        if self._graph is None:
+            return
+        for node in self._graph_nodes():
+            try:
+                node.model.set_property("visible", True)
+            except Exception:
+                pass
+            view = getattr(node, "view", None)
+            if view is None:
+                continue
+            try:
+                view.visible = True
+            except Exception:
+                try:
+                    view.setVisible(True)
+                except Exception:
+                    pass
+            self._sync_pipe_visibility(node)
+        self._sync_all_pipes()
+
+    def _show_all_nodes(self) -> None:
+        if self._graph is None:
+            return
+        for node in self._graph_nodes():
+            self._set_node_visible(node, True)
+        self._sync_all_pipes()
+
+    def _purge_orphan_pipes(self) -> None:
+        if self._graph is None:
+            return
+        try:
+            from OdenGraphQt.qgraphics.pipe import PipeItem
+        except Exception:
+            return
+        try:
+            scene = self._graph.scene()
+        except Exception:
+            return
+        if scene is None:
+            return
+        for item in list(scene.items()):
+            if not isinstance(item, PipeItem):
+                continue
+            try:
+                ip = getattr(item, "input_port", None)
+                op = getattr(item, "output_port", None)
+                ip_node = getattr(ip, "node", None) if ip is not None else None
+                op_node = getattr(op, "node", None) if op is not None else None
+                if ip is None and op is None:
+                    continue
+                if ip_node is None or op_node is None or not ip_node.scene() or not op_node.scene():
+                    try:
+                        item.delete()
+                    except Exception:
+                        try:
+                            scene.removeItem(item)
+                        except Exception:
+                            pass
+            except Exception:
+                try:
+                    scene.removeItem(item)
+                except Exception:
+                    pass
+
+    def _sync_pipe_visibility(self, node) -> None:
+        view = getattr(node, "view", None) if node is not None else None
+        if view is None:
+            return
+        try:
+            node_visible = bool(view.isVisible())
+        except Exception:
+            node_visible = True
+        ports = list(getattr(view, "inputs", []) or []) + list(getattr(view, "outputs", []) or [])
+        for port in ports:
+            for pipe in list(getattr(port, "connected_pipes", []) or []):
+                try:
+                    if not node_visible:
+                        pipe.setVisible(False)
+                        continue
+                    ip = pipe.input_port
+                    op = pipe.output_port
+                    if ip is not None and op is not None:
+                        pipe.draw_path(ip, op)
+                    else:
+                        pipe.setVisible(False)
+                except Exception:
+                    try:
+                        pipe.setVisible(False)
+                    except Exception:
+                        pass
+
+    def _sync_all_pipes(self) -> None:
+        if self._graph is None:
+            return
+        seen = set()
+        for node in self._graph_nodes():
+            view = getattr(node, "view", None)
+            if view is None:
+                continue
+            ports = list(getattr(view, "inputs", []) or []) + list(getattr(view, "outputs", []) or [])
+            for port in ports:
+                for pipe in list(getattr(port, "connected_pipes", []) or []):
+                    pid = id(pipe)
+                    if pid in seen:
+                        continue
+                    seen.add(pid)
+                    try:
+                        ip = pipe.input_port
+                        op = pipe.output_port
+                        if ip is not None and op is not None:
+                            pipe.draw_path(ip, op)
+                    except Exception:
+                        pass
+        self._purge_orphan_pipes()
+
+    def _set_node_visible(self, node, visible: bool) -> None:
+        if node is None:
+            return
+        visible = bool(visible)
+        view = getattr(node, "view", None)
+        # Prefer direct model/view updates. NodeVisibleCmd + undo interactions are unreliable here.
+        try:
+            node.model.set_property("visible", visible)
+        except Exception:
+            pass
+        if view is not None:
+            try:
+                props = getattr(view, "_properties", None)
+                if isinstance(props, dict):
+                    props["visible"] = visible
+            except Exception:
+                pass
+            try:
+                view.setVisible(visible)
+            except Exception:
+                try:
+                    view.visible = visible
+                except Exception:
+                    pass
+        self._sync_pipe_visibility(node)
+
+    def _apply_segment_visibility(self) -> None:
+        # Never leave filtering permanently disabled after a failed mode switch.
+        if getattr(self, "_segment_suspend", False) and not self._loading:
+            self._segment_suspend = False
+        if self._graph is None or self._loading:
+            return
+        nodes = self._graph_nodes()
+        if not nodes:
+            self._purge_orphan_pipes()
+            return
+        if not self._segment_enabled():
+            self._force_all_nodes_visible()
+            return
+        selected = self._selected_afcs_nodes()
+        if not selected:
+            self._force_all_nodes_visible()
+            return
+        wanted = self._chain_node_ids(selected)
+        for node in nodes:
+            node_id = str(getattr(node, "id", "") or "")
+            self._set_node_visible(node, bool(node_id) and node_id in wanted)
+        self._sync_all_pipes()
+        try:
+            scene = self._graph.scene()
+            if scene is not None:
+                scene.update()
+        except Exception:
+            pass
+
+    def _snap_all_nodes(self) -> None:
+        if self._graph is None:
+            return
+        views = []
+        for node in self._graph_nodes():
+            view = getattr(node, "view", None)
+            if view is not None:
+                views.append(view)
+        self._snap_node_views(views)
+
+    def _snap_node_views(self, node_views) -> None:
+        if self._graph is None or self._snapping:
+            return
+        changed = False
+        self._snapping = True
+        try:
+            for node_view in node_views or []:
+                try:
+                    x, y = node_view.xy_pos
+                    sx, sy = _snap_xy(float(x), float(y))
+                    if abs(sx - float(x)) <= 1e-6 and abs(sy - float(y)) <= 1e-6:
+                        continue
+                    node_view.xy_pos = [sx, sy]
+                    node_id = getattr(node_view, "id", None)
+                    node = self._graph.get_node_by_id(node_id) if node_id else None
+                    if node is not None:
+                        node.model.pos = [sx, sy]
+                    changed = True
+                except Exception:
+                    continue
+        finally:
+            self._snapping = False
+        if changed and not self._loading:
+            self._capture_graph()
+
     def _on_show_live_toggled(self, checked: bool) -> None:
         gremlin.config.Configuration().afcs_show_live_while_running = bool(checked)
         self._refresh_meters()
@@ -1733,8 +2278,12 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                         "range_mode": graph_node.get_property("range_mode"),
                         "display_range": graph_node.get_property("display_range"),
                     }
+                    names = self._meter_names_for_node(graph_node)
+                    centered = meter_is_centered(kind, props, names)
                     if hasattr(meter, "set_centered"):
-                        meter.set_centered(meter_is_centered(kind, props, self._meter_names_for_node(graph_node)))
+                        meter.set_centered(centered)
+                    if hasattr(meter, "set_unit_unipolar"):
+                        meter.set_unit_unipolar(kind == "input" and not centered)
                     meter.set_value(float(values.get(afcs_id, 0.0)) if live else 0.0)
                 except Exception:
                     pass
