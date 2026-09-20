@@ -724,7 +724,6 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawRect(rect)
 
     tracker = ApplicationViewTracker()
-    tracker.sample(item)
     pixmap = tracker.pixmap(item)
     if pixmap is not None and not pixmap.isNull():
         keep = bool(style.get("image_keep_aspect", True))
@@ -1835,6 +1834,9 @@ def _format_graph_tick(value: float, unit: str) -> str:
     return f"{text}{unit}" if unit else text
 
 
+_BAR_UNSET = object()
+
+
 def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Scrolling time plot of one or more physical / vJoy axes."""
     from .graph_track import GraphOverlayTracker, graph_period_s, graph_series_label, graph_unit, graph_value_range
@@ -1843,7 +1845,7 @@ def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
     rect = widget_rect(item)
     radius = _corner_radius(style, 6.0)
     painter.save()
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
     painter.setBrush(fill_brush(style.get("fill"), "#121826"))
@@ -1949,7 +1951,7 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
     rect = widget_rect(item)
     radius = _corner_radius(style, 6.0)
     painter.save()
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(style.get("border"), _border_w(style)))
     painter.setBrush(fill_brush(style.get("fill"), "#121826"))
@@ -2012,16 +2014,28 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
 
     count = max(1, len(series))
     gap = 6.0
+    percents = {}
+    if isinstance(value, tuple):
+        for entry in value:
+            if isinstance(entry, tuple) and len(entry) >= 2:
+                percents[str(entry[0])] = entry[1]
+
+    def _bar_percent(series_item):
+        series_id = str(series_item.get("id") or "")
+        cached = percents.get(series_id, _BAR_UNSET)
+        if cached is not _BAR_UNSET:
+            return 0.0 if cached is None else float(cached)
+        if binding_is_configured(series_item):
+            raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
+            return axis_display_percent(raw, series_is_centered(series_item))
+        return 0.0
+
     painter.setPen(QtCore.Qt.NoPen)
     if vertical:
         bar_w = max(6.0, (plot.width() - gap * (count - 1)) / count)
         for index, series_item in enumerate(series):
             x = plot.left() + index * (bar_w + gap)
-            percent = 0.0
-            if binding_is_configured(series_item):
-                raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
-                percent = axis_display_percent(raw, series_is_centered(series_item))
-            percent = max(vmin, min(vmax, percent))
+            percent = max(vmin, min(vmax, _bar_percent(series_item)))
             y_val = plot.bottom() - ((percent - vmin) / span) * plot.height()
             y_zero = plot.bottom() - ((0.0 - vmin) / span) * plot.height()
             y_zero = max(plot.top(), min(plot.bottom(), y_zero))
@@ -2034,11 +2048,7 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
         bar_h = max(6.0, (plot.height() - gap * (count - 1)) / count)
         for index, series_item in enumerate(series):
             y = plot.top() + index * (bar_h + gap)
-            percent = 0.0
-            if binding_is_configured(series_item):
-                raw = read_axis(series_item, series_item.get("input_id"), bool(series_item.get("invert")))
-                percent = axis_display_percent(raw, series_is_centered(series_item))
-            percent = max(vmin, min(vmax, percent))
+            percent = max(vmin, min(vmax, _bar_percent(series_item)))
             x_val = plot.left() + ((percent - vmin) / span) * plot.width()
             x_zero = plot.left() + ((0.0 - vmin) / span) * plot.width()
             x_zero = max(plot.left(), min(plot.right(), x_zero))

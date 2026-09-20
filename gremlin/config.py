@@ -2111,6 +2111,28 @@ class Configuration(QtCore.QObject):
             self._set_data("afcs_show_live_while_running", bool(value))
 
     @property
+    def afcs_snap_to_grid(self):
+        """Snap AFCS designer nodes to the canvas grid while dragging."""
+        return bool(self._get_data("afcs_snap_to_grid", False))
+
+    @afcs_snap_to_grid.setter
+    def afcs_snap_to_grid(self, value):
+        current = self.afcs_snap_to_grid
+        if current != bool(value):
+            self._set_data("afcs_snap_to_grid", bool(value))
+
+    @property
+    def afcs_show_selected_segment_only(self):
+        """Hide AFCS nodes that are not in the selected node's connected chain."""
+        return bool(self._get_data("afcs_show_selected_segment_only", False))
+
+    @afcs_show_selected_segment_only.setter
+    def afcs_show_selected_segment_only(self, value):
+        current = self.afcs_show_selected_segment_only
+        if current != bool(value):
+            self._set_data("afcs_show_selected_segment_only", bool(value))
+
+    @property
     def input_viewer_disables_repeaters(self):
         return self._get_data("input_viewer_disables_repeaters", False)
 

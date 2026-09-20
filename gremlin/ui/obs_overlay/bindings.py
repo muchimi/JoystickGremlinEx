@@ -989,6 +989,17 @@ def _read_axis_bars(item: dict[str, Any]):
     return tuple(fingerprint)
 
 
+def _quantize_overlay_value(value):
+    """Drop DirectInput noise so still axes do not repaint 60 times a second."""
+    if isinstance(value, float):
+        return round(value * 200.0) / 200.0
+    if isinstance(value, tuple):
+        return tuple(_quantize_overlay_value(item) for item in value)
+    if isinstance(value, list):
+        return [_quantize_overlay_value(item) for item in value]
+    return value
+
+
 def read_widget_value(item: dict[str, Any]):
     """Return the live value used by a widget: float, (x,y), bool, or hat tuple."""
     widget_type = item.get("type")
@@ -1084,13 +1095,13 @@ class OverlayValueBus(QtCore.QObject):
         self._refcount = 0
         self._connected = False
         self._poll = QtCore.QTimer(self)
-        self._poll.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
+        self._poll.setTimerType(QtCore.Qt.TimerType.CoarseTimer)
         self._poll.setInterval(self.POLL_INTERVAL_MS)
         self._poll.timeout.connect(self.refresh)
         self._cache: dict[str, Any] = {}
         self._visible_cache: dict[str, bool] = {}
         self._locked: set[str] = set()
-        self._scene_widgets: list[dict[str, Any]] = []
+        self._widget_sources: dict[int, list[dict[str, Any]]] = {}
         self._streamdeck_hooked = False
         self._streamdeck_bridge = None
         self._refresh_queued = False
@@ -1099,41 +1110,40 @@ class OverlayValueBus(QtCore.QObject):
         if app is not None and QtCore.QThread.currentThread() is not app.thread():
             self.moveToThread(app.thread())
 
-    def attach(self, widgets: list[dict[str, Any]] | None = None):
-        if widgets is not None:
-            self._scene_widgets = widgets
+    def attach(self, widgets: list[dict[str, Any]] | None = None, source=None):
+        self.set_widgets(widgets if widgets is not None else [], source=source)
         self._refcount += 1
         if self._refcount == 1:
             self._connect()
         self.refresh()
 
-    def detach(self):
+    def detach(self, source=None):
+        if source is not None:
+            self._widget_sources.pop(id(source), None)
         self._refcount = max(0, self._refcount - 1)
         if self._refcount == 0:
+            self._widget_sources.clear()
             self._disconnect()
 
-    def set_widgets(self, widgets: list[dict[str, Any]]):
-        self._scene_widgets = widgets
+    def set_widgets(self, widgets: list[dict[str, Any]], source=None):
+        key = id(source) if source is not None else 0
+        self._widget_sources[key] = widgets or []
+
+    def _iter_widgets(self):
+        seen: set[str] = set()
+        for widgets in self._widget_sources.values():
+            for item in widgets or []:
+                widget_id = item.get("id")
+                if not widget_id or widget_id in seen:
+                    continue
+                seen.add(widget_id)
+                yield item
 
     def _connect(self):
         if self._connected:
             return
-        try:
-            from gremlin.ui import state_device
-
-            state_device.StateData().changed.connect(self.refresh)
-        except Exception:
-            pass
-        try:
-            import gremlin.event_handler
-
-            el = gremlin.event_handler.EventListener()
-            el.runtime_mode_changed.connect(self.refresh)
-            el.edit_mode_changed.connect(self.refresh)
-            el.profile_started.connect(self.refresh)
-            el.profile_stop.connect(self.refresh)
-        except Exception:
-            pass
+        # Timer poll is enough for axes/buttons/states. Extra DirectInput/state
+        # callbacks used to run a second full refresh in the same frame.
         self._hook_streamdeck(True)
         self._poll.start()
         self._connected = True
@@ -1141,22 +1151,6 @@ class OverlayValueBus(QtCore.QObject):
     def _disconnect(self):
         if not self._connected:
             return
-        try:
-            from gremlin.ui import state_device
-
-            state_device.StateData().changed.disconnect(self.refresh)
-        except Exception:
-            pass
-        try:
-            import gremlin.event_handler
-
-            el = gremlin.event_handler.EventListener()
-            el.runtime_mode_changed.disconnect(self.refresh)
-            el.edit_mode_changed.disconnect(self.refresh)
-            el.profile_started.disconnect(self.refresh)
-            el.profile_stop.disconnect(self.refresh)
-        except Exception:
-            pass
         self._hook_streamdeck(False)
         self._poll.stop()
         self._connected = False
@@ -1209,7 +1203,7 @@ class OverlayValueBus(QtCore.QObject):
         self._refresh_queued = False
         if not alive(self):
             return
-        if any(item.get("type") == "sys_stats" for item in self._scene_widgets):
+        if any(item.get("type") == "sys_stats" for item in self._iter_widgets()):
             from .sys_stats import SysStatsSampler
 
             SysStatsSampler().tick()
@@ -1231,7 +1225,7 @@ class OverlayValueBus(QtCore.QObject):
         manual_ids = set()
         remote_ids = set()
         application_ids = set()
-        for item in self._scene_widgets:
+        for item in self._iter_widgets():
             widget_id = item.get("id")
             widget_type = item.get("type")
             if widget_type == "axis_mouse" and widget_id:
@@ -1261,7 +1255,7 @@ class OverlayValueBus(QtCore.QObject):
                     remote_ids.add(cid)
             if widget_id in self._locked:
                 continue
-            value = read_widget_value(item)
+            value = _quantize_overlay_value(read_widget_value(item))
             live = widget_is_live_visible(item)
             blink_dirty = False
             if blink_is_armed(item.get("blink")):
@@ -1296,7 +1290,7 @@ class OverlayValueBus(QtCore.QObject):
         widget_id = item.get("id")
         if widget_id in self._cache:
             return self._cache[widget_id]
-        value = read_widget_value(item)
+        value = _quantize_overlay_value(read_widget_value(item))
         self._cache[widget_id] = value
         self._visible_cache[widget_id] = widget_is_live_visible(item)
         return value
@@ -1310,9 +1304,10 @@ class OverlayValueBus(QtCore.QObject):
             return
         if lock:
             self._locked.add(widget_id)
-        if self._cache.get(widget_id) == value:
+        quantized = _quantize_overlay_value(value)
+        if self._cache.get(widget_id) == quantized:
             return
-        self._cache[widget_id] = value
+        self._cache[widget_id] = quantized
         self.values_changed.emit([widget_id])
 
     def unlock(self, widget_id: str | None):

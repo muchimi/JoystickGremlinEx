@@ -277,6 +277,9 @@ class OverlayView(QtWidgets.QWidget):
         self._scene_connected = True
         self._bus_connected = False
         self._scene_queued = False
+        self._update_queued = False
+        self._pending_full = False
+        self._pending_rect = QtCore.QRect()
         self.destroyed.connect(self._on_view_destroyed)
 
     def _on_view_destroyed(self, *_args):
@@ -383,9 +386,9 @@ class OverlayView(QtWidgets.QWidget):
         if QtCore.QThread.currentThread() is not self.thread():
             QtCore.QTimer.singleShot(0, self, self.attach_bus)
             return
-        self.bus.set_widgets(self.page_widgets)
+        self.bus.set_widgets(self.page_widgets, source=self)
         if not self._bus_connected:
-            self.bus.attach(self.page_widgets)
+            self.bus.attach(self.page_widgets, source=self)
             self.bus.values_changed.connect(self._on_values_changed)
             self._bus_connected = True
 
@@ -397,13 +400,13 @@ class OverlayView(QtWidgets.QWidget):
         except Exception:
             pass
         self._bus_connected = False
-        self.bus.detach()
+        self.bus.detach(source=self)
 
     def _on_values_changed(self, widget_ids=None):
         if not Shiboken.isValid(self):
             return
         if not widget_ids:
-            self.update()
+            self._schedule_update(None)
             return
         united = QtCore.QRect()
         for widget_id in widget_ids:
@@ -413,9 +416,35 @@ class OverlayView(QtWidgets.QWidget):
             rect = self._widget_rect(widget_dirty_rect(item))
             united = rect if united.isNull() else united.united(rect)
         if united.isNull():
+            return
+        self._schedule_update(united)
+
+    def _schedule_update(self, rect: QtCore.QRect | None):
+        if rect is None:
+            self._pending_full = True
+        elif not self._pending_full:
+            if self._pending_rect.isNull():
+                self._pending_rect = QtCore.QRect(rect)
+            else:
+                self._pending_rect = self._pending_rect.united(rect)
+        if self._update_queued:
+            return
+        self._update_queued = True
+        QtCore.QTimer.singleShot(0, self, self._flush_update)
+
+    def _flush_update(self):
+        self._update_queued = False
+        if not Shiboken.isValid(self):
+            return
+        full = self._pending_full
+        rect = QtCore.QRect(self._pending_rect)
+        self._pending_full = False
+        self._pending_rect = QtCore.QRect()
+        if full:
             self.update()
-        else:
-            self.update(united)
+            return
+        if not rect.isNull():
+            self.update(rect)
 
     def _on_scene_changed(self):
         if not Shiboken.isValid(self):
@@ -427,7 +456,7 @@ class OverlayView(QtWidgets.QWidget):
             QtCore.QTimer.singleShot(0, self, self._on_scene_changed)
             return
         self._scene_queued = False
-        self.bus.set_widgets(self.page_widgets)
+        self.bus.set_widgets(self.page_widgets, source=self)
         self._grid_pm = None
         self._sync_paint_mode()
         self._apply_size()
