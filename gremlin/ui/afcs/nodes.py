@@ -19,17 +19,29 @@ class _MeterBar(QtWidgets.QWidget):
         super().__init__(parent)
         self._value = 0.0
         self._centered = True
+        self._unit_unipolar = False
         self.setMinimumHeight(16)
         self.setMaximumHeight(18)
         self.setMinimumWidth(110)
 
     def set_centered(self, centered: bool) -> None:
         self._centered = bool(centered)
+        if self._centered:
+            self._unit_unipolar = False
+        self.update()
+
+    def set_unit_unipolar(self, native: bool) -> None:
+        self._unit_unipolar = bool(native) and not self._centered
         self.update()
 
     def set_value(self, value: float) -> None:
         self._value = max(-1.0, min(1.0, float(value)))
         self.update()
+
+    def _unipolar_fill(self) -> float:
+        if self._unit_unipolar:
+            return max(0.0, min(1.0, self._value))
+        return max(0.0, min(1.0, (self._value + 1.0) * 0.5))
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -49,8 +61,7 @@ class _MeterBar(QtWidgets.QWidget):
                 color = QtGui.QColor(200, 90, 60)
             painter.fillRect(bar, color)
         else:
-            fill = max(0.0, min(1.0, (self._value + 1.0) * 0.5))
-            span = int(fill * rect.width())
+            span = int(self._unipolar_fill() * rect.width())
             painter.fillRect(QtCore.QRect(rect.left(), rect.top(), span, rect.height()), QtGui.QColor(70, 170, 90))
         painter.setPen(QtGui.QColor(20, 20, 20))
         painter.drawRect(rect)
@@ -74,13 +85,18 @@ class _MeterRow(QtWidgets.QWidget):
         self._bar.set_centered(centered)
         self.set_value(self._bar._value)
 
+    def set_unit_unipolar(self, native: bool) -> None:
+        self._bar.set_unit_unipolar(native)
+        self.set_value(self._bar._value)
+
     def set_value(self, value: float) -> None:
         current = max(-1.0, min(1.0, float(value)))
         self._bar.set_value(current)
         if self._centered:
             self._label.setText(f"{current:+.2f}")
         else:
-            self._label.setText(f"{(current + 1.0) * 50.0:.0f}%")
+            fill = self._bar._unipolar_fill()
+            self._label.setText(f"{fill * 100.0:.0f}%")
 
 
 class NodeMeterWidget(NodeBaseWidget):
@@ -98,6 +114,11 @@ class NodeMeterWidget(NodeBaseWidget):
         row = self.get_custom_widget()
         if row is not None:
             row.set_centered(centered)
+
+    def set_unit_unipolar(self, native: bool) -> None:
+        row = self.get_custom_widget()
+        if row is not None:
+            row.set_unit_unipolar(native)
 
     def set_value(self, value=0.0):
         row = self.get_custom_widget()
