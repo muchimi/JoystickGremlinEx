@@ -59,6 +59,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: API: EMA filter updates on drastic input changes (courtesy Lolo350)
 - Fix: UI: plugin UI does not always update correctly.
 - New: AFCS action (courtesy Lolo350)
+	- AFCS designer polish (canvas/inspector UX)
+	- Config toggles: snap-to-grid and show-selected-segment-only
+	- Robust AFCS device-tab registration in the main window
+	
+- Change: Overlay:
+	- Overlay visibility conditions/preview, blink, host window, property clipboard, selection pane
+	- Gradient fills (editor + palette storage) with live widget preview and enable/disable checkbox
+	- Widget/font drop shadows with smoother rendering; collapsible inspector sections
+	- Stream Deck page-name preservation in the profile sidecar; overlay persist logging
 
 ### (m77T57)
 - Change: further optimization of input filtering for axis and button/hat inputs
