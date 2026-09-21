@@ -50,6 +50,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T58)
+- Change: further optimization of input filtering for axis and button/hat inputs and large deviations.
+
+
 ### (m77T57A)
 - Fix: UI: various fixes (courtesy Lolo350)
 - Fix: API: EMA filter updates on drastic input changes (courtesy Lolo350)
