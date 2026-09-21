@@ -899,6 +899,8 @@ class EventListener(QtCore.QObject):
         self._vjoy_callbacks = []
         self._debounce_map = {}
         self._button_debounce_seconds =  0.01
+        self._axis_settle_timers = {}
+        self._axis_settle_lock = threading.Lock()
 
         self._hat_state = {}  # list of map positions (device_id, input_id), position_tuple, if blank - not set
 
@@ -1031,12 +1033,86 @@ class EventListener(QtCore.QObject):
             callback(event)
 
     def reset(self):
+        self._cancel_axis_settle_timers()
         self._vjoy_events.clear()
         self._vjoy_callbacks.clear()
         self._mode_lookup_cache.clear()
 
         # clear the event queue
         self._event_queue.clear()
+
+    def _cancel_axis_settle_timers(self):
+        with self._axis_settle_lock:
+            for timer in self._axis_settle_timers.values():
+                timer.cancel()
+            self._axis_settle_timers.clear()
+
+    def _schedule_axis_settle_check(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
+        """Schedules a one-shot settling check after axis input quiets down."""
+        settle_delay = 0.025
+        if data is not None and data.filter is not None:
+            settle_delay = max(data.filter.settle_interval_ns / 1_000_000_000.0, 0.0)
+
+        with self._axis_settle_lock:
+            old_timer = self._axis_settle_timers.pop(key, None)
+            if old_timer is not None:
+                old_timer.cancel()
+
+            timer = Timer(settle_delay, lambda: self._axis_settle_timer_cb(key, data, device_guid, input_id, is_virtual))
+            timer.daemon = True
+            self._axis_settle_timers[key] = timer
+            timer.start()
+
+    def _axis_settle_timer_cb(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
+        with self._axis_settle_lock:
+            self._axis_settle_timers.pop(key, None)
+
+        if not self._running:
+            return
+
+        if self._debounce_map.get(key) is not data:
+            return
+
+        try:
+            settled_raw = data.check_settling()
+        except Exception:
+            return
+
+        if settled_raw is None:
+            return
+
+        self._queue_settled_axis_event(device_guid, input_id, settled_raw, is_virtual)
+
+    def _queue_settled_axis_event(self, device_guid, input_id: int, raw_axis_value: float, is_virtual: bool):
+        """Queues a synthesized final axis sample when an axis has settled."""
+        raw_value = gremlin.util.scale_to_range(raw_axis_value, source_min=-32768, source_max=32767, target_min=-1.0, target_max=1.0)
+        value = raw_value
+        extra_data = {"settled": True}
+
+        if self._has_calibration(device_guid, input_id):
+            value = self._apply_calibration_ex(device_guid, input_id, raw_axis_value)
+            extra_data["calibrated"] = True
+            extra_data["calibrated_value"] = value
+
+        curved_value, has_curve = self._apply_curve_ex(device_guid, input_id, value)
+        if has_curve:
+            extra_data["curved"] = True
+
+        event = Event(
+            event_type=InputType.JoystickAxis,
+            device_guid=device_guid,
+            identifier=input_id,
+            value=value,
+            curved_value=curved_value,
+            raw_value=raw_value,
+            is_axis=True,
+            is_virtual=is_virtual,
+            extra_data=extra_data,
+        )
+
+        self.queueJoystickEvent(event)
+        if not gremlin.shared_state.is_running:
+            self.axis_state_change.emit(event)
 
     def disconnect(self, signal: Signal | QtCore.Signal, slot: Callable):
         """attempts to disconnect a slot from a signal safely"""
@@ -1105,6 +1181,7 @@ class EventListener(QtCore.QObject):
         self.stopKeepAlive()
         self.stopRunThread()
         self.stopEventThread()
+        self._cancel_axis_settle_timers()
 
         # mark all events processed
         self._event_queue.clear()
@@ -1226,6 +1303,7 @@ class EventListener(QtCore.QObject):
         # clear the current event queue
         syslog.info(f"EXEC: clear event queue: size: {len(self._event_queue)}")
         self._event_queue.clear()
+        self._cancel_axis_settle_timers()
 
         self._profile_started = False
         device_guid = gremlin.shared_state.mode_tab_guid
@@ -1725,15 +1803,38 @@ class EventListener(QtCore.QObject):
 
         data = self._debounce_map.get(key)
         if data is None:
-            data = DInputData()
-            self._debounce_map[key] = data
+            if event_type == dinput.InputType.Axis:
+                data = DInputData(
+                    device_guid=event.device_guid,
+                    input_id=input_id,
+                )
+                self._debounce_map[key] = data
+                data.process_input(value)
+                self._schedule_axis_settle_check(
+                    key=key,
+                    data=data,
+                    device_guid=event.device_guid,
+                    input_id=input_id,
+                    is_virtual=bool(getattr(device, "is_virtual", False)),
+                )
+            else:
+                data = DInputData()
+                self._debounce_map[key] = data
             return False # process event
 
 
         if event_type == dinput.InputType.Axis:
+            filtered = data.process_input(value) is None
+            self._schedule_axis_settle_check(
+                key=key,
+                data=data,
+                device_guid=event.device_guid,
+                input_id=input_id,
+                is_virtual=bool(getattr(device, "is_virtual", False)),
+            )
             # EMA filter for axis events. Only None means drop — never use
             # truthiness, or an exact center sample (0) is discarded.
-            return data.process_input(value) is None
+            return filtered
 
 
 
@@ -4571,18 +4672,113 @@ class AxisData:
         return f"AxisData: device: {self.device.name} input_id: {self.input_id} linear_id: {self.linear_id} actual: {self.actual_value} raw: {self.raw_value} calibrated: {self.calibrated_value} curve: {self.curve_value}"
 
 
-class DInputData:
-    """holds dinput signaling data"""
+# class DInputData:
+#     """holds dinput signaling data"""
 
-    def __init__(self):
+#     def __init__(self,
+#                  device_guid,
+#                  input_id):
+#         self.device_guid = device_guid
+#         self.input_id = input_id
+#         self.last_time = None
+#         self.value = None
+#         self.debounce = True
+#         self.filter = EMAFilter()
+
+#     def process_input(self, raw_value):
+#         """determins if the axis should be processed - returns None if should be ignored"""
+#         return self.filter.process_input(raw_value)
+
+class DInputData:
+    """Holds DirectInput signaling and filtering state."""
+
+    __slots__ = (
+        "device_guid",
+        "input_id",
+        "last_time",
+        "value",
+        "debounce",
+        "filter",
+    )
+
+    def __init__(
+        self,
+        device_guid=None,
+        input_id=None,
+        read_axis_callback=None,
+        **filter_options,
+    ):
+        """
+        Initializes DirectInput state for an axis.
+
+        :param device_guid: GUID identifying the DirectInput device.
+        :param input_id: Identifier or index of the axis.
+        :param read_axis_callback: Callable accepting ``device_guid`` and
+            ``input_id`` and returning the current raw axis value.
+        :param filter_options: Optional keyword arguments passed directly to
+            ``EMAFilter``.
+        """
+        self.device_guid = device_guid
+        self.input_id = input_id
         self.last_time = None
         self.value = None
         self.debounce = True
-        self.filter = EMAFilter()
+
+        if read_axis_callback is None:
+            read_axis_callback = self._read_axis
+
+        if not callable(read_axis_callback):
+            raise TypeError("read_axis_callback must be callable")
+
+
+        self.filter = EMAFilter(
+            read_value_callback=read_axis_callback,
+            **filter_options,
+        )
+
+    def _read_axis(self):
+        """ reads the current value of an axis from DINPUT """
+        return dinput.DILL.get_axis(self.device_guid, self.input_id)
+
 
     def process_input(self, raw_value):
-        """determins if the axis should be processed - returns None if should be ignored"""
-        return self.filter.process_input(raw_value)
+        """
+        Processes a new axis sample.
+
+        :param raw_value: Raw axis value supplied by DirectInput.
+        :return: Filtered value when it should be propagated; otherwise,
+            ``None``.
+        """
+        value = self.filter.process_input(raw_value)
+
+        if value is not None:
+            self.value = value
+
+        return value
+
+    def check_settling(self):
+        """
+        Checks whether the axis has reached its final physical position.
+
+        :return: Exact final value when settling occurs; otherwise, ``None``.
+        """
+        value = self.filter.check_settling()
+
+        if value is not None:
+            self.value = value
+
+        return value
+
+    def reset(self, raw_value=None):
+        """
+        Resets the axis state and filter.
+
+        :param raw_value: Optional value used to initialize the filter.
+        :return: ``None``.
+        """
+        self.last_time = None
+        self.value = raw_value
+        self.filter.reset(raw_value)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -4595,6 +4791,8 @@ class DInputState:
         el.profile_unload.connect(self.reset)
         el.profile_start.connect(self.reset)
         el.profile_stop.connect(self.reset)
+
+
 
     def shouldProcess(self, event: dinput.InputEvent):
         key = self.getKey(event)

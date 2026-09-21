@@ -80,8 +80,8 @@ import time
 #             self.smoothed_value = out
 #         return out
 
-
-
+import math
+from typing import Callable
 
 
 class EMAFilter:
@@ -91,89 +91,79 @@ class EMAFilter:
         "threshold",
         "large_jump_threshold",
         "min_interval_ns",
+        "settle_interval_ns",
+        "settle_tolerance",
         "input_min",
         "input_max",
         "clamp_input",
+        "read_value_callback",
         "smoothed_value",
         "last_raw_value",
         "last_sent_value",
+        "last_input_time_ns",
         "last_process_time_ns",
     )
 
     def __init__(
         self,
+        read_value_callback: Callable[[], float],
         smoothing_factor=0.25,
         change_threshold=0.01,
         min_interval_ms=10,
+        settle_interval_ms=25,
+        settle_tolerance=1.0,
         input_min=-32768.0,
         input_max=32767.0,
         large_jump_ratio=0.015,
         clamp_input=False,
+
     ):
         """
         Initializes the axis input filter.
 
-        :param smoothing_factor:
-            EMA smoothing coefficient in the range ``(0.0, 1.0]``.
-            Lower values produce smoother but slower output. Higher values
-            respond faster but allow more input noise through.
-
-            Typical values are:
-
-            - ``0.10``: Heavy smoothing.
-            - ``0.25``: Balanced smoothing.
-            - ``0.75``: Light smoothing.
-            - ``1.00``: No smoothing.
-
-        :param change_threshold:
-            Minimum change required before a filtered value can be emitted.
-
-            Values from ``0.0`` through ``1.0`` are interpreted as a fraction
-            of the complete axis range. Values greater than ``1.0`` are
-            interpreted as raw axis units.
-
-            For a range of ``-32768`` through ``32767``:
-
-            - ``0.001`` is approximately 66 raw units.
-            - ``0.010`` is approximately 655 raw units.
-            - ``500.0`` is exactly 500 raw units.
-
-        :param min_interval_ms:
-            Minimum number of milliseconds between ordinary emitted events.
-            Large changes bypass this rate limit so rapid movements and
-            return-to-center events are not delayed. A value of ``0`` disables
-            interval-based throttling.
-
-        :param input_min:
-            Minimum expected raw axis value. This is used to calculate
-            proportional thresholds and optionally clamp invalid values.
-
-        :param input_max:
-            Maximum expected raw axis value. This must be greater than
-            ``input_min``.
-
-        :param large_jump_ratio:
-            Fraction of the complete axis range considered a large change.
-            Large changes bypass both EMA smoothing and rate limiting.
-
-            For a 65,535-unit DirectInput range:
-
-            - ``0.005`` is approximately 328 raw units.
-            - ``0.015`` is approximately 983 raw units.
-            - ``0.050`` is approximately 3,277 raw units.
-
-        :param clamp_input:
-            When ``True``, values outside ``input_min`` and ``input_max`` are
-            clamped to the configured range. Leave this disabled when the
-            input API already guarantees the range to avoid extra comparisons
-            for every event.
-
-        :raises ValueError:
-            If a parameter is outside its permitted range.
+        :param read_value_callback: Callback that returns the axis's current
+            raw value. The callback takes no arguments and is invoked by
+            ``check_settling()`` after the input has been quiet for the
+            configured settling interval.
+        :param smoothing_factor: EMA smoothing coefficient in the range
+            ``(0.0, 1.0]``. Lower values provide more smoothing, while higher
+            values provide faster response. A value of ``1.0`` disables
+            smoothing.
+        :param change_threshold: Minimum output change required to emit an
+            ordinary event. Values from ``0.0`` through ``1.0`` represent a
+            fraction of the full axis range. Values greater than ``1.0``
+            represent raw axis units.
+        :param min_interval_ms: Minimum time in milliseconds between ordinary
+            output events. Large jumps and final settling events bypass this
+            rate limit.
+        :param settle_interval_ms: Amount of time in milliseconds without a
+            new input event before ``check_settling()`` verifies the current
+            physical axis value.
+        :param settle_tolerance: Maximum raw difference between the callback
+            value and the last received raw value for the axis to be considered
+            stationary.
+        :param input_min: Minimum expected raw axis value.
+        :param input_max: Maximum expected raw axis value. Must be greater
+            than ``input_min``.
+        :param large_jump_ratio: Fraction of the full axis range considered
+            a large jump. Large jumps bypass smoothing and rate limiting.
+            Set to ``0.0`` to disable large-jump detection.
+        :param clamp_input: If ``True``, clamp raw values to ``input_min`` and
+            ``input_max``.
+        :raises TypeError: If ``read_value_callback`` is not callable.
+        :raises ValueError: If a numeric parameter is invalid.
         """
+        if not callable(read_value_callback):
+            raise TypeError("read_value_callback must be callable")
+
         alpha = float(smoothing_factor)
+        change_threshold = float(change_threshold)
+        min_interval_ms = float(min_interval_ms)
+        settle_interval_ms = float(settle_interval_ms)
+        settle_tolerance = float(settle_tolerance)
         input_min = float(input_min)
         input_max = float(input_max)
+        large_jump_ratio = float(large_jump_ratio)
 
         if not 0.0 < alpha <= 1.0:
             raise ValueError(
@@ -195,6 +185,16 @@ class EMAFilter:
                 "min_interval_ms cannot be negative"
             )
 
+        if settle_interval_ms < 0.0:
+            raise ValueError(
+                "settle_interval_ms cannot be negative"
+            )
+
+        if settle_tolerance < 0.0:
+            raise ValueError(
+                "settle_tolerance cannot be negative"
+            )
+
         if not 0.0 <= large_jump_ratio <= 1.0:
             raise ValueError(
                 "large_jump_ratio must be between 0 and 1"
@@ -206,56 +206,43 @@ class EMAFilter:
         self.inverse_alpha = 1.0 - alpha
 
         self.threshold = (
-            float(change_threshold) * input_range
+            change_threshold * input_range
             if change_threshold <= 1.0
-            else float(change_threshold)
+            else change_threshold
         )
 
-        self.large_jump_threshold = (
-            float(large_jump_ratio) * input_range
-        )
-
-        self.min_interval_ns = int(
-            float(min_interval_ms) * 1_000_000
-        )
+        self.large_jump_threshold = large_jump_ratio * input_range
+        self.min_interval_ns = int(min_interval_ms * 1_000_000)
+        self.settle_interval_ns = int(settle_interval_ms * 1_000_000)
+        self.settle_tolerance = settle_tolerance
 
         self.input_min = input_min
         self.input_max = input_max
         self.clamp_input = bool(clamp_input)
+        self.read_value_callback = read_value_callback
 
         self.smoothed_value = None
         self.last_raw_value = 0.0
         self.last_sent_value = 0.0
+        self.last_input_time_ns = 0
         self.last_process_time_ns = 0
 
     def process_input(self, raw_value):
         """
         Processes one raw axis sample.
 
-        :param raw_value:
-            Current raw axis position.
-
-        :return:
-            The filtered axis value when the event should be propagated.
-            Returns ``None`` when the event is suppressed by the change
-            threshold or rate limiter.
-
-            Callers must explicitly test for ``None`` because ``0.0`` is a
-            valid axis value.
+        :param raw_value: Current raw axis value.
+        :return: Filtered axis value when the event should be propagated;
+            otherwise, ``None``.
+        :raises ValueError: If ``raw_value`` is not finite.
         """
-        value = float(raw_value)
-
-        if self.clamp_input:
-            if value < self.input_min:
-                value = self.input_min
-            elif value > self.input_max:
-                value = self.input_max
+        value = self._prepare_value(raw_value)
+        now_ns = time.perf_counter_ns()
 
         smoothed = self.smoothed_value
+        self.last_input_time_ns = now_ns
 
         if smoothed is None:
-            now_ns = time.perf_counter_ns()
-
             self.smoothed_value = value
             self.last_raw_value = value
             self.last_sent_value = value
@@ -268,15 +255,17 @@ class EMAFilter:
 
         self.last_raw_value = value
 
-        # Bypass smoothing and throttling for large movements, reversals,
-        # or rapid returns to center.
+        # Zero disables large-jump handling instead of matching every sample.
         if (
-            abs(value - last_raw) >= jump_threshold
-            or abs(value - last_sent) >= jump_threshold
+            jump_threshold > 0.0
+            and (
+                abs(value - last_raw) >= jump_threshold
+                or abs(value - last_sent) >= jump_threshold
+            )
         ):
             self.smoothed_value = value
             self.last_sent_value = value
-            self.last_process_time_ns = time.perf_counter_ns()
+            self.last_process_time_ns = now_ns
             return value
 
         smoothed = (
@@ -285,11 +274,10 @@ class EMAFilter:
         )
         self.smoothed_value = smoothed
 
-        # Avoid reading the timer for insignificant input jitter.
-        if abs(smoothed - last_sent) < self.threshold:
+        # Using <= prevents unchanged values from passing when the configured
+        # threshold is zero.
+        if abs(smoothed - last_sent) <= self.threshold:
             return None
-
-        now_ns = time.perf_counter_ns()
 
         if now_ns - self.last_process_time_ns < self.min_interval_ns:
             return None
@@ -298,26 +286,85 @@ class EMAFilter:
         self.last_process_time_ns = now_ns
         return smoothed
 
+    def check_settling(self):
+        """
+        Checks whether a quiet axis has reached its final physical position.
+
+        This method should be called periodically by the input loop even when
+        no new axis events have been received.
+
+        :return: Exact current raw axis value when final settling occurs;
+            otherwise, ``None``.
+        :raises ValueError: If the callback returns a non-finite value.
+        """
+        if self.smoothed_value is None:
+            return None
+
+        now_ns = time.perf_counter_ns()
+
+        # The input has not been quiet long enough to test for settling.
+        if now_ns - self.last_input_time_ns < self.settle_interval_ns:
+            return None
+
+        value = self._prepare_value(self.read_value_callback())
+
+        # The callback found movement that was not delivered as an event.
+        # Process it as a new sample and restart the settling interval.
+        if abs(value - self.last_raw_value) > self.settle_tolerance:
+            return self.process_input(value)
+
+        # The exact final position was already emitted.
+        if value == self.last_sent_value:
+            return None
+
+        # The physical value remained stable during the quiet interval.
+        # Snap all state to the exact value and emit it without rate limiting.
+        self.smoothed_value = value
+        self.last_raw_value = value
+        self.last_sent_value = value
+        self.last_input_time_ns = now_ns
+        self.last_process_time_ns = now_ns
+        return value
+
     def reset(self, raw_value=None):
         """
-        Resets the filter state.
+        Resets or initializes the filter state.
 
-        :param raw_value:
-            Optional initial axis value. If omitted, the next input sample
-            initializes the filter and is emitted immediately. If supplied,
-            the filter is initialized to that value without emitting an event.
-
-        :return:
-            None.
+        :param raw_value: Optional initial axis value. If ``None``, the next
+            input sample initializes the filter and is emitted immediately.
+            If supplied, the filter initializes to this value without emitting
+            an event.
+        :return: ``None``.
         """
         if raw_value is None:
             self.smoothed_value = None
             self.last_raw_value = 0.0
             self.last_sent_value = 0.0
+            self.last_input_time_ns = 0
             self.last_process_time_ns = 0
             return
 
+        value = self._prepare_value(raw_value)
+        now_ns = time.perf_counter_ns()
+
+        self.smoothed_value = value
+        self.last_raw_value = value
+        self.last_sent_value = value
+        self.last_input_time_ns = now_ns
+        self.last_process_time_ns = now_ns
+
+    def _prepare_value(self, raw_value):
+        """
+        Converts and validates an axis value.
+
+        :param raw_value: Value to convert and validate.
+        :return: Validated and optionally clamped floating-point value.
+        :raises ValueError: If the value is NaN or infinite.
+        """
         value = float(raw_value)
+
+        if not math.isfinite(value):
+            raise ValueError("axis value must be finite")
 
         if self.clamp_input:
             if value < self.input_min:
@@ -325,7 +372,4 @@ class EMAFilter:
             elif value > self.input_max:
                 value = self.input_max
 
-        self.smoothed_value = value
-        self.last_raw_value = value
-        self.last_sent_value = value
-        self.last_process_time_ns = time.perf_counter_ns()
+        return value
