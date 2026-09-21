@@ -560,12 +560,12 @@ class Configuration(QtCore.QObject):
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)
-            is_error = True
+            #is_error = True
         finally:
             self._lock.release()
 
-        if is_error:
-            syslog.warning(f"CONFIG: keeping existing config at {fname} because the write failed")
+        # if is_error:
+        #     syslog.warning(f"CONFIG: keeping existing config at {fname} because the write failed")
 
         if save_profile:
             self._save_profile_ui()

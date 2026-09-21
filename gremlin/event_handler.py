@@ -28,7 +28,6 @@ import collections
 from typing import Optional
 from threading import Thread, Timer
 from typing import Callable
-import math
 import itertools
 import queue
 
@@ -988,35 +987,88 @@ class EventListener(QtCore.QObject):
         else:
             self._event_queue.put(event)
 
-    def _event_runner(self) -> None:
-        """Process inbound joystick event thread worker"""
+    # def _event_runner_v0(self) -> None:
+    #     """Process inbound joystick event thread worker"""
 
+    #     event_queue = self._event_queue
+
+    #     joystick_event_emit = self.joystick_event.emit
+    #     joystick_event_ui_emit = self.joystick_event_ui.emit
+    #     axis_state_change_emit = self.axis_state_change.emit
+    #     button_state_change_emit = self.button_state_change.emit
+
+    #     while not self._event_event.is_set():
+    #         try:
+    #             event_list = event_queue.get(timeout=0.01)
+    #             if not isinstance(event_list, list):
+    #                 event_list = [event_list]
+    #         except FastQueue.Empty:
+    #             continue
+    #         except Exception:
+    #             continue
+
+    #         if not event_list:
+    #             continue
+
+    #         event_list = _coalesce_axis_batch(event_list)
+    #         for event in event_list:
+    #             joystick_event_emit(event)
+    #             joystick_event_ui_emit(event)
+
+    #             if not gremlin.shared_state.is_running:
+    #                 if event.is_axis:
+    #                     axis_state_change_emit(event)
+    #                 else:
+    #                     button_state_change_emit(event)
+
+    def _event_runner(self) -> None:
+        """Process inbound joystick event thread worker (lower CPU usage)."""
         event_queue = self._event_queue
+        is_set = self._event_event.is_set
 
         joystick_event_emit = self.joystick_event.emit
         joystick_event_ui_emit = self.joystick_event_ui.emit
         axis_state_change_emit = self.axis_state_change.emit
         button_state_change_emit = self.button_state_change.emit
 
-        while not self._event_event.is_set():
+        while not is_set():
             try:
-                event_list = event_queue.get(timeout=0.01)
-                if not isinstance(event_list, list):
-                    event_list = [event_list]
+                # 1. Block indefinitely with zero CPU until data arrives or stop event fires
+                item = event_queue.get(block=True, timeout=0.1)
             except FastQueue.Empty:
                 continue
             except Exception:
                 continue
 
+            # Fast single item or list normalization
+            event_list = item if isinstance(item, list) else [item]
+
+            # 2. Drain any additional queued items immediately without waiting
+            while True:
+                try:
+                    next_item = event_queue.get_nowait()
+                    if isinstance(next_item, list):
+                        event_list.extend(next_item)
+                    else:
+                        event_list.append(next_item)
+                except FastQueue.Empty:
+                    break
+
             if not event_list:
                 continue
 
-            event_list = _coalesce_axis_batch(event_list)
-            for event in event_list:
+            # 3. Coalesce high-frequency axis motion into single updates
+            # coalesced_list = _coalesce_axis_batch(event_list)
+            coalesced_list = event_list # EMA filter will handle smoothing of axis events
+
+            # Localize state access outside the inner loop
+            is_running = gremlin.shared_state.is_running
+
+            for event in coalesced_list:
                 joystick_event_emit(event)
                 joystick_event_ui_emit(event)
 
-                if not gremlin.shared_state.is_running:
+                if not is_running:
                     if event.is_axis:
                         axis_state_change_emit(event)
                     else:
@@ -1615,16 +1667,29 @@ class EventListener(QtCore.QObject):
         dinput.DILL.set_device_change_callback(None)
         dinput.DILL.set_input_event_callback(None)
 
+    # @ignore_function
+    # def _keep_alive_v0(self):
+    #     """keep alive 30 second hearbeat"""
+    #     delay = 60 * 2  # delay in seconds
+    #     notify_time = time.time()
+    #     while not self._keep_alive_event.is_set():
+    #         if time.time() >= notify_time:
+    #             self.heartbeat.emit()
+    #             notify_time = time.time() + delay  # 2 minutes
+    #         time.sleep(delay)  # do other stuff
+
+
     @ignore_function
     def _keep_alive(self):
-        """keep alive 30 second hearbeat"""
-        delay = 60 * 2  # delay in seconds
-        notify_time = time.time()
-        while not self._keep_alive_event.is_set():
-            if time.time() >= notify_time:
-                self.heartbeat.emit()
-                notify_time = time.time() + delay  # 2 minutes
-            time.sleep(5)  # do other stuff
+        """Zero-CPU background heartbeat thread."""
+        interval = 120.0  # 2 minutes in seconds
+
+        # Send initial heartbeat immediately
+        self.heartbeat.emit()
+
+        # kernel sleep: OS consumes zero CPU cycles while waiting
+        while not self._keep_alive_event.wait(timeout=interval):
+            self.heartbeat.emit()
 
     def _handle_vjoy_event(self, vjoyevent: VjoyEvent):
         """handles internal loopback events
@@ -4829,6 +4894,9 @@ class AxisState:
         self._joystick_input_item_map = {}
         self._last_axis_values = {}  # last value
         self._last_axis_time = {}  # time when last modified
+        self._axis_filters = {}
+        self._axis_filter_values = {}
+        self._axis_filter_params = {}
 
         self._registered_devices = []  # guid of registered devices
         self.usage_data = gremlin.joystick_handling.VirtualDeviceUsageState()
@@ -4857,6 +4925,9 @@ class AxisState:
         if verbose:
             syslog.info("AXIS STATE: reset...")
         self._data.clear()
+        self._axis_filters.clear()
+        self._axis_filter_values.clear()
+        self._axis_filter_params.clear()
         self._registered_devices.clear()
         self._joystick_input_item_map.clear()
         profile = gremlin.shared_state.current_profile
@@ -5176,31 +5247,41 @@ class AxisState:
             self._receive_count[key] += 1
             reason = ""
 
-        now = time.time()
+        # VJOY events can contain button/hat updates; only filter axes.
+        if isinstance(event, VjoyEvent):
+            if event.input_type != InputType.JoystickAxis:
+                return True
+            input_id = event.input_id
+
         delay = delay or self._delay
-        result = True
-        if key in self._last_axis_values:
-            last_value = self._last_axis_values[key]
-            last_modified = self._last_axis_time[key]
+        delta = delta or self._delta
 
-            delta = delta or self._delta
-            if delta and math.isclose(last_value, current_value, abs_tol=delta):
-                # fail: value within the delta change
-                self._last_axis_time[key] = now
-                if self.perf:
-                    reason = "too close"
-                result = False
+        min_interval_ms = max(float(delay), 0.0) * 1000.0
+        change_threshold = max(float(delta), 0.0)
+        params = (min_interval_ms, change_threshold)
 
-            if not result and delay and (last_modified + delay) >= now:
-                # fail: value too soon
-                if self.perf:
-                    if key not in self._skip_count:
-                        self._skip_count[key] = 0
-                    self._skip_count[key] += 1
-                    device = gremlin.joystick_handling.getDevice(event.device_guid)
-                    reason = "too frequent"
+        self._axis_filter_values[key] = current_value
 
-                result = False
+        filter_obj = self._axis_filters.get(key)
+        if filter_obj is None or self._axis_filter_params.get(key) != params:
+            filter_obj = EMAFilter(
+                read_value_callback=lambda key=key, value=current_value: self._axis_filter_values.get(key, value),
+                smoothing_factor=1.0,
+                change_threshold=change_threshold,
+                min_interval_ms=min_interval_ms,
+                settle_interval_ms=0.0,
+                settle_tolerance=0.0,
+                input_min=0.0,
+                input_max=1.0,
+                large_jump_ratio=0.0,
+                clamp_input=False,
+            )
+            self._axis_filters[key] = filter_obj
+            self._axis_filter_params[key] = params
+
+        result = filter_obj.process_input(current_value) is not None
+        if not result and self.perf:
+            reason = "ema filtered"
 
         if not result:
             if self.perf:
@@ -5218,7 +5299,7 @@ class AxisState:
             return False
 
         self._last_axis_values[key] = current_value
-        self._last_axis_time[key] = now
+        self._last_axis_time[key] = time.time()
         return True
 
 
