@@ -95,6 +95,26 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     allow_reuse_address = True
     daemon_threads = True
 
+    def process_request(self, request, client_address):
+        """Handle a UDP RPC packet without reading current_thread().daemon.
+
+        Python 3.14 Thread.__init__ calls current_thread().daemon when daemon=
+        is omitted. Qt / DummyThread parents assert Thread.__init__() not called
+        and take down logging + the Plugins UI (Tune Law ship combo included).
+        """
+        try:
+            t = threading.Thread(
+                target=self.process_request_thread,
+                args=(request, client_address),
+                daemon=bool(self.daemon_threads),
+            )
+            t.start()
+        except Exception:
+            try:
+                self.finish_request(request, client_address)
+            finally:
+                self.shutdown_request(request)
+
     def handle_timeout(self):
         import gremlin.event_handler
 

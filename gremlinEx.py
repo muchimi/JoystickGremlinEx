@@ -37,6 +37,11 @@ import uuid
 import traceback
 import threading
 from threading import Lock
+
+try:
+    import gremlin.py314_threads  # noqa: F401
+except Exception:
+    pass
 from typing import Callable
 from collections.abc import Iterator
 import webbrowser
@@ -6088,9 +6093,18 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     # Log the complete traceback string automatically into both log files
     msg = "Uncaught exception:\n"
     msg += " ".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-    syslog.critical(msg)
+    try:
+        syslog.critical(msg)
+    except Exception:
+        try:
+            sys.stderr.write(msg + "\n")
+        except Exception:
+            pass
 
-    gremlin.util.display_error(msg)
+    try:
+        gremlin.util.display_error(msg)
+    except Exception:
+        pass
 
 
 # general exception handling
