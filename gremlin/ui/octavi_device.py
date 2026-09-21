@@ -253,6 +253,7 @@ class OctaviButton(enum.IntEnum):
 class OctaviInterface:
     def __init__(self):
         self._device_found = False  # true if the device is found
+        self._device_probed = False
         self._device = None
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._stop)
@@ -550,8 +551,11 @@ class OctaviInterface:
 
     def deviceFound(self, refresh=False) -> bool:
         """scans the HID devices to see if the device is found"""
-        if self._device_found:
+        if self._device_found and not refresh:
             return True
+        if self._device_probed and not refresh:
+            return False
+        self._device_probed = True
         vid = 0x4D8  # vendor ID
         pid = 0xE6D6  # product ID
         try:
@@ -564,17 +568,6 @@ class OctaviInterface:
                 return True
         except Exception:
             pass
-
-        # hid_devices = list(hid.enumerate())
-        # data = next((hid for hid in hid_devices if hid["vendor_id"] == vid and data["product_id"] == pid), None)
-        # if data:
-        #     vid = data['vendor_id']
-        #     pid = data['product_id']
-        #     self._device_found = True
-        #     self._device = hid.Device(vid, pid)
-        #     self._device.nonblocking = 1
-        #     syslog.info("IFR1: detected")
-        #     return True
 
         self._device_found = False
         self._device = None

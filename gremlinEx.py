@@ -47,7 +47,6 @@ if __name__ == "__main__" and "--remote-video-worker" in sys.argv:
 
     raise SystemExit(worker_main(sys.argv))
 
-
 import filelock
 
 from objprint.executing.executing import lock
@@ -97,14 +96,11 @@ import gremlin.ui.virpil_device
 import gremlin.sound
 import gremlin.voice
 
-
 # import gremlin.ktts
 from gremlin.worker import WorkManager
 import gremlin.maestro
 
-
 # Import QtMultimedia so pyinstaller doesn't miss it
-
 
 from gremlin.input_types import InputType
 import gremlin.types
@@ -114,7 +110,6 @@ import gremlin.shared_state
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.config
-
 
 import gremlin.code_runner
 
@@ -127,13 +122,11 @@ import gremlin.base_profile
 # imports needed by pyinstaller to be included
 import gremlin.control_action
 
-
 import gremlin.tts
 
 from gremlin.util import log_sys_error, compare_path
 import gremlin.util
 import graphviz
-
 
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
@@ -149,16 +142,13 @@ from shiboken6 import Shiboken
 
 from gremlin.input_item import InputItem, InputItemWidget, BaseDeviceTabWidget
 
-
 from gremlin.ui.ui_gremlin import Ui_Gremlin
-
 
 import gremlin.reporting
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.tabstate import TabData
 
 from logging.handlers import RotatingFileHandler
-
 
 # Figure out the location of the code / executable and change the working
 # directory accordingly
@@ -170,7 +160,6 @@ if os.path.isdir(install_path):
         pass
 
 syslog = logging.getLogger("system")
-
 
 class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     """Main window of the Joystick Gremlin user interface."""
@@ -216,6 +205,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._change_input_lock = threading.Lock()  # true when changing inputs
         self._ui_update_pending = False  # flag = if True, UI updates are pending
         self._suspend_ui_update = 0  # stack = if non zero, UI updates should be suspended
+        self._creating_tabs = False  # true while _create_tabs_ui is running
+        self._tabs_rebuild_pending = False  # coalesce overlapping tab rebuilds
+        self._tabs_rebuild_refresh = False  # pending rebuild should restore selector/selection
+        self._tabs_rebuild_timer = None
 
         self._comparative_file = os.path.join(os.getenv("temp"), "8c71a5a6eae74f989cf903816868028e.xml")
 
@@ -2727,10 +2720,39 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     @QtCore.Slot()
     def _handle_on_change(self):
         """manual lambda for QT memory references"""
-        self._create_tabs_ui()
+        self._create_tabs()
 
     def _create_tabs(self, activate_tab=None):
-        gremlin.util.InvokeUiMethod(self._create_tabs_ui)
+        self._tabs_rebuild_pending = True
+        gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
+
+    def _arm_tabs_rebuild_timer(self):
+        """Collapse burst tab rebuilds (profile load + Stream Deck handshake) into one pass."""
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
+            return
+        self._tabs_rebuild_pending = True
+        if self._creating_tabs or gremlin.shared_state.profile_loading:
+            return
+        if self._tabs_rebuild_timer is None:
+            self._tabs_rebuild_timer = QTimer(self)
+            self._tabs_rebuild_timer.setSingleShot(True)
+            self._tabs_rebuild_timer.timeout.connect(self._flush_tabs_rebuild)
+        self._tabs_rebuild_timer.start(50)
+
+    def _flush_tabs_rebuild(self):
+        if self._creating_tabs or gremlin.shared_state.profile_loading:
+            self._arm_tabs_rebuild_timer()
+            return
+        if not self._tabs_rebuild_pending:
+            return
+        do_refresh = self._tabs_rebuild_refresh
+        self._tabs_rebuild_pending = False
+        self._tabs_rebuild_refresh = False
+        if do_refresh:
+            self._refresh_ui()
+        else:
+            self._create_tabs_ui()
 
     def _get_vjoy_input_enabled(self, device):
         """gets the vjoy input enabled state"""
@@ -2974,7 +2996,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # record the update requirement
         if self._suspend_ui_update:
             self._ui_update_pending = True
+            self._tabs_rebuild_pending = True
             return
+
+        if self._creating_tabs:
+            self._tabs_rebuild_pending = True
+            return
+
+        self._creating_tabs = True
+        self._tabs_rebuild_pending = False
 
         try:
             self.pushLoading()
@@ -3462,10 +3492,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
                                 syslog.error(traceback.format_exc())
 
-                elif device in config_set:
-                    # =======================================================
-                    # config devices
-                    match device.device_type:
                         case DeviceType.Settings:
                             # =======================================================
                             # Add profile configuration tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
@@ -3618,7 +3644,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if verbose_detailed:
                 syslog.info("CREATE TABS: complete")
 
-            self.popLoading(selected_device_guid)
+            try:
+                self.popLoading(selected_device_guid)
+            finally:
+                self._creating_tabs = False
+                if self._tabs_rebuild_pending:
+                    self._arm_tabs_rebuild_timer()
 
     def get_ordered_device_guid_list(self, filter_tab_type: TabDeviceType = TabDeviceType.NotSet) -> Iterator[dinput.GUID]:
         """returns the list of device guids as directinput GUIDs
@@ -5185,6 +5216,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _profile_load_completed(self, *args):
         """called when a profile has been loaded"""  # force a UI update
         verbose = gremlin.config.Configuration().verbose_mode_ui
+        # The load worker already schedules refresh(); don't rebuild the current
+        # device a second time (that re-execs plugins / Virpil rows).
+        if self._tabs_rebuild_pending or self._creating_tabs or self._tabs_rebuild_refresh:
+            if verbose:
+                syslog.info("profile loaded")
+            return
         widget: BaseDeviceTabWidget = self.getCurrentRegisteredWidget()
         if widget:
             widget.refresh(force=True)
@@ -5473,7 +5510,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.refresh()
 
     def refresh(self):
-        gremlin.util.InvokeUiMethod(self._refresh_ui)
+        self._tabs_rebuild_pending = True
+        self._tabs_rebuild_refresh = True
+        gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
 
     def _refresh_ui(self):
         """refresh the UI"""
@@ -5953,7 +5992,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.setWindowTitle(the_title)
 
-
 def configure_logger(config: dict):
     """Creates a new logger instance.
 
@@ -6001,7 +6039,6 @@ def configure_logger(config: dict):
 
     return True
 
-
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     # Ignore KeyboardInterrupt (Ctrl+C) so users can close the app normally
     if issubclass(exc_type, KeyboardInterrupt):
@@ -6015,12 +6052,10 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
 
     gremlin.util.display_error(msg)
 
-
 # general exception handling
 sys.excepthook = handle_unhandled_exception
 
 WM_INPUT = 0x00FF
-
 
 if __name__ == "__main__":
     gremlin.shared_state.ui_ready = False
