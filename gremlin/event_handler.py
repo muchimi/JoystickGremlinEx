@@ -851,6 +851,7 @@ class EventListener(QtCore.QObject):
 
         self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
         self.keyboard_hook.register(self._keyboard_handler)
+        self._keyboard_thread_event = threading.Event()
 
         # Calibration function for each axis of all devices
         self._calibrations = {}
@@ -859,8 +860,6 @@ class EventListener(QtCore.QObject):
         self._device_update_timer = None
         self._device_change_suppressed = 0  # suppression counter for device change events
         self._device_change_pending = False  # true if a device change occured while suppressed
-
-
 
         self._running = True
         self._run_thread = None
@@ -897,7 +896,7 @@ class EventListener(QtCore.QObject):
 
         self._vjoy_callbacks = []
         self._debounce_map = {}
-        self._button_debounce_seconds =  0.01
+        self._button_debounce_seconds = 0.01
         self._axis_settle_timers = {}
         self._axis_settle_lock = threading.Lock()
 
@@ -1059,7 +1058,7 @@ class EventListener(QtCore.QObject):
 
             # 3. Coalesce high-frequency axis motion into single updates
             # coalesced_list = _coalesce_axis_batch(event_list)
-            coalesced_list = event_list # EMA filter will handle smoothing of axis events
+            coalesced_list = event_list  # EMA filter will handle smoothing of axis events
 
             # Localize state access outside the inner loop
             is_running = gremlin.shared_state.is_running
@@ -1518,18 +1517,17 @@ class EventListener(QtCore.QObject):
         """true if input selection is suspended"""
         return gremlin.shared_state.is_input_selection_suspended
 
-    def _process_queue(self):
+    def _process_queue(self, items: list):
         """processes an item the keyboard buffer queue"""
-        items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
             if not self._keyboard_thread_running:
                 break
-            verbose = gremlin.config.Configuration().verbose_mode_detailed
+            # verbose = gremlin.config.Configuration().verbose_mode_detailed
             # verbose = True
 
             is_error = False
-            if verbose:
-                syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
+            # if verbose:
+            #     syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
 
             if isinstance(item, int):
                 virtual_code = item
@@ -1557,34 +1555,36 @@ class EventListener(QtCore.QObject):
                     is_pressed=is_pressed,
                     data=self._keyboard_buffer,
                 )
-                if verbose:
-                    syslog.info(
-                        f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed} event: {str(event)}"
-                    )
+                # if verbose:
+                #     syslog.info(
+                #         f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed} event: {str(event)}"
+                #     )
 
-                if verbose and is_pressed:
-                    syslog.info(f"fire keyboard event on key press - key.name: [{key.name}]")
+                # if verbose and is_pressed:
+                #     syslog.info(f"fire keyboard event on key press - key.name: [{key.name}]")
                 self.keyboard_event.emit(event)
-            else:
-                if verbose:
-                    syslog.info(f"DEQUEUE KEY: error processing item: {item}")
+            # else:
+            #     if verbose:
+            #         syslog.info(f"DEQUEUE KEY: error processing item: {item}")
 
             # process the events
-            time.sleep(0)  # yield to other threads
+            # time.sleep(0)  # yield to other threads
 
-    def _keyboard_runner(self):
+    def _keyboard_runner(self, abort_event: threading.Event):
         """runs as a thread to process inbound keyboard events using a queue"""
 
         syslog.info("KBD: processing start")
         self._keyboard_buffer = {}
         self._key_listener_started = True
-        while self._keyboard_thread_running:
-            if self._keyboard_queue.empty():
-                time.sleep(0)
+        while not abort_event.is_set():
+            try:
+                items = self._keyboard_queue.getall(timeout=0.5)  # @IgnoreException
+                if items:
+                    self._process_queue(items)
+            except FastQueue.Empty:
                 continue
-            if self._keyboard_thread_running:
-                self._process_queue()
-                time.sleep(0)  # yield to other threads
+            except Exception as e:
+                syslog.error(f"Error processing keyboard queue: {e}")
 
         syslog.info("KBD: stopped")
 
@@ -1593,18 +1593,22 @@ class EventListener(QtCore.QObject):
         if not self._key_listener_started:
             self._key_listener_started = True
             self._keyboard_thread_running = True
+            self._keyboard_thread_event.clear()
+
             self._keyboard_queue: FastQueue[Event] = FastQueue(name="keyboard_queue")  # queue.Queue()
-            self._keyboard_thread = threading.Thread(target=self._keyboard_runner, daemon=True)
+            self._keyboard_thread = threading.Thread(target=self._keyboard_runner, args=(self._keyboard_thread_event,), daemon=True)
             self._keyboard_thread.start()
 
     def stop_key_listener(self):
         """stops the key listener"""
         if self._key_listener_started:
             syslog.info("KEY THREAD: stopping...")
-            self._keyboard_queue.clear()
+            self._keyboard_thread_event.set()
             self._keyboard_thread_running = False
+            gremlin.util.safeJoin(self._keyboard_thread)
             self._keyboard_thread = None
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
+            self._keyboard_queue.clear()
 
             syslog.info("KEY THREAD: stopped")
             self._key_listener_started = False
@@ -1655,29 +1659,17 @@ class EventListener(QtCore.QObject):
     def _run(self):
         """Starts the event loop."""
 
-        if not dinput.DILL.initalized:
+        if not dinput.DILL.initialized:
             dinput.DILL.init()
         syslog.info("DILL: start listen")
         dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
         dinput.DILL.set_input_event_callback(self._dinput_event_handler)  # DINPUT event handler
-        while self._running and not self._run_event.is_set():
-            # Keep this thread alive until we are done
-            time.sleep(0)
+        while not self._run_event.wait(timeout=0.5):
+            continue
+
         syslog.info("DILL: shutdown")
         dinput.DILL.set_device_change_callback(None)
         dinput.DILL.set_input_event_callback(None)
-
-    # @ignore_function
-    # def _keep_alive_v0(self):
-    #     """keep alive 30 second hearbeat"""
-    #     delay = 60 * 2  # delay in seconds
-    #     notify_time = time.time()
-    #     while not self._keep_alive_event.is_set():
-    #         if time.time() >= notify_time:
-    #             self.heartbeat.emit()
-    #             notify_time = time.time() + delay  # 2 minutes
-    #         time.sleep(delay)  # do other stuff
-
 
     @ignore_function
     def _keep_alive(self):
@@ -1885,8 +1877,7 @@ class EventListener(QtCore.QObject):
             else:
                 data = DInputData()
                 self._debounce_map[key] = data
-            return False # process event
-
+            return False  # process event
 
         if event_type == dinput.InputType.Axis:
             filtered = data.process_input(value) is None
@@ -1900,8 +1891,6 @@ class EventListener(QtCore.QObject):
             # EMA filter for axis events. Only None means drop — never use
             # truthiness, or an exact center sample (0) is discarded.
             return filtered
-
-
 
         if event_type in (
             dinput.InputType.Button,
@@ -1928,10 +1917,7 @@ class EventListener(QtCore.QObject):
 
             # Suppress a state transition that occurs too soon after the last
             # accepted transition.
-            if (
-                now - data.last_time
-                <= self._button_debounce_seconds
-            ):
+            if now - data.last_time <= self._button_debounce_seconds:
                 return True
 
             data.value = value
@@ -3949,7 +3935,7 @@ class EventHandler(QtCore.QObject):
                                 m_list = self._matching_latched_callbacks(event, latch_key)
 
                             # check voice latching if latching on keyboard
-                            if config.VOICE_INPUT_ENABLED:
+                            if config.voice_enabled:
                                 v_list = self._matching_voice_callbacks(event, latch_key, input_item)
                                 if v_list:
                                     m_list.extend(v_list)
@@ -4062,7 +4048,7 @@ class EventHandler(QtCore.QObject):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
             # check for matching voice recognition trigger
-            if config.VOICE_INPUT_ENABLED and not v_list:
+            if config.voice_enabled and not v_list:
                 v_list = self._matching_voice_callbacks(event, None, input_item)
                 if v_list:
                     m_list.extend(v_list)
@@ -4754,6 +4740,7 @@ class AxisData:
 #         """determins if the axis should be processed - returns None if should be ignored"""
 #         return self.filter.process_input(raw_value)
 
+
 class DInputData:
     """Holds DirectInput signaling and filtering state."""
 
@@ -4795,16 +4782,14 @@ class DInputData:
         if not callable(read_axis_callback):
             raise TypeError("read_axis_callback must be callable")
 
-
         self.filter = EMAFilter(
             read_value_callback=read_axis_callback,
             **filter_options,
         )
 
     def _read_axis(self):
-        """ reads the current value of an axis from DINPUT """
+        """reads the current value of an axis from DINPUT"""
         return dinput.DILL.get_axis(self.device_guid, self.input_id)
-
 
     def process_input(self, raw_value):
         """
@@ -4856,8 +4841,6 @@ class DInputState:
         el.profile_unload.connect(self.reset)
         el.profile_start.connect(self.reset)
         el.profile_stop.connect(self.reset)
-
-
 
     def shouldProcess(self, event: dinput.InputEvent):
         key = self.getKey(event)

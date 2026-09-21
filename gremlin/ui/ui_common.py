@@ -1548,7 +1548,11 @@ class Icons:
     def _icon(value: str, qta_color=None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
-        return load_icon(value, qta_color=qta_color) if qta_color is not None else load_icon(value)
+        icon = load_icon(value, qta_color=qta_color) if qta_color is not None else load_icon(value)
+        if icon is None:
+            syslog.error(f"ICON: icon not found: [{value}]")
+            icon = load_icon("mdi.alert-circle-outline", qta_color="#FFAE00")  # fallback icon
+        return icon
 
     def to_pixmap(icon: QtGui.QIcon, pixels=24):
         """convers an icon to a pixmap"""
@@ -13856,13 +13860,11 @@ class QWarningWidget(QWidget):
             visible = bool(self._label_widget.text()) if self._split else bool(self._icon_widget.text())
             self.setVisible(visible)
 
-
-
     def text(self) -> str:
         return self._text
 
     def setText(self, text: str):
-        """ sets the text of the widget """
+        """sets the text of the widget"""
         gremlin.util.InvokeUiMethod(self._set_text_ui, text)
 
     def _set_text_ui(self, text: str):
@@ -13872,8 +13874,6 @@ class QWarningWidget(QWidget):
             self._icon_widget.setText(text)
         self._text = text
         self._update_ui()
-
-
 
     def hasText(self) -> bool:
         return bool(self._text)
@@ -15858,6 +15858,7 @@ class RemoteClientWidget(QWidget):
         except Exception as err:
             syslog.error(f"REMOTE: identify request failed: {err}")
         # Do not rebuild UI here — wait for debounced client_changed after replies.
+
     def _handle_select_all(self, widget):
         """selects all widgets"""
         self.config.selectAll()
@@ -16269,302 +16270,352 @@ class ResizingStackedWidget(QtWidgets.QStackedWidget):
         return super().minimumSizeHint()
 
 
-class AutoHideStackedWidget(QtWidgets.QStackedWidget):
-    """A stacked widget that collapses when it has no content."""
+# class AutoHideStackedWidget(QtWidgets.QStackedWidget):
+#     """A stacked widget that collapses when it has no content."""
 
-    widgetChanged = QtCore.Signal()
-    sizeChanged = QtCore.Signal()
+#     widgetChanged = QtCore.Signal()
+#     sizeChanged = QtCore.Signal()
 
-    def __init__(
-        self,
-        widget: QWidget | None = None,
-        data=None,
-        name: str | None = None,
-        parent: QWidget | None = None,
-    ):
-        super().__init__(parent)
+#     def __init__(
+#         self,
+#         widget: QWidget | None = None,
+#         data=None,
+#         name: str | None = None,
+#         parent: QWidget | None = None,
+#     ):
+#         super().__init__(parent)
 
-        self._widget: QWidget | None = None
-        self.data = data
-        self._name = name
-        self._size_update_pending = False
-        self._updating_size = False
+#         self._widget: QWidget | None = None
+#         self.data = data
+#         self._name = name
+#         self._size_update_pending = False
+#         self._updating_size = False
 
-        if name:
-            self.setObjectName(name)
+#         if name:
+#             self.setObjectName(name)
 
-        # Target only this container instead of every descendant QWidget.
-        self.setStyleSheet("AutoHideStackedWidget { background: transparent; }")
+#         # Target only this container instead of every descendant QWidget.
+#         self.setStyleSheet("AutoHideStackedWidget { background: transparent; }")
 
-        self.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Minimum,
-        )
+#         self.setSizePolicy(
+#             QtWidgets.QSizePolicy.Policy.Expanding,
+#             QtWidgets.QSizePolicy.Policy.Minimum,
+#         )
 
-        if widget is not None:
-            self.setWidget(widget)
-        else:
-            self._updateSize()
+#         if widget is not None:
+#             self.setWidget(widget)
+#         else:
+#             self._updateSize()
 
-    def widget(self) -> QWidget | None:
-        return self._widget
+#     def widget(self) -> QWidget | None:
+#         return self._widget
 
-    def setWidget(self, widget: QWidget | None) -> None:
-        """Replace the current content widget."""
-        if not Shiboken.isValid(self):
-            return
-        if widget is self._widget:
-            self.refreshSize()
-            return
+#     def setWidget(self, widget: QWidget | None) -> None:
+#         """Replace the current content widget."""
+#         if not Shiboken.isValid(self):
+#             return
+#         if widget is self._widget:
+#             self.refreshSize()
+#             return
 
-        old_widget = self._widget
-        self._widget = None
+#         old_widget = self._widget
+#         self._widget = None
 
-        if old_widget is not None:
-            old_widget.removeEventFilter(self)
-            self.removeWidget(old_widget)
+#         if old_widget is not None:
+#             old_widget.removeEventFilter(self)
+#             self.removeWidget(old_widget)
 
-        if widget is not None:
-            self._widget = widget
-            super().addWidget(widget)
-            self.setCurrentWidget(widget)
-            widget.installEventFilter(self)
-            widget.show()
+#         if widget is not None:
+#             self._widget = widget
+#             super().addWidget(widget)
+#             self.setCurrentWidget(widget)
+#             widget.installEventFilter(self)
+#             widget.show()
 
-        if old_widget is not None:
-            gremlin.util.delete_widget(old_widget)
+#         if old_widget is not None:
+#             gremlin.util.delete_widget(old_widget)
 
-        self._updateSize()
-        self.widgetChanged.emit()
+#         self._updateSize()
+#         self.widgetChanged.emit()
 
-    def contentLayout(self) -> QtWidgets.QLayout:
-        """
-        Return the content widget's layout.
+#     def contentLayout(self) -> QtWidgets.QLayout:
+#         """
+#         Return the content widget's layout.
 
-        A container and QVBoxLayout are created when the stacked widget does
-        not currently contain a widget.
-        """
-        if self._widget is None:
-            container = QWidget()
-            layout = QtWidgets.QVBoxLayout(container)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(0)
-            self.setWidget(container)
-            return layout
+#         A container and QVBoxLayout are created when the stacked widget does
+#         not currently contain a widget.
+#         """
+#         if self._widget is None:
+#             container = QWidget()
+#             layout = QtWidgets.QVBoxLayout(container)
+#             layout.setContentsMargins(0, 0, 0, 0)
+#             layout.setSpacing(0)
+#             self.setWidget(container)
+#             return layout
 
-        layout = self._widget.layout()
+#         layout = self._widget.layout()
 
-        if layout is None:
-            layout = QtWidgets.QVBoxLayout(self._widget)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(0)
+#         if layout is None:
+#             layout = QtWidgets.QVBoxLayout(self._widget)
+#             layout.setContentsMargins(0, 0, 0, 0)
+#             layout.setSpacing(0)
 
-        return layout
+#         return layout
 
-    def hasWidget(self) -> bool:
-        return self._widget is not None
+#     def hasWidget(self) -> bool:
+#         return self._widget is not None
 
-    def refreshSize(self) -> None:
-        """Schedule a size recalculation after pending layout changes."""
-        if self._size_update_pending:
-            return
+#     def refreshSize(self) -> None:
+#         """Schedule a size recalculation after pending layout changes."""
+#         if self._size_update_pending:
+#             return
 
-        self._size_update_pending = True
-        QtCore.QTimer.singleShot(0, self._updateSize)
+#         self._size_update_pending = True
+#         QtCore.QTimer.singleShot(0, self._updateSize)
 
-    def _contentMinimumSize(self) -> QSize:
-        """Return the minimum size required by the content widget."""
-        if self._widget is None:
-            return QSize(0, 0)
+#     def _contentMinimumSize(self) -> QSize:
+#         """Return the minimum size required by the content widget."""
+#         if self._widget is None:
+#             return QSize(0, 0)
 
-        self._widget.ensurePolished()
+#         self._widget.ensurePolished()
 
-        # Read layout hints only — invalidate/activate here re-enters via
-        # LayoutRequest/Resize and freezes the UI thread.
-        layout = self._widget.layout()
-        minimum = self._widget.minimumSizeHint()
+#         # Read layout hints only — invalidate/activate here re-enters via
+#         # LayoutRequest/Resize and freezes the UI thread.
+#         layout = self._widget.layout()
+#         minimum = self._widget.minimumSizeHint()
 
-        if not minimum.isValid():
-            minimum = QSize(0, 0)
+#         if not minimum.isValid():
+#             minimum = QSize(0, 0)
 
-        minimum = minimum.expandedTo(self._widget.minimumSize())
+#         minimum = minimum.expandedTo(self._widget.minimumSize())
 
-        if layout is not None:
-            minimum = minimum.expandedTo(layout.minimumSize())
+#         if layout is not None:
+#             minimum = minimum.expandedTo(layout.minimumSize())
 
-        frame_size = self.frameWidth() * 2
-        return minimum + QSize(frame_size, frame_size)
+#         frame_size = self.frameWidth() * 2
+#         return minimum + QSize(frame_size, frame_size)
 
-    def _contentSizeHint(self) -> QSize:
-        """Return the preferred size of the content widget."""
-        if self._widget is None:
-            return QSize(0, 0)
+#     def _contentSizeHint(self) -> QSize:
+#         """Return the preferred size of the content widget."""
+#         if self._widget is None:
+#             return QSize(0, 0)
 
-        self._widget.ensurePolished()
+#         self._widget.ensurePolished()
 
-        layout = self._widget.layout()
-        hint = self._widget.sizeHint()
+#         layout = self._widget.layout()
+#         hint = self._widget.sizeHint()
 
-        if not hint.isValid():
-            hint = QSize(0, 0)
+#         if not hint.isValid():
+#             hint = QSize(0, 0)
 
-        if layout is not None:
-            hint = hint.expandedTo(layout.sizeHint())
+#         if layout is not None:
+#             hint = hint.expandedTo(layout.sizeHint())
 
-        frame_size = self.frameWidth() * 2
-        hint += QSize(frame_size, frame_size)
+#         frame_size = self.frameWidth() * 2
+#         hint += QSize(frame_size, frame_size)
 
-        return hint.expandedTo(self._contentMinimumSize())
+#         return hint.expandedTo(self._contentMinimumSize())
 
-    def _updateSize(self) -> None:
-        """Update the container constraints from its current content."""
-        if not Shiboken.isValid(self):
-            return
-        self._size_update_pending = False
-        if self._updating_size:
-            return
-        self._updating_size = True
-        try:
-            if self._widget is None:
-                self.setMinimumSize(0, 0)
-                self.setMaximumHeight(0)
-                self.hide()
-            else:
-                self.show()
+#     def _updateSize(self) -> None:
+#         """Update the container constraints from its current content."""
+#         if not Shiboken.isValid(self):
+#             return
+#         self._size_update_pending = False
+#         if self._updating_size:
+#             return
+#         self._updating_size = True
+#         try:
+#             if self._widget is None:
+#                 self.setMinimumSize(0, 0)
+#                 self.setMaximumHeight(0)
+#                 self.hide()
+#             else:
+#                 self.show()
 
-                # Restore the maximum height used by the empty state.
-                self.setMaximumHeight(QWIDGETSIZE_MAX)
-                minimum = self._contentMinimumSize()
-                if self.minimumSize() != minimum:
-                    self.setMinimumSize(minimum)
+#                 # Restore the maximum height used by the empty state.
+#                 self.setMaximumHeight(QWIDGETSIZE_MAX)
+#                 minimum = self._contentMinimumSize()
+#                 if self.minimumSize() != minimum:
+#                     self.setMinimumSize(minimum)
 
-            self.updateGeometry()
-            parent = self.parentWidget()
-            if parent is not None:
-                parent.updateGeometry()
+#             self.updateGeometry()
+#             parent = self.parentWidget()
+#             if parent is not None:
+#                 parent.updateGeometry()
 
-            self.sizeChanged.emit()
-        finally:
-            self._updating_size = False
+#             self.sizeChanged.emit()
+#         finally:
+#             self._updating_size = False
 
-    def eventFilter(
-        self,
-        watched: QtCore.QObject,
-        event: QtCore.QEvent,
-    ) -> bool:
-        # Ignore Resize: our own setMinimumSize/updateGeometry causes it and
-        # would otherwise form a permanent layout feedback loop.
-        if (
-            not self._updating_size
-            and not self._size_update_pending
-            and watched is self._widget
-            and event.type()
-            in (
-                QtCore.QEvent.Type.LayoutRequest,
-                QtCore.QEvent.Type.Show,
-                QtCore.QEvent.Type.Hide,
-                QtCore.QEvent.Type.StyleChange,
-                QtCore.QEvent.Type.FontChange,
-            )
-        ):
-            self.refreshSize()
+#     def eventFilter(
+#         self,
+#         watched: QtCore.QObject,
+#         event: QtCore.QEvent,
+#     ) -> bool:
+#         # Ignore Resize: our own setMinimumSize/updateGeometry causes it and
+#         # would otherwise form a permanent layout feedback loop.
+#         if (
+#             not self._updating_size
+#             and not self._size_update_pending
+#             and watched is self._widget
+#             and event.type()
+#             in (
+#                 QtCore.QEvent.Type.LayoutRequest,
+#                 QtCore.QEvent.Type.Show,
+#                 QtCore.QEvent.Type.Hide,
+#                 QtCore.QEvent.Type.StyleChange,
+#                 QtCore.QEvent.Type.FontChange,
+#             )
+#         ):
+#             self.refreshSize()
 
-        return super().eventFilter(watched, event)
+#         return super().eventFilter(watched, event)
 
-    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
-        super().resizeEvent(event)
-        self.sizeChanged.emit()
+#     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+#         super().resizeEvent(event)
+#         self.sizeChanged.emit()
 
-    def sizeHint(self) -> QSize:
-        if self._widget is None:
-            return QSize(0, 0)
+#     def sizeHint(self) -> QSize:
+#         if self._widget is None:
+#             return QSize(0, 0)
 
-        return self._contentSizeHint()
+#         return self._contentSizeHint()
 
-    def minimumSizeHint(self) -> QSize:
-        return self._contentMinimumSize()
+#     def minimumSizeHint(self) -> QSize:
+#         return self._contentMinimumSize()
 
-    def _cleanup_ui(self) -> None:
-        self.setWidget(None)
-
-
-class AutoHideStackedWidgetOld(QtWidgets.QStackedWidget):
-    """stacked widget that automatically hides itself if no widget is set"""
-
-    widgetChanged = QtCore.Signal()
-    sizeChanged = QtCore.Signal()
-
-    def __init__(self, widget: QWidget = None, data=None, name: str = None, parent=None):
-        super().__init__(parent=parent)
-        self._widget = widget
-        self.data = data
-        self._name = name
-        if name:
-            self.setObjectName(name)
-
-        if widget is not None:
-            self.addWidget(widget)
-        # prevent style sheet propagation
-        self.setStyleSheet("QWidget { background: transparent; }")
-
-    def widget(self):
-        return self._widget
-
-    def setWidget(self, widget: QWidget):
-        if self._widget is not None and widget != self._widget:
-            # delete the old widget
-            self.removeWidget(self._widget)
-            gremlin.util.delete_widget(self._widget)
-
-        # set the new widget
-        self._widget = widget
-        if widget is not None:
-            super().addWidget(widget)
-            self.setCurrentWidget(widget)
-            height = widget.sizeHint().height()
-            self.setFixedHeight(height)
-        else:
-            self.setFixedHeight(0)  # hide
-        self.widgetChanged.emit()
-
-    def layout(self):
-        if not self._widget:
-            # create a container for the widgets to get a layout
-            self._widget = QWidget()
-            QtWidgets.QVBoxLayout(self._widget)
-        if self._widget is not None:
-            return self._widget.layout()
-
-    def _cleanup_ui(self):
-        self.setWidget(None)
-
-    def hasWidget(self):
-        return self._widget is not None
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.sizeChanged.emit()
-
-    def sizeHint(self):
-        if not self._widget:
-            # hide if no content
-            # syslog.info(f"{self.data}: AutoHideStackedWidget has no widget, returning QSize(0, 0)")
-            return QSize(0, 0)
-        hint = super().sizeHint()
-        # syslog.info(f"{self.data}: AutoHideStackedWidget has widget, returning {hint}")
-        return hint
-
-    def minimumSizeHint(self):
-        if not self._widget:
-            # hide if no content
-            return QSize(0, 0)
-        return super().minimumSizeHint()
+#     def _cleanup_ui(self) -> None:
+#         self.setWidget(None)
 
 
-class AutohideContainer(AutoHideStackedWidget):
+# class AutoHideStackedWidgetOld(QtWidgets.QStackedWidget):
+#     """stacked widget that automatically hides itself if no widget is set"""
+
+#     widgetChanged = QtCore.Signal()
+#     sizeChanged = QtCore.Signal()
+
+#     def __init__(self, widget: QWidget = None, data=None, name: str = None, parent=None):
+#         super().__init__(parent=parent)
+#         self._widget = widget
+#         self.data = data
+#         self._name = name
+#         if name:
+#             self.setObjectName(name)
+
+#         if widget is not None:
+#             self.addWidget(widget)
+#         # prevent style sheet propagation
+#         self.setStyleSheet("QWidget { background: transparent; }")
+
+#     def widget(self):
+#         return self._widget
+
+#     def setWidget(self, widget: QWidget):
+#         if self._widget is not None and widget != self._widget:
+#             # delete the old widget
+#             self.removeWidget(self._widget)
+#             gremlin.util.delete_widget(self._widget)
+
+#         # set the new widget
+#         self._widget = widget
+#         if widget is not None:
+#             super().addWidget(widget)
+#             self.setCurrentWidget(widget)
+#             height = widget.sizeHint().height()
+#             self.setFixedHeight(height)
+#         else:
+#             self.setFixedHeight(0)  # hide
+#         self.widgetChanged.emit()
+
+#     def layout(self):
+#         if not self._widget:
+#             # create a container for the widgets to get a layout
+#             self._widget = QWidget()
+#             QtWidgets.QVBoxLayout(self._widget)
+#         if self._widget is not None:
+#             return self._widget.layout()
+
+#     def _cleanup_ui(self):
+#         self.setWidget(None)
+
+#     def hasWidget(self):
+#         return self._widget is not None
+
+#     def resizeEvent(self, event):
+#         super().resizeEvent(event)
+#         self.sizeChanged.emit()
+
+#     def sizeHint(self):
+#         if not self._widget:
+#             # hide if no content
+#             # syslog.info(f"{self.data}: AutoHideStackedWidget has no widget, returning QSize(0, 0)")
+#             return QSize(0, 0)
+#         hint = super().sizeHint()
+#         # syslog.info(f"{self.data}: AutoHideStackedWidget has widget, returning {hint}")
+#         return hint
+
+#     def minimumSizeHint(self):
+#         if not self._widget:
+#             # hide if no content
+#             return QSize(0, 0)
+#         return super().minimumSizeHint()
+
+
+class AutohideContainer(QtWidgets.QWidget):
     """autohide container widget - shows its content if set, otherwise hides the widget"""
 
-    pass
+    def __init__(self, widget: QtWidgets.QWidget = None, name: str = None, parent=None):
+        super().__init__(parent=parent)
+        self._content_widget = None
+        self._main_layout = QtWidgets.QVBoxLayout(self)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+        if name:
+            self.setObjectName(name)
+        if widget is not None:
+            self.setContent(widget)
+
+    def setWidget(self, widget: QtWidgets.QWidget):
+        self.setContent(widget)
+
+    def widget(self):
+        """gets the content widget"""
+        return self._content_widget
+
+    def setContent(self, widget: QtWidgets.QWidget):
+        if self._content_widget is not None:
+            self._content_widget.setParent(None) # delete
+            self._content_widget.deleteLater() # schedule for deletion
+        self._content_widget = widget
+        if widget is not None:
+            self._main_layout.addWidget(widget)
+            self.setFixedHeight(widget.sizeHint().height())
+        else:
+            self.setFixedHeight(0)  # hide
+
+
+
+
+class AutohideContainerIdWidget(AutohideContainer):
+    """shows content based on the container id configuration property"""
+
+    def __init__(self, widget: QtWidgets.QWidget = None, name: str = None, parent=None):
+        super().__init__(widget=widget, name=name, parent=parent)
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
+        self._config_changed_ui()  # set initial visibility based on current config
+
+    def _config_changed(self, filter, value):
+        if filter == "show_container_id":
+            import gremlin.util
+
+            gremlin.util.invokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
+        if gremlin.config.Configuration().show_container_id:
+            self.setVisible(True)
+        else:
+            self.setVisible(False)
 
 
 class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
@@ -16635,61 +16686,6 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
         self._update()
 
-
-class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
-    """A widget that automatically shows or hides contained widget if the config setting for showing container IDs is changed"""
-
-    def __init__(self, widget: QWidget = None, data=None, parent=None):
-        super().__init__(parent=parent)
-        self._widget = widget
-        self.data = data
-        if widget is not None:
-            self.addWidget(widget)
-
-        # prevent style sheet propagation
-        self.setStyleSheet("QWidget { background: transparent; }")
-
-        config = gremlin.config.Configuration()
-        self._show_id = config.show_container_id
-
-        # listen for configuration changes
-        el = gremlin.event_handler.EventListener()
-        el.config_changed.connect(self._on_config_changed)
-
-    def _on_config_changed(self):
-        """handle configuration changes"""
-        # update visibility based on configuration or data
-        config = gremlin.config.Configuration()
-        show_id = config.show_container_id
-        if self._show_id != show_id:
-            self._show_id = show_id
-            self.updateGeometry()
-
-    def setWidget(self, widget: QWidget):
-        """sets the widget to be displayed"""
-        if not Shiboken.isValid(self):
-            return
-        if self._widget is not None and Shiboken.isValid(self._widget):
-            self.removeWidget(self._widget)
-        if widget is not None and not Shiboken.isValid(widget):
-            self._widget = None
-            return
-        self._widget = widget
-        if widget is not None:
-            self.addWidget(widget)
-        self.updateGeometry()
-
-    def sizeHint(self):
-        if self._widget and self._show_id:
-            return super().sizeHint()
-        # hide if no content
-        return QSize(0, 0)
-
-    def minimumSizeHint(self):
-        if self._widget and self._show_id:
-            return super().minimumSizeHint()
-        # hide if no content
-        return QSize(0, 0)
 
 
 class QScrollLayout(QtWidgets.QLayout):

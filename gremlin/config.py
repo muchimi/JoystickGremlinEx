@@ -39,17 +39,23 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
+# general override flags for builds and execution - these override configuration settings from the config file
+# this is used to simplify diagnostics and help with development of work in progress modules
 
-VOICE_INPUT_ENABLED = "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
-
+VOICE_ENABLED = "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
+OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
+SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in ("1", "true", "yes")
+OVERLAY_ENABLED = "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
+AFCS_ENABLED = "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
+STREAMDECK_ENABLED = "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
+OCTAVI_ENABLED = True # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
     changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
-
-    VOICE_INPUT_ENABLED = VOICE_INPUT_ENABLED
 
     def get_config(self) -> str:
         """local config file (version based)"""
@@ -127,6 +133,18 @@ class Configuration(QtCore.QObject):
         self._started = False
 
         self.reload()
+
+
+    def logModuleOptions(self):
+        """Logs the status of various module options."""
+        enabled_text = gremlin.util.ansiText("enabled", "green")
+        disabled_text = gremlin.util.ansiText("disabled", "red")
+        syslog.info("CONFIG: module options:")
+        syslog.info(f"\tVoice module: {enabled_text if self.voice_enabled else disabled_text}")
+        syslog.info(f"\tOSC module: {enabled_text if self.osc_enabled else disabled_text}")
+        syslog.info(f"\tMIDI module: {enabled_text if self.midi_enabled else disabled_text}")
+        syslog.info(f"\tOverlay module: {enabled_text if self.overlay_enabled else disabled_text}")
+        syslog.info(f"\tAFCS module: {enabled_text if self.afcs_enabled else disabled_text}")
 
     def start(self):
         """starts the file watcher"""
@@ -560,7 +578,7 @@ class Configuration(QtCore.QObject):
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)
-            #is_error = True
+            # is_error = True
         finally:
             self._lock.release()
 
@@ -633,10 +651,7 @@ class Configuration(QtCore.QObject):
             mem_custom = self._streamdeck_pages_custom_count(mem_pages)
             if disk_custom > 0 and mem_custom < disk_custom:
                 merged["streamdeck_pages"] = disk_pages
-                syslog.info(
-                    "CONFIG: preserved on-disk streamdeck_pages "
-                    f"(disk_custom={disk_custom}, memory_custom={mem_custom})"
-                )
+                syslog.info(f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})")
             self._profile_data = merged
 
             try:
@@ -2010,15 +2025,15 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.L3 in self.verbose_mode
 
     @property
-    def osc_enabled(self):
-        """true if osc module is enabled"""
-        return self._get_data("osc_enabled", True)
-
-    @property
     def verbose_mode_voice(self):
         """true if verbose mode for voice"""
         return True
         return self.verbose and VerboseMode.Voice in self.verbose_mode
+
+    @property
+    def osc_enabled(self):
+        """true if osc module is enabled"""
+        return OSC_ENABLED and self._get_data("osc_enabled", True)
 
     @osc_enabled.setter
     def osc_enabled(self, value):
@@ -2109,7 +2124,6 @@ class Configuration(QtCore.QObject):
         current = self.afcs_show_live_while_running
         if current != bool(value):
             self._set_data("afcs_show_live_while_running", bool(value))
-
 
     @property
     def input_viewer_disables_repeaters(self):
@@ -2678,7 +2692,7 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        return self._data.get("midi_enabled", False)  # disabled by default
+        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # disabled by default
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
@@ -2699,9 +2713,36 @@ class Configuration(QtCore.QObject):
         self.save()  # save the change
 
     @property
+    def afcs_enabled(self) -> bool:
+        """True if AFCS support is enabled"""
+        return AFCS_ENABLED and self._get_data("afcs_enabled", True)
+
+    @afcs_enabled.setter
+    def afcs_enabled(self, value: bool):
+        self._set_data("afcs_enabled", value)
+
+    @property
+    def osc_enabled(self) -> bool:
+        """True if OSC support is enabled"""
+        return OSC_ENABLED and self._get_data("osc_enabled", True)
+
+    @osc_enabled.setter
+    def osc_enabled(self, value: bool):
+        self._set_data("osc_enabled", value)
+
+    @property
+    def overlay_enabled(self) -> bool:
+        """True if Overlay support is enabled"""
+        return OVERLAY_ENABLED and self._get_data("overlay_enabled", True)
+
+    @overlay_enabled.setter
+    def overlay_enabled(self, value: bool):
+        self._set_data("overlay_enabled", value)
+
+    @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return self._get_data("streamdeck_enabled", False)
+        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", True)
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -3240,7 +3281,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def simconnect_enabled(self) -> bool:
-        return self._get_data("simconnect_enabled", False)
+        return SIMCONNECT_ENABLED and self._get_data("simconnect_enabled", False)
 
     @simconnect_enabled.setter
     def simconnect_enabled(self, value: bool):
@@ -3813,6 +3854,24 @@ class Configuration(QtCore.QObject):
         self._set_data("use_v2_macro_mode", value)
 
     @property
+    def voice_enabled(self) -> bool:
+        """returns true if voice input is enabled"""
+        return VOICE_ENABLED and self._get_data("voice_enabled", True)
+
+    @voice_enabled.setter
+    def voice_enabled(self, value: bool):
+        self._set_data("voice_enabled", value)
+
+    @property
+    def octavi_enabled(self) -> bool:
+        """returns true if the Octavi device is enabled"""
+        return OCTAVI_ENABLED and self._get_data("octavi_enabled", True)
+
+    @octavi_enabled.setter
+    def octavi_enabled(self, value: bool):
+        self._set_data("octavi_enabled", value)
+
+    @property
     def voice_command_release_delay(self) -> int:
         """delay in milliseconds before releasing a voice command event"""
         return self._get_data("voice_command_release_delay", 250)  # default to 250 ms
@@ -3820,6 +3879,8 @@ class Configuration(QtCore.QObject):
     @voice_command_release_delay.setter
     def voice_command_release_delay(self, value: int):
         self._set_data("voice_command_release_delay", value)
+
+
 
     @property
     def audio_blocking(self) -> bool:
@@ -3865,7 +3926,6 @@ class Configuration(QtCore.QObject):
     @audio_silence_threshold_db.setter
     def audio_silence_threshold_db(self, value: float):
         self._set_data("audio_silence_threshold_db", value)
-
 
     @property
     def voice_model_name(self) -> str:

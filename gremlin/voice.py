@@ -1708,7 +1708,7 @@ class Voice:
     def test(self):
 
         # channels=1 ensures mono audio, and dtype='float32' matches Whisper's expected input
-        if not gremlin.config.VOICE_INPUT_ENABLED:
+        if not gremlin.config.Configuration().voice_enabled:
             syslog.info("Voice input is disabled.")
             return
 
@@ -1719,7 +1719,7 @@ class Voice:
         if self._listening:
             return  # already listening
 
-        if not gremlin.config.VOICE_INPUT_ENABLED:
+        if not gremlin.config.Configuration().voice_enabled:
             # disabled
             return
 

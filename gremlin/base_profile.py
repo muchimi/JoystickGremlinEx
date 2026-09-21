@@ -189,7 +189,7 @@ class ProfileDeviceNode:
             return self._device.device_id
         return str(self.device_guid)
 
-    
+
 
     def getModeNode(self, mode: str, system: bool = None, autocreate=False):
         """gets the mode object for the given mode
@@ -2972,6 +2972,8 @@ class Profile:
     def initialize_regular_devices(self):
         """setup suported non joystick devices"""
 
+        config = gremlin.config.Configuration()
+
         # Keyboard
         device_guid = gremlin.shared_state.keyboard_tab_guid
         device_type = DeviceType.Keyboard
@@ -2985,26 +2987,28 @@ class Profile:
         self.devices[device_guid] = new_device
 
         # MIDI
-        device_guid = gremlin.shared_state.midi_tab_guid
-        device_type = DeviceType.Midi
-        new_device = ProfileDeviceNode(self)
-        new_device.name = DeviceType.to_display_name(device_type)
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            raise ValueError(f"MIDI device with GUID {device_guid} not found")
-        new_device.device = device
-        self.devices[device_guid] = new_device
+        if config.midi_enabled:
+            device_guid = gremlin.shared_state.midi_tab_guid
+            device_type = DeviceType.Midi
+            new_device = ProfileDeviceNode(self)
+            new_device.name = DeviceType.to_display_name(device_type)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if not device:
+                raise ValueError(f"MIDI device with GUID {device_guid} not found")
+            new_device.device = device
+            self.devices[device_guid] = new_device
 
         # OSC
-        device_guid = gremlin.shared_state.osc_tab_guid
-        device_type = DeviceType.Osc
-        new_device = ProfileDeviceNode(self)
-        new_device.name = DeviceType.to_display_name(device_type)
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            raise ValueError(f"OSC device with GUID {device_guid} not found")
-        new_device.device = device
-        self.devices[device_guid] = new_device
+        if config.osc_enabled:
+            device_guid = gremlin.shared_state.osc_tab_guid
+            device_type = DeviceType.Osc
+            new_device = ProfileDeviceNode(self)
+            new_device.name = DeviceType.to_display_name(device_type)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if not device:
+                raise ValueError(f"OSC device with GUID {device_guid} not found")
+            new_device.device = device
+            self.devices[device_guid] = new_device
 
         # mode control
         device_guid = gremlin.shared_state.mode_tab_guid
@@ -3019,17 +3023,18 @@ class Profile:
         self.devices[device_guid] = new_device
 
         # voice data
-        self.voice = gremlin.ui.voice_device.VoiceData()
+        if config.voice_enabled:
+            self.voice = gremlin.ui.voice_device.VoiceData()
 
-        device_guid = gremlin.shared_state.voice_tab_guid
-        device_type = DeviceType.Voice
-        new_device = ProfileDeviceNode(self)
-        new_device.name = DeviceType.to_display_name(device_type)
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            raise ValueError(f"Voice device with GUID {device_guid} not found")
-        new_device.device = device
-        self.devices[device_guid] = new_device
+            device_guid = gremlin.shared_state.voice_tab_guid
+            device_type = DeviceType.Voice
+            new_device = ProfileDeviceNode(self)
+            new_device.name = DeviceType.to_display_name(device_type)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if not device:
+                raise ValueError(f"Voice device with GUID {device_guid} not found")
+            new_device.device = device
+            self.devices[device_guid] = new_device
 
         # state data
         self.state = gremlin.ui.state_device.StateData()
@@ -4859,28 +4864,32 @@ class Profile:
                 self.to_xml(use_name)
                 if verbose:
                     syslog.info(f"SAVE: [{gremlin.util.toUrl(self._profile_fname)}]")
-                try:
-                    import gremlin.ui.obs_overlay as obs_overlay
+                if gremlin.config.OVERLAY_ENABLED:
+                    try:
+                        import gremlin.ui.obs_overlay as obs_overlay
+                        obs_overlay.persist_for_profile(self, dest_xml=use_name)
+                    except Exception as err:
+                        syslog.error(f"OBS OVERLAY: persist on profile save failed: {err}")
+                        syslog.error(traceback.format_exc())
 
-                    obs_overlay.persist_for_profile(self, dest_xml=use_name)
-                except Exception as err:
-                    syslog.error(f"OBS OVERLAY: persist on profile save failed: {err}")
-                    syslog.error(traceback.format_exc())
-                try:
-                    import gremlin.ui.afcs as afcs
+                if gremlin.config.AFCS_ENABLED:
+                    try:
+                        import gremlin.ui.afcs as afcs
 
-                    afcs.persist_for_profile(self, dest_xml=use_name)
-                except Exception:
-                    pass
-                # Stream Deck page names live in the sidecar JSON, not the XML.
-                # Persist on every save (including Save As) so a new path cannot
-                # drop streamdeck_pages the way overlay-only writes used to.
-                try:
-                    from gremlin.ui.streamdeck_device import StreamDeckBridge
+                        afcs.persist_for_profile(self, dest_xml=use_name)
+                    except Exception:
+                        pass
 
-                    StreamDeckBridge()._persist_page_metadata()
-                except Exception:
-                    pass
+                if gremlin.config.STREAMDECK_ENABLED:
+                    # Stream Deck page names live in the sidecar JSON, not the XML.
+                    # Persist on every save (including Save As) so a new path cannot
+                    # drop streamdeck_pages the way overlay-only writes used to.
+                    try:
+                        from gremlin.ui.streamdeck_device import StreamDeckBridge
+
+                        StreamDeckBridge()._persist_page_metadata()
+                    except Exception:
+                        pass
 
             except Exception as err:
                 syslog.error(f"SAVE: error: [{gremlin.util.toUrl(self._profile_fname)}]")
@@ -4927,7 +4936,8 @@ class Profile:
         data = {}
         if fname and os.path.isfile(fname):
             try:
-                verbose = gremlin.config.Configuration().verbose
+                config = gremlin.config.Configuration()
+                verbose = config.verbose_mode_details
                 if verbose:
                     syslog.info(f"Profile: read profile configuration: {gremlin.util.toUrl(fname)}")
 

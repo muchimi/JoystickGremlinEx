@@ -30,9 +30,10 @@ import gremlin.ui.joystick_device
 import gremlin.base_profile
 from gremlin.singleton_decorator import SingletonDecorator
 import time
+from shiboken6 import Shiboken
 
 import gremlin.ui.ui_common
-from gremlin.util import *
+from gremlin.util import compare_guid
 
 import enum
 
@@ -264,6 +265,7 @@ class OctaviInterface:
         self._timers = {}
         self._device_guid = gremlin.shared_state.octavi_tab_guid
         self._last_led = 0  # last status LED
+        self._thread_event = threading.Event()
         for button in OctaviButton:
             self._buttons[button] = False
             self._last_buttons[button] = False
@@ -296,137 +298,150 @@ class OctaviInterface:
         if self._running:
             return True
 
+        config = gremlin.config.Configuration()
+        if not config.octavi_enabled:
+            return False
+
+        # # verify the profile has mappings for this device
+        # profile = gremlin.shared_state.current_profile
+        # if not profile or not profile.hasInputItems(self._device_guid, has_mappings = True):
+        #     return False
+
         verbose = gremlin.config.Configuration().verbose_mode_octavi
         if verbose:
             syslog.info("IFR1: start")
 
         self._running = True
-        self._thread = threading.Thread(target=self._run)
+        self._thread_event.clear()
+        self._thread = threading.Thread(target=self._run, args=(self._thread_event,))
         self._thread.name = "IFR1 Poll"
         self._thread.start()
 
         return True
 
-    def _run(self):
+    def _run(self, thread_event: threading.Event):
         """data poll"""
-        while self._running:
+        while not thread_event.is_set():
             try:
-                data = list(self._device.read(8))  # returns an array of 8 bytes
-            except Exception as e:
-                pass
+                data = list(self._device.read(8))  # @IgnoreException returns an array of 8 bytes
+            except Exception:
+                thread_event.wait(0.05)
                 continue
 
-            if data:
-                changed_data = {}
+            if not data:
+                thread_event.wait(0.05)
+                continue
 
-                # 0 byte0, 1 buttons0, 2 buttons1, 3 buttons2, 4 byte5, 5 knob0, 6 knob1, 7 mode_val
-                b0 = data[1]
-                b1 = data[2]
-                b2 = data[3]
-                k1 = data[5]
-                k2 = data[6]
-                mode = data[7]
+            changed_data = {}
 
-                verbose = gremlin.config.Configuration().verbose_mode_octavi
-                if verbose:
-                    stub = ""
-                    for item in data:
-                        stub += f"0x{item:x} ({item}), "
-                    syslog.info(stub)
+            # 0 byte0, 1 buttons0, 2 buttons1, 3 buttons2, 4 byte5, 5 knob0, 6 knob1, 7 mode_val
+            b0 = data[1]
+            b1 = data[2]
+            b2 = data[3]
+            k1 = data[5]
+            k2 = data[6]
+            mode = data[7]
 
-                # byte 1 buttons
-                self._buttons[OctaviButton.DIRECT] = (b0 & 0x10) > 0
-                self._buttons[OctaviButton.MENU] = (b0 & 0x20) > 0
-                self._buttons[OctaviButton.CLR] = (b0 & 0x40) > 0
-                self._buttons[OctaviButton.ENT] = (b0 & 0x80) > 0
+            verbose = gremlin.config.Configuration().verbose_mode_octavi
+            if verbose:
+                stub = ""
+                for item in data:
+                    stub += f"0x{item:x} ({item}), "
+                syslog.info(stub)
 
-                # byte 2 buttons
-                self._buttons[OctaviButton.EXC] = (b1 & 0x01) > 0
-                self._buttons[OctaviButton.PRESS] = (b1 & 0x02) > 0
-                self._buttons[OctaviButton.MODEAP] = (b1 & 0x40) > 0
-                self._buttons[OctaviButton.MODEHDG] = (b1 & 0x80) > 0
+            # byte 1 buttons
+            self._buttons[OctaviButton.DIRECT] = (b0 & 0x10) > 0
+            self._buttons[OctaviButton.MENU] = (b0 & 0x20) > 0
+            self._buttons[OctaviButton.CLR] = (b0 & 0x40) > 0
+            self._buttons[OctaviButton.ENT] = (b0 & 0x80) > 0
 
-                # byte 3 buttons
-                self._buttons[OctaviButton.MODENAV] = (b2 & 0x01) > 0
-                self._buttons[OctaviButton.MODEAPR] = (b2 & 0x02) > 0
-                self._buttons[OctaviButton.MODEALT] = (b2 & 0x04) > 0
-                self._buttons[OctaviButton.MODEVS] = (b2 & 0x08) > 0
+            # byte 2 buttons
+            self._buttons[OctaviButton.EXC] = (b1 & 0x01) > 0
+            self._buttons[OctaviButton.PRESS] = (b1 & 0x02) > 0
+            self._buttons[OctaviButton.MODEAP] = (b1 & 0x40) > 0
+            self._buttons[OctaviButton.MODEHDG] = (b1 & 0x80) > 0
 
-                # knob rotation
-                v1 = self._knob_value(k1)
-                v2 = self._knob_value(k2)
-                self._buttons[OctaviButton.OUTER] = v1
-                self._buttons[OctaviButton.INNER] = v2
+            # byte 3 buttons
+            self._buttons[OctaviButton.MODENAV] = (b2 & 0x01) > 0
+            self._buttons[OctaviButton.MODEAPR] = (b2 & 0x02) > 0
+            self._buttons[OctaviButton.MODEALT] = (b2 & 0x04) > 0
+            self._buttons[OctaviButton.MODEVS] = (b2 & 0x08) > 0
 
-                timers = []
+            # knob rotation
+            v1 = self._knob_value(k1)
+            v2 = self._knob_value(k2)
+            self._buttons[OctaviButton.OUTER] = v1
+            self._buttons[OctaviButton.INNER] = v2
 
-                if v1 > 0:
-                    button = OctaviButton.OUTER_INC
-                    callback = self._autorelease_outer_inc
-                elif v1 < 0:
-                    button = OctaviButton.OUTER_DEC
-                    callback = self._autorelease_outer_dec
+            timers = []
 
-                if v1:
-                    changed_data[button] = True
-                    if button in self._timers:
-                        timer = self._timers[button]
-                        timer.cancel()
+            if v1 > 0:
+                button = OctaviButton.OUTER_INC
+                callback = self._autorelease_outer_inc
+            elif v1 < 0:
+                button = OctaviButton.OUTER_DEC
+                callback = self._autorelease_outer_dec
 
-                    timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
-                    self._timers[button] = timer
-                    timers.append(timer)
+            if v1:
+                changed_data[button] = True
+                if button in self._timers:
+                    timer = self._timers[button]
+                    timer.cancel()
 
-                if v2 > 0:
-                    button = OctaviButton.INNER_INC
-                    callback = self._autorelease_inner_inc
-                elif v2 < 0:
-                    button = OctaviButton.INNER_DEC
-                    callback = self._autorelease_inner_dec
+                timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
+                self._timers[button] = timer
+                timers.append(timer)
 
-                if v2:
-                    changed_data[button] = True
-                    if button in self._timers:
-                        timer = self._timers[button]
-                        timer.cancel()
+            if v2 > 0:
+                button = OctaviButton.INNER_INC
+                callback = self._autorelease_inner_inc
+            elif v2 < 0:
+                button = OctaviButton.INNER_DEC
+                callback = self._autorelease_inner_dec
 
-                    timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
-                    self._timers[button] = timer
-                    timers.append(timer)
+            if v2:
+                changed_data[button] = True
+                if button in self._timers:
+                    timer = self._timers[button]
+                    timer.cancel()
 
-                # other buttons
-                self._buttons[OctaviButton.COM1] = mode == 0
-                self._buttons[OctaviButton.COM2] = mode == 1
-                self._buttons[OctaviButton.NAV1] = mode == 2
-                self._buttons[OctaviButton.NAV2] = mode == 3
-                self._buttons[OctaviButton.FMS1] = mode == 4
-                self._buttons[OctaviButton.FMS2] = mode == 5
-                self._buttons[OctaviButton.AP] = mode == 6
-                self._buttons[OctaviButton.XPDR] = mode == 7
+                timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
+                self._timers[button] = timer
+                timers.append(timer)
 
-                if self._last_buttons:
-                    # prior data set = do a diffential of what's changed
+            # other buttons
+            self._buttons[OctaviButton.COM1] = mode == 0
+            self._buttons[OctaviButton.COM2] = mode == 1
+            self._buttons[OctaviButton.NAV1] = mode == 2
+            self._buttons[OctaviButton.NAV2] = mode == 3
+            self._buttons[OctaviButton.FMS1] = mode == 4
+            self._buttons[OctaviButton.FMS2] = mode == 5
+            self._buttons[OctaviButton.AP] = mode == 6
+            self._buttons[OctaviButton.XPDR] = mode == 7
 
-                    for button in self._core_buttons:
-                        if button not in self._buttons:
-                            continue
-                        value = self._buttons[button]
-                        if self._last_buttons[button] != value:
-                            changed_data[button] = value
-                            self._last_buttons[button] = value
+            if self._last_buttons:
+                # prior data set = do a diffential of what's changed
 
-                    if changed_data:
-                        self._process_input(changed_data)
+                for button in self._core_buttons:
+                    if button not in self._buttons:
+                        continue
+                    value = self._buttons[button]
+                    if self._last_buttons[button] != value:
+                        changed_data[button] = value
+                        self._last_buttons[button] = value
 
-                    for timer in timers:
-                        timer.start()
+                if changed_data:
+                    self._process_input(changed_data)
 
-                else:
-                    self._process_input(self._buttons)
+                for timer in timers:
+                    timer.start()
 
-                    # copy the data over
-                    for button in self._buttons:
-                        self._last_buttons[button] = self._buttons[button]
+            else:
+                self._process_input(self._buttons)
+
+                # copy the data over
+                for button in self._buttons:
+                    self._last_buttons[button] = self._buttons[button]
 
             time.sleep(0.2)
 
@@ -499,6 +514,7 @@ class OctaviInterface:
     def _stop(self):
         if self._running:
             self._running = False
+            self._thread_event.set()
             # wait for the thread to finishi
             gremlin.util.safeJoin(self._thread)
             self._thread = None

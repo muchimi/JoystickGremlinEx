@@ -161,6 +161,7 @@ if os.path.isdir(install_path):
 
 syslog = logging.getLogger("system")
 
+
 class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     """Main window of the Joystick Gremlin user interface."""
 
@@ -1870,6 +1871,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def save_profile_as(self):
         """Prompts the user for a file to save to profile to."""
+
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
         if fname != "":
             # Seed the new sidecar from the previous profile companion before the
@@ -1893,14 +1895,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             except Exception as err:
                 syslog.warning(f"SAVE AS: could not seed companion JSON: {err}")
 
-            # Flush Stream Deck page names into the *current* sidecar first so
-            # in-memory renames are not left only in RAM when the path changes.
-            try:
-                from gremlin.ui.streamdeck_device import StreamDeckBridge
+            if self.config.streamdeck_enabled:
+                # Flush Stream Deck page names into the *current* sidecar first so
+                # in-memory renames are not left only in RAM when the path changes.
+                try:
+                    from gremlin.ui.streamdeck_device import StreamDeckBridge
 
-                StreamDeckBridge()._persist_page_metadata()
-            except Exception:
-                pass
+                    StreamDeckBridge()._persist_page_metadata()
+                except Exception:
+                    pass
 
             self.profile.setProfileFile(fname)
             self.profile.save()
@@ -3032,9 +3035,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device: DeviceSummary
             device_guid = None
 
-            midi_enabled = self.config.midi_enabled
-            osc_enabled = self.config.osc_enabled
-            streamdeck_enabled = self.config.streamdeck_enabled
 
             self.push_highlighting()
             el = gremlin.event_handler.EventListener()
@@ -3306,10 +3306,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         case DeviceType.Midi:
                             # =======================================================
                             # Create MIDI tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
-                            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.midi_tab_guid)
-                            device = gremlin.joystick_handling.getDevice(device_guid)
+                            if config.midi_enabled:
+                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.midi_tab_guid)
+                                device = gremlin.joystick_handling.getDevice(device_guid)
 
-                            if midi_enabled:
                                 widget = self.getRegisteredWidget(device_guid)
                                 if not widget:
                                     # create the device
@@ -3333,10 +3333,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         case DeviceType.Osc:
                             # =======================================================
                             # Create OSC tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
-                            device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
-                            device = gremlin.joystick_handling.getDevice(device_guid)
 
-                            if osc_enabled:
+                            if config.osc_enabled:
+                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
+                                device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
                                 if not widget:
                                     widget = gremlin.ui.osc_device.OscDeviceTabWidget(profile=self.profile, mode=self.current_mode)
@@ -3383,10 +3383,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     index += 1
 
                         case DeviceType.StreamDeck:
-                            # =======================================================
-                            # Stream Deck via Elgato plugin bridge — one tab per
-                            # connected physical deck; legacy shared tab only if needed.
-                            if streamdeck_enabled:
+                            if config.streamdeck_enabled:
+                                # =======================================================
+                                # Stream Deck via Elgato plugin bridge — one tab per
+                                # connected physical deck; legacy shared tab only if needed.
+
                                 from gremlin.ui import streamdeck_device as streamdeck_ui
 
                                 streamdeck_ui.ensure_bridge_started()
@@ -3451,7 +3452,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 index += 1
 
                         case DeviceType.Voice:
-                            if gremlin.config.VOICE_INPUT_ENABLED:
+                            if config.voice_enabled:
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.voice_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
@@ -3467,31 +3468,37 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     index += 1
 
                         case DeviceType.Overlay:
-                            try:
-                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
-                                device = gremlin.joystick_handling.getDevice(device_guid)
-                                widget = self.getRegisteredWidget(device_guid)
-                                if not widget:
-                                    import gremlin.ui.obs_overlay as obs_overlay
+                            # =======================================================
+                            # Add overlay device
+                            if config.overlay_enabled:
+                                try:
+                                    device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
+                                    device = gremlin.joystick_handling.getDevice(device_guid)
+                                    widget = self.getRegisteredWidget(device_guid)
+                                    if not widget:
+                                        import gremlin.ui.obs_overlay as obs_overlay
 
-                                    manager = obs_overlay.OverlayManager()
-                                    widget = obs_overlay.OverlayDesignerWidget(
-                                        manager.scene,
-                                        overlay_manager=manager,
-                                    )
-                                    self.registerWidget(device_guid, widget)
-                                    self._overlay_device_guid = device_guid
-                                    widget.data = (
-                                        TabDeviceType.Overlay,
-                                        device_guid,
-                                        index,
-                                    )
-                                if add_tab_if_missing(device, TabDeviceType.Overlay):
-                                    index += 1
-                            except Exception as err:
-                                syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
-                                syslog.error(traceback.format_exc())
+                                        manager = obs_overlay.OverlayManager()
+                                        widget = obs_overlay.OverlayDesignerWidget(
+                                            manager.scene,
+                                            overlay_manager=manager,
+                                        )
+                                        self.registerWidget(device_guid, widget)
+                                        self._overlay_device_guid = device_guid
+                                        widget.data = (
+                                            TabDeviceType.Overlay,
+                                            device_guid,
+                                            index,
+                                        )
+                                    if add_tab_if_missing(device, TabDeviceType.Overlay):
+                                        index += 1
+                                except Exception as err:
+                                    syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
+                                    syslog.error(traceback.format_exc())
 
+                elif device in config_set:
+                    # configuration devices
+                    match device.device_type:
                         case DeviceType.Settings:
                             # =======================================================
                             # Add profile configuration tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
@@ -3502,7 +3509,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             if not widget:
                                 widget = gremlin.ui.profile_settings.ProfileSettingsWidget(self.profile.settings)
                                 self.registerWidget(device_guid, widget)
-                                # widget.changed.connect(self._handle_on_change)
+
 
                                 self._settings_device_guid = device_guid
 
@@ -4417,10 +4424,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # add the Keyboard, OSC and MIDI
 
         guid_list.append(self._find_tab_data_guid(gremlin.shared_state.keyboard_tab_guid))
+
         if self.config.midi_enabled:
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.midi_tab_guid))
+
         if self.config.osc_enabled:
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.osc_tab_guid))
+
         if self.config.streamdeck_enabled:
             # One tab per connected Stream Deck (+ legacy tab only when still needed)
             from gremlin.ui import streamdeck_device as streamdeck_ui
@@ -4442,15 +4452,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # add the user plugin tab
         guid_list.append(self._find_tab_data_guid(gremlin.shared_state.plugins_tab_guid))
 
-        # add the overlay designer tab
-        overlay_tab = self._find_tab_data_guid(gremlin.shared_state.overlay_tab_guid)
-        if overlay_tab:
-            guid_list.append(overlay_tab)
+        if self.config.overlay_enabled:
+            overlay_tab = self._find_tab_data_guid(gremlin.shared_state.overlay_tab_guid)
+            if overlay_tab:
+                guid_list.append(overlay_tab)
 
-        # add the AFCS designer tab
-        afcs_tab = self._find_tab_data_guid(gremlin.shared_state.afcs_tab_guid)
-        if afcs_tab:
-            guid_list.append(afcs_tab)
+        if self.config.afcs_enabled:
+            # add the AFCS designer tab
+            afcs_tab = self._find_tab_data_guid(gremlin.shared_state.afcs_tab_guid)
+            if afcs_tab:
+                guid_list.append(afcs_tab)
 
         # move the tabs to the correct location
         self._reset_tab_data()
@@ -5992,6 +6003,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.setWindowTitle(the_title)
 
+
 def configure_logger(config: dict):
     """Creates a new logger instance.
 
@@ -6039,6 +6051,7 @@ def configure_logger(config: dict):
 
     return True
 
+
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     # Ignore KeyboardInterrupt (Ctrl+C) so users can close the app normally
     if issubclass(exc_type, KeyboardInterrupt):
@@ -6051,6 +6064,7 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     syslog.critical(msg)
 
     gremlin.util.display_error(msg)
+
 
 # general exception handling
 sys.excepthook = handle_unhandled_exception
@@ -6098,6 +6112,7 @@ if __name__ == "__main__":
 
     # config file watcher setup (must be after app is instantiated)
     config.start()
+
 
     # set faster context switch for Python
     sys.setswitchinterval(0.001)
@@ -6210,7 +6225,7 @@ if __name__ == "__main__":
         hg = gremlin.hid_guardian.HidGuardian()
         hg.add_process(os.getpid())
 
-        config = gremlin.config.Configuration()
+
 
         # command line parser
         parser = QtCore.QCommandLineParser()
@@ -6255,6 +6270,10 @@ if __name__ == "__main__":
                     os._exit(1)
 
             config.profile_to_load = profile_to_load if args else None
+
+        # Log module options for debugging purposes
+        config.logModuleOptions()
+
 
         # event listener init (after processing command line args)
         el = gremlin.event_handler.EventListener()
@@ -6381,24 +6400,6 @@ if __name__ == "__main__":
         # HID maestro
         maestro = gremlin.maestro.Maestro()
 
-        # # voice input testing
-        # if gremlin.config.VOICE_INPUT_ENABLED:
-        #     def test_callback(command : gremlin.voice.VoiceCommand):
-        #         syslog.info(f"VOICE TRIGGER: {command}")
-
-        #     commands = [
-        #         gremlin.voice.VoiceCommand("gear down", test_callback),
-        #         gremlin.voice.VoiceCommand("gear up", test_callback),
-        #         gremlin.voice.VoiceCommand("flaps down", test_callback),
-        #         gremlin.voice.VoiceCommand("flaps up", test_callback),
-        #         gremlin.voice.VoiceCommand("landing gear down", test_callback),
-        #         gremlin.voice.VoiceCommand("landing gear up", test_callback),
-        #         gremlin.voice.VoiceCommand("toggle landing gear", test_callback),
-
-        #     ]
-        #     voice = gremlin.voice.Voice(commands=commands)
-
-        # Run UI
 
         # for some reason QT shows the window with a white background and ignores stylesheets/background color
         # workaround for now: show the window minimized so it doesnt' flash on the screen

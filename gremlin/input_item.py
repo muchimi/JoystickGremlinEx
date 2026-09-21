@@ -1918,7 +1918,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._description_icon = None
 
         # action icons
-        self._action_icon_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="action icons")
+        self._action_icon_widget = gremlin.ui.ui_common.AutohideContainer()
+        self._action_icon_widget.setProperty("data", "action icons")
 
         # input description row
         self._input_description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="input description")
@@ -1933,7 +1934,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # repeater
         self.axis_repeater_widget = None  # axis repeater
         self.button_repeater_widget = None  # button repeater
-        self._repeater_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="repeater")
+        self._repeater_container_widget = gremlin.ui.ui_common.AutohideContainer()
+        self._repeater_container_widget.setProperty("data", "repeater")
 
         # comment row
         self._comment_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="comment")
@@ -1946,7 +1948,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._container_id_widget = gremlin.ui.ui_common.AutohideContainerIdWidget(widget)
 
         # item content setup below the title bar
-        # self._content_widget = gremlin.ui.ui_common.AutohideContainer()
         self._content_widget = QtWidgets.QWidget()
         self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
         self._content_layout.setContentsMargins(4, 4, 4, 4)
@@ -2012,7 +2013,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self.ensureStyle()
 
-        self._autohide_widgets = gremlin.util.get_widget_references(self, gremlin.ui.ui_common.AutoHideStackedWidget)
         self.widget_height = self.sizeHint().height()
 
         # debug content

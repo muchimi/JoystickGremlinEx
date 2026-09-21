@@ -51,7 +51,19 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T58)
-- Change: further optimization of input filtering for axis and button/hat inputs and large deviations.
+
+- Change: general optimization pass
+	- keyboard input queues
+	- mouse input queues
+	- joystick input queues
+	- Octavi IFR - HID polling
+	- major refresh improvement for input viewer
+- Change: configuration overrides for development (allows toggling of components for dev purposes)
+- Fix: further tweaking of axis filtering workflows with EMA filter now able to handle rapid and large changes.  Added axis settling algorithm to filter to validate final position.  This is aimed at devices that spam (a.k.a. overwhelm inputs with hundred or thousand of updates per second).  The devices also tend to instantly stop spamming when the input is in certain positions (such as a center location) causing the filter to terminate on the wrong value due to the low-pass algorithm.  This is the best of both worlds, with filtering of spam, while keeping accurate final positions after the spam stops and smoothing values in between.
+- Fix: UI: replaced QT stacked widget custom size/custom layouts as those were determined to cause random QT internal library crashes.  These in turn caused an instant Python crash with no errors logged.
+- Change: Platform: reverted to Python 3.14.6 as 3.14.7 does not appear as stable for now especially with older libraries and the very heavy threaded nature of GEX.
+- Fix: UI: added fallback icon if an icon is not found (avoids a font exception) - this may not resolve the issue in all cases.
+
 
 
 ### (m77T57A)
