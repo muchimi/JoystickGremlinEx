@@ -46,7 +46,15 @@ The most current test releases will contain the latest bug fixes, features and o
 The test versions are available here: https://github.com/muchimi/JoystickGremlinEx/releases/tag/test
 
 
+
 # Change log
+
+
+### (m77T57A)
+- Fix: UI: various fixes (courtesy Lolo350)
+- Fix: API: EMA filter updates on drastic input changes (courtesy Lolo350)
+- Fix: UI: plugin UI does not always update correctly.
+- New: AFCS action (courtesy Lolo350)
 
 ### (m77T57)
 - Change: further optimization of input filtering for axis and button/hat inputs
