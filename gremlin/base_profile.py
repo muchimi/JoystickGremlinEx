@@ -4838,7 +4838,7 @@ class Profile:
                 backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
                 try:
                     shutil.copyfile(use_name, backup_file)
-                    ext_list = ["json", ".calib", "overlay.json"]
+                    ext_list = ["json", ".calib"]
                     for ext in ext_list:
                         json_source = gremlin.util.swap_ext(use_name, ext)
                         json_target = gremlin.util.swap_ext(backup_file, ext)
@@ -4863,8 +4863,9 @@ class Profile:
                     import gremlin.ui.obs_overlay as obs_overlay
 
                     obs_overlay.persist_for_profile(self, dest_xml=use_name)
-                except Exception:
-                    pass
+                except Exception as err:
+                    syslog.error(f"OBS OVERLAY: persist on profile save failed: {err}")
+                    syslog.error(traceback.format_exc())
                 try:
                     import gremlin.ui.afcs as afcs
 

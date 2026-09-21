@@ -27,15 +27,15 @@ _CLIPBOARD_MIME_FORMATS = (
 
 
 def overlay_images_dir(scene=None) -> str:
-    """Folder next to the overlay JSON (or the GEX user profile) for pasted clips."""
+    """Folder next to the profile (or the GEX user profile) for pasted clips."""
     import gremlin.util
 
-    from .model import overlay_path_for_profile
+    from .model import profile_json_path, profile_xml_path
 
     path = None
     if scene is not None:
-        path = getattr(scene, "_path", None)
-    path = path or overlay_path_for_profile()
+        path = getattr(scene, "_path", None) or getattr(scene, "_profile_key", None)
+    path = path or profile_json_path() or profile_xml_path()
     if path:
         base = os.path.dirname(os.path.abspath(str(path)))
     else:
