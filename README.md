@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T58B)
+- Fix: resolved one more cause of thread.init() exception
+
 ### (m77T58A)
 - Fix: Map to Vjoy Action: axis scaling exception.
 
