@@ -193,6 +193,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         super().__init__(parent)
         self.model = model
         self.index = index
+        self.config = gremlin.config.Configuration()
+
 
         self.action_types = {
             "Joystick": MacroActionEditor.ActionTypeData("Joystick", self._joystick_ui, gremlin.macro.JoystickAction),
@@ -203,9 +205,11 @@ class MacroActionEditor(QtWidgets.QWidget):
             "vJoy": MacroActionEditor.ActionTypeData("vJoy", self._vjoy_ui, gremlin.macro.VJoyMacroAction),
             "Remote Control": MacroActionEditor.ActionTypeData("Remote Control", self._remote_control_ui, gremlin.macro.RemoteControlAction),
             "State": MacroActionEditor.ActionTypeData("State", self._state_ui, gremlin.macro.StateAction),
-            "Stream Deck": MacroActionEditor.ActionTypeData("Stream Deck", self._streamdeck_ui, gremlin.macro.StreamDeckAction),
             "Description": MacroActionEditor.ActionTypeData("Description", self._description_ui, gremlin.macro.MacroDescriptionAction),
         }
+
+        if self.config.streamdeck_enabled:
+            self.action_types["Stream Deck"] = MacroActionEditor.ActionTypeData("Stream Deck", self._streamdeck_ui, gremlin.macro.StreamDeckAction)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -295,7 +299,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         # Clear the current editor widget ui components
         gremlin.ui.ui_common.clear_layout(self.action_layout)
         self.ui_elements = {}
-
+        config = gremlin.config.Configuration()
         # Update the model data to match the new type
         if value == "Joystick":
             self.model.set_entry(gremlin.macro.JoystickAction(0, InputType.JoystickButton, 1, True), self.index.row())
@@ -313,7 +317,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
         elif value == "State":
             self.model.set_entry(gremlin.macro.StateAction(), self.index.row())
-        elif value == "Stream Deck":
+        elif value == "Stream Deck" and config.streamdeck_enabled:
             self.model.set_entry(gremlin.macro.StreamDeckAction(), self.index.row())
         elif value == "Description":
             self.model.set_entry(gremlin.macro.MacroDescriptionAction(), self.index.row())
@@ -720,6 +724,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _streamdeck_ui(self):
         """Stream Deck page-control step (mirrors Map to Stream Deck)."""
+
         from action_plugins.map_to_streamdeck import (
             AUTO_RETURN_COMMANDS,
             DEFAULT_AUTO_RETURN_SECONDS,
@@ -778,44 +783,51 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["sd_auto_return_seconds"] = auto_return_seconds
         self.ui_elements["sd_auto_return_row"] = auto_return_row
 
-        def _connected_devices():
-            try:
-                from gremlin.ui.streamdeck_device import StreamDeckBridge
+        self.config = gremlin.config.Configuration()
 
-                bridge = StreamDeckBridge()
-                items = []
-                for device_id, info in bridge.devices.items():
-                    name = (info.get("name") or "").strip() or f"Stream Deck ({str(device_id)[:8]})"
-                    dtype = info.get("type")
-                    suffix = f" [type {dtype}]" if dtype not in (None, "") else ""
-                    items.append((str(device_id), f"{name}{suffix}"))
-                items.sort(key=lambda x: x[1].casefold())
-                return items
-            except Exception:
-                return []
+
+        def _connected_devices():
+            if self.config.streamdeck_enabled:
+                try:
+                    from gremlin.ui.streamdeck_device import StreamDeckBridge
+
+                    bridge = StreamDeckBridge()
+                    items = []
+                    for device_id, info in bridge.devices.items():
+                        name = (info.get("name") or "").strip() or f"Stream Deck ({str(device_id)[:8]})"
+                        dtype = info.get("type")
+                        suffix = f" [type {dtype}]" if dtype not in (None, "") else ""
+                        items.append((str(device_id), f"{name}{suffix}"))
+                    items.sort(key=lambda x: x[1].casefold())
+                    return items
+                except Exception:
+                    pass
+            return []
 
         def _page_choices(device_id: str):
-            try:
-                from gremlin.ui.streamdeck_device import StreamDeckBridge
+            if self.config.streamdeck_enabled:
+                try:
+                    from gremlin.ui.streamdeck_device import StreamDeckBridge
 
-                bridge = StreamDeckBridge()
-                did = device_id or ""
-                if not did and bridge.devices:
-                    did = next(iter(bridge.devices.keys()))
-                pages = bridge.list_pages(did) if did else [1]
-                if not pages:
-                    pages = [1]
-                out = []
-                for page in pages:
-                    name = bridge.page_name(did, page) if did else f"Page {page}"
-                    if name == f"Page {page}":
-                        label = f"{page}. Page {page}"
-                    else:
-                        label = f"{page}. {name}"
-                    out.append((page, label))
-                return out
-            except Exception:
-                return [(1, "1. Page 1")]
+                    bridge = StreamDeckBridge()
+                    did = device_id or ""
+                    if not did and bridge.devices:
+                        did = next(iter(bridge.devices.keys()))
+                    pages = bridge.list_pages(did) if did else [1]
+                    if not pages:
+                        pages = [1]
+                    out = []
+                    for page in pages:
+                        name = bridge.page_name(did, page) if did else f"Page {page}"
+                        if name == f"Page {page}":
+                            label = f"{page}. Page {page}"
+                        else:
+                            label = f"{page}. {name}"
+                        out.append((page, label))
+                    return out
+                except Exception:
+                    pass
+            return [(1, "1. Page 1")]
 
         def _refresh_pages():
             if not Shiboken.isValid(page_widget):
@@ -2395,7 +2407,7 @@ To send complex sequences, please look at the sequence container."""
                 else:
                     table.addField("State", "N/A")
 
-            elif isinstance(entry, gremlin.macro.StreamDeckAction):
+            elif gremlin.config.STREAMDECK_ENABLED and isinstance(entry, gremlin.macro.StreamDeckAction):
                 from action_plugins.map_to_streamdeck import FUNCTIONS
 
                 label = dict(FUNCTIONS).get(entry.command or "changePage", entry.command)

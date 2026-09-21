@@ -127,6 +127,7 @@ class ApplicationViewTracker:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
+        self._start_queued = False
 
     def retain(self, widget_ids: set[str] | None):
         wanted = set(widget_ids or ())
@@ -225,10 +226,34 @@ class ApplicationViewTracker:
         if thread is not None and thread.is_alive():
             self._wake.set()
             return
+        # paintEvent is a C++ → Python callback. On Python 3.14, constructing or
+        # starting threading.Thread there raises RuntimeError("thread.__init__()
+        # not called") and Qt reports it as a QWidget.paintEvent override error.
+        if self._start_queued:
+            return
+        self._start_queued = True
+        from PySide6 import QtCore
+
+        app = QtCore.QCoreApplication.instance()
+        if app is not None:
+            QtCore.QTimer.singleShot(0, self._start_thread)
+            return
+        self._start_thread()
+
+    def _start_thread(self):
+        self._start_queued = False
+        thread = self._thread
+        if thread is not None and thread.is_alive():
+            self._wake.set()
+            return
         self._stop.clear()
         thread = threading.Thread(target=self._run, name="overlay-app-view", daemon=True)
         self._thread = thread
-        thread.start()
+        try:
+            thread.start()
+        except RuntimeError as err:
+            self._thread = None
+            syslog.warning(f"OBS OVERLAY: application capture thread failed to start: {err}")
 
     def _run(self):
         while not self._stop.is_set():

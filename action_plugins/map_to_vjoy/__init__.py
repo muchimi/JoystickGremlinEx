@@ -4839,6 +4839,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.step_index = action_data.target_step_start_index
         self.step_direction = 1.0  # assume going up for linear step mode
         self.synced = False  # true if synchronized, resets on profile start
+        self.scale_factor = 1.0
 
         v1 = action_data.button_range_min
         v2 = action_data.button_range_max
@@ -6041,6 +6042,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     ),
                                 )
 
+                            self.scale_factor = scale_factor
+
                         else:
                             self.scale_factor = 1.0
 
@@ -6049,15 +6052,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                         # update tracking values
 
-                        # self.lock.acquire()
-                        self.scale_factor = scale_factor
                         self.direction = direction
                         # self.lock.release()
 
                         if verbose_extra:
-                            syslog.info(f"Tick value: {direction * scale_factor: 0.3f}")
+                            syslog.info(f"Tick value: {direction * self.scale_factor: 0.3f}")
 
-                        if scale_factor >= 0.02:
+                        if self.scale_factor >= 0.02:
                             if not self._relative_pulse_worker.is_running:
                                 if verbose_extra:
                                     syslog.info("VJOY: Tick start")

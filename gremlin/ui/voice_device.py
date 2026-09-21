@@ -1437,7 +1437,9 @@ class VoiceData:
         """persists the voice input configuration data to XML"""
         verbose = gremlin.config.Configuration().verbose_mode_voice
         if verbose:
-            syslog.info(f"Persisting voices to XML - voice count: {len(self._data)}")
+            count = len(self._data)
+            if count > 0:
+                syslog.info(f"Persisting voices to XML - voice count: {len(self._data)}")
         root = ElementTree.Element("voices")
         for key in self._data:
             item = self._data[key]

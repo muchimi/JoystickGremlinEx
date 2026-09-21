@@ -28,7 +28,6 @@ import collections
 from typing import Optional
 from threading import Thread, Timer
 from typing import Callable
-import math
 import itertools
 import queue
 
@@ -852,6 +851,7 @@ class EventListener(QtCore.QObject):
 
         self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
         self.keyboard_hook.register(self._keyboard_handler)
+        self._keyboard_thread_event = threading.Event()
 
         # Calibration function for each axis of all devices
         self._calibrations = {}
@@ -860,8 +860,6 @@ class EventListener(QtCore.QObject):
         self._device_update_timer = None
         self._device_change_suppressed = 0  # suppression counter for device change events
         self._device_change_pending = False  # true if a device change occured while suppressed
-
-
 
         self._running = True
         self._run_thread = None
@@ -898,7 +896,9 @@ class EventListener(QtCore.QObject):
 
         self._vjoy_callbacks = []
         self._debounce_map = {}
-        self._button_debounce_seconds =  0.01
+        self._button_debounce_seconds = 0.01
+        self._axis_settle_timers = {}
+        self._axis_settle_lock = threading.Lock()
 
         self._hat_state = {}  # list of map positions (device_id, input_id), position_tuple, if blank - not set
 
@@ -986,35 +986,88 @@ class EventListener(QtCore.QObject):
         else:
             self._event_queue.put(event)
 
-    def _event_runner(self) -> None:
-        """Process inbound joystick event thread worker"""
+    # def _event_runner_v0(self) -> None:
+    #     """Process inbound joystick event thread worker"""
 
+    #     event_queue = self._event_queue
+
+    #     joystick_event_emit = self.joystick_event.emit
+    #     joystick_event_ui_emit = self.joystick_event_ui.emit
+    #     axis_state_change_emit = self.axis_state_change.emit
+    #     button_state_change_emit = self.button_state_change.emit
+
+    #     while not self._event_event.is_set():
+    #         try:
+    #             event_list = event_queue.get(timeout=0.01)
+    #             if not isinstance(event_list, list):
+    #                 event_list = [event_list]
+    #         except FastQueue.Empty:
+    #             continue
+    #         except Exception:
+    #             continue
+
+    #         if not event_list:
+    #             continue
+
+    #         event_list = _coalesce_axis_batch(event_list)
+    #         for event in event_list:
+    #             joystick_event_emit(event)
+    #             joystick_event_ui_emit(event)
+
+    #             if not gremlin.shared_state.is_running:
+    #                 if event.is_axis:
+    #                     axis_state_change_emit(event)
+    #                 else:
+    #                     button_state_change_emit(event)
+
+    def _event_runner(self) -> None:
+        """Process inbound joystick event thread worker (lower CPU usage)."""
         event_queue = self._event_queue
+        is_set = self._event_event.is_set
 
         joystick_event_emit = self.joystick_event.emit
         joystick_event_ui_emit = self.joystick_event_ui.emit
         axis_state_change_emit = self.axis_state_change.emit
         button_state_change_emit = self.button_state_change.emit
 
-        while not self._event_event.is_set():
+        while not is_set():
             try:
-                event_list = event_queue.get(timeout=0.01)
-                if not isinstance(event_list, list):
-                    event_list = [event_list]
+                # 1. Block indefinitely with zero CPU until data arrives or stop event fires
+                item = event_queue.get(block=True, timeout=0.1)
             except FastQueue.Empty:
                 continue
             except Exception:
                 continue
 
+            # Fast single item or list normalization
+            event_list = item if isinstance(item, list) else [item]
+
+            # 2. Drain any additional queued items immediately without waiting
+            while True:
+                try:
+                    next_item = event_queue.get_nowait()
+                    if isinstance(next_item, list):
+                        event_list.extend(next_item)
+                    else:
+                        event_list.append(next_item)
+                except FastQueue.Empty:
+                    break
+
             if not event_list:
                 continue
 
-            event_list = _coalesce_axis_batch(event_list)
-            for event in event_list:
+            # 3. Coalesce high-frequency axis motion into single updates
+            # coalesced_list = _coalesce_axis_batch(event_list)
+            coalesced_list = event_list  # EMA filter will handle smoothing of axis events
+
+            # Localize state access outside the inner loop
+            is_running = gremlin.shared_state.is_running
+
+            for event in coalesced_list:
                 joystick_event_emit(event)
                 joystick_event_ui_emit(event)
 
-                if not gremlin.shared_state.is_running:
+                if not is_running:
                     if event.is_axis:
                         axis_state_change_emit(event)
                     else:
@@ -1031,12 +1084,86 @@ class EventListener(QtCore.QObject):
             callback(event)
 
     def reset(self):
+        self._cancel_axis_settle_timers()
         self._vjoy_events.clear()
         self._vjoy_callbacks.clear()
         self._mode_lookup_cache.clear()
 
         # clear the event queue
         self._event_queue.clear()
+
+    def _cancel_axis_settle_timers(self):
+        with self._axis_settle_lock:
+            for timer in self._axis_settle_timers.values():
+                timer.cancel()
+            self._axis_settle_timers.clear()
+
+    def _schedule_axis_settle_check(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
+        """Schedules a one-shot settling check after axis input quiets down."""
+        settle_delay = 0.025
+        if data is not None and data.filter is not None:
+            settle_delay = max(data.filter.settle_interval_ns / 1_000_000_000.0, 0.0)
+
+        with self._axis_settle_lock:
+            old_timer = self._axis_settle_timers.pop(key, None)
+            if old_timer is not None:
+                old_timer.cancel()
+
+            timer = Timer(settle_delay, lambda: self._axis_settle_timer_cb(key, data, device_guid, input_id, is_virtual))
+            timer.daemon = True
+            self._axis_settle_timers[key] = timer
+            timer.start()
+
+    def _axis_settle_timer_cb(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
+        with self._axis_settle_lock:
+            self._axis_settle_timers.pop(key, None)
+
+        if not self._running:
+            return
+
+        if self._debounce_map.get(key) is not data:
+            return
+
+        try:
+            settled_raw = data.check_settling()
+        except Exception:
+            return
+
+        if settled_raw is None:
+            return
+
+        self._queue_settled_axis_event(device_guid, input_id, settled_raw, is_virtual)
+
+    def _queue_settled_axis_event(self, device_guid, input_id: int, raw_axis_value: float, is_virtual: bool):
+        """Queues a synthesized final axis sample when an axis has settled."""
+        raw_value = gremlin.util.scale_to_range(raw_axis_value, source_min=-32768, source_max=32767, target_min=-1.0, target_max=1.0)
+        value = raw_value
+        extra_data = {"settled": True}
+
+        if self._has_calibration(device_guid, input_id):
+            value = self._apply_calibration_ex(device_guid, input_id, raw_axis_value)
+            extra_data["calibrated"] = True
+            extra_data["calibrated_value"] = value
+
+        curved_value, has_curve = self._apply_curve_ex(device_guid, input_id, value)
+        if has_curve:
+            extra_data["curved"] = True
+
+        event = Event(
+            event_type=InputType.JoystickAxis,
+            device_guid=device_guid,
+            identifier=input_id,
+            value=value,
+            curved_value=curved_value,
+            raw_value=raw_value,
+            is_axis=True,
+            is_virtual=is_virtual,
+            extra_data=extra_data,
+        )
+
+        self.queueJoystickEvent(event)
+        if not gremlin.shared_state.is_running:
+            self.axis_state_change.emit(event)
 
     def disconnect(self, signal: Signal | QtCore.Signal, slot: Callable):
         """attempts to disconnect a slot from a signal safely"""
@@ -1105,6 +1232,7 @@ class EventListener(QtCore.QObject):
         self.stopKeepAlive()
         self.stopRunThread()
         self.stopEventThread()
+        self._cancel_axis_settle_timers()
 
         # mark all events processed
         self._event_queue.clear()
@@ -1226,6 +1354,7 @@ class EventListener(QtCore.QObject):
         # clear the current event queue
         syslog.info(f"EXEC: clear event queue: size: {len(self._event_queue)}")
         self._event_queue.clear()
+        self._cancel_axis_settle_timers()
 
         self._profile_started = False
         device_guid = gremlin.shared_state.mode_tab_guid
@@ -1388,18 +1517,17 @@ class EventListener(QtCore.QObject):
         """true if input selection is suspended"""
         return gremlin.shared_state.is_input_selection_suspended
 
-    def _process_queue(self):
+    def _process_queue(self, items: list):
         """processes an item the keyboard buffer queue"""
-        items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
             if not self._keyboard_thread_running:
                 break
-            verbose = gremlin.config.Configuration().verbose_mode_detailed
+            # verbose = gremlin.config.Configuration().verbose_mode_detailed
             # verbose = True
 
             is_error = False
-            if verbose:
-                syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
+            # if verbose:
+            #     syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
 
             if isinstance(item, int):
                 virtual_code = item
@@ -1427,34 +1555,36 @@ class EventListener(QtCore.QObject):
                     is_pressed=is_pressed,
                     data=self._keyboard_buffer,
                 )
-                if verbose:
-                    syslog.info(
-                        f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed} event: {str(event)}"
-                    )
+                # if verbose:
+                #     syslog.info(
+                #         f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed} event: {str(event)}"
+                #     )
 
-                if verbose and is_pressed:
-                    syslog.info(f"fire keyboard event on key press - key.name: [{key.name}]")
+                # if verbose and is_pressed:
+                #     syslog.info(f"fire keyboard event on key press - key.name: [{key.name}]")
                 self.keyboard_event.emit(event)
-            else:
-                if verbose:
-                    syslog.info(f"DEQUEUE KEY: error processing item: {item}")
+            # else:
+            #     if verbose:
+            #         syslog.info(f"DEQUEUE KEY: error processing item: {item}")
 
             # process the events
-            time.sleep(0)  # yield to other threads
+            # time.sleep(0)  # yield to other threads
 
-    def _keyboard_runner(self):
+    def _keyboard_runner(self, abort_event: threading.Event):
         """runs as a thread to process inbound keyboard events using a queue"""
 
         syslog.info("KBD: processing start")
         self._keyboard_buffer = {}
         self._key_listener_started = True
-        while self._keyboard_thread_running:
-            if self._keyboard_queue.empty():
-                time.sleep(0)
+        while not abort_event.is_set():
+            try:
+                items = self._keyboard_queue.getall(timeout=0.5)  # @IgnoreException
+                if items:
+                    self._process_queue(items)
+            except FastQueue.Empty:
                 continue
-            if self._keyboard_thread_running:
-                self._process_queue()
-                time.sleep(0)  # yield to other threads
+            except Exception as e:
+                syslog.error(f"Error processing keyboard queue: {e}")
 
         syslog.info("KBD: stopped")
 
@@ -1463,18 +1593,22 @@ class EventListener(QtCore.QObject):
         if not self._key_listener_started:
             self._key_listener_started = True
             self._keyboard_thread_running = True
+            self._keyboard_thread_event.clear()
+
             self._keyboard_queue: FastQueue[Event] = FastQueue(name="keyboard_queue")  # queue.Queue()
-            self._keyboard_thread = threading.Thread(target=self._keyboard_runner, daemon=True)
+            self._keyboard_thread = threading.Thread(target=self._keyboard_runner, args=(self._keyboard_thread_event,), daemon=True)
             self._keyboard_thread.start()
 
     def stop_key_listener(self):
         """stops the key listener"""
         if self._key_listener_started:
             syslog.info("KEY THREAD: stopping...")
-            self._keyboard_queue.clear()
+            self._keyboard_thread_event.set()
             self._keyboard_thread_running = False
+            gremlin.util.safeJoin(self._keyboard_thread)
             self._keyboard_thread = None
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
+            self._keyboard_queue.clear()
 
             syslog.info("KEY THREAD: stopped")
             self._key_listener_started = False
@@ -1525,28 +1659,29 @@ class EventListener(QtCore.QObject):
     def _run(self):
         """Starts the event loop."""
 
-        if not dinput.DILL.initalized:
+        if not dinput.DILL.initialized:
             dinput.DILL.init()
         syslog.info("DILL: start listen")
         dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
         dinput.DILL.set_input_event_callback(self._dinput_event_handler)  # DINPUT event handler
-        while self._running and not self._run_event.is_set():
-            # Keep this thread alive until we are done
-            time.sleep(0)
+        while not self._run_event.wait(timeout=0.5):
+            continue
+
         syslog.info("DILL: shutdown")
         dinput.DILL.set_device_change_callback(None)
         dinput.DILL.set_input_event_callback(None)
 
     @ignore_function
     def _keep_alive(self):
-        """keep alive 30 second hearbeat"""
-        delay = 60 * 2  # delay in seconds
-        notify_time = time.time()
-        while not self._keep_alive_event.is_set():
-            if time.time() >= notify_time:
-                self.heartbeat.emit()
-                notify_time = time.time() + delay  # 2 minutes
-            time.sleep(5)  # do other stuff
+        """Zero-CPU background heartbeat thread."""
+        interval = 120.0  # 2 minutes in seconds
+
+        # Send initial heartbeat immediately
+        self.heartbeat.emit()
+
+        # kernel sleep: OS consumes zero CPU cycles while waiting
+        while not self._keep_alive_event.wait(timeout=interval):
+            self.heartbeat.emit()
 
     def _handle_vjoy_event(self, vjoyevent: VjoyEvent):
         """handles internal loopback events
@@ -1725,15 +1860,37 @@ class EventListener(QtCore.QObject):
 
         data = self._debounce_map.get(key)
         if data is None:
-            data = DInputData()
-            self._debounce_map[key] = data
-            return False # process event
-
+            if event_type == dinput.InputType.Axis:
+                data = DInputData(
+                    device_guid=event.device_guid,
+                    input_id=input_id,
+                )
+                self._debounce_map[key] = data
+                data.process_input(value)
+                self._schedule_axis_settle_check(
+                    key=key,
+                    data=data,
+                    device_guid=event.device_guid,
+                    input_id=input_id,
+                    is_virtual=bool(getattr(device, "is_virtual", False)),
+                )
+            else:
+                data = DInputData()
+                self._debounce_map[key] = data
+            return False  # process event
 
         if event_type == dinput.InputType.Axis:
-            # EMA filter for axis events.
-            return not data.process_input(value)
-
+            filtered = data.process_input(value) is None
+            self._schedule_axis_settle_check(
+                key=key,
+                data=data,
+                device_guid=event.device_guid,
+                input_id=input_id,
+                is_virtual=bool(getattr(device, "is_virtual", False)),
+            )
+            # EMA filter for axis events. Only None means drop — never use
+            # truthiness, or an exact center sample (0) is discarded.
+            return filtered
 
         if event_type in (
             dinput.InputType.Button,
@@ -1760,10 +1917,7 @@ class EventListener(QtCore.QObject):
 
             # Suppress a state transition that occurs too soon after the last
             # accepted transition.
-            if (
-                now - data.last_time
-                <= self._button_debounce_seconds
-            ):
+            if now - data.last_time <= self._button_debounce_seconds:
                 return True
 
             data.value = value
@@ -3781,7 +3935,7 @@ class EventHandler(QtCore.QObject):
                                 m_list = self._matching_latched_callbacks(event, latch_key)
 
                             # check voice latching if latching on keyboard
-                            if config.VOICE_INPUT_ENABLED:
+                            if config.voice_enabled:
                                 v_list = self._matching_voice_callbacks(event, latch_key, input_item)
                                 if v_list:
                                     m_list.extend(v_list)
@@ -3894,7 +4048,7 @@ class EventHandler(QtCore.QObject):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
             # check for matching voice recognition trigger
-            if config.VOICE_INPUT_ENABLED and not v_list:
+            if config.voice_enabled and not v_list:
                 v_list = self._matching_voice_callbacks(event, None, input_item)
                 if v_list:
                     m_list.extend(v_list)
@@ -4569,18 +4723,112 @@ class AxisData:
         return f"AxisData: device: {self.device.name} input_id: {self.input_id} linear_id: {self.linear_id} actual: {self.actual_value} raw: {self.raw_value} calibrated: {self.calibrated_value} curve: {self.curve_value}"
 
 
-class DInputData:
-    """holds dinput signaling data"""
+# class DInputData:
+#     """holds dinput signaling data"""
 
-    def __init__(self):
+#     def __init__(self,
+#                  device_guid,
+#                  input_id):
+#         self.device_guid = device_guid
+#         self.input_id = input_id
+#         self.last_time = None
+#         self.value = None
+#         self.debounce = True
+#         self.filter = EMAFilter()
+
+#     def process_input(self, raw_value):
+#         """determins if the axis should be processed - returns None if should be ignored"""
+#         return self.filter.process_input(raw_value)
+
+
+class DInputData:
+    """Holds DirectInput signaling and filtering state."""
+
+    __slots__ = (
+        "device_guid",
+        "input_id",
+        "last_time",
+        "value",
+        "debounce",
+        "filter",
+    )
+
+    def __init__(
+        self,
+        device_guid=None,
+        input_id=None,
+        read_axis_callback=None,
+        **filter_options,
+    ):
+        """
+        Initializes DirectInput state for an axis.
+
+        :param device_guid: GUID identifying the DirectInput device.
+        :param input_id: Identifier or index of the axis.
+        :param read_axis_callback: Callable accepting ``device_guid`` and
+            ``input_id`` and returning the current raw axis value.
+        :param filter_options: Optional keyword arguments passed directly to
+            ``EMAFilter``.
+        """
+        self.device_guid = device_guid
+        self.input_id = input_id
         self.last_time = None
         self.value = None
         self.debounce = True
-        self.filter = EMAFilter()
+
+        if read_axis_callback is None:
+            read_axis_callback = self._read_axis
+
+        if not callable(read_axis_callback):
+            raise TypeError("read_axis_callback must be callable")
+
+        self.filter = EMAFilter(
+            read_value_callback=read_axis_callback,
+            **filter_options,
+        )
+
+    def _read_axis(self):
+        """reads the current value of an axis from DINPUT"""
+        return dinput.DILL.get_axis(self.device_guid, self.input_id)
 
     def process_input(self, raw_value):
-        """determins if the axis should be processed - returns None if should be ignored"""
-        return self.filter.process_input(raw_value)
+        """
+        Processes a new axis sample.
+
+        :param raw_value: Raw axis value supplied by DirectInput.
+        :return: Filtered value when it should be propagated; otherwise,
+            ``None``.
+        """
+        value = self.filter.process_input(raw_value)
+
+        if value is not None:
+            self.value = value
+
+        return value
+
+    def check_settling(self):
+        """
+        Checks whether the axis has reached its final physical position.
+
+        :return: Exact final value when settling occurs; otherwise, ``None``.
+        """
+        value = self.filter.check_settling()
+
+        if value is not None:
+            self.value = value
+
+        return value
+
+    def reset(self, raw_value=None):
+        """
+        Resets the axis state and filter.
+
+        :param raw_value: Optional value used to initialize the filter.
+        :return: ``None``.
+        """
+        self.last_time = None
+        self.value = raw_value
+        self.filter.reset(raw_value)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -4629,6 +4877,9 @@ class AxisState:
         self._joystick_input_item_map = {}
         self._last_axis_values = {}  # last value
         self._last_axis_time = {}  # time when last modified
+        self._axis_filters = {}
+        self._axis_filter_values = {}
+        self._axis_filter_params = {}
 
         self._registered_devices = []  # guid of registered devices
         self.usage_data = gremlin.joystick_handling.VirtualDeviceUsageState()
@@ -4657,6 +4908,9 @@ class AxisState:
         if verbose:
             syslog.info("AXIS STATE: reset...")
         self._data.clear()
+        self._axis_filters.clear()
+        self._axis_filter_values.clear()
+        self._axis_filter_params.clear()
         self._registered_devices.clear()
         self._joystick_input_item_map.clear()
         profile = gremlin.shared_state.current_profile
@@ -4976,31 +5230,41 @@ class AxisState:
             self._receive_count[key] += 1
             reason = ""
 
-        now = time.time()
+        # VJOY events can contain button/hat updates; only filter axes.
+        if isinstance(event, VjoyEvent):
+            if event.input_type != InputType.JoystickAxis:
+                return True
+            input_id = event.input_id
+
         delay = delay or self._delay
-        result = True
-        if key in self._last_axis_values:
-            last_value = self._last_axis_values[key]
-            last_modified = self._last_axis_time[key]
+        delta = delta or self._delta
 
-            delta = delta or self._delta
-            if delta and math.isclose(last_value, current_value, abs_tol=delta):
-                # fail: value within the delta change
-                self._last_axis_time[key] = now
-                if self.perf:
-                    reason = "too close"
-                result = False
+        min_interval_ms = max(float(delay), 0.0) * 1000.0
+        change_threshold = max(float(delta), 0.0)
+        params = (min_interval_ms, change_threshold)
 
-            if not result and delay and (last_modified + delay) >= now:
-                # fail: value too soon
-                if self.perf:
-                    if key not in self._skip_count:
-                        self._skip_count[key] = 0
-                    self._skip_count[key] += 1
-                    device = gremlin.joystick_handling.getDevice(event.device_guid)
-                    reason = "too frequent"
+        self._axis_filter_values[key] = current_value
 
-                result = False
+        filter_obj = self._axis_filters.get(key)
+        if filter_obj is None or self._axis_filter_params.get(key) != params:
+            filter_obj = EMAFilter(
+                read_value_callback=lambda key=key, value=current_value: self._axis_filter_values.get(key, value),
+                smoothing_factor=1.0,
+                change_threshold=change_threshold,
+                min_interval_ms=min_interval_ms,
+                settle_interval_ms=0.0,
+                settle_tolerance=0.0,
+                input_min=0.0,
+                input_max=1.0,
+                large_jump_ratio=0.0,
+                clamp_input=False,
+            )
+            self._axis_filters[key] = filter_obj
+            self._axis_filter_params[key] = params
+
+        result = filter_obj.process_input(current_value) is not None
+        if not result and self.perf:
+            reason = "ema filtered"
 
         if not result:
             if self.perf:
@@ -5018,7 +5282,7 @@ class AxisState:
             return False
 
         self._last_axis_values[key] = current_value
-        self._last_axis_time[key] = now
+        self._last_axis_time[key] = time.time()
         return True
 
 

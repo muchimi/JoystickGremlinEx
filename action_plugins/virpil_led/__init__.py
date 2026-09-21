@@ -1274,6 +1274,7 @@ class VirpilAction(gremlin.input_item.AbstractAction):
 
     functor = VirpilActionFunctor
     widget = VirpilActionWidget
+    _icon_path = None
 
     def __init__(self, parent, extra_data: dict = None):
         super().__init__(parent, extra_data=extra_data)
@@ -1312,11 +1313,16 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         return virpil_map
 
     def icon(self):
+        if VirpilAction._icon_path:
+            return VirpilAction._icon_path
+        if VirpilAction._icon_path == "":
+            return None
         base_path = gremlin.util.script_path()
         icon_path = os.path.join(base_path, "action_plugins", "virpil_led", "icon.png")
         if os.path.isfile(icon_path):
-            syslog.info(f"found virpil icon at {icon_path}")
+            VirpilAction._icon_path = icon_path
             return icon_path
+        VirpilAction._icon_path = ""
         return None
 
     def requires_virtual_button(self):

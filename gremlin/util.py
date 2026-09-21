@@ -1039,8 +1039,13 @@ def load_pixmap(path, size=24, qta_color=None):
     icon: QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
     return icon.pixmap(desired_size)
 
-
 def load_icon(*paths, use_qta=False, qta_color=None):
+    icon = _load_icon(*paths, use_qta=use_qta, qta_color=qta_color)
+    if not icon:
+        icon = get_generic_icon()
+    return icon
+
+def _load_icon(*paths, use_qta=False, qta_color=None):
     """gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search"""
     import gremlin.config
     import gremlin.shared_state
@@ -1053,6 +1058,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
 
     the_path = paths[0]
     if not the_path:
+        syslog.warning("ICON: no path provided, using generic icon.")
         return get_generic_icon()
     if isinstance(the_path, QtGui.QIcon):
         return the_path
@@ -1099,7 +1105,10 @@ def load_icon(*paths, use_qta=False, qta_color=None):
         icon.addPixmap(pixmap, QtGui.QIcon.Normal)
         if verbose:
             syslog.info(f"LoadIcon() found icon: {paths}  path: {toUrl(the_path)}")
+
     return icon
+
+
 
 
 def dark_file(image_path):
@@ -1172,21 +1181,8 @@ def load_image(*paths):
 
 def get_generic_icon():
     """gets a generic icon"""
-    # import gremlin.shared_state
+    return load_icon("mdi.alert-circle-outline", qta_color="#FFAE00")  # fallback icon
 
-    # root_path = gremlin.shared_state.root_path
-    return load_icon("fa5.question-circle")
-    # generic_icon = os.path.join(root_path, "generic.png")
-    # if generic_icon and os.path.isfile(generic_icon):
-    #     pixmap = QtGui.QPixmap(generic_icon)
-    #     if pixmap.isNull():
-    #         syslog.warning(f"load_icon(): generic pixmap failed: {generic_icon}")
-    #         return None
-    #     icon = QtGui.QIcon()
-    #     icon.addPixmap(pixmap, QtGui.QIcon.Normal)
-    #     return icon
-    # syslog.warning(f"load_icon(): generic icon file not found: {generic_icon}")
-    # return None
 
 
 def write_guid(guid):

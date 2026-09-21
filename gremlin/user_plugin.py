@@ -36,6 +36,10 @@ import gremlin.event_handler
 
 syslog = logging.getLogger("system")
 
+# Avoid re-executing user plugins on every Plugins-tab rebuild (profile load).
+# Keyed by absolute path; invalidated when mtime/size change.
+_variable_definition_cache: dict[str, tuple[int, int, tuple]] = {}
+
 
 def load_module(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -62,6 +66,15 @@ def get_variable_definitions(fname):
     if not os.path.isfile(fname):
         return {}
 
+    cache_key = os.path.normcase(os.path.abspath(fname))
+    try:
+        stat = os.stat(fname)
+        cached = _variable_definition_cache.get(cache_key)
+        if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+            return cached[2]
+    except OSError:
+        stat = None
+
     user_package = "user_plugins"
 
     spec = importlib.util.spec_from_file_location(user_package + "." + "".join(random.choices(string.ascii_lowercase, k=16)), fname)
@@ -84,7 +97,10 @@ def get_variable_definitions(fname):
             if value.label in variables:
                 syslog.error(f"Plugin: Duplicate label {value.label} present in {fname}")
             variables[value.label] = value
-    return variables.values()
+    result = tuple(variables.values())
+    if stat is not None:
+        _variable_definition_cache[cache_key] = (stat.st_mtime_ns, stat.st_size, result)
+    return result
 
 
 def clamp_value(value, min_val, max_val):

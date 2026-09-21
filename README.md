@@ -46,7 +46,45 @@ The most current test releases will contain the latest bug fixes, features and o
 The test versions are available here: https://github.com/muchimi/JoystickGremlinEx/releases/tag/test
 
 
+
 # Change log
+
+### (m77T58B)
+- Fix: resolved one more cause of thread.init() exception
+
+### (m77T58A)
+- Fix: Map to Vjoy Action: axis scaling exception.
+
+### (m77T58)
+
+- Change: general optimization pass
+	- keyboard input queues
+	- mouse input queues
+	- joystick input queues
+	- Octavi IFR - HID polling
+	- major refresh improvement for input viewer
+- Change: configuration overrides for development (allows toggling of components for dev purposes)
+- Fix: further tweaking of axis filtering workflows with EMA filter now able to handle rapid and large changes.  Added axis settling algorithm to filter to validate final position.  This is aimed at devices that spam (a.k.a. overwhelm inputs with hundred or thousand of updates per second).  The devices also tend to instantly stop spamming when the input is in certain positions (such as a center location) causing the filter to terminate on the wrong value due to the low-pass algorithm.  This is the best of both worlds, with filtering of spam, while keeping accurate final positions after the spam stops and smoothing values in between.
+- Fix: UI: replaced QT stacked widget custom size/custom layouts as those were determined to cause random QT internal library crashes.  These in turn caused an instant Python crash with no errors logged.
+- Change: Platform: reverted to Python 3.14.6 as 3.14.7 does not appear as stable for now especially with older libraries and the very heavy threaded nature of GEX.
+- Fix: UI: added fallback icon if an icon is not found (avoids a font exception) - this may not resolve the issue in all cases.
+
+
+
+### (m77T57A)
+- Fix: UI: various fixes (courtesy Lolo350)
+- Fix: API: EMA filter updates on drastic input changes (courtesy Lolo350)
+- Fix: UI: plugin UI does not always update correctly.
+- New: AFCS action (courtesy Lolo350)
+	- AFCS designer polish (canvas/inspector UX)
+	- Config toggles: snap-to-grid and show-selected-segment-only
+	- Robust AFCS device-tab registration in the main window
+	
+- Change: Overlay:
+	- Overlay visibility conditions/preview, blink, host window, property clipboard, selection pane
+	- Gradient fills (editor + palette storage) with live widget preview and enable/disable checkbox
+	- Widget/font drop shadows with smoother rendering; collapsible inspector sections
+	- Stream Deck page-name preservation in the profile sidecar; overlay persist logging
 
 ### (m77T57)
 - Change: further optimization of input filtering for axis and button/hat inputs

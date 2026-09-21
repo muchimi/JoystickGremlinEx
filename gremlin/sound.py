@@ -955,7 +955,7 @@ class Sound:
                 thread = self._thread
 
         if thread and thread.is_alive() and thread is not threading.current_thread():
-            thread.join()
+            gremlin.util.safeJoin(thread)
 
         with self._state_lock:
             self._thread = None

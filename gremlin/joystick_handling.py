@@ -1188,6 +1188,9 @@ def noOpHatCallback(self, value):
 def registerSpecialDevices():
     """registers special devices"""
     import gremlin.ui.octavi_device
+    import gremlin.config
+
+
 
     # import gremlin.ui.osc_device
     # import gremlin.ui.midi_device
@@ -1200,6 +1203,8 @@ def registerSpecialDevices():
         _config_devices.clear()
 
     syslog.info("Special devices:")
+
+    config = gremlin.config.Configuration()
 
     # keyboard
 
@@ -1220,22 +1225,22 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # OSC
-
-    device = DeviceSummary()
-    device.name = "OSC"
-    device.device_guid = gremlin.shared_state.osc_tab_guid
-    device.device_type = DeviceType.Osc
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.osc_enabled:
+        device = DeviceSummary()
+        device.name = "OSC"
+        device.device_guid = gremlin.shared_state.osc_tab_guid
+        device.device_type = DeviceType.Osc
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
 
     # MIDI
-
-    device = DeviceSummary()
-    device.name = "MIDI"
-    device.device_guid = gremlin.shared_state.midi_tab_guid
-    device.device_type = DeviceType.Midi
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.midi_enabled:
+        device = DeviceSummary()
+        device.name = "MIDI"
+        device.device_guid = gremlin.shared_state.midi_tab_guid
+        device.device_type = DeviceType.Midi
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
 
     # Octavi IFR1
 
@@ -1251,28 +1256,32 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # Stream Deck legacy tab GUID (old profiles). Live decks register per deviceId.
-    device = DeviceSummary()
-    device.name = "Stream Deck (legacy)"
-    device.device_guid = gremlin.shared_state.streamdeck_tab_guid
-    device.device_type = DeviceType.StreamDeck
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.streamdeck_enabled:
+        device = DeviceSummary()
+        device.name = "Stream Deck (legacy)"
+        device.device_guid = gremlin.shared_state.streamdeck_tab_guid
+        device.device_type = DeviceType.StreamDeck
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
+
+        # Re-attach any Stream Decks the bridge already knows about (after a rescan).
+        try:
+            from gremlin.ui import streamdeck_device as streamdeck_ui
+
+            streamdeck_ui.resync_streamdeck_special_devices()
+        except Exception:
+            pass
+
 
     # voice
-    device = DeviceSummary()
-    device.name = "Voice"
-    device.device_guid = gremlin.shared_state.voice_tab_guid
-    device.device_type = DeviceType.Voice
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.voice_enabled:
+        device = DeviceSummary()
+        device.name = "Voice"
+        device.device_guid = gremlin.shared_state.voice_tab_guid
+        device.device_type = DeviceType.Voice
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
 
-    # Re-attach any Stream Decks the bridge already knows about (after a rescan).
-    try:
-        from gremlin.ui import streamdeck_device as streamdeck_ui
-
-        streamdeck_ui.resync_streamdeck_special_devices()
-    except Exception:
-        pass
 
     # mode
     device = DeviceSummary()
@@ -1283,20 +1292,22 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # overlay designer
-    device = DeviceSummary()
-    device.name = "Overlay"
-    device.device_guid = gremlin.shared_state.overlay_tab_guid
-    device.device_type = DeviceType.Overlay
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.overlay_enabled:
+        device = DeviceSummary()
+        device.name = "Overlay"
+        device.device_guid = gremlin.shared_state.overlay_tab_guid
+        device.device_type = DeviceType.Overlay
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
 
-    # AFCS visual axis-flow designer
-    device = DeviceSummary()
-    device.name = "AFCS"
-    device.device_guid = gremlin.shared_state.afcs_tab_guid
-    device.device_type = DeviceType.Afcs
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    if config.afcs_enabled:
+        # AFCS visual axis-flow designer
+        device = DeviceSummary()
+        device.name = "AFCS"
+        device.device_guid = gremlin.shared_state.afcs_tab_guid
+        device.device_type = DeviceType.Afcs
+        device.device_category = DeviceCategory.Special
+        registerSpecialDevice(device)
 
     # THESE SHOULD BE LAST
     # plugin

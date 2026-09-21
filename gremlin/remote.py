@@ -19,6 +19,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 import logging
 import time
 import threading
+import struct
 import uuid
 import socket
 from lxml import etree as ElementTree
@@ -145,102 +146,217 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
 
 class RPCGremlin:
-    """remote UDP multicast listener"""
+    """Remote UDP multicast listener"""
 
-    MULTICAST_GROUP = "224.3.29.72"  # multicast group
-    # multicast time to live
-    MULTICAST_TTL = 2
+    MULTICAST_GROUP = "224.3.29.72" # only use not routable multicast for local network comms between instances
+    MULTICAST_TTL = 2 # max jumps
 
     def __init__(self):
-        # self._address = "0.0.0.0"
-        # self._server_address = "localhost"
         config = gremlin.config.Configuration()
         self._port = config.server_port
         self._server = None
         self._running = False
+
+        # Thread controls
+        self._lock = threading.Lock()
         self._thread_event = threading.Event()
         self._thread = None
-        self._server_thread = None
-        self._keep_running = False
         self._warning_issued = False
 
+        # Hook into global shutdown
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
 
     def _thread_runner(self):
-        import struct
-
-        syslog.info("Starting gremlin listener...")
-        self._server = GremlinServer(("", self._port), GremlinSocketHandler)
-        self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=False)
-        self._server_thread.daemon = True
+        syslog.info("Starting GEX listener...")
         try:
-            self._server_thread.start()
-            # enable listen to multicast UDP
+            # 1. Initialize server and socket settings
+            self._server = GremlinServer(("", self._port), GremlinSocketHandler)
+
+            # Configure multicast subscriptions prior to starting execution loops
             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
             mreq = struct.pack("4sL", group, socket.INADDR_ANY)
             self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-            syslog.info(f"Starting gremlin server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
-            self._keep_running = True
-            self._running = True
-            while not self._thread_event.is_set() and self._keep_running:
-                time.sleep(0.5)
-        except Exception:
-            pass
 
-        self._server.shutdown()
-        self._server.server_close()
-        self._running = False
-        syslog.info("Gremlin listener stopped.")
-        proxy = gremlin.joystick_handling.VJoyProxy()
-        # release any locks on devices
-        proxy.reset()
+            # 2. Spawn and spin up the server worker thread
+            server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+            server_thread.start()
+
+            syslog.info(f"Starting gremlin server listener: multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
+
+            # 3. Main execution sleep-loop
+            while not self._thread_event.is_set():
+                # Faster response to shutdown signal without spinning the CPU too hard
+                self._thread_event.wait(timeout=0.2)
+
+        except Exception as e:
+            syslog.error(f"Critical error in GEX listener thread execution: {e}")
+        finally:
+            # 4. Enforce strict cleanup sequence
+            if self._server:
+                try:
+                    self._server.shutdown()
+                    self._server.server_close()
+                except Exception as e:
+                    syslog.error(f"Error while tearing down server context: {e}")
+
+            with self._lock:
+                self._running = False
+
+            syslog.info("GEX listener stopped.")
+
+            # Release virtual joystick locks safely
+            try:
+                proxy = gremlin.joystick_handling.VJoyProxy()
+                proxy.reset()
+            except Exception as e:
+                syslog.error(f"Failed to reset VJoyProxy during cleanup: {e}")
 
     @property
     def running(self):
-        return self._running
+        with self._lock:
+            return self._running
 
     def start(self):
-        """starts the listener"""
+        """Starts the multicast listener background execution thread"""
+        with self._lock:
+            if self._running:
+                return
 
-        if self._running:
-            # already running
-            return
+            config = gremlin.config.Configuration()
+            if not config.remoteEnabled():
+                if not self._warning_issued:
+                    syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
+                    self._warning_issued = True
+                return
 
-        config = gremlin.config.Configuration()
-        if not config.remoteEnabled():
-            if not self._warning_issued:
-                syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
-                self._warning_issued = True
-            return
+            # Pre-acquire connected vJoy devices safely
+            vjoy_ids = gremlin.joystick_handling.vjoy_id_list(connected=True)
+            for key in vjoy_ids:
+                try:
+                    _ = gremlin.joystick_handling.VJoyProxy()[key]
+                    syslog.info(f"Remote proxy VJOY [{key}] ok")
+                except Exception:
+                    pass
 
-        # Pre-acquire connected vJoy devices for remote receive (also opens on demand later)
-        for key in gremlin.joystick_handling.vjoy_id_list(connected=True):
-            try:
-                _device = gremlin.joystick_handling.VJoyProxy()[key]
-                syslog.info(f"Remote proxy VJOY [{key}] ok")
-            except Exception:
-                pass
-        self._thread_event.clear()
-        self._thread = threading.Thread(target=self._thread_runner, daemon=False)
-        self._thread.name = "RPCRunner"
-        self._thread.start()
-
-        self._running = True
+            self._thread_event.clear()
+            self._thread = threading.Thread(target=self._thread_runner, name="RPCRunner", daemon=True)
+            self._thread.start()
+            self._running = True
 
     def stop(self):
-        """stops the loop"""
-        self._warning_issued = False
-        if not self._running:
-            return
+        """Signals and safely blocks until the background loops are terminated"""
+        with self._lock:
+            self._warning_issued = False
+            if not self._running:
+                return
 
-        # stop the server loop
-        self._keep_running = False
+        # Trigger thread exit event safely outside the lock to avoid blocking context transitions
         self._thread_event.set()
-        gremlin.util.safeJoin(self._thread)
-        self._thread = None
 
-        syslog.info("Gremlin RPC server stopped...")
+        if self._thread:
+            gremlin.util.safeJoin(self._thread)
+            self._thread = None
+
+        syslog.info("GEX RPC server stopped...")
+
+# class RPCGremlin_v0:
+#     """GEX remote UDP multicast listener"""
+
+#     MULTICAST_GROUP = "224.3.29.72"  # multicast group
+#     # multicast time to live
+#     MULTICAST_TTL = 2
+
+#     def __init__(self):
+#         # self._address = "0.0.0.0"
+#         # self._server_address = "localhost"
+#         config = gremlin.config.Configuration()
+#         self._port = config.server_port
+#         self._server = None
+#         self._running = False
+#         self._thread_event = threading.Event()
+#         self._thread = None
+#         self._server_thread = None
+#         self._keep_running = False
+#         self._warning_issued = False
+
+#         el = gremlin.event_handler.EventListener()
+#         el.shutdown.connect(self.stop)
+
+#     def _thread_runner(self):
+#         import struct
+
+#         syslog.info("Starting GEX listener...")
+#         self._server = GremlinServer(("", self._port), GremlinSocketHandler)
+#         self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=False)
+#         self._server_thread.daemon = True
+#         try:
+#             self._server_thread.start()
+#             # enable listen to multicast UDP
+#             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
+#             mreq = struct.pack("4sL", group, socket.INADDR_ANY)
+#             self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+#             syslog.info(f"Starting GEX server listener:  multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
+#             self._keep_running = True
+#             self._running = True
+#             while not self._thread_event.is_set() and self._keep_running:
+#                 time.sleep(0.5)
+#         except Exception:
+#             pass
+
+#         self._server.shutdown()
+#         self._server.server_close()
+#         self._running = False
+#         syslog.info("Gremlin listener stopped.")
+#         proxy = gremlin.joystick_handling.VJoyProxy()
+#         # release any locks on devices
+#         proxy.reset()
+
+#     @property
+#     def running(self):
+#         return self._running
+
+#     def start(self):
+#         """starts the listener"""
+
+#         if self._running:
+#             # already running
+#             return
+
+#         config = gremlin.config.Configuration()
+#         if not config.remoteEnabled():
+#             if not self._warning_issued:
+#                 syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
+#                 self._warning_issued = True
+#             return
+
+#         # Pre-acquire connected vJoy devices for remote receive (also opens on demand later)
+#         for key in gremlin.joystick_handling.vjoy_id_list(connected=True):
+#             try:
+#                 _device = gremlin.joystick_handling.VJoyProxy()[key]
+#                 syslog.info(f"Remote proxy VJOY [{key}] ok")
+#             except Exception:
+#                 pass
+#         self._thread_event.clear()
+#         self._thread = threading.Thread(target=self._thread_runner, daemon=True)
+#         self._thread.name = "RPCRunner"
+#         self._thread.start()
+
+#         self._running = True
+
+#     def stop(self):
+#         """stops the loop"""
+#         self._warning_issued = False
+#         if not self._running:
+#             return
+
+#         # stop the server loop
+#         self._keep_running = False
+#         self._thread_event.set()
+#         gremlin.util.safeJoin(self._thread)
+#         self._thread = None
+
+#         syslog.info("Gremlin RPC server stopped...")
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -1834,7 +1950,7 @@ class RemoteControl:
             else:
                 msg = "Paired mode disabled"
             syslog.info(f"REMOTE CONTROL: Paired mode changed: {msg}")
-            thread = threading.Thread(target=self.say, args=(msg,), daemon=False)
+            thread = threading.Thread(target=self.say, args=(msg,), daemon=True)
             thread.name = "REMOTE CONTROL remote control paired update"
             thread.start()
 
@@ -1895,7 +2011,7 @@ class RemoteControl:
             elif event.is_remote:
                 msg = "Remote control is enabled"
             if msg:
-                thread = threading.Thread(target=self.say, args=(msg,), daemon=False)
+                thread = threading.Thread(target=self.say, args=(msg,), daemon=True)
                 thread.name = "remove control broadcast"
                 thread.start()
 

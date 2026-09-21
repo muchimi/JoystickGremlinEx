@@ -26,18 +26,18 @@ import logging
 import traceback
 from gremlin.types import DeviceType, DeviceCategory
 
-MAESTRO_VID = 0x1209 # vendor ID for GEX managed devices
-GEX_VID = MAESTRO_VID # vendor ID for GEX managed devices
-MAESTRO_PID_BASE = 0x1000 # base product ID for Maestro devices
+MAESTRO_VID = 0x1209  # vendor ID for GEX managed devices
+GEX_VID = MAESTRO_VID  # vendor ID for GEX managed devices
+MAESTRO_PID_BASE = 0x1000  # base product ID for Maestro devices
 
 GEX_ID_STRING = "GEX"
 GEX_VENDOR_STRING = "GEX"  # vendor string for GEX managed devices
 GEX_PRODUCT_STRING = "GEX Custom Device"
 GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
-GEX_PID_BASE = MAESTRO_PID_BASE # base product id (sequential) for GEX managed devices
-GEX_PID_MAX = GEX_PID_BASE + GEX_MAX_DEVICES - 1 # maximum product id for GEX managed devices
-VJOY_VID = 0x1234 # vendor ID for vJoy devices
-VJOY_PID = 0x5678 # product ID for vJoy devices
+GEX_PID_BASE = MAESTRO_PID_BASE  # base product id (sequential) for GEX managed devices
+GEX_PID_MAX = GEX_PID_BASE + GEX_MAX_DEVICES - 1  # maximum product id for GEX managed devices
+VJOY_VID = 0x1234  # vendor ID for vJoy devices
+VJOY_PID = 0x5678  # product ID for vJoy devices
 
 syslog = logging.getLogger("system")
 
@@ -58,20 +58,10 @@ class _GUID(ctypes.Structure):
     ]
 
     def toId(self) -> str:
-        return (
-            f"{self.Data1:08x}"
-            f"{self.Data2:04x}"
-            f"{self.Data3:04x}"
-            f"{bytes(self.Data4).hex()}"
-        )
+        return f"{self.Data1:08x}{self.Data2:04x}{self.Data3:04x}{bytes(self.Data4).hex()}"
 
     def toInt(self) -> int:
-        return (
-            (self.Data1 << 96)
-            | (self.Data2 << 80)
-            | (self.Data3 << 64)
-            | int.from_bytes(self.Data4, "big")
-        )
+        return (self.Data1 << 96) | (self.Data2 << 80) | (self.Data3 << 64) | int.from_bytes(self.Data4, "big")
 
     @classmethod
     def from_uuid(cls, value: str) -> "_GUID":
@@ -118,13 +108,7 @@ class _GUID(ctypes.Structure):
 
     def __str__(self) -> str:
         data4 = bytes(self.Data4).hex()
-        return (
-            f"{self.Data1:08x}-"
-            f"{self.Data2:04x}-"
-            f"{self.Data3:04x}-"
-            f"{data4[:4]}-"
-            f"{data4[4:]}"
-        )
+        return f"{self.Data1:08x}-{self.Data2:04x}-{self.Data3:04x}-{data4[:4]}-{data4[4:]}"
 
 
 _GUID_SysKeyboard = _GUID()
@@ -482,6 +466,7 @@ class DeviceSummary:
         """
         import gremlin.util
         import gremlin.types
+
         self._connected = False  # true if device is connected
         self._disabled = False  # true if the device is disabled in GremlinEx
         self._hard_disabled = False  # true if the device is out of spec or otherwise excluded by GEX
@@ -507,7 +492,7 @@ class DeviceSummary:
         self._get_button_callback = None  # custom callback to read a button value from this device if a special device
         self._get_axis_callback = None  # custom callback to read an axis value from this device if a special device
         self._get_hat_callback = None  # custom callback to read a hat value if this device is a special device
-        self.visible = True # device is visible by default in the UI
+        self.visible = True  # device is visible by default in the UI
         self._device_guid = None
         self._device_id = None
         if data is not None:
@@ -522,7 +507,7 @@ class DeviceSummary:
                 self._device_type = gremlin.types.DeviceType.VJoy
             elif data.vendor_id == MAESTRO_VID and self.product_id >= GEX_PID_BASE and self.product_id <= GEX_PID_MAX:
                 self._device_type = gremlin.types.DeviceType.Maestro
-                self.virtual_id = self.product_id - GEX_PID_BASE # index of maestro is kept in the product ID
+                self.virtual_id = self.product_id - GEX_PID_BASE  # index of maestro is kept in the product ID
             else:
                 self._device_type = gremlin.types.DeviceType.Joystick
 
@@ -569,7 +554,7 @@ class DeviceSummary:
 
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names[am.axis_index] = axis_name
-               
+
             # auto disable invalid joystick devices that are not in spec
             self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
             if self._hard_disabled:
@@ -581,7 +566,7 @@ class DeviceSummary:
     def key(self):
         """gets a unique key for this device"""
         if self.device_type == DeviceType.VJoy:
-            return ((self.vjoy_id, self.axis_count, self.button_count, self.hat_count)) # vjoy differentiates by input config
+            return (self.vjoy_id, self.axis_count, self.button_count, self.hat_count)  # vjoy differentiates by input config
         return self.device_id
 
     @property
@@ -612,7 +597,6 @@ class DeviceSummary:
         """true if the device is enabled (not manually disabled or out of spec)"""
         return not self.disabled
 
-
     def setAxisCallback(self, callback):
         """sets a custom axis callback to get an axis value (parameter is the axis number)"""
         self._get_axis_callback = callback
@@ -640,7 +624,7 @@ class DeviceSummary:
         return DILL.get_axis(self.device_guid, axis)
 
     def get_axis_list(self) -> list:
-        """ gets the list of axis input ids for this device (1 based, skips unmapped axes)"""
+        """gets the list of axis input ids for this device (1 based, skips unmapped axes)"""
         return list(self.axis_id_map.keys())
 
     def get_hat(self, hat):
@@ -663,7 +647,7 @@ class DeviceSummary:
         """zero based index to input ID for axes
         :param zerobased_index: zero based index to convert to an input ID
         """
-        linear_id = zerobased_index + 1 # linear is 1 based
+        linear_id = zerobased_index + 1  # linear is 1 based
         if self.is_virtual:
             # vjoy devices
             return linear_id
@@ -671,14 +655,13 @@ class DeviceSummary:
             # mapped devices
             return self.linear_id_map[linear_id]
 
-
     @property
     def device_type(self):
         """device type"""
         return self._device_type
 
     @property
-    def device_name(self) ->str:
+    def device_name(self) -> str:
         return self.name
 
     @device_type.setter
@@ -740,7 +723,7 @@ class DeviceSummary:
     def setVirtual(self, is_virtual: bool):
         self._is_virtual = is_virtual
 
-    def set_vjoy_id(self, vjoy_id : int):
+    def set_vjoy_id(self, vjoy_id: int):
         """Sets the vJoy id for this device summary.
 
         Settings the vJoy device id is necessary, as DILL cannot know these
@@ -760,15 +743,12 @@ class DeviceSummary:
         self.virtual_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
-    def get_axis_name(self, index : int, is_linear=False, short_name=False):
-        """gets the axis name based on the input #
-
-
-        """
+    def get_axis_name(self, index: int, is_linear=False, short_name=False):
+        """gets the axis name based on the input #"""
         if index is None:
             return "N/A"
 
-        assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
+        assert isinstance(index, int) and index > 0, f"invalid index: {index} - should be a 1 based integer"
         if is_linear:
             input_id = self.getAxisLinearId(index)
         else:
@@ -826,11 +806,11 @@ class DeviceSummary:
         """gets the list of valid axis inputs"""
         return [input_id for input_id in self.axis_id_map]
 
-    def getAxisInputId(self, linear_id: int, throw_on_missing = True):
+    def getAxisInputId(self, linear_id: int, throw_on_missing=True):
         """Gets the input for the linear index
         :param index: 1 based linear index to get the mapped input ID for
         """
-        assert linear_id > 0,"invalid linear id - must be 1 based"
+        assert linear_id > 0, "invalid linear id - must be 1 based"
         if linear_id in self.linear_id_map:
             return self.linear_id_map[linear_id]
         if throw_on_missing:
@@ -839,8 +819,8 @@ class DeviceSummary:
 
     def getAxisLinearId(self, axis_id: int):
         """gets the linear index for a given non linear axis id
-         :param axis_id: axis id to get the linear index for"""
-        assert axis_id > 0,"invalid axis id - must be 1 based"
+        :param axis_id: axis id to get the linear index for"""
+        assert axis_id > 0, "invalid axis id - must be 1 based"
         if axis_id in self.axis_id_map:
             return self.axis_id_map[axis_id]
         return None
@@ -864,7 +844,7 @@ class DeviceSummary:
         :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
 
         """
-        assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
+        assert isinstance(index, int) and index > 0, f"invalid index: {index} - should be a 1 based integer"
         try:
             am: AxisMap
             stub = ""
@@ -943,7 +923,7 @@ class DILL:
 
     # true if initialized
 
-    initalized = False
+    initialized = False
 
     # Storage for the callback functions
     device_change_callback_fn = None
@@ -1017,7 +997,7 @@ class DILL:
             if os.path.isfile(debug_path):
                 # blitz it
                 try:
-                    os.unlink(debug_path)
+                    os.unlink(debug_path) # @IgnoreException
                 except Exception:
                     syslog.warning(f"DILL: unable to truncate debug file: {debug_path}")
 
@@ -1044,7 +1024,7 @@ class DILL:
                 syslog.critical(msg)
                 os._exit(1)
 
-            DILL.initalized = True
+            DILL.initialized = True
 
     @staticmethod
     def reset():
@@ -1064,7 +1044,7 @@ class DILL:
 
     @staticmethod
     def getDevices() -> list[DeviceSummary]:
-        '''gets the maestro devices created by GEX'''
+        """gets the maestro devices created by GEX"""
         device_list = []
         device_count = DILL.get_device_count()
         for index in range(device_count):
@@ -1074,7 +1054,7 @@ class DILL:
 
     @staticmethod
     def getMaestroDevices() -> list[DeviceSummary]:
-        '''gets the maestro devices created by GEX'''
+        """gets the maestro devices created by GEX"""
         device_list = []
         device_count = DILL.get_device_count()
         for index in range(device_count):

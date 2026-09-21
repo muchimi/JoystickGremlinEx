@@ -121,6 +121,15 @@ class ContainerPlugins:
             raise error.GremlinError(f"No container with name '{name}' exists")
         return self._name_to_type_map[name]
 
+    def _validate_plugin(self, plugin):
+        """Validates a plugin based on the current configuration."""
+        import gremlin.config
+        if "version" not in plugin.__dict__:
+            # not one of our plugins
+            return False
+        return True
+
+
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
         import gremlin.shared_state
@@ -130,7 +139,7 @@ class ContainerPlugins:
         walk_path = os.path.join(root_path, plugin_folder)
         syslog.info(f"Containers: Using container plugin folder: {toUrl(walk_path)}")
         if not os.path.isdir(walk_path):
-            raise error(f"Unable to find container plugins: {walk_path}")
+            raise error.GremlinError(f"Unable to find container plugins: {walk_path}")
 
         loaded_count = 0
         for root, dirs, files in os.walk(walk_path):
@@ -144,7 +153,7 @@ class ContainerPlugins:
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
                     plugin = importlib.import_module(f"container_plugins.{module}")
-                    if "version" in plugin.__dict__:
+                    if self._validate_plugin(plugin):
                         self._plugins[plugin.name] = plugin.create
                         self._plugins_folder_map[plugin.name] = root
                         syslog.info(f"\tFound: {plugin.name}")
@@ -286,6 +295,23 @@ class ActionPlugins:
         """Returns a mapping from plugin names to their folder paths."""
         return self._plugins_folder_map
 
+    def _validate_plugin(self, plugin):
+        """Validates a plugin based on the current configuration."""
+        import gremlin.config
+        config = gremlin.config.Configuration()
+        if "version" not in plugin.__dict__:
+            # not one of our plugins
+            return False
+        if not config.osc_enabled and "map-to-osc" in plugin.name.casefold():
+            return False
+        if not config.simconnect_enabled and "simconnect" in plugin.name.casefold():
+            return False
+        if not config.streamdeck_enabled and "streamdeck" in plugin.name.casefold():
+            return False
+        if not config.afcs_enabled and "afcs" in plugin.name.casefold():
+            return False
+
+        return True
 
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
@@ -307,10 +333,13 @@ class ActionPlugins:
                     if not folder.lower().endswith(plugin_folder):
                         continue
 
+
+
                     # Attempt to load the file and if it looks like a proper
                     # action_plugins store it in the registry
                     plugin = importlib.import_module(f"action_plugins.{module}")
-                    if "version" in plugin.__dict__:
+
+                    if self._validate_plugin(plugin):
                         self._plugins[plugin.name] = plugin.create
                         self._plugins_folder_map[plugin.name] = root
                         syslog.info(f"\tFound: {plugin.name}")
@@ -318,6 +347,11 @@ class ActionPlugins:
 
                     else:
                         del plugin
+
+
+
+
+
                 except Exception as e:
                     # Log an error and ignore the action_plugins if
                     # anything is wrong with it

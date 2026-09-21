@@ -425,7 +425,7 @@ class CodeRunner:
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
 
             # setup callbacks for voice input items if a trigger is identified
-            if config.VOICE_INPUT_ENABLED:
+            if config.voice_enabled:
                 vd = gremlin.ui.voice_device.VoiceData()
                 input_item = vd.ptt_input_item
 
@@ -544,13 +544,16 @@ class CodeRunner:
             evt_listener.virtual_event.connect(self.event_handler.execute_event)
 
             # hook midi events
-            evt_listener.midi_event.connect(self.event_handler.execute_event)
+            if config.midi_enabled:
+                evt_listener.midi_event.connect(self.event_handler.execute_event)
 
             # hook osc events
-            evt_listener.osc_event.connect(self.event_handler.execute_event)
+            if config.osc_enabled:
+                evt_listener.osc_event.connect(self.event_handler.execute_event)
 
             # hook stream deck plugin bridge events
-            evt_listener.streamdeck_event.connect(self.event_handler.execute_event)
+            if config.streamdeck_enabled:
+                evt_listener.streamdeck_event.connect(self.event_handler.execute_event)
 
             # # hook state events
             # evt_listener.state_event.connect(self.event_handler.execute_event)

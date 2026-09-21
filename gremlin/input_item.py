@@ -1918,7 +1918,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._description_icon = None
 
         # action icons
-        self._action_icon_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="action icons")
+        self._action_icon_widget = gremlin.ui.ui_common.AutohideContainer()
+        self._action_icon_widget.setProperty("data", "action icons")
 
         # input description row
         self._input_description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="input description")
@@ -1933,7 +1934,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # repeater
         self.axis_repeater_widget = None  # axis repeater
         self.button_repeater_widget = None  # button repeater
-        self._repeater_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="repeater")
+        self._repeater_container_widget = gremlin.ui.ui_common.AutohideContainer()
+        self._repeater_container_widget.setProperty("data", "repeater")
 
         # comment row
         self._comment_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="comment")
@@ -1946,7 +1948,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._container_id_widget = gremlin.ui.ui_common.AutohideContainerIdWidget(widget)
 
         # item content setup below the title bar
-        # self._content_widget = gremlin.ui.ui_common.AutohideContainer()
         self._content_widget = QtWidgets.QWidget()
         self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
         self._content_layout.setContentsMargins(4, 4, 4, 4)
@@ -2012,7 +2013,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self.ensureStyle()
 
-        self._autohide_widgets = gremlin.util.get_widget_references(self, gremlin.ui.ui_common.AutoHideStackedWidget)
         self.widget_height = self.sizeHint().height()
 
         # debug content
@@ -2377,8 +2377,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if self.input_item:
             self.input_item.setInputWidget(None)  # clear reference on the input
 
-        self._container_id_widget.setWidget(None)
-        self._repeater_container_widget.setWidget(None)
+        if self._container_id_widget and Shiboken.isValid(self._container_id_widget):
+            self._container_id_widget.setWidget(None)
+        if self._repeater_container_widget and Shiboken.isValid(self._repeater_container_widget):
+            self._repeater_container_widget.setWidget(None)
         gremlin.util.clear_layout(self._custom_container_layout)
 
         gremlin.util.clear_widget_references(self)
@@ -4718,8 +4720,22 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _fireChangeCallbacks(self):
         """fires the change callbacks for this container"""
+        alive = []
         for callback in self._container_changed_callbacks:
-            callback(self)
+            owner = getattr(callback, "__self__", None)
+            if owner is not None:
+                try:
+                    if not Shiboken.isValid(owner):
+                        continue
+                except Exception:
+                    continue
+            try:
+                callback(self)
+            except RuntimeError:
+                continue
+            alive.append(callback)
+        if len(alive) != len(self._container_changed_callbacks):
+            self._container_changed_callbacks = alive
 
     def registerChangeCallback(self, callback: Callable):
         """registers a change callback for this container"""
@@ -8321,19 +8337,40 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         return widget
 
     def _update_container_id(self):
-        if self._container_id_widget:
+        if self._container_id_widget and Shiboken.isValid(self) and Shiboken.isValid(self._container_id_widget):
             gremlin.util.InvokeUiMethod(self._update_container_id_ui)  # on UI thread
 
     def _update_container_id_ui(self):
         """updates the container ID display for this container"""
-        if self._container_id_widget:
-            widget = self._create_container_id_ui()
-            self._container_id_widget.setWidget(widget)
+        if not Shiboken.isValid(self):
+            return
+        holder = self._container_id_widget
+        if holder is None or not Shiboken.isValid(holder):
+            self._container_id_widget = None
+            return
+        widget = self._create_container_id_ui()
+        holder.setWidget(widget)
 
     def _fireChangeCallbacks(self):
-        """fires the change callbacks for this container"""
+        """fires the change callbacks for this container widget"""
+        if not Shiboken.isValid(self):
+            return
+        alive = []
         for callback in self._container_changed_callbacks:
-            callback(self)
+            owner = getattr(callback, "__self__", None)
+            if owner is not None:
+                try:
+                    if not Shiboken.isValid(owner):
+                        continue
+                except Exception:
+                    continue
+            try:
+                callback(self)
+            except RuntimeError:
+                continue
+            alive.append(callback)
+        if len(alive) != len(self._container_changed_callbacks):
+            self._container_changed_callbacks = alive
 
     def registerChangeCallback(self, callback: Callable):
         """registers a change callback for this container"""
@@ -8348,11 +8385,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._container_changed_callbacks.remove(callback)
 
     def _handle_container_changed(self, container):
+        if not Shiboken.isValid(self):
+            return
         gremlin.util.InvokeUiMethod(self._handle_container_changed_ui, container)
 
     def _handle_container_changed_ui(self, container):
         gremlin.util.assert_ui_thread()
         """handles a change in a container"""
+        if not Shiboken.isValid(self):
+            return
         self._fireChangeCallbacks()
         self.redrawActionSets()
         self._update_container_id()
@@ -8518,10 +8559,27 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._cleanup_ui()
 
     def _cleanup_ui(self):
-        tracker = ConditionStateTracker()
-        tracker.unregister(self.container.input_item, self.container)
-        self.container.input_item.lockedChanged.disconnect(self._handle_lock_changed)
-        self.container.unregisterChangeCallback(self._handle_container_changed)
+        try:
+            if self.container is not None:
+                tracker = ConditionStateTracker()
+                tracker.unregister(self.container.input_item, self.container)
+                try:
+                    self.container.input_item.lockedChanged.disconnect(self._handle_lock_changed)
+                except Exception:
+                    pass
+                try:
+                    self.container.unregisterChangeCallback(self._handle_container_changed)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        for widget in list(self._widget_map.values()):
+            try:
+                gremlin.util.delete_widget(widget)
+            except Exception:
+                pass
+        self._widget_map.clear()
+        self._container_id_widget = None
 
     def _create_action_tab(self):
         """create the widget for the container's action tab"""
@@ -8738,11 +8796,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.registerActionSetView(action_set, action_set_view)
 
         return action_set_view
-
-    def _cleanup_ui(self):
-        for widget in self._widget_map.values():
-            gremlin.util.delete_widget(widget)
-        self._widget_map.clear()
 
     def _container_remove(self):
         """Emits the closed event when this widget is being closed."""

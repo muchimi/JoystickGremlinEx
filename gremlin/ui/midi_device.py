@@ -20,7 +20,7 @@ import logging
 import re
 from PySide6 import QtWidgets, QtCore, QtGui
 
-from gremlin.threading import AbortableThread
+import threading
 from gremlin.input_types import InputType
 import gremlin.shared_state
 from typing import Callable, override
@@ -559,7 +559,7 @@ class MidiInputItemWidget(gremlin.input_item.InputItemWidget):
         return self.input_item.getState()
 
 
-class MidiListener(AbortableThread):
+class MidiListener():
     """midi input object"""
 
     midi_listener_message = QtCore.Signal(str, int, object)  # port_name : str, port_index : int, midi_message : mido.message (ensure UI thread safety)
@@ -582,8 +582,23 @@ class MidiListener(AbortableThread):
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._on_config_changed)
-
+        self._abort_event = threading.Event()
+        self._started = False # true if started
         self.midi_listener_message.connect(self._handle_midi_message_ui)
+
+    def start(self):
+        if not self._started:
+            self._started = True
+            self._thread = threading.Thread(target=self._midi_runner, args=(self._abort_event,))
+            self._thread.start()
+            return True
+
+    def stop(self):
+        if self._started:
+            self._abort_event.set()
+            gremlin.util.safeJoin(self._thread)
+            self._started = False
+            self._thread = None
 
     def _handle_midi_message_ui(self, port_name: str, port_index: int, message: mido.Message):
         if self.callback_ui:
@@ -592,7 +607,7 @@ class MidiListener(AbortableThread):
     def _on_config_changed(self):
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
 
-    def run(self):
+    def _midi_runner(self, abort_event : threading.Event):
         # verbose = gremlin.config.Configuration().verbose_mode_midi
 
         try:
@@ -603,13 +618,11 @@ class MidiListener(AbortableThread):
                 if port_name:
                     inport = mido.open_input(port_name)
                     syslog.info(f"MIDI: Listener: active on port: {self.port_name} [{self.port_number}]")
-                    while not self.stopped():
+                    while not abort_event.is_set():
                         for message in inport.iter_pending():
                             if self.verbose:
                                 syslog.info(f"MIDI: heard message: {self.port_name} [{self.port_number}] {message}")
                             self.midi_listener_message.emit(self.port_name, self.port_number, message)
-
-                        time.sleep(0)
                     try:
                         inport.close()
                         syslog.info(f"MIDI: Listener: closed port {self.port_name} [{self.port_number}]")
@@ -922,6 +935,7 @@ class MidiInterface(QtCore.QObject):
         self._listeners.clear()  # clear the listeners dictionary
 
         self._stopping = False
+        
     @property
     def started(self):
         """returns True if the MIDI interface has been started"""
