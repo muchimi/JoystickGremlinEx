@@ -9587,6 +9587,8 @@ class ContainerView(AbstractView):
                     # widget.container_modified.connect(self._handle_container_modified)
                     self._scroll_layout.addWidget(widget)
                     self._widget_map[container.id] = widget
+                    
+                self._scroll_layout.addStretch() # bump content to the top
 
                 self._show_content()
 
@@ -9980,6 +9982,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         container_layout.addWidget(QtWidgets.QLabel("Content Area"))
         container_layout.addWidget(container_view_widget)
+
 
         container_view_widget.setContentsMargins(0, 0, 0, 0)
 
