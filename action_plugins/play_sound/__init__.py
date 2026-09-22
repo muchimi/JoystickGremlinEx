@@ -17,6 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import os
+import traceback
 
 # import subprocess
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
@@ -1475,10 +1476,16 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         """ sets the icon of the label, pass a blank or None path to clear the icon"""
         if icon_path:
             if use_qta:
-                if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(icon_size)
-                else:
-                    pixmap = qta.icon(icon_path).pixmap(icon_size)
+                try:
+                    if color:
+                        pixmap = qta.icon(icon_path, color=color).pixmap(icon_size)
+                    else:
+                        pixmap = qta.icon(icon_path).pixmap(icon_size)
+                except Exception as e:
+                    icon = gremlin.util.get_generic_icon()
+                    pixmap = icon.pixmap(icon_size)
+                    syslog.error(f"ICON: (PlaysoundWidget _setIcon) QTA reported load error for [{icon_path}] color [{color}], using generic icon")
+                    syslog.error(traceback.format_exc())
             else:
                 pixmap = load_pixmap(icon_path) if icon_path else None
         else:

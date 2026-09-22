@@ -484,6 +484,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self._create_simconnect_page()
         self._create_reporting_page()
         self._create_runtime_page()
+        self._create_modules_page()
 
         # closing bar
         close_button = gremlin.ui.ui_common.QDataPushButton("Close")
@@ -2266,6 +2267,77 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Stream Deck")
+
+    def _create_modules_page(self):
+        """Creates the module enable/disable page"""
+        page_widget = QtWidgets.QWidget()
+        page_layout = QtWidgets.QVBoxLayout(page_widget)
+
+        page_layout.addWidget(QtWidgets.QLabel("Module Configuration Options"))
+
+        modules = [
+            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks."),
+            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen."),
+            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices."),
+            (
+                "osc",
+                "OSC",
+                "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.",
+            ),
+            ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions."),
+        ]
+
+        widgets = []
+        for data, name, description in modules:
+            match data:
+                case "streamdeck":
+                    value = self.config.streamdeck_enabled
+                case "overlay":
+                    value = self.config.overlay_enabled
+                case "midi":
+                    value = self.config.midi_enabled
+                case "osc":
+                    value = self.config.osc_enabled
+                case "voice":
+                    value = self.config.voice_enabled
+            checkbox = gremlin.ui.ui_common.QDataCheckbox(name,
+                                                          value = value,
+                                                          data=data,
+                                                          tooltip=description,
+                                                          callbackEx=self._handle_module_enabled_changed)
+            page_layout.addWidget(checkbox)
+            widgets.append(checkbox)
+
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True, left_margin=8)
+        page_layout.addWidget(widget)
+
+        page_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        msg = """
+Changing enabled module settings requires a GEX restart.
+Profile data for a module may be deleted if the module is disabled.
+Enabled modules may not show until the device filter is updated.
+"""
+        warning_widget = gremlin.ui.ui_common.QInfoBox(msg)
+        page_layout.addWidget(warning_widget)
+
+        page_layout.addStretch()
+
+        content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
+        self.tab_container.addTab(content_widget, "Modules")
+
+    def _handle_module_enabled_changed(self, widget, data):
+        checked = widget.isChecked()
+        match data:
+            case "streamdeck":
+                self.config.streamdeck_enabled = checked
+            case "overlay":
+                self.config.overlay_enabled = checked
+            case "midi":
+                self.config.midi_enabled = checked
+            case "osc":
+                self.config.osc_enabled = checked
+            case "voice":
+                self.config.voice_enabled = checked
 
     def _handle_verbose_all_off(self, widget):
         for widget in self._verbose_mode_widgets.values():
@@ -4777,7 +4849,6 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             widgets.append(self.show_profile_tree_widget)
 
         widgets.append(gremlin.ui.ui_common.QHorizontalLine())
-
 
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
         widget.setContentsMargins(4, 0, 0, 0)

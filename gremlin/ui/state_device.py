@@ -1520,6 +1520,16 @@ class StateData:
             if verbose:
                 syslog.info(f"\t[{state.key}] expression: {state.value}")
 
+
+        # output profile start values
+        syslog.info("Startup state values:")
+        sd = gremlin.ui.state_device.StateData()
+        if sd.getCount():
+            sd.dumpStates()
+        else:
+            syslog.info("\tNo states defined.")
+
+
     def _register(self, key: str, value=None, description=None) -> StateInputItem:
         """registers a new state"""
         if not key:
@@ -1537,6 +1547,17 @@ class StateData:
         if not gremlin.shared_state.profile_loading:
             self.crud.emit()
         return state
+
+    def getCount(self) -> int:
+        """returns the number of registered states"""
+        return len(self._data)
+
+    def dumpStates(self):
+        """ dumps current states to the log file """
+        syslog.info("Current states:")
+        state: StateInputItem
+        for state in self._data.values():
+            syslog.info(f"\t{state.key}: {gremlin.util.ansiText('on',"green") if state.value else gremlin.util.ansiText('off',"red")}")
 
     def update_key(self, state, old_name, new_name):
         """occurs on a key change"""
@@ -3437,6 +3458,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
+
+
 
     def display_name(self, input_id):
         """returns the name for the given input ID"""

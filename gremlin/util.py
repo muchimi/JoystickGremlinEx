@@ -1015,8 +1015,10 @@ def load_pixmap(path, size=24, qta_color=None):
         icon = None
         try:
             icon = QtGui.QIcon(qta.icon(path, color=qta_color))
-        except Exception:
-            pass
+        except Exception as e:
+            icon = gremlin.util.get_generic_icon()
+            syslog.error(f"ICON: (load pixmap) QTA reported load error for [{path}] color [{qta_color}], using generic icon")
+            syslog.error(traceback.format_exc())
 
         if icon:
             return icon.pixmap(desired_size)
@@ -1091,7 +1093,13 @@ def _load_icon(*paths, use_qta=False, qta_color=None):
                 qta_color = gremlin.ui.ui_common.Color.normalColor()
             if isinstance(qta_color, str):
                 assert qta_color.startswith("#") and len(qta_color) == 7
-            icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
+            try:
+                icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
+            except Exception:
+                syslog.error(f"ICON: (_load_icon) QTA reported load error for [{the_path}] color [{qta_color}], using generic icon")
+                syslog.error(traceback.format_exc())
+                icon = get_generic_icon()
+
         except Exception:
             pass
     if not icon:

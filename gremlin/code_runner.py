@@ -182,7 +182,11 @@ class CodeRunner:
         if not start_mode:
             start_mode = gremlin.shared_state.current_profile.get_start_mode()
 
+
         syslog.info(f"Startup mode: {start_mode}")
+        syslog.info(f"Verbosity options: {gremlin.util.ansiText('on','green') if config.verbose else gremlin.util.ansiText('off','red')}")
+        config.dumpVerboseModes()
+
 
         # Set default macro action delay
         gremlin.macro.MacroManager().default_delay = settings.default_delay
@@ -324,7 +328,8 @@ class CodeRunner:
                             callbacks = []
                             for container in input_item.containers:
                                 if not container.hasOutput():
-                                    syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: zero output container ignored")
+                                    if verbose:
+                                        syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: zero output container ignored")
                                     continue
                                 if not container.is_valid():
                                     continue
@@ -527,6 +532,8 @@ class CodeRunner:
             # hook vjoy debug data based on state
             vjoy_debug = vjoy.VjoyDebug()
             vjoy_debug.Hook()
+
+
 
             # Connect signals
             evt_listener = gremlin.event_handler.EventListener()

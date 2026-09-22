@@ -49,6 +49,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T59)
+- Change: added verbosity option readout to log file on profile start
+- Change: added state status readout to log file on profile start after states are reset for a new profile run
+- Change: added more meaningful diagnostics data to TempoEx container including input and current profile mode.
+- New: Options: ability to enable/disable various GEX modules.  Unused features should be disabled to reduce memory and CPU usage at runtime.
+- Fix: UI (icon bug): as it's difficult to determine what is causing the underlying QTA library exception, wrapped these calls to capture the error and traceback to the log file and replace the icon with a generic icon. This should hopefully provide better information as to what's causing this without crashing GEX.
+- Fix: API: exception on JSON output with continued OS file locks.  Added logic and timer to allow for the OS to release the file locks on temporary files.
+
 ### (m77T58B)
 - Fix: resolved one more cause of thread.init() exception
 

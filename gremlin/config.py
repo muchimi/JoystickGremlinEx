@@ -492,12 +492,14 @@ class Configuration(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
-    def getTemporaryFile(self, ext=None):
+    def getTemporaryFile(self, ext=None, dir = None):
         """gets a temporary file - the temporary file location is in the user folder"""
-        data_path = self.data_path()
-        user_profile = os.path.join(data_path, "temp")
-        os.makedirs(user_profile, exist_ok=True)
-        tmp_file = os.path.join(user_profile, gremlin.util.get_guid())
+        data_path = dir if dir else self.data_path()
+        tmp_path = os.path.join(data_path, "temp")
+        os.makedirs(tmp_path, exist_ok=True)
+
+        os.makedirs(tmp_path, exist_ok=True)
+        tmp_file = os.path.join(tmp_path, gremlin.util.get_guid())
         if ext:
             if not ext.startswith("."):
                 tmp_file += "."
@@ -528,26 +530,88 @@ class Configuration(QtCore.QObject):
             except Exception as ex:
                 syslog.error(f"CONFIG: could not archive broken config {fname}: {ex}")
 
-    def _write_json_atomic(self, fname: str, payload: dict):
-        """Write JSON atomically without deleting the current file on a failed replace."""
-        tmp = self.getTemporaryFile(".json")
+    # def _write_json_atomic(self, fname: str, payload: dict):
+    #     """Write JSON atomically without deleting the current file on a failed replace."""
+    #     tmp = self.getTemporaryFile(".json")
+    #     try:
+    #         with open(tmp, "w", encoding="utf-8") as hdl:
+    #             encoder = json.JSONEncoder(sort_keys=True, indent=4)
+    #             hdl.write(encoder.encode(payload))
+    #             hdl.flush()
+    #             os.fsync(hdl.fileno())
+
+    #         os.replace(tmp, fname)
+    #         return True
+    #     except Exception as ex:
+    #         syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
+    #         if os.path.exists(tmp):
+    #             try:
+    #                 os.unlink(tmp)
+    #             except OSError:
+    #                 pass
+    #         return False
+
+
+    def _write_json_atomic(
+        self,
+        fname: str,
+        payload: dict,
+        max_retries: int = 5,
+        initial_delay: float = 0.05,
+    ) -> bool:
+        """Write JSON atomically on Windows, handling process locks and permission delays."""
+        fname_abs = os.path.abspath(fname)
+        target_dir = os.path.dirname(fname_abs)
+
+        # 1. Create temp file in target dir (guarantees same NTFS volume for os.replace)
+        tmp = self.getTemporaryFile(".json", dir=target_dir)
+
         try:
+            # 2. Write data and commit file contents to disk
             with open(tmp, "w", encoding="utf-8") as hdl:
-                encoder = json.JSONEncoder(sort_keys=True, indent=4)
-                hdl.write(encoder.encode(payload))
+                json.dump(payload, hdl, sort_keys=True, indent=4)
                 hdl.flush()
                 os.fsync(hdl.fileno())
 
-            os.replace(tmp, fname)
-            return True
+            # 3. Clear Read-Only attribute on destination file if it exists
+            if os.path.exists(fname_abs):
+                try:
+                    os.chmod(fname_abs, 0o666)
+                except OSError:
+                    pass
+
+            # 4. Atomic Replace with retry loop for Windows file locking
+            delay = initial_delay
+            for attempt in range(max_retries):
+                try:
+                    os.replace(tmp, fname_abs)
+                    return True
+                except PermissionError as ex:
+                    # Catch WinError 5 (Access Denied) or WinError 32 (Sharing Violation)
+                    winerror = getattr(ex, "winerror", None)
+                    if winerror in (5, 32) and attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise ex
+                except OSError as ex:
+                    if getattr(ex, "winerror", None) in (5, 32) and attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise ex
+
+            return False
+
         except Exception as ex:
-            syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
+            syslog.error(f"CONFIG: unable to write atomically to {fname_abs}: {ex}")
             if os.path.exists(tmp):
                 try:
                     os.unlink(tmp)
                 except OSError:
                     pass
             return False
+
 
     def _save_ui(self, fname: str = None, save_profile: bool = False):
         """Writes the version specific configuration file to disk."""
@@ -1744,6 +1808,26 @@ class Configuration(QtCore.QObject):
         else:
             value = value & ~mode
         self.verbose_mode = value
+
+    def dumpVerboseModes(self):
+        """dumps the current verbose modes to the log"""
+        import gremlin.util
+        modes = self.verbose_mode
+        enabled_modes = []
+
+        for mode in VerboseMode:
+            if mode == VerboseMode.NotSet or mode == VerboseMode.All:
+                continue
+            if mode in modes:
+                enabled_modes.append(mode.name)
+
+        if not enabled_modes:
+            syslog.info(f"Verbose mode details: {gremlin.util.ansiText('No sub modes enabled.','red')}")
+            return
+
+        syslog.info("Verbose mode details:")
+        for mode_name in enabled_modes:
+            syslog.info(f"\t{gremlin.util.ansiText(mode_name,'green')}")
 
     @property
     def verbose_mode_inputitems(self):

@@ -21,6 +21,7 @@ import logging
 import threading
 import time
 
+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
@@ -607,8 +608,8 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.second_tap_press_time = 0.0
 
         self.verbose = gremlin.config.Configuration().verbose_mode_container
-        
 
+        self.container._ensure_action_sets() # ensure sets are assembled
         assert len(self.container.action_sets) == 3, "TempoEx container must have exactly 3 action sets: short, long, and double."
 
         self.last_trigger = None
@@ -626,10 +627,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             self.valid = False
 
         if self.verbose or not self.valid:
-            syslog.info("TEMPOEX: Configuration:")
+            syslog.info("TEMPOEX: Profile start Configuration:")
             syslog.info(f"\tContainer ID: {self.container.id}")
+            syslog.info(f"\tProfile mode: {gremlin.shared_state.current_mode}")
             input_item: gremlin.input_item.InputItem = self.action_data._input_item
-            syslog.info(f"\tAttached input: {input_item.display_name}")
+            syslog.info(f"\tAttached to input: {input_item.display_name}")
             syslog.info(f"\tExecution mode: activate on {self.container.activate_on}")
             syslog.info(f"\tShort action sets: {len(self.container.short_action_set)}")
             syslog.info(f"\tChain enabled: short: [{self.container.chain_short}] long: [{self.container.chain_long}] dtap: [{self.container.chain_double}]")
@@ -726,9 +728,9 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         # double tap processing
         if self.verbose:
             if is_pressed:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('double press (press)', 'red', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('double press (press)', 'red', True)} {self._debug_stub()}")
             else:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('double press (release)', 'red', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('double press (release)', 'red', True)} {self._debug_stub()}")
 
         if is_pressed:
             if self.last_trigger:
@@ -749,6 +751,10 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             # index
             if self.chain_double and (self.switch_on_press and is_pressed) or not is_pressed:
                 self.dtap_index = (self.dtap_index + 1) % node_count
+
+    def _debug_stub(self) -> str:
+        input_item: gremlin.input_item.InputItem = self.action_data._input_item
+        return f"Input: {input_item.display_name} Profile mode: {gremlin.shared_state.current_mode}"
 
     def _trigger_short_press(self, event, value, extra_data: dict = None):
         """triggers a short press"""
@@ -771,9 +777,9 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         if self.verbose:
             if is_pressed:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('short press (press)', 'yellow', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('short press (press)', 'yellow', True)} {self._debug_stub()}")
             else:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('short press (release)', 'yellow', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('short press (release)', 'yellow', True)} {self._debug_stub()}")
 
         node_count = len(self.short_nodes)
         if node_count:
@@ -800,9 +806,9 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         if self.verbose:
             if is_pressed:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('long press (press)', 'green', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('long press (press)', 'green', True)} {self._debug_stub()}")
             else:
-                syslog.info(f"\tTrigger: {gremlin.util.ansiText('long press (release)', 'green', True)}")
+                syslog.info(f"\tTrigger: {gremlin.util.ansiText('long press (release)', 'green', True)} {self._debug_stub()}")
 
         if is_pressed:
             if self.last_trigger:

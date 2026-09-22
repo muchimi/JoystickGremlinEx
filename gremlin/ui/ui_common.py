@@ -4673,10 +4673,16 @@ class QIconLabel(QWidget):
                     pixmap = load_pixmap(icon_or_path, self._icon_size, color)
             else:
                 if use_qta:
-                    if color:
-                        pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
-                    else:
-                        pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                    try:
+                        if color:
+                            pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
+                        else:
+                            pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                    except Exception as e:
+                        icon = gremlin.util.get_generic_icon()
+                        pixmap = icon.pixmap(self._icon_size)
+                        syslog.error(f"ICON: (setIcon) QTA reported load error for [{icon_or_path}] color [{color}], using generic icon")
+                        syslog.error(traceback.format_exc())
                 else:
                     pixmap = load_pixmap(icon_or_path) if icon_or_path else None
         else:
@@ -5898,10 +5904,16 @@ class QPathLineItem(QWidget):
         """sets the icon of the label, pass a blank or None path to clear the icon"""
         if icon_path:
             if use_qta:
-                if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
-                else:
-                    pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+                try:
+                    if color:
+                        pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
+                    else:
+                        pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+                except Exception as e:
+                    icon = gremlin.util.get_generic_icon()
+                    pixmap = icon.pixmap(self.IconSize)
+                    syslog.error(f"ICON: (QpathLineItem _setIcon) QTA reported load error for [{icon_path}] color [{color}], using generic icon")
+                    syslog.error(traceback.format_exc())
             else:
                 pixmap = load_pixmap(icon_path) if icon_path else None
         else:

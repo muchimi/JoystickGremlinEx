@@ -1479,7 +1479,7 @@ def joystick_devices_initialization():
                 device_count = dinput.DILL.get_device_count()
                 attempt += 1
 
-            if device_count:
+            if config.verbose and device_count:
                 syslog.info(f"INIT: {device_count} hardware devices detected:")
                 dinput.DILL.dumpDevices()
 
