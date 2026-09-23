@@ -1228,6 +1228,10 @@ class Icons:
     """general UI icon handling"""
 
     @staticmethod
+    def containerIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.alpha-c-box-outline", qta_color)
+
+    @staticmethod
     def listUpIcon(qta_color=None) -> QtGui.QIcon:
         return Icons._icon("ph.caret-circle-up-light", qta_color)
 

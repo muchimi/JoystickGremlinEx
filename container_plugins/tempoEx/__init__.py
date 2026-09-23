@@ -1246,7 +1246,9 @@ More than one action per short press or long press can be added."""
 
     def _action_set_changed(self, data, force: bool = False):
         """Callback for when the action sets change."""
-        pass
+        # update the UI
+        self.input_item.notifyContentChanged()
+
 
     def get_input_type(self):
         """override input type when actions check what input type they are hooked to"""

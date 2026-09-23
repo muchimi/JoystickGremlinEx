@@ -1339,6 +1339,27 @@ class VjoyAction(enum.Enum):
         )
 
     @staticmethod
+    def is_axis_action(mode):
+        """true if the mode is an axis output mode"""
+        return mode in (
+            VjoyAction.VJoyAxis,
+            VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyInvertAxis,
+            VjoyAction.VJoyRangeAxis,
+            VjoyAction.VJoyMergeAxis,
+        )
+
+    @staticmethod
+    def is_hat_action(mode):
+        """true if the mode is a hat output mode"""
+        return mode in (
+            VjoyAction.VJoyHat,
+            VjoyAction.VJoyHatPress,
+            VjoyAction.VJoyHatPulse,
+            VjoyAction.VJoyHatToButton,
+        )
+
+    @staticmethod
     def to_string(mode):
         return mode.name
 

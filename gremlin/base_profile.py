@@ -31,7 +31,6 @@ import time
 from typing import Callable
 
 
-
 import container_plugins
 import gremlin.keyboard
 import gremlin.profile
@@ -189,8 +188,6 @@ class ProfileDeviceNode:
             return self._device.device_id
         return str(self.device_guid)
 
-
-
     def getModeNode(self, mode: str, system: bool = None, autocreate=False):
         """gets the mode object for the given mode
         :param mode: the mode name (case sensitive)
@@ -260,7 +257,6 @@ class ProfileDeviceNode:
                 # device not found (could bedisconnected)
                 syslog.info(f"DEVICE: Device with GUID [{device_guid}] not found for profile [{self.name}]")
 
-
                 # map to an existing vjoy if possible - match the vjoy by configuration and ID
                 pattern = r"VJoy \d+/\d+/\d+ \(\d+\)"
 
@@ -309,21 +305,16 @@ class ProfileDeviceNode:
                         device.vjoy_id = vjoy_id
                         device.virtual_id = device.vjoy_id
 
-
-
                     device.button_count = 128
                     device.hat_count = 4
                     device.name = safe_read(node, "name", str, "unknown")
                     device.setConnected(False)
-
 
                     if "type" in node.attrib:
                         dt = safe_read(node, "type", str, "")
                         device.device_type = DeviceType.to_enum(dt)
                     else:
                         device.device_type = DeviceType.NotSet
-
-
 
                 # register disconnected device in the tracking data
                 gremlin.joystick_handling.registerDisconnectedDevice(device)
@@ -3081,7 +3072,6 @@ class Profile:
     def get_mode_display_list(self) -> list:
         """gets a pairs (display_name, mode)"""
 
-
         hide_default_mode = gremlin.config.Configuration().hide_default_mode
         if hide_default_mode:
             mode_objects = self.get_mode_objects("Default")
@@ -3119,7 +3109,6 @@ class Profile:
             if mode_name == master_mode:
                 continue  # special mode
             mode_set.append((display_name, mode_name))
-
 
         return mode_set
 
@@ -3905,8 +3894,15 @@ class Profile:
                     return device_node.modes[mode_name]
         return None
 
-    def find_input(self, device_guid, input_id):
-        """finds the input item for the give device_guid, input_id"""
+    def find_input(self, device_guid, input_id, input_type: InputType = None):
+        """finds the input item for the given device_guid, input_id, and optional input_type"""
+        if (
+            isinstance(input_id, str)
+            and input_id.isnumeric()
+            and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+        ):
+            input_id = int(input_id)
+
         device_guid = gremlin.util.normalize_guid(device_guid)
         for dev_guid in self.devices:
             id = gremlin.util.normalize_guid(dev_guid)
@@ -3915,8 +3911,10 @@ class Profile:
             dev = self.devices[dev_guid]
             for mode_name in dev.modes:
                 mode = dev.modes[mode_name]
-                for input_type in mode.config:
-                    for input_item in mode.config[input_type].values():
+                for mode_input_type in mode.config:
+                    if input_type is not None and mode_input_type != input_type:
+                        continue
+                    for input_item in mode.config[mode_input_type].values():
                         if input_item and input_item.input_id == input_id:
                             return input_item
 
@@ -4151,7 +4149,6 @@ class Profile:
                 self.voice.from_xml(node)
                 break
 
-
         # removed devices
         self._removed_devices.clear()
 
@@ -4186,8 +4183,6 @@ class Profile:
                 # disconnected device most likely
                 device_node = self.readDeviceNode(child)
                 self.devices[device_guid] = device_node
-
-
 
             if device_node is None:
                 syslog.warning(f"XML: unrecognized device id [{str(device_guid)}] line : {child.sourceline} - skipping this entry")
@@ -4310,8 +4305,6 @@ class Profile:
                 new_device = self.getDeviceNode(dev.device_guid, autocreate=True)
                 if __debug__ and new_device is None:
                     new_device = self.getDeviceNode(dev.device_guid, autocreate=True)
-
-
 
                 if new_device.virtual:
                     self.vjoy_devices[dev.device_guid] = new_device
@@ -4867,6 +4860,7 @@ class Profile:
                 if gremlin.config.OVERLAY_ENABLED:
                     try:
                         import gremlin.ui.obs_overlay as obs_overlay
+
                         obs_overlay.persist_for_profile(self, dest_xml=use_name)
                     except Exception as err:
                         syslog.error(f"OBS OVERLAY: persist on profile save failed: {err}")
@@ -5008,10 +5002,12 @@ class Profile:
                     del data["last_input_id"]
 
             else:
-                data["last_device_guid"] = gremlin.util.normalize_guid(device_guid)
+                selection_key = gremlin.util.normalize_guid(device_guid)
+                data["last_device_guid"] = selection_key
                 if "selection_map" not in data:
                     data["selection_map"] = {}
-                data["selection_map"]["device_guid"] = {}
+                if selection_key not in data["selection_map"]:
+                    data["selection_map"][selection_key] = {}
 
                 if input_id is None:
                     # remove any existing input_id and input_type
@@ -5019,10 +5015,10 @@ class Profile:
                         del data["last_input_id"]
                     if "last_input_type" in data:
                         del data["last_input_type"]
-                    if "input_id" in data["selection_map"]["device_guid"]:
-                        del data["selection_map"]["device_guid"]["input_id"]
-                    if "input_type" in data["selection_map"]["device_guid"]:
-                        del data["selection_map"]["device_guid"]["input_type"]
+                    if "input_id" in data["selection_map"][selection_key]:
+                        del data["selection_map"][selection_key]["input_id"]
+                    if "input_type" in data["selection_map"][selection_key]:
+                        del data["selection_map"][selection_key]["input_type"]
                 else:
                     # id provided
                     if not isinstance(input_id, int) or isinstance(input_id, float):
@@ -5034,17 +5030,17 @@ class Profile:
                     else:
                         data["last_input_id"] = input_id
 
-                    data["selection_map"]["device_guid"]["input_id"] = data["last_input_id"]
+                    data["selection_map"][selection_key]["input_id"] = data["last_input_id"]
 
                     if input_type is None:
                         if "last_input_type" in data:
                             del data["last_input_type"]
-                        if "input_type" in data["selection_map"]["device_guid"]:
-                            del data["selection_map"]["device_guid"]["input_type"]
+                        if "input_type" in data["selection_map"][selection_key]:
+                            del data["selection_map"][selection_key]["input_type"]
 
                     else:
                         data["last_input_type"] = InputType.to_string(input_type)
-                        data["selection_map"]["device_guid"]["input_type"] = data["last_input_type"]
+                        data["selection_map"][selection_key]["input_type"] = data["last_input_type"]
 
             self._writeConfig(data)
 
@@ -5058,11 +5054,17 @@ class Profile:
         input_type = None
         if device_guid is not None and "selection_map" in data:
             device_guid = gremlin.util.normalize_guid(device_guid)
-            if device_guid in data["selection_map"]:
-                if "input_id" in data["selection_map"]["device_guid"]:
-                    input_id = data["last_input_id"]
-                if "input_type" in data["selection_map"]["device_guid"]:
-                    input_type = InputType.convert(data["last_input_type"])
+            selection_map = data["selection_map"]
+            selection_entry = selection_map.get(device_guid)
+            if selection_entry is None and "device_guid" in selection_map:
+                # Backward compatibility for legacy buggy keying.
+                selection_entry = selection_map.get("device_guid")
+
+            if selection_entry:
+                if "input_id" in selection_entry:
+                    input_id = selection_entry["input_id"]
+                if "input_type" in selection_entry:
+                    input_type = InputType.convert(selection_entry["input_type"])
 
         if device_guid is None:
             if "last_device_guid" in data:
@@ -5346,7 +5348,7 @@ class Profile:
 
         return count
 
-    def convertTTSToPlaySound(self, use_edge = True):
+    def convertTTSToPlaySound(self, use_edge=True):
         """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile"""
         fname = self.profile_file
         if not fname or not os.path.isfile(fname):
@@ -5432,14 +5434,9 @@ class Profile:
 
             auto_generate = True
 
-            node.attrib.clear() # blitz all attributes and repladce
-
+            node.attrib.clear()  # blitz all attributes and repladce
 
             mode = PlayMode.EdgeAI if use_edge else PlayMode.PyTTS
-
-
-
-
 
             node.tag = "play-sound"
             node.set("mode", PlayMode.to_string(mode))
@@ -5462,7 +5459,7 @@ class Profile:
 
             if use_edge:
                 etts_speed = max(0, min(200, rate)) - 100  # clamp
-                etts_volume = volume - 100 # volume offset
+                etts_volume = volume - 100  # volume offset
                 speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
 
                 # voice conversions
@@ -5475,9 +5472,7 @@ class Profile:
                 node.set("ptts_speed", safe_format(pytts_speed, int))
                 node.set("ptts_volume", safe_format(pytts_volume, int))
 
-
             node.set("speaker", speaker)
-
 
         # convert the playsound mode from pyTTS to edge TTS
         if use_edge:
@@ -5487,7 +5482,7 @@ class Profile:
                     node.set("mode", PlayMode.to_string(PlayMode.EdgeAI))
                     speaker = node.get("speaker")
                     # SAPI female voices
-                    female_voices = ["anna", "mary", "zira", "hazel", "lili", "hortense", "julie", "hakura", "hedda","ayumi"]
+                    female_voices = ["anna", "mary", "zira", "hazel", "lili", "hortense", "julie", "hakura", "hedda", "ayumi"]
                     pytts_speaker = speaker.casefold()
                     speaker = gremlin.sound.DEFAULT_ETTS_MALE
                     # look for female voices used
@@ -5504,9 +5499,6 @@ class Profile:
                         del node.attrib["ptts_volume"]
                     if "ptts_voice" in node.attrib:
                         del node.attrib["ptts_voice"]
-
-
-
 
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
 
@@ -6055,10 +6047,7 @@ class PluginInstance:
                 return True
         for var in [var for var in self.variables.values() if not var.is_optional]:
             if not var.is_configured:
-                syslog.warn(
-                    f"Plugin instance '{self.name}' not configured: variable '{var.name}' "
-                    f"type={var.type} optional={var.is_optional} value={var.value}"
-                )
+                syslog.warn(f"Plugin instance '{self.name}' not configured: variable '{var.name}' type={var.type} optional={var.is_optional} value={var.value}")
                 return False
         return True
 

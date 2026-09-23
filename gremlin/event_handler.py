@@ -2540,7 +2540,7 @@ class EventHandler(QtCore.QObject):
 
         self.registry = EventRegistry()
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._started = False
         self._execute_queue = []  # list of items to execute
         self._execute_thread = None
@@ -2843,14 +2843,15 @@ class EventHandler(QtCore.QObject):
 
     def registerMappedInput(self, device_guid, mode, input_type, magic, input_item):
         """Registers a mapped input item for the given device, mode, input type, and magic value"""
-        if device_guid not in self.input_item_map:
-            self.input_item_map[device_guid] = {}
-        if mode not in self.input_item_map[device_guid]:
-            self.input_item_map[device_guid][mode] = {}
-        if input_type not in self.input_item_map[device_guid][mode]:
-            self.input_item_map[device_guid][mode][input_type] = {}
+        with self._lock:
+            if device_guid not in self.input_item_map:
+                self.input_item_map[device_guid] = {}
+            if mode not in self.input_item_map[device_guid]:
+                self.input_item_map[device_guid][mode] = {}
+            if input_type not in self.input_item_map[device_guid][mode]:
+                self.input_item_map[device_guid][mode][input_type] = {}
 
-        self.input_item_map[device_guid][mode][input_type][magic] = input_item
+            self.input_item_map[device_guid][mode][input_type][magic] = input_item
 
     def triggerContainerCallback(self, container, event):
         """Creates a callback for the given container - this allows latched inputs to issue a trigger at the container node level so conditions are handled"""
@@ -2942,44 +2943,45 @@ class EventHandler(QtCore.QObject):
             key_stub = self._callback_key_stub(key)
             syslog.info(f"**** NO LATCH MATCH: magic: [{magic}] key: {key_stub}")
 
-        if device_guid in self.input_item_map:
-            # walk the mode inheritance chain: a child mode inherits its
-            # parent's input items unless it defines its own. input_item_map is
-            # only populated for the mode where an input is declared, so we must
-            # fall back to parent modes here (mirrors build_event_lookup, which
-            # only propagates inheritance into the callbacks maps, not this one).
+        with self._lock:
+            if device_guid in self.input_item_map:
+                # walk the mode inheritance chain: a child mode inherits its
+                # parent's input items unless it defines its own. input_item_map is
+                # only populated for the mode where an input is declared, so we must
+                # fall back to parent modes here (mirrors build_event_lookup, which
+                # only propagates inheritance into the callbacks maps, not this one).
 
-            for lookup_mode in modes:
-                visited.clear()
-                while lookup_mode and lookup_mode not in visited:
-                    visited.add(lookup_mode)
-                    mode_map = self.input_item_map[device_guid].get(lookup_mode)
-                    if mode_map and input_type in mode_map:
-                        if magic in mode_map[input_type]:
-                            if verbose:
-                                syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
-                            return mode_map[input_type][magic]
-                        # State events: fall back to message_key match (object identity
-                        # can miss after profile reload / clone).
-                        if input_type == InputType.State:
-                            want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
-                            if want:
-                                for mapped_magic, mapped_item in mode_map[input_type].items():
-                                    mapped_key = (
-                                        getattr(mapped_magic, "message_key", None)
-                                        or getattr(mapped_item, "message_key", None)
-                                        or getattr(mapped_item, "key", None)
-                                    )
-                                    if mapped_key == want:
-                                        if verbose:
-                                            syslog.info(f"Match Input: state by key [{want}] (mode: {lookup_mode})")
-                                        return mapped_item
-                        elif verbose:
-                            syslog.info("available magic values for this input are: ")
-                            for m in mode_map[input_type]:
-                                syslog.info(f"\t{m}")
-                    # ascend to the parent mode, if any
-                    lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
+                for lookup_mode in modes:
+                    visited.clear()
+                    while lookup_mode and lookup_mode not in visited:
+                        visited.add(lookup_mode)
+                        mode_map = self.input_item_map[device_guid].get(lookup_mode)
+                        if mode_map and input_type in mode_map:
+                            if magic in mode_map[input_type]:
+                                if verbose:
+                                    syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
+                                return mode_map[input_type][magic]
+                            # State events: fall back to message_key match (object identity
+                            # can miss after profile reload / clone).
+                            if input_type == InputType.State:
+                                want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
+                                if want:
+                                    for mapped_magic, mapped_item in mode_map[input_type].items():
+                                        mapped_key = (
+                                            getattr(mapped_magic, "message_key", None)
+                                            or getattr(mapped_item, "message_key", None)
+                                            or getattr(mapped_item, "key", None)
+                                        )
+                                        if mapped_key == want:
+                                            if verbose:
+                                                syslog.info(f"Match Input: state by key [{want}] (mode: {lookup_mode})")
+                                            return mapped_item
+                            elif verbose:
+                                syslog.info("available magic values for this input are: ")
+                                for m in mode_map[input_type]:
+                                    syslog.info(f"\t{m}")
+                        # ascend to the parent mode, if any
+                        lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
 
         if verbose:
             syslog.info(f"Match input: **no match**: {input_type} {magic}")
@@ -3317,38 +3319,39 @@ class EventHandler(QtCore.QObject):
         """
         # Propagate events from parent to children if the children lack
         # handlers for the available events
-        callbacks_list = [self.callbacks, self.latched_callbacks, self.latched_events]
+        with self._lock:
+            callbacks_list = [self.callbacks, self.latched_callbacks, self.latched_events]
 
-        # build the inheritance modes
-        node = inheritance_tree
-        if node.name:
-            parent = node.name
-            children = [n.name for n in node.children]
+            # build the inheritance modes
+            node = inheritance_tree
+            if node.name:
+                parent = node.name
+                children = [n.name for n in node.children]
 
-            # Each device is treated separately
-            for callback_items in callbacks_list:
-                for device_guid in callback_items:
-                    # Only attempt to copy handlers if we have any available in
-                    # the parent mode
-                    if parent in callback_items[device_guid]:
-                        device_cb = callback_items[device_guid]
-                        parent_cb = device_cb[parent]
-                        # Copy the handlers into each child mode, unless they
-                        # have their own handlers already defined
-                        for child in children:
-                            if child not in device_cb:
-                                device_cb[child] = {}
-                            for event, callbacks in parent_cb.items():
-                                if isinstance(event, gremlin.event_handler.Event):
-                                    key = event.callbackKey
-                                else:
-                                    key = event
-                                if key not in device_cb[child]:
-                                    device_cb[child][key] = callbacks
+                # Each device is treated separately
+                for callback_items in callbacks_list:
+                    for device_guid in callback_items:
+                        # Only attempt to copy handlers if we have any available in
+                        # the parent mode
+                        if parent in callback_items[device_guid]:
+                            device_cb = callback_items[device_guid]
+                            parent_cb = device_cb[parent]
+                            # Copy the handlers into each child mode, unless they
+                            # have their own handlers already defined
+                            for child in children:
+                                if child not in device_cb:
+                                    device_cb[child] = {}
+                                for event, callbacks in parent_cb.items():
+                                    if isinstance(event, gremlin.event_handler.Event):
+                                        key = event.callbackKey
+                                    else:
+                                        key = event
+                                    if key not in device_cb[child]:
+                                        device_cb[child][key] = callbacks
 
-        # Recurse until we've dealt with all modes
-        for child in node.children:
-            self.build_event_lookup(child)
+            # Recurse until we've dealt with all modes
+            for child in node.children:
+                self.build_event_lookup(child)
 
     def change_profile(self, new_profile):
         """requests a profile load"""

@@ -49,10 +49,22 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T59A)
-- Fix: Trigger Action: exception on press/release checkbox selection due to new API.
+### (m77T60)
 - New: Trigger Action: added pulse mode for button triggers.
-
+- New: UI (Inputs): new icon to identify if the input has at least one mapped container.  This is added because some mappings may have empty containers attached to the input with no actions.
+- Change: UI (Options): Modules tab : list applicable environment variable if the module is enabled via an environment variable.
+- Change: Map to VJoy Action: guard against invalid output configurations if the output device, button, hat or axis no longer exists. Instead of throwing an exception, the action will ignore all triggers and place warnings in the log file.  This can happen when a profile is saved but the vjoy configuration changed after the fact.
+- Change: UI (Device Filter): filter is now aware of modules that are turned off through configuration options.
+- Fix: API (Events): added lock for certain event processing to avoid potential race conditions.
+- Fix: Trigger Action: exception on press/release checkbox selection due to new API.
+- Fix: Map to VJoy Action: virtual output device button count exception in hat to button mapping.
+- Fix: API (Keyboard): obtaining a list of key names fails with an exception if keys are not yet defined.
+- Fix: UI (Device Filter): exception when clicking the default button due to API change.
+- Fix: StreamDeck device: fix for two potential QT issue. 
+- Fix: State device: fix for two potential QT issue.
+- Fix: UI (Input Viewer): toggle combo hat/button display resets other visualizers. 
+- Fix: UI (Input Viewer): visualizers could stop updating on profile run on profile change while the window is visible.
+- Fix: UI (input selection): last selected input may not be restored on profile load or app start (still under investigation).
 
 ### (m77T59)
 - Change: added verbosity option readout to log file on profile start

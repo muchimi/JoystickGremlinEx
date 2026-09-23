@@ -2276,19 +2276,18 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout.addWidget(QtWidgets.QLabel("Module Configuration Options"))
 
         modules = [
-            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks."),
-            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen."),
-            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices."),
+            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.", 'GEX_STREAMDECK_ENABLED'),
+            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen.", 'GEX_OVERLAY_ENABLED'),
+            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.", 'GEX_MIDI_ENABLED'),
             (
                 "osc",
                 "OSC",
-                "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.",
-            ),
-            ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions."),
+                "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
+            ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
         ]
 
         widgets = []
-        for data, name, description in modules:
+        for data, name, description, env_var in modules:
             match data:
                 case "streamdeck":
                     value = self.config.streamdeck_enabled
@@ -2305,8 +2304,13 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                                                           data=data,
                                                           tooltip=description,
                                                           callbackEx=self._handle_module_enabled_changed)
-            page_layout.addWidget(checkbox)
-            widgets.append(checkbox)
+            if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
+                var_widget = QtWidgets.QLabel(f"({env_var} set)")
+                widget = gremlin.ui.ui_common.getHContainer([checkbox, var_widget,"||"], widget_only=True)
+            else:
+                widget = checkbox
+
+            widgets.append(widget)
 
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True, left_margin=8)
         page_layout.addWidget(widget)
@@ -5160,8 +5164,29 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
 
         # load default device order
         data = ui._get_sorted_tab_map(reset=True)
-        tab_map = {index: (device, visible) for index, (device_id, device, visible) in enumerate(data["sorted"])}
+        # tab_map = {}
+        # for index, dev in enumerate(data["sorted"]):
+        #     tab_map[index] = (dev, dev.visible)
+        tab_map = {index: (dev, dev.visible) for index, dev in enumerate(data["sorted"])}
+
         self._populate_list_widget(tab_map)
+
+    def _device_enabled(self, device):
+        config = gremlin.config.Configuration()
+        match device.device_type:
+            case DeviceType.Osc:
+                return config.osc_enabled
+            case DeviceType.Midi:
+                return config.midi_enabled
+            case DeviceType.Voice:
+                return config.voice_enabled
+            case DeviceType.Overlay:
+                return config.overlay_enabled
+            case DeviceType.StreamDeck:
+                return config.stream_deck_enabled
+            case DeviceType.OctaviIFR1:
+                return config.octavi_enabled
+        return True
 
     def _populate_list_widget(self, tab_map):
         """populates the list widget with the tab_map"""
@@ -5172,6 +5197,9 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
                 continue
             if device.disabled:
                 # skip disabled devices
+                continue
+            # check for disabled devices from a configuration perspective
+            if not self._device_enabled(device):
                 continue
             widget = ReorderDeviceListWidget(device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device)
             item = QListWidgetItem(self._list_widget)
@@ -5195,7 +5223,8 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
         items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
         for index, item in enumerate(items):
             device, visible = item.data(QtCore.Qt.UserRole)
-            tab_map[index] = (device.device_id, visible)
+            if self._device_enabled(device):
+                tab_map[index] = (device.device_id, visible)
         self.config.tab_list = tab_map
         visible_map = {device_id: visible for device_id, visible in tab_map.values()}
         self.config.tab_visible_map = visible_map

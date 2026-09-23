@@ -1182,6 +1182,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._bridge_hooks.clear()
 
     def _on_plugin_connected(self, _connected: bool):
+        gremlin.util.InvokeUiMethod(self._on_plugin_connected_ui, _connected)
+
+    def _on_plugin_connected_ui(self, _connected: bool):
         if self._runtime_locked():
             return
         self._schedule_refresh()
@@ -1191,9 +1194,15 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         return bool(gremlin.shared_state.is_running)
 
     def _on_profile_start(self):
+        gremlin.util.InvokeUiMethod(self._on_profile_start_ui)
+
+    def _on_profile_start_ui(self):
         self._apply_runtime_lock(True)
 
     def _on_profile_stop(self):
+        gremlin.util.InvokeUiMethod(self._on_profile_stop_ui)
+
+    def _on_profile_stop_ui(self):
         self._apply_runtime_lock(False)
         # One catch-up refresh after stop so the grid matches live state.
         self._schedule_refresh()
@@ -2794,6 +2803,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._rebuild_grid()
 
     def _on_gex_state_identity_changed(self, *args):
+        gremlin.util.InvokeUiMethod(self._on_gex_state_identity_changed_ui, *args)
+
+    def _on_gex_state_identity_changed_ui(self, *args):
         if getattr(gremlin.shared_state, "profile_loading", False):
             return
         item = self._selected_item()
@@ -3698,6 +3710,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             self.refresh()
 
     def _on_virtual_page_changed(self, device_id, page):
+        gremlin.util.InvokeUiMethod(self._on_virtual_page_changed_ui, device_id, page)
+
+    def _on_virtual_page_changed_ui(self, device_id, page):
         if not Shiboken.isValid(self) or self._runtime_locked():
             return
         if device_id and self._device_id and device_id != self._device_id:
@@ -3705,6 +3720,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._schedule_refresh()
 
     def _on_inputs_changed(self, device_guid):
+        gremlin.util.InvokeUiMethod(self._on_inputs_changed_ui, device_guid)
+
+    def _on_inputs_changed_ui(self, device_guid):
         if not Shiboken.isValid(self) or self._runtime_locked():
             return
         from gremlin.util import compare_guid
@@ -3714,6 +3732,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             self._schedule_cell_refresh()
 
     def _on_slot_pressed(self, device_id, row, column, is_pressed):
+        gremlin.util.InvokeUiMethod(self._on_slot_pressed_ui, device_id, row, column, is_pressed)
+
+    def _on_slot_pressed_ui(self, device_id, row, column, is_pressed):
         if not Shiboken.isValid(self) or self._runtime_locked():
             return
         if device_id and self._device_id and device_id != self._device_id:

@@ -3581,9 +3581,12 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         return True
 
     def _create_expression_update_callback(self, state, widget):
-        return lambda: self._change_expression_callback(state, widget)
+        return lambda: gremlin.util.InvokeUiMethod(self._change_expression_callback_ui, state, widget)
 
     def _change_expression_callback(self, state, widget):
+        gremlin.util.InvokeUiMethod(self._change_expression_callback_ui, state, widget)
+
+    def _change_expression_callback_ui(self, state, widget):
         if Shiboken.isValid(widget):
             if widget.data.input_id == state:
                 widget.setText(state.expression)

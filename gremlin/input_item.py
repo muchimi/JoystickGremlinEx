@@ -2264,6 +2264,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             gremlin.util.InvokeUiMethod(self._handle_input_item_lock_changed_ui, input_item)
 
     def _handle_tooltip_changed(self):
+        gremlin.util.InvokeUiMethod(self._handle_tooltip_changed_ui)
+
+    def _handle_tooltip_changed_ui(self):
         if self.input_item and self.input_item.tooltip:
             self.setToolTip(self.input_item.tooltip)
         else:
@@ -2990,12 +2993,30 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if input_item.containers:
             # Create the actual icons
 
+            widgets = []
+
+
             # syslog.debug(f"creating action icons for input item: {input_item.display_name} [{input_item.id}] container model id: [{input_item.containers.id}] count: [{len(input_item.containers)}]")
             row = 0
             col = 1
-            max_col = 5
+            max_col = 6 # max icons per line
             size = self._getIconSize()
             button_size = size + 2
+
+            icon = gremlin.ui.ui_common.Icons.containerIcon()
+            widget = ui_common.QIconPushButton(
+                            icon=icon,
+                            icon_size=size,
+                            height=button_size,
+                            width=button_size,
+                            data=(input_item, ),
+                            callback= None,
+                            tooltip="Has Containers"
+                        )
+
+            widgets.append(widget)
+
+
             for container in input_item.containers:
                 actions = container.getActions()
                 for action in actions:
@@ -3026,15 +3047,17 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                             callback=self._handle_action_icon_clicked,
                             tooltip=tooltip,
                         )
-                        # widget.setMaximumWidth(button_size)
-                        # widget.setMaximumHeight(button_size)
-                        layout.addWidget(widget, row, col)
-                        col += 1
-                        if col > max_col:
-                            col = 1
-                            row += 1
 
-            # self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
+                        widgets.append(widget)
+
+            for widget in widgets:
+                layout.addWidget(widget, row, col)
+                col += 1
+                if col > max_col:
+                    col = 1
+                    row += 1
+
+
 
         else:
             widget = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
@@ -9587,7 +9610,7 @@ class ContainerView(AbstractView):
                     # widget.container_modified.connect(self._handle_container_modified)
                     self._scroll_layout.addWidget(widget)
                     self._widget_map[container.id] = widget
-                    
+
                 self._scroll_layout.addStretch() # bump content to the top
 
                 self._show_content()
@@ -11509,7 +11532,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         )
 
         self._filter = None
-
+        self._ui_loading = False # true if UI is being loaded
         self.device = device
         self.profile = profile
         self.device_node = profile.getDeviceNode(device.device_guid)
@@ -11679,6 +11702,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             raise ValueError(f"DeviceWidget: CreateUi() - invalid model - got [{type(self._input_item_list_model)}]")
 
         try:
+            self._ui_loading = True
+
             if self._input_item_list_model.count() == 0:
                 # no inputs in the model
                 if self._input_item_list_model.rows():
@@ -11707,6 +11732,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if self._input_item_list_view is None:
                 device = self.device
                 # view that displays all the inputs in the model, which can be filtered
+
                 widget = InputItemListView(
                     name=device.name,
                     custom_widget_handler=self._custom_widget_handler,  # called when an input widget has to be created in the list view
@@ -11739,6 +11765,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 syslog.error(f"BaseDevice: failed to create input item widget: {e}")
                 syslog.error(traceback.format_exc())
             return False
+        finally:
+            self._ui_loading = False
 
         return True
 
@@ -12151,6 +12179,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # remember the last selection
         self._last_selected_input_item = input_item  # update selection
+
+        # update the main UI and persisted data on selection
+        if not self._ui_loading:
+            gremlin.shared_state.ui.saveLastSelection(device_guid, input_type, input_id)
 
         if emit:
             el = gremlin.event_handler.EventListener()
