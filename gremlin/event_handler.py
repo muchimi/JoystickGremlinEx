@@ -236,7 +236,9 @@ class Event:
         memo[id(self)] = result
         slots = chain.from_iterable(getattr(s, "__slots__", []) for s in self.__class__.__mro__)
         for var in slots:
-            if var in ("data", "extra_data"):
+            if var == "device_guid":
+                setattr(result, var, getattr(self, var))
+            elif var in ("data", "extra_data"):
                 # shallow copy
                 setattr(result, var, copy.copy(getattr(self, var)))
             else:

@@ -2165,7 +2165,7 @@ class ExecutionContext:
 
         finally:
             if verbose_exec:
-                syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
+                syslog.info(f"{logTabs}>Overall Result: {gremlin.util.ansiText('PASS','green') if result else gremlin.util.ansiText('FAIL','red')}")
             gremlin.shared_state.popLog()
 
     def execute_condition_functors(self, node, event, value, extra_data, manual) -> bool:

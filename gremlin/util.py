@@ -1430,27 +1430,29 @@ def parse_guid(value) -> dinput.GUID:
     try:
         if value is None or value == "None" or not value:
             value = None
-        elif isinstance(value, str) and len(value) < 32:
-            value = None
         elif isinstance(value, dinput.GUID):
             pass
         elif isinstance(value, uuid.UUID):
-            value = dinput.GUID(value)
+            value = dinput.GUID(value.int)
+        elif hasattr(value, "toId"):
+            # Handle _GUID-like objects and any wrapper exposing a canonical id.
+            value = dinput.GUID(value.toId())
         else:
-            try:
+            if not isinstance(value, str):
+                value = str(value)
+            if len(value) < 32:
+                value = None
+            else:
                 tmp = uuid.UUID(value)
-                raw_guid = dinput._GUID()
-                raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
-                raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
-                raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
-                for i in range(8):
-                    raw_guid.Data4[i] = tmp.bytes[8 + i]
-                value = dinput.GUID(raw_guid)
-            except Exception:
-                syslog.error(f"Failed parsing GUID from value [{value}]")
-                raise ValueError(f"Failed parsing GUID from value [{value}]")
-    finally:
-        assert value is None or isinstance(value, dinput.GUID), "conversion failed"
+                try:
+                    value = dinput.GUID(tmp.int)
+                except Exception:
+                    value = None
+    except Exception:
+        syslog.error(f"Failed parsing GUID from value [{value!r}]")
+        raise ValueError(f"Failed parsing GUID from value [{value!r}]")
+
+    assert value is None or isinstance(value, dinput.GUID), "conversion failed"
     return value
 
 

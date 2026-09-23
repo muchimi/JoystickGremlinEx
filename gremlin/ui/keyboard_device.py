@@ -188,7 +188,8 @@ class KeyboardInputItem(InputItem):
         if self._key:
             key_map[self._key.name] = self._key
             for key in self.latched_keys:
-                key_map[key.name] = key
+                if key:
+                    key_map[key.name] = key
         return key_map
 
     @property

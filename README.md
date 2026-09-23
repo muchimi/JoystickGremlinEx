@@ -49,6 +49,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T59A)
+- Fix: Trigger Action: exception on press/release checkbox selection due to new API.
+- New: Trigger Action: added pulse mode for button triggers.
+
+
 ### (m77T59)
 - Change: added verbosity option readout to log file on profile start
 - Change: added state status readout to log file on profile start after states are reset for a new profile run
