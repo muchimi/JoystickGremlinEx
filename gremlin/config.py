@@ -2505,6 +2505,11 @@ class Configuration(QtCore.QObject):
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
             case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
+                if isinstance(input_id,  str) and input_id.isnumeric():
+                    input_id = int(input_id)
+                else:
+                    input_id = 1
+
                 device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
                 if device_info:
                     if device_info.axis_count > 0:
@@ -2564,13 +2569,14 @@ class Configuration(QtCore.QObject):
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl
-            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs:
+            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs | DeviceType.Voice:
                 input_type = InputType.NotSet
                 input_id = None
                 save_input_id = None
             case DeviceType.OctaviIFR1:
                 save_input_id = input_id
                 input_type = InputType.OctaviIfr1
+
 
             case DeviceType.NotSet:
                 # settings or other non input type page

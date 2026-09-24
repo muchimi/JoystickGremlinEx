@@ -10340,7 +10340,14 @@ class WidgetCacheTracker:
         if key in self._param_map:
             if key not in self._widget_map:
                 # recreate the widget using the original data
-                instance_type, params = self.getParams(key)
+                try:
+                    instance_type, params = self.getParams(key)
+                except Exception as e:
+                    syslog.error(f"WidgetCache: failed to get parameters for key [{key}]")
+                    syslog.error(f"\treturned params: {self.getParams(key)}")
+                    syslog.error(f"\texception: {e}")
+                    syslog.error(f"\tstack trace: {traceback.format_exc()}")
+                    return (None, created)
                 if verbose:
                     syslog.info(f"WidgetCache: create instance from parameter for key [{key}] [{instance_type.__name__}]")
                 widget = instance_type.fromParams(params)

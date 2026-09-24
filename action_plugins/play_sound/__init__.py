@@ -1618,7 +1618,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self.blocking = config.audio_blocking  # whether playback should block until finished
-        self.blocking_delay = config.audio_blocking_delay_ms  # blocking delay in ms (this is an optional pause after the sound finishes playing when blocked)
+        self.blocking_delay_ms = config.audio_blocking_delay_ms  # blocking delay in ms (this is an optional pause after the sound finishes playing when blocked)
         self.trim_all = True  # controls if the audio is trimmed for silence at the beginning and end
         self.trim_end = True  # controls if the audio is trimmed for silence at the end (when trim_all is not set)
         self.silence_threshold_db: float = -55.0  # threshold in dB to consider as silence
@@ -2036,7 +2036,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 stop_previous=self.stop_previous,
                 rate=self.playback_rate,
                 blocking=blocking,
-                blocking_delay_ms=self.blocking_delay,
+                blocking_delay_ms=self.blocking_delay_ms,
                 trim_all=self.trim_all,
                 trim_end=self.trim_end,
                 silence_threshold_db=self.silence_threshold_db,
