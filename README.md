@@ -49,6 +49,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T61)
+- New: API: Containers have an execution priority order like actions. The order priority sets, at run time, the trigger order (the order in which container receives input triggers) with the lowest numbers executing first, and the higher numbers executing last.  Containers with the same priority run in an undefined order based on the way the data is stored, which is not necessarily the order in which the container appears on the screen or is listed in the profile. As with actions, if you want a container B to execute before container A, give B a lower number, for example A = 10, B = 0.  If you want container C to execute between B and A, in the example here, C = 5.  The default priority is 0.  The number range is 0 to 999. Any number can be used in that range.  If you need precise control over actions, consider using the sequence container which is designed to sequence actions and includes advanced features like delay, randomization, repeat counts, etc...
+- Change: API: generic sidecar support in profile save / save-as
+- Fix: Overlay: sidecar configuration file moved to .obs.json to avoid a contention issue with the main .json sidecar.
+- Fix: Overlay: resolve an issue with overlay not saving due to occasional sidecar contention.
+
+
+
 ### (m77T60)
 - New: Trigger Action: added pulse mode for button triggers.
 - New: UI (Inputs): new icon to identify if the input has at least one mapped container.  This is added because some mappings may have empty containers attached to the input with no actions.

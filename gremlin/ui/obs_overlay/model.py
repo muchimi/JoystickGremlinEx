@@ -1365,7 +1365,7 @@ def profile_xml_path(profile=None) -> str | None:
     profile = profile or gremlin.shared_state.current_profile
     if profile is None:
         return None
-    return getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
+    return profile.profile_file # getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
 
 
 def profile_display_name(profile=None) -> str:
@@ -1390,6 +1390,11 @@ def overlay_path_for_profile(profile=None) -> str | None:
 
 
 def profile_json_path(profile=None, dest_xml: str | None = None) -> str | None:
+    if profile is not None:
+        fname = profile.profile_file
+        if fname:
+            return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
+
     fname = dest_xml or profile_xml_path(profile)
     if not fname:
         return None
@@ -1440,6 +1445,16 @@ class OverlayScene(QtCore.QObject):
         self._identity_hooks = False
         self._reset_default_pages(emit=False)
         self._bind_identity_hooks()
+
+        # hook sidecar updates
+        el = gremlin.event_handler.EventListener()
+        el.update_sidecar.connect(self._handle_save_sidecar)
+
+    def _handle_save_sidecar(self):
+        """ handle update requests to store the configuration file"""
+        sidecar = overlay_path_for_profile()
+        if sidecar:
+            self.save(sidecar)
 
     def _bind_identity_hooks(self):
         """Keep overlay state/mode names in sync with JG Ex unique IDs."""
@@ -2596,18 +2611,22 @@ class OverlayScene(QtCore.QObject):
             return None
 
     def load_for_profile(self, profile=None) -> bool:
+        """ loads for a profile - account for the profile not being saved yet (so having no file)"""
         profile = profile or gremlin.shared_state.current_profile
         self._undo.clear()
         self._redo.clear()
         self.selected_ids = []
         path = profile_xml_path(profile)
-        json_path = profile_json_path(profile)
-        if not os.path.isfile(json_path):
-            # fallback to old sidecar without "obs" suffix
-            json_path = gremlin.util.swap_ext(path, "json")
+        json_path = profile_json_path(profile) if path else None
+        if profile and json_path:
+            if not os.path.isfile(json_path):
+                # fallback to old sidecar without "obs" suffix
+                json_path = gremlin.util.swap_ext(path, "json")
 
         data = None
-        if profile is not None:
+        if not json_path:
+            return False
+        if os.path.isfile(json_path):
             try:
                 cfg = profile._readConfig(force=True) or {}
                 candidate = cfg.get(OVERLAY_CONFIG_KEY)

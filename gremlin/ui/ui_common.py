@@ -1049,6 +1049,7 @@ class Color:
                         border: 4px solid {border_color};
                         border-radius: 8px;
                         background-color: {header_background_color};
+
                     }}
 
             QWidget[cssClass="box_frame"]  {{
@@ -14196,6 +14197,8 @@ class QCollapsible(QFrame):
         self._title_layout.addWidget(self._row_1_widget)
         self._title_layout.addWidget(self._row_2_widget)
 
+
+
         if titlebar_widget:
             self._top_bar_widget.setWidget(titlebar_widget)
 
@@ -16600,16 +16603,21 @@ class AutohideContainer(QtWidgets.QWidget):
 
     def setContent(self, widget: QtWidgets.QWidget):
         if self._content_widget is not None:
-            self._content_widget.setParent(None) # delete
-            self._content_widget.deleteLater() # schedule for deletion
+            self._content_widget.setParent(None)  # delete
+            self._content_widget.deleteLater()  # schedule for deletion
         self._content_widget = widget
         if widget is not None:
             self._main_layout.addWidget(widget)
             self.setFixedHeight(widget.sizeHint().height())
         else:
             self.setFixedHeight(0)  # hide
+        self.updateGeometry()
 
-
+    def sizeHint(self):
+        hint =  super().sizeHint()
+        if self._content_widget is None:
+            hint.setHeight(0)
+        return hint
 
 
 class AutohideContainerIdWidget(AutohideContainer):
@@ -16701,7 +16709,6 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         if self._icon is not None:
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
         self._update()
-
 
 
 class QScrollLayout(QtWidgets.QLayout):

@@ -70,7 +70,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.auto_release_checkbox.stateChanged.connect(self._auto_release_changed_cb)
         self.action_layout.addWidget(self.auto_release_checkbox)
         self.auto_release_checkbox.setEnabled(False)
-        self.container.auto_release = True # force True
+        self.container.auto_release = True  # force True
 
         self.auto_release_delay_widget = gremlin.ui.ui_common.QDelayWidget(
             label="<b>Auto Release Delay: </b>", callback=self._auto_release_delay_changed_cb, value=self.action_data.auto_release_delay
@@ -307,7 +307,9 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
     def _ensure_autorelease_event(self, event, value, extra_data):
         release_event = event.release_event()
         self._reset_autorelease()
-        self._autorelease_timer = threading.Timer(self.action_data.auto_release_delay / 1000, lambda: self._trigger_auto_release(release_event, value, extra_data))
+        self._autorelease_timer = threading.Timer(
+            self.action_data.auto_release_delay / 1000, lambda: self._trigger_auto_release(release_event, value, extra_data)
+        )
         self._autorelease_timer.start()
 
     def process_event(self, event, value, extra_data=None):
@@ -359,7 +361,6 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
             if verbose:
                 syslog.info("DTAP: release event")
 
-
         return False  # stop execution as the logic is internal to trigger the other nodes
 
     def _single_tap_callback(self, event, value, extra_data):
@@ -382,7 +383,6 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
                 syslog.info("DTAP: release double tap")
             self._trigger_double_tap(event, value, extra_data)
             self._double_triggered = False
-
 
 
 class DoubleTapContainer(AbstractContainer):
@@ -430,9 +430,9 @@ and another action on input double-click (tap)"""
         self.single_tap_set = gremlin.input_item.ActionSet(model_description="Single Tap")
         self.double_tap_set = gremlin.input_item.ActionSet(model_description="Double Tap")
 
-        self._ensure_action_sets()
+        self.ensureActionSets()
 
-    def _ensure_action_sets(self):
+    def ensureActionSets(self):
         self.action_sets.clear()
         self.action_sets.add(self.single_tap_set, 0)  # 0
         self.action_sets.add(self.double_tap_set, 1)  # 1
@@ -463,7 +463,7 @@ and another action on input double-click (tap)"""
         self.activate_on = gremlin.profile.safe_read(node, "activate-on", str, "combined")
         self.exec_on_press = gremlin.profile.safe_read(node, "exec-on-press", bool, True)
         self.exec_on_release = gremlin.profile.safe_read(node, "exec-on-release", bool, False)
-        self.auto_release = True # force enabled  # gremlin.profile.safe_read(node, "auto-release", bool, True)
+        self.auto_release = True  # force enabled  # gremlin.profile.safe_read(node, "auto-release", bool, True)
         self.auto_release_delay = gremlin.profile.safe_read(node, "auto-release-delay", int, 250)
 
     def _generate_xml(self):

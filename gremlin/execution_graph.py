@@ -144,6 +144,7 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     @property
     def has_actions(self):
         return self._has_actions
+
     @has_actions.setter
     def has_actions(self, value: bool):
         if self._has_actions != value:
@@ -305,6 +306,7 @@ class ExecutionGraphInputNode(ExecutionGraphNode):
     @property
     def input_item(self):
         return self._input_item
+
     @input_item.setter
     def input_item(self, value):
         self._input_item = value
@@ -410,7 +412,7 @@ class ExecutionGraphContainerNode(ExecutionGraphNode):
         device_name = container.get_device_name()
         condition: gremlin.base_profile.BaseAbstractCondition = container.activation_condition
         condition_stub = f"True id: {condition.id}" if condition else ""
-        stub = f"Container: {self.container.name} Device: {device_name} Input {container.input_display_name}  Condition: {condition_stub}  Comment: {self.container.comment}"
+        stub = f"Container: {self.container.name} Device: {device_name} Input {container.input_display_name} Priority: {self.container.priority} Condition: {condition_stub}  Comment: {self.container.comment}"
         return f"{self.node_string()} {stub}"
 
 
@@ -589,7 +591,7 @@ class ExecutionContext:
 
     @property
     def action_functor_map(self) -> dict:
-        """ map of action IDs to their corresponding functors """
+        """map of action IDs to their corresponding functors"""
         return self._action_functor_map
 
     @property
@@ -855,7 +857,7 @@ class ExecutionContext:
         """returns the list of defined modes in the execution tree"""
         return [node.mode for node in anytree.PreOrderIter(self.graph) if node.nodeType == ExecutionGraphNodeType.Mode and node.mode]
 
-    def getCallbacks(self, callback_map : dict, key, mode):
+    def getCallbacks(self, callback_map: dict, key, mode):
         callback_list = []
         verbose = gremlin.config.Configuration().verbose_mode_inputs
         # syslog = logging.getLogger("system")
@@ -998,8 +1000,6 @@ class ExecutionContext:
             return self.m_input_nodes[callback_key]
         return None
 
-
-
     def findDeviceNode(self, device_guid):
         """gets the device node for the given device guid"""
         device_node = next((n for n in self.graph.children if n.nodeType == ExecutionGraphNodeType.Device and n.device.device_guid == device_guid), None)
@@ -1100,7 +1100,7 @@ class ExecutionContext:
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.input_item.BaseActivationCondition(target=target, conditions = conditions, rule=activation_condition.rule)
+        return gremlin.input_item.BaseActivationCondition(target=target, conditions=conditions, rule=activation_condition.rule)
 
     def _get_condition_node(self, owner, parent=None):
         """gets a condition node"""
@@ -1327,7 +1327,7 @@ class ExecutionContext:
 
         functor: gremlin.base_profile.AbstractFunctor = action.functor(action, node)
 
-        self._action_functor_map[action.id] = functor # update the map of the action to its functor instance
+        self._action_functor_map[action.id] = functor  # update the map of the action to its functor instance
 
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
@@ -1493,163 +1493,176 @@ class ExecutionContext:
 
             extra_data = {"container": container, "mode": mode_name, "device_node": device_node, "input_item": input_item}
 
-            for action_set in container.action_sets:
-                # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
-                # sort actions by priority low to high
+            # check for custom action sets and convert to list if needed
+            if hasattr(container, "ensureActionSets"):
+                container.ensureActionSets()
 
-                # action_set = self._ensure_action_set(action_set) # convert to ActionSet if a plain list
+            if not container.action_sets:
+                input_item = container.input_item
+                syslog.warning(f"BUILD WARNING: Container has no action sets: [{container.name}] id [{container.id}] input item: [{input_item.display_name}] profile mode: [{mode_name}]")
+            else:
 
-                action_set_node = ExecutionGraphActionSetNode(action_set)
-                action_set_group_node = ExecutionGraphGroupNode()
-                action_set_node.parent = container_group
-                action_set_group_node.parent = action_set_node
+                for action_set in container.action_sets:
+                    # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
+                    # sort actions by priority low to high
 
-                action_list = [((action.priority, index), action) for index, action in enumerate(action_set)]
-                if not action_list:
-                    # empty set
-                    continue
-                if verbose and len(action_list) > 1:
-                    syslog.info(f"BUILD: priorities for {len(action_list)} actions:")
-                    for (priority, index), action in action_list:
-                        syslog.info(f"\t[{index} priority: {priority} action: [{action}]]")
-                action_list.sort(key=lambda x: x[0])  # sort by priority, order of appearance
-                for index, action in action_list:
-                    if action.id in self.used_items:
-                        if verbose:
-                            syslog.info(f"{logtabs}BUILD WARNING: Action already used: {action.id} - setting up a new unique ID")
-                        action.setId(gremlin.util.get_guid())
+                    action_set_node = ExecutionGraphActionSetNode(action_set)
+                    action_set_group_node = ExecutionGraphGroupNode()
+                    action_set_node.parent = container_group
+                    action_set_group_node.parent = action_set_node
 
-                    self.used_items[action.id] = action
+                    action_list = [((action.priority, index), action) for index, action in enumerate(action_set)]
+                    if not action_list:
+                        # empty set
+                        continue
+                    if verbose and len(action_list) > 1:
+                        syslog.info(f"BUILD: priorities for {len(action_list)} actions:")
+                        for (priority, index), action in action_list:
+                            syslog.info(f"\t[{index} priority: {priority} action: [{action}]]")
+                    action_list.sort(key=lambda x: x[0])  # sort by priority, order of appearance
+                    for index, action in action_list:
+                        if action.id in self.used_items:
+                            if verbose:
+                                syslog.info(f"{logtabs}BUILD WARNING: Action already used: {action.id} - setting up a new unique ID")
+                            action.setId(gremlin.util.get_guid())
 
-                    # action node
-                    action_node = ExecutionGraphActionNode(action)
-                    action_node.ref = action.id
+                        self.used_items[action.id] = action
 
-                    action_node.mode = mode_name
-                    action_node.comment = action.comment
-                    action_node.device_link = device_node
-                    action_node.input_item = input_item
+                        # action node
+                        action_node = ExecutionGraphActionNode(action)
+                        action_node.ref = action.id
 
-                    action_node.parent = action_set_group_node
-                    action_condition_node = None
-                    if action.has_conditions:
-                        action_condition_node = self._get_condition_node(action, action_set_group_node)
-                        action_node.parent = action_condition_node  # action node is owned by its condition node
+                        action_node.mode = mode_name
+                        action_node.comment = action.comment
+                        action_node.device_link = device_node
+                        action_node.input_item = input_item
 
-                    m_action_node = ExecutionGraphActionNode(action)
-                    m_action_node.ref = action.id
-                    m_action_node.parent = m_input_node  # action node is owned by its condition node
-                    m_action_node.mode = mode_name
-                    m_action_node.link = action_node  # link the input tree action node to the execution tree action node
-                    action_node.link = m_action_node  # link the execution tree action node to the input tree action node
+                        action_node.parent = action_set_group_node
+                        action_condition_node = None
+                        if action.has_conditions:
+                            action_condition_node = self._get_condition_node(action, action_set_group_node)
+                            action_node.parent = action_condition_node  # action node is owned by its condition node
 
-                    action_node.container = container
-                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data=extra_data)
-                    action_node.functors.append(functor)
-                    action_node.description = f"Action node: [{str(action)}]"
+                        m_action_node = ExecutionGraphActionNode(action)
+                        m_action_node.ref = action.id
+                        m_action_node.parent = m_input_node  # action node is owned by its condition node
+                        m_action_node.mode = mode_name
+                        m_action_node.link = action_node  # link the input tree action node to the execution tree action node
+                        action_node.link = m_action_node  # link the execution tree action node to the input tree action node
 
-                    # build gate action execution subtree
-                    if action.name == "Gated Axis":
-                        # build gate subtree
-                        gate_data: gremlin.gated_handler.GateData = action.gate_data
-                        gates = gate_data.getUsedGates()
-                        gate_info: gremlin.gated_handler.GateInfo
+                        action_node.container = container
+                        functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data=extra_data)
+                        action_node.functors.append(functor)
+                        action_node.description = f"Action node: [{str(action)}]"
 
-                        # gates hold a group of conditions (increase/decrease/cross)
-                        gate_group = ExecutionGraphGroupNode()
-                        gate_group.parent = action_node
+                        # build gate action execution subtree
+                        if action.name == "Gated Axis":
+                            # build gate subtree
+                            gate_data: gremlin.gated_handler.GateData = action.gate_data
+                            gates = gate_data.getUsedGates()
+                            gate_info: gremlin.gated_handler.GateInfo
 
-                        condition_type: gremlin.gated_handler.GateConditionType
+                            # gates hold a group of conditions (increase/decrease/cross)
+                            gate_group = ExecutionGraphGroupNode()
+                            gate_group.parent = action_node
 
-                        for gate_info in gates:
-                            if self._verbose_detailed:
-                                syslog.info(f"{logtabs}Processing gate conditions for gate [{gate_info.to_display()}]:")
-                            items = list(gate_info.item_data_map.items())
-                            if not items:
+                            condition_type: gremlin.gated_handler.GateConditionType
+
+                            for gate_info in gates:
                                 if self._verbose_detailed:
-                                    syslog.info(f"{logtabs}\tNo conditions found")
-                                continue
-
-                            for condition_type, item_data in items:
-                                try:
-                                    # gate activation condition node
-                                    gremlin.shared_state.pushLog()
-
-                                    if not item_data.containers:
-                                        # no containers to process for this condition
-                                        if self._verbose_detailed:
-                                            syslog.info(f"{logtabs}Gate Condition [{condition_type.name}]: skipped due to no containers found")
-                                        continue
-
+                                    syslog.info(f"{logtabs}Processing gate conditions for gate [{gate_info.to_display()}]:")
+                                items = list(gate_info.item_data_map.items())
+                                if not items:
                                     if self._verbose_detailed:
-                                        syslog.info(f"{logtabs}Gate Condition [{condition_type.name}]: adding condition")
+                                        syslog.info(f"{logtabs}\tNo conditions found")
+                                    continue
 
-                                    exec_functors = gremlin.gated_handler.GatedAxisGateCondition(gate_data, gate_info, condition_type)
-                                    gate_condition_node = ExecutionGraphGateConditionNode(exec_functors)
-                                    gate_condition_node.parent = gate_group
+                                for condition_type, item_data in items:
+                                    try:
+                                        # gate activation condition node
+                                        gremlin.shared_state.pushLog()
 
-                                    gate_node = ExecutionGraphGateNode(gate_info)
-                                    gate_node.description = f"Gate for condition: {condition_type.name} {gate_info.to_display()}"
-                                    gate_node.parent = gate_condition_node  # gate node is owned by its parent action
-                                    gate_node.latched_conditions = latched_conditions
+                                        if not item_data.containers:
+                                            # no containers to process for this condition
+                                            if self._verbose_detailed:
+                                                syslog.info(f"{logtabs}Gate Condition [{condition_type.name}]: skipped due to no containers found")
+                                            continue
 
-                                    group_node = ExecutionGraphGroupNode()
-                                    group_node.parent = gate_node
+                                        if self._verbose_detailed:
+                                            syslog.info(f"{logtabs}Gate Condition [{condition_type.name}]: adding condition")
 
-                                    for container in item_data.containers:
-                                        node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
-                                        if not node:
-                                            syslog.error(f"{logtabs}Container build error")
-                                            return None
-                                finally:
-                                    gremlin.shared_state.popLog()
+                                        exec_functors = gremlin.gated_handler.GatedAxisGateCondition(gate_data, gate_info, condition_type)
+                                        gate_condition_node = ExecutionGraphGateConditionNode(exec_functors)
+                                        gate_condition_node.parent = gate_group
 
-                        # build range subtree
-                        range_group = gate_group  # use the same group
-                        range_info: gremlin.gated_handler.RangeInfo
-                        for range_info in gate_data.getUsedRanges():
-                            if self._verbose_detailed:
-                                syslog.info(f"{logtabs}Processing range conditions for range [{range_info.to_display()}]:")
-                            items = range_info.item_data_map.items()
-                            if not items:
+                                        gate_node = ExecutionGraphGateNode(gate_info)
+                                        gate_node.description = f"Gate for condition: {condition_type.name} {gate_info.to_display()}"
+                                        gate_node.parent = gate_condition_node  # gate node is owned by its parent action
+                                        gate_node.latched_conditions = latched_conditions
+
+                                        group_node = ExecutionGraphGroupNode()
+                                        group_node.parent = gate_node
+
+                                        containers = list(item_data.containers)
+                                        containers.sort(key=lambda c: c.priority) # lower priority runs first
+
+                                        for container in containers:
+                                            node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
+                                            if not node:
+                                                syslog.error(f"{logtabs}Container build error")
+                                                return None
+                                    finally:
+                                        gremlin.shared_state.popLog()
+
+                            # build range subtree
+                            range_group = gate_group  # use the same group
+                            range_info: gremlin.gated_handler.RangeInfo
+                            for range_info in gate_data.getUsedRanges():
                                 if self._verbose_detailed:
-                                    syslog.info(f"{logtabs}\tNo conditions found")
-                                continue
-                            for condition_type, item_data in items:
-                                try:
-                                    gremlin.shared_state.pushLog()
-
-                                    if not item_data.containers:
-                                        # no containers to process for this condition
-                                        if self._verbose_detailed:
-                                            syslog.info(f"{logtabs}Range Condition [{condition_type.name}]: skipped due to no containers found")
-                                        continue
-
+                                    syslog.info(f"{logtabs}Processing range conditions for range [{range_info.to_display()}]:")
+                                items = range_info.item_data_map.items()
+                                if not items:
                                     if self._verbose_detailed:
-                                        syslog.info(f"{logtabs}Range Condition [{condition_type.name}]: adding condition")
+                                        syslog.info(f"{logtabs}\tNo conditions found")
+                                    continue
+                                for condition_type, item_data in items:
+                                    try:
+                                        gremlin.shared_state.pushLog()
 
-                                    # range condition (condition applied to the range)
-                                    exec_functors = gremlin.gated_handler.GatedAxisRangeCondition(gate_data, range_info, condition_type)
-                                    range_condition_node = ExecutionGraphRangeConditionNode(exec_functors)
-                                    range_condition_node.parent = range_group
+                                        if not item_data.containers:
+                                            # no containers to process for this condition
+                                            if self._verbose_detailed:
+                                                syslog.info(f"{logtabs}Range Condition [{condition_type.name}]: skipped due to no containers found")
+                                            continue
 
-                                    range_node = ExecutionGraphRangeNode(range_info)
-                                    range_node.parent = range_condition_node
-                                    range_node.description = f"Range for condition: {condition_type.name} {range_info.to_display()}"
-                                    range_node.latched_conditions = latched_conditions
+                                        if self._verbose_detailed:
+                                            syslog.info(f"{logtabs}Range Condition [{condition_type.name}]: adding condition")
 
-                                    # holds the containers for the range
-                                    group_node = ExecutionGraphGroupNode()
-                                    group_node.parent = range_node
+                                        # range condition (condition applied to the range)
+                                        exec_functors = gremlin.gated_handler.GatedAxisRangeCondition(gate_data, range_info, condition_type)
+                                        range_condition_node = ExecutionGraphRangeConditionNode(exec_functors)
+                                        range_condition_node.parent = range_group
 
-                                    for container in item_data.containers:
-                                        node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
-                                        if node is None:
-                                            # error building the tree
-                                            syslog.error(f"{logtabs}Container build error")
-                                            return None
-                                finally:
-                                    gremlin.shared_state.popLog()
+                                        range_node = ExecutionGraphRangeNode(range_info)
+                                        range_node.parent = range_condition_node
+                                        range_node.description = f"Range for condition: {condition_type.name} {range_info.to_display()}"
+                                        range_node.latched_conditions = latched_conditions
+
+                                        # holds the containers for the range
+                                        group_node = ExecutionGraphGroupNode()
+                                        group_node.parent = range_node
+
+                                        containers = list(item_data.containers)
+                                        containers.sort(key=lambda c: c.priority) # lower priority runs first
+
+                                        for container in containers:
+                                            node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
+                                            if node is None:
+                                                # error building the tree
+                                                syslog.error(f"{logtabs}Container build error")
+                                                return None
+                                    finally:
+                                        gremlin.shared_state.popLog()
 
             return return_node
         finally:
@@ -1689,7 +1702,10 @@ class ExecutionContext:
             input_container_group.parent = input_node
 
             container: gremlin.input_item.AbstractContainer
-            for container in input_item.containers:
+            containers = list(input_item.containers)
+            containers.sort(key=lambda c: c.priority) # lower priority runs first
+
+            for container in containers:
                 node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
                 if not node:
                     syslog.error(f"BUILD ERROR: failed to obtain a node for container: {container.id}")
@@ -2073,6 +2089,13 @@ class ExecutionContext:
                 # find the container nodes for the input item
                 container_nodes = self.findContainerNode(node)
                 if container_nodes:
+                    # sort container nodes by priority before execution
+                    # if all priorities are the same, execute in the order added
+                    # if they are not, sort by priority number with the lowest number executing first
+                    if len(container_nodes) > 1:
+                        priorities = set((c.container.priority for c in container_nodes))
+                        if len(priorities) > 1:
+                            container_nodes.sort(key=lambda c: c.container.priority) # lower priority runs first
                     for container_node in container_nodes:
                         result = self.execute_node(container_node, event, value, extra_data, manual, visited)
                 return True  # input item nodes always pass
@@ -2165,7 +2188,7 @@ class ExecutionContext:
 
         finally:
             if verbose_exec:
-                syslog.info(f"{logTabs}>Overall Result: {gremlin.util.ansiText('PASS','green') if result else gremlin.util.ansiText('FAIL','red')}")
+                syslog.info(f"{logTabs}>Overall Result: {gremlin.util.ansiText('PASS', 'green') if result else gremlin.util.ansiText('FAIL', 'red')}")
             gremlin.shared_state.popLog()
 
     def execute_condition_functors(self, node, event, value, extra_data, manual) -> bool:
@@ -2268,7 +2291,7 @@ class ContainerCallback:
         execution graph until every entry has run or it is aborted.
         """
 
-        input_type = event.getInputType() # includes override types
+        input_type = event.getInputType()  # includes override types
 
         if event.is_axis:
             match event.event_type:
@@ -2636,11 +2659,9 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             action_set_node = ExecutionGraphActionSetNode()
             action_set_node.parent = parent
 
-
-            priority = 0 # default priority
+            priority = 0  # default priority
             if hasattr(action, "priority"):
-                priority = gremlin.util.clamp(action.priority, 0, 1000) # unique action priority
-
+                priority = gremlin.util.clamp(action.priority, 0, 1000)  # unique action priority
 
             ordered_action_set.append((priority, action))
             if verbose:

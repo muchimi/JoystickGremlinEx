@@ -308,7 +308,9 @@ and another action on trigger release in a single container."""
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True, custom_parse_callback=self._parse_actionset_xml)  # indicate we use custom action sets
+        super().__init__(
+            parent, node, extra_data=extra_data, custom_action_sets=True, custom_parse_callback=self._parse_actionset_xml
+        )  # indicate we use custom action sets
         self.delay = 0.5
         self.activate_on = "release"
         self.autorelease = True
@@ -318,7 +320,7 @@ and another action on trigger release in a single container."""
         # self.press_action_set.addOnItemChangedCallback(self.OnPressActionSetChanged)
         self.release_action_set = gremlin.input_item.ActionSet(model_description="release actions")
         # self.release_action_set.addOnItemChangedCallback(self.OnReleaseActionSetChanged)
-        self._ensure_action_sets()
+        self.ensureActionSets()
 
     # def OnPressActionSetChanged(self, model, index: int, new_item, old_item, operation):
     #     syslog.info(f"Press action set changed: [{len(model)}] operation: {operation}")
@@ -328,8 +330,7 @@ and another action on trigger release in a single container."""
     #     syslog.info(f"Release action set changed: [{len(model)}] operation: {operation}")
     #     pass
 
-
-    def _ensure_action_sets(self):
+    def ensureActionSets(self):
         self.action_sets.clear()
         self.action_sets.add(self.press_action_set, 0)  # 0
         self.action_sets.add(self.release_action_set, 1)  # 1
@@ -340,7 +341,7 @@ and another action on trigger release in a single container."""
         self.release_action_set.clear()
 
     def _parse_actionset_xml(self, node, action_set, extra_data=None):
-        """ read custom action sets """
+        """read custom action sets"""
         self.resetActionSets()
         as_nodes = node.xpath(".//action-set")
         for index, as_node in enumerate(as_nodes):
@@ -358,14 +359,12 @@ and another action on trigger release in a single container."""
         :param node the XML node with which to populate the container
         """
 
-
         super()._parse_xml(node, input_item)
         if "autorelease" in node.attrib:
             self.autorelease = safe_read(node, "autorelease", bool, True)
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node, "delay", int, 250)
         syslog.info(f"press action set: [{len(self.press_action_set)}] release action set: [{len(self.release_action_set)}]")
-
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

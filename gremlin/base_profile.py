@@ -4892,6 +4892,11 @@ class Profile:
             self._profile_fname = None
             self._dirty = False
 
+    def getSidecars(self) -> list:
+        """returns a list of sidecar files for the current profile"""
+        return gremlin.util.getSidecarFiles(self._profile_fname)
+
+
     def _readConfig(self, force: bool = False) -> dict:
         """reads the profile config, ensuring it is done on the UI thread
 

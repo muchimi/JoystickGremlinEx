@@ -2067,6 +2067,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return sidecar
         xml = profile_xml_path()
         folder = os.path.dirname(xml) if xml else (gremlin.shared_state.data_path or "")
+
         stem = profile_display_name().replace(" ", "_") or "overlay"
         if stem in ("No profile", "Unsaved profile"):
             stem = "overlay"

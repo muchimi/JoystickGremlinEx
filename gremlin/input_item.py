@@ -2995,27 +2995,19 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             widgets = []
 
-
             # syslog.debug(f"creating action icons for input item: {input_item.display_name} [{input_item.id}] container model id: [{input_item.containers.id}] count: [{len(input_item.containers)}]")
             row = 0
             col = 1
-            max_col = 6 # max icons per line
+            max_col = 6  # max icons per line
             size = self._getIconSize()
             button_size = size + 2
 
             icon = gremlin.ui.ui_common.Icons.containerIcon()
             widget = ui_common.QIconPushButton(
-                            icon=icon,
-                            icon_size=size,
-                            height=button_size,
-                            width=button_size,
-                            data=(input_item, ),
-                            callback= None,
-                            tooltip="Has Containers"
-                        )
+                icon=icon, icon_size=size, height=button_size, width=button_size, data=(input_item,), callback=None, tooltip="Has Containers"
+            )
 
             widgets.append(widget)
-
 
             for container in input_item.containers:
                 actions = container.getActions()
@@ -3056,8 +3048,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                 if col > max_col:
                     col = 1
                     row += 1
-
-
 
         else:
             widget = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
@@ -4652,6 +4642,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         custom_action_sets: bool = False,
         content_callback: Callable = None,
         extra_data: dict = None,
+        priority: int = 0,
     ):
         """Creates a new instance.
 
@@ -4660,6 +4651,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         :param custom_parse_callback: optional callback to use when parsing action set if it has additional data (node), returns an action set
         :param custom_generate_callback: optional callback to use when generating XML for the action set, returns an XML node
         :param custom_action_sets: indicates if the container uses custom action sets
+        :param priority: execution priority of the container when multiple containers are defined, numeric, higher value means higher priority
         """
         import gremlin.profile_graph
 
@@ -4681,6 +4673,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # self._action_sets.addOnItemChangedCallback(self._on_action_sets_changed)
 
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
+        self._priority = priority  # container execution priority when multiple containers are defined
         self._condition_enabled = True  # condition flag
         self._virtual_button_enabled = (
             True  # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
@@ -4727,6 +4720,19 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
         self.extra_data = extra_data or {}
+
+    def setPriority(self, priority: int):
+        """sets the execution priority for this container"""
+        self._priority = priority
+
+    def getPriority(self) -> int:
+        """returns the execution priority for this container"""
+        return self._priority
+
+    @property
+    def priority(self) -> int:
+        """returns the execution priority for this container"""
+        return self._priority
 
     def setContentCallback(self, callback: Callable):
         """sets the content changed callback for this container"""
@@ -5041,8 +5047,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # notify of changes to this container
         self._fireChangeCallbacks()
 
-
-
         return index
 
     def ensureActionSet(self, count: int):
@@ -5169,6 +5173,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             self.comment = comment
 
         self._collapsed = safe_read(node, "collapsed", bool, False)
+        self._priority = safe_read(node, "priority", int, 0)
 
         # read container specific data
         self._parse_xml(node, data, extra_data)
@@ -5217,6 +5222,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
             if self.comment:
                 node.set("comment", self.comment)
+
+            node.set("priority", safe_format(self._priority, int))
 
             # generate the action sets
             if self.actionsetGenerateCallback is not None:
@@ -7295,7 +7302,6 @@ class ActionSetView(AbstractView):
 
             self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
 
-
             self._stacked_widget.addWidget(self._container_widget)  # index 1
 
             self._action_widget = self._container_widget
@@ -8241,12 +8247,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             close_callback=self._container_remove,
             clipboard_callback=self._copy_container,
             data=container,
+            priority_label="Container Execution Order:",
         )
 
         container_name = f"{self._get_window_title()} ({mode})"
 
         self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title=container_name, titlebar_widget=self._title_bar_widget)
         self.collapsible_widget.toggled.connect(self._handle_toggled)
+        self.collapsible_widget.setMaximumHeight(108)
+
         self.setTitleBarWidget(self.collapsible_widget)
 
         # Create tab widget to display various UI controls in
@@ -9110,6 +9119,7 @@ class TitleBar(QtWidgets.QWidget):
         parent: object = None,
         data: object = None,
         prompt_on_close: bool = False,
+        priority_label: str = None,
     ):
         """Creates a new instance.
 
@@ -9119,6 +9129,7 @@ class TitleBar(QtWidgets.QWidget):
         :param clipboard_cb the function to call for clipboard operations (optional)
         :param parent the parent of this widget
         :param prompt_on_close whether to prompt the user for confirmation before closing the widget
+        :param priority_label the label indicating the priority of the container (optional)
         """
         import gremlin.ui.ui_common
 
@@ -9194,11 +9205,11 @@ class TitleBar(QtWidgets.QWidget):
 
         if hasattr(data, "priority"):
             self.priority_widget = gremlin.ui.ui_common.QIntLineEdit(data, min_range=0, max_range=1000, value=data.priority, chars=4)
-            self.priority_widget.setToolTip("Execution priority.  Lower priority runs first.")
+            self.priority_widget.setToolTip("Execution priority.  Lower priority runs first.  Priority only impacts the execution order of the current group.")
             self.priority_widget.valueChanged.connect(self._priority_changed)
             self.priority_container = gremlin.ui.ui_common.getHContainer(
                 self.priority_widget,
-                "Priority",
+                "Priority:" if priority_label is None else priority_label,
                 widget_only=True,
                 right_stretch=False,
                 left_stretch=False,
@@ -9304,7 +9315,13 @@ class BasicActionWrapper(AbstractActionWrapper):
             hint = gremlin.hints.hint.get(action.tag, "")
 
         self._title_bar_widget = TitleBar(
-            f"{action.name} ({mode})", hint, self._remove, self._clipboard_copy, data=action_widget.action_data, prompt_on_close=True
+            f"{action.name} ({mode})",
+            hint,
+            self._remove,
+            self._clipboard_copy,
+            data=action_widget.action_data,
+            prompt_on_close=True,
+            priority_label="Action Execution Order:",
         )
 
         self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
@@ -9466,7 +9483,6 @@ class ContainerView(AbstractView):
         self._input_item = input_item
         self._model = model
 
-
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"Creating container view for: {model.debug_name}")
@@ -9568,7 +9584,6 @@ class ContainerView(AbstractView):
 
         self._drawn_once = False  # draw on demand only on first redraw
 
-
     def create_ui(self):
         """creates the UI for the container contents"""
         import gremlin.util
@@ -9611,7 +9626,7 @@ class ContainerView(AbstractView):
                     self._scroll_layout.addWidget(widget)
                     self._widget_map[container.id] = widget
 
-                self._scroll_layout.addStretch() # bump content to the top
+                self._scroll_layout.addStretch()  # bump content to the top
 
                 self._show_content()
 
@@ -10005,7 +10020,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         container_layout.addWidget(QtWidgets.QLabel("Content Area"))
         container_layout.addWidget(container_view_widget)
-
 
         container_view_widget.setContentsMargins(0, 0, 0, 0)
 
@@ -11532,7 +11546,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         )
 
         self._filter = None
-        self._ui_loading = False # true if UI is being loaded
+        self._ui_loading = False  # true if UI is being loaded
         self.device = device
         self.profile = profile
         self.device_node = profile.getDeviceNode(device.device_guid)

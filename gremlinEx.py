@@ -1877,6 +1877,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         If the file was loaded from an existing profile that file is
         updated, otherwise the user is prompted for a new file.
         """
+
+        # notify modules to update their sidecar files
+        el = gremlin.event_handler.EventListener()
+        el.update_sidecar.emit()
+
+
         if self.profile.profile_file is not None:
             self.profile.save()
             # update the hash so we can detect changes
@@ -1886,39 +1892,50 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def save_profile_as(self):
         """Prompts the user for a file to save to profile to."""
+        from pathlib import Path
 
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
         if fname != "":
             # Seed the new sidecar from the previous profile companion before the
             # path switch. Overlay/save used to create a sparse JSON (overlay +
             # last_input only) and Stream Deck page names were lost on Save As.
+
+            # list the sidecars for the current profile
+
             old_xml = getattr(self.profile, "_profile_fname", None) or self.profile.profile_file
-            old_json = getattr(self.profile, "_profile_config_fname", None)
-            if not old_json and old_xml:
-                old_json = gremlin.util.swap_ext(old_xml, "json")
-            new_xml = gremlin.util.fix_path(fname)
-            new_json = gremlin.util.swap_ext(new_xml, "json")
-            try:
-                if (
-                    old_json
-                    and os.path.isfile(old_json)
-                    and new_json
-                    and os.path.normcase(os.path.abspath(old_json)) != os.path.normcase(os.path.abspath(new_json))
-                    and not os.path.isfile(new_json)
-                ):
-                    shutil.copyfile(old_json, new_json)
-            except Exception as err:
-                syslog.warning(f"SAVE AS: could not seed companion JSON: {err}")
+            if old_xml:
 
-            if self.config.streamdeck_enabled:
-                # Flush Stream Deck page names into the *current* sidecar first so
-                # in-memory renames are not left only in RAM when the path changes.
-                try:
-                    from gremlin.ui.streamdeck_device import StreamDeckBridge
+                # notify modules to update their sidecar files
+                el = gremlin.event_handler.EventListener()
+                el.update_sidecar.emit()
 
-                    StreamDeckBridge()._persist_page_metadata()
-                except Exception:
-                    pass
+                new_xml = gremlin.util.fix_path(fname)
+
+                sidecars = gremlin.util.getSidecarFiles(old_xml)
+                old_stem = Path(old_xml).stem
+                new_stem = Path(new_xml).stem
+                base_dir = os.path.dirname(new_xml)
+
+                file_pairs = []
+                for sidecar in sidecars:
+                    new_sidecar = os.path.join(base_dir, os.path.basename(sidecar).replace(old_stem, new_stem, 1))
+                    file_pairs.append((sidecar, new_sidecar))
+
+
+                # copy the files
+                for old_file, new_file in file_pairs:
+                    try:
+                        if (
+                            old_file
+                            and os.path.isfile(old_file)
+                            and new_file
+                            and os.path.normcase(os.path.abspath(old_file)) != os.path.normcase(os.path.abspath(new_file))
+                            and not os.path.isfile(new_file)
+                        ):
+                            shutil.copyfile(old_file, new_file) # overwrite if necessary
+                    except Exception as err:
+                        syslog.warning(f"SAVE AS: could not copy file {old_file} to {new_file}: {err}")
+
 
             self.profile.setProfileFile(fname)
             self.profile.save()

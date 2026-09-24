@@ -3025,3 +3025,14 @@ def phraseSplit(phrase: str) -> list[str]:
     phrase = phrase.casefold().strip()
     result = [item.strip() for item in re.split(pattern, phrase) if item.strip()]
     return result
+
+
+def getSidecarFiles(path: str) -> list[str]:
+    """Returns a list of sidecar JSON files for the given XML file path."""
+    from pathlib import Path
+    xml_path = Path(path)
+    if not xml_path.is_file():
+        return []
+    base_name = xml_path.stem
+    sidecar_files = list(xml_path.parent.glob(f"{base_name}*.json"))
+    return [str(f) for f in sidecar_files]

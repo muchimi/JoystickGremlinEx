@@ -648,6 +648,8 @@ class EventListener(QtCore.QObject):
     request_reload = Signal()  # request a reload of the profile
     request_ui_refresh = Signal()  # request a UI refresh
 
+    update_sidecar = Signal()  # signal to notify modules to update and save their sidecar files
+
     process_monitor_changed = Signal()  # process monitor options changed
 
     host_ip_changed = Signal(str)  # indicates the local machines' host IP changed
