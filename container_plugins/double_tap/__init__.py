@@ -433,7 +433,7 @@ and another action on input double-click (tap)"""
         self.ensureActionSets()
 
     def ensureActionSets(self):
-        self.action_sets.clear()
+        self.action_sets.clear(False)
         self.action_sets.add(self.single_tap_set, 0)  # 0
         self.action_sets.add(self.double_tap_set, 1)  # 1
 

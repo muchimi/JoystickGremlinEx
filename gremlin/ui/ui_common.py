@@ -694,7 +694,7 @@ class Color:
         return css
 
     @staticmethod
-    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None):
+    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None, padding : int = 4,):
         if background_color is None:
             background_color = Color.normalColor()
         if foreground_color is None:
@@ -706,7 +706,7 @@ class Color:
                 color: {foreground_color};
                 border-radius: 6px;
                 font: bold {fontSize}px;
-                padding: 4px;
+                padding: {padding}px;
             }}
 
             """
@@ -10205,6 +10205,7 @@ class QVContentWidget(QContentWidget):
         return self.main_layout
 
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class WidgetCacheTracker:
     """tracks mapping widgets to stay within QT memory budget"""
@@ -10238,6 +10239,11 @@ class WidgetCacheTracker:
                 # unlimited
                 self._widget_map.clear()
 
+    def _validate_key(self, key):
+        assert isinstance(key, tuple), "key must be a tuple of 4 parameters"
+        assert len(key) == 4, "key must be a tuple of 4 parameters (mode, device_guid, input_type, input_id)"
+
+
     def addWidget(self, key, widget):
         """adds a widget to the cache and drops the oldest one in round robin style if a cache size is specified
         if a replacement, the widget is added to the back of the queue
@@ -10249,6 +10255,12 @@ class WidgetCacheTracker:
         assert hasattr(widget, "fromParams") and hasattr(widget, "params") and hasattr(widget, "expired"), (
             "Invalid widget for cache purposes - requires fromParams() and params methods and expired event"
         )
+
+        # validate the key
+        if __debug__:
+            self._validate_key(key)
+
+
         params = widget.params
         # store the type name
         instance_type = type(widget)
@@ -10302,6 +10314,9 @@ class WidgetCacheTracker:
             # caching disabled - never remove
             return
 
+        if __debug__:
+            self._validate_key(key)
+
         if key in self._widget_map:
             widget = self._widget_map[key]
             del self._widget_map[key]  # remove from the active widget list
@@ -10337,11 +10352,17 @@ class WidgetCacheTracker:
         """gets an item from the cache and re-cache it"""
         created = False
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+
+
         if key in self._param_map:
             if key not in self._widget_map:
                 # recreate the widget using the original data
                 try:
-                    instance_type, params = self.getParams(key)
+                    # params hold (instance_type, some_other_data, params)
+                    data = self.getParams(key)
+                    assert len(data) == 3, "expected 3 elements in the parameter tuple (instance_type, key, params)"
+                    instance_type, _ , params = data
+
                 except Exception as e:
                     syslog.error(f"WidgetCache: failed to get parameters for key [{key}]")
                     syslog.error(f"\treturned params: {self.getParams(key)}")
@@ -10532,7 +10553,7 @@ class QSplitTabWidget(QDataWidget):
         if widget:
             container_view = widget.getContainerView()
             if container_view:
-                msg = f"Please add a container or action for{suffix} <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{input_item.display_name}</span>"
+                msg = "Please add a container or action."
                 container_view.setBlankMessage(msg)
 
     @property
@@ -16972,10 +16993,11 @@ class QInteractWidget(QtWidgets.QWidget):
 class QStepTile(QtWidgets.QWidget):
     """step title widget"""
 
-    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, parent=None):
+    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, padding : int = 4, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color))
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color, padding=padding))
         if icon:
             self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
             self.main_layout.addWidget(self.icon_label)

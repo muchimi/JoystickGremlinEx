@@ -1493,10 +1493,7 @@ class ExecutionContext:
 
             extra_data = {"container": container, "mode": mode_name, "device_node": device_node, "input_item": input_item}
 
-            # check for custom action sets and convert to list if needed
-            if hasattr(container, "ensureActionSets"):
-                container.ensureActionSets()
-
+   
             if not container.action_sets:
                 input_item = container.input_item
                 syslog.warning(f"BUILD WARNING: Container has no action sets: [{container.name}] id [{container.id}] input item: [{input_item.display_name}] profile mode: [{mode_name}]")

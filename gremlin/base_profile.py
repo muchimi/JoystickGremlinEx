@@ -4897,7 +4897,7 @@ class Profile:
         return gremlin.util.getSidecarFiles(self._profile_fname)
 
 
-    def _readConfig(self, force: bool = False) -> dict:
+    def _readConfig(self, force: bool = False, timeout : int = 10) -> dict:
         """reads the profile config, ensuring it is done on the UI thread
 
         :param force: when True, ignore the in-memory cache and re-read the sidecar
@@ -4915,7 +4915,7 @@ class Profile:
             finally:
                 result["done"] = True
 
-        time_max = time.time() + 2.0
+        time_max = time.time() + timeout
         gremlin.util.InvokeUiMethod(_do_read)
         while not result["done"] and time.time() < time_max:
             time.sleep(0.01)

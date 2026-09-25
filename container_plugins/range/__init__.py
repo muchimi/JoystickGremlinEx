@@ -74,7 +74,7 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         self.widget_layout = QtWidgets.QVBoxLayout()
 
-        # self.profile_data.create_or_delete_virtual_button()
+
         self.action_selector = ActionSelector(
             self.container.get_input_type(),
             self.container.input_item,
@@ -251,7 +251,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_min_box = min_box
         self.ui_min_box_included = min_box_included
         self.ui_max_box = max_box
-        self.ui_max_box_included = min_box_included
+        self.ui_max_box_included = max_box_included
         self.ui_symmetrical = symmetrical_box
         self.ui_range_options = toolbar2_widget
         # self.ui_autorelease = release_box
@@ -268,18 +268,18 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.widget_layout)
 
-        mode = self.profile_data.any_change_mode
-        mode_widget.setEnabled(mode)
-        range_widget.setEnabled(not mode)
-        toolbar2_widget.setEnabled(not mode)
+        any_change_mode = self.container.any_change_mode
+        mode_widget.setEnabled(any_change_mode)
+        range_widget.setEnabled(not any_change_mode)
+        toolbar2_widget.setEnabled(not any_change_mode)
 
         toolbar_container.addWidget(toolbar1_widget)
         toolbar_container.addWidget(toolbar2_widget)
         # toolbar_container.addWidget(options_widget)
 
         # Insert action widgets
-        for i, action in enumerate(self.profile_data.action_sets):
-            widget = self._create_action_set_widget(self.profile_data.action_sets[i], f"Action {i:d}", ContainerViewTypes.Action)
+        for i, action in enumerate(self.container.action_sets):
+            widget = self._create_action_set_widget(self.container.action_sets[i], f"Action {i:d}", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -289,12 +289,12 @@ class RangeContainerWidget(AbstractContainerWidget):
         if checked:
             rb = self.sender()
             delta = rb.data
-            self.profile_data.any_change_direction = delta
+            self.container.any_change_direction = delta
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            for i, action in enumerate(self.profile_data.action_sets):
-                widget = self._create_action_set_widget(self.profile_data.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            for i, action in enumerate(self.container.action_sets):
+                widget = self._create_action_set_widget(self.container.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -306,8 +306,8 @@ class RangeContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -315,8 +315,8 @@ class RangeContainerWidget(AbstractContainerWidget):
         """pastes an action into the container"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -336,18 +336,18 @@ class RangeContainerWidget(AbstractContainerWidget):
         # Perform action
         if action == Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index], self.profile_data.action_sets[index - 1] = (
-                    self.profile_data.action_sets[index - 1],
-                    self.profile_data.action_sets[index],
+                self.container.action_sets[index], self.container.action_sets[index - 1] = (
+                    self.container.action_sets[index - 1],
+                    self.container.action_sets[index],
                 )
         if action == Interactions.Down:
-            if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], self.profile_data.action_sets[index + 1] = (
-                    self.profile_data.action_sets[index + 1],
-                    self.profile_data.action_sets[index],
+            if index < len(self.container.action_sets) - 1:
+                self.container.action_sets[index], self.container.action_sets[index + 1] = (
+                    self.container.action_sets[index + 1],
+                    self.container.action_sets[index],
                 )
         if action == Interactions.Delete:
-            del self.profile_data.action_sets[index]
+            del self.container.action_sets[index]
 
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -357,36 +357,32 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        return f"Range: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
+        return f"Range: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.container.action_sets])}"
 
     def _any_change_mode_changed(self):
         mode = self.ui_any_change_mode.isChecked()
         self.ui_range_widget.setEnabled(not mode)
         self.ui_range_options.setEnabled(not mode)
         self.ui_mode_widget.setEnabled(mode)
-        self.profile_data.any_change_mode = mode
+        self.container.any_change_mode = mode
 
     """ event handlers for the UI elements in this action """
 
     def _range_min_changed(self):
-        self.profile_data.range_min = self.ui_min_box.value()
+        self.container.range_min = self.ui_min_box.value()
 
     def _range_max_changed(self):
-        self.profile_data.range_max = self.ui_max_box.value()
+        self.container.range_max = self.ui_max_box.value()
 
     def _range_min_included_changed(self):
-        self.profile_data.range_min_included = self.ui_min_box_included.isChecked()
+        self.container.range_min_included = self.ui_min_box_included.isChecked()
 
     def _range_max_included_changed(self):
-        self.profile_data.range_max_included = self.ui_max_box_included.isChecked()
+        self.container.range_max_included = self.ui_max_box_included.isChecked()
 
     @QtCore.Slot(bool)
     def _symmetrical_changed(self):
-        self.profile_data.symmetrical = self.ui_symmetrical.isChecked()
-
-    # @QtCore.Slot(bool)
-    # def _autorelease_changed(self):
-    #     self.profile_data.autorelease = self.ui_autorelease.isChecked()
+        self.container.symmetrical = self.ui_symmetrical.isChecked()
 
     def _add_top_90(self):
         self.ui_min_box.setValue(0.90)
@@ -414,8 +410,8 @@ class RangeContainerWidget(AbstractContainerWidget):
             return
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        # the profile_data member is a RangeContainer object
-        widget = container_plugins.get_parent_widget(self.profile_data)
+        # the container member is a RangeContainer object
+        widget = container_plugins.get_parent_widget(self.container)
         for container in widget.action_model._containers:
             if isinstance(container, RangeContainer):
                 widget._remove_container(container)
@@ -423,8 +419,8 @@ class RangeContainerWidget(AbstractContainerWidget):
 
     def _add_containers(self, count, action_name=None):
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-        # the profile_data member is a RangeContainer object
-        widget = container_plugins.get_parent_widget(self.profile_data)
+        # the container member is a RangeContainer object
+        widget = container_plugins.get_parent_widget(self.container)
         if widget:
             # add five containers via the parent widget
             value = -1.0

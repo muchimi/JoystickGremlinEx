@@ -808,8 +808,8 @@ class EventListener(QtCore.QObject):
     expand_all_containers = Signal()  # expand all containers
     curve_added = Signal(object)  # fires when a curve is added from an input item (InputItem)
     curve_deleted = Signal(object)  # fires when a curve is deleted from an input item (InputItem)
-    curve_edit = Signal(int, object)  # fires when a curve is edited from an input item (InputItem)
-    curve_delete = Signal(int, object)  # fires when a curve is deleted from an input item (InputItem)
+    curve_edit = Signal(int, object)  # fires when a curve is edited from an input item (model index, InputItem)
+    curve_delete = Signal(int, object)  # fires when a curve is deleted from an input item (model index, InputItem)
 
     # occurs when calibration data changes
     calibration_added = Signal(object)  # fires when a calibration is added from an input item (InputItem)

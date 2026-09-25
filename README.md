@@ -50,7 +50,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T62)
-- Fix: Packaging: missing data files for voice processing in packaged (.exe) mode preventing transcription.
+- Change: UI: Add mapping header to clarify what is being mapped.
+- Fix: Package (Voice): Packaging utility failed to detect and include library dependencies for the voice engine.  This prevented voice transcription from running in the packaged version of GEX.
+- Fix: UI: delete axis curve generated duplicate delete action.
+- Fix: Range Container: incomplete prior refactor caused an exception
+- Fix: UI: device widget: selection API causes parameter exception depending on interaction method
+- Fix: API: widget cache exception
+- Fix: API (Execution Engine): revert inadvertent clear container command for containers that support that option such as TempoEx.
 
 ### (m77T61B)
 - Change: UI: added additional diagnostics and trace information on retrieving cache data.

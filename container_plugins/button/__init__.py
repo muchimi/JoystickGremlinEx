@@ -331,7 +331,7 @@ and another action on trigger release in a single container."""
     #     pass
 
     def ensureActionSets(self):
-        self.action_sets.clear()
+        self.action_sets.clear(False)
         self.action_sets.add(self.press_action_set, 0)  # 0
         self.action_sets.add(self.release_action_set, 1)  # 1
 
