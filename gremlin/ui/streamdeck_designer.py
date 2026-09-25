@@ -25,7 +25,7 @@ from shiboken6 import Shiboken
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.util
-from gremlin.ui.ui_common import Color
+from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup
 
 syslog = logging.getLogger("system")
 
@@ -1305,12 +1305,16 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             tooltip="Reload live plugin keys",
             callback=self._on_refresh,
         )
-        clear_btn = QtWidgets.QPushButton("Clear cell")
-        clear_btn.setToolTip("Remove mappings and appearance from the selected key on this page")
-        clear_btn.clicked.connect(self._clear_selected_cell)
-        wipe_btn = QtWidgets.QPushButton("Wipe page")
-        wipe_btn.setToolTip("Clear all keys on the current edit page")
-        wipe_btn.clicked.connect(self._wipe_page)
+        clear_btn = Buttons.getClearWidget(
+            label="Clear cell",
+            tooltip="Remove mappings and appearance from the selected key on this page",
+            callback=self._clear_selected_cell,
+        )
+        wipe_btn = Buttons.getClearWidget(
+            label="Wipe page",
+            tooltip="Clear all keys on the current edit page",
+            callback=self._wipe_page,
+        )
 
         layout.addWidget(self._status, 1)
         layout.addWidget(refresh)
@@ -1336,20 +1340,18 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         layout.addWidget(self._page_list, 1)
 
         row = QtWidgets.QHBoxLayout()
-        add_btn = QtWidgets.QPushButton("Add")
-        add_btn.clicked.connect(self._add_page)
-        del_btn = QtWidgets.QPushButton("Delete")
-        del_btn.clicked.connect(self._delete_page)
-        rename_btn = QtWidgets.QPushButton("Rename")
-        rename_btn.clicked.connect(self._rename_page)
+        add_btn = Buttons.getAddWidget(
+            label="Add",
+            callback=self._add_page,
+        )
+        del_btn = QDataPushButton("Delete", clicked=self._delete_page)
+        rename_btn = QDataPushButton("Rename", clicked=self._rename_page)
         row.addWidget(add_btn)
         row.addWidget(rename_btn)
         row.addWidget(del_btn)
         layout.addLayout(row)
 
-        import_btn = QtWidgets.QPushButton("Import")
-        import_btn.setToolTip("Import page appearance from a Bitfocus Companion configuration export")
-        import_btn.clicked.connect(self._import_companion_pages)
+        import_btn = QDataPushButton("Import", tooltip="Import page appearance from a Bitfocus Companion configuration export", clicked=self._import_companion_pages)
         layout.addWidget(import_btn)
         return panel
 
@@ -1376,7 +1378,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         preview_font.setBold(False)
 
         def _preview_btn(text: str) -> QtWidgets.QPushButton:
-            btn = QtWidgets.QPushButton(text)
+            btn = QDataPushButton(text)
             btn.setCheckable(True)
             btn.setFont(preview_font)
             btn.setCursor(QtCore.Qt.PointingHandCursor)
@@ -1536,24 +1538,31 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         driver_layout.setContentsMargins(0, 0, 0, 0)
         driver_layout.setSpacing(8)
         driver_layout.addWidget(QtWidgets.QLabel("Appearance"))
-        self._appearance_mode_combo = QtWidgets.QComboBox()
-        self._appearance_mode_combo.addItem("Press / Release", "press")
-        self._appearance_mode_combo.addItem("GEX State", "state")
+        self._appearance_mode_combo = QDataRadioButtonGroup(
+            [
+                ("Press / Release", "press", "Follows the physical key hold."),
+                ("GEX State", "state", "Uses State OFF / State ON looks from a named state."),
+            ],
+            value="press",
+            callback=lambda _v: self._on_appearance_mode_ui(),
+        )
+        if self._appearance_mode_combo.layout() is not None:
+            self._appearance_mode_combo.layout().setContentsMargins(0, 0, 0, 0)
         self._appearance_mode_combo.setToolTip(
             "Press / Release follows the physical key hold. "
             "GEX State uses State OFF / State ON looks from a named state."
         )
-        self._appearance_mode_combo.currentIndexChanged.connect(self._on_appearance_mode_ui)
         driver_layout.addWidget(self._appearance_mode_combo)
         self._appearance_state_label = QtWidgets.QLabel("State")
         driver_layout.addWidget(self._appearance_state_label)
-        self._appearance_state_combo = QtWidgets.QComboBox()
+        self._appearance_state_combo = QDataComboBox()
         self._appearance_state_combo.setEditable(False)
         self._appearance_state_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         self._appearance_state_combo.setMinimumWidth(120)
         self._appearance_state_combo.setToolTip("GEX state that drives State ON / State OFF appearance")
         self._appearance_state_combo.currentIndexChanged.connect(self._on_appearance_state_ui)
-        driver_layout.addWidget(self._appearance_state_combo, 1)
+        driver_layout.addWidget(self._appearance_state_combo)
+        driver_layout.addStretch(1)
         states_row.addWidget(driver_host)
 
         def _wire_icon_bg_row(
@@ -1568,18 +1577,18 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             icon_tip: str,
         ):
             """Icon preview | Icon… | Clear | BG swatch | Color… | Clear BG"""
-            browse = QtWidgets.QPushButton("Icon…")
-            browse.setToolTip(icon_tip)
-            browse.clicked.connect(browse_cb)
-            clear_icon = QtWidgets.QPushButton("Clear")
-            clear_icon.setToolTip("Clear icon")
-            clear_icon.clicked.connect(clear_icon_cb)
-            pick_bg = QtWidgets.QPushButton("Color…")
-            pick_bg.setToolTip("Choose background color")
-            pick_bg.clicked.connect(pick_bg_cb)
-            clear_bg = QtWidgets.QPushButton("Clear BG")
-            clear_bg.setToolTip("Clear background color")
-            clear_bg.clicked.connect(clear_bg_cb)
+            browse = QDataPushButton("Icon…", tooltip=icon_tip, clicked=browse_cb)
+            clear_icon = Buttons.getClearWidget(
+                label="Clear",
+                tooltip="Clear icon",
+                callback=clear_icon_cb,
+            )
+            pick_bg = QDataPushButton("Color…", tooltip="Choose background color", clicked=pick_bg_cb)
+            clear_bg = Buttons.getClearWidget(
+                label="Clear BG",
+                tooltip="Clear background color",
+                callback=clear_bg_cb,
+            )
             bg_swatch.clicked.connect(pick_bg_cb)
             bg_swatch.clear_requested.connect(clear_bg_cb)
             layout.addWidget(preview)
@@ -1692,16 +1701,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._link_banner = QtWidgets.QFrame()
         self._link_banner.setObjectName("sdLinkBanner")
-        self._link_banner.setStyleSheet(
-            """
-            QFrame#sdLinkBanner {
-                background-color: #1c1a32;
-                border: 1px solid #7a6cff;
-                border-radius: 8px;
-            }
-            QLabel { color: #d8d4ff; }
-            """
-        )
+        self._link_banner.setStyleSheet(Color.cssInfoBox())
         link_layout = QtWidgets.QVBoxLayout(self._link_banner)
         link_layout.setContentsMargins(12, 10, 12, 10)
         link_layout.setSpacing(8)
@@ -1709,10 +1709,8 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._link_banner_label.setWordWrap(True)
         link_layout.addWidget(self._link_banner_label)
         link_btn_row = QtWidgets.QHBoxLayout()
-        self._link_goto_btn = QtWidgets.QPushButton("Go to source page")
-        self._link_goto_btn.clicked.connect(self._goto_linked_source_page)
-        self._link_unlink_btn = QtWidgets.QPushButton("Unlink")
-        self._link_unlink_btn.clicked.connect(self._unlink_selected)
+        self._link_goto_btn = QDataPushButton("Go to source page", clicked=self._goto_linked_source_page)
+        self._link_unlink_btn = Buttons.getRemoveWidget(label="Unlink", callback=self._unlink_selected)
         link_btn_row.addWidget(self._link_goto_btn)
         link_btn_row.addWidget(self._link_unlink_btn)
         link_btn_row.addStretch(1)
@@ -1722,16 +1720,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._multi_banner = QtWidgets.QFrame()
         self._multi_banner.setObjectName("sdMultiBanner")
-        self._multi_banner.setStyleSheet(
-            """
-            QFrame#sdMultiBanner {
-                background-color: #1a2832;
-                border: 1px solid #4da3ff;
-                border-radius: 8px;
-            }
-            QLabel { color: #c5d8e8; }
-            """
-        )
+        self._multi_banner.setStyleSheet(Color.cssInfoBox())
         multi_layout = QtWidgets.QVBoxLayout(self._multi_banner)
         multi_layout.setContentsMargins(12, 10, 12, 10)
         self._multi_banner_label = QtWidgets.QLabel()
@@ -1765,7 +1754,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         font_size.setRange(8, 72)
         font_size.setValue(18)
         font_size.valueChanged.connect(lambda *_: self._apply_style_fields())
-        font_color_btn = QtWidgets.QPushButton("Color")
+        font_color_btn = QDataPushButton("Color")
         font_color_btn.clicked.connect(
             lambda: self._pick_font_color(pressed=pressed)
         )
@@ -1779,30 +1768,30 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         parent_layout.addLayout(font_row)
 
         align_row = QtWidgets.QHBoxLayout()
-        text_h = QtWidgets.QComboBox()
-        text_h.addItem("Text ←", "left")
-        text_h.addItem("Text ↔", "center")
-        text_h.addItem("Text →", "right")
-        text_h.setCurrentIndex(1)
-        text_h.currentIndexChanged.connect(lambda *_: self._apply_style_fields())
-        text_v = QtWidgets.QComboBox()
-        text_v.addItem("Text ↑", "top")
-        text_v.addItem("Text ↕", "middle")
-        text_v.addItem("Text ↓", "bottom")
-        text_v.setCurrentIndex(2)
-        text_v.currentIndexChanged.connect(lambda *_: self._apply_style_fields())
-        icon_h = QtWidgets.QComboBox()
-        icon_h.addItem("Icon ←", "left")
-        icon_h.addItem("Icon ↔", "center")
-        icon_h.addItem("Icon →", "right")
-        icon_h.setCurrentIndex(1)
-        icon_h.currentIndexChanged.connect(lambda *_: self._apply_style_fields())
-        icon_v = QtWidgets.QComboBox()
-        icon_v.addItem("Icon ↑", "top")
-        icon_v.addItem("Icon ↕", "middle")
-        icon_v.addItem("Icon ↓", "bottom")
-        icon_v.setCurrentIndex(1)
-        icon_v.currentIndexChanged.connect(lambda *_: self._apply_style_fields())
+        text_h = QDataRadioButtonGroup(
+            [("Text ←", "left"), ("Text ↔", "center"), ("Text →", "right")],
+            value="center",
+            callback=lambda _v: self._apply_style_fields(),
+        )
+        text_v = QDataRadioButtonGroup(
+            [("Text ↑", "top"), ("Text ↕", "middle"), ("Text ↓", "bottom")],
+            value="bottom",
+            callback=lambda _v: self._apply_style_fields(),
+        )
+        icon_h = QDataRadioButtonGroup(
+            [("Icon ←", "left"), ("Icon ↔", "center"), ("Icon →", "right")],
+            value="center",
+            callback=lambda _v: self._apply_style_fields(),
+        )
+        icon_v = QDataRadioButtonGroup(
+            [("Icon ↑", "top"), ("Icon ↕", "middle"), ("Icon ↓", "bottom")],
+            value="middle",
+            callback=lambda _v: self._apply_style_fields(),
+        )
+        for group in (text_h, text_v, icon_h, icon_v):
+            if group.layout() is not None:
+                group.layout().setContentsMargins(0, 0, 0, 0)
+                group.layout().setSpacing(4)
         align_row.addWidget(text_h)
         align_row.addWidget(text_v)
         align_row.addWidget(icon_h)
@@ -2999,8 +2988,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             if mode != "state":
                 mode = "press"
             with QtCore.QSignalBlocker(mode_combo):
-                idx = mode_combo.findData(mode)
-                mode_combo.setCurrentIndex(idx if idx >= 0 else 0)
+                mode_combo.setValue(mode)
         self._populate_appearance_state_combo(
             getattr(item, "appearance_state_id", "") or "",
             getattr(item, "appearance_state", "") or "",
@@ -3102,15 +3090,14 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if sf is not None and Shiboken.isValid(sf):
             sf.setChecked(shrink)
         for key, value, fallback in (
-            ("text_h", text_h, 1),
-            ("text_v", text_v, 2),
-            ("icon_h", icon_h, 1),
-            ("icon_v", icon_v, 1),
+            ("text_h", text_h, "center"),
+            ("text_v", text_v, "bottom"),
+            ("icon_h", icon_h, "center"),
+            ("icon_v", icon_v, "middle"),
         ):
             w = block.get(key)
             if w is not None and Shiboken.isValid(w):
-                idx = w.findData(value)
-                w.setCurrentIndex(idx if idx >= 0 else fallback)
+                w.setValue(value if value in ("left", "center", "right", "top", "middle", "bottom") else fallback)
 
     def _update_color_button_styles(self):
         for block, font_c in (

@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import gremlin.ui.ui_common
+
 import copy
 from typing import Any
 
@@ -75,9 +77,9 @@ def clipboard_groups() -> list[str]:
     return list(_clipboard.get("groups") or [])
 
 
-class PropertyGroupsDialog(QtWidgets.QDialog):
+class PropertyGroupsDialog(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, title: str, action: str, groups: list[str] | None = None, parent=None):
-        super().__init__(parent)
+        super().__init__("overlay_property_groups", parent=parent)
         self.setWindowTitle(title)
         layout = QtWidgets.QVBoxLayout(self)
         hint = QtWidgets.QLabel("Choose which properties to include. Items that do not apply to the target widget are skipped.")
@@ -91,11 +93,11 @@ class PropertyGroupsDialog(QtWidgets.QDialog):
             box.setEnabled(key in allowed)
             self._boxes[key] = box
             layout.addWidget(box)
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText(action)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label=action, callback=self.accept)
+        cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
+        )
 
     def selected_groups(self) -> list[str]:
         return [key for key, box in self._boxes.items() if box.isChecked() and box.isEnabled()]

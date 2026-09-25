@@ -31,11 +31,11 @@ class AbortableThread(threading.Thread, QtCore.QObject):
         # subclass logic or start() is used. This avoids the common runtime error
         # where a thread is started before Thread.__init__ has run.
         QtCore.QObject.__init__(self)
+        eh = kwargs.pop("eh", None)
+        kwargs.setdefault("daemon", True)
         threading.Thread.__init__(self, *args, **kwargs)
 
-        if "eh" in kwargs:
-            eh = kwargs["eh"]
-        else:
+        if eh is None:
             import gremlin.event_handler
 
             eh = gremlin.event_handler.EventListener()
@@ -69,6 +69,7 @@ class AbortableThreadX(threading.Thread):
     def __init__(self, target=None, eh=None, *args, **kwargs):
         # Ensure the Python thread object is fully initialized before any subclass
         # logic or start() is used.
+        kwargs.setdefault("daemon", True)
         threading.Thread.__init__(self, *args, target=target, **kwargs)
 
         if not eh:

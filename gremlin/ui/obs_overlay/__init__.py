@@ -24,7 +24,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 
 from .bindings import binding_is_configured, read_toggle_active, toggle_follows_level
 from .designer import OverlayDesignerWidget
-from .model import OverlayScene, is_onscreen_mode, normalize_background_mode, _overlay_payload_has_content
+from .model import OverlayScene, normalize_background_mode, _overlay_payload_has_content
 from .overlay_window import OverlayWindow, apply_onscreen_geometry
 from .widgets import live_window_is_layered
 
@@ -47,6 +47,7 @@ class OverlayManager:
         self._toggle_timer = None
         self._toggle_active: dict[str, bool] = {}
         self._recreate_pending: set[str] = set()
+        self._stream_page_id: str | None = None
         self._bind_profile_hooks()
         self.scene.load_for_profile()
         self._apply_all_onscreen()
@@ -169,8 +170,17 @@ class OverlayManager:
         auto = self._auto_shown or any(
             page.get("canvas", {}).get("show_on_profile_start") for page in self.scene.pages
         )
-        if auto:
-            self._auto_shown = False
+        attached = any(
+            window is not None
+            and Shiboken.isValid(window)
+            and getattr(window, "_host_attached", False)
+            for window in self._overlays.values()
+        )
+        self._auto_shown = False
+        # Always tear down live / app-share overlays on deactivate — a detached
+        # child that Qt still thinks is hidden leaves a ghost HWND + host cursor
+        # over JG Ex.
+        if auto or attached or self._overlays:
             self.hide_overlay()
 
     def _start_runtime_toggle(self):
@@ -263,6 +273,7 @@ class OverlayManager:
                 continue
             self._recreate_pending.add(page_id)
             QtCore.QTimer.singleShot(0, lambda pid=page_id: gremlin.util.InvokeUiMethod(self._recreate_page_ui, pid))
+        self._sync_stream_to_active_page()
 
     def _recreate_page_ui(self, page_id: str):
         self._recreate_pending.discard(page_id)
@@ -288,13 +299,30 @@ class OverlayManager:
 
     def page_is_visible(self, page_id: str) -> bool:
         window = self._overlays.get(page_id)
-        return window is not None and Shiboken.isValid(window) and window.isVisible()
+        if window is None or not Shiboken.isValid(window):
+            return False
+        # After app-share SetParent, Qt can report isVisible()==False even though
+        # the child HWND is live — that made the 16ms toggle poll reopen forever.
+        if window.isVisible():
+            return True
+        return bool(getattr(window, "_host_attached", False))
 
     def show_overlay(self, auto: bool = False, page_ids: list[str] | None = None):
         gremlin.util.InvokeUiMethod(self._show_overlay_ui, auto, page_ids)
 
     def hide_overlay_page(self, page_id: str):
-        gremlin.util.InvokeUiMethod(self._hide_page_ui, page_id)
+        gremlin.util.InvokeUiMethod(self._hide_overlay_page_ui, page_id)
+
+    def _hide_overlay_page_ui(self, page_id: str):
+        window = self._overlays.get(page_id)
+        reclaim = bool(
+            window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False)
+        )
+        self._hide_page_ui(page_id)
+        if reclaim:
+            self._reclaim_main_window_focus()
+            QtCore.QTimer.singleShot(50, self._reclaim_main_window_focus)
+            QtCore.QTimer.singleShot(200, self._reclaim_main_window_focus)
 
     def _show_overlay_ui(self, auto: bool = False, page_ids: list[str] | None = None):
         try:
@@ -305,11 +333,17 @@ class OverlayManager:
                 targets = [active] if active and self.scene.page_by_id(active) else []
             else:
                 targets = [page_id for page_id in page_ids if self.scene.page_by_id(page_id)]
+            opened = False
             for page_id in targets:
+                already = self.page_is_visible(page_id)
                 self._show_page_ui(page_id, auto=auto)
-            if auto and targets:
+                self._stream_page_id = page_id
+                if not already:
+                    opened = True
+            if auto and opened:
                 syslog.info("OBS OVERLAY: window opened for profile start")
             self._emit_visibility()
+            self._invalidate_remote_window_cache()
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to open overlay window: {err}")
 
@@ -317,16 +351,66 @@ class OverlayManager:
         apply_onscreen_geometry(self.scene, emit=False, page_id=page_id)
         window = self._overlays.get(page_id)
         if window is not None and Shiboken.isValid(window):
+            # Already live (including app-share child): avoid flag rebuild / re-show storms.
+            if window.isVisible() or getattr(window, "_host_attached", False):
+                if self.scene.canvas_for(page_id).get("attach_to_window"):
+                    window._sync_host_attach()
+                return
             window._apply_window_flags()
-            window.show()
-            if not is_onscreen_mode(self.scene.canvas_for(page_id)):
-                window.raise_()
+            window.show_without_activating()
+            self._enforce_exclusive_app_share(page_id)
             return
         window = OverlayWindow(self.scene, page_id=page_id)
         window.destroyed.connect(lambda *_args, pid=page_id: self._overlay_destroyed(pid))
         self._overlays[page_id] = window
         self._page_chrome[page_id] = self._page_chrome_tuple(page_id)
-        window.show()
+        window.show_without_activating()
+        self._enforce_exclusive_app_share(page_id)
+
+    def _sync_stream_to_active_page(self):
+        """Track designer selection only — do not auto show/hide live windows.
+
+        Forcing show on tab change fought toggle + app-share and stole focus
+        (game cursor appearing over JG Ex).
+        """
+        active = self.scene.active_page_id
+        if active and self.page_is_visible(active):
+            self._stream_page_id = active
+
+    def _enforce_exclusive_app_share(self, page_id: str):
+        """Only one overlay may be parented into a host for app share."""
+        canvas = self.scene.canvas_for(page_id)
+        if not canvas.get("attach_to_window"):
+            return
+        for other_id, window in list(self._overlays.items()):
+            if other_id == page_id or not Shiboken.isValid(window):
+                continue
+            other_canvas = self.scene.canvas_for(other_id)
+            if not other_canvas.get("attach_to_window"):
+                continue
+            if getattr(window, "_host_attached", False) or window.isVisible():
+                try:
+                    window._detach_host()
+                except Exception:
+                    pass
+                if window.isVisible():
+                    window.hide()
+        window = self._overlays.get(page_id)
+        if window is not None and Shiboken.isValid(window) and (
+            window.isVisible() or getattr(window, "_host_attached", False)
+        ):
+            window._sync_host_attach()
+
+    def _invalidate_remote_window_cache(self):
+        try:
+            import gremlin.remote_video as remote_video
+
+            cache = getattr(remote_video, "_hwnd_cache", None)
+            if isinstance(cache, dict):
+                cache["checked_at"] = 0.0
+                cache["hwnd"] = 0
+        except Exception:
+            pass
 
     def _overlay_destroyed(self, page_id: str):
         current = self._overlays.get(page_id)
@@ -338,9 +422,36 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._hide_overlay_ui)
 
     def _hide_overlay_ui(self):
+        reclaim = False
         for page_id in list(self._overlays):
+            window = self._overlays.get(page_id)
+            if window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False):
+                reclaim = True
             self._hide_page_ui(page_id)
         self._emit_visibility()
+        if reclaim:
+            self._reclaim_main_window_focus()
+            # Windows often ignores the first SetForegroundWindow after SetParent;
+            # retry so the host cursor does not stay glued over JG Ex.
+            QtCore.QTimer.singleShot(50, self._reclaim_main_window_focus)
+            QtCore.QTimer.singleShot(200, self._reclaim_main_window_focus)
+
+    def _reclaim_main_window_focus(self):
+        """After app-share detach, ensure the game is not left covering JG Ex."""
+        try:
+            from .host_window import release_input_hooks, restore_foreground
+
+            release_input_hooks()
+            ui = gremlin.shared_state.ui
+            if ui is None or not Shiboken.isValid(ui):
+                return
+            hwnd = int(ui.winId()) if hasattr(ui, "winId") else 0
+            if hwnd:
+                restore_foreground(hwnd)
+            ui.raise_()
+            ui.activateWindow()
+        except Exception as err:
+            syslog.debug(f"OBS OVERLAY: reclaim UI focus skipped: {err}")
 
     def _hide_page_ui(self, page_id: str):
         window = self._overlays.pop(page_id, None)
@@ -348,6 +459,13 @@ class OverlayManager:
             return
         try:
             if Shiboken.isValid(window):
+                # Tear down app-share parenting before hide/close so the host
+                # cannot stay raised over JG Ex after profile deactivation.
+                try:
+                    window._stop_host_follow()
+                    window._detach_host(activate_host=False, hide_window=True)
+                except Exception:
+                    pass
                 window.detach_from_scene()
                 window.hide()
                 window.close()

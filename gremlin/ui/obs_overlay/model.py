@@ -20,6 +20,7 @@ from typing import Any
 from PySide6 import QtCore
 from psygnal import Signal
 
+import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.util
 
@@ -1361,11 +1362,10 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
 
 
 def profile_xml_path(profile=None) -> str | None:
-    assert profile is None or isinstance(profile, gremlin.base_profile.Profile), "invalid profile object"
     profile = profile or gremlin.shared_state.current_profile
     if profile is None:
         return None
-    return profile.profile_file # getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
+    return getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
 
 
 def profile_display_name(profile=None) -> str:
@@ -1386,19 +1386,14 @@ def overlay_path_for_profile(profile=None) -> str | None:
     fname = profile_xml_path(profile)
     if not fname:
         return None
-    return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
+    return gremlin.util.swap_ext(fname, "overlay.json")
 
 
 def profile_json_path(profile=None, dest_xml: str | None = None) -> str | None:
-    if profile is not None:
-        fname = profile.profile_file
-        if fname:
-            return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
-
     fname = dest_xml or profile_xml_path(profile)
     if not fname:
         return None
-    return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
+    return gremlin.util.swap_ext(fname, "json")
 
 
 def _same_profile_path(left: str | None, right: str | None) -> bool:
@@ -1434,6 +1429,7 @@ class OverlayScene(QtCore.QObject):
         self.canvas: dict[str, Any] = {}
         self.widgets: list[dict[str, Any]] = []
         self.selected_ids: list[str] = []
+        self._widget_clipboard: list[dict[str, Any]] = []
         self._undo: list[str] = []
         self._redo: list[str] = []
         self._suspend = 0
@@ -1446,12 +1442,12 @@ class OverlayScene(QtCore.QObject):
         self._reset_default_pages(emit=False)
         self._bind_identity_hooks()
 
-        # hook sidecar updates
+        # Hook sidecar updates so profile save requests persist overlay JSON.
         el = gremlin.event_handler.EventListener()
         el.update_sidecar.connect(self._handle_save_sidecar)
 
     def _handle_save_sidecar(self):
-        """ handle update requests to store the configuration file"""
+        """Handle update requests to store the overlay configuration file."""
         sidecar = overlay_path_for_profile()
         if sidecar:
             self.save(sidecar)
@@ -2145,6 +2141,46 @@ class OverlayScene(QtCore.QObject):
         self._emit()
         self.selection_changed.emit()
 
+    def copy_selected(self) -> bool:
+        """Copy selected widgets into the scene widget clipboard (Ctrl+C)."""
+        items = []
+        for widget_id in list(self.selected_ids):
+            src = self.widget_by_id(widget_id)
+            if src:
+                items.append(copy.deepcopy(src))
+        self._widget_clipboard = items
+        return bool(items)
+
+    def has_widget_clipboard(self) -> bool:
+        return bool(getattr(self, "_widget_clipboard", None))
+
+    def paste_clipboard(self) -> bool:
+        """Paste widgets from the scene widget clipboard (Ctrl+V)."""
+        clip = list(getattr(self, "_widget_clipboard", None) or [])
+        if not clip:
+            return False
+        self.push_undo()
+        copies = []
+        group_map: dict[str, str] = {}
+        grid = max(1, int(self.canvas.get("grid_size", 8)))
+        base_z = max((w.get("z", 0) for w in self.widgets), default=0)
+        for index, src in enumerate(clip):
+            item = copy.deepcopy(src)
+            item["id"] = _new_id()
+            item["x"] = int(item.get("x") or 0) + grid * 2
+            item["y"] = int(item.get("y") or 0) + grid * 2
+            item["z"] = base_z + 1 + index
+            old_group = str(item.get("group") or "").strip()
+            if old_group:
+                item["group"] = group_map.setdefault(old_group, _new_id())
+            self.widgets.append(item)
+            copies.append(item["id"])
+        self.selected_ids = copies
+        self._dirty = True
+        self._emit()
+        self.selection_changed.emit()
+        return bool(copies)
+
     def expand_group_ids(self, ids: list[str]) -> list[str]:
         """Include every widget that shares a group with any of the given ids."""
         seen: list[str] = []
@@ -2611,22 +2647,14 @@ class OverlayScene(QtCore.QObject):
             return None
 
     def load_for_profile(self, profile=None) -> bool:
-        """ loads for a profile - account for the profile not being saved yet (so having no file)"""
         profile = profile or gremlin.shared_state.current_profile
         self._undo.clear()
         self._redo.clear()
         self.selected_ids = []
         path = profile_xml_path(profile)
-        json_path = profile_json_path(profile) if path else None
-        if profile and json_path:
-            if not os.path.isfile(json_path):
-                # fallback to old sidecar without "obs" suffix
-                json_path = gremlin.util.swap_ext(path, "json")
-
+        json_path = profile_json_path(profile)
         data = None
-        if not json_path:
-            return False
-        if os.path.isfile(json_path):
+        if profile is not None:
             try:
                 cfg = profile._readConfig(force=True) or {}
                 candidate = cfg.get(OVERLAY_CONFIG_KEY)
@@ -2691,8 +2719,7 @@ class OverlayScene(QtCore.QObject):
         ok = self._persist_files(path, data)
         if ok:
             self._profile_key = path
-            self._path = profile_json_path(dest_xml=path)
-            #self._path = gremlin.util.swap_ext(path, "json")
+            self._path = gremlin.util.swap_ext(path, "json")
             if profile is not None:
                 cfg = getattr(profile, "_config_data", None)
                 if not isinstance(cfg, dict):
@@ -2745,9 +2772,6 @@ class OverlayScene(QtCore.QObject):
                 os.makedirs(folder, exist_ok=True)
             with open(path, "w", encoding="utf-8") as handle:
                 json.dump(data, handle, indent=2)
-                handle.flush()  # Push Python internal buffers to OS cache
-                os.fsync(handle.fileno())  # Force OS cache flush to physical storage
-
             return True
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to save layout {path}: {err}")
@@ -2764,9 +2788,8 @@ class OverlayScene(QtCore.QObject):
             syslog.warning(f"OBS OVERLAY: failed to load layout {path}: {err}")
             return None
 
-    def _persist_files_v0(self, profile_xml: str, data: dict[str, Any]) -> bool:
-        config_path = profile_json_path(profile_xml)
-        # config_path = gremlin.util.swap_ext(profile_xml, "json")
+    def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
+        config_path = gremlin.util.swap_ext(profile_xml, "json")
         merged: dict[str, Any] | None = {}
         if os.path.isfile(config_path):
             try:
@@ -2793,58 +2816,6 @@ class OverlayScene(QtCore.QObject):
             return True
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}")
-            return False
-
-    def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
-        config_path = profile_json_path(dest_xml = profile_xml)
-        merged: dict[str, Any] = {}
-
-        if os.path.isfile(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as handle:
-                    loaded = json.load(handle)
-
-                if isinstance(loaded, dict):
-                    merged = loaded
-                else:
-                    syslog.error(
-                        f"OBS OVERLAY: profile config is not an object: {config_path}"
-                    )
-                    return False
-            except Exception as err:
-                syslog.error(
-                    f"OBS OVERLAY: could not read/parse overlay at {config_path}: {err}"
-                )
-                return False
-
-        # 2. Update configuration payload
-        merged[OVERLAY_CONFIG_KEY] = data
-
-        # 3. Persist back to disk safely
-        tmp_path = f"{config_path}.tmp"
-        try:
-            folder = os.path.dirname(config_path)
-            if folder:
-                os.makedirs(folder, exist_ok=True)
-
-            with open(tmp_path, "w", encoding="utf-8") as handle:
-                json.dump(merged, handle, indent=4, sort_keys=True)
-                handle.flush()  # Push Python internal buffers to OS cache
-                os.fsync(handle.fileno())  # Force OS cache flush to physical storage
-
-            os.replace(tmp_path, config_path)
-            self._dirty = False
-            return True
-
-        except Exception as err:
-            syslog.error(
-                f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}"
-            )
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
             return False
 
     @property

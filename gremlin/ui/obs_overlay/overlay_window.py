@@ -978,13 +978,15 @@ class OverlayWindow(QtWidgets.QWidget):
         if view is not None and Shiboken.isValid(view):
             view.release_touch()
             view.detach_bus()
+        # Stop the follow timer before detach so a tick cannot re-attach / raise
+        # the host while the overlay is closing for profile stop.
         self._stop_host_follow()
-        self._detach_host()
+        self._detach_host(activate_host=False, hide_window=True)
         super().hideEvent(event)
 
     def closeEvent(self, event):
         self._stop_host_follow()
-        self._detach_host()
+        self._detach_host(activate_host=False, hide_window=True)
         self.detach_from_scene()
         super().closeEvent(event)
 
@@ -1063,18 +1065,39 @@ class OverlayWindow(QtWidgets.QWidget):
             return
         self._apply_window_flags()
 
+    def show_without_activating(self):
+        """Show the live overlay without pulling focus out of the game or JG Ex."""
+        if not Shiboken.isValid(self):
+            return
+        interactive = is_interactive_overlay(self.page_canvas)
+        if not interactive:
+            self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        self.show()
+        if sys.platform == "win32" and not interactive:
+            try:
+                from .host_window import apply_noactivate_exstyle
+
+                hwnd = int(self.winId() or 0)
+                if hwnd:
+                    apply_noactivate_exstyle(hwnd)
+            except Exception:
+                pass
+
     def _apply_window_flags(self):
         if self._applying_flags or not Shiboken.isValid(self):
             return
         self._applying_flags = True
+        was_attached = bool(self._host_attached)
         try:
-            self._detach_host()
             self._chrome_sig = self._chrome_signature()
             self._sync_page_title()
             onscreen = is_onscreen_mode(self.page_canvas)
             interactive = is_interactive_overlay(self.page_canvas)
             attach = bool(self.page_canvas.get("attach_to_window"))
             visible = self.isVisible()
+            # Detach only when leaving app-share or rebuilding HWND flags.
+            # Unconditional detach on every apply was yanking focus from the game.
+            flags_preview = None
             if onscreen:
                 flags = (
                     QtCore.Qt.Window
@@ -1088,16 +1111,31 @@ class OverlayWindow(QtWidgets.QWidget):
                         flags |= QtCore.Qt.WindowDoesNotAcceptFocus
                 elif not interactive:
                     flags |= QtCore.Qt.WindowDoesNotAcceptFocus | QtCore.Qt.WindowTransparentForInput
+                flags_preview = flags
+            else:
+                layered = live_window_is_layered(self.page_canvas)
+                flags = QtCore.Qt.Window | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint
+                if layered or self.page_canvas.get("frameless"):
+                    flags = QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint
+                if self.page_canvas.get("always_on_top"):
+                    flags |= QtCore.Qt.WindowStaysOnTopHint
+                if not interactive or attach:
+                    flags |= QtCore.Qt.WindowDoesNotAcceptFocus
+                flags_preview = flags
+            flags_changed = int(self.windowFlags()) != int(flags_preview)
+            if was_attached and (flags_changed or not attach):
+                self._detach_host()
+
+            if onscreen:
                 self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
                 self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, not interactive)
                 self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, not interactive)
                 self.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, interactive)
-                flags_changed = int(self.windowFlags()) != int(flags)
                 if flags_changed:
                     # Never change flags while visible — Windows HWND UAF risk.
                     if visible:
                         self.hide()
-                    self.setWindowFlags(flags)
+                    self.setWindowFlags(flags_preview)
                     self._sync_page_title()
                 self.drag_bar.setVisible(False)
                 if Shiboken.isValid(self.view):
@@ -1114,25 +1152,19 @@ class OverlayWindow(QtWidgets.QWidget):
                         self.adjustSize()
             else:
                 layered = live_window_is_layered(self.page_canvas)
-                flags = QtCore.Qt.Window | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint
-                if layered or self.page_canvas.get("frameless"):
-                    flags = QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint
-                if self.page_canvas.get("always_on_top"):
-                    flags |= QtCore.Qt.WindowStaysOnTopHint
                 self.setAttribute(QtCore.Qt.WA_TranslucentBackground, layered)
                 self.setAttribute(QtCore.Qt.WA_NoSystemBackground, layered)
                 self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-                self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, False)
+                self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
                 self.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, interactive)
                 if layered:
                     _transparent_palette(self)
                     if Shiboken.isValid(self.view):
                         _transparent_palette(self.view)
-                flags_changed = int(self.windowFlags()) != int(flags)
                 if flags_changed:
                     if visible:
                         self.hide()
-                    self.setWindowFlags(flags)
+                    self.setWindowFlags(flags_preview)
                     self._sync_page_title()
                 show_bar = bool(self.page_canvas.get("show_drag_bar", True)) or layered
                 if self.page_canvas.get("attach_to_window"):
@@ -1140,7 +1172,8 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.drag_bar.setVisible(show_bar)
                 chroma = chroma_fill_color(self.page_canvas)
                 bar = chroma if chroma.alpha() > 80 else QtGui.QColor("#8a93a3")
-                self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:#111;")
+                fg = gremlin.ui.ui_common.Color.normalColor()
+                self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:{fg};")
                 if Shiboken.isValid(self.view):
                     self.view._sync_paint_mode()
                     self.view._apply_size()
@@ -1148,7 +1181,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 if not self.page_canvas.get("attach_to_window"):
                     self._restore_or_center()
             if visible and flags_changed and Shiboken.isValid(self):
-                self.show()
+                self.show_without_activating()
             if Shiboken.isValid(self):
                 self._apply_click_through(onscreen and not interactive)
             if live_window_is_layered(self.page_canvas) and Shiboken.isValid(self) and (visible or self.isVisible()):
@@ -1178,15 +1211,25 @@ class OverlayWindow(QtWidgets.QWidget):
                 user32.GetWindowLongPtrW.restype = ctypes.c_longlong
                 user32.SetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_longlong]
                 style = user32.GetWindowLongPtrW(hwnd, gwl_exstyle)
-                extras = ws_ex_transparent | ws_ex_noactivate | ws_ex_toolwindow
-                style = (style | extras) if enabled else (style & ~extras)
+                # Always keep NOACTIVATE on live overlays so app-share attach
+                # and toggle show cannot steal the game's foreground.
+                extras = ws_ex_noactivate | ws_ex_toolwindow
+                if enabled:
+                    extras |= ws_ex_transparent
+                    style = style | extras
+                else:
+                    style = (style | (ws_ex_noactivate | ws_ex_toolwindow)) & ~ws_ex_transparent
                 user32.SetWindowLongPtrW(hwnd, gwl_exstyle, style)
             else:
                 style = user32.GetWindowLongW(hwnd, gwl_exstyle)
-                extras = ws_ex_transparent | ws_ex_noactivate | ws_ex_toolwindow
-                style = (style | extras) if enabled else (style & ~extras)
+                extras = ws_ex_noactivate | ws_ex_toolwindow
+                if enabled:
+                    extras |= ws_ex_transparent
+                    style = style | extras
+                else:
+                    style = (style | (ws_ex_noactivate | ws_ex_toolwindow)) & ~ws_ex_transparent
                 user32.SetWindowLongW(hwnd, gwl_exstyle, style)
-            user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020)
+            user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020 | 0x0010)
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: click-through style failed: {err}")
 
@@ -1209,8 +1252,14 @@ class OverlayWindow(QtWidgets.QWidget):
         want = bool(canvas.get("attach_to_window"))
         title = str(canvas.get("attach_window_title") or "").strip()
         exe = str(canvas.get("attach_window_exe") or "").strip()
-        if not want or (not title and not exe) or not self.isVisible():
+        # After SetParent, Qt often reports isVisible()==False even though the
+        # child HWND is live. Treating that as "not shown" caused a detach every
+        # tick, which promoted the game (and its cursor) over JG Ex.
+        live = self.isVisible() or bool(self._host_attached)
+        if not want or (not title and not exe):
             self._detach_host()
+            return
+        if not live:
             return
         from .app_view import resolve_application_hwnd
         from .host_window import attach_overlay_hwnd, place_overlay_in_host
@@ -1235,17 +1284,23 @@ class OverlayWindow(QtWidgets.QWidget):
             _extend_frame_into_client(self)
         self._apply_click_through(is_onscreen_mode(canvas) and not is_interactive_overlay(canvas))
 
-    def _detach_host(self):
+    def _detach_host(self, activate_host: bool = False, hide_window: bool = False):
         if not self._host_attached:
             self._host_hwnd = 0
             return
+        host = int(self._host_hwnd or 0)
         try:
             from .host_window import detach_overlay_hwnd
 
             if Shiboken.isValid(self):
                 hwnd = int(self.winId())
                 if hwnd:
-                    detach_overlay_hwnd(hwnd)
+                    detach_overlay_hwnd(
+                        hwnd,
+                        restore_hwnd=host,
+                        activate_host=activate_host,
+                        hide_window=hide_window,
+                    )
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: host detach failed: {err}")
         self._host_attached = False
@@ -1324,7 +1379,7 @@ class OverlayWindow(QtWidgets.QWidget):
             self.page_canvas["always_on_top"] = top.isChecked()
             self.scene._dirty = True
             self._apply_window_flags()
-            self.show()
+            self.show_without_activating()
         elif chosen is bar:
             self.page_canvas["show_drag_bar"] = bar.isChecked()
             self.scene._dirty = True
@@ -1333,6 +1388,6 @@ class OverlayWindow(QtWidgets.QWidget):
             self.page_canvas["frameless"] = frame.isChecked()
             self.scene._dirty = True
             self._apply_window_flags()
-            self.show()
+            self.show_without_activating()
         elif chosen is close_action:
             self.hide()

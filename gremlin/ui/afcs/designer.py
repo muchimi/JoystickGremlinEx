@@ -20,6 +20,7 @@ import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.util
 from gremlin.input_types import InputType
+from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup
 from gremlin.ui.obs_overlay.bindings import (
     find_overlay_state,
     overlay_mode_combo_fields,
@@ -269,7 +270,7 @@ class ActivationBindingWidget(QtWidgets.QWidget):
         self._binding = default_toggle_binding()
         self._layout = QtWidgets.QFormLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._source = QtWidgets.QComboBox()
+        self._source = QDataComboBox()
         for value, label in (
             ("none", "Always (fallback)"),
             ("state", "State"),
@@ -325,12 +326,12 @@ class ActivationBindingWidget(QtWidgets.QWidget):
         gremlin.util.clear_layout(self._body_layout)
         source = str(self._source.currentData() or "none")
         if source == "state":
-            combo = QtWidgets.QComboBox()
+            combo = QDataComboBox()
             populate_overlay_state_combo(combo, self._binding.get("state_id"), self._binding.get("state_name"))
             combo.currentIndexChanged.connect(self._on_state)
             self._body_layout.addWidget(combo)
         elif source == "mode":
-            combo = QtWidgets.QComboBox()
+            combo = QDataComboBox()
             populate_overlay_mode_combo(combo, self._binding.get("mode_id"), self._binding.get("mode_name"))
             combo.currentIndexChanged.connect(self._on_mode)
             self._body_layout.addWidget(combo)
@@ -341,8 +342,10 @@ class ActivationBindingWidget(QtWidgets.QWidget):
         elif source == "physical":
             row = QtWidgets.QHBoxLayout()
             label = QtWidgets.QLabel(self._device_label())
-            listen = QtWidgets.QPushButton("Listen...")
-            listen.clicked.connect(self._listen)
+            listen = Buttons.getListenWidget(
+                label="Listen...",
+                callback=self._listen,
+            )
             row.addWidget(label, 1)
             row.addWidget(listen)
             wrap = QtWidgets.QWidget()
@@ -540,9 +543,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             )
             expr.editingFinished.connect(self._on_expression_finished)
             self._expression_edit = expr
-            preview = QtWidgets.QPushButton("Preview")
-            preview.setToolTip("Show a Venn diagram, boolean algebra, and truth table for this expression.")
-            preview.clicked.connect(self._preview_expression)
+            preview = QDataPushButton("Preview", tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.", clicked=self._preview_expression)
             expr_row = QtWidgets.QWidget()
             expr_layout = QtWidgets.QHBoxLayout(expr_row)
             expr_layout.setContentsMargins(0, 0, 0, 0)
@@ -550,9 +551,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             expr_layout.addWidget(preview)
             self._form.addRow("Expression", expr_row)
 
-            ops = QtWidgets.QPushButton("Boolean operators")
-            ops.setToolTip("Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.")
-            ops.clicked.connect(self._show_boolean_operators)
+            ops = QDataPushButton("Boolean operators", tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.", clicked=self._show_boolean_operators)
             self._form.addRow("", ops)
 
             hint = QtWidgets.QLabel(_condition_summary(vis))
@@ -568,12 +567,14 @@ class NodeConditionWidget(QtWidgets.QWidget):
             for cond in vis.get("conditions") or []:
                 self._form.addRow(self._condition_box(cond))
 
-            add_kind = QtWidgets.QComboBox()
+            add_kind = QDataComboBox()
             for value, label in _CONDITION_KINDS:
                 add_kind.addItem(label, value)
-            add_btn = QtWidgets.QPushButton("Add condition")
-            add_btn.setToolTip("Add a mode, state, or input. It is assigned the next letter (A, B, C...).")
-            add_btn.clicked.connect(lambda _=False, box=add_kind: self._add_condition(str(box.currentData() or "mode")))
+            add_btn = Buttons.getAddWidget(
+                label="Add condition",
+                tooltip="Add a mode, state, or input. It is assigned the next letter (A, B, C...).",
+                callback=lambda box=add_kind: self._add_condition(str(box.currentData() or "mode")),
+            )
             add_row = QtWidgets.QWidget()
             add_layout = QtWidgets.QHBoxLayout(add_row)
             add_layout.setContentsMargins(0, 0, 0, 0)
@@ -637,7 +638,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         form = QtWidgets.QFormLayout(box)
         cond_id = str(cond.get("id") or "")
         kind = str(cond.get("kind") or "mode").casefold()
-        kind_box = QtWidgets.QComboBox()
+        kind_box = QDataComboBox()
         for value, label in _CONDITION_KINDS:
             kind_box.addItem(label, value)
         index = kind_box.findData(kind)
@@ -646,20 +647,22 @@ class NodeConditionWidget(QtWidgets.QWidget):
             lambda _i, combo=kind_box, cid=cond_id: self._set_condition(cid, rebuild=True, kind=str(combo.currentData() or "mode"))
         )
         form.addRow("If", kind_box)
-        when = QtWidgets.QComboBox()
-        if kind == "mode":
-            when.addItem("is current", "on")
-            when.addItem("is not current", "off")
-        else:
-            when.addItem("is on", "on")
-            when.addItem("is off", "off")
-        when.setCurrentIndex(1 if str(cond.get("when") or "on").casefold() == "off" else 0)
-        when.currentIndexChanged.connect(
-            lambda _i, combo=when, cid=cond_id: self._set_condition(cid, when=str(combo.currentData() or "on"))
+        when_opts = (
+            [("is current", "on"), ("is not current", "off")]
+            if kind == "mode"
+            else [("is on", "on"), ("is off", "off")]
         )
+        when_cur = "off" if str(cond.get("when") or "on").casefold() == "off" else "on"
+        when = QDataRadioButtonGroup(
+            when_opts,
+            value=when_cur,
+            callback=lambda v, cid=cond_id: self._set_condition(cid, when=str(v or "on")),
+        )
+        if when.layout() is not None:
+            when.layout().setContentsMargins(0, 0, 0, 0)
         form.addRow("When", when)
         if kind == "mode":
-            combo = QtWidgets.QComboBox()
+            combo = QDataComboBox()
             populate_overlay_mode_combo(combo, cond.get("mode_id"), cond.get("mode_name"))
             combo.currentIndexChanged.connect(
                 lambda _i, combo=combo, cid=cond_id: self._set_condition(
@@ -668,7 +671,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             )
             form.addRow("Mode", combo)
         elif kind == "state":
-            combo = QtWidgets.QComboBox()
+            combo = QDataComboBox()
             populate_overlay_state_combo(combo, cond.get("state_id"), cond.get("state_name"))
             combo.currentIndexChanged.connect(
                 lambda _i, combo=combo, cid=cond_id: self._set_condition(
@@ -684,15 +687,17 @@ class NodeConditionWidget(QtWidgets.QWidget):
             form.addRow(picker)
         else:
             self._fill_button(form, cond)
-        remove = QtWidgets.QPushButton("Remove")
-        remove.clicked.connect(lambda _=False, cid=cond_id: self._remove_condition(cid))
+        remove = Buttons.getRemoveWidget(
+            label="Remove",
+            callback=lambda cid=cond_id: self._remove_condition(cid),
+        )
         form.addRow("", remove)
         return box
 
     def _fill_button(self, form: QtWidgets.QFormLayout, cond: dict) -> None:
         kind = str(cond.get("kind") or "physical").casefold()
         cond_id = str(cond.get("id") or "")
-        device_box = QtWidgets.QComboBox()
+        device_box = QDataComboBox()
         if kind == "vjoy":
             for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
                 device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
@@ -724,12 +729,14 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
         device_box.currentIndexChanged.connect(_device_changed)
         form.addRow("Device", device_box)
-        listen = QtWidgets.QPushButton("Listen...")
-        listen.setToolTip("Assign from the next physical or vJoy button press")
-        listen.clicked.connect(lambda _=False, cid=cond_id: self._listen(cid))
+        listen = Buttons.getListenWidget(
+            label="Listen...",
+            tooltip="Assign from the next physical or vJoy button press",
+            callback=lambda cid=cond_id: self._listen(cid),
+        )
         form.addRow("", listen)
         device = _device_from_combo(device_box, kind)
-        id_box = QtWidgets.QComboBox()
+        id_box = QDataComboBox()
         id_box.addItem("(none)", 0)
         try:
             current_id = int(cond.get("input_id") or 0)
@@ -894,10 +901,10 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._mode_list.customContextMenuRequested.connect(self._mode_context_menu)
         left_layout.addWidget(self._mode_list, 1)
         mode_buttons = QtWidgets.QHBoxLayout()
-        add_mode = QtWidgets.QPushButton("Add")
-        duplicate_mode = QtWidgets.QPushButton("Duplicate")
-        rename_mode = QtWidgets.QPushButton("Rename")
-        delete_mode = QtWidgets.QPushButton("Delete")
+        add_mode = Buttons.getAddWidget(label="Add")
+        duplicate_mode = QDataPushButton("Duplicate")
+        rename_mode = QDataPushButton("Rename")
+        delete_mode = QDataPushButton("Delete")
         add_mode.clicked.connect(self._add_mode)
         duplicate_mode.clicked.connect(self._duplicate_mode)
         rename_mode.clicked.connect(self._rename_mode)
@@ -928,12 +935,14 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             ("laglead", "Lag-lead"),
             ("output", "Output"),
         ):
-            button = QtWidgets.QPushButton(label)
+            button = QDataPushButton(label)
             button.clicked.connect(lambda _=False, k=kind: self._add_node(k))
             tools.addWidget(button)
-        delete_btn = QtWidgets.QPushButton("Delete")
-        delete_btn.setToolTip("Delete the selected node(s). The Delete key also works.")
-        delete_btn.clicked.connect(self._delete_selected_nodes)
+        delete_btn = Buttons.getDeleteWidget(
+            label="Delete",
+            tooltip="Delete the selected node(s). The Delete key also works.",
+            callback=self._delete_selected_nodes,
+        )
         tools.addWidget(delete_btn)
         tools.addStretch()
         center_layout.addLayout(tools)
@@ -1655,7 +1664,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._inspector_form.addRow(self._help_label)
         self._set_inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
         if kind == "input":
-            source = QtWidgets.QComboBox()
+            source = QDataComboBox()
             source.setEditable(True)
             source.addItem("")
             for entry in self.document.enrollments():
@@ -1672,20 +1681,22 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             invert.setChecked(bool(node.get_property("invert")))
             invert.toggled.connect(lambda checked, n=node: self._set_node_prop(n, "invert", checked))
             self._inspector_form.addRow(invert)
-            display = QtWidgets.QComboBox()
-            for mode in INPUT_DISPLAY_RANGES:
-                display.addItem(INPUT_DISPLAY_LABELS[mode], mode)
-            current_display = normalize_input_display_range(node.get_property("display_range"))
-            index = display.findData(current_display)
-            display.setCurrentIndex(index if index >= 0 else 0)
+            display = QDataRadioButtonGroup(
+                [(INPUT_DISPLAY_LABELS[mode], mode) for mode in INPUT_DISPLAY_RANGES],
+                value=normalize_input_display_range(node.get_property("display_range")),
+                callback=lambda v, n=node: self._set_node_prop(n, "display_range", v),
+            )
+            if display.layout() is not None:
+                display.layout().setContentsMargins(0, 0, 0, 0)
             display.setToolTip(
                 "Invert first, then this range is the node's output. Hardware is always −1..+1. "
                 "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps ±1. Auto uses throttle/slider names like GEX."
             )
-            display.currentIndexChanged.connect(lambda _i, n=node, box=display: self._set_node_prop(n, "display_range", box.currentData()))
             self._inspector_form.addRow("Display", display)
-            listen = QtWidgets.QPushButton("Listen for physical axis...")
-            listen.clicked.connect(lambda _=False, n=node: self._listen_axis(n))
+            listen = Buttons.getListenWidget(
+                label="Listen for physical axis...",
+                callback=lambda _=False, n=node: self._listen_axis(n),
+            )
             self._inspector_form.addRow(listen)
             guid = str(node.get_property("device_guid") or "")
             axis_id = int(node.get_property("axis_id") or 0)
@@ -1693,7 +1704,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             if guid and axis_id:
                 self._inspector_form.addRow(QtWidgets.QLabel(f"{device_name or guid} axis {axis_id}"))
         elif kind == "merge":
-            combo = QtWidgets.QComboBox()
+            combo = QDataComboBox()
             for op in MERGE_OPS:
                 combo.addItem(MERGE_OP_LABELS[op], op)
             current = operation_from_label(node.get_property("operation"))
@@ -1702,30 +1713,28 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             combo.currentIndexChanged.connect(lambda _i, n=node, box=combo: self._set_merge_op(n, box.currentData()))
             self._inspector_form.addRow("Operation", combo)
         elif kind == "curve":
-            edit = QtWidgets.QPushButton("Edit curve...")
-            edit.clicked.connect(lambda _=False, n=node: self._on_double_click(n))
+            edit = QDataPushButton("Edit curve...", clicked=lambda n=node: self._on_double_click(n))
             self._inspector_form.addRow(edit)
         elif kind == "limiter":
-            shape = QtWidgets.QComboBox()
-            for mode in LIMITER_SHAPES:
-                shape.addItem(LIMITER_SHAPE_LABELS[mode], mode)
-            current_shape = normalize_limiter_shape(node.get_property("shape"))
-            shape_index = shape.findData(current_shape)
-            shape.setCurrentIndex(shape_index if shape_index >= 0 else 0)
+            shape = QDataRadioButtonGroup(
+                [(LIMITER_SHAPE_LABELS[mode], mode) for mode in LIMITER_SHAPES],
+                value=normalize_limiter_shape(node.get_property("shape")),
+                callback=lambda v, n=node: self._set_limiter_shape(n, v),
+            )
+            if shape.layout() is not None:
+                shape.layout().setContentsMargins(0, 0, 0, 0)
             shape.setToolTip("Linear scales throw. Bezier morphs GEX-style handles toward a flat center. Min-max follows 1:1 then clips at the live limiter axis from 100% down to 0%.")
-            shape.currentIndexChanged.connect(lambda _i, n=node, box=shape: self._set_limiter_shape(n, box.currentData()))
             self._inspector_form.addRow("Shape", shape)
-            combo = QtWidgets.QComboBox()
-            for mode in LIMITER_RANGES:
-                combo.addItem(LIMITER_RANGE_LABELS[mode], mode)
-            current = normalize_limiter_range(node.get_property("range_mode"))
-            index = combo.findData(current)
-            combo.setCurrentIndex(index if index >= 0 else 0)
+            combo = QDataRadioButtonGroup(
+                [(LIMITER_RANGE_LABELS[mode], mode) for mode in LIMITER_RANGES],
+                value=normalize_limiter_range(node.get_property("range_mode")),
+                callback=lambda v, n=node: self._set_node_prop(n, "range_mode", v),
+            )
+            if combo.layout() is not None:
+                combo.layout().setContentsMargins(0, 0, 0, 0)
             combo.setToolTip("0 to 100%: slider or throttle over full travel. Centered (−100 to +100): stick; negative inverts the output.")
-            combo.currentIndexChanged.connect(lambda _i, n=node, box=combo: self._set_node_prop(n, "range_mode", box.currentData()))
             self._inspector_form.addRow("Limit axis", combo)
-            edit = QtWidgets.QPushButton("Edit full-throw curve...")
-            edit.clicked.connect(lambda _=False, n=node: self._on_double_click(n))
+            edit = QDataPushButton("Edit full-throw curve...", clicked=lambda n=node: self._on_double_click(n))
             self._inspector_form.addRow(edit)
         elif kind == "deadzone":
             center = self._percent_spin(self._prop_float(node, "center", 0.05), lambda value, n=node: self._set_node_prop(n, "center", value / 100.0))
@@ -1756,9 +1765,11 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         when_widget.set_value(node.get_property("when_json"))
         when_widget.changed.connect(lambda vis, n=node: self._set_node_prop(n, "when_json", encode_when(vis)))
         self._inspector_form.addRow(when_widget)
-        remove = QtWidgets.QPushButton("Delete node")
-        remove.setToolTip("Remove this node from the graph")
-        remove.clicked.connect(lambda _=False, n=node: self._delete_nodes([n]))
+        remove = Buttons.getDeleteWidget(
+            label="Delete node",
+            tooltip="Remove this node from the graph",
+            callback=lambda n=node: self._delete_nodes([n]),
+        )
         self._inspector_form.addRow(remove)
 
     def _set_inspector_help(self, kind: str, operation: str | None = None) -> None:
@@ -1831,7 +1842,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             return
         current_vid = int(node.get_property("vjoy_id") or devices[0].vjoy_id or 1)
         current_axis = int(node.get_property("axis_id") or 1)
-        device_combo = QtWidgets.QComboBox()
+        device_combo = QDataComboBox()
         for device in devices:
             device_combo.addItem(_vjoy_device_label(device), int(device.vjoy_id))
         index = device_combo.findData(current_vid)
@@ -1840,7 +1851,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             index = 0
         with QtCore.QSignalBlocker(device_combo):
             device_combo.setCurrentIndex(index)
-        axis_combo = QtWidgets.QComboBox()
+        axis_combo = QDataComboBox()
 
         def fill_axes(vjoy_id: int, selected_axis: int) -> None:
             device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(int(vjoy_id), connected_only=False)

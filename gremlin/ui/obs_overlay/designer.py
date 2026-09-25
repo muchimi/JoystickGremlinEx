@@ -19,7 +19,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.util
-from gremlin.ui.ui_common import Color, QTabHeader
+from gremlin.ui.ui_common import Color, QDataPushButton, QDataRadioButtonGroup, QTabHeader
 
 from .images import (
     apply_image_to_item,
@@ -109,9 +109,39 @@ WIDGET_TITLES = {
     "streamdeck": "Stream Deck",
 }
 
+WIDGET_TOOLTIPS = {
+    "button": "On/off button. Bind a physical, vJoy, state, mode, or keyboard input.",
+    "hat": "Hat / POV rose (4 or 8 positions).",
+    "switch_4way": "Four-way cardinal switch (N/E/S/W).",
+    "switch_2way": "Two-way toggle with a center rest.",
+    "switch_3way": "Three-way switch (up / center / down).",
+    "axis_bar": "Single-axis bar meter.",
+    "axis_radio": "Horizontal radio-style axis strip.",
+    "axis_fader": "Slider / fader for one axis.",
+    "axis_radial": "Radial gauge for one axis.",
+    "axis_encoder": "Rotary encoder-style display.",
+    "axis_paddle": "Paddle / throttle arc.",
+    "axis_stick_square": "Two-axis stick in a square pad.",
+    "axis_crosshair": "Two-axis radar / crosshair.",
+    "axis_stick_circle": "Two-axis stick in a circular pad.",
+    "axis_mouse": "Mouse displacement display (VJoy or standard).",
+    "axis_graph": "Scrolling temporal graph of one or more axes.",
+    "axis_bars": "Bar graph of several axis datasets.",
+    "sys_stats": "Counter / stats (time, FPS, temperature, manual).",
+    "stopwatch": "Stopwatch (digital or analog).",
+    "label": "Text label, or live current profile mode.",
+    "input_display": "On-screen keyboard / mouse key highlighter.",
+    "shape": "Rectangle, circle, freeform, and other shapes.",
+    "image": "Static image or SVG from a file, or a pasted screenshot. SVG stays sharp at any size.",
+    "application": "Live capture of another application window.",
+    "remote_view": "Video return from a remote GEX peer.",
+    "streamdeck": "Live Stream Deck key grid on the overlay.",
+}
+
 _BANNER_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
 _BANNER_PREF_KEY = "show_action_banner"
 _PANE_PREF_KEY = "show_selection_pane"
+_PALETTE_VIEW_KEY = "palette_view"
 _PANE_DEFAULT_WIDTH = 220
 _PANE_MIN_WIDTH = 200
 
@@ -119,11 +149,11 @@ _COMMON_WIDGET_MOUSE = (
     "Drag to move (snaps to grid and guides). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
     "Drag the round handle above the widget to rotate; hold Shift to snap to 15°. "
     "Hold the middle mouse button to pan the canvas. "
-    "Shift+click adds to the selection. Right-click: Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
+    "Shift+click adds to the selection. Right-click: Copy, Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
 )
 _COMMON_WIDGET_KEYS = (
-    "Delete removes. Ctrl+D duplicates. Ctrl+V pastes a screenshot from the clipboard as an Image. "
-    "Arrow keys nudge (Shift = larger step). Ctrl+Z / Ctrl+Y undo/redo. "
+    "Delete removes. Ctrl+C copies, Ctrl+V pastes (widgets, or a screenshot as an Image). "
+    "Ctrl+D duplicates. Arrow keys nudge (Shift = larger step). Ctrl+Z / Ctrl+Y undo/redo. "
     "Ctrl+G groups (two or more). Ctrl+Shift+G ungroups. Ctrl+A selects all. Ctrl+wheel zooms. Ctrl+0 resets zoom."
 )
 _COMMON_WIDGET_PALETTE = "With this widget selected, a palette click changes its type and keeps compatible settings."
@@ -148,6 +178,17 @@ def _pane_pref_visible() -> bool:
 
 def _set_pane_pref_visible(visible: bool):
     QtCore.QSettings(*_BANNER_SETTINGS).setValue(_PANE_PREF_KEY, bool(visible))
+
+
+def _palette_view_mode() -> str:
+    raw = str(QtCore.QSettings(*_BANNER_SETTINGS).value(_PALETTE_VIEW_KEY, "wrap") or "wrap").casefold()
+    if raw in ("flow", "wrap"):
+        return "wrap"
+    return "list"
+
+
+def _set_palette_view_mode(mode: str):
+    QtCore.QSettings(*_BANNER_SETTINGS).setValue(_PALETTE_VIEW_KEY, "list" if mode == "list" else "wrap")
 
 
 def _banner_type_help(item: dict) -> list[str]:
@@ -270,7 +311,9 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
         body = (
             "<b>Mouse</b> — Click empty space to deselect. Drag empty space for a rubber-band (Shift adds). "
             "Hold the middle mouse button to pan. Drag a guide to move it. Ctrl+wheel zooms the designer (does not change overlay resolution).<br>"
-            "<b>Keys</b> — Ctrl+A select all. Ctrl+V paste a screenshot as an Image. Ctrl+Z / Ctrl+Y undo/redo. Ctrl+0 reset zoom. Ctrl++ / Ctrl+− zoom.<br>"
+            "<b>Keys</b> — Ctrl+A select all. Ctrl+C / Ctrl+V copy and paste widgets. "
+            "Ctrl+V also pastes a screenshot as an Image when no widgets were copied. "
+            "Ctrl+Z / Ctrl+Y undo/redo. Ctrl+0 reset zoom. Ctrl++ / Ctrl+− zoom.<br>"
             "<b>Pages</b> — Double-click a tab to rename. Right-click a tab to duplicate or delete. + adds a page. "
             "Show overlay and Interactive apply to the selected page.<br>"
             "<b>Palette</b> — Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
@@ -688,6 +731,13 @@ class DesignerCanvas(OverlayView):
             self.scene.remove_selected()
         elif key == QtCore.Qt.Key_D and mods & QtCore.Qt.ControlModifier:
             self.scene.duplicate_selected()
+        elif key == QtCore.Qt.Key_C and mods & QtCore.Qt.ControlModifier:
+            self.scene.copy_selected()
+        elif key == QtCore.Qt.Key_V and mods & QtCore.Qt.ControlModifier:
+            if self.scene.has_widget_clipboard():
+                self.scene.paste_clipboard()
+            elif clipboard_has_image():
+                self.paste_clipboard_image()
         elif key == QtCore.Qt.Key_G and mods & QtCore.Qt.ControlModifier:
             if mods & QtCore.Qt.ShiftModifier:
                 self.scene.ungroup_selected()
@@ -732,15 +782,20 @@ class DesignerCanvas(OverlayView):
         if hit and hit["id"] not in self.scene.selected_ids:
             self.scene.set_selection(self.scene.expand_group_ids([hit["id"]]))
         menu = QtWidgets.QMenu(self)
+        paste_widgets = menu.addAction("Paste")
+        paste_widgets.setEnabled(self.scene.has_widget_clipboard())
         paste_image = menu.addAction("Paste image")
         paste_image.setEnabled(clipboard_has_image())
         if not self.scene.selected_ids:
             chosen = menu.exec(event.globalPos())
-            if chosen is paste_image:
+            if chosen is paste_widgets:
+                self.scene.paste_clipboard()
+            elif chosen is paste_image:
                 self.paste_clipboard_image(pos)
             return
         grouped = any(str(item.get("group") or "").strip() for item in self.scene.selected_widgets())
         menu.addSeparator()
+        copy_widgets = menu.addAction("Copy")
         duplicate = menu.addAction("Duplicate")
         delete = menu.addAction("Delete")
         menu.addSeparator()
@@ -781,8 +836,12 @@ class DesignerCanvas(OverlayView):
             turn_image_button = menu.addAction("Turn into button")
             turn_image_paddle = menu.addAction("Turn into paddle")
         chosen = menu.exec(event.globalPos())
-        if chosen is paste_image:
+        if chosen is paste_widgets:
+            self.scene.paste_clipboard()
+        elif chosen is paste_image:
             self.paste_clipboard_image(pos)
+        elif chosen is copy_widgets:
+            self.scene.copy_selected()
         elif chosen is duplicate:
             self.scene.duplicate_selected()
         elif chosen is delete:
@@ -1229,6 +1288,8 @@ class DesignerCanvas(OverlayView):
     def _place_image(self, path: str, image: QtGui.QImage | None = None, scene_pos: QtCore.QPointF | None = None, hit=None) -> bool:
         if not path:
             return False
+        from .images import image_intrinsic_size
+
         if image is None or image.isNull():
             image = QtGui.QImage(path)
         target = hit
@@ -1239,12 +1300,17 @@ class DesignerCanvas(OverlayView):
             return apply_image_to_item(self.scene, target, path, image)
         width = 200
         height = 120
+        size = None
         if image is not None and not image.isNull():
+            size = (image.width(), image.height())
+        if size is None:
+            size = image_intrinsic_size(path)
+        if size is not None:
             canvas_w = max(32, int(self.scene.canvas.get("width") or 1280))
             canvas_h = max(32, int(self.scene.canvas.get("height") or 720))
-            scale = min(1.0, canvas_w / max(1, image.width()), canvas_h / max(1, image.height()))
-            width = max(16, int(round(image.width() * scale)))
-            height = max(16, int(round(image.height() * scale)))
+            scale = min(1.0, canvas_w / max(1, size[0]), canvas_h / max(1, size[1]))
+            width = max(16, int(round(size[0] * scale)))
+            height = max(16, int(round(size[1] * scale)))
         x, y = self._image_origin(width, height, scene_pos)
         item = self.scene.add_widget("image", x, y)
         item["w"] = width
@@ -1292,8 +1358,7 @@ class DesignerCanvas(OverlayView):
         file_path = local_image_path_from_mime(mime)
         if file_path:
             path = import_image_file(self.scene, file_path)
-            image = QtGui.QImage(path) if path else None
-            if self._place_image(path, image, scene_pos, hit):
+            if self._place_image(path, None, scene_pos, hit):
                 event.acceptProposedAction()
                 return
         image = qimage_from_mime(mime)
@@ -1418,6 +1483,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         paste = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Paste, self)
         paste.setContext(QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut)
         paste.activated.connect(self._paste_shortcut)
+        copy = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Copy, self)
+        copy.setContext(QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        copy.activated.connect(self._copy_shortcut)
 
         try:
             el = gremlin.event_handler.EventListener()
@@ -1441,25 +1509,38 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             widget = widget.parentWidget()
         return False
 
+    def _copy_shortcut(self):
+        if gremlin.shared_state.is_running:
+            return
+        if self._focus_wants_text_paste():
+            focus = QtWidgets.QApplication.focusWidget()
+            if focus is not None and hasattr(focus, "copy"):
+                focus.copy()
+            return
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None and alive(canvas):
+            canvas.scene.copy_selected()
+
     def _paste_shortcut(self):
         if gremlin.shared_state.is_running and not self._focus_wants_text_paste():
             return
-        clip = QtWidgets.QApplication.clipboard()
-        mime = clip.mimeData() if clip is not None else None
-        has_text = bool(mime is not None and mime.hasText() and str(mime.text() or "").strip())
-        if clipboard_has_image() and not (self._focus_wants_text_paste() and has_text):
+        if self._focus_wants_text_paste():
+            focus = QtWidgets.QApplication.focusWidget()
+            if isinstance(focus, QtWidgets.QAbstractSpinBox):
+                line = focus.lineEdit()
+                if line is not None:
+                    line.paste()
+                    return
+            if focus is not None and hasattr(focus, "paste"):
+                focus.paste()
+            return
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None and alive(canvas) and canvas.scene.has_widget_clipboard():
+            canvas.scene.paste_clipboard()
+            return
+        if clipboard_has_image():
             if self.canvas.paste_clipboard_image():
                 return
-        if not self._focus_wants_text_paste():
-            return
-        focus = QtWidgets.QApplication.focusWidget()
-        if isinstance(focus, QtWidgets.QAbstractSpinBox):
-            line = focus.lineEdit()
-            if line is not None:
-                line.paste()
-            return
-        if hasattr(focus, "paste"):
-            focus.paste()
 
     def _cleanup_ui(self, *_args):
         """Disconnect scene/manager/profile hooks before Qt tears the widget down."""
@@ -1559,9 +1640,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         bar = QtWidgets.QWidget()
         layout = QtWidgets.QHBoxLayout(bar)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._overlay_button = QtWidgets.QPushButton("Show overlay")
-        self._overlay_button.setToolTip("Show or hide the live window for the selected overlay page")
-        self._overlay_button.clicked.connect(lambda _=False: self._toggle_overlay())
+        self._overlay_button = QDataPushButton(
+            "Show overlay",
+            tooltip="Show or hide the live window for the selected overlay page",
+            clicked=lambda: self._toggle_overlay(),
+        )
         self._interactive_box = QtWidgets.QCheckBox("Interactive")
         self._interactive_box.setToolTip(
             "On this page’s live overlay, touch or click widgets bound to vJoy or GEX states. "
@@ -1575,19 +1658,21 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._pane_box = QtWidgets.QCheckBox("Selection pane")
         self._pane_box.setToolTip("Show a PowerPoint-style list of widgets: name, type, show/hide, lock, group.")
         self._pane_box.setChecked(False)
-        export = QtWidgets.QPushButton("Export overlay...")
-        export.setToolTip("Copy this overlay to a JSON file you choose. The profile still keeps its own overlay.")
-        export.clicked.connect(self._export_overlay)
+        export = QDataPushButton(
+            "Export overlay...",
+            tooltip="Copy this overlay to a JSON file you choose. The profile still keeps its own overlay.",
+            clicked=self._export_overlay,
+        )
         self._export_btn = export
-        import_btn = QtWidgets.QPushButton("Import overlay...")
-        import_btn.setToolTip("Replace this profile’s overlay with a JSON file.")
-        import_btn.clicked.connect(self._import_overlay)
+        import_btn = QDataPushButton(
+            "Import overlay...",
+            tooltip="Replace this profile’s overlay with a JSON file.",
+            clicked=self._import_overlay,
+        )
         self._import_btn = import_btn
-        undo = QtWidgets.QPushButton("Undo")
-        undo.clicked.connect(self.scene.undo)
+        undo = QDataPushButton("Undo", clicked=self.scene.undo)
         self._undo_btn = undo
-        redo = QtWidgets.QPushButton("Redo")
-        redo.clicked.connect(self.scene.redo)
+        redo = QDataPushButton("Redo", clicked=self.scene.redo)
         self._redo_btn = redo
         for widget in (self._overlay_button, self._interactive_box, self._hints_box, self._pane_box, export, import_btn, undo, redo):
             layout.addWidget(widget)
@@ -1601,10 +1686,12 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._zoom_slider.valueChanged.connect(self._on_zoom_slider)
         self._zoom_value = QtWidgets.QLabel("100%")
         self._zoom_value.setMinimumWidth(44)
-        reset_zoom = QtWidgets.QPushButton("100%")
-        reset_zoom.setFixedWidth(48)
-        reset_zoom.setToolTip("Reset designer zoom to 100%")
-        reset_zoom.clicked.connect(lambda _=False: self._set_zoom_percent(100))
+        reset_zoom = QDataPushButton(
+            "100%",
+            tooltip="Reset designer zoom to 100%",
+            clicked=lambda: self._set_zoom_percent(100),
+            width=48,
+        )
         layout.addWidget(zoom_label)
         layout.addWidget(self._zoom_slider)
         layout.addWidget(self._zoom_value)
@@ -1842,25 +1929,48 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
     def _palette(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
         panel.setMinimumWidth(220)
-        panel.setMaximumWidth(280)
+        panel.setMaximumWidth(320)
         layout = QtWidgets.QVBoxLayout(panel)
-        for title, types in PALETTE_GROUPS:
-            layout.addWidget(QtWidgets.QLabel(title))
-            for widget_type in types:
-                btn = QtWidgets.QPushButton(WIDGET_TITLES.get(widget_type, widget_type))
-                btn.setToolTip(
-                    f"Add a {WIDGET_TITLES.get(widget_type, widget_type)}. "
-                    "If a widget is selected, change it to this type and keep compatible settings."
-                )
-                btn.clicked.connect(lambda _=False, t=widget_type: self._add_widget(t))
-                layout.addWidget(btn)
-        layout.addSpacing(12)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+
+        view_row = QtWidgets.QWidget()
+        view_layout = QtWidgets.QHBoxLayout(view_row)
+        view_layout.setContentsMargins(0, 0, 0, 0)
+        view_layout.setSpacing(8)
+        view_layout.addWidget(QtWidgets.QLabel("Widgets"))
+        self._palette_view = _palette_view_mode()
+        view_toggle = QDataRadioButtonGroup(
+            [
+                ("List", "list", "One button per row."),
+                ("Wrap", "wrap", "Wrap buttons to the left panel width."),
+            ],
+            value=self._palette_view,
+            callback=self._on_palette_view,
+        )
+        view_layout.addWidget(view_toggle)
+        view_layout.addStretch(1)
+        layout.addWidget(view_row)
+        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        layout.addSpacing(4)
+
+        self._palette_widgets_host = QtWidgets.QWidget()
+        self._palette_widgets_layout = QtWidgets.QVBoxLayout(self._palette_widgets_host)
+        self._palette_widgets_layout.setContentsMargins(0, 0, 0, 0)
+        self._palette_widgets_layout.setSpacing(6)
+        layout.addWidget(self._palette_widgets_host)
+        self._rebuild_palette_widgets()
+
+        layout.addSpacing(8)
         layout.addWidget(QtWidgets.QLabel("Templates"))
+        templates_host, templates_flow = gremlin.ui.ui_common.getFlowContainer()
         for name, tip, factory in TEMPLATES:
             btn = TemplateButton(name, editable=False)
             btn.setToolTip(tip)
             btn.apply_requested.connect(lambda fn=factory, title=name: self._apply_template(title, fn))
-            layout.addWidget(btn)
+            templates_flow.addWidget(btn)
+        layout.addWidget(templates_host)
+
         saved_header = QtWidgets.QWidget()
         saved_row = QtWidgets.QHBoxLayout(saved_header)
         saved_row.setContentsMargins(0, 0, 0, 0)
@@ -1888,8 +1998,53 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         scroll.setWidget(panel)
         scroll.setMinimumWidth(220)
-        scroll.setMaximumWidth(280)
+        scroll.setMaximumWidth(320)
+        self._palette_scroll = scroll
         return scroll
+
+    def _on_palette_view(self, mode: str):
+        self._palette_view = "list" if mode == "list" else "wrap"
+        _set_palette_view_mode(self._palette_view)
+        self._rebuild_palette_widgets()
+
+    def _palette_type_button(self, widget_type: str) -> QDataPushButton:
+        title = WIDGET_TITLES.get(widget_type, widget_type)
+        tip = WIDGET_TOOLTIPS.get(widget_type) or f"Add a {title}."
+        tip = (
+            f"{tip}\n\n"
+            "Click to add. If a widget is selected, change it to this type and keep compatible settings."
+        )
+        return QDataPushButton(
+            title,
+            tooltip=tip,
+            clicked=lambda _checked=False, t=widget_type: self._add_widget(t),
+        )
+
+    def _rebuild_palette_widgets(self):
+        layout = getattr(self, "_palette_widgets_layout", None)
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            child = item.layout()
+            if child is not None:
+                gremlin.util.clear_layout(child)
+        wrap_mode = getattr(self, "_palette_view", _palette_view_mode()) != "list"
+        for index, (title, types) in enumerate(PALETTE_GROUPS):
+            if wrap_mode and index > 0:
+                layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+            layout.addWidget(QtWidgets.QLabel(title))
+            if wrap_mode:
+                host, flow = gremlin.ui.ui_common.getFlowContainer()
+                for widget_type in types:
+                    flow.addWidget(self._palette_type_button(widget_type))
+                layout.addWidget(host)
+            else:
+                for widget_type in types:
+                    layout.addWidget(self._palette_type_button(widget_type))
 
     def _add_widget(self, widget_type: str):
         if gremlin.shared_state.is_running:
@@ -2067,7 +2222,6 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return sidecar
         xml = profile_xml_path()
         folder = os.path.dirname(xml) if xml else (gremlin.shared_state.data_path or "")
-
         stem = profile_display_name().replace(" ", "_") or "overlay"
         if stem in ("No profile", "Unsaved profile"):
             stem = "overlay"

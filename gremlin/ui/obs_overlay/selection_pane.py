@@ -9,6 +9,9 @@ from __future__ import annotations
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 
+import gremlin.ui.ui_common
+from gremlin.ui.ui_common import Color, QDataPushButton, QDataRadioButtonGroup
+
 from .model import OverlayScene, widget_display_name
 from .qt_guard import alive
 from .widgets import widget_rotated_bounds
@@ -53,7 +56,7 @@ def _icon_eye(visible: bool) -> QtGui.QIcon:
     pm.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pm)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    color = QtGui.QColor("#d8dee8" if visible else "#6a7380")
+    color = QtGui.QColor(Color.normalColor() if visible else Color.inactiveColor())
     painter.setPen(QtGui.QPen(color, 1.4))
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawEllipse(QtCore.QRectF(2.5, 5.0, 11.0, 6.0))
@@ -71,7 +74,7 @@ def _icon_lock(locked: bool) -> QtGui.QIcon:
     pm.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pm)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    color = QtGui.QColor("#e2b04a" if locked else "#6a7380")
+    color = QtGui.QColor(Color.orangeColor() if locked else Color.inactiveColor())
     painter.setPen(QtGui.QPen(color, 1.4))
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawRoundedRect(QtCore.QRectF(4.0, 7.5, 8.0, 6.0), 1.5, 1.5)
@@ -104,10 +107,13 @@ class OverlaySelectionPane(QtWidgets.QWidget):
 
         sort_row = QtWidgets.QHBoxLayout()
         sort_row.addWidget(QtWidgets.QLabel("Sort"))
-        self._sort_box = QtWidgets.QComboBox()
-        self._sort_box.addItem("Name", "name")
-        self._sort_box.addItem("Type", "type")
-        self._sort_box.currentIndexChanged.connect(self._on_sort)
+        self._sort_box = QDataRadioButtonGroup(
+            [("Name", "name"), ("Type", "type")],
+            value="name",
+            callback=self._on_sort,
+        )
+        if self._sort_box.layout() is not None:
+            self._sort_box.layout().setContentsMargins(0, 0, 0, 0)
         sort_row.addWidget(self._sort_box, 1)
         root.addLayout(sort_row)
 
@@ -135,16 +141,19 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         )
         root.addWidget(self._tree, 1)
 
-        buttons = QtWidgets.QHBoxLayout()
-        self._group_btn = QtWidgets.QPushButton("Group")
-        self._group_btn.setToolTip("Group the widgets selected in this list (Ctrl+G).")
-        self._group_btn.clicked.connect(self._group)
-        self._ungroup_btn = QtWidgets.QPushButton("Ungroup")
-        self._ungroup_btn.setToolTip("Ungroup the selected widgets (Ctrl+Shift+G).")
-        self._ungroup_btn.clicked.connect(self._ungroup)
-        buttons.addWidget(self._group_btn)
-        buttons.addWidget(self._ungroup_btn)
-        root.addLayout(buttons)
+        self._group_btn = QDataPushButton(
+            "Group",
+            tooltip="Group the widgets selected in this list (Ctrl+G).",
+            clicked=self._group,
+        )
+        self._ungroup_btn = QDataPushButton(
+            "Ungroup",
+            tooltip="Ungroup the selected widgets (Ctrl+Shift+G).",
+            clicked=self._ungroup,
+        )
+        root.addWidget(
+            gremlin.ui.ui_common.getHContainer([self._group_btn, self._ungroup_btn], widget_only=True)
+        )
 
         self.scene.changed.connect(self.refresh)
         self.scene.selection_changed.connect(self._on_scene_selection)
@@ -167,8 +176,8 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         except Exception:
             pass
 
-    def _on_sort(self):
-        self._sort = str(self._sort_box.currentData() or "name")
+    def _on_sort(self, value=None):
+        self._sort = str(value if value is not None else (self._sort_box.currentData() or "name"))
         self.refresh()
 
     def refresh(self):
