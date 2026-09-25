@@ -783,7 +783,7 @@ def find_icon(icon_file):
 
     root_folder = get_root_folder()
     # usual locations for images
-    folder_list = ["icons"]
+    folder_list = ["icons","sounds"]
     for folder in folder_list:
         full_folder = os.path.join(root_folder, folder)
         if os.path.isdir(full_folder):

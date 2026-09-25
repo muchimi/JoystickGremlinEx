@@ -44,8 +44,8 @@ import traceback
 # import queue
 from gremlin.fastqueue import FastQueue
 import gremlin.util
-from gremlin.sound import Sound, PlaybackOptions, PhraseData
-from gremlin.types import PlayMode
+from gremlin.sound import Sound
+
 
 syslog = logging.getLogger("system")
 

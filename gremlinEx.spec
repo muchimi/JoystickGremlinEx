@@ -35,6 +35,11 @@ for root, _, files in os.walk("icons"):
     for fname in files:
         icon_files.append((os.path.join(root, fname), root))
 
+sound_files = []
+for root, _, files in os.walk("sounds"):
+    for fname in files:
+        sound_files.append((os.path.join(root, fname), root))
+
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
@@ -49,6 +54,7 @@ added_files.extend(collect_data_files("faster_whisper"))
 
 added_files.extend(action_plugins_files)
 added_files.extend(icon_files)
+added_files.extend(sound_files)
 added_files.extend(container_plugins_files)
 added_files.extend(doc_files)
 added_files.extend(xml_files)
@@ -61,6 +67,9 @@ _binary_candidates = [
     ("ffmpeg/ffmpeg.exe", "."),
     ("ffmpeg/ffprobe.exe", "."),
 ]
+
+
+
 added_binaries = []
 for src, dest in _binary_candidates:
     if os.path.exists(src):

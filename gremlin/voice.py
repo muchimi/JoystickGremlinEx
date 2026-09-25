@@ -40,6 +40,7 @@ from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, has
 from collections import deque
 import queue
 import sounddevice as sd
+from gremlin.sound import Sound, PlaybackOptions
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.utils import download_model
@@ -1640,6 +1641,11 @@ class Voice:
         self._new_word = False  # flag to indicate if a new word has been added
         self._volume = 0.0  # default volume level (system microphone level)
 
+        self._beep_valid = False
+        self._beep_enabled = True
+        self._sound = None
+        self._beep_on_path = None
+        self._beep_off_path = None
         self._beep_init() # setup beep on voice flip
 
         self._callbacks = []
@@ -1654,23 +1660,25 @@ class Voice:
 
     def _beep_init(self):
         # audio beep when toggling voice
-        from gremlin.sound import Sound
+
         self._sound = None
-        self._beep_enabled = False  # enable or disable audio beep for voice toggling
+        self._bee_valid = False  # enable or disable audio beep for voice toggling
         self._beep_on_path = gremlin.util.find_file("voice_beep_on.wav")
         self._beep_off_path = gremlin.util.find_file("voice_beep_off.wav")
 
-        if os.path.isfile(self._beep_on_path) and os.path.isfile(self._beep_off_path):
-            self._beep_enabled = True
+        # sound files located
+        if self._beep_on_path and self._beep_off_path and os.path.isfile(self._beep_on_path) and os.path.isfile(self._beep_off_path):
+            self._beep_valid = True
             self._sound = Sound()
+            self._beep_options = PlaybackOptions("voice_beep")
 
     def _beep(self, enabled : bool):
-        if not self._beep_enabled:
+        if not self._beep_valid:
             return
         if enabled:
-            self._sound.play(self._beep_on_path)
+            self._sound.play(self._beep_on_path, self._beep_options)
         else:
-            self._sound.play(self._beep_off_path)
+            self._sound.play(self._beep_off_path, self._beep_options)
 
 
 
@@ -1742,17 +1750,26 @@ class Voice:
             elif self._recognize_stack > 0:
                 self._recognize_stack -= 1
 
-    def setListen(self, enable: bool):
+    def setListen(self, enabled: bool):
         """enable or disable listening while monitoring"""
         with self._listen_lock:
-            self._listen_enabled = enable
+            self._listen_enabled = enabled
+        self._beep(enabled)
         if self.verbose:
-            syslog.info(f"Voice: Listening set to {'enabled' if enable else 'disabled'}")
+            syslog.info(f"Voice: Listening set to {'enabled' if enabled else 'disabled'}")
 
     def listenEnabled(self) -> bool:
         """returns whether listening is currently enabled"""
         with self._listen_lock:
             return self._listen_enabled
+
+    def setBeep(self, enabled: bool):
+        """enable or disable the audio beep when voice recognition is toggled"""
+        self._beep_enabled = enabled
+
+    def beepEnabled(self) -> bool:
+        """returns whether the audio beep is enabled"""
+        return self._beep_enabled
 
     def test(self):
 
