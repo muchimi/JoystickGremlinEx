@@ -191,6 +191,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._widget_device_index_map = {}
 
         self._profile_load_stack = []
+        self._profile_loading_stack = 0
         self._profile_load_temporary_files = []
         self._profile_hash = None  # active profile hash to detect changes
         self.locked = False
@@ -221,6 +222,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_selected_device_guid = None
         self._last_selected_input_type = None
         self._last_selected_input_id = None
+        self._startup_restore_target = None  # deferred startup restore tuple (device_guid, input_type, input_id)
 
         self._resize_count = 0
 
@@ -441,6 +443,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.config.run_on_start and profile_to_load:
             # register a startup call
             el.profile_loaded.connect(self._handle_auto_start_on_load)
+
+    def pushProfileLoading(self):
+        self._profile_loading_stack += 1
+
+    def popProfileLoading(self, reset=False):
+        if self._profile_loading_stack:
+            if reset:
+                self._profile_loading_stack = 0
+            else:
+                self._profile_loading_stack -= 1
+
+    def isProfileLoading(self):
+        return self._profile_loading_stack > 0
 
     def _handle_auto_start_on_load(self):
         """Handles auto start when the profile is loaded"""
@@ -1862,6 +1877,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         If the file was loaded from an existing profile that file is
         updated, otherwise the user is prompted for a new file.
         """
+
+        # notify modules to update their sidecar files
+        el = gremlin.event_handler.EventListener()
+        el.update_sidecar.emit()
+
+
         if self.profile.profile_file is not None:
             self.profile.save()
             # update the hash so we can detect changes
@@ -1871,39 +1892,50 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def save_profile_as(self):
         """Prompts the user for a file to save to profile to."""
+        from pathlib import Path
 
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
         if fname != "":
             # Seed the new sidecar from the previous profile companion before the
             # path switch. Overlay/save used to create a sparse JSON (overlay +
             # last_input only) and Stream Deck page names were lost on Save As.
+
+            # list the sidecars for the current profile
+
             old_xml = getattr(self.profile, "_profile_fname", None) or self.profile.profile_file
-            old_json = getattr(self.profile, "_profile_config_fname", None)
-            if not old_json and old_xml:
-                old_json = gremlin.util.swap_ext(old_xml, "json")
-            new_xml = gremlin.util.fix_path(fname)
-            new_json = gremlin.util.swap_ext(new_xml, "json")
-            try:
-                if (
-                    old_json
-                    and os.path.isfile(old_json)
-                    and new_json
-                    and os.path.normcase(os.path.abspath(old_json)) != os.path.normcase(os.path.abspath(new_json))
-                    and not os.path.isfile(new_json)
-                ):
-                    shutil.copyfile(old_json, new_json)
-            except Exception as err:
-                syslog.warning(f"SAVE AS: could not seed companion JSON: {err}")
+            if old_xml:
 
-            if self.config.streamdeck_enabled:
-                # Flush Stream Deck page names into the *current* sidecar first so
-                # in-memory renames are not left only in RAM when the path changes.
-                try:
-                    from gremlin.ui.streamdeck_device import StreamDeckBridge
+                # notify modules to update their sidecar files
+                el = gremlin.event_handler.EventListener()
+                el.update_sidecar.emit()
 
-                    StreamDeckBridge()._persist_page_metadata()
-                except Exception:
-                    pass
+                new_xml = gremlin.util.fix_path(fname)
+
+                sidecars = gremlin.util.getSidecarFiles(old_xml)
+                old_stem = Path(old_xml).stem
+                new_stem = Path(new_xml).stem
+                base_dir = os.path.dirname(new_xml)
+
+                file_pairs = []
+                for sidecar in sidecars:
+                    new_sidecar = os.path.join(base_dir, os.path.basename(sidecar).replace(old_stem, new_stem, 1))
+                    file_pairs.append((sidecar, new_sidecar))
+
+
+                # copy the files
+                for old_file, new_file in file_pairs:
+                    try:
+                        if (
+                            old_file
+                            and os.path.isfile(old_file)
+                            and new_file
+                            and os.path.normcase(os.path.abspath(old_file)) != os.path.normcase(os.path.abspath(new_file))
+                            and not os.path.isfile(new_file)
+                        ):
+                            shutil.copyfile(old_file, new_file) # overwrite if necessary
+                    except Exception as err:
+                        syslog.warning(f"SAVE AS: could not copy file {old_file} to {new_file}: {err}")
+
 
             self.profile.setProfileFile(fname)
             self.profile.save()
@@ -2168,6 +2200,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _update_highlight_toolbar_enabled(self):
         """updates the enabled status of the highlight status bar buttons based on current enabled state"""
+        gremlin.util.InvokeUiMethod(self._update_highlight_toolbar_enabled_ui)
+
+    def _update_highlight_toolbar_enabled_ui(self):
+        """updates the enabled status of the highlight status bar buttons based on current enabled state"""
+        gremlin.util.assert_ui_thread()
         enabled = self.config.highlight_enabled
         icon = self._icon_green if enabled else self._icon_gray
         self.status_bar_highlight_enable_widget.setIcon(icon)
@@ -2306,6 +2343,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot(bool)
     def _highlight_enable_changed(self, enabled: bool):
+        gremlin.util.InvokeUiMethod(self._highlight_enable_changed_ui, enabled)
+
+    def _highlight_enable_changed_ui(self, enabled: bool):
         self._update_highlight_toolbar_enabled()
         if enabled:
             # reset the highlight stack
@@ -3035,7 +3075,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device: DeviceSummary
             device_guid = None
 
-
             self.push_highlighting()
             el = gremlin.event_handler.EventListener()
             gremlin.shared_state.push_input_selection()  # prevent selections
@@ -3533,7 +3572,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 widget = gremlin.ui.profile_settings.ProfileSettingsWidget(self.profile.settings)
                                 self.registerWidget(device_guid, widget)
 
-
                                 self._settings_device_guid = device_guid
 
                                 widget.data = (
@@ -3601,9 +3639,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     assert device is not None, "unable to derive device"
 
                 input_item = None
-                if last_input_id:
+                if last_input_id is not None:
                     # ensure the input still exists
-                    input_item = self.profile.find_input(last_device_guid, last_input_id)
+                    input_item = self.profile.find_input(last_device_guid, last_input_id, last_input_type)
 
                 if not input_item:
                     # not found
@@ -3654,6 +3692,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.pop_highlighting()
             self._update_highlight_toolbar_enabled()
             gremlin.shared_state.pop_suspend_save_input()
+
+            if last_device_guid is not None and last_input_type is not None and last_input_id is not None:
+                self._schedule_startup_input_restore(last_device_guid, last_input_type, last_input_id)
+
             selected_device_guid = self.getActiveTabDeviceGuid()
             if verbose:
                 syslog.info("Tab recreated:")
@@ -3680,6 +3722,44 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self._creating_tabs = False
                 if self._tabs_rebuild_pending:
                     self._arm_tabs_rebuild_timer()
+
+    def _schedule_startup_input_restore(self, device_guid, input_type, input_id):
+        """Schedules a post-load input restore after Qt has settled widget creation."""
+        self._startup_restore_target = (device_guid, input_type, input_id)
+        gremlin.util.singleShot(lambda: self._apply_startup_input_restore(0))
+
+    def _apply_startup_input_restore(self, attempt: int):
+        """Attempts startup input restore with a few retries to avoid Qt timing races."""
+        target = self._startup_restore_target
+        if target is None:
+            return
+
+        device_guid, input_type, input_id = target
+        if device_guid is None or input_type is None or input_id is None:
+            self._startup_restore_target = None
+            return
+
+        self._select_input(
+            device_guid=device_guid,
+            input_type=input_type,
+            input_id=input_id,
+            force_update=True,
+            force_switch=True,
+            tab_changed=True,
+            extra_data={"source": "startup_restore_retry"},
+        )
+
+        selected_ok = (
+            gremlin.util.compare_guid(self._last_selected_device_guid, device_guid)
+            and self._last_selected_input_type == input_type
+            and self._last_selected_input_id == input_id
+        )
+
+        if selected_ok or attempt >= 3:
+            self._startup_restore_target = None
+            return
+
+        gremlin.util.singleShot(lambda: self._apply_startup_input_restore(attempt + 1))
 
     def get_ordered_device_guid_list(self, filter_tab_type: TabDeviceType = TabDeviceType.NotSet) -> Iterator[dinput.GUID]:
         """returns the list of device guids as directinput GUIDs
@@ -3792,11 +3872,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self,
         extra_data: dict = None,
     ):
+
         # if there is a last input - select that input as well
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
-            eh = gremlin.event_handler.EventListener()
-            eh.select_input.emit(device_guid, input_type, input_id, False, True, False, extra_data)
+            syslog.info(f"UI: selecting last input: device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
+            self._select_input(device_guid, input_type, input_id)
+            # eh = gremlin.event_handler.EventListener()
+            # eh.select_input.emit(device_guid, input_type, input_id, False, True, False, extra_data)
 
     def _get_last_input(self, device_guid: str) -> tuple:
         """Gets the last input selection for the given device
@@ -3847,9 +3930,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # nothing to match
             return None
 
+        try:
+            input_type = InputType.convert(input_type)
+        except Exception:
+            pass
+
+        if isinstance(input_id, str) and input_id.isnumeric() and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+            input_id = int(input_id)
+
         widget = self._get_tab_widget_guid(device_guid)
         if widget is not None and hasattr(widget, "find_input"):
             return widget.find_input(device_guid, input_type, input_id)
+
+        if widget is not None and hasattr(widget, "inputItemListModel"):
+            model = widget.inputItemListModel
+            if model is not None and hasattr(model, "getUnfilteredItems"):
+                items = model.getUnfilteredItems()
+                if items:
+                    return next(
+                        (item for item in items if item and item.input_id == input_id and item.input_type == input_type),
+                        None,
+                    )
 
         items = self._get_input_items(device_guid)
         if items:
@@ -3981,6 +4082,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device_guid = None
             input_type = None
             input_id = None
+            skip_selection_tracking = False
             if self._change_input_lock.locked():
                 return
 
@@ -4016,6 +4118,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # syslog = logging.getLogger("system")
                     input_id = restore_input_id
                     input_type = restore_input_type
+                    requested_specific_input = restore_input_type is not None and restore_input_id is not None
+
+                    if (
+                        isinstance(input_id, str)
+                        and input_id.isnumeric()
+                        and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+                    ):
+                        input_id = int(input_id)
 
                     switch_input = force_switch  # true if inputs are switched or forcing refresh
 
@@ -4153,9 +4263,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     has_containers = False
 
                     # see if the request input is found
+                    if requested_specific_input and hasattr(widget, "refresh"):
+                        # Ensure the list/model are current before resolving a
+                        # persisted selection during startup/profile reload.
+                        widget.refresh(emit=False)
+
                     input_item = self._find_input_item(device_guid, input_type, input_id)
                     if input_item is None:
-                        # not found
+                        if requested_specific_input:
+                            skip_selection_tracking = True
+                            if verbose:
+                                syslog.info(f"SELECT INPUT: deferred restore miss for {device_guid} {input_type} {input_id}; waiting for retry")
+                            return
+
+                        # no specific restore target - fall back to first input
                         input_item = self._get_input_item(device_guid, 0)
 
                         if not input_item:
@@ -4212,6 +4333,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
                             if tab_changed or not hasattr(widget, "inputItemListView"):
                                 widget.refresh(emit=False)
+
+                            # A tab refresh can rebuild list/model objects. Re-resolve the
+                            # input item from ids to avoid selecting a stale object reference.
+                            if input_type is not None and input_id is not None:
+                                resolved_item = self._find_input_item(device_guid, input_type, input_id)
+                                if resolved_item is not None:
+                                    input_item = resolved_item
+
                             if not force_update:
                                 force_update = (
                                     current_input_id != input_id
@@ -4219,7 +4348,38 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     or not gremlin.util.compare_guid(current_device_guid_norm, device_guid)
                                 )
 
-                            index = widget.indexOf(input_item)
+                            index = widget.indexOf(input_item) if input_item is not None else -1
+                            if index == -1 and input_type is not None and input_id is not None and hasattr(widget, "inputItemListModel"):
+                                for candidate in widget.inputItemListModel:
+                                    if candidate is not None and candidate.input_type == input_type and candidate.input_id == input_id:
+                                        input_item = candidate
+                                        index = widget.indexOf(candidate)
+                                        break
+
+                            if index == -1 and requested_specific_input and input_item is not None:
+                                device = gremlin.joystick_handling.getDevice(device_guid)
+                                if device and device.device_type == DeviceType.Joystick and self.is_highligthing_enabled and self.config.filter_auto_unhide:
+                                    widget.setInputVisible(input_item, True, emit=True)
+                                    index = widget.indexOf(input_item)
+                                    if verbose:
+                                        syslog.info(f"SELECT INPUT: restore target {input_item.display_name} unhidden at index {index}")
+
+                            if index == -1:
+                                if requested_specific_input:
+                                    if verbose:
+                                        syslog.info(
+                                            f"SELECT INPUT: requested restore target still unresolved for {device_guid} {input_type} {input_id}; waiting for retry"
+                                        )
+                                    skip_selection_tracking = True
+                                    return
+
+                                fallback_item = self._get_input_item(device_guid, 0)
+                                if fallback_item is not None:
+                                    input_item = fallback_item
+                                    input_type = fallback_item.input_type
+                                    input_id = fallback_item.input_id
+                                    index = widget.indexOf(fallback_item)
+
                             if index == -1:
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 if device and device.device_type == DeviceType.Joystick and self.is_highligthing_enabled and self.config.filter_auto_unhide:
@@ -4228,8 +4388,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     if verbose:
                                         syslog.info(f"SELECT INPUT: input {input_item.display_name} made visible at index {index}")
 
-                            widget.selectInputItemIndex(index)
-                            widget.setContentWidget(input_type, input_id)
+                            if index >= 0:
+                                widget.selectInputItemIndex(index)
+                            if input_type is not None and input_id is not None:
+                                widget.setContentWidget(input_type, input_id)
 
                             list_view = widget.inputItemListView
                             if list_view is not None and index is not None and index >= 0:
@@ -4277,14 +4439,42 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # update tracking
             self.setCurrentTabTracking(device_guid)
 
-            self._last_selected_device_guid = device_guid
-            self._last_selected_input_type = input_type
-            self._last_selected_input_id = input_id
-            config.set_last_input(device_guid, input_type, input_id)
+            if not skip_selection_tracking:
+                self.saveLastSelection(device_guid, input_type, input_id)
+
+
 
             if completion_callback:
                 # fire the callback on completion
                 completion_callback(device_guid, input_type, input_id)
+
+    def saveLastSelection(self, device_guid, input_type, input_id):
+        if self.isProfileLoading():
+            # ignore if we're loading
+            return
+        if self._last_selected_device_guid == device_guid and self._last_selected_input_type == input_type and self._last_selected_input_id == input_id:
+            return
+
+        if not device_guid:
+            return
+        dev = gremlin.joystick_handling.getDevice(device_guid)
+        if not dev:
+            return
+        if input_type is None:
+            return
+        if input_id is None:
+            return
+
+        self._last_selected_device_guid = device_guid
+        self._last_selected_input_type = input_type
+        self._last_selected_input_id = input_id
+        config = gremlin.config.Configuration()
+        config.set_last_input(device_guid, input_type, input_id)
+
+        verbose = gremlin.config.Configuration().verbose_mode_select
+        if verbose:
+            device_name = gremlin.joystick_handling.getDeviceName(device_guid) or 'n/a'
+            syslog.info(f"last saved selected input: device_guid= [{device_guid}], device_name=[{device_name}], input_type=[{input_type.name}], input_id=[{input_id}]")
 
     def _handle_item_selected(self, device_guid, input_type, input_id):
         """Handles item selection events from the list view"""
@@ -5216,6 +5406,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # file does not exist
             return
 
+        self.pushProfileLoading()
+
         wm = WorkManager()
         wm.submit(
             callback=self._do_load_profile_internal_worker,
@@ -5248,7 +5440,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.finished.emit()  # indicate done
 
     def _profile_load_completed(self, *args):
-        """called when a profile has been loaded"""  # force a UI update
+        """called when a profile has been loaded"""
+        self.popProfileLoading()  # decrement the profile loading stack
+        # force a UI update
         verbose = gremlin.config.Configuration().verbose_mode_ui
         # The load worker already schedules refresh(); don't rebuild the current
         # device a second time (that re-execs plugins / Virpil rows).
@@ -5279,6 +5473,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.worker.deleteLater()
         self._delay_refresh_thread.quit()
         self._delay_refresh_thread.deleteLater()
+
+
+        self._select_last_input()
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
@@ -5842,6 +6039,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot(object, object)
     def _handle_highlight_state(self, autoswitch_state, axis_state, button_state):
+        gremlin.util.InvokeUiMethod(self._handle_highlight_state_ui, autoswitch_state, axis_state, button_state)
+
+    def _handle_highlight_state_ui(self, autoswitch_state, axis_state, button_state):
+        gremlin.util.assert_ui_thread()
 
         if autoswitch_state is not None:
             self.config.highlight_autoswitch = autoswitch_state
@@ -6136,7 +6337,6 @@ if __name__ == "__main__":
     # config file watcher setup (must be after app is instantiated)
     config.start()
 
-
     # set faster context switch for Python
     sys.setswitchinterval(0.001)
 
@@ -6248,8 +6448,6 @@ if __name__ == "__main__":
         hg = gremlin.hid_guardian.HidGuardian()
         hg.add_process(os.getpid())
 
-
-
         # command line parser
         parser = QtCore.QCommandLineParser()
         parser.addOption(QtCore.QCommandLineOption(["noprofile", "np"], "Do not load a profile on start (--r and --p will be ignored)"))
@@ -6296,7 +6494,6 @@ if __name__ == "__main__":
 
         # Log module options for debugging purposes
         config.logModuleOptions()
-
 
         # event listener init (after processing command line args)
         el = gremlin.event_handler.EventListener()
@@ -6422,7 +6619,6 @@ if __name__ == "__main__":
 
         # HID maestro
         maestro = gremlin.maestro.Maestro()
-
 
         # for some reason QT shows the window with a white background and ignores stylesheets/background color
         # workaround for now: show the window minimized so it doesnt' flash on the screen

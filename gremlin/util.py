@@ -1015,8 +1015,10 @@ def load_pixmap(path, size=24, qta_color=None):
         icon = None
         try:
             icon = QtGui.QIcon(qta.icon(path, color=qta_color))
-        except Exception:
-            pass
+        except Exception as e:
+            icon = gremlin.util.get_generic_icon()
+            syslog.error(f"ICON: (load pixmap) QTA reported load error for [{path}] color [{qta_color}], using generic icon")
+            syslog.error(traceback.format_exc())
 
         if icon:
             return icon.pixmap(desired_size)
@@ -1091,7 +1093,13 @@ def _load_icon(*paths, use_qta=False, qta_color=None):
                 qta_color = gremlin.ui.ui_common.Color.normalColor()
             if isinstance(qta_color, str):
                 assert qta_color.startswith("#") and len(qta_color) == 7
-            icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
+            try:
+                icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
+            except Exception:
+                syslog.error(f"ICON: (_load_icon) QTA reported load error for [{the_path}] color [{qta_color}], using generic icon")
+                syslog.error(traceback.format_exc())
+                icon = get_generic_icon()
+
         except Exception:
             pass
     if not icon:
@@ -1422,27 +1430,29 @@ def parse_guid(value) -> dinput.GUID:
     try:
         if value is None or value == "None" or not value:
             value = None
-        elif isinstance(value, str) and len(value) < 32:
-            value = None
         elif isinstance(value, dinput.GUID):
             pass
         elif isinstance(value, uuid.UUID):
-            value = dinput.GUID(value)
+            value = dinput.GUID(value.int)
+        elif hasattr(value, "toId"):
+            # Handle _GUID-like objects and any wrapper exposing a canonical id.
+            value = dinput.GUID(value.toId())
         else:
-            try:
+            if not isinstance(value, str):
+                value = str(value)
+            if len(value) < 32:
+                value = None
+            else:
                 tmp = uuid.UUID(value)
-                raw_guid = dinput._GUID()
-                raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
-                raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
-                raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
-                for i in range(8):
-                    raw_guid.Data4[i] = tmp.bytes[8 + i]
-                value = dinput.GUID(raw_guid)
-            except Exception:
-                syslog.error(f"Failed parsing GUID from value [{value}]")
-                raise ValueError(f"Failed parsing GUID from value [{value}]")
-    finally:
-        assert value is None or isinstance(value, dinput.GUID), "conversion failed"
+                try:
+                    value = dinput.GUID(tmp.int)
+                except Exception:
+                    value = None
+    except Exception:
+        syslog.error(f"Failed parsing GUID from value [{value!r}]")
+        raise ValueError(f"Failed parsing GUID from value [{value!r}]")
+
+    assert value is None or isinstance(value, dinput.GUID), "conversion failed"
     return value
 
 
@@ -3015,3 +3025,14 @@ def phraseSplit(phrase: str) -> list[str]:
     phrase = phrase.casefold().strip()
     result = [item.strip() for item in re.split(pattern, phrase) if item.strip()]
     return result
+
+
+def getSidecarFiles(path: str) -> list[str]:
+    """Returns a list of sidecar JSON files for the given XML file path."""
+    from pathlib import Path
+    xml_path = Path(path)
+    if not xml_path.is_file():
+        return []
+    base_name = xml_path.stem
+    sidecar_files = list(xml_path.parent.glob(f"{base_name}*.json"))
+    return [str(f) for f in sidecar_files]

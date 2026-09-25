@@ -312,6 +312,10 @@ class VisualizationSelector(QtWidgets.QWidget):
             self.main_layout.removeWidget(widget)
             gremlin.util.delete_widget(widget)
 
+        self._selector_widgets.clear()
+        self._selector_callbacks.clear()
+        self._view_map.clear()
+
         bh_cb = None
         at_cb = None
         ac_cb = None
@@ -1280,13 +1284,70 @@ States can be toggled by clicking on the state button.  Expression states will u
             gremlin.util.InvokeUiMethod(self._reload_ui)  # refresh the visuals and selectors
 
     def _reload_ui(self):
+        visible_visualizers = self._visible_visualizer_keys()
+        show_state = self._state_visible
+        show_keyboard = self._keyboard_visible
+
+        self._reload_visualizers_ui()
         self._reload_states_ui()
-        if self._state_visible:
+
+        if show_state:
             self.showState()
-        if self._keyboard_visible:
+        if show_keyboard:
             self.showKeyboard()
+
         self.vis_selector.updateSelector()
+        self._restore_visible_visualizers(visible_visualizers)
         self._update_ui()
+
+    def _visible_visualizer_keys(self):
+        """captures the currently visible non-system visualizers"""
+        visible = []
+        for key, viewer_widget in self._viewer_widget_map.items():
+            if viewer_widget is None:
+                continue
+            widget = viewer_widget.widget
+            if widget is None or not Shiboken.isValid(widget):
+                continue
+            visible.append(key)
+        return visible
+
+    def _restore_visible_visualizers(self, visible_keys):
+        """restores the visualizers that were visible before a reload"""
+        if not visible_keys:
+            return
+
+        vc = VisualizationConfig()
+        for key in visible_keys:
+            if key not in self._viewer_widget_map:
+                continue
+            device = vc.getDevice(key)
+            if device is None:
+                continue
+            _, visualization = key
+            self._add_remove_visualization_widget(device, visualization, True)
+
+    def _reload_visualizers_ui(self):
+        """rebuilds the viewer widgets after a profile reset"""
+        self._delete_widget(self._state_filter_widget)
+        self._delete_widget(self._state_visualizer_widget)
+        self._delete_widget(self.keyboard_widget)
+        self._delete_widget(self._keyboard_visualizer_widget)
+
+        self._state_filter_widget = None
+        self._state_visualizer_widget = None
+        self.keyboard_widget = None
+        self._keyboard_visualizer_widget = None
+        self._state_visible = False
+        self._keyboard_visible = False
+
+        self._cleanup_joystick_widgets()
+
+        for key, widget in list(self._visualizer_widgets.items()):
+            if widget not in (self.keyboard_widget_selector, self.state_widget_selector):
+                del self._visualizer_widgets[key]
+
+        self.load_viewer_widgets()
 
     def refresh(self):
         """refreshes the visualizers"""
@@ -1600,10 +1661,31 @@ States can be toggled by clicking on the state button.  Expression states will u
         config = gremlin.config.Configuration()
         config.input_viewer_combine_buttonhats = checked
 
-        # remove the joystick widgets
-        self._cleanup_joystick_widgets()
+        # rebuild only button/hat visualizers; keep all other active visualizers intact
+        self._clear_joystick_visualizers({VisualizationType.Button, VisualizationType.Hat, VisualizationType.ButtonHat})
 
         self.vis_selector.updateSelector()
+
+    def _clear_joystick_visualizers(self, visualizations: set[VisualizationType] | None = None):
+        """Clears active joystick content widgets, optionally filtered by visualization type."""
+        for key, viewer_widget in list(self._viewer_widget_map.items()):
+            _, visualization = key
+            if visualization in (VisualizationType.State, VisualizationType.Keyboard):
+                continue
+            if visualizations is not None and visualization not in visualizations:
+                continue
+
+            widget = viewer_widget.widget if viewer_widget is not None else None
+            if widget is not None:
+                viewer_widget.setWidget(None)
+                if Shiboken.isValid(widget):
+                    widget.unhook()
+                    gremlin.util.delete_widget(widget)
+
+            if key in self._visualizer_widgets:
+                del self._visualizer_widgets[key]
+
+        self._update_ui()
 
     def _cleanup_joystick_widgets(self):
         for key in self._viewer_widget_map:

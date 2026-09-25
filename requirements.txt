@@ -30,7 +30,9 @@ audioop-lts
 pydub
 pycountry
 faster_whisper>=0.7.0
+ctranslate2
 huggingface_hub
+onnxruntime
 filelock>=3.12.0
 OdenGraphQt
 

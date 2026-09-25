@@ -3907,7 +3907,9 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         key = item.message.casefold().strip()
 
         include = fnmatch.fnmatch(key, self._filter)
-        syslog.info(f"Filter check: key='{key}', filter='{self._filter}', result={include}")
+        verbose = gremlin.config.Configuration().verbose_mode_osc
+        if verbose:
+            syslog.info(f"Filter check: key='{key}', filter='{self._filter}', result={include}")
         return include
 
     def onInputListViewCreated(self):

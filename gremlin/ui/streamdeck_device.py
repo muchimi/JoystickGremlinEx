@@ -1229,6 +1229,11 @@ class StreamDeckBridge(QtCore.QObject):
 
     def __init__(self):
         super().__init__()
+
+        # hook sidecar updates
+        el = gremlin.event_handler.EventListener()
+        el.update_sidecar.connect(self._persist_page_metadata)
+
         self._server: Optional[QtWebSockets.QWebSocketServer] = None
         self._clients: list[QtWebSockets.QWebSocket] = []
         self._lock = threading.RLock()

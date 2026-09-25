@@ -49,6 +49,57 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T62)
+- Change: UI: Add mapping header to clarify what is being mapped.
+- Fix: Package (Voice): Packaging utility failed to detect and include library dependencies for the voice engine.  This prevented voice transcription from running in the packaged version of GEX.
+- Fix: UI: delete axis curve generated duplicate delete action.
+- Fix: Range Container: incomplete prior refactor caused an exception
+- Fix: UI: device widget: selection API causes parameter exception depending on interaction method
+- Fix: API: widget cache exception
+- Fix: API (Execution Engine): revert inadvertent clear container command for containers that support that option such as TempoEx.
+
+### (m77T61B)
+- Change: UI: added additional diagnostics and trace information on retrieving cache data.
+- Fix: UI: Calibration: axis exception.
+
+
+### (m77T61A)
+- Fix: PlaySound Action: typo exception in blocking delay
+- Fix: API: get last input for voice and non-numeric data.
+
+### (m77T61)
+- New: API: Containers have an execution priority order like actions. The order priority sets, at run time, the trigger order (the order in which container receives input triggers) with the lowest numbers executing first, and the higher numbers executing last.  Containers with the same priority run in an undefined order based on the way the data is stored, which is not necessarily the order in which the container appears on the screen or is listed in the profile. As with actions, if you want a container B to execute before container A, give B a lower number, for example A = 10, B = 0.  If you want container C to execute between B and A, in the example here, C = 5.  The default priority is 0.  The number range is 0 to 999. Any number can be used in that range.  If you need precise control over actions, consider using the sequence container which is designed to sequence actions and includes advanced features like delay, randomization, repeat counts, etc...
+- Change: API: generic sidecar support in profile save / save-as
+- Fix: Overlay: sidecar configuration file moved to .obs.json to avoid a contention issue with the main .json sidecar.
+- Fix: Overlay: resolve an issue with overlay not saving due to occasional sidecar contention.
+
+
+
+### (m77T60)
+- New: Trigger Action: added pulse mode for button triggers.
+- New: UI (Inputs): new icon to identify if the input has at least one mapped container.  This is added because some mappings may have empty containers attached to the input with no actions.
+- Change: UI (Options): Modules tab : list applicable environment variable if the module is enabled via an environment variable.
+- Change: Map to VJoy Action: guard against invalid output configurations if the output device, button, hat or axis no longer exists. Instead of throwing an exception, the action will ignore all triggers and place warnings in the log file.  This can happen when a profile is saved but the vjoy configuration changed after the fact.
+- Change: UI (Device Filter): filter is now aware of modules that are turned off through configuration options.
+- Fix: API (Events): added lock for certain event processing to avoid potential race conditions.
+- Fix: Trigger Action: exception on press/release checkbox selection due to new API.
+- Fix: Map to VJoy Action: virtual output device button count exception in hat to button mapping.
+- Fix: API (Keyboard): obtaining a list of key names fails with an exception if keys are not yet defined.
+- Fix: UI (Device Filter): exception when clicking the default button due to API change.
+- Fix: StreamDeck device: fix for two potential QT issue. 
+- Fix: State device: fix for two potential QT issue.
+- Fix: UI (Input Viewer): toggle combo hat/button display resets other visualizers. 
+- Fix: UI (Input Viewer): visualizers could stop updating on profile run on profile change while the window is visible.
+- Fix: UI (input selection): last selected input may not be restored on profile load or app start (still under investigation).
+
+### (m77T59)
+- Change: added verbosity option readout to log file on profile start
+- Change: added state status readout to log file on profile start after states are reset for a new profile run
+- Change: added more meaningful diagnostics data to TempoEx container including input and current profile mode.
+- New: Options: ability to enable/disable various GEX modules.  Unused features should be disabled to reduce memory and CPU usage at runtime.
+- Fix: UI (icon bug): as it's difficult to determine what is causing the underlying QTA library exception, wrapped these calls to capture the error and traceback to the log file and replace the icon with a generic icon. This should hopefully provide better information as to what's causing this without crashing GEX.
+- Fix: API: exception on JSON output with continued OS file locks.  Added logic and timer to allow for the OS to release the file locks on temporary files.
+
 ### (m77T58B)
 - Fix: resolved one more cause of thread.init() exception
 

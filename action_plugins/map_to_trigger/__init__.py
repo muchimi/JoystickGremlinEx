@@ -15,6 +15,7 @@ from gremlin.types import HatDirection
 from gremlin.util import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
+import threading
 
 import gremlin.joystick_handling
 from shiboken6 import Shiboken
@@ -59,17 +60,25 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
         # button press widget
         self.button_release_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Released", value=not self.action_data.is_pressed, data=False, callback=self._handle_button_state_changed
+            "Released", value=self.action_data.mode == "release", data="release", callbackEx=self._handle_button_state_changed
         )
         self.button_press_widget = gremlin.ui.ui_common.QDataRadioButton(
             "Pressed",
-            value=self.action_data.is_pressed,
-            data=True,
-            callback=self._handle_button_state_changed,
+            value=self.action_data.mode == "press",
+            data="press",
+            callbackEx=self._handle_button_state_changed,
         )
+
+        self.pulse_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "Pulse", value=self.action_data.mode == "pulse", data="pulse", callbackEx=self._handle_button_state_changed
+        )
+
+        self.pulse_delay_widget = gremlin.ui.ui_common.QDelayWidget(value=self.action_data.pulse_delay, callback=self._handle_pulse_delay_changed)
+
+
         # set button widgets
-        widgets = [self.button_press_widget, self.button_release_widget]
-        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets, "Set Button:", left_margin=margin, widget_only=True)
+        widgets = [self.button_press_widget, self.button_release_widget, self.pulse_widget, self.pulse_delay_widget, "||"]
+        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets, "Mode:", left_margin=margin, widget_only=True)
 
         self.use_actual_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Use actual value",
@@ -168,6 +177,10 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
                     else:
                         button_visible = True
                         exec_visible = True
+
+                    pulse_visible = self.action_data.mode == "pulse"
+                    self.pulse_delay_widget.setVisible(pulse_visible)
+
                 case InputType.JoystickHat:
                     if input_type == InputType.JoystickAxis:
                         warning = "Axis input cannot be used to trigger hats."
@@ -203,9 +216,12 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         syslog.info(f"received: {dev.name} [{dev.device_id}] input: {self.action_data.input_id} type: {self.action_data.input_type}")
         self._update_ui()
 
-    def _handle_button_state_changed(self):
-        widget = self.sender()
-        self.action_data.is_pressed = widget.data
+    def _handle_pulse_delay_changed(self, value: float):
+        self.action_data.pulse_delay = value
+
+    def _handle_button_state_changed(self, widget, checked : bool):
+        if checked:
+            self.action_data.mode = widget.data # press, release, or pulse
 
     def _handle_direction_changed(self, direction):
         self.action_data.direction = direction
@@ -239,6 +255,7 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
             el = gremlin.event_handler.EventListener()
             extra_data = {"trigger": True}  # indicate the source of the event is a macro
             device_guid = gremlin.util.parse_guid(self.action_data.device_id)
+            input_id = self.action_data.input_id
             match self.action_data.input_type:
                 case InputType.JoystickAxis:
                     if use_actual:
@@ -258,18 +275,40 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
                         # skip if the event is an axis
                         return True
 
-                    if use_actual:
-                        is_pressed = event.is_pressed
-                    else:
-                        is_pressed = self.action_data.is_pressed
-                    event = gremlin.event_handler.Event(
-                        event_type=InputType.JoystickButton,
-                        device_guid=device_guid,
-                        identifier=self.action_data.input_id,
-                        value=is_pressed,
-                        is_pressed=is_pressed,
-                        extra_data=extra_data,
-                    )
+                    match self.action_data.mode:
+                        case "press" | "release":
+                            is_pressed = self.action_data.mode == "press"
+                            press_event = gremlin.event_handler.Event(
+                                event_type=InputType.JoystickButton,
+                                device_guid=device_guid,
+                                identifier=input_id,
+                                value=is_pressed,
+                                is_pressed=is_pressed,
+                                extra_data=extra_data,
+                            )
+
+                            press_event.is_virtual = True
+                            el.joystick_event.emit(press_event)
+                            return True
+
+                        case "pulse":
+                            press_event = gremlin.event_handler.Event(
+                                event_type=InputType.JoystickButton,
+                                device_guid=device_guid,
+                                identifier=input_id,
+                                value=True,
+                                is_pressed=True,
+                                extra_data=extra_data,
+                            )
+                            self._extra_data = extra_data
+                            press_event.is_virtual = True
+                            el.joystick_event.emit(press_event)
+                            timer = threading.Timer(self.action_data.pulse_delay/1000, self._trigger_release)
+                            timer.start()
+                            return True
+
+
+
                 case InputType.JoystickHat:
                     if event.is_axis:
                         # skip if the event is an axis
@@ -294,6 +333,21 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
 
         return True
 
+    def _trigger_release(self):
+        device_guid = gremlin.util.parse_guid(self.action_data.device_id)
+        input_id = self.action_data.input_id
+
+        release_event = gremlin.event_handler.Event(
+            event_type=InputType.JoystickButton,
+            device_guid=device_guid,
+            identifier=input_id,
+            value=True,
+            is_pressed=False,
+            extra_data=self._extra_data,
+        )
+        release_event.is_virtual = True
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event.emit(release_event)
 
 class MapToTrigger(gremlin.input_item.AbstractAction):
     """map to trigger action"""
@@ -340,7 +394,8 @@ class MapToTrigger(gremlin.input_item.AbstractAction):
         self.input_type = last_input_type
         self.input_id = last_input_id
         self.action = "joystick"  # trigger action "joystick" for now
-        self.is_pressed = False  # true if a button is pressed
+        self.pulse_delay = 250  # delay for pulse action in ms
+        self.mode = "pulse"  # mode of the trigger action
         self.use_actual = False  # true if the actual event value is used
         self.value = 0.0  # value if setting a joystick
         self.direction = HatDirection.Center  # value if setting a hat
@@ -364,12 +419,14 @@ class MapToTrigger(gremlin.input_item.AbstractAction):
         node.set("exec-on-press", safe_format(self.exec_on_press, bool))
         node.set("exec-on-release", safe_format(self.exec_on_release, bool))
         node.set("actual", safe_format(self.use_actual, bool))
+        node.set("mode", self.mode)
+        node.set("pulse-delay", safe_format(self.pulse_delay, int))
 
         match self.input_type:
             case InputType.JoystickAxis:
                 node.set("value", safe_format(self.value, float))
             case InputType.JoystickButton:
-                node.set("pressed", safe_format(self.is_pressed, bool))
+                node.set("mode", self.mode)
             case InputType.JoystickHat:
                 node.set("direction", self.direction.name)
 
@@ -388,12 +445,28 @@ class MapToTrigger(gremlin.input_item.AbstractAction):
             self.action = action
 
         self.use_actual = safe_read(node, "actual", bool, False)
+        if "pressed" in node.attrib:
+            is_pressed = safe_read(node, "pressed", bool, False)
+            if is_pressed:
+                self.mode = "press"
+            else:
+                self.mode = "release"
+        else:
+            self.mode = safe_read(node, "mode", str, "pulse")
+
+        self.pulse_delay = safe_read(node, "pulse-delay", int, 250)
 
         match self.input_type:
             case InputType.JoystickAxis:
                 self.value = safe_read(node, "value", float, 0.0)
             case InputType.JoystickButton:
-                self.is_pressed = safe_read(node, "pressed", bool, False)
+
+                if "pressed" in node.attrib:
+                    if safe_read(node, "pressed", bool, False):
+                        self.mode = "press"
+                    else:
+                        self.mode = "release"
+
             case InputType.JoystickHat:
                 direction = safe_read(node, "direction", str, "Center")
                 self.direction = HatDirection.to_enum(direction)
@@ -421,7 +494,7 @@ class MapToTrigger(gremlin.input_item.AbstractAction):
                     table.addField("Set value", f"{self.value:0.03f}")
                 case InputType.JoystickButton:
                     table.addField("Button", f"{self.input_id}")
-                    table.addField("Action", "Press" if self.is_pressed else "Release")
+                    table.addField("Mode", self.mode.capitalize())
                 case InputType.JoystickHat:
                     table.addField("Hat", f"{self.input_id}")
                     table.addField("Direction", self.direction.name)

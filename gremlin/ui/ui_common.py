@@ -694,7 +694,7 @@ class Color:
         return css
 
     @staticmethod
-    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None):
+    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None, padding : int = 4,):
         if background_color is None:
             background_color = Color.normalColor()
         if foreground_color is None:
@@ -706,7 +706,7 @@ class Color:
                 color: {foreground_color};
                 border-radius: 6px;
                 font: bold {fontSize}px;
-                padding: 4px;
+                padding: {padding}px;
             }}
 
             """
@@ -1049,6 +1049,7 @@ class Color:
                         border: 4px solid {border_color};
                         border-radius: 8px;
                         background-color: {header_background_color};
+
                     }}
 
             QWidget[cssClass="box_frame"]  {{
@@ -1226,6 +1227,10 @@ class Color:
 
 class Icons:
     """general UI icon handling"""
+
+    @staticmethod
+    def containerIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.alpha-c-box-outline", qta_color)
 
     @staticmethod
     def listUpIcon(qta_color=None) -> QtGui.QIcon:
@@ -4673,10 +4678,16 @@ class QIconLabel(QWidget):
                     pixmap = load_pixmap(icon_or_path, self._icon_size, color)
             else:
                 if use_qta:
-                    if color:
-                        pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
-                    else:
-                        pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                    try:
+                        if color:
+                            pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
+                        else:
+                            pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                    except Exception as e:
+                        icon = gremlin.util.get_generic_icon()
+                        pixmap = icon.pixmap(self._icon_size)
+                        syslog.error(f"ICON: (setIcon) QTA reported load error for [{icon_or_path}] color [{color}], using generic icon")
+                        syslog.error(traceback.format_exc())
                 else:
                     pixmap = load_pixmap(icon_or_path) if icon_or_path else None
         else:
@@ -5898,10 +5909,16 @@ class QPathLineItem(QWidget):
         """sets the icon of the label, pass a blank or None path to clear the icon"""
         if icon_path:
             if use_qta:
-                if color:
-                    pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
-                else:
-                    pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+                try:
+                    if color:
+                        pixmap = qta.icon(icon_path, color=color).pixmap(self.IconSize)
+                    else:
+                        pixmap = qta.icon(icon_path).pixmap(self.IconSize)
+                except Exception as e:
+                    icon = gremlin.util.get_generic_icon()
+                    pixmap = icon.pixmap(self.IconSize)
+                    syslog.error(f"ICON: (QpathLineItem _setIcon) QTA reported load error for [{icon_path}] color [{color}], using generic icon")
+                    syslog.error(traceback.format_exc())
             else:
                 pixmap = load_pixmap(icon_path) if icon_path else None
         else:
@@ -10188,6 +10205,7 @@ class QVContentWidget(QContentWidget):
         return self.main_layout
 
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class WidgetCacheTracker:
     """tracks mapping widgets to stay within QT memory budget"""
@@ -10221,6 +10239,11 @@ class WidgetCacheTracker:
                 # unlimited
                 self._widget_map.clear()
 
+    def _validate_key(self, key):
+        assert isinstance(key, tuple), "key must be a tuple of 4 parameters"
+        assert len(key) == 4, "key must be a tuple of 4 parameters (mode, device_guid, input_type, input_id)"
+
+
     def addWidget(self, key, widget):
         """adds a widget to the cache and drops the oldest one in round robin style if a cache size is specified
         if a replacement, the widget is added to the back of the queue
@@ -10232,6 +10255,12 @@ class WidgetCacheTracker:
         assert hasattr(widget, "fromParams") and hasattr(widget, "params") and hasattr(widget, "expired"), (
             "Invalid widget for cache purposes - requires fromParams() and params methods and expired event"
         )
+
+        # validate the key
+        if __debug__:
+            self._validate_key(key)
+
+
         params = widget.params
         # store the type name
         instance_type = type(widget)
@@ -10285,6 +10314,9 @@ class WidgetCacheTracker:
             # caching disabled - never remove
             return
 
+        if __debug__:
+            self._validate_key(key)
+
         if key in self._widget_map:
             widget = self._widget_map[key]
             del self._widget_map[key]  # remove from the active widget list
@@ -10320,10 +10352,23 @@ class WidgetCacheTracker:
         """gets an item from the cache and re-cache it"""
         created = False
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+
+
         if key in self._param_map:
             if key not in self._widget_map:
                 # recreate the widget using the original data
-                instance_type, params = self.getParams(key)
+                try:
+                    # params hold (instance_type, some_other_data, params)
+                    data = self.getParams(key)
+                    assert len(data) == 3, "expected 3 elements in the parameter tuple (instance_type, key, params)"
+                    instance_type, _ , params = data
+
+                except Exception as e:
+                    syslog.error(f"WidgetCache: failed to get parameters for key [{key}]")
+                    syslog.error(f"\treturned params: {self.getParams(key)}")
+                    syslog.error(f"\texception: {e}")
+                    syslog.error(f"\tstack trace: {traceback.format_exc()}")
+                    return (None, created)
                 if verbose:
                     syslog.info(f"WidgetCache: create instance from parameter for key [{key}] [{instance_type.__name__}]")
                 widget = instance_type.fromParams(params)
@@ -10508,7 +10553,7 @@ class QSplitTabWidget(QDataWidget):
         if widget:
             container_view = widget.getContainerView()
             if container_view:
-                msg = f"Please add a container or action for{suffix} <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{input_item.display_name}</span>"
+                msg = "Please add a container or action."
                 container_view.setBlankMessage(msg)
 
     @property
@@ -14180,6 +14225,8 @@ class QCollapsible(QFrame):
         self._title_layout.addWidget(self._row_1_widget)
         self._title_layout.addWidget(self._row_2_widget)
 
+
+
         if titlebar_widget:
             self._top_bar_widget.setWidget(titlebar_widget)
 
@@ -16584,16 +16631,21 @@ class AutohideContainer(QtWidgets.QWidget):
 
     def setContent(self, widget: QtWidgets.QWidget):
         if self._content_widget is not None:
-            self._content_widget.setParent(None) # delete
-            self._content_widget.deleteLater() # schedule for deletion
+            self._content_widget.setParent(None)  # delete
+            self._content_widget.deleteLater()  # schedule for deletion
         self._content_widget = widget
         if widget is not None:
             self._main_layout.addWidget(widget)
             self.setFixedHeight(widget.sizeHint().height())
         else:
             self.setFixedHeight(0)  # hide
+        self.updateGeometry()
 
-
+    def sizeHint(self):
+        hint =  super().sizeHint()
+        if self._content_widget is None:
+            hint.setHeight(0)
+        return hint
 
 
 class AutohideContainerIdWidget(AutohideContainer):
@@ -16685,7 +16737,6 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         if self._icon is not None:
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
         self._update()
-
 
 
 class QScrollLayout(QtWidgets.QLayout):
@@ -16942,10 +16993,11 @@ class QInteractWidget(QtWidgets.QWidget):
 class QStepTile(QtWidgets.QWidget):
     """step title widget"""
 
-    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, parent=None):
+    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, padding : int = 4, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color))
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color, padding=padding))
         if icon:
             self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
             self.main_layout.addWidget(self.icon_label)

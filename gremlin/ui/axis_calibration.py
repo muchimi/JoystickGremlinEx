@@ -1173,7 +1173,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _joystick_event_handler(self, event: gremlin.event_handler.Event):
         """handles a joystick axis event"""
 
-        if event.isAxis:
+        if not event.is_axis:
             return
         if event.device_guid != self._device_guid:
             return

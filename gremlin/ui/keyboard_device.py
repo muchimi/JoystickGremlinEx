@@ -171,9 +171,11 @@ class KeyboardInputItem(InputItem):
 
     @property
     def keynames(self) -> list:
-        key_list = [self._key.name]
-        key_list.extend([key.name for key in self.latched_keys])
+        """ gets a list of key names """
+        key_list = [self._key.name] if self._key else []
+        key_list.extend([key.name for key in self.latched_keys if key])
         return key_list
+
 
     def getKeyList(self) -> list:
         """gets keys as a list, including any latched keys"""
@@ -188,7 +190,8 @@ class KeyboardInputItem(InputItem):
         if self._key:
             key_map[self._key.name] = self._key
             for key in self.latched_keys:
-                key_map[key.name] = key
+                if key:
+                    key_map[key.name] = key
         return key_map
 
     @property

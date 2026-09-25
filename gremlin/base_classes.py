@@ -1163,6 +1163,16 @@ class AbstractCallbackModel(AbstractModel):
 
         items = item if isinstance(item, list) else [item]
 
+        if index in self._index_map:
+            # replacement logic if the index is already in the map
+            old_item = self._index_map[index]
+            if old_item == item:
+                # nothing to do
+                return index
+            self.markDirty()
+            self._set_item_at(index, item, emit=emit, operation="replace")
+            return index
+
         for item in items:
             if self._allowed_types:
                 if not isinstance(item, self._allowed_types):
@@ -1170,6 +1180,7 @@ class AbstractCallbackModel(AbstractModel):
                 assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
 
             if item not in self._index_map:
+                # not in the map
                 self.markDirty()
                 if index == -1:
                     # find the next available index
@@ -1177,6 +1188,13 @@ class AbstractCallbackModel(AbstractModel):
                     while index in self._index_map:
                         index += 1
                 self._set_item_at(index, item, emit=emit, operation="add")
+
+            else:
+                # item is already in the map - this is a move
+                old_index = self._index_map[item]
+                if old_index != index:
+                    self.markDirty()
+                    self._set_item_at(index, item, emit=emit, operation="move")
 
 
             return index

@@ -49,7 +49,8 @@ SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_
 OVERLAY_ENABLED = "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
 AFCS_ENABLED = "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
 STREAMDECK_ENABLED = "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
-OCTAVI_ENABLED = True # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
+OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
@@ -133,7 +134,6 @@ class Configuration(QtCore.QObject):
         self._started = False
 
         self.reload()
-
 
     def logModuleOptions(self):
         """Logs the status of various module options."""
@@ -492,12 +492,14 @@ class Configuration(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
-    def getTemporaryFile(self, ext=None):
+    def getTemporaryFile(self, ext=None, dir=None):
         """gets a temporary file - the temporary file location is in the user folder"""
-        data_path = self.data_path()
-        user_profile = os.path.join(data_path, "temp")
-        os.makedirs(user_profile, exist_ok=True)
-        tmp_file = os.path.join(user_profile, gremlin.util.get_guid())
+        data_path = dir if dir else self.data_path()
+        tmp_path = os.path.join(data_path, "temp")
+        os.makedirs(tmp_path, exist_ok=True)
+
+        os.makedirs(tmp_path, exist_ok=True)
+        tmp_file = os.path.join(tmp_path, gremlin.util.get_guid())
         if ext:
             if not ext.startswith("."):
                 tmp_file += "."
@@ -528,20 +530,80 @@ class Configuration(QtCore.QObject):
             except Exception as ex:
                 syslog.error(f"CONFIG: could not archive broken config {fname}: {ex}")
 
-    def _write_json_atomic(self, fname: str, payload: dict):
-        """Write JSON atomically without deleting the current file on a failed replace."""
-        tmp = self.getTemporaryFile(".json")
+    # def _write_json_atomic(self, fname: str, payload: dict):
+    #     """Write JSON atomically without deleting the current file on a failed replace."""
+    #     tmp = self.getTemporaryFile(".json")
+    #     try:
+    #         with open(tmp, "w", encoding="utf-8") as hdl:
+    #             encoder = json.JSONEncoder(sort_keys=True, indent=4)
+    #             hdl.write(encoder.encode(payload))
+    #             hdl.flush()
+    #             os.fsync(hdl.fileno())
+
+    #         os.replace(tmp, fname)
+    #         return True
+    #     except Exception as ex:
+    #         syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
+    #         if os.path.exists(tmp):
+    #             try:
+    #                 os.unlink(tmp)
+    #             except OSError:
+    #                 pass
+    #         return False
+
+    def _write_json_atomic(
+        self,
+        fname: str,
+        payload: dict,
+        max_retries: int = 5,
+        initial_delay: float = 0.05,
+    ) -> bool:
+        """Write JSON atomically on Windows, handling process locks and permission delays."""
+        fname_abs = os.path.abspath(fname)
+        target_dir = os.path.dirname(fname_abs)
+
+        # 1. Create temp file in target dir (guarantees same NTFS volume for os.replace)
+        tmp = self.getTemporaryFile(".json", dir=target_dir)
+
         try:
+            # 2. Write data and commit file contents to disk
             with open(tmp, "w", encoding="utf-8") as hdl:
-                encoder = json.JSONEncoder(sort_keys=True, indent=4)
-                hdl.write(encoder.encode(payload))
+                json.dump(payload, hdl, sort_keys=True, indent=4)
                 hdl.flush()
                 os.fsync(hdl.fileno())
 
-            os.replace(tmp, fname)
-            return True
+            # 3. Clear Read-Only attribute on destination file if it exists
+            if os.path.exists(fname_abs):
+                try:
+                    os.chmod(fname_abs, 0o666)
+                except OSError:
+                    pass
+
+            # 4. Atomic Replace with retry loop for Windows file locking
+            delay = initial_delay
+            for attempt in range(max_retries):
+                try:
+                    os.replace(tmp, fname_abs)
+                    return True
+                except PermissionError as ex:
+                    # Catch WinError 5 (Access Denied) or WinError 32 (Sharing Violation)
+                    winerror = getattr(ex, "winerror", None)
+                    if winerror in (5, 32) and attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise ex
+                except OSError as ex:
+                    if getattr(ex, "winerror", None) in (5, 32) and attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2
+                    else:
+                        raise ex
+
+            return False
+
         except Exception as ex:
-            syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
+            syslog.error(f"CONFIG: unable to write atomically to {fname_abs}: {ex}")
             if os.path.exists(tmp):
                 try:
                     os.unlink(tmp)
@@ -600,7 +662,6 @@ class Configuration(QtCore.QObject):
         else:
             self._save_profile_ui()
 
-
     def _save_profile_ui(self):
         """saves to the profile specific config file"""
         if not self._lock.acquire(blocking=False):
@@ -610,6 +671,8 @@ class Configuration(QtCore.QObject):
             fname = self._profile_config_fname
             if not fname:
                 return
+
+            pending_profile_data = self._profile_data if isinstance(self._profile_data, dict) else {}
 
             # Merge with on-disk sidecar. _profile_data often only holds last_input /
             # selection fields; a blind overwrite previously deleted unrelated keys
@@ -623,6 +686,12 @@ class Configuration(QtCore.QObject):
                         merged = loaded
                 except Exception as err:
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
+
+            # Apply pending in-memory profile changes (e.g. last_input/selection_map)
+            # on top of on-disk data before writing.
+            if pending_profile_data:
+                merged.update(pending_profile_data)
+
             self._profile_data = merged
 
             try:
@@ -1716,6 +1785,27 @@ class Configuration(QtCore.QObject):
             value = value & ~mode
         self.verbose_mode = value
 
+    def dumpVerboseModes(self):
+        """dumps the current verbose modes to the log"""
+        import gremlin.util
+
+        modes = self.verbose_mode
+        enabled_modes = []
+
+        for mode in VerboseMode:
+            if mode == VerboseMode.NotSet or mode == VerboseMode.All:
+                continue
+            if mode in modes:
+                enabled_modes.append(mode.name)
+
+        if not enabled_modes:
+            syslog.info(f"Verbose mode details: {gremlin.util.ansiText('No sub modes enabled.', 'red')}")
+            return
+
+        syslog.info("Verbose mode details:")
+        for mode_name in enabled_modes:
+            syslog.info(f"\t{gremlin.util.ansiText(mode_name, 'green')}")
+
     @property
     def verbose_mode_inputitems(self):
         """true if verbose mode is in keyboard mode"""
@@ -2324,7 +2414,15 @@ class Configuration(QtCore.QObject):
             # ignore selection requests if selection is suspended
             return
 
-        device_guid = gremlin.util.normalize_guid(device_guid)
+        normalized_device_guid = gremlin.util.normalize_guid(device_guid)
+
+        # Canonical key for per-device input selection cache. Prefer device_id
+        # (stable profile-facing identifier), fall back to normalized guid.
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if device is None:
+            device = gremlin.joystick_handling.getDevice(normalized_device_guid)
+        device_key = device.device_id if device is not None else normalized_device_guid
+
         data: dict = self._profile_data.get("last_input", {})
         if mode is None:
             mode = gremlin.shared_state.current_mode
@@ -2362,16 +2460,16 @@ class Configuration(QtCore.QObject):
 
         input_type = InputType.convert(input_type)
         if input_type is not None:
-            data[device_guid] = (input_type, input_id)
+            data[device_key] = (input_type, input_id)
 
             input_type_string = InputType.to_string(input_type)
             self._profile_data["last_input"] = data
-            self._profile_data["last_input_device_guid"] = device_guid
+            self._profile_data["last_input_device_guid"] = normalized_device_guid
             self._profile_data["last_input_id"] = input_id
             self._profile_data["last_input_type"] = input_type_string
             self._profile_data["last_input_mode"] = mode
 
-            self._data["last_device_guid"] = device_guid
+            self._data["last_device_guid"] = normalized_device_guid
             self._data["last_input_type"] = input_type_string
             self._data["last_input_id"] = input_id
             self._data["last_input_mode"] = mode
@@ -2407,6 +2505,11 @@ class Configuration(QtCore.QObject):
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
             case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
+                if isinstance(input_id,  str) and input_id.isnumeric():
+                    input_id = int(input_id)
+                else:
+                    input_id = 1
+
                 device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
                 if device_info:
                     if device_info.axis_count > 0:
@@ -2466,13 +2569,14 @@ class Configuration(QtCore.QObject):
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl
-            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs:
+            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs | DeviceType.Voice:
                 input_type = InputType.NotSet
                 input_id = None
                 save_input_id = None
             case DeviceType.OctaviIFR1:
                 save_input_id = input_id
                 input_type = InputType.OctaviIfr1
+
 
             case DeviceType.NotSet:
                 # settings or other non input type page
@@ -2499,21 +2603,27 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = self.verbose_mode_details
 
+        requested_device_guid = device_guid
+
         # get the profile data
         if self._profile_data:
             data = self._profile_data.get("last_input", {})
-            device_guid = self._profile_data.get("last_input_device_guid", None)
+            profile_last_device_guid = self._profile_data.get("last_input_device_guid", None)
             input_id = self._profile_data.get("last_input_id", None)
-            if not device_guid:
-                device_guid = self._profile_data.get("last_device_guid", None)
+            if not profile_last_device_guid:
+                profile_last_device_guid = self._profile_data.get("last_device_guid", None)
             input_type_string = self._profile_data.get("last_input_type", None)
-            if input_type_string:
+
+            # Fast path only applies to global "last input" lookup.
+            # For per-device lookups, keep the requested device_guid and
+            # resolve via the per-device selection map below.
+            if requested_device_guid is None and input_type_string:
                 input_type = InputType.from_string(input_type_string)
-                if data and device_guid and input_id:
+                if data and profile_last_device_guid and input_id is not None:
                     if return_mode:
                         mode = self._profile_data.get("last_input_mode", None)
-                        return (device_guid, input_type, input_id, mode)
-                    return (device_guid, input_type, input_id)
+                        return (profile_last_device_guid, input_type, input_id, mode)
+                    return (profile_last_device_guid, input_type, input_id)
 
         if device_guid is None:
             # get the last profile device guid saved to config
@@ -2559,16 +2669,26 @@ class Configuration(QtCore.QObject):
         mode = gremlin.shared_state.edit_mode  # current mode
         dinput_device_guid = device.device_guid
         device_guid = device.device_id
+        normalized_dinput_device_guid = gremlin.util.normalize_guid(dinput_device_guid)
+        normalized_requested_guid = gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
 
         data: dict = self._profile_data.get("last_input", {})
-        if device_guid in data:
-            input_type, input_id = data[device_guid]
+        lookup_keys = [device_guid, normalized_dinput_device_guid]
+        if normalized_requested_guid and normalized_requested_guid not in lookup_keys:
+            lookup_keys.append(normalized_requested_guid)
+
+        data_key = next((key for key in lookup_keys if key in data), None)
+        if data_key is not None:
+            input_type, input_id = data[data_key]
 
             try:
                 input_type = InputType.to_enum(input_type)
             except Exception:
                 syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                 input_type = InputType.NotSet
+
+            if isinstance(input_id, str) and input_id.isnumeric() and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+                input_id = int(input_id)
 
             if input_id is not None and isinstance(input_id, int):
                 if return_mode:
@@ -3872,8 +3992,6 @@ class Configuration(QtCore.QObject):
     @voice_command_release_delay.setter
     def voice_command_release_delay(self, value: int):
         self._set_data("voice_command_release_delay", value)
-
-
 
     @property
     def audio_blocking(self) -> bool:

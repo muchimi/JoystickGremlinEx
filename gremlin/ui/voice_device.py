@@ -651,6 +651,10 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         )
         self.button_press_dialog.show()
 
+    def _handle_keyboard_listen_close(self):
+        gremlin.shared_state.pop_suspend_highlighting()
+      
+
     def _add_keyboard_listener_key_cb(self, data):
         gremlin.util.InvokeUiMethod(self._add_keyboard_listener_key_ui, data)
 

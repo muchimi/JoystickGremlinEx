@@ -34,7 +34,7 @@ from pathlib import Path
 import comtypes
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
-from pyttsx3 import voice
+
 import gremlin.util
 from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, hashString
 from collections import deque
@@ -596,13 +596,17 @@ class SpeechRecognizer:
         self.sample_rate = sample_rate
         self.callback = callback
 
-        voice = Voice()
+
+
+        self.verbose = gremlin.config.Configuration().verbose_mode_voice
 
 
         if WhisperModel is None:
             raise RuntimeError(
                 "faster_whisper is not installed — cannot start speech recognition"
             )
+
+        voice = Voice()
 
         # convert the model path to something whisper recognizes
         model_path = str(Path(voice._local_model_path).resolve())
@@ -618,23 +622,32 @@ class SpeechRecognizer:
             local_files_only=True,
        )
 
+        if self.verbose:
+            syslog.info(f"Voice: Initialized Whisper model with path: {model_path}")
+
         self._queue = queue.Queue()
 
         self._audio = []
         self._running = False
         self._abort_event = threading.Event()
 
-        self.verbose = True
+
 
     def _get_whisper_model_name(self, model_path):
         # Check model.json if available
+
         config_path = os.path.join(model_path, "model.json")
+        if self.verbose:
+            syslog.info(f"Voice: Checking model config at {config_path}")
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 # Some CTranslate2 models store source specs in metadata
                 if "model_type" in data:
-                    return data.get("model_type")
+                    model_type = data.get("model_type")
+                    if self.verbose:
+                        syslog.info(f"Voice: Detected model type: {model_type}")
+                    return model_type
 
         # Fallback: Use the parent directory name
         return os.path.basename(os.path.normpath(model_path))
@@ -645,8 +658,8 @@ class SpeechRecognizer:
         """Start the recognition thread."""
         if self._running:
             return
-        # if self.verbose:
-        #     syslog.info("Recog: starting recognition thread")
+        if self.verbose:
+            syslog.info("Recog: starting recognition thread")
         self._running = True
         self._abort_event.clear()
         self._thread = threading.Thread(
@@ -661,8 +674,8 @@ class SpeechRecognizer:
     def stop(self):
         """Stop the recognition thread."""
         if self._running:
-            # if self.verbose:
-            #     syslog.info("Recog: stopping recognition thread")
+            if self.verbose:
+                syslog.info("Recog: stopping recognition thread")
             self._running = False
             self._abort_event.set()
             self._queue.put(None)
@@ -706,9 +719,9 @@ class SpeechRecognizer:
     # ---------------------------------------------------------
 
     def _worker(self, abort_event):
-        # verbose = self.verbose
-        # if verbose:
-        #     syslog.info("Recog: worker thread runner started")
+        verbose = self.verbose
+        if verbose:
+            syslog.info("Recog: worker thread runner started")
         while not abort_event.is_set():
             item = self._queue.get()
             # if verbose:
@@ -716,7 +729,7 @@ class SpeechRecognizer:
 
             if item is None:
                 # got signal break
-                syslog.info("Recog: received stop signal, breaking worker loop")
+                # syslog.info("Recog: received stop signal, breaking worker loop")
                 break
 
             audio, started, ended = item
@@ -737,8 +750,8 @@ class SpeechRecognizer:
                 #     syslog.info("Recog: SPEECH ENDED")
                 self._recognize()
 
-        # if verbose:
-        #     syslog.info("Recog: worker thread runner stopped")
+        if verbose:
+            syslog.info("Recog: worker thread runner stopped")
 
     # ---------------------------------------------------------
     # Recognition
@@ -746,7 +759,8 @@ class SpeechRecognizer:
 
     def _recognize(self):
 
-        # syslog.info("_recognize called")
+        if self.verbose:
+            syslog.info("_recognize called")
 
         if not self._audio:
             return
@@ -758,19 +772,27 @@ class SpeechRecognizer:
         # Ignore extremely short utterances.
         duration = len(audio) / self.sample_rate
 
-        # syslog.info(f"\nDuration: {duration}")
 
         if duration < 0.15:
             return
 
-        # syslog.info("\ntranscribe")
-        segments, info = self.model.transcribe(
-            audio,
-            language="en",
-            vad_filter=True,
-            beam_size=2,
-            condition_on_previous_text=False,
-        )
+        if self.verbose:
+            syslog.info("Starting transcribe")
+        try:
+            segments, info = self.model.transcribe(
+                audio,
+                language="en",
+                vad_filter=True,
+                beam_size=2,
+                condition_on_previous_text=False,
+            )
+        except Exception as e:
+            if self.verbose:
+                syslog.error(f"Transcription failed: {e}")
+            return
+
+        if self.verbose:
+            syslog.info("Finished transcribe")
         words = []
         for segment in segments:
             text = segment.text.strip().casefold()
@@ -1599,7 +1621,7 @@ class Voice:
             syslog.error(f"Voice: failed to find voice recognition model [{self._model_size}].")
         else:
             self._model_valid = True
-
+            syslog.info(f"Voice: using local voice recognition model [{self._model_size}]")
 
         self._listening = False  # true if actively listening for voice input
         self._listen_enabled = False  # true if listening is enabled while monitoring
@@ -1730,9 +1752,10 @@ class Voice:
         commands = self.getCommands()
         if not commands:
             # no commands to process - do not start listener
+            syslog.info("Voice: No commands to process - listener will not start.")
             return
 
-        syslog.info("Starting voice input...")
+        syslog.info("VOICE: Starting voice input...")
 
         if self.verbose:
             syslog.info("List of defined voice commands:")
@@ -1757,10 +1780,18 @@ class Voice:
             callback=self._on_recognized,
         )
 
+        if self.verbose:
+            syslog.info("Starting recognizer...")
         self.recognizer.start()
+        if self.verbose:
+            syslog.info("Recognizer started.")
 
 
+        if self.verbose:
+            syslog.info("Starting rolling matcher...")
         self._rolling_matcher.start()
+        if self.verbose:
+            syslog.info("Rolling matcher started.")
 
         with self._voice_lock:
             if self._suspend_stack == 0:  # not suspended
@@ -1770,7 +1801,10 @@ class Voice:
                     self._abort_event = threading.Event()
                     self._listen_thread = threading.Thread(target=self._listen_runner, args=(self._abort_event,), daemon=True)
                     self._listen_thread.name = "VoiceListen"
+                    if self.verbose:
+                        syslog.info("Listen thread starting...")
                     self._listen_thread.start()
+
             else:
                 self._listening = False
 
@@ -1799,8 +1833,8 @@ class Voice:
     def _listen_runner(self, abort_event: threading.Event):
         """Internal method run in a separate thread to handle listening."""
 
-        # if self.verbose:
-        #     syslog.info("Voice listen runner started...")
+        if self.verbose:
+            syslog.info("Voice listen runner started...")
         audio_queue = queue.Queue(maxsize=16) # use a small queue for real time reading to not block
 
         def callback(indata, frames, time_info, status):
@@ -1839,8 +1873,8 @@ class Voice:
                     listen_enabled = self._listen_enabled
 
                 if not listen_enabled:
-                    # if self.verbose:
-                    #     syslog.info("Voice listen runner: listening disabled")
+                    if self.verbose:
+                        syslog.info("Voice listen runner: listening disabled")
                     continue
 
                 output, info = self.processor.process(audio)

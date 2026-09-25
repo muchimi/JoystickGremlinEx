@@ -16,8 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
+import logging
 import tempfile
 import pytest
 
@@ -53,13 +55,14 @@ def test_simple(modify_config):
     assert c.value("test", "case", "2") == True
     assert c.value("test", "case", "3") == gremlin.types.HatDirection.SouthWest
 
+
 def test_load_save(modify_config):
     c = gremlin.config.Configuration()
 
     c.register("test", "case", "1", PropertyType.Int, 42, "one")
     c.register("test", "case", "2", PropertyType.Bool, False, "two", True)
     c.register("test", "case", "3", PropertyType.HatDirection, gremlin.types.HatDirection.NorthEast, "")
-    c.register("test", "case", "4", PropertyType.List, [1,2,3,4,5], "")
+    c.register("test", "case", "4", PropertyType.List, [1, 2, 3, 4, 5], "")
     assert c.value("test", "case", "1") == 42
     assert c.description("test", "case", "1") == "one"
     assert c.expose("test", "case", "1") == False
@@ -72,7 +75,7 @@ def test_load_save(modify_config):
     assert c.description("test", "case", "3") == ""
     assert c.expose("test", "case", "3") == False
 
-    assert c.value("test", "case", "4") == [1,2,3,4,5]
+    assert c.value("test", "case", "4") == [1, 2, 3, 4, 5]
     assert c.description("test", "case", "4") == ""
     assert c.expose("test", "case", "4") == False
 
@@ -91,9 +94,22 @@ def test_load_save(modify_config):
     assert c.description("test", "case", "3") == ""
     assert c.expose("test", "case", "3") == False
 
-    assert c.value("test", "case", "4") == [1,2,3,4,5]
+    assert c.value("test", "case", "4") == [1, 2, 3, 4, 5]
     assert c.description("test", "case", "4") == ""
     assert c.expose("test", "case", "4") == False
+
+
+def test_dump_verbose_modes(caplog):
+    c = gremlin.config.Configuration()
+    c.verbose_mode = gremlin.types.VerboseMode.Keyboard | gremlin.types.VerboseMode.Inputs | gremlin.types.VerboseMode.UI
+
+    with caplog.at_level(logging.INFO, logger="system"):
+        c.dumpVerboseModes()
+
+    assert "Verbose mode enabled: Keyboard" in caplog.text
+    assert "Verbose mode enabled: Inputs" in caplog.text
+    assert "Verbose mode enabled: UI" in caplog.text
+
 
 def test_exceptions():
     c = gremlin.config.Configuration()
