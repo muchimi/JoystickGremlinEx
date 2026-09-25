@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T62A)
+- New: API (Voice): added a two tone beep to signal voice recognition is enabled/disabled.  This can be turned off in the voice settings options.
+- Change: Control Action: added voice management commands to enable/disable/toggle voice recognition from any input (on top of the default input setup in voice settings).
+
 ### (m77T62)
 - Change: UI: Add mapping header to clarify what is being mapped.
 - Fix: Package (Voice): Packaging utility failed to detect and include library dependencies for the voice engine.  This prevented voice transcription from running in the packaged version of GEX.
