@@ -2895,15 +2895,6 @@ class Configuration(QtCore.QObject):
     def osc_last_target_port(self, port: int):
         self._set_data("osc_last_target_port", port)
 
-    # @property
-    # def splitter_pos(self) -> int:
-    #     ''' splitter config  '''
-    #     return self._get_data("splitter_config", 250)
-
-    # @splitter_pos.setter
-    # def splitter_pos(self, data : int):
-    #     self._data["splitter_config"] = data
-
     @property
     def mapping_rollover_mode(self):
         return self._get_data("mapping_rollover_mode", 1)

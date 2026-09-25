@@ -2284,6 +2284,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "OSC",
                 "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
             ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
+            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS module for advanced flight control systems.", 'GEX_AFCS_ENABLED'),
         ]
 
         widgets = []
@@ -2299,6 +2300,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.osc_enabled
                 case "voice":
                     value = self.config.voice_enabled
+                case "afcs":
+                    value = self.config.afcs_enabled
             checkbox = gremlin.ui.ui_common.QDataCheckbox(name,
                                                           value = value,
                                                           data=data,

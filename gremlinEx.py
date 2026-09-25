@@ -3536,27 +3536,28 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     syslog.error(traceback.format_exc())
 
                         case DeviceType.Afcs:
-                            try:
-                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.afcs_tab_guid)
-                                device = gremlin.joystick_handling.getDevice(device_guid)
-                                widget = self.getRegisteredWidget(device_guid)
-                                if not widget:
-                                    import gremlin.ui.afcs as afcs
+                            if config.afcs_enabled:
+                                try:
+                                    device_guid = gremlin.util.normalize_guid(gremlin.shared_state.afcs_tab_guid)
+                                    device = gremlin.joystick_handling.getDevice(device_guid)
+                                    widget = self.getRegisteredWidget(device_guid)
+                                    if not widget:
+                                        import gremlin.ui.afcs as afcs
 
-                                    manager = afcs.AfcsManager()
-                                    widget = manager.designer_widget()
-                                    self.registerWidget(device_guid, widget)
-                                    self._afcs_device_guid = device_guid
-                                    widget.data = (
-                                        TabDeviceType.Afcs,
-                                        device_guid,
-                                        index,
-                                    )
-                                if add_tab_if_missing(device, TabDeviceType.Afcs):
-                                    index += 1
-                            except Exception as err:
-                                syslog.error(f"DEVICE TABS: AFCS tab failed: {err}")
-                                syslog.error(traceback.format_exc())
+                                        manager = afcs.AfcsManager()
+                                        widget = manager.designer_widget()
+                                        self.registerWidget(device_guid, widget)
+                                        self._afcs_device_guid = device_guid
+                                        widget.data = (
+                                            TabDeviceType.Afcs,
+                                            device_guid,
+                                            index,
+                                        )
+                                    if add_tab_if_missing(device, TabDeviceType.Afcs):
+                                        index += 1
+                                except Exception as err:
+                                    syslog.error(f"DEVICE TABS: AFCS tab failed: {err}")
+                                    syslog.error(traceback.format_exc())
 
                 elif device in config_set:
                     # configuration devices

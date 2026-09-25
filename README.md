@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T62B)
+- Fix: AFCS device tab not checking to see if AFCS module is enabled or not.  
+- Fix: AFCS missing module option in modules tab (global options)
+
 ### (m77T62A)
 - New: API (Voice): added a two tone beep to signal voice recognition is enabled/disabled.  This can be turned off in the voice settings options.
 - Change: Control Action: added voice management commands to enable/disable/toggle voice recognition from any input (on top of the default input setup in voice settings).
