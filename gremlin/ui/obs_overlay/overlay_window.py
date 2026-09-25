@@ -978,13 +978,15 @@ class OverlayWindow(QtWidgets.QWidget):
         if view is not None and Shiboken.isValid(view):
             view.release_touch()
             view.detach_bus()
+        # Stop the follow timer before detach so a tick cannot re-attach / raise
+        # the host while the overlay is closing for profile stop.
         self._stop_host_follow()
-        self._detach_host()
+        self._detach_host(activate_host=False, hide_window=True)
         super().hideEvent(event)
 
     def closeEvent(self, event):
         self._stop_host_follow()
-        self._detach_host()
+        self._detach_host(activate_host=False, hide_window=True)
         self.detach_from_scene()
         super().closeEvent(event)
 
@@ -1170,7 +1172,8 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.drag_bar.setVisible(show_bar)
                 chroma = chroma_fill_color(self.page_canvas)
                 bar = chroma if chroma.alpha() > 80 else QtGui.QColor("#8a93a3")
-                self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:#111;")
+                fg = gremlin.ui.ui_common.Color.normalColor()
+                self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:{fg};")
                 if Shiboken.isValid(self.view):
                     self.view._sync_paint_mode()
                     self.view._apply_size()
@@ -1249,8 +1252,14 @@ class OverlayWindow(QtWidgets.QWidget):
         want = bool(canvas.get("attach_to_window"))
         title = str(canvas.get("attach_window_title") or "").strip()
         exe = str(canvas.get("attach_window_exe") or "").strip()
-        if not want or (not title and not exe) or not self.isVisible():
+        # After SetParent, Qt often reports isVisible()==False even though the
+        # child HWND is live. Treating that as "not shown" caused a detach every
+        # tick, which promoted the game (and its cursor) over JG Ex.
+        live = self.isVisible() or bool(self._host_attached)
+        if not want or (not title and not exe):
             self._detach_host()
+            return
+        if not live:
             return
         from .app_view import resolve_application_hwnd
         from .host_window import attach_overlay_hwnd, place_overlay_in_host
@@ -1275,7 +1284,7 @@ class OverlayWindow(QtWidgets.QWidget):
             _extend_frame_into_client(self)
         self._apply_click_through(is_onscreen_mode(canvas) and not is_interactive_overlay(canvas))
 
-    def _detach_host(self):
+    def _detach_host(self, activate_host: bool = False, hide_window: bool = False):
         if not self._host_attached:
             self._host_hwnd = 0
             return
@@ -1286,7 +1295,12 @@ class OverlayWindow(QtWidgets.QWidget):
             if Shiboken.isValid(self):
                 hwnd = int(self.winId())
                 if hwnd:
-                    detach_overlay_hwnd(hwnd, restore_hwnd=host)
+                    detach_overlay_hwnd(
+                        hwnd,
+                        restore_hwnd=host,
+                        activate_host=activate_host,
+                        hide_window=hide_window,
+                    )
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: host detach failed: {err}")
         self._host_attached = False

@@ -5010,7 +5010,13 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
         self._callback_ex = callbackEx
         self._widgets = []
 
+        # Hug content width so parent rows do not spread radios across the panel.
+        self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
+
         layout = QtWidgets.QVBoxLayout(self) if orientation == QtCore.Qt.Vertical else QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         for item in options:
             count = len(item)
             match count:
@@ -5025,8 +5031,31 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
                     tooltip = None
 
             widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip)
+            widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
             layout.addWidget(widget)
             self._widgets.append(widget)
+        if orientation != QtCore.Qt.Vertical:
+            layout.addStretch(1)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, data):
+        self.setValue(data)
+
+    def currentData(self):
+        """Combo-compatible: return the selected option's data."""
+        return self._value
+
+    def setValue(self, data):
+        """Select the radio whose data matches, without firing callbacks."""
+        self._value = data
+        for button in self._widgets:
+            match = button.data == data
+            with QtCore.QSignalBlocker(button):
+                button.setChecked(bool(match))
 
     def _handle_button_clicked(self, widget, checked):
         if checked:

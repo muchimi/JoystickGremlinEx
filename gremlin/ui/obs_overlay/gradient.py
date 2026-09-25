@@ -12,6 +12,9 @@ from typing import Any
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+import gremlin.ui.ui_common
+from gremlin.ui.ui_common import Color, QDataRadioButtonGroup
+
 from .widgets import qcolor
 
 MAX_STOPS = 6
@@ -211,7 +214,7 @@ def paint_gradient_spectrum(painter: QtGui.QPainter, rect: QtCore.QRectF, gradie
         return
     grad = normalize_gradient(gradient)
     # Checkerboard for translucent stops
-    painter.fillRect(rect, QtGui.QColor("#2a2a2a"))
+    painter.fillRect(rect, QtGui.QColor(Color.backgroundColor()))
     tile = 6
     light = QtGui.QColor("#3a3a3a")
     left = int(math.floor(rect.left()))
@@ -411,13 +414,13 @@ class _GradientBar(QtWidgets.QWidget):
             self.update()
 
 
-class GradientEditorDialog(QtWidgets.QDialog):
+class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
     """Limited Photoshop-like gradient editor."""
 
     preview_changed = QtCore.Signal(object)
 
     def __init__(self, gradient=None, seed_color: str | None = None, parent=None):
-        super().__init__(parent)
+        super().__init__("overlay_gradient_editor", parent=parent)
         self.setWindowTitle("Gradient")
         self.setMinimumWidth(420)
         self._gradient = normalize_gradient(gradient, seed_color=seed_color)
@@ -428,11 +431,13 @@ class GradientEditorDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         form = QtWidgets.QFormLayout()
-        self._style = QtWidgets.QComboBox()
-        self._style.addItem("Linear", "linear")
-        self._style.addItem("Radial", "radial")
-        self._style.setCurrentIndex(1 if self._gradient.get("style") == "radial" else 0)
-        self._style.currentIndexChanged.connect(self._on_style)
+        self._style = QDataRadioButtonGroup(
+            [("Linear", "linear"), ("Radial", "radial")],
+            value="radial" if self._gradient.get("style") == "radial" else "linear",
+            callback=self._on_style,
+        )
+        if self._style.layout() is not None:
+            self._style.layout().setContentsMargins(0, 0, 0, 0)
         form.addRow("Style", self._style)
 
         angle_row = QtWidgets.QWidget()
@@ -504,10 +509,11 @@ class GradientEditorDialog(QtWidgets.QDialog):
         stop_row.addWidget(self._stop_pos)
         layout.addLayout(stop_row)
 
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Ok", callback=self.accept)
+        cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
+        )
 
         self._sync_angle_enabled()
         self._refresh_stop_editors()
@@ -538,8 +544,8 @@ class GradientEditorDialog(QtWidgets.QDialog):
         self._refresh_stop_editors()
         self._schedule_preview()
 
-    def _on_style(self, _i=None):
-        self._gradient["style"] = str(self._style.currentData() or "linear")
+    def _on_style(self, value=None):
+        self._gradient["style"] = str(value if value is not None else (self._style.currentData() or "linear"))
         self._sync_angle_enabled()
         self._push()
 

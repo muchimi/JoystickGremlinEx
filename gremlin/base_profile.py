@@ -4074,6 +4074,7 @@ class Profile:
         import_data.used_ids = {}  # reset used list
         profile_was_updated = False
         self.registry.reset()  # clear registry on profile load
+        self._lpa_load_path = None if fname_is_xml else fname
 
         if extra_data is None:
             extra_data = {}
@@ -4406,6 +4407,7 @@ class Profile:
 
         # ensure registry and model are synchronized before saving
         self.sync()
+        self._lpa_save_path = fname or self._profile_fname
 
         # Generate XML document
         root = etree.Element("profile")
@@ -4838,7 +4840,7 @@ class Profile:
                 backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
                 try:
                     shutil.copyfile(use_name, backup_file)
-                    ext_list = ["json", ".calib"]
+                    ext_list = ["json", "lpa.json", ".calib"]
                     for ext in ext_list:
                         json_source = gremlin.util.swap_ext(use_name, ext)
                         json_target = gremlin.util.swap_ext(backup_file, ext)
@@ -4859,6 +4861,9 @@ class Profile:
                 self.to_xml(use_name)
                 if verbose:
                     syslog.info(f"SAVE: [{gremlin.util.toUrl(self._profile_fname)}]")
+                lpa_path = lpa_sidecar_path(self._profile_fname)
+                if lpa_path and os.path.isfile(lpa_path):
+                    syslog.info(f"SAVE: [{gremlin.util.toUrl(lpa_path)}]")
                 try:
                     import gremlin.ui.obs_overlay as obs_overlay
 
@@ -5501,7 +5506,7 @@ class Profile:
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
 
         # companion files
-        ext_list = ["json", ".calib"]
+        ext_list = ["json", "lpa.json", ".calib"]
         for ext in ext_list:
             source = gremlin.util.swap_ext(fname, ext)
             target = gremlin.util.swap_ext(save_fname, ext)
@@ -6004,6 +6009,141 @@ class ProfileModeNode:
         return f"ProfileModeNode: id [{self.id}] name: [{self.name}] config size: [{len(self._config)}] contents: [{self._config}] ]"
 
 
+def _is_lpa_plugin(plugin) -> bool:
+    """Lead-pip assist stores its variables in a sidecar, not the profile XML."""
+    name = str(getattr(plugin, "file_name", "") or "").replace("\\", "/").lower()
+    return name.endswith("lead_pip_assist.py")
+
+
+def lpa_sidecar_path(profile_path: str):
+    """``MyProfile.xml`` -> ``MyProfile.lpa.json`` beside the profile."""
+    if not profile_path or str(profile_path).startswith("<"):
+        return None
+    root, _ext = os.path.splitext(str(profile_path))
+    if not root:
+        return None
+    return root + ".lpa.json"
+
+
+def _lpa_profile_path(plugin, for_save: bool = False):
+    parent = getattr(plugin, "parent", None)
+    if parent is None:
+        return None
+    if for_save:
+        path = getattr(parent, "_lpa_save_path", None) or getattr(parent, "_profile_fname", None)
+    else:
+        path = getattr(parent, "_lpa_load_path", None) or getattr(parent, "_profile_fname", None)
+    return path
+
+
+def _lpa_encode_value(var_type, value):
+    """JSON-safe copy of a plugin variable value. Keeps the Use checkbox."""
+    if var_type == PluginVariableType.VirtualInput and isinstance(value, dict):
+        itype = value.get("input_type")
+        return {
+            "device_id": value.get("device_id"),
+            "input_id": value.get("input_id"),
+            "input_type": InputType.to_string(itype) if itype is not None else None,
+            "enabled": bool(value.get("enabled", False)),
+        }
+    if var_type == PluginVariableType.PhysicalInput and isinstance(value, dict):
+        device_id = value.get("device_id")
+        itype = value.get("input_type")
+        guid = None
+        if device_id:
+            try:
+                guid = write_guid(device_id)
+            except Exception:
+                guid = str(device_id)
+        return {
+            "device_id": guid,
+            "device_name": value.get("device_name") or "",
+            "input_id": value.get("input_id"),
+            "input_type": InputType.to_string(itype) if itype is not None else None,
+        }
+    if var_type == PluginVariableType.Bool:
+        return bool(value) if value is not None else False
+    return value
+
+
+def _lpa_decode_value(var_type, value):
+    if var_type == PluginVariableType.VirtualInput and isinstance(value, dict):
+        itype = value.get("input_type")
+        return {
+            "device_id": value.get("device_id"),
+            "input_id": value.get("input_id"),
+            "input_type": InputType.to_enum(itype) if itype else None,
+            "enabled": bool(value.get("enabled", False)),
+        }
+    if var_type == PluginVariableType.PhysicalInput and isinstance(value, dict):
+        device_id = value.get("device_id")
+        itype = value.get("input_type")
+        if isinstance(device_id, str) and device_id:
+            try:
+                device_id = parse_guid(device_id)
+            except Exception:
+                pass
+        return {
+            "device_id": device_id,
+            "device_name": value.get("device_name") or "",
+            "input_id": value.get("input_id"),
+            "input_type": InputType.to_enum(itype) if itype else None,
+        }
+    return value
+
+
+def _lpa_write(plugin, path: str) -> None:
+    instances = {}
+    for instance in plugin.instances:
+        variables = {}
+        for variable in instance.variables.values():
+            if variable.type == PluginVariableType.Action or not variable.name:
+                continue
+            variables[variable.name] = {
+                "type": PluginVariableType.to_string(variable.type),
+                "is_optional": bool(variable.is_optional),
+                "value": _lpa_encode_value(variable.type, variable.value),
+            }
+        instances[instance.name or ""] = variables
+    payload = {"plugin": "lead_pip_assist.py", "instances": instances}
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(tmp, path)
+    count = sum(len(variables) for variables in instances.values())
+    syslog.info(f"SAVE: [{gremlin.util.toUrl(path)}] plugin variables {count}")
+
+
+def _lpa_read(plugin, path: str) -> None:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    instances = payload.get("instances") or {}
+    by_name = {instance.name: instance for instance in plugin.instances}
+    for name, variables in instances.items():
+        instance = by_name.get(name)
+        if instance is None:
+            instance = PluginInstance(plugin)
+            instance.name = name
+            plugin.instances.append(instance)
+            by_name[name] = instance
+        instance.variables = {}
+        if not isinstance(variables, dict):
+            continue
+        for var_name, spec in variables.items():
+            if not isinstance(spec, dict):
+                continue
+            variable = PluginVariable(instance)
+            variable.name = var_name
+            variable.type = PluginVariableType.to_enum(str(spec.get("type") or "String"))
+            variable.is_optional = bool(spec.get("is_optional", False))
+            variable.value = _lpa_decode_value(variable.type, spec.get("value"))
+            instance.variables[var_name] = variable
+
+
 class Plugin:
     """Custom module."""
 
@@ -6018,10 +6158,26 @@ class Plugin:
             instance = PluginInstance(self)
             instance.from_xml(child, data)
             self.instances.append(instance)
+        if _is_lpa_plugin(self):
+            path = lpa_sidecar_path(_lpa_profile_path(self, for_save=False))
+            if path and os.path.isfile(path):
+                _lpa_read(self, path)
+            elif path and any(instance.variables for instance in self.instances):
+                _lpa_write(self, path)
 
     def to_xml(self):
         node = etree.Element("plugin")
         node.set("file-name", safe_format(self.file_name, str))
+        if _is_lpa_plugin(self):
+            path = lpa_sidecar_path(_lpa_profile_path(self, for_save=True))
+            if path:
+                _lpa_write(self, path)
+            for instance in self.instances:
+                if instance.is_configured():
+                    stub = etree.Element("instance")
+                    stub.set("name", safe_format(instance.name, str))
+                    node.append(stub)
+            return node
         for instance in self.instances:
             if instance.is_configured():
                 node.append(instance.to_xml())

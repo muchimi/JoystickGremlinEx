@@ -24,7 +24,10 @@ SWP_NOZORDER = 0x0004
 SWP_NOACTIVATE = 0x0010
 SWP_FRAMECHANGED = 0x0020
 SWP_SHOWWINDOW = 0x0040
+SW_HIDE = 0
 ASFW_ANY = 0xFFFFFFFF
+HWND_TOP = 0
+HWND_NOTOPMOST = -2
 
 
 def _user32():
@@ -59,6 +62,14 @@ def _user32():
         ctypes.c_uint,
     ]
     user32.SetWindowPos.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    user32.BringWindowToTop.argtypes = [wintypes.HWND]
+    user32.BringWindowToTop.restype = wintypes.BOOL
+    user32.ReleaseCapture.argtypes = []
+    user32.ReleaseCapture.restype = wintypes.BOOL
+    user32.ClipCursor.argtypes = [ctypes.c_void_p]
+    user32.ClipCursor.restype = wintypes.BOOL
     if ctypes.sizeof(ctypes.c_void_p) == 8:
         user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
         user32.GetWindowLongPtrW.restype = ctypes.c_longlong
@@ -141,7 +152,17 @@ def restore_foreground(hwnd: int) -> None:
         user32 = _user32()
         if not user32.IsWindow(hwnd):
             return
+        # Clear game cursor clip / capture that can make JG Ex feel dead.
+        try:
+            user32.ClipCursor(None)
+        except Exception:
+            pass
+        try:
+            user32.ReleaseCapture()
+        except Exception:
+            pass
         if int(user32.GetForegroundWindow() or 0) == int(hwnd):
+            user32.BringWindowToTop(hwnd)
             return
         user32.AllowSetForegroundWindow(ASFW_ANY)
         kernel32 = ctypes.windll.kernel32
@@ -152,15 +173,53 @@ def restore_foreground(hwnd: int) -> None:
         cur = int(kernel32.GetCurrentThreadId())
         attached_fg = False
         attached_host = False
-        if fg_tid and fg_tid != cur:
-            attached_fg = bool(user32.AttachThreadInput(cur, fg_tid, True))
-        if host_tid and host_tid != cur:
-            attached_host = bool(user32.AttachThreadInput(cur, host_tid, True))
-        user32.SetForegroundWindow(hwnd)
-        if attached_host:
-            user32.AttachThreadInput(cur, host_tid, False)
-        if attached_fg:
-            user32.AttachThreadInput(cur, fg_tid, False)
+        try:
+            if fg_tid and fg_tid != cur:
+                attached_fg = bool(user32.AttachThreadInput(cur, fg_tid, True))
+            if host_tid and host_tid != cur and host_tid != fg_tid:
+                attached_host = bool(user32.AttachThreadInput(cur, host_tid, True))
+            user32.BringWindowToTop(hwnd)
+            user32.SetWindowPos(
+                hwnd,
+                HWND_TOP,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+            )
+            user32.SetForegroundWindow(hwnd)
+        finally:
+            # Always undo AttachThreadInput — a stuck attach makes the host
+            # cursor/input appear over JG Ex and blocks the UI permanently.
+            if attached_host:
+                user32.AttachThreadInput(cur, host_tid, False)
+            if attached_fg:
+                user32.AttachThreadInput(cur, fg_tid, False)
+    except Exception:
+        pass
+
+
+def release_input_hooks() -> None:
+    """Drop cursor clip / mouse capture left behind by a host game."""
+    if sys.platform != "win32":
+        return
+    try:
+        user32 = _user32()
+        user32.ClipCursor(None)
+        user32.ReleaseCapture()
+    except Exception:
+        pass
+
+
+def hide_overlay_hwnd(overlay_hwnd: int) -> None:
+    """Native hide — Qt hide() is a no-op when isVisible() is already False after SetParent."""
+    if sys.platform != "win32" or not overlay_hwnd:
+        return
+    try:
+        user32 = _user32()
+        if user32.IsWindow(overlay_hwnd):
+            user32.ShowWindow(overlay_hwnd, SW_HIDE)
     except Exception:
         pass
 
@@ -185,6 +244,19 @@ def restore_foreground_if_was(hwnd: int, previous_foreground: int) -> None:
     if int(previous_foreground) != int(hwnd):
         return
     restore_foreground(hwnd)
+
+
+def restore_previous_foreground(previous_foreground: int, host_hwnd: int = 0) -> None:
+    """Put focus back where it was before SetParent, without promoting *host_hwnd*.
+
+    SetParent often activates the host. If JG Ex (or anything else) had focus,
+    give it back. If the host already had focus, leave it alone.
+    """
+    if not previous_foreground:
+        return
+    if host_hwnd and int(previous_foreground) == int(host_hwnd):
+        return
+    restore_foreground(previous_foreground)
 
 
 def host_client_size(hwnd: int) -> tuple[int, int]:
@@ -228,9 +300,9 @@ def attach_overlay_hwnd(overlay_hwnd: int, host_hwnd: int) -> bool:
             0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW,
         )
-        # Only put the game back on top if it already had focus — never yank
-        # focus away from JG Ex while the user is clicking the UI.
-        restore_foreground_if_was(host_hwnd, prev_fg)
+        # SetParent often activates the host. Put focus back where it was
+        # (typically JG Ex). Only leave the host alone if it already had focus.
+        restore_previous_foreground(prev_fg, host_hwnd)
         return True
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: attach to application window failed: {err}")
@@ -248,6 +320,7 @@ def place_overlay_in_host(overlay_hwnd: int, host_hwnd: int, width: int, height:
         cw, ch = host_client_size(host_hwnd)
         w = max(1, min(int(width or 1), cw or int(width or 1)))
         h = max(1, min(int(height or 1), ch or int(height or 1)))
+        # NOZORDER: HWND_TOP here was raising the host over JG Ex every tick.
         user32.SetWindowPos(
             overlay_hwnd,
             0,
@@ -255,7 +328,7 @@ def place_overlay_in_host(overlay_hwnd: int, host_hwnd: int, width: int, height:
             0,
             w,
             h,
-            SWP_NOACTIVATE | SWP_SHOWWINDOW,
+            SWP_NOACTIVATE | SWP_NOZORDER | SWP_SHOWWINDOW,
         )
         return True
     except Exception as err:
@@ -263,11 +336,21 @@ def place_overlay_in_host(overlay_hwnd: int, host_hwnd: int, width: int, height:
         return False
 
 
-def detach_overlay_hwnd(overlay_hwnd: int, restore_hwnd: int = 0) -> None:
+def detach_overlay_hwnd(
+    overlay_hwnd: int,
+    restore_hwnd: int = 0,
+    activate_host: bool = False,
+    hide_window: bool = False,
+) -> None:
     """Restore a top-level overlay after attach_overlay_hwnd.
 
-    *restore_hwnd* is typically the game window. Focus is restored to it only
-    when it already had foreground — otherwise JG Ex keeps input.
+    By default this does **not** raise *restore_hwnd* (the game). Forcing the
+    host to the foreground on detach left its cursor on top of JG Ex after
+    profile stop. Pass activate_host=True only when the host already had focus
+    and must keep it mid-session.
+
+    *hide_window*: after SetParent(0) the HWND can remain visible while Qt still
+    thinks it is hidden — native SW_HIDE is required when tearing down.
     """
     if sys.platform != "win32" or not overlay_hwnd:
         return
@@ -282,6 +365,10 @@ def detach_overlay_hwnd(overlay_hwnd: int, restore_hwnd: int = 0) -> None:
             except Exception:
                 host = 0
         prev_fg = foreground_hwnd()
+        # Hide while still a child so SetParent(0) cannot flash a full-size
+        # top-level popup over JG Ex.
+        if hide_window:
+            user32.ShowWindow(overlay_hwnd, SW_HIDE)
         apply_noactivate_exstyle(overlay_hwnd)
         user32.SetParent(overlay_hwnd, 0)
         style = _get_style(user32, overlay_hwnd)
@@ -296,6 +383,14 @@ def detach_overlay_hwnd(overlay_hwnd: int, restore_hwnd: int = 0) -> None:
             0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
         )
-        restore_foreground_if_was(host, prev_fg)
+        if hide_window:
+            user32.ShowWindow(overlay_hwnd, SW_HIDE)
+        release_input_hooks()
+        if activate_host:
+            restore_foreground_if_was(host, prev_fg)
+        else:
+            # Prefer whoever had focus before detach — never promote the game
+            # over JG Ex when tearing the overlay down.
+            restore_previous_foreground(prev_fg, host)
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: detach from application window failed: {err}")

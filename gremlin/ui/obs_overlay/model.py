@@ -1428,6 +1428,7 @@ class OverlayScene(QtCore.QObject):
         self.canvas: dict[str, Any] = {}
         self.widgets: list[dict[str, Any]] = []
         self.selected_ids: list[str] = []
+        self._widget_clipboard: list[dict[str, Any]] = []
         self._undo: list[str] = []
         self._redo: list[str] = []
         self._suspend = 0
@@ -2128,6 +2129,46 @@ class OverlayScene(QtCore.QObject):
         self._dirty = True
         self._emit()
         self.selection_changed.emit()
+
+    def copy_selected(self) -> bool:
+        """Copy selected widgets into the scene widget clipboard (Ctrl+C)."""
+        items = []
+        for widget_id in list(self.selected_ids):
+            src = self.widget_by_id(widget_id)
+            if src:
+                items.append(copy.deepcopy(src))
+        self._widget_clipboard = items
+        return bool(items)
+
+    def has_widget_clipboard(self) -> bool:
+        return bool(getattr(self, "_widget_clipboard", None))
+
+    def paste_clipboard(self) -> bool:
+        """Paste widgets from the scene widget clipboard (Ctrl+V)."""
+        clip = list(getattr(self, "_widget_clipboard", None) or [])
+        if not clip:
+            return False
+        self.push_undo()
+        copies = []
+        group_map: dict[str, str] = {}
+        grid = max(1, int(self.canvas.get("grid_size", 8)))
+        base_z = max((w.get("z", 0) for w in self.widgets), default=0)
+        for index, src in enumerate(clip):
+            item = copy.deepcopy(src)
+            item["id"] = _new_id()
+            item["x"] = int(item.get("x") or 0) + grid * 2
+            item["y"] = int(item.get("y") or 0) + grid * 2
+            item["z"] = base_z + 1 + index
+            old_group = str(item.get("group") or "").strip()
+            if old_group:
+                item["group"] = group_map.setdefault(old_group, _new_id())
+            self.widgets.append(item)
+            copies.append(item["id"])
+        self.selected_ids = copies
+        self._dirty = True
+        self._emit()
+        self.selection_changed.emit()
+        return bool(copies)
 
     def expand_group_ids(self, ids: list[str]) -> list[str]:
         """Include every widget that shares a group with any of the given ids."""

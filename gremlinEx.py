@@ -26,7 +26,6 @@ from __future__ import annotations  # deprecated with python 3.14+
 import encodings
 import faulthandler
 import ctypes
-import logging
 import os
 import shutil
 import subprocess
@@ -40,8 +39,11 @@ from threading import Lock
 
 try:
     import gremlin.py314_threads  # noqa: F401
+
+    gremlin.py314_threads.ensure_runtime_tempdirs()
 except Exception:
     pass
+import logging
 from typing import Callable
 from collections.abc import Iterator
 import webbrowser

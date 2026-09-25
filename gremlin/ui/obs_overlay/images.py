@@ -13,7 +13,14 @@ from typing import Any
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif", ".tif", ".tiff"}
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif", ".tif", ".tiff", ".svg"}
+IMAGE_FILE_FILTER = (
+    "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif *.svg);;"
+    "SVG vector (*.svg);;"
+    "All files (*.*)"
+)
+# Back-compat alias used by older call sites.
+_IMAGE_FILE_FILTER = IMAGE_FILE_FILTER
 _CLIPBOARD_MIME_FORMATS = (
     "image/png",
     "PNG",
@@ -24,6 +31,8 @@ _CLIPBOARD_MIME_FORMATS = (
     "image/webp",
     "application/x-qt-image",
 )
+
+_svg_renderer_cache: dict[str, object] = {}
 
 
 def overlay_images_dir(scene=None) -> str:
@@ -88,9 +97,14 @@ def qimage_from_mime(mime: QtCore.QMimeData | None) -> QtGui.QImage | None:
             return data.toImage()
     path = local_image_path_from_mime(mime)
     if path:
-        image = QtGui.QImage(path)
-        if not image.isNull():
-            return image
+        if is_svg_path(path):
+            pixmap = pixmap_from_image_path(path, max_edge=2048)
+            if not pixmap.isNull():
+                return pixmap.toImage()
+        else:
+            image = QtGui.QImage(path)
+            if not image.isNull():
+                return image
     return None
 
 
@@ -115,6 +129,131 @@ def qimage_from_clipboard() -> QtGui.QImage | None:
 
 def clipboard_has_image() -> bool:
     return qimage_from_clipboard() is not None
+
+
+def is_svg_path(path: str | None) -> bool:
+    return bool(path) and os.path.splitext(str(path))[1].lower() == ".svg"
+
+
+def svg_renderer(path: str):
+    """Cached QSvgRenderer for an on-disk SVG, or None if missing/invalid."""
+    if not path or not os.path.isfile(path) or not is_svg_path(path):
+        return None
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    key = f"{path}|{mtime}"
+    cached = _svg_renderer_cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from PySide6 import QtSvg
+    except Exception:
+        return None
+    renderer = QtSvg.QSvgRenderer(path)
+    if not renderer.isValid():
+        return None
+    if len(_svg_renderer_cache) > 24:
+        _svg_renderer_cache.clear()
+    _svg_renderer_cache[key] = renderer
+    return renderer
+
+
+def svg_default_size(path: str) -> tuple[int, int] | None:
+    """Intrinsic SVG size from the document, or None if unreadable."""
+    renderer = svg_renderer(path)
+    if renderer is None:
+        return None
+    size = renderer.defaultSize()
+    width, height = int(size.width()), int(size.height())
+    if width <= 0 or height <= 0:
+        box = renderer.viewBox()
+        width, height = int(round(box.width())), int(round(box.height()))
+    if width <= 0 or height <= 0:
+        return (256, 256)
+    return (width, height)
+
+
+def fitted_content_rect(
+    content_w: float,
+    content_h: float,
+    rect: QtCore.QRectF,
+    keep_aspect: bool,
+) -> QtCore.QRectF:
+    """Center a content size inside rect, optionally preserving aspect."""
+    content_w = max(1.0, float(content_w))
+    content_h = max(1.0, float(content_h))
+    if not keep_aspect:
+        return QtCore.QRectF(rect)
+    scale = min(rect.width() / content_w, rect.height() / content_h)
+    width = content_w * scale
+    height = content_h * scale
+    return QtCore.QRectF(
+        rect.center().x() - width / 2.0,
+        rect.center().y() - height / 2.0,
+        width,
+        height,
+    )
+
+
+def render_svg(
+    painter: QtGui.QPainter,
+    path: str,
+    rect: QtCore.QRectF,
+    keep_aspect: bool = True,
+) -> bool:
+    """Paint an SVG into rect at the current resolution (vector-sharp)."""
+    renderer = svg_renderer(path)
+    if renderer is None or rect.isEmpty():
+        return False
+    intrinsic = svg_default_size(path) or (int(rect.width()), int(rect.height()))
+    target = fitted_content_rect(intrinsic[0], intrinsic[1], rect, keep_aspect)
+    painter.save()
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+    renderer.render(painter, target)
+    painter.restore()
+    return True
+
+
+def pixmap_from_image_path(path: str, max_edge: int | None = None) -> QtGui.QPixmap:
+    """Load a raster image, or rasterize an SVG (optionally capped on the long edge)."""
+    if not path or not os.path.isfile(path):
+        return QtGui.QPixmap()
+    if is_svg_path(path):
+        renderer = svg_renderer(path)
+        if renderer is None:
+            return QtGui.QPixmap()
+        width, height = svg_default_size(path) or (256, 256)
+        if max_edge and max(width, height) > max_edge:
+            scale = max_edge / float(max(width, height))
+            width = max(1, int(round(width * scale)))
+            height = max(1, int(round(height * scale)))
+        image = QtGui.QImage(width, height, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+        image.fill(QtCore.Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(image)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        renderer.render(painter)
+        painter.end()
+        return QtGui.QPixmap.fromImage(image)
+    image = QtGui.QImage(path)
+    if image.isNull():
+        return QtGui.QPixmap()
+    if image.hasAlphaChannel():
+        image = image.convertToFormat(QtGui.QImage.Format_ARGB32_Premultiplied)
+    return QtGui.QPixmap.fromImage(image)
+
+
+def image_intrinsic_size(path: str) -> tuple[int, int] | None:
+    """Width/height for layout fitting (SVG document size or raster pixel size)."""
+    if not path or not os.path.isfile(path):
+        return None
+    if is_svg_path(path):
+        return svg_default_size(path)
+    image = QtGui.QImage(path)
+    if image.isNull():
+        return None
+    return (image.width(), image.height())
 
 
 def local_image_path_from_mime(mime: QtCore.QMimeData | None) -> str:
@@ -194,6 +333,8 @@ def import_image_file(scene, source_path: str) -> str:
 
             shutil.copy2(source_path, dest)
         except OSError:
+            if is_svg_path(source_path):
+                return ""
             image = QtGui.QImage(source_path)
             if image.isNull() or not image.save(dest, "PNG"):
                 return ""
@@ -221,10 +362,13 @@ def apply_image_to_item(scene, item: dict[str, Any], path: str, image: QtGui.QIm
         return False
     style = item.setdefault("style", {})
     style["image_path"] = path
-    if image is None or image.isNull():
-        image = QtGui.QImage(path)
+    size = None
     if image is not None and not image.isNull():
-        fit_item_to_image_size(item, image.width(), image.height(), scene.canvas)
+        size = (image.width(), image.height())
+    if size is None:
+        size = image_intrinsic_size(path)
+    if size is not None:
+        fit_item_to_image_size(item, size[0], size[1], scene.canvas)
     scene._dirty = True
     scene._emit()
     return True

@@ -826,16 +826,30 @@ def _widget_image_pixmap(path: str) -> QtGui.QPixmap:
     pixmap = _widget_image_cache.get(key)
     if pixmap is not None and not pixmap.isNull():
         return pixmap
-    image = QtGui.QImage(path)
-    if image.isNull():
+    from .images import pixmap_from_image_path
+
+    pixmap = pixmap_from_image_path(path, max_edge=2048)
+    if pixmap.isNull():
         return QtGui.QPixmap()
-    if image.hasAlphaChannel():
-        image = image.convertToFormat(QtGui.QImage.Format_ARGB32_Premultiplied)
-    pixmap = QtGui.QPixmap.fromImage(image)
     if len(_widget_image_cache) > 24:
         _widget_image_cache.clear()
     _widget_image_cache[key] = pixmap
     return pixmap
+
+
+def _draw_image_path(painter: QtGui.QPainter, path: str, rect: QtCore.QRectF, keep_aspect: bool) -> bool:
+    """Paint a file path into rect — SVG via QSvgRenderer (vector-sharp), else pixmap."""
+    if not path or rect.isEmpty():
+        return False
+    from .images import is_svg_path, render_svg
+
+    if is_svg_path(path):
+        return render_svg(painter, path, rect, keep_aspect=keep_aspect)
+    pixmap = _widget_image_pixmap(path)
+    if pixmap.isNull():
+        return False
+    _draw_fitted_pixmap(painter, pixmap, rect, keep_aspect)
+    return True
 
 
 def _fitted_pixmap_rect(pixmap: QtGui.QPixmap, rect: QtCore.QRectF, keep_aspect: bool) -> tuple[QtCore.QRectF, QtGui.QPixmap]:
@@ -878,6 +892,7 @@ def _button_outline_path(item: dict[str, Any], rect: QtCore.QRectF) -> QtGui.QPa
 
 def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
     from .gradient import is_gradient
+    from .images import is_svg_path, svg_renderer
 
     style = item.get("style") or {}
     rect = widget_rect(item)
@@ -890,8 +905,12 @@ def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.setBrush(fill_brush(fill_value, "#00000000", rect=rect))
         painter.drawRect(rect)
     path = style.get("image_path") or ""
-    pixmap = _widget_image_pixmap(path)
-    if pixmap.isNull():
+    keep_aspect = bool(style.get("image_keep_aspect", True))
+    has_content = bool(path) and (
+        (is_svg_path(path) and svg_renderer(path) is not None)
+        or (not is_svg_path(path) and not _widget_image_pixmap(path).isNull())
+    )
+    if not has_content:
         painter.setPen(_pen(style.get("border"), border_w))
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.drawRect(rect)
@@ -900,8 +919,7 @@ def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
         _draw_label(painter, item, rect)
         painter.restore()
         return
-    keep_aspect = bool(style.get("image_keep_aspect", True))
-    _draw_fitted_pixmap(painter, pixmap, rect, keep_aspect)
+    _draw_image_path(painter, path, rect, keep_aspect)
     if border_w > 0:
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.setPen(_pen(style.get("border"), border_w))
@@ -1284,28 +1302,30 @@ def paint_label(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
+    from .images import is_svg_path, svg_renderer
+
     style = item.get("style") or {}
     rect = widget_rect(item)
     on = _pressed(value)
     fill = style.get("fill_on") if on else style.get("fill")
     border = style.get("border_on") if on else style.get("border")
-    off_pm = _widget_image_pixmap(str(style.get("image_path") or ""))
-    on_pm = _widget_image_pixmap(str(style.get("image_path_on") or ""))
-    if on and not on_pm.isNull():
-        image = on_pm
-    elif (not on) and not off_pm.isNull():
-        image = off_pm
-    else:
-        image = QtGui.QPixmap()
+    off_path = str(style.get("image_path") or "")
+    on_path = str(style.get("image_path_on") or "")
+    image_path = on_path if on else off_path
     outline = _button_outline_path(item, rect)
     painter.save()
     painter.setOpacity(_opacity(style))
     set_fill_and_outline(painter, fill, border, _border_w(style), "#3a1518", rect=rect)
     painter.drawPath(outline)
-    if not image.isNull():
+    keep_aspect = bool(style.get("image_keep_aspect", True))
+    has_image = bool(image_path) and (
+        (is_svg_path(image_path) and svg_renderer(image_path) is not None)
+        or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
+    )
+    if has_image:
         painter.save()
         painter.setClipPath(outline)
-        _draw_fitted_pixmap(painter, image, rect, bool(style.get("image_keep_aspect", True)))
+        _draw_image_path(painter, image_path, rect, keep_aspect)
         painter.restore()
         if _border_w(style) > 0:
             painter.setBrush(QtCore.Qt.NoBrush)
@@ -1811,7 +1831,9 @@ def _paddle_pixmap(style: dict) -> QtGui.QPixmap | None:
     cached = _PADDLE_PM_CACHE.get(path)
     if cached is not None and not cached.isNull():
         return cached
-    pm = QtGui.QPixmap(path)
+    from .images import pixmap_from_image_path
+
+    pm = pixmap_from_image_path(path, max_edge=1024)
     if pm.isNull():
         return None
     _PADDLE_PM_CACHE[path] = pm
@@ -3288,17 +3310,23 @@ def paint_background(
     if mode == "image":
         path = canvas.get("image_path") or ""
         if path:
-            key = (path, rect.width(), rect.height())
-            pixmap = _bg_image_cache.get(key)
-            if pixmap is None or pixmap.isNull():
-                loaded = QtGui.QPixmap(path)
-                if not loaded.isNull():
-                    pixmap = loaded.scaled(rect.size(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
-                    _bg_image_cache.clear()
-                    _bg_image_cache[key] = pixmap
-            if pixmap is not None and not pixmap.isNull():
-                painter.drawPixmap(rect, pixmap)
-                return
+            from .images import is_svg_path, render_svg
+
+            if is_svg_path(path):
+                if render_svg(painter, path, QtCore.QRectF(rect), keep_aspect=False):
+                    return
+            else:
+                key = (path, rect.width(), rect.height())
+                pixmap = _bg_image_cache.get(key)
+                if pixmap is None or pixmap.isNull():
+                    loaded = QtGui.QPixmap(path)
+                    if not loaded.isNull():
+                        pixmap = loaded.scaled(rect.size(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
+                        _bg_image_cache.clear()
+                        _bg_image_cache[key] = pixmap
+                if pixmap is not None and not pixmap.isNull():
+                    painter.drawPixmap(rect, pixmap)
+                    return
     if not fallback_chroma:
         return
     color = chroma_fill_color(canvas)
