@@ -201,6 +201,12 @@ class ControlAction(IntEnum):
     LocalEnable = 7  # enable local output
     LocalDisable = 8  # disable local output
     ProfileStop = 9  # stop current profile
+    VoiceEnable = 10  # enable voice control
+    VoiceDisable = 11  # disable voice control
+    VoiceToggle = 12  # toggle voice control
+    OverlayEnable = 13  # enable overload
+    OverlayDisable = 14  # disable overload
+    OverlayToggle = 15  # toggle overload
 
     @staticmethod
     def to_string(action):
@@ -230,6 +236,12 @@ _control_action_display = {
     ControlAction.LocalDisable: "Disable local control",
     ControlAction.ProfileStop: "Stop profile",
     ControlAction.RemoteToggle: "Toggle Remote",
+    ControlAction.VoiceEnable: "Enable Voice Recognition",
+    ControlAction.VoiceDisable: "Disable Voice Recognition",
+    ControlAction.VoiceToggle: "Toggle Voice Recognition",
+    ControlAction.OverlayEnable: "Enable Overlay",
+    ControlAction.OverlayDisable: "Disable Overlay",
+    ControlAction.OverlayToggle: "Toggle Overlay",
 }
 
 

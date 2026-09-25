@@ -694,7 +694,12 @@ class Color:
         return css
 
     @staticmethod
-    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None, padding : int = 4,):
+    def cssTitleBox(
+        fontSize=14,
+        foreground_color=None,
+        background_color=None,
+        padding: int = 4,
+    ):
         if background_color is None:
             background_color = Color.normalColor()
         if foreground_color is None:
@@ -9320,6 +9325,7 @@ class QDelayWidget(QWidget):
                 shortcuts = {
                     "0s": 0,
                     "1/10s": 100,
+                    "1/8s": 125,
                     "1/4s": 250,
                     "1/2s": 500,
                     "3/4s": 750,
@@ -10205,7 +10211,6 @@ class QVContentWidget(QContentWidget):
         return self.main_layout
 
 
-
 @gremlin.singleton_decorator.SingletonDecorator
 class WidgetCacheTracker:
     """tracks mapping widgets to stay within QT memory budget"""
@@ -10243,7 +10248,6 @@ class WidgetCacheTracker:
         assert isinstance(key, tuple), "key must be a tuple of 4 parameters"
         assert len(key) == 4, "key must be a tuple of 4 parameters (mode, device_guid, input_type, input_id)"
 
-
     def addWidget(self, key, widget):
         """adds a widget to the cache and drops the oldest one in round robin style if a cache size is specified
         if a replacement, the widget is added to the back of the queue
@@ -10259,7 +10263,6 @@ class WidgetCacheTracker:
         # validate the key
         if __debug__:
             self._validate_key(key)
-
 
         params = widget.params
         # store the type name
@@ -10353,7 +10356,6 @@ class WidgetCacheTracker:
         created = False
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
-
         if key in self._param_map:
             if key not in self._widget_map:
                 # recreate the widget using the original data
@@ -10361,7 +10363,7 @@ class WidgetCacheTracker:
                     # params hold (instance_type, some_other_data, params)
                     data = self.getParams(key)
                     assert len(data) == 3, "expected 3 elements in the parameter tuple (instance_type, key, params)"
-                    instance_type, _ , params = data
+                    instance_type, _, params = data
 
                 except Exception as e:
                     syslog.error(f"WidgetCache: failed to get parameters for key [{key}]")
@@ -14225,8 +14227,6 @@ class QCollapsible(QFrame):
         self._title_layout.addWidget(self._row_1_widget)
         self._title_layout.addWidget(self._row_2_widget)
 
-
-
         if titlebar_widget:
             self._top_bar_widget.setWidget(titlebar_widget)
 
@@ -16642,7 +16642,7 @@ class AutohideContainer(QtWidgets.QWidget):
         self.updateGeometry()
 
     def sizeHint(self):
-        hint =  super().sizeHint()
+        hint = super().sizeHint()
         if self._content_widget is None:
             hint.setHeight(0)
         return hint
@@ -16993,7 +16993,7 @@ class QInteractWidget(QtWidgets.QWidget):
 class QStepTile(QtWidgets.QWidget):
     """step title widget"""
 
-    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, padding : int = 4, parent=None):
+    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, padding: int = 4, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)

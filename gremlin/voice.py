@@ -1640,6 +1640,8 @@ class Voice:
         self._new_word = False  # flag to indicate if a new word has been added
         self._volume = 0.0  # default volume level (system microphone level)
 
+        self._beep_init() # setup beep on voice flip
+
         self._callbacks = []
 
         self._rolling_matcher = CommandMatcher(
@@ -1649,6 +1651,31 @@ class Voice:
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.start)
         el.profile_stop.connect(self.stop)
+
+    def _beep_init(self):
+        # audio beep when toggling voice
+        from gremlin.sound import Sound
+        self._sound = None
+        self._beep_enabled = False  # enable or disable audio beep for voice toggling
+        self._beep_on_path = gremlin.util.find_file("voice_beep_on.wav")
+        self._beep_off_path = gremlin.util.find_file("voice_beep_off.wav")
+
+        if os.path.isfile(self._beep_on_path) and os.path.isfile(self._beep_off_path):
+            self._beep_enabled = True
+            self._sound = Sound()
+
+    def _beep(self, enabled : bool):
+        if not self._beep_enabled:
+            return
+        if enabled:
+            self._sound.play(self._beep_on_path)
+        else:
+            self._sound.play(self._beep_off_path)
+
+
+
+
+
 
     @property
     def model_valid(self):

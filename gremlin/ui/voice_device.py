@@ -33,7 +33,7 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 
 import gremlin.config
 import gremlin.event_handler
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, ControlAction
 from gremlin.input_types import InputType
 import gremlin.shared_state
 import html
@@ -653,7 +653,7 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def _handle_keyboard_listen_close(self):
         gremlin.shared_state.pop_suspend_highlighting()
-      
+
 
     def _add_keyboard_listener_key_cb(self, data):
         gremlin.util.InvokeUiMethod(self._add_keyboard_listener_key_ui, data)
@@ -1218,6 +1218,20 @@ class VoiceData:
         # set initial state of voice recognition
         self._update_listen_mode(False)
         self._last_event = None
+
+        el = gremlin.event_handler.EventListener()
+        el.control_event.connect(self._handle_control_command)
+
+    def _handle_control_command(self, action : ControlAction):
+        """handles control commands for the voice device"""
+        match action:
+            case ControlAction.VoiceDisable:
+                self._voice.setListen(False)
+            case ControlAction.VoiceEnable:
+                self._voice.setListen(True)
+            case ControlAction.VoiceToggle:
+                self._voice.setListen(not self._voice.listenEnabled())
+
 
     def _update_listen_mode(self, is_pressed: bool):
         """updates the listening mode"""

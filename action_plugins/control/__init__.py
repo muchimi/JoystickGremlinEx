@@ -15,7 +15,6 @@ from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
 from gremlin.types import ControlAction
-from gremlin.util import *
 from shiboken6 import Shiboken
 
 from gremlin.types import SyncMode
@@ -206,6 +205,8 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                                         action = ControlAction.RemoteDisable
                                         is_pressed = True
 
+
+
                         # construct the input event to sync
                         event = gremlin.event_handler.Event(
                             event_type=input_type,
@@ -231,6 +232,9 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
 
         el = gremlin.event_handler.EventListener()
         if trigger:
+
+            el.control_event.emit(action) # fire the event
+
             match action:
                 case ControlAction.TTSAbort:
                     tts = gremlin.tts.TextToSpeech()
@@ -271,6 +275,8 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                     if verbose:
                         syslog.info(f"CONTROL: set remote TOGGLE -> new state {'ENABLED' if new_state else 'DISABLED'}")
                     return True
+
+
 
             # find the actionable input
             verbose = gremlin.config.Configuration().verbose

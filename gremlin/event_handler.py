@@ -837,6 +837,8 @@ class EventListener(QtCore.QObject):
     remote_control_socket_timeout = Signal()  # emits when the socket times out
     remote_control_socket_error = Signal()  # emits when the socket has an error
 
+    control_event = Signal("gremlin.types.ControlAction")  # fires a control action -
+
     find_next = Signal()  # find next event
 
     # container_modified = Signal(object) # indicates a container was modified
