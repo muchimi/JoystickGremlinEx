@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T62)
+- Fix: Packaging: missing data files for voice processing in packaged (.exe) mode preventing transcription.
+
 ### (m77T61B)
 - Change: UI: added additional diagnostics and trace information on retrieving cache data.
 - Fix: UI: Calibration: axis exception.

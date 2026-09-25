@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 
 import os
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
@@ -43,6 +43,9 @@ added_files = [
 ]
 if os.path.isdir("gremlin/ui/obs_overlay/assets"):
     added_files.append(("gremlin/ui/obs_overlay/assets", "gremlin/ui/obs_overlay/assets"))
+
+
+added_files.extend(collect_data_files("faster_whisper"))
 
 added_files.extend(action_plugins_files)
 added_files.extend(icon_files)
@@ -91,7 +94,6 @@ a = Analysis(
         'lxml',
         'pyttsx3',
         'hid',
-        "windows_event_hook",
         "psygnal",
         "graphviz",
         "numpy",
@@ -103,6 +105,9 @@ a = Analysis(
         "pydub",
         "faster_whisper",
         "huggingface_hub",
+        "ctranslate2",
+        "tokenizers",
+        "onnxruntime",
         "pycaw",
         "pycountry",
         "OdenGraphQt",
