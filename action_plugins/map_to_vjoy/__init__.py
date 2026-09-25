@@ -5145,11 +5145,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 vjoy_id = self.action_data.virtual_id
                 dev = joystick_handling.getDeviceFromVjoyId(vjoy_id)
                 if dev:
-                    input_id = self.action_data.vjoy_button_id
-                    if input_id > 0 and input_id <= dev.button_count:
-                        joystick_handling.VJoyProxy()[vjoy_id].button(input_id).is_pressed = self.action_data.button_start_value
+                    # Keep hardware input_id intact for later get_button(device_guid, input_id).
+                    vjoy_button_id = self.action_data.vjoy_button_id
+                    if vjoy_button_id > 0 and vjoy_button_id <= dev.button_count:
+                        joystick_handling.VJoyProxy()[vjoy_id].button(vjoy_button_id).is_pressed = self.action_data.button_start_value
                     else:
-                        syslog.warning(f"VJOY: unable to set output button [{input_id}] for vjoy [{vjoy_id}] (not found)")
+                        syslog.warning(f"VJOY: unable to set output button [{vjoy_button_id}] for vjoy [{vjoy_id}] (not found)")
                 else:
                     syslog.warning(f"VJOY: failed to get proxy for vjoy [{vjoy_id}] (not found)")
 
