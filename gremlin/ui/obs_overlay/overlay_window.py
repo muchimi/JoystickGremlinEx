@@ -1003,6 +1003,28 @@ class OverlayView(QtWidgets.QWidget):
                         ]
                     )
                 )
+        self._paint_active_widget_snaps(painter, cw, ch)
+
+    def _paint_active_widget_snaps(self, painter: QtGui.QPainter, cw: int, ch: int):
+        """Dashed white lines for live widget-to-widget snaps (cleared on mouse release)."""
+        if not self.interactive:
+            return
+        lines = getattr(self.scene, "active_snap_lines", None) or []
+        if not lines:
+            return
+        pen = QtGui.QPen(QtGui.QColor("#ffffff"), 1.25, QtCore.Qt.DashLine)
+        pen.setDashPattern([5, 4])
+        painter.setPen(pen)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        for axis, value in lines:
+            try:
+                pos = float(value)
+            except (TypeError, ValueError):
+                continue
+            if axis == "h":
+                painter.drawLine(QtCore.QPointF(0, pos), QtCore.QPointF(cw, pos))
+            else:
+                painter.drawLine(QtCore.QPointF(pos, 0), QtCore.QPointF(pos, ch))
 
     def guide_at(self, pos: QtCore.QPointF) -> dict | None:
         cw, ch = self.canvas_size()

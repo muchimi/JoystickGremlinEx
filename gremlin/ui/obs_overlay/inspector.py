@@ -113,6 +113,23 @@ CANVAS_RUNTIME_PREFIX = "__canvas_runtime__:"
 syslog = logging.getLogger("system")
 
 
+def _set_form_rows_visible(form, fields, visible: bool):
+    """Show or hide QFormLayout rows for the given field widgets (and their labels)."""
+    visible = bool(visible)
+    for field in fields or ():
+        if field is None:
+            continue
+        if isinstance(form, QtWidgets.QFormLayout):
+            try:
+                form.setRowVisible(field, visible)
+            except (AttributeError, TypeError, RuntimeError):
+                pass
+            label = form.labelForField(field)
+            if label is not None:
+                label.setVisible(visible)
+        field.setVisible(visible)
+
+
 class ColorButton(QtWidgets.QPushButton):
     """Solid color or gradient value swatch. Emits str hex or gradient dict."""
 
@@ -620,10 +637,12 @@ def _enum_radios(options, value, callback, tooltip: str | None = None, parent=No
     if parent is None:
         parent = Buttons._default_parent
     group = QDataRadioButtonGroup(options, value=value, callback=callback, parent=parent)
+    group.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
     layout = group.layout()
     if layout is not None:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
+        layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
     if tooltip:
         group.setToolTip(tooltip)
     return group
@@ -1015,7 +1034,6 @@ class OverlayInspector(QtWidgets.QWidget):
         self._rebuild_pending = False
         self._live_fields = []
         built_ids = None
-        previous_ids = list(self._last_rebuild_ids)
         saved_v = 0
         saved_h = 0
         scroll = self._scroll_area()
@@ -1064,8 +1082,9 @@ class OverlayInspector(QtWidgets.QWidget):
                 self._form.addStretch()
             built_ids = list(self._edit_ids)
             self._last_rebuild_ids = built_ids
-            keep_scroll = bool(built_ids) and built_ids == previous_ids
-            self._pending_scroll = (saved_h, saved_v) if keep_scroll else (0, 0)
+            # Keep the same vertical position when switching widgets so Appearance /
+            # Border / etc. stay in view. Clamped after layout if content is shorter.
+            self._pending_scroll = (saved_h, saved_v)
             self._scroll_restore_tries = 0
             later(self, self._restore_inspector_scroll)
         except RuntimeError:
@@ -1214,8 +1233,17 @@ class OverlayInspector(QtWidgets.QWidget):
 
         snap = QtWidgets.QCheckBox(self._host)
         snap.setChecked(bool(canvas.get("snap_to_grid", True)))
+        snap.setToolTip("Snap move/resize to the canvas grid.")
         snap.toggled.connect(lambda v: self._set_canvas("snap_to_grid", v))
         form.addRow("Snap to grid", snap)
+        snap_widgets = QtWidgets.QCheckBox(self._host)
+        snap_widgets.setChecked(bool(canvas.get("snap_to_widgets", True)))
+        snap_widgets.setToolTip(
+            "Snap move/resize to other widgets' left/center/right and top/middle/bottom. "
+            "A dashed white line shows the match while dragging."
+        )
+        snap_widgets.toggled.connect(lambda v: self._set_canvas("snap_to_widgets", v))
+        form.addRow("Snap to widget", snap_widgets)
         self._build_guides(form, canvas)
 
         if not onscreen:
@@ -1597,8 +1625,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 hint = QtWidgets.QLabel('Updates live: edit mode now, runtime mode while the profile is running.', self._host)
                 hint.setWordWrap(True)
                 label_form.addRow(hint)
-        self._style_font(label_form, item)
-        self._style_color(label_form, item, "font_color", "Font color")
+        self._style_label_fonts(label_form, item, widget_type)
         self._slider_int(
             label_form,
             "Label offset X",
@@ -1848,8 +1875,12 @@ class OverlayInspector(QtWidgets.QWidget):
 
         label_form = self._section("Label")
         self._style_bool(label_form, item, "show_label", "Show label")
-        self._style_font(label_form, item)
-        self._style_color(label_form, item, "font_color", "Font color")
+        meter_types = {canonical_widget_type(t) for t in types}
+        if meter_types <= {"sys_stats", "stopwatch"} and len(meter_types) == 1:
+            self._style_label_fonts(label_form, item, next(iter(meter_types)))
+        else:
+            self._style_font(label_form, item)
+            self._style_color(label_form, item, "font_color", "Font color")
         self._slider_int(
             label_form,
             "Label offset X",
@@ -2770,8 +2801,7 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_float(form, item, "corner_radius", "Corner radius", 0, 200)
 
         def _sync(on: bool):
-            for widget in dependents:
-                widget.setEnabled(bool(on))
+            _set_form_rows_visible(form, dependents, on)
 
         def _on_toggle(value, wid=item["id"]):
             on = str(value or "on") == "on"
@@ -4147,7 +4177,25 @@ class OverlayInspector(QtWidgets.QWidget):
         box.stateChanged.connect(lambda _s, wid=item["id"], k=key, b=box: self._on_bool(b, wid, style_key=k))
         form.addRow(title, box)
 
-    def _style_font(self, form, item, prefix=""):
+    def _style_label_fonts(self, form, item, widget_type: str | None = None):
+        """Font controls for the Label section; counters/stopwatches get separate caption fonts."""
+        widget_type = canonical_widget_type(widget_type or item.get("type"))
+        if widget_type == "sys_stats":
+            self._style_font(form, item, title="Counter font")
+            self._style_color(form, item, "font_color", "Counter color")
+            self._style_font(form, item, prefix="caption_", title="Caption font")
+            self._style_color(form, item, "caption_font_color", "Caption color")
+            return
+        if widget_type == "stopwatch":
+            self._style_font(form, item, title="Timer font")
+            self._style_color(form, item, "font_color", "Timer color")
+            self._style_font(form, item, prefix="caption_", title="Caption font")
+            self._style_color(form, item, "caption_font_color", "Caption color")
+            return
+        self._style_font(form, item)
+        self._style_color(form, item, "font_color", "Font color")
+
+    def _style_font(self, form, item, prefix="", title: str | None = None):
         family_key = f"{prefix}font_family"
         size_key = f"{prefix}font_size"
         bold_key = f"{prefix}font_bold"
@@ -4206,7 +4254,14 @@ class OverlayInspector(QtWidgets.QWidget):
             btn.toggled.connect(lambda v, wid=item["id"], k=key: self._style(wid, **{k: v}))
             style_layout.addWidget(btn)
         style_layout.addStretch()
-        label = "Axis font" if prefix else "Font"
+        if title is None:
+            if prefix == "axis_label_":
+                title = "Axis font"
+            elif prefix == "caption_":
+                title = "Caption font"
+            else:
+                title = "Font"
+        label = title
         form.addRow(label, combo)
         form.addRow(f"{label} size", style_row)
         if not prefix:
@@ -4255,16 +4310,19 @@ class OverlayInspector(QtWidgets.QWidget):
         def _set_stroke(width, wid=item["id"], enabled=True):
             self._style(wid, **{f"{prefix}font_stroke_width": float(width) if enabled else 0.0})
 
-        def _stroke_toggled(on, slider=stroke_slider, spin=stroke_spin):
-            slider.setEnabled(on)
-            spin.setEnabled(on)
+        def _stroke_toggled(on, slider=stroke_slider, spin=stroke_spin, color=stroke_color):
+            on = bool(on)
+            color.setVisible(on)
+            slider.setVisible(on)
+            spin.setVisible(on)
             _set_stroke(spin.value(), enabled=on)
 
         stroke_box.toggled.connect(_stroke_toggled)
         stroke_slider.valueChanged.connect(lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True)))
         stroke_spin.valueChanged.connect(lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True)))
-        stroke_slider.setEnabled(stroke_w > 0)
-        stroke_spin.setEnabled(stroke_w > 0)
+        stroke_color.setVisible(stroke_w > 0)
+        stroke_slider.setVisible(stroke_w > 0)
+        stroke_spin.setVisible(stroke_w > 0)
         stroke_layout.addWidget(stroke_box)
         stroke_layout.addWidget(stroke_color)
         stroke_layout.addWidget(stroke_slider, 1)
@@ -4455,24 +4513,10 @@ class OverlayInspector(QtWidgets.QWidget):
             "size",
         )
 
-        shadow_widgets = [
-            shadow_color,
-            dial,
-            angle_spin,
-            dist_row,
-            dist_slider,
-            dist_spin,
-            spread_row,
-            spread_slider,
-            spread_spin,
-            size_row,
-            size_slider,
-            size_spin,
-        ]
-
         def _set_shadow_enabled(on):
-            for w in shadow_widgets:
-                w.setEnabled(bool(on))
+            on = bool(on)
+            shadow_color.setVisible(on)
+            _set_form_rows_visible(form, [angle_row, dist_row, spread_row, size_row], on)
 
         shadow_box.toggled.connect(
             lambda on, wid=item["id"], key=enabled_key: (

@@ -5037,6 +5037,10 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
         self._widgets = []
 
         layout = QtWidgets.QVBoxLayout(self) if orientation == QtCore.Qt.Vertical else QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        # Don't stretch across the form field column (avoids centered On/Off radios).
+        self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
         for item in options:
             count = len(item)
             match count:
@@ -5052,7 +5056,7 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
 
             widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip, parent=self)
             widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
-            layout.addWidget(widget)
+            layout.addWidget(widget, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             self._widgets.append(widget)
 
     def _handle_button_clicked(self, widget, checked):

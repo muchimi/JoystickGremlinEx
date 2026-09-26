@@ -84,8 +84,13 @@ def _font_scale(item: dict[str, Any] | None) -> float:
 
 def _scaled_font_px(style: dict[str, Any], key: str, item: dict[str, Any] | None, default: int = 11) -> int:
     size = style.get(key)
-    if size is None and key.startswith("axis_"):
-        size = style.get("font_size")
+    if size is None and (key.startswith("axis_") or key.startswith("caption_")):
+        base = style.get("font_size")
+        if key.startswith("caption_") and base is not None:
+            # Legacy overlays: captions were drawn at ~42% of the value font.
+            size = max(8, int(round(float(base) * 0.42)))
+        else:
+            size = base
     px = float(size if size is not None else default)
     return max(6, int(round(px * _font_scale(item))))
 
@@ -1043,7 +1048,14 @@ def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
     return rect.adjusted(-pad, -pad, pad, pad)
 
 
-def _draw_label(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCore.QRectF, color=None, text_override=None):
+def _draw_label(
+    painter: QtGui.QPainter,
+    item: dict[str, Any],
+    rect: QtCore.QRectF,
+    color=None,
+    text_override=None,
+    font_prefix: str = "",
+):
     style = item.get("style") or {}
     show_mode = bool(style.get("show_current_mode")) and item.get("type") == "label"
     if text_override is not None:
@@ -1064,8 +1076,17 @@ def _draw_label(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCore.QRec
         float(style.get("label_offset_x") or 0),
         float(style.get("label_offset_y") or 0),
     )
+    color_key = f"{font_prefix}font_color" if font_prefix else "font_color"
     painter.save()
-    _draw_text_ex(painter, text, label_rect, _font(style, item), color or style.get("font_color"), style)
+    _draw_text_ex(
+        painter,
+        text,
+        label_rect,
+        _font(style, item, prefix=font_prefix),
+        color or style.get(color_key) or style.get("font_color"),
+        style,
+        prefix=font_prefix,
+    )
     painter.restore()
 
 
@@ -2796,6 +2817,7 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
         cell_h = inner.height()
         cell_w = inner.width() / count
     base_font = _font(style, item)
+    cap_font = _font(style, item, prefix="caption_")
     for index, row in enumerate(rows):
         _sid, text, color, caption = row if len(row) >= 4 else ("", str(row), style.get("font_color") or "#f4efe4", "")
         if vertical:
@@ -2803,17 +2825,15 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
         else:
             cell = QtCore.QRectF(inner.left() + index * cell_w, inner.top(), cell_w, cell_h)
         if caption_on and caption:
-            cap_font = QtGui.QFont(base_font)
-            cap_font.setPixelSize(max(8, int(round(_scaled_font_px(style, "font_size", item, 22) * 0.42))))
-            cap_font.setBold(True)
             cap_h = QtGui.QFontMetrics(cap_font).height()
             _draw_text_ex(
                 painter,
                 caption,
                 QtCore.QRectF(cell.left(), cell.top(), cell.width(), min(cap_h, cell.height() * 0.45)),
                 cap_font,
-                color,
+                style.get("caption_font_color") or color,
                 style,
+                prefix="caption_",
                 flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
             )
             value_rect = QtCore.QRectF(
@@ -2826,7 +2846,7 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
             value_rect = cell
         _draw_text_ex(painter, str(text or ""), value_rect, base_font, color, style)
     if style.get("show_label", False):
-        _draw_label(painter, item, rect)
+        _draw_label(painter, item, rect, font_prefix="caption_")
     painter.restore()
 
 
@@ -2957,8 +2977,8 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
             style.get("needle_second_color") if running else style.get("font_color"),
             style,
         )
-        if style.get("show_label", False):
-            _draw_label(painter, item, rect)
+    if style.get("show_label", False):
+        _draw_label(painter, item, rect, font_prefix="caption_")
     painter.restore()
 
 

@@ -145,9 +145,12 @@ _PANE_PREF_KEY = "show_selection_pane"
 _PALETTE_VIEW_KEY = "palette_view"
 _PANE_DEFAULT_WIDTH = 220
 _PANE_MIN_WIDTH = 200
+# Inspector (right column): default = max so it never opens at the old 320/420 ≈ 75% width.
+_INSPECTOR_MIN_WIDTH = 300
+_INSPECTOR_WIDTH = 420
 
 _COMMON_WIDGET_MOUSE = (
-    "Drag to move (snaps to grid and guides). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
+    "Drag to move (snaps to grid, guides, and other widgets). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
     "Drag the round handle above the widget to rotate; hold Shift to snap to 15°. "
     "Hold the middle mouse button to pan the canvas. "
     "Shift+click adds to the selection. Right-click: Copy, Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
@@ -1540,8 +1543,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._configure_pane_widget(False)
         splitter.addWidget(self._selection_pane)
         self.inspector = OverlayInspector(scene)
-        self.inspector.setMinimumWidth(300)
-        self.inspector.setMaximumWidth(420)
+        self.inspector.setMinimumWidth(_INSPECTOR_MIN_WIDTH)
+        self.inspector.setMaximumWidth(_INSPECTOR_WIDTH)
         splitter.addWidget(self.inspector)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -1551,7 +1554,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         splitter.setCollapsible(1, False)
         splitter.setCollapsible(2, True)
         splitter.setCollapsible(3, False)
-        splitter.setSizes([220, 700, 0, 320])
+        splitter.setSizes([220, 700, 0, _INSPECTOR_WIDTH])
         self._splitter = splitter
         self._pane_width = _PANE_DEFAULT_WIDTH
         self._pane_collapsed = True
@@ -1883,12 +1886,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         sizes = splitter.sizes()
         pal = 220
-        insp = 320
+        # Always restore the inspector to full width (not the old 320px / ~75% default).
+        insp = _INSPECTOR_WIDTH
         if len(sizes) >= 4:
             if sizes[0] >= 180:
                 pal = min(280, max(220, sizes[0]))
-            if sizes[3] >= 280:
-                insp = min(420, max(300, sizes[3]))
         pane_w = _PANE_DEFAULT_WIDTH if visible else 0
         if visible:
             stored = int(getattr(self, "_pane_width", 0) or 0)
@@ -1918,7 +1920,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         if len(sizes) < 4:
             return
         pane_ok = (sizes[2] >= _PANE_MIN_WIDTH) if visible else (sizes[2] <= 2)
-        if sizes[1] >= 160 and pane_ok:
+        # Also re-apply when the inspector shrank below full width (page change / re-entry).
+        insp_ok = sizes[3] >= (_INSPECTOR_WIDTH - 8)
+        if sizes[1] >= 160 and pane_ok and insp_ok:
             return
         self._apply_splitter_sizes(visible)
 
@@ -1969,6 +1973,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         page_id = self._page_tabs.tabData(index)
         if page_id:
             self.scene.set_active_page(str(page_id))
+        QtCore.QTimer.singleShot(0, self._ensure_splitter_layout)
 
     def _rename_page_tab(self, index: int):
         if index < 0:

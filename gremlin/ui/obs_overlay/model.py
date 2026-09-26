@@ -366,6 +366,23 @@ def default_style(widget_type: str) -> dict[str, Any]:
         "axis_label_font_stroke_width": 0,
         "axis_label_font_stroke_color": "#000000",
         "axis_label_font_color": "#f4efe4",
+        "caption_font_family": "Segoe UI",
+        "caption_font_size": 10,
+        "caption_font_bold": True,
+        "caption_font_italic": False,
+        "caption_font_underline": False,
+        "caption_font_strike": False,
+        "caption_font_shadow": False,
+        "caption_font_shadow_color": "#80000000",
+        "caption_font_shadow_angle": 135.0,
+        "caption_font_shadow_distance": 3.0,
+        "caption_font_shadow_spread": 0.0,
+        "caption_font_shadow_size": 0.0,
+        "caption_font_shadow_dx": 2,
+        "caption_font_shadow_dy": 2,
+        "caption_font_stroke_width": 0,
+        "caption_font_stroke_color": "#000000",
+        "caption_font_color": "#f4efe4",
         "label_offset_x": 0,
         "label_offset_y": 0,
         "show_label": True,
@@ -586,6 +603,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "border_width": 2.0,
                 "corner_radius": 8.0,
                 "font_size": 22,
+                "caption_font_size": 9,
                 "show_label": False,
                 "show_caption": True,
                 "stat": "time",
@@ -602,6 +620,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "border_width": 2.0,
                 "corner_radius": 8.0,
                 "font_size": 22,
+                "caption_font_size": 11,
                 "show_label": False,
                 "stopwatch_face": "digital",
                 "stopwatch_format": "mmss",
@@ -716,6 +735,7 @@ def _refresh_font_scale_base(item: dict[str, Any], style_updates: dict[str, Any]
         "auto_scale_font" in updates
         or "font_size" in updates
         or "axis_label_font_size" in updates
+        or "caption_font_size" in updates
         or not style.get("font_scale_base")
     ):
         return
@@ -1395,6 +1415,7 @@ def default_canvas() -> dict[str, Any]:
         "image_path": "",
         "grid_size": 8,
         "snap_to_grid": True,
+        "snap_to_widgets": True,
         "always_on_top": False,
         "frameless": False,
         "show_drag_bar": True,
@@ -1661,6 +1682,8 @@ class OverlayScene(QtCore.QObject):
         self._identity_hooks = False
         # True while the designer is mid move/resize/rotate — inspectors skip live churn.
         self.geometry_gesture = False
+        # Transient alignment lines while snapping to other widgets (cleared on release).
+        self.active_snap_lines: list[tuple[str, float]] = []
         self._geometry_pending = False
         self._geometry_timer = QtCore.QTimer(self)
         self._geometry_timer.setSingleShot(True)
@@ -2238,6 +2261,7 @@ class OverlayScene(QtCore.QObject):
 
     def begin_geometry_gesture(self):
         self.geometry_gesture = True
+        self.active_snap_lines = []
         try:
             from .widgets import set_interaction_paint
 
@@ -2247,6 +2271,7 @@ class OverlayScene(QtCore.QObject):
 
     def end_geometry_gesture(self):
         self.geometry_gesture = False
+        self.active_snap_lines = []
         try:
             from .widgets import set_interaction_paint
 
@@ -3160,6 +3185,29 @@ class OverlayScene(QtCore.QObject):
         self._dirty = True
         self._emit()
 
+    def _widget_snap_targets(self, exclude_ids: set[str] | None = None) -> tuple[list[float], list[float]]:
+        """X and Y snap lines from other widgets (left/center/right and top/middle/bottom)."""
+        from .widgets import widget_rotated_bounds
+
+        exclude = {str(i) for i in (exclude_ids or set())}
+        vertical: list[float] = []
+        horizontal: list[float] = []
+        for item in self.widgets:
+            wid = str(item.get("id") or "")
+            if not wid or wid in exclude:
+                continue
+            if not item.get("visible", True):
+                continue
+            try:
+                bounds = widget_rotated_bounds(item)
+            except Exception:
+                continue
+            if bounds.isNull() or bounds.width() <= 0 or bounds.height() <= 0:
+                continue
+            vertical.extend([bounds.left(), bounds.center().x(), bounds.right()])
+            horizontal.extend([bounds.top(), bounds.center().y(), bounds.bottom()])
+        return vertical, horizontal
+
     def snap_geom_to_guides(
         self,
         x: float,
@@ -3170,9 +3218,12 @@ class OverlayScene(QtCore.QObject):
         y_edges: tuple[str, ...] | None = None,
         mode: str = "move",
         previous: tuple[float, float, float, float] | None = None,
+        exclude_ids: set[str] | None = None,
     ) -> tuple[float, float, float, float]:
         guides = self.canvas.get("guides") or []
-        if not guides:
+        snap_widgets = bool(self.canvas.get("snap_to_widgets", True))
+        self.active_snap_lines = []
+        if not guides and not snap_widgets:
             return x, y, w, h
         cw = max(1.0, float(self.canvas.get("width") or 1280))
         ch = max(1.0, float(self.canvas.get("height") or 720))
@@ -3183,6 +3234,14 @@ class OverlayScene(QtCore.QObject):
             y_edges = ("top", "center", "bottom")
         vertical = [float(g.get("position") or 0) * cw for g in guides if g.get("axis") == "v"]
         horizontal = [float(g.get("position") or 0) * ch for g in guides if g.get("axis") == "h"]
+        widget_v: list[float] = []
+        widget_h: list[float] = []
+        if snap_widgets:
+            if exclude_ids is None:
+                exclude_ids = {str(i) for i in self.selected_ids}
+            widget_v, widget_h = self._widget_snap_targets(exclude_ids)
+            vertical.extend(widget_v)
+            horizontal.extend(widget_h)
 
         def _best(current: dict[str, float], targets: list[float], previous: dict[str, float] | None = None):
             best_dist = threshold + 1.0
@@ -3227,6 +3286,8 @@ class OverlayScene(QtCore.QObject):
         hit = _best(x_map, vertical, prev_x) if vertical else None
         if hit:
             edge, target = hit
+            if any(abs(float(target) - t) < 0.05 for t in widget_v):
+                self.active_snap_lines.append(("v", float(target)))
             if mode == "resize":
                 if edge == "left":
                     right = x + w
@@ -3264,6 +3325,8 @@ class OverlayScene(QtCore.QObject):
         hit = _best(y_map, horizontal, prev_y) if horizontal else None
         if hit:
             edge, target = hit
+            if any(abs(float(target) - t) < 0.05 for t in widget_h):
+                self.active_snap_lines.append(("h", float(target)))
             if mode == "resize":
                 if edge == "top":
                     bottom = y + h
