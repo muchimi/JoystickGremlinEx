@@ -1455,7 +1455,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
         )
         self._grid_layout = QtWidgets.QGridLayout(self._grid_host)
-        self._grid_layout.setSpacing(8)
+        self._grid_layout.setSpacing(16)
         self._grid_layout.setContentsMargins(8, 4, 8, 4)
         self._grid_layout.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
         body_layout.addWidget(self._grid_host, 0, QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
@@ -2018,7 +2018,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
     def _compute_cell_side(self, cols: int | None = None) -> int:
         cols = cols or self._grid_cols or 5
-        spacing = self._grid_layout.spacing() if self._grid_layout is not None else 8
+        spacing = self._grid_layout.spacing() if self._grid_layout is not None else 16
         margins = 16
         avail = 640
         if self._scroll is not None and Shiboken.isValid(self._scroll):

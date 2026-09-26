@@ -476,8 +476,9 @@ def _clear_layout(layout):
         item = layout.takeAt(index)
         widget = item.widget()
         if widget is not None:
+            # Hide and delete in place. setParent(None) promotes the widget to a
+            # top-level window and causes visible flashes over the main UI.
             widget.hide()
-            widget.setParent(None)
             widget.deleteLater()
         elif item.layout():
             _clear_layout(item.layout())
@@ -492,10 +493,7 @@ def delete_widget(widget: QtWidgets.QWidget):
             widget.unhook()
         if hasattr(widget, "_cleanup_ui"):
             widget._cleanup_ui()
-        # layout = widget.layout()
-        # if layout is not None:
-        #     clear_layout(layout)
-        widget.setParent(None)  # removes the widget from the containing layout
+        # Do not setParent(None) — that creates a transient top-level HWND flash.
         widget.deleteLater()  # tell QT to free the widget from memory
 
 
@@ -1899,13 +1897,22 @@ class InvokeUiMethod(QtCore.QObject):
 
         super().__init__()
         assert method is not None, "Method not provided"
-        current_thread = QtCore.QThread.currentThread()
-        # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
-        instance = QtWidgets.QApplication.instance()
+        # Prefer isMainThread(): Python QThread wrappers for the same C++ thread
+        # can fail `==`/`!=` and force a DirectConnection self-reenter loop.
+        on_ui = False
+        try:
+            on_ui = bool(QtCore.QThread.isMainThread())
+        except Exception:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                try:
+                    on_ui = QtCore.QThread.currentThread() is app.thread() or (
+                        QtCore.QThread.currentThread() == app.thread()
+                    )
+                except Exception:
+                    on_ui = False
 
-        ui_thread = QtWidgets.QApplication.instance().thread()  # QT thread
-
-        if current_thread != ui_thread:
+        if not on_ui:
             # not on the QT UI thread, move it to the UI thread - because this is an indirect call
             # create references to the objects so they don't go out of scope later
             self._p0 = p0
@@ -1917,12 +1924,18 @@ class InvokeUiMethod(QtCore.QObject):
             self._p6 = p6
             self._p7 = p7
 
-            self.moveToThread(ui_thread)
-            self.setParent(QtWidgets.QApplication.instance())
-            self._called.connect(self._execute)
+            app = QtWidgets.QApplication.instance()
+            ui_thread = app.thread() if app is not None else None
+            if ui_thread is not None:
+                self.moveToThread(ui_thread)
+            if app is not None:
+                self.setParent(app)
+            # QueuedConnection: never DirectConnection-reenter the caller.
+            self._called.connect(
+                self._execute,
+                QtCore.Qt.ConnectionType.QueuedConnection,
+            )
             self.method = method
-            # self._waiting = True
-            # syslog.info("invoke: call start")
             self._called.emit(
                 self._p0,
                 self._p1,
@@ -1933,13 +1946,10 @@ class InvokeUiMethod(QtCore.QObject):
                 self._p6,
                 self._p7,
             )
-            # while self._waiting:
-            #     time.sleep(0)
-            # syslog.info("invoke: call completed")
             self.deleteLater()
 
         else:
-            # direct call
+            # Already on the UI thread — call directly.
             self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
@@ -1981,9 +1991,17 @@ def is_ui_thread():
     if app is None:
         # Import / early init — no Qt app yet; treat as safe for sync work
         return True
-    current_thread = QtCore.QThread.currentThread()
-    ui_thread = app.thread()
-    return current_thread == ui_thread
+    try:
+        # Stable across PySide wrapper identity; `currentThread() == app.thread()`
+        # has been observed to disagree with isMainThread() and break marshaling.
+        return bool(QtCore.QThread.isMainThread())
+    except Exception:
+        try:
+            current_thread = QtCore.QThread.currentThread()
+            ui_thread = app.thread()
+            return current_thread is ui_thread or current_thread == ui_thread
+        except Exception:
+            return False
 
 
 @debug_only
@@ -2874,10 +2892,9 @@ def toUrl(fname: str):
     """converts a file name to a URL link format"""
     import pathlib
 
-    url = pathlib.Path(fname)
     try:
-        url = url.resolve()
-        return url.as_uri()
+        path = pathlib.Path(os.path.abspath(os.path.expanduser(str(fname))))
+        return path.as_uri()
     except Exception as ex:
         syslog.error(f"URL: Failed to resolve path [{fname}]: {ex}")
         return fname

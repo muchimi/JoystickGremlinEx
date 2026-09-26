@@ -43,6 +43,7 @@ from .model import DEFAULT_SIZES, PALETTE_GROUPS, OverlayScene, is_interactive_o
 from .overlay_window import OverlayView, ROTATE_HANDLE
 from .qt_guard import alive, on_ui
 from .widgets import (
+    apply_group_rotation_delta,
     apply_widget_rotation,
     normalize_rotation,
     scene_to_widget_local,
@@ -317,7 +318,7 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
             "<b>Pages</b> — Double-click a tab to rename. Right-click a tab to duplicate or delete. + adds a page. "
             "Show overlay and Interactive apply to the selected page.<br>"
             "<b>Palette</b> — Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
-            "<b>Inspector</b> — Background (chroma / image / on-screen), Visible, Interactive, Toggle overlay, "
+            "<b>Inspector</b> — Mode (Windowed / On-screen), Visible, Interactive, Toggle overlay, "
             "Show at profile start, Guides, and canvas size."
         )
         return title, body
@@ -467,6 +468,20 @@ class DesignerCanvas(OverlayView):
             self.scene.selection_changed.disconnect(self._clear_shape_vertex)
         except Exception:
             pass
+
+    def _group_selected_with_name(self):
+        if len(self.scene.selected_ids) < 2:
+            return
+        suggested = self.scene._next_group_name()
+        name, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Group widgets",
+            "Group name:",
+            text=suggested,
+        )
+        if not ok:
+            return
+        self.scene.group_selected(name=str(name or "").strip() or suggested)
         self.detach_from_scene()
 
     def _clear_shape_vertex(self):
@@ -531,12 +546,22 @@ class DesignerCanvas(OverlayView):
                     return True
             if self._mode == "pan":
                 if event.type() == QtCore.QEvent.MouseMove and isinstance(event, QtGui.QMouseEvent):
+                    if not (event.buttons() & QtCore.Qt.MiddleButton):
+                        self._end_pan()
+                        return True
                     self._pan_by(event)
                     return True
                 if event.type() == QtCore.QEvent.MouseButtonRelease and isinstance(event, QtGui.QMouseEvent):
                     if event.button() == QtCore.Qt.MiddleButton:
                         self._end_pan()
                         return True
+                if event.type() in (
+                    QtCore.QEvent.Type.WindowDeactivate,
+                    QtCore.QEvent.Type.FocusOut,
+                    QtCore.QEvent.Type.Hide,
+                ):
+                    self._end_pan()
+                    return False
         return super().eventFilter(watched, event)
 
     def mousePressEvent(self, event: QtGui.QMouseEvent):
@@ -555,6 +580,7 @@ class DesignerCanvas(OverlayView):
         if vertex is not None:
             self.scene.push_undo()
             self._mode = "shape"
+            self.scene.begin_geometry_gesture()
             self._shape_vertex, self._shape_handle = vertex
             self.update()
             return
@@ -566,6 +592,7 @@ class DesignerCanvas(OverlayView):
                 return
             self.scene.push_undo()
             self._mode = "rotate"
+            self.scene.begin_geometry_gesture()
             self._last = pos
             bounds = self._selected_bounds()
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
@@ -579,10 +606,19 @@ class DesignerCanvas(OverlayView):
                 math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x())
             )
             self._start_rotations = {}
+            self._start_geoms = {}
             for sid in self.scene.selected_ids:
                 it = self.scene.widget_by_id(sid)
-                if it:
-                    self._start_rotations[sid] = widget_rotation_deg(it)
+                if not it or widget_is_locked(it):
+                    continue
+                self._start_rotations[sid] = widget_rotation_deg(it)
+                self._start_geoms[sid] = {
+                    "x": float(it.get("x") or 0),
+                    "y": float(it.get("y") or 0),
+                    "w": float(it.get("w") or 1),
+                    "h": float(it.get("h") or 1),
+                    "rotation": widget_rotation_deg(it),
+                }
             return
         if handle >= 0:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
@@ -591,6 +627,7 @@ class DesignerCanvas(OverlayView):
                 return
             self.scene.push_undo()
             self._mode = "resize"
+            self.scene.begin_geometry_gesture()
             self._handle = handle
             self._last = pos
             self._start_geoms = {}
@@ -625,6 +662,7 @@ class DesignerCanvas(OverlayView):
                 return
             self.scene.push_undo()
             self._mode = "move"
+            self.scene.begin_geometry_gesture()
             self._last = pos
             self.setCursor(QtCore.Qt.SizeAllCursor)
             return
@@ -632,6 +670,7 @@ class DesignerCanvas(OverlayView):
         if guide:
             self.scene.push_undo()
             self._mode = "guide"
+            self.scene.begin_geometry_gesture()
             self._guide_id = guide.get("id")
             self.setCursor(QtCore.Qt.SizeVerCursor if guide.get("axis") == "h" else QtCore.Qt.SizeHorCursor)
             return
@@ -644,6 +683,10 @@ class DesignerCanvas(OverlayView):
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
         if self._mode == "pan":
+            if not (event.buttons() & QtCore.Qt.MiddleButton):
+                self._end_pan()
+                event.accept()
+                return
             self._pan_by(event)
             event.accept()
             return
@@ -688,7 +731,10 @@ class DesignerCanvas(OverlayView):
                 event.accept()
             return
         if self._runtime_locked():
+            was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
             self._mode = None
+            if was_geometry:
+                self.scene.end_geometry_gesture()
             event.accept()
             return
         if self._mode == "rubber":
@@ -700,12 +746,17 @@ class DesignerCanvas(OverlayView):
             if event.modifiers() & QtCore.Qt.ShiftModifier:
                 self.scene.set_selection(self.scene.expand_group_ids(self.scene.selected_ids))
             self._rubber = QtCore.QRectF()
+        was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
         self._mode = None
         self._handle = -1
         self._guide_id = None
         self._shape_handle = None
         self._start_rotations = {}
+        self._start_geoms = {}
+        self._start_bounds = {}
         self.setCursor(QtCore.Qt.ArrowCursor)
+        if was_geometry:
+            self.scene.end_geometry_gesture()
         self.update()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent):
@@ -742,7 +793,7 @@ class DesignerCanvas(OverlayView):
             if mods & QtCore.Qt.ShiftModifier:
                 self.scene.ungroup_selected()
             else:
-                self.scene.group_selected()
+                self._group_selected_with_name()
         elif key == QtCore.Qt.Key_A and mods & QtCore.Qt.ControlModifier:
             self.scene.set_selection([w["id"] for w in self.scene.widgets])
         elif key == QtCore.Qt.Key_Z and mods & QtCore.Qt.ControlModifier:
@@ -781,17 +832,32 @@ class DesignerCanvas(OverlayView):
         hit = self.scene.hit_test(pos.x(), pos.y())
         if hit and hit["id"] not in self.scene.selected_ids:
             self.scene.set_selection(self.scene.expand_group_ids([hit["id"]]))
+        self.show_widget_context_menu(event.globalPos(), scene_pos=pos)
+
+    def show_widget_context_menu(self, global_pos, scene_pos: QtCore.QPointF | None = None):
+        """Shared widget/group context menu (designer canvas and selection pane)."""
+        if self._runtime_locked():
+            return
+        if scene_pos is None:
+            bounds = self._selected_bounds()
+            if bounds is not None:
+                scene_pos = bounds.center()
+            else:
+                scene_pos = QtCore.QPointF(
+                    float(self.scene.canvas.get("width") or 0) * 0.5,
+                    float(self.scene.canvas.get("height") or 0) * 0.5,
+                )
         menu = QtWidgets.QMenu(self)
         paste_widgets = menu.addAction("Paste")
         paste_widgets.setEnabled(self.scene.has_widget_clipboard())
         paste_image = menu.addAction("Paste image")
         paste_image.setEnabled(clipboard_has_image())
         if not self.scene.selected_ids:
-            chosen = menu.exec(event.globalPos())
+            chosen = menu.exec(global_pos)
             if chosen is paste_widgets:
                 self.scene.paste_clipboard()
             elif chosen is paste_image:
-                self.paste_clipboard_image(pos)
+                self.paste_clipboard_image(scene_pos)
             return
         grouped = any(str(item.get("group") or "").strip() for item in self.scene.selected_widgets())
         menu.addSeparator()
@@ -835,11 +901,11 @@ class DesignerCanvas(OverlayView):
             menu.addSeparator()
             turn_image_button = menu.addAction("Turn into button")
             turn_image_paddle = menu.addAction("Turn into paddle")
-        chosen = menu.exec(event.globalPos())
+        chosen = menu.exec(global_pos)
         if chosen is paste_widgets:
             self.scene.paste_clipboard()
         elif chosen is paste_image:
-            self.paste_clipboard_image(pos)
+            self.paste_clipboard_image(scene_pos)
         elif chosen is copy_widgets:
             self.scene.copy_selected()
         elif chosen is duplicate:
@@ -855,16 +921,16 @@ class DesignerCanvas(OverlayView):
         elif chosen is backward:
             self.scene.send_backward()
         elif chosen is group:
-            self.scene.group_selected()
+            self._group_selected_with_name()
         elif chosen is ungroup:
             self.scene.ungroup_selected()
         elif chosen is add_point:
-            pos = self.map_to_scene(event.pos())
-            self.scene.push_undo()
-            index, _dist = closest_segment(item, pos)
-            self._shape_vertex = insert_shape_point(item, index, pos)
-            self.scene._dirty = True
-            self.scene.changed.emit()
+            if item:
+                self.scene.push_undo()
+                index, _dist = closest_segment(item, scene_pos)
+                self._shape_vertex = insert_shape_point(item, index, scene_pos)
+                self.scene._dirty = True
+                self.scene.changed.emit()
         elif chosen is delete_point:
             self._delete_shape_vertex()
         elif chosen is turn_button:
@@ -945,16 +1011,39 @@ class DesignerCanvas(OverlayView):
             return
         angle = math.degrees(math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x()))
         delta = angle - self._rotate_start_mouse
-        for widget_id, start in self._start_rotations.items():
-            item = self.scene.widget_by_id(widget_id)
-            if not item:
-                continue
-            rotation = start + delta
-            if snap:
-                rotation = round(rotation / 15.0) * 15.0
-            item["rotation"] = normalize_rotation(rotation)
+        if snap:
+            # Snap the group angle as a whole so positions and rotations stay in sync.
+            delta = round(delta / 15.0) * 15.0
+        multi = len(self._start_geoms) > 1
+        if multi:
+            items = []
+            for widget_id in self._start_geoms:
+                item = self.scene.widget_by_id(widget_id)
+                if item:
+                    items.append(item)
+            apply_group_rotation_delta(
+                items,
+                self._start_geoms,
+                self._rotate_center.x(),
+                self._rotate_center.y(),
+                delta,
+            )
+        else:
+            for widget_id, start in self._start_rotations.items():
+                item = self.scene.widget_by_id(widget_id)
+                if not item:
+                    continue
+                item["rotation"] = normalize_rotation(start + delta)
         self.scene._dirty = True
-        self.scene.changed.emit()
+        # During a gesture, repaint this canvas immediately and coalesce geometry
+        # notifies — critical for large image groups with drop shadows.
+        if getattr(self.scene, "geometry_gesture", False):
+            self.update()
+            self.scene._geometry_pending = True
+            if not self.scene._geometry_timer.isActive():
+                self.scene._geometry_timer.start()
+            return
+        self.scene._emit_geometry()
 
     def _resize_to(self, pos: QtCore.QPointF, keep_aspect: bool = False):
         if len(self._start_geoms) > 1 and self._start_bounds:
@@ -998,7 +1087,7 @@ class DesignerCanvas(OverlayView):
             item["w"] = max(8, int(round(gw)))
             item["h"] = max(8, int(round(gh)))
         self.scene._dirty = True
-        self.scene.changed.emit()
+        self.scene._emit_geometry()
 
     def _handle_edges(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
         handle = self._handle
@@ -1116,7 +1205,7 @@ class DesignerCanvas(OverlayView):
         finally:
             self.scene._suspend = max(0, self.scene._suspend - 1)
             self.scene._dirty = True
-            self.scene._emit()
+            self.scene._emit_geometry()
 
     def _drag_guide(self, pos: QtCore.QPointF):
         guide = self.scene.guide_by_id(self._guide_id) if self._guide_id else None
@@ -1219,7 +1308,7 @@ class DesignerCanvas(OverlayView):
             expand_shape_widget_to_controls(item, points)
         item["points"] = points
         self.scene._dirty = True
-        self.scene.changed.emit()
+        self.scene._emit_geometry()
 
     def _delete_shape_vertex(self) -> bool:
         item = self.scene.primary_selection()
@@ -1645,6 +1734,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             tooltip="Show or hide the live window for the selected overlay page",
             clicked=lambda: self._toggle_overlay(),
         )
+        self._control_button = QDataPushButton(
+            "Runtime control…",
+            tooltip="Open the overlay control panel. Controls are active while the profile is running.",
+            clicked=self._open_runtime_control,
+        )
         self._interactive_box = QtWidgets.QCheckBox("Interactive")
         self._interactive_box.setToolTip(
             "On this page’s live overlay, touch or click widgets bound to vJoy or GEX states. "
@@ -1674,7 +1768,17 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._undo_btn = undo
         redo = QDataPushButton("Redo", clicked=self.scene.redo)
         self._redo_btn = redo
-        for widget in (self._overlay_button, self._interactive_box, self._hints_box, self._pane_box, export, import_btn, undo, redo):
+        for widget in (
+            self._interactive_box,
+            self._hints_box,
+            self._pane_box,
+            self._overlay_button,
+            self._control_button,
+            export,
+            import_btn,
+            undo,
+            redo,
+        ):
             layout.addWidget(widget)
         layout.addStretch()
         zoom_label = QtWidgets.QLabel("Zoom")
@@ -2028,6 +2132,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             item = layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.hide()
                 widget.deleteLater()
             child = item.layout()
             if child is not None:
@@ -2191,6 +2296,15 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             self._overlay_callback()
         self._refresh_overlay_button()
 
+    def _open_runtime_control(self):
+        manager = self._overlay_manager
+        if manager is not None:
+            manager.open_control_panel(parent=self)
+            return
+        from .control_panel import open_overlay_control_panel
+
+        open_overlay_control_panel(self.scene, parent=self)
+
     def _refresh_overlay_button(self):
         if not alive(self):
             return
@@ -2304,7 +2418,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             widget = getattr(self, attr, None)
             if widget is not None and alive(widget):
                 widget.setEnabled(not locked)
-        # Keep Show overlay / Hints / Zoom usable; lock edit actions.
+        # Keep Show overlay / Runtime control / Hints / Zoom usable; lock edit actions.
         for attr in (
             "_interactive_box",
             "_export_btn",
@@ -2315,6 +2429,12 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             widget = getattr(self, attr, None)
             if widget is not None and alive(widget):
                 widget.setEnabled(not locked)
+        control = getattr(self, "_control_button", None)
+        if control is not None and alive(control):
+            control.setEnabled(True)
+            control.setToolTip(
+                "Open the overlay control panel. Controls inside are active while the profile is running."
+            )
         banner = getattr(self, "_action_banner", None)
         if locked:
             if banner is not None and alive(banner):

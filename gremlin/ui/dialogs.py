@@ -2278,6 +2278,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         modules = [
             ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.", 'GEX_STREAMDECK_ENABLED'),
             ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen.", 'GEX_OVERLAY_ENABLED'),
+            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS visual axis-flow designer tab and Map to AFCS action.", 'GEX_AFCS_ENABLED'),
             ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.", 'GEX_MIDI_ENABLED'),
             (
                 "osc",
@@ -2293,6 +2294,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.streamdeck_enabled
                 case "overlay":
                     value = self.config.overlay_enabled
+                case "afcs":
+                    value = self.config.afcs_enabled
                 case "midi":
                     value = self.config.midi_enabled
                 case "osc":
@@ -2336,6 +2339,8 @@ Enabled modules may not show until the device filter is updated.
                 self.config.streamdeck_enabled = checked
             case "overlay":
                 self.config.overlay_enabled = checked
+            case "afcs":
+                self.config.afcs_enabled = checked
             case "midi":
                 self.config.midi_enabled = checked
             case "osc":

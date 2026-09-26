@@ -17,7 +17,6 @@ from PySide6 import QtCore, QtGui
 
 from .model import (
     is_onscreen_mode,
-    normalize_background_mode,
     normalize_paddle_direction,
     normalize_switch_appearance,
     switch_2way_cardinal_slots,
@@ -479,18 +478,170 @@ def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
     return path
 
 
+def _widget_shadow_image_path(item: dict[str, Any]) -> str:
+    """File path whose alpha should mask the drop shadow (empty → geometric body)."""
+    style = item.get("style") or {}
+    # Prefer off/base image; any widget with a raster/SVG asset shadows that silhouette.
+    for key in ("image_path", "paddle_image", "image_path_on"):
+        path = str(style.get(key) or "").strip()
+        if path:
+            return path
+    return ""
+
+
+_widget_shadow_cache: dict[tuple, QtGui.QPixmap] = {}
+# While True, skip drop shadows so large-group move/rotate cannot stall the UI thread.
+_interaction_paint = False
+
+
+def set_interaction_paint(enabled: bool):
+    global _interaction_paint
+    _interaction_paint = bool(enabled)
+
+
+def interaction_paint() -> bool:
+    return _interaction_paint
+
+
+def _image_shadow_silhouette(path: str, width: int, height: int, color: QtGui.QColor) -> QtGui.QPixmap:
+    """Tinted copy of *path* that keeps the image alpha (transparent where the image is)."""
+    width = max(1, int(width))
+    height = max(1, int(height))
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+    key = (path, mtime, width, height, color.rgba(), 2)  # v2 = DestinationIn mask
+    cached = _widget_shadow_cache.get(key)
+    if cached is not None and not cached.isNull():
+        return cached
+
+    from .images import is_svg_path, render_svg
+
+    buffer = QtGui.QImage(width, height, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+    buffer.fill(QtCore.Qt.transparent)
+    layer = QtGui.QPainter(buffer)
+    layer.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+    layer.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+    local = QtCore.QRectF(0.0, 0.0, float(width), float(height))
+    # Fill shadow color, then DestinationIn with the image alpha (keeps transparency).
+    layer.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+    layer.fillRect(local, color)
+    layer.setCompositionMode(QtGui.QPainter.CompositionMode_DestinationIn)
+    if is_svg_path(path):
+        render_svg(layer, path, local, keep_aspect=False)
+    else:
+        pixmap = _widget_image_pixmap(path)
+        if pixmap.isNull():
+            layer.end()
+            return QtGui.QPixmap()
+        image = pixmap.toImage().convertToFormat(QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+        scaled = QtGui.QPixmap.fromImage(image).scaled(
+            QtCore.QSize(width, height),
+            QtCore.Qt.AspectRatioMode.IgnoreAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation,
+        )
+        layer.drawPixmap(0, 0, scaled)
+    layer.end()
+    out = QtGui.QPixmap.fromImage(buffer)
+    if len(_widget_shadow_cache) > 48:
+        _widget_shadow_cache.clear()
+    _widget_shadow_cache[key] = out
+    return out
+
+
+def _paint_image_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any], path: str, shadow: dict[str, Any]):
+    """Drop shadow masked to the image alpha; Size/Spread match geometric widget shadows."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    keep_aspect = bool(style.get("image_keep_aspect", True))
+    content = _image_content_rect(path, rect, keep_aspect)
+    if content is None or content.isEmpty():
+        return
+    dx = float(shadow.get("dx") or 0)
+    dy = float(shadow.get("dy") or 0)
+    blur = max(0.0, float(shadow.get("size") or 0))
+    spread = max(0.0, min(100.0, float(shadow.get("spread") or 0)))
+    expand = min(blur * (spread / 100.0), max(0.0, blur), 24.0)
+    soft = min(blur, 48.0)
+    base = QtGui.QColor(shadow.get("color") or "#80000000")
+    if base.alpha() <= 0:
+        return
+    width = max(1, int(math.ceil(content.width())))
+    height = max(1, int(math.ceil(content.height())))
+    # Opaque RGB silhouette; stamp strength comes from painter opacity × base alpha.
+    tint = QtGui.QColor(base)
+    tint.setAlpha(255)
+    silhouette = _image_shadow_silhouette(path, width, height, tint)
+    if silhouette.isNull():
+        return
+    origin = content.topLeft()
+    widget_op = _opacity(style)
+    base_a = max(0.0, min(1.0, base.alphaF()))
+
+    def _stamp(alpha: float, ox: float, oy: float, pad: float = 0.0):
+        painter.setOpacity(widget_op * max(0.0, min(1.0, alpha)))
+        if pad <= 0.05:
+            painter.drawPixmap(QtCore.QPointF(origin.x() + ox, origin.y() + oy), silhouette)
+            return
+        painter.drawPixmap(
+            QtCore.QRectF(origin.x() + ox - pad, origin.y() + oy - pad, width + pad * 2.0, height + pad * 2.0),
+            silhouette,
+            QtCore.QRectF(0, 0, width, height),
+        )
+
+    painter.save()
+    if soft < 0.5:
+        _stamp(base_a, dx, dy, expand)
+        painter.restore()
+        return
+    # Same soft-stamp model as geometric shadows, but on the alpha silhouette.
+    layers = max(3, min(6, int(math.ceil(soft * 0.4)) + 2))
+    ring = max(6, min(10, 4 + layers))
+    for layer in range(layers, 0, -1):
+        t = layer / float(layers)
+        radius = soft * t
+        falloff = math.exp(-3.2 * t * t)
+        sample_a = min(0.12, base_a * falloff * (0.55 / layers))
+        for i in range(ring):
+            a = (2.0 * math.pi * i) / ring
+            _stamp(sample_a, dx + radius * math.cos(a), dy + radius * math.sin(a), expand)
+    _stamp(min(0.55, base_a * 0.75), dx, dy, expand)
+    painter.restore()
+
+
 def paint_widget_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any]):
     shadow = resolve_widget_shadow(item.get("style"))
     if not shadow.get("on"):
         return
+    # Drag/rotate of large groups must not pay for soft-shadow stamps on the UI thread.
+    if _interaction_paint:
+        return
+    image_path = _widget_shadow_image_path(item)
+    if image_path:
+        from .images import is_svg_path, svg_renderer
+
+        usable = (is_svg_path(image_path) and svg_renderer(image_path) is not None) or (
+            not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull()
+        )
+        if usable:
+            _paint_image_drop_shadow(painter, item, image_path, shadow)
+            return
+        # Asset configured but unloadable — never fall back to a solid rectangle slab.
+        return
     path = widget_body_path(item)
     if path.isEmpty():
         return
+    painter.save()
+    painter.setOpacity(_opacity(item.get("style") or {}))
     _paint_font_shadow(painter, "", QtGui.QFont(), shadow, None, None, int(QtCore.Qt.AlignCenter), path=path)
+    painter.restore()
 
 
 def _border_w(style: dict[str, Any] | None, default: float = 2.0) -> float:
     """Border width in px. 0 is valid (no stroke); missing falls back to *default*."""
+    if not border_is_enabled(style):
+        return 0.0
     value = (style or {}).get("border_width")
     if value is None or value == "":
         return float(default)
@@ -498,6 +649,18 @@ def _border_w(style: dict[str, Any] | None, default: float = 2.0) -> float:
         return max(0.0, float(value))
     except (TypeError, ValueError):
         return float(default)
+
+
+def border_is_enabled(style: dict[str, Any] | None) -> bool:
+    """True when the widget should stroke a border. Missing key keeps legacy width behavior."""
+    if not style:
+        return True
+    if "border_enabled" in style:
+        return bool(style.get("border_enabled"))
+    try:
+        return float(style.get("border_width") or 0) > 0
+    except (TypeError, ValueError):
+        return True
 
 
 def _pen(color, width=1.0) -> QtGui.QPen:
@@ -587,6 +750,45 @@ def widget_rotation_deg(item: dict[str, Any] | None) -> float:
 
 def widget_center(item: dict[str, Any]) -> QtCore.QPointF:
     return widget_rect(item).center()
+
+
+def rotate_point_around(x: float, y: float, cx: float, cy: float, degrees: float) -> tuple[float, float]:
+    """Rotate (x, y) around (cx, cy) by *degrees* using QPainter's clockwise convention."""
+    if abs(degrees) < 1e-9:
+        return float(x), float(y)
+    rad = math.radians(float(degrees))
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+    dx = float(x) - float(cx)
+    dy = float(y) - float(cy)
+    # Same 2D matrix as QTransform.rotate (clockwise on screen y-down coords).
+    return cx + cos_a * dx - sin_a * dy, cy + sin_a * dx + cos_a * dy
+
+
+def apply_group_rotation_delta(
+    items: list[dict[str, Any]],
+    start_geoms: dict[str, dict[str, float]],
+    pivot_x: float,
+    pivot_y: float,
+    delta_deg: float,
+):
+    """Orbit widget centers around a shared pivot and add *delta_deg* to each rotation.
+
+    ``start_geoms`` maps widget id → ``{x, y, w, h, rotation}`` captured before the gesture.
+    """
+    for item in items:
+        wid = str(item.get("id") or "")
+        geom = start_geoms.get(wid)
+        if not geom:
+            continue
+        w = max(1.0, float(geom.get("w") or item.get("w") or 1))
+        h = max(1.0, float(geom.get("h") or item.get("h") or 1))
+        ox = float(geom.get("x") or 0.0) + w * 0.5
+        oy = float(geom.get("y") or 0.0) + h * 0.5
+        nx, ny = rotate_point_around(ox, oy, pivot_x, pivot_y, delta_deg)
+        item["x"] = int(round(nx - w * 0.5))
+        item["y"] = int(round(ny - h * 0.5))
+        item["rotation"] = normalize_rotation(float(geom.get("rotation") or 0.0) + float(delta_deg))
 
 
 def widget_transform(item: dict[str, Any]) -> QtGui.QTransform:
@@ -813,6 +1015,7 @@ def paint_shape(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 _widget_image_cache: dict[str, QtGui.QPixmap] = {}
+_widget_fill_cache: dict[tuple, QtGui.QImage] = {}
 
 
 def _widget_image_pixmap(path: str) -> QtGui.QPixmap:
@@ -835,6 +1038,106 @@ def _widget_image_pixmap(path: str) -> QtGui.QPixmap:
         _widget_image_cache.clear()
     _widget_image_cache[key] = pixmap
     return pixmap
+
+
+def _fill_cache_key(fill) -> str:
+    """Stable key for solid or gradient fills used by the tinted-image cache."""
+    from .gradient import is_gradient, normalize_gradient
+
+    if is_gradient(fill):
+        g = normalize_gradient(fill)
+        stops = tuple(
+            (round(float(s.get("pos", 0.0)), 4), str(s.get("color") or ""))
+            for s in (g.get("stops") or [])
+        )
+        return (
+            f"g|{g.get('style')}|{round(float(g.get('angle') or 0.0), 2)}|"
+            f"{round(float(g.get('scale') or 100.0), 2)}|"
+            f"{round(float(g.get('smoothness') or 0.0), 2)}|{stops}"
+        )
+    return f"c|{qcolor(fill, '#00000000').name(QtGui.QColor.NameFormat.HexArgb)}"
+
+
+def _image_content_rect(path: str, rect: QtCore.QRectF, keep_aspect: bool) -> QtCore.QRectF | None:
+    """Fitted rect where an image path is drawn inside ``rect`` (aspect-aware)."""
+    if not path or rect.isEmpty():
+        return None
+    from .images import fitted_content_rect, is_svg_path, svg_default_size
+
+    if is_svg_path(path):
+        size = svg_default_size(path)
+        if not size:
+            return QtCore.QRectF(rect)
+        return fitted_content_rect(size[0], size[1], rect, keep_aspect)
+    pixmap = _widget_image_pixmap(path)
+    if pixmap.isNull():
+        return None
+    return fitted_content_rect(pixmap.width(), pixmap.height(), rect, keep_aspect)
+
+
+def _draw_image_path_with_fill(
+    painter: QtGui.QPainter,
+    path: str,
+    rect: QtCore.QRectF,
+    keep_aspect: bool,
+    fill=None,
+    default_fill: str = "#3a1518",
+) -> QtCore.QRectF | None:
+    """Draw an image; optional fill is masked to the image alpha via an offscreen buffer.
+
+    Compositing on the live painter is wrong: SourceAtop would also tint whatever was
+    already under the widget (chroma / previous paint). The buffer starts transparent.
+    """
+    from .gradient import is_gradient
+    from .images import is_svg_path, render_svg
+
+    content = _image_content_rect(path, rect, keep_aspect)
+    if content is None or content.isEmpty():
+        return None
+    fill_visible = fill is not None and (is_gradient(fill) or qcolor(fill, "#00000000").alpha() > 0)
+    if not fill_visible:
+        _draw_image_path(painter, path, rect, keep_aspect)
+        return content
+
+    width = max(1, int(math.ceil(content.width())))
+    height = max(1, int(math.ceil(content.height())))
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+    cache_key = (path, mtime, width, height, _fill_cache_key(fill), default_fill)
+    buffer = _widget_fill_cache.get(cache_key)
+    if buffer is None or buffer.isNull() or buffer.width() != width or buffer.height() != height:
+        buffer = QtGui.QImage(width, height, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+        buffer.fill(QtCore.Qt.transparent)
+        layer = QtGui.QPainter(buffer)
+        layer.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        layer.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+        local = QtCore.QRectF(0.0, 0.0, float(width), float(height))
+        if is_svg_path(path):
+            render_svg(layer, path, local, keep_aspect=False)
+        else:
+            pixmap = _widget_image_pixmap(path)
+            if pixmap.isNull():
+                layer.end()
+                return content
+            scaled = pixmap.scaled(
+                QtCore.QSize(width, height),
+                QtCore.Qt.AspectRatioMode.IgnoreAspectRatio,
+                QtCore.Qt.TransformationMode.SmoothTransformation,
+            )
+            layer.drawPixmap(0, 0, scaled)
+        # Keep image alpha; replace/tint with the fill color only on those pixels.
+        layer.setCompositionMode(QtGui.QPainter.CompositionMode_SourceAtop)
+        layer.setPen(QtCore.Qt.NoPen)
+        layer.setBrush(fill_brush(fill, default_fill, rect=local))
+        layer.drawRect(local)
+        layer.end()
+        if len(_widget_fill_cache) > 32:
+            _widget_fill_cache.clear()
+        _widget_fill_cache[cache_key] = buffer
+    painter.drawImage(content.topLeft(), buffer)
+    return content
 
 
 def _draw_image_path(painter: QtGui.QPainter, path: str, rect: QtCore.QRectF, keep_aspect: bool) -> bool:
@@ -1311,26 +1614,37 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     border = style.get("border_on") if on else style.get("border")
     off_path = str(style.get("image_path") or "")
     on_path = str(style.get("image_path_on") or "")
-    image_path = on_path if on else off_path
-    outline = _button_outline_path(item, rect)
-    painter.save()
-    painter.setOpacity(_opacity(style))
-    set_fill_and_outline(painter, fill, border, _border_w(style), "#3a1518", rect=rect)
-    painter.drawPath(outline)
+    # Keep showing the off image when pressed unless a dedicated on image is set.
+    image_path = on_path if (on and on_path) else off_path
     keep_aspect = bool(style.get("image_keep_aspect", True))
     has_image = bool(image_path) and (
         (is_svg_path(image_path) and svg_renderer(image_path) is not None)
         or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
     )
-    if has_image:
-        painter.save()
-        painter.setClipPath(outline)
-        _draw_image_path(painter, image_path, rect, keep_aspect)
-        painter.restore()
-        if _border_w(style) > 0:
+    use_shape = button_uses_shape_path(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    border_w = _border_w(style)
+    if has_image and not use_shape:
+        content = _draw_image_path_with_fill(painter, image_path, rect, keep_aspect, fill, "#3a1518")
+        outline = _button_outline_path(item, content if content is not None else rect)
+        if border_w > 0:
             painter.setBrush(QtCore.Qt.NoBrush)
-            painter.setPen(_pen(border, _border_w(style)))
+            painter.setPen(_pen(border, border_w))
             painter.drawPath(outline)
+    else:
+        outline = _button_outline_path(item, rect)
+        set_fill_and_outline(painter, fill, border, border_w, "#3a1518", rect=rect)
+        painter.drawPath(outline)
+        if has_image:
+            painter.save()
+            painter.setClipPath(outline)
+            _draw_image_path(painter, image_path, rect, keep_aspect)
+            painter.restore()
+            if border_w > 0:
+                painter.setBrush(QtCore.Qt.NoBrush)
+                painter.setPen(_pen(border, border_w))
+                painter.drawPath(outline)
     _draw_label(painter, item, rect)
     painter.restore()
 
@@ -2935,15 +3249,6 @@ def _paint_mouse_buttons(painter: QtGui.QPainter, bounds: QtCore.QRectF, style: 
         ("mouse_d_2", _map_unit_rect(bounds, 0.58, 0.00, 0.22, 0.08), "DC2", "rect"),
         ("mouse_d_3", _map_unit_rect(bounds, 0.28, 0.54, 0.26, 0.08), "DC3", "rect"),
     )
-    # Body pad behind extra buttons (image 2 circle).
-    pad = _map_unit_rect(bounds, 0.58, 0.58, 0.36, 0.36)
-    fill, border = _input_key_colors(style, False)
-    fill.setAlpha(max(30, int(fill.alpha() * 0.4)))
-    painter.setPen(_pen(border, max(1.4, _border_w(style))))
-    painter.setBrush(fill)
-    painter.drawEllipse(pad)
-    painter.setBrush(qcolor(style.get("font_color"), "#f4efe4"))
-    painter.drawEllipse(pad.center(), max(3.0, pad.width() * 0.08), max(3.0, pad.height() * 0.08))
 
     for lookup, rect, label, kind in regions:
         if lookup not in selected:
@@ -3276,9 +3581,6 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     return _undo_invert_display(item, _clamp(t * 2.0 - 1.0))
 
 
-_bg_image_cache: dict[tuple, QtGui.QPixmap] = {}
-
-
 def _fill_checkerboard(painter: QtGui.QPainter, rect: QtCore.QRect, tile: int = 8):
     light = QtGui.QColor("#3a4250")
     dark = QtGui.QColor("#2a3140")
@@ -3302,31 +3604,10 @@ def paint_background(
     preview: bool = False,
     fallback_chroma: bool = True,
 ):
-    mode = normalize_background_mode(canvas.get("background_mode"))
     if is_onscreen_mode(canvas):
         if preview:
             painter.fillRect(rect, QtGui.QColor("#1b2230"))
         return
-    if mode == "image":
-        path = canvas.get("image_path") or ""
-        if path:
-            from .images import is_svg_path, render_svg
-
-            if is_svg_path(path):
-                if render_svg(painter, path, QtCore.QRectF(rect), keep_aspect=False):
-                    return
-            else:
-                key = (path, rect.width(), rect.height())
-                pixmap = _bg_image_cache.get(key)
-                if pixmap is None or pixmap.isNull():
-                    loaded = QtGui.QPixmap(path)
-                    if not loaded.isNull():
-                        pixmap = loaded.scaled(rect.size(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
-                        _bg_image_cache.clear()
-                        _bg_image_cache[key] = pixmap
-                if pixmap is not None and not pixmap.isNull():
-                    painter.drawPixmap(rect, pixmap)
-                    return
     if not fallback_chroma:
         return
     color = chroma_fill_color(canvas)

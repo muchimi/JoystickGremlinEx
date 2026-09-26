@@ -32,7 +32,7 @@ from .bindings import (
     write_switch_position,
 )
 from .model import is_interactive_overlay, switch_rest_position, widget_is_switch
-from .widgets import value_from_point, widget_dirty_rect
+from .widgets import value_from_point
 
 syslog = logging.getLogger("system")
 SPRING_TYPES = ("axis_stick_square", "axis_stick_circle", "axis_crosshair", "hat")
@@ -47,6 +47,9 @@ class OverlayTouchHandler:
         self._logged_ignore = False
 
     def enabled(self) -> bool:
+        # Mouse repositioning on the live overlay temporarily suspends interactive writes.
+        if getattr(self.view.scene, "mouse_reposition_enabled", False):
+            return False
         return bool(getattr(self.view, "touch_output", False)) and is_interactive_overlay(self.view.page_canvas)
 
     def _ignore(self, reason: str):
@@ -210,7 +213,12 @@ class OverlayTouchHandler:
         if bus is not None:
             bus.poke(item.get("id"), value, lock=True)
         else:
-            view.update(widget_dirty_rect(item).toRect())
+            # Never partial-update a layered/onscreen view — leaves ghost trails.
+            schedule = getattr(view, "_schedule_update", None)
+            if callable(schedule):
+                schedule(None)
+            else:
+                view.update()
 
     def _unlock(self, widget_id: str | None):
         bus = getattr(self.view, "bus", None)

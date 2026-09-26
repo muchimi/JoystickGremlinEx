@@ -11694,10 +11694,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def ensureLoaded(self):
         """ensures the device has inputs loaded because the inputs are delay loaded until the tab is visible"""
-        if gremlin.util.is_ui_thread():
-            self._ensureLoaded_ui()
-        else:
-            gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
+        # Always marshal — is_ui_thread() can disagree with QThread affinity under
+        # Python 3.14 / foreign Qt callbacks, and InputItemListView asserts UI thread.
+        gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
 
     def isLoaded(self) -> bool:
         """true if the widget is loaded"""
@@ -11705,13 +11704,19 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _ensureLoaded_ui(self):
         """ensures the data is loaded into the widget - runs on UI thread"""
-        if not Shiboken.isValid(self) or not Shiboken.isValid(self._input_item_list_view):
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
             return
+        if not Shiboken.isValid(self):
+            return
+        # Shiboken.isValid(None) can return True — never treat None as a live widget.
         if self._input_item_list_view is None:
             result = self._create_ui()
             if not result:
                 # create failed - happens if QT discarded objects already
                 return
+        elif not Shiboken.isValid(self._input_item_list_view):
+            return
 
         assert self._input_item_list_model is not None, "invalid model"
         assert self._input_item_list_view is not None, "invalid view"
@@ -11737,8 +11742,13 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _create_ui(self):
         """load the list view for the joystick device if not loaded yet"""
         # if there are no inputs in the model, pick the default filter for the devices
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._create_ui)
+            return False
         assert not self._ui_created, "_create_ui should only be called once per widget life"
-        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container) or not Shiboken.isValid(self._input_item_list_view):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container):
+            return False
+        if self._input_item_list_view is not None and not Shiboken.isValid(self._input_item_list_view):
             return False
 
         if not isinstance(self._input_item_list_model, InputItemListModel):
@@ -12136,10 +12146,36 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def selectInputItem(self, input_item: InputItem, force=False, emit=True):
         """selects a specific input item"""
+        if self._input_item_list_view is None:
+            return
+        if not Shiboken.isValid(self._input_item_list_view):
+            return
         self._input_item_list_view.selectInputItem(input_item, force=force, emit=emit)
 
     def selectInputItemIndex(self, index, force: bool = False, emit: bool = True):
-        self._input_item_list_view.selectInputItemAt(index, force=force, emit=emit)
+        gremlin.util.InvokeUiMethod(self._select_input_item_index_ui, index, force, emit)
+
+    def _select_input_item_index_ui(self, index, force: bool = False, emit: bool = True):
+        """Selects an input by index on the UI thread.
+
+        A queued re-selection can fire during tab/mode rebuild before the list
+        view has been reconstructed — ignore until the view exists.
+        """
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._select_input_item_index_ui, index, force, emit)
+            return
+        if not Shiboken.isValid(self):
+            return
+        if self._input_item_list_view is None or not Shiboken.isValid(self._input_item_list_view):
+            return
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if index != -1:
+            if verbose:
+                syslog.info(f"DeviceTabWidget: select input index [{index}]")
+            self._input_item_list_view.selectInputItemAt(index, force=force, emit=emit)
+            self._input_item_list_view.ensureVisibleIndex(index)
+        elif verbose:
+            syslog.info("DeviceTabWidget: select input index - nothing to select")
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str):
         """called when the input item widget reports a mapping change for its associated input item"""

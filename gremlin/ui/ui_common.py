@@ -1589,6 +1589,8 @@ class Buttons:
     """common UI button widgets"""
 
     maxHeight = 24  # max height in pixels
+    # Optional parent applied when callers omit one (avoids top-level HWND flashes).
+    _default_parent = None
 
     @staticmethod
     def _template(
@@ -1602,6 +1604,7 @@ class Buttons:
         width: int = None,
         height: int = None,
         size: int = 16,
+        parent=None,
     ):
 
         assert isinstance(label, (type(None), str)), "invalid label"
@@ -1615,10 +1618,13 @@ class Buttons:
         assert isinstance(height, (type(None), int)), "invalid height"
         assert isinstance(size, int), "invalid size"
 
+        if parent is None:
+            parent = Buttons._default_parent
+
         if no_keyboard:
-            widget = NoKeyboardPushButton()
+            widget = NoKeyboardPushButton(parent=parent)
         else:
-            widget = QIconPushButton()
+            widget = QIconPushButton(parent=parent)
 
         widget.data = data
         if label:
@@ -5044,7 +5050,8 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
                     data = item
                     tooltip = None
 
-            widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip)
+            widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip, parent=self)
+            widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
             layout.addWidget(widget)
             self._widgets.append(widget)
 
@@ -5058,6 +5065,30 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
                 self._callback(self._value)
             if self._callback_ex:
                 self._callback_ex(widget, self._value)
+
+    def currentData(self):
+        """Selected option value (matches QComboBox.currentData naming used by callers)."""
+        return self._value
+
+    def value(self):
+        return self._value
+
+    def setValue(self, value, emit=False):
+        """Select the option whose data matches value (combo-like API for callers)."""
+        self._value = value
+        matched = None
+        for button in self._widgets:
+            on = button.data == value
+            button.blockSignals(True)
+            button.setChecked(on)
+            button.blockSignals(False)
+            if on:
+                matched = button
+        if emit and matched is not None:
+            if self._callback:
+                self._callback(self._value)
+            if self._callback_ex:
+                self._callback_ex(matched, self._value)
 
 
 class QDataPushButton(QtWidgets.QPushButton):
@@ -5102,6 +5133,8 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         """
 
+        if parent is None:
+            parent = Buttons._default_parent
         super().__init__(text, parent)
         self._data = data
         if tooltip:
@@ -5590,6 +5623,8 @@ class QDataComboBox(QComboBox):
         :items: optional, list of tuples (display, data) to populate the combo box with
 
         """
+        if parent is None:
+            parent = Buttons._default_parent
         super().__init__(parent)
         self._data = data
         self._wheel_enabled = gremlin.config.Configuration().dropdown_use_mouse_wheel if wheel_enabled is None else wheel_enabled

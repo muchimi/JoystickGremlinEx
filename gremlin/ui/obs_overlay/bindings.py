@@ -1095,7 +1095,7 @@ class OverlayValueBus(QtCore.QObject):
         self._refcount = 0
         self._connected = False
         self._poll = QtCore.QTimer(self)
-        self._poll.setTimerType(QtCore.Qt.TimerType.CoarseTimer)
+        self._poll.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
         self._poll.setInterval(self.POLL_INTERVAL_MS)
         self._poll.timeout.connect(self.refresh)
         self._cache: dict[str, Any] = {}

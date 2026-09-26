@@ -64,6 +64,13 @@ _IDENTITY_STYLE_KEYS = {
     "font_scale_base",
 }
 
+# Asset paths — appearance is colors/borders/effects, not the widget's image files.
+_APPEARANCE_ASSET_KEYS = {
+    "image_path",
+    "image_path_on",
+    "paddle_image",
+}
+
 _clipboard: dict[str, Any] | None = None
 
 
@@ -132,7 +139,7 @@ def collect_widget_properties(item: dict[str, Any] | None, groups: list[str]) ->
         payload["label"] = str(item.get("label") or "")
         payload["label_style"] = {key: copy.deepcopy(style[key]) for key in LABEL_STYLE_KEYS if key in style}
     if "appearance" in groups:
-        skip = set(LABEL_STYLE_KEYS) | _IDENTITY_STYLE_KEYS
+        skip = set(LABEL_STYLE_KEYS) | _IDENTITY_STYLE_KEYS | _APPEARANCE_ASSET_KEYS
         payload["appearance"] = {key: copy.deepcopy(value) for key, value in style.items() if key not in skip}
         payload["blink"] = copy.deepcopy(normalize_blink(item.get("blink")))
     return payload
@@ -175,7 +182,7 @@ def paste_widget_properties(item: dict[str, Any] | None, payload: dict[str, Any]
                 style_update[key] = copy.deepcopy(value)
     if "appearance" in use:
         for key, value in (clip.get("appearance") or {}).items():
-            if key in _IDENTITY_STYLE_KEYS or key in LABEL_STYLE_KEYS:
+            if key in _IDENTITY_STYLE_KEYS or key in LABEL_STYLE_KEYS or key in _APPEARANCE_ASSET_KEYS:
                 continue
             if key in allowed_style:
                 style_update[key] = copy.deepcopy(value)

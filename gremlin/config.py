@@ -494,12 +494,29 @@ class Configuration(QtCore.QObject):
 
     def getTemporaryFile(self, ext=None, dir=None):
         """gets a temporary file - the temporary file location is in the user folder"""
-        data_path = dir if dir else self.data_path()
-        tmp_path = os.path.join(data_path, "temp")
-        os.makedirs(tmp_path, exist_ok=True)
+        import tempfile as _tempfile
 
-        os.makedirs(tmp_path, exist_ok=True)
-        tmp_file = os.path.join(tmp_path, gremlin.util.get_guid())
+        data_path = dir if dir else self.data_path()
+        user_profile = os.path.join(data_path, "temp")
+        try:
+            # A leftover FILE named "temp" causes WinError 183 on makedirs.
+            if os.path.isfile(user_profile):
+                try:
+                    os.replace(user_profile, user_profile + ".bak_file")
+                except OSError:
+                    try:
+                        os.unlink(user_profile)
+                    except OSError:
+                        user_profile = os.path.join(_tempfile.gettempdir(), "JoystickGremlinEx_temp")
+            os.makedirs(user_profile, exist_ok=True)
+            if not os.path.isdir(user_profile):
+                raise OSError(f"temp path is not a directory: {user_profile}")
+        except OSError as ex:
+            syslog.warning(f"CONFIG: profile temp folder unavailable ({ex}); using system temp")
+            user_profile = os.path.join(_tempfile.gettempdir(), "JoystickGremlinEx_temp")
+            os.makedirs(user_profile, exist_ok=True)
+
+        tmp_file = os.path.join(user_profile, gremlin.util.get_guid())
         if ext:
             if not ext.startswith("."):
                 tmp_file += "."
@@ -617,10 +634,6 @@ class Configuration(QtCore.QObject):
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
         self.ensureProfilePath()
-        data_path = self.data_path()
-        tmp = os.path.join(data_path, "temp")
-        os.makedirs(tmp, exist_ok=True)
-
         is_error = False
         try:
             if not fname:
