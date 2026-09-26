@@ -144,9 +144,11 @@ class OverlayManager:
 
     def _on_profile_loaded_ui(self):
         if self.scene.belongs_to_profile():
-            # Already showing this profile. Flush edits; do not reload from disk
-            # (that used to drop in-memory changes that had not hit JSON yet).
+            # Same profile path: flush any unsaved edits, then reload from disk
+            # so Save + Reload actually verifies what was written (skipping the
+            # reload used to keep RAM state and hide sidecar write failures).
             self._flush_dirty_scene()
+            self._load_current_profile_scene()
             return
         self._flush_dirty_scene()
         self._load_current_profile_scene()

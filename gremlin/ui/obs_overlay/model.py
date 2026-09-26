@@ -1698,10 +1698,13 @@ class OverlayScene(QtCore.QObject):
         el.update_sidecar.connect(self._handle_save_sidecar)
 
     def _handle_save_sidecar(self):
-        """Handle update requests to store the overlay configuration file."""
-        sidecar = overlay_path_for_profile()
-        if sidecar:
-            self.save(sidecar)
+        """Persist overlay into the profile JSON sidecar (obs_overlay key).
+
+        Must not write only to *.overlay.json — load reads profile.json, so a
+        sidecar-only write looks saved in-session but is lost after restart.
+        """
+        if not self.save_to_profile():
+            syslog.warning("OBS OVERLAY: update_sidecar did not write the layout to the profile JSON")
 
     def _bind_identity_hooks(self):
         """Keep overlay state/mode names in sync with JG Ex unique IDs."""
@@ -3526,16 +3529,29 @@ class OverlayScene(QtCore.QObject):
                 syslog.warning(f"OBS OVERLAY: profile overlay read failed: {err}")
         if not isinstance(data, dict) or not (data.get("pages") or data.get("widgets") or data.get("canvas")):
             data = self.read_stored_layout(profile)
-        # One-time import of a leftover .overlay.json from older builds.
-        if not _overlay_payload_has_content(data):
-            legacy = self._read_json_file(overlay_path_for_profile(profile))
-            if isinstance(legacy, dict) and (legacy.get("pages") or legacy.get("widgets") or legacy.get("canvas")):
+        # Prefer a newer *.overlay.json export/sidecar if profile.json is stale.
+        # update_sidecar used to write only that file; load reads profile.json.
+        legacy = self._read_json_file(overlay_path_for_profile(profile))
+        if isinstance(legacy, dict) and _overlay_payload_has_content(legacy):
+            if not _overlay_payload_has_content(data):
                 data = legacy
-                if profile is not None:
-                    try:
-                        profile._setConfig(OVERLAY_CONFIG_KEY, data)
-                    except Exception:
-                        pass
+            else:
+                try:
+                    legacy_ts = float(legacy.get("saved_at") or 0)
+                    data_ts = float((data or {}).get("saved_at") or 0)
+                except (TypeError, ValueError):
+                    legacy_ts, data_ts = 0.0, 0.0
+                if legacy_ts > data_ts + 0.01:
+                    syslog.info(
+                        "OBS OVERLAY: adopting newer layout from .overlay.json "
+                        f"(sidecar {legacy_ts:g} > profile {data_ts:g})"
+                    )
+                    data = legacy
+                    if profile is not None:
+                        try:
+                            profile._setConfig(OVERLAY_CONFIG_KEY, copy.deepcopy(data))
+                        except Exception:
+                            pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
             self._profile_key = path
             self._path = json_path
@@ -3578,11 +3594,29 @@ class OverlayScene(QtCore.QObject):
             syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
             return False
         data = self.to_dict()
-        ok = self._persist_files(path, data)
+        current = profile_xml_path(profile)
+        # Prefer Profile._setConfig so we merge against the live sidecar and keep
+        # _config_data in sync — a direct file write can be overwritten moments
+        # later by Stream Deck / last_input using a stale in-memory cache.
+        use_set_config = (
+            profile is not None
+            and hasattr(profile, "_setConfig")
+            and (not dest_xml or _same_profile_path(dest_xml, current))
+        )
+        ok = False
+        if use_set_config:
+            try:
+                profile._setConfig(OVERLAY_CONFIG_KEY, copy.deepcopy(data))
+                ok = True
+            except Exception as err:
+                syslog.warning(f"OBS OVERLAY: profile _setConfig failed, falling back to file merge: {err}")
+        if not ok:
+            ok = self._persist_files(path, data)
         if ok:
+            self._dirty = False
             self._profile_key = path
             self._path = gremlin.util.swap_ext(path, "json")
-            if profile is not None:
+            if profile is not None and not use_set_config:
                 cfg = getattr(profile, "_config_data", None)
                 if not isinstance(cfg, dict):
                     cfg = {}
