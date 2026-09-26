@@ -78,7 +78,20 @@ class OverlayManager:
         el.profile_started.connect(self._on_profile_started)
         el.profile_stop.connect(self._on_profile_stop)
         el.tabs_loaded.connect(self._on_tabs_loaded)
+        try:
+            el.shutdown.connect(self._on_shutdown)
+        except Exception:
+            pass
         self._hooks = True
+
+    def _on_shutdown(self, *_args):
+        gremlin.util.InvokeUiMethod(self._on_shutdown_ui)
+
+    def _on_shutdown_ui(self):
+        try:
+            self.scene.save_now()
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: shutdown flush failed: {err}")
 
     def _apply_all_onscreen(self):
         for page in self.scene.pages:
@@ -107,6 +120,13 @@ class OverlayManager:
 
     def _flush_dirty_scene(self) -> bool:
         """Write unsaved overlay edits (page names, etc.) before start/stop/reload."""
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            if ManualCounterTracker().sync_into_scene(self.scene):
+                self.scene._dirty = True
+        except Exception:
+            pass
         if not self.scene.dirty:
             return True
         try:

@@ -1122,6 +1122,23 @@ class OverlayValueBus(QtCore.QObject):
             self._widget_sources.pop(id(source), None)
         self._refcount = max(0, self._refcount - 1)
         if self._refcount == 0:
+            # Last live listener — flush tallies synchronously (hide/quit can
+            # kill the event loop before save_later's timer fires).
+            try:
+                from .sys_stats import ManualCounterTracker
+                from gremlin.ui.obs_overlay import OverlayManager
+
+                tracker = ManualCounterTracker()
+                scene = OverlayManager().scene
+                dirty = tracker.take_persist_dirty()
+                if tracker.sync_into_scene(scene):
+                    dirty = True
+                if dirty:
+                    scene._dirty = True
+                if scene.dirty:
+                    scene.save_now()
+            except Exception:
+                pass
             self._widget_sources.clear()
             self._disconnect()
 
@@ -1272,19 +1289,30 @@ class OverlayValueBus(QtCore.QObject):
         ApplicationViewTracker().retain(application_ids)
         RemoteVideoHub().retain(remote_ids)
         if ManualCounterTracker().take_persist_dirty():
-            try:
-                from gremlin.ui.obs_overlay import OverlayManager
-
-                scene = OverlayManager().scene
-                scene._dirty = True
-                scene.save_later()
-            except Exception:
-                pass
+            self._persist_manual_counters()
         if self._emit_all:
             self._emit_all = False
             self.values_changed.emit([])
         elif changed_ids:
             self.values_changed.emit(changed_ids)
+
+    def _persist_manual_counters(self):
+        """Write manual tallies into the scene and schedule a profile sidecar save."""
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+            from .sys_stats import ManualCounterTracker
+
+            scene = OverlayManager().scene
+            ManualCounterTracker().sync_into_scene(scene)
+            scene._dirty = True
+            scene.save_later()
+        except Exception as err:
+            try:
+                import logging
+
+                logging.getLogger("system").warning(f"OBS OVERLAY: manual counter persist failed: {err}")
+            except Exception:
+                pass
 
     def value_for(self, item: dict[str, Any]):
         widget_id = item.get("id")

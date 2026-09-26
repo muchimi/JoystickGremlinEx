@@ -3500,6 +3500,12 @@ class OverlayScene(QtCore.QObject):
         self._undo.clear()
         self._redo.clear()
         self.selected_ids = []
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().clear()
+        except Exception:
+            pass
         path = profile_xml_path(profile)
         json_path = profile_json_path(profile)
         data = None
@@ -3598,14 +3604,39 @@ class OverlayScene(QtCore.QObject):
         self._save_later_pending = True
         QtCore.QTimer.singleShot(0, self, self._save_later_run)
 
+    def save_now(self) -> bool:
+        """Synchronously persist the overlay (e.g. on overlay hide / app quit)."""
+        self._save_later_pending = False
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().sync_into_scene(self)
+        except Exception:
+            pass
+        if not self._dirty:
+            return True
+        try:
+            return bool(self.save_owned() or self.save_to_profile())
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: save_now failed: {err}")
+            return False
+
     def _save_later_run(self):
         self._save_later_pending = False
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().sync_into_scene(self)
+        except Exception:
+            pass
         if not self._dirty:
             return
         try:
-            self.save_to_profile()
-        except Exception:
-            pass
+            ok = bool(self.save_owned() or self.save_to_profile())
+            if not ok:
+                syslog.warning("OBS OVERLAY: deferred save did not write (profile may be unsaved)")
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: deferred save failed: {err}")
 
     def save_owned(self) -> bool:
         """Persist this scene to the profile it was loaded from, even after a switch."""
