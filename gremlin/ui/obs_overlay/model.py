@@ -3244,7 +3244,11 @@ class OverlayScene(QtCore.QObject):
             horizontal.extend(widget_h)
 
         def _best(current: dict[str, float], targets: list[float], previous: dict[str, float] | None = None):
-            best_dist = threshold + 1.0
+            # Engage when approaching a line; release after 1px away so one arrow key
+            # or a tiny mouse nudge can leave a magnet without fighting the threshold.
+            engage = threshold
+            release = 1.0
+            best_dist = engage + 1.0
             best = None
             for name, value in current.items():
                 for target in targets:
@@ -3252,17 +3256,20 @@ class OverlayScene(QtCore.QObject):
                     if dist < best_dist:
                         best_dist = dist
                         best = (name, target)
-            if best is None or previous is None:
-                return best
+            if best is None:
+                return None
+            if previous is None:
+                return best if best_dist <= engage else None
             name, target = best
             old = previous.get(name)
-            if old is None:
-                return best
             new = current.get(name)
-            if new is None:
+            if old is None or new is None:
                 return best
-            unstick = max(2.0, threshold * 0.25)
-            if abs(new - target) > abs(old - target) + 0.01 and abs(new - target) >= unstick:
+            # Break free as soon as we move away from the locked line by `release`.
+            if abs(old - target) <= 0.51 and abs(new - target) >= release and abs(new - target) > abs(old - target) + 0.01:
+                return None
+            # Also break if the nearest line is a different one we're leaving past release.
+            if abs(new - target) > abs(old - target) + 0.01 and abs(new - target) >= release:
                 return None
             return best
 

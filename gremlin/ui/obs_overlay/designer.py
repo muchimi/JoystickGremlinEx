@@ -700,8 +700,27 @@ class DesignerCanvas(OverlayView):
         if self._mode == "move":
             dx = pos.x() - self._last.x()
             dy = pos.y() - self._last.y()
+            primary = self.scene.primary_selection()
+            before = (
+                (float(primary["x"]), float(primary["y"]))
+                if primary
+                else None
+            )
             self.scene.move_selected(int(dx), int(dy), snap=True)
-            self._last = pos
+            # Only advance the drag anchor by how far the widget actually moved.
+            # If snap held it in place, keep _last so further mouse travel accumulates
+            # until the magnet releases — otherwise the cursor drifts while the widget stays put.
+            if before is not None:
+                primary = self.scene.primary_selection()
+                if primary:
+                    self._last = QtCore.QPointF(
+                        self._last.x() + (float(primary["x"]) - before[0]),
+                        self._last.y() + (float(primary["y"]) - before[1]),
+                    )
+                else:
+                    self._last = pos
+            else:
+                self._last = pos
         elif self._mode == "shape":
             self._drag_shape_handle(pos, event.modifiers())
         elif self._mode == "rotate":
