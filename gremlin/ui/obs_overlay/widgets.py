@@ -323,26 +323,57 @@ def _paint_font_shadow(
             painter.fillPath(stamp, base)
             painter.restore()
             return
-        # Soft edge: same-sized stamps at small offsets (box/gaussian approx).
-        layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
-        ring = max(8, min(14, 6 + layers))
-        for layer in range(layers, 0, -1):
-            t = layer / float(layers)
-            radius = soft * t
-            falloff = math.exp(-3.2 * t * t)
-            sample = QtGui.QColor(base)
-            # Keep stamps very faint so overlaps only soften the rim.
-            sample.setAlphaF(min(0.12, base.alphaF() * falloff * (0.55 / layers)))
-            for i in range(ring):
-                a = (2.0 * math.pi * i) / ring
-                stamp = QtGui.QPainterPath(shape)
-                stamp.translate(dx + radius * math.cos(a), dy + radius * math.sin(a))
-                painter.fillPath(stamp, sample)
-        core = QtGui.QPainterPath(shape)
-        core.translate(dx, dy)
-        core_color = QtGui.QColor(base)
-        core_color.setAlphaF(min(0.55, base.alphaF() * 0.75))
-        painter.fillPath(core, core_color)
+        # Compose soft stamps once, blit thereafter (live + designer).
+        br = shape.boundingRect()
+        pad = int(math.ceil(soft)) + 2
+        iw = max(1, int(math.ceil(br.width())) + pad * 2)
+        ih = max(1, int(math.ceil(br.height())) + pad * 2)
+        # Quantize geometry so tiny float noise does not thrash the cache.
+        cache_key = (
+            "pathsoft",
+            round(br.x(), 1),
+            round(br.y(), 1),
+            round(br.width(), 1),
+            round(br.height(), 1),
+            round(soft, 2),
+            round(expand, 2),
+            base.rgba(),
+            pad,
+            shape.elementCount(),
+        )
+        soft_pm = _widget_shadow_cache.get(cache_key)
+        if soft_pm is None or soft_pm.isNull():
+            buffer = QtGui.QImage(iw, ih, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+            buffer.fill(QtCore.Qt.transparent)
+            layer = QtGui.QPainter(buffer)
+            layer.setRenderHint(QtGui.QPainter.Antialiasing, False)
+            layer.setPen(QtCore.Qt.NoPen)
+            ox0 = -br.x() + pad
+            oy0 = -br.y() + pad
+            layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
+            ring = max(8, min(14, 6 + layers))
+            for layer_i in range(layers, 0, -1):
+                t = layer_i / float(layers)
+                radius = soft * t
+                falloff = math.exp(-3.2 * t * t)
+                sample = QtGui.QColor(base)
+                sample.setAlphaF(min(0.12, base.alphaF() * falloff * (0.55 / layers)))
+                for i in range(ring):
+                    a = (2.0 * math.pi * i) / ring
+                    stamp = QtGui.QPainterPath(shape)
+                    stamp.translate(ox0 + radius * math.cos(a), oy0 + radius * math.sin(a))
+                    layer.fillPath(stamp, sample)
+            core = QtGui.QPainterPath(shape)
+            core.translate(ox0, oy0)
+            core_color = QtGui.QColor(base)
+            core_color.setAlphaF(min(0.55, base.alphaF() * 0.75))
+            layer.fillPath(core, core_color)
+            layer.end()
+            soft_pm = QtGui.QPixmap.fromImage(buffer)
+            if len(_widget_shadow_cache) > 64:
+                _widget_shadow_cache.clear()
+            _widget_shadow_cache[cache_key] = soft_pm
+        painter.drawPixmap(QtCore.QPointF(br.x() + dx - pad, br.y() + dy - pad), soft_pm)
         painter.restore()
         return
 
@@ -350,8 +381,13 @@ def _paint_font_shadow(
     if soft < 0.5 and expand < 0.5:
         _fill_text(base, dx, dy)
         return
-    layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
-    ring = max(8, min(14, 6 + layers))
+    # Text shadows are cheap enough; keep a lighter stamp set only while live.
+    if _live_fast_paint:
+        layers = max(2, min(3, int(math.ceil(soft * 0.25)) + 1))
+        ring = max(4, min(6, 3 + layers))
+    else:
+        layers = max(3, min(8, int(math.ceil(soft * 0.5)) + 2))
+        ring = max(8, min(14, 6 + layers))
     for layer in range(layers, 0, -1):
         t = layer / float(layers)
         radius = soft * t + expand * 0.25
@@ -492,6 +528,8 @@ def _widget_shadow_image_path(item: dict[str, Any]) -> str:
 _widget_shadow_cache: dict[tuple, QtGui.QPixmap] = {}
 # While True, skip drop shadows so large-group move/rotate cannot stall the UI thread.
 _interaction_paint = False
+# Live HUD paint: prefer cached soft-shadow blits / lighter text stamps (shadows stay on).
+_live_fast_paint = False
 
 
 def set_interaction_paint(enabled: bool):
@@ -501,6 +539,15 @@ def set_interaction_paint(enabled: bool):
 
 def interaction_paint() -> bool:
     return _interaction_paint
+
+
+def set_live_fast_paint(enabled: bool):
+    global _live_fast_paint
+    _live_fast_paint = bool(enabled)
+
+
+def live_fast_paint() -> bool:
+    return _live_fast_paint
 
 
 def _image_shadow_silhouette(path: str, width: int, height: int, color: QtGui.QColor) -> QtGui.QPixmap:
@@ -579,34 +626,68 @@ def _paint_image_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any], path
     widget_op = _opacity(style)
     base_a = max(0.0, min(1.0, base.alphaF()))
 
-    def _stamp(alpha: float, ox: float, oy: float, pad: float = 0.0):
-        painter.setOpacity(widget_op * max(0.0, min(1.0, alpha)))
-        if pad <= 0.05:
-            painter.drawPixmap(QtCore.QPointF(origin.x() + ox, origin.y() + oy), silhouette)
-            return
-        painter.drawPixmap(
-            QtCore.QRectF(origin.x() + ox - pad, origin.y() + oy - pad, width + pad * 2.0, height + pad * 2.0),
-            silhouette,
-            QtCore.QRectF(0, 0, width, height),
-        )
-
     painter.save()
+    painter.setOpacity(widget_op)
     if soft < 0.5:
-        _stamp(base_a, dx, dy, expand)
+        pad = expand
+        painter.setOpacity(widget_op * base_a)
+        if pad <= 0.05:
+            painter.drawPixmap(QtCore.QPointF(origin.x() + dx, origin.y() + dy), silhouette)
+        else:
+            painter.drawPixmap(
+                QtCore.QRectF(origin.x() + dx - pad, origin.y() + dy - pad, width + pad * 2.0, height + pad * 2.0),
+                silhouette,
+                QtCore.QRectF(0, 0, width, height),
+            )
         painter.restore()
         return
-    # Same soft-stamp model as geometric shadows, but on the alpha silhouette.
-    layers = max(3, min(6, int(math.ceil(soft * 0.4)) + 2))
-    ring = max(6, min(10, 4 + layers))
-    for layer in range(layers, 0, -1):
-        t = layer / float(layers)
-        radius = soft * t
-        falloff = math.exp(-3.2 * t * t)
-        sample_a = min(0.12, base_a * falloff * (0.55 / layers))
-        for i in range(ring):
-            a = (2.0 * math.pi * i) / ring
-            _stamp(sample_a, dx + radius * math.cos(a), dy + radius * math.sin(a), expand)
-    _stamp(min(0.55, base_a * 0.75), dx, dy, expand)
+
+    # Compose soft stamps once into a pixmap, then blit — keeps live shadows without
+    # re-running dozens of stamps every frame (that was starving vJoy).
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+    pad = int(math.ceil(soft + expand)) + 2
+    cache_key = ("imgsoft", path, mtime, width, height, round(soft, 2), round(expand, 2), base.rgba(), pad)
+    soft_pm = _widget_shadow_cache.get(cache_key)
+    if soft_pm is None or soft_pm.isNull():
+        pw = width + pad * 2
+        ph = height + pad * 2
+        buffer = QtGui.QImage(pw, ph, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+        buffer.fill(QtCore.Qt.transparent)
+        layer = QtGui.QPainter(buffer)
+        layer.setRenderHint(QtGui.QPainter.Antialiasing, False)
+
+        def _stamp_buf(alpha: float, ox: float, oy: float, grow: float = 0.0):
+            layer.setOpacity(max(0.0, min(1.0, alpha)))
+            if grow <= 0.05:
+                layer.drawPixmap(QtCore.QPointF(pad + ox, pad + oy), silhouette)
+                return
+            layer.drawPixmap(
+                QtCore.QRectF(pad + ox - grow, pad + oy - grow, width + grow * 2.0, height + grow * 2.0),
+                silhouette,
+                QtCore.QRectF(0, 0, width, height),
+            )
+
+        layers = max(3, min(6, int(math.ceil(soft * 0.4)) + 2))
+        ring = max(6, min(10, 4 + layers))
+        for layer_i in range(layers, 0, -1):
+            t = layer_i / float(layers)
+            radius = soft * t
+            falloff = math.exp(-3.2 * t * t)
+            sample_a = min(0.12, base_a * falloff * (0.55 / layers))
+            for i in range(ring):
+                a = (2.0 * math.pi * i) / ring
+                _stamp_buf(sample_a, radius * math.cos(a), radius * math.sin(a), expand)
+        _stamp_buf(min(0.55, base_a * 0.75), 0.0, 0.0, expand)
+        layer.end()
+        soft_pm = QtGui.QPixmap.fromImage(buffer)
+        if len(_widget_shadow_cache) > 64:
+            _widget_shadow_cache.clear()
+        _widget_shadow_cache[cache_key] = soft_pm
+
+    painter.drawPixmap(QtCore.QPointF(origin.x() + dx - pad, origin.y() + dy - pad), soft_pm)
     painter.restore()
 
 
@@ -3413,7 +3494,7 @@ _PAINTERS = {
 }
 
 
-def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value):
+def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value, *, draw_shadow: bool = True):
     if not item.get("visible", True):
         return
     from .blink import blink_paint_item
@@ -3421,12 +3502,14 @@ def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value):
     item = blink_paint_item(item, value) or item
     fn = _PAINTERS.get(item.get("type"), paint_button)
     if abs(widget_rotation_deg(item)) < 0.001:
-        paint_widget_drop_shadow(painter, item)
+        if draw_shadow:
+            paint_widget_drop_shadow(painter, item)
         fn(painter, item, value)
         return
     painter.save()
     apply_widget_rotation(painter, item)
-    paint_widget_drop_shadow(painter, item)
+    if draw_shadow:
+        paint_widget_drop_shadow(painter, item)
     fn(painter, item, value)
     painter.restore()
 

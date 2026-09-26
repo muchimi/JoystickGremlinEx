@@ -119,7 +119,9 @@ class GraphOverlayTracker:
             while hist and hist[0][0] < cutoff:
                 hist.pop(0)
             last = hist[-1][1] if hist else None
-            fingerprint.append((series_id, round(last, 3) if last is not None else None, int(now * 30)))
+            # Time bucket at ~10 Hz so a still axis still scrolls the window
+            # without forcing a full layered redraw every poll tick.
+            fingerprint.append((series_id, round(last, 3) if last is not None else None, int(now * 10)))
         return tuple(fingerprint)
 
     def history(self, widget_id: str, series_id: str) -> list[tuple[float, float]]:

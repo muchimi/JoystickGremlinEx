@@ -1083,19 +1083,19 @@ def read_widget_value(item: dict[str, Any]):
 class OverlayValueBus(QtCore.QObject):
     """Live physical / vJoy / state values for overlay widgets.
 
-    Steady 60 Hz DirectInput poll. Per-event UI callbacks are not used:
+    Steady ~30 Hz DirectInput poll. Per-event UI callbacks are not used:
     HID packets from every device starve Qt's paint timer and look worse.
     """
 
     values_changed = QtCore.Signal(object)
-    POLL_INTERVAL_MS = 16  # ~60 Hz
+    POLL_INTERVAL_MS = 33  # ~30 Hz — keeps UI/GIL free for vJoy while overlay is up
 
     def __init__(self):
         super().__init__()
         self._refcount = 0
         self._connected = False
         self._poll = QtCore.QTimer(self)
-        self._poll.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
+        self._poll.setTimerType(QtCore.Qt.TimerType.CoarseTimer)
         self._poll.setInterval(self.POLL_INTERVAL_MS)
         self._poll.timeout.connect(self.refresh)
         self._cache: dict[str, Any] = {}

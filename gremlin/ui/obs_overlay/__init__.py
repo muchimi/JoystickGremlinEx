@@ -227,8 +227,8 @@ class OverlayManager:
         if self._toggle_timer is None:
             app = QtCore.QCoreApplication.instance()
             timer = QtCore.QTimer(app)
-            timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
-            timer.setInterval(16)
+            timer.setTimerType(QtCore.Qt.TimerType.CoarseTimer)
+            timer.setInterval(33)
             timer.timeout.connect(self._poll_toggle)
             self._toggle_timer = timer
         if not self._toggle_timer.isActive():

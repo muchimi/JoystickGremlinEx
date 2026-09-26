@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 
 import math
 
@@ -28,12 +29,16 @@ from .widgets import (
     live_window_is_layered,
     paint_background,
     paint_widget,
+    paint_widget_drop_shadow,
     qcolor,
+    resolve_widget_shadow,
+    set_live_fast_paint,
     widget_contains_point,
     widget_dirty_rect,
     widget_local_to_scene,
     widget_rect,
     widget_rotated_bounds,
+    widget_rotation_deg,
     apply_widget_rotation,
 )
 
@@ -320,6 +325,12 @@ class OverlayView(QtWidgets.QWidget):
         self._update_queued = False
         self._pending_full = False
         self._pending_rect = QtCore.QRect()
+        self._last_flush_mono = 0.0
+        # Live HUD: static = bg+shadows; frame = full composite patched only for dirty widgets.
+        self._static_pm: QtGui.QPixmap | None = None
+        self._static_key = None
+        self._frame_pm: QtGui.QPixmap | None = None
+        self._dirty_body_ids: set[str] | None = None  # None = rebuild all bodies
         self.destroyed.connect(self._on_view_destroyed)
 
     def _on_view_destroyed(self, *_args):
@@ -469,19 +480,34 @@ class OverlayView(QtWidgets.QWidget):
     def _on_values_changed(self, widget_ids=None):
         if not Shiboken.isValid(self):
             return
-        # Layered/onscreen composites cannot erase old pixels with a sub-rect
-        # update — partial dirty regions leave ghost trails when widgets move.
-        if live_window_is_layered(self.page_canvas, designer=self.interactive):
+        if self.interactive:
+            self._schedule_update(None)
+            return
+        # Track which widget bodies need a paint. Background/shadows stay in the
+        # static layer and are only restored under dirty rects.
+        if not widget_ids:
+            self._dirty_body_ids = None
+        elif self._dirty_body_ids is None and self._frame_pm is None:
+            # First frame not built yet — full rebuild on paint.
+            self._dirty_body_ids = None
+        else:
+            if self._dirty_body_ids is None:
+                self._dirty_body_ids = set()
+            self._dirty_body_ids.update(str(wid) for wid in widget_ids if wid)
+
+        # Layered HWNDs must blit the full client (partial Qt updates smear), but
+        # the expensive CPU work is only the dirty body patch into _frame_pm.
+        if live_window_is_layered(self.page_canvas, designer=False):
             self._schedule_update(None)
             return
         if getattr(self.scene, "mouse_reposition_enabled", False):
             self._schedule_update(None)
             return
-        if not widget_ids:
+        if self._dirty_body_ids is None:
             self._schedule_update(None)
             return
         united = QtCore.QRect()
-        for widget_id in widget_ids:
+        for widget_id in self._dirty_body_ids:
             item = self.scene.widget_by_id(widget_id, self._page_id)
             if not item:
                 continue
@@ -505,7 +531,15 @@ class OverlayView(QtWidgets.QWidget):
         if self._update_queued:
             return
         self._update_queued = True
-        QtCore.QTimer.singleShot(0, self, self._flush_update)
+        delay_ms = 0
+        if not self.interactive:
+            # Cap live paint rate. Full-scene layered redraws were starving the
+            # Python GIL and delaying joystick→vJoy on the event thread.
+            elapsed_ms = (time.monotonic() - self._last_flush_mono) * 1000.0
+            min_ms = 33.0  # ~30 Hz
+            if elapsed_ms < min_ms:
+                delay_ms = int(min_ms - elapsed_ms)
+        QtCore.QTimer.singleShot(delay_ms, self, self._flush_update)
 
     def _flush_update(self):
         full = self._pending_full
@@ -514,6 +548,7 @@ class OverlayView(QtWidgets.QWidget):
         self._pending_rect = QtCore.QRect()
         # Allow coalescing more dirties that arrive while we invalidate.
         self._update_queued = False
+        self._last_flush_mono = time.monotonic()
         if not Shiboken.isValid(self):
             return
         if full or live_window_is_layered(self.page_canvas, designer=self.interactive):
@@ -534,6 +569,7 @@ class OverlayView(QtWidgets.QWidget):
         self._scene_queued = False
         self.bus.set_widgets(self.page_widgets, source=self)
         self._grid_pm = None
+        self._invalidate_static_layer()
         self._sync_paint_mode()
         self._apply_size()
         self.update()
@@ -546,6 +582,7 @@ class OverlayView(QtWidgets.QWidget):
             QtCore.QTimer.singleShot(0, self, self._on_geometry_changed)
             return
         # Direct full update (not a sub-rect) — critical for onscreen translucency.
+        self._invalidate_static_layer()
         self._pending_full = True
         self._pending_rect = QtCore.QRect()
         self.update()
@@ -574,6 +611,7 @@ class OverlayView(QtWidgets.QWidget):
         zh = max(64, int(round(content.height() * z)))
         if self._scene_origin != origin or self.width() != zw or self.height() != zh:
             self._grid_pm = None
+            self._invalidate_static_layer()
         self._scene_origin = origin
         if self.interactive and origin != old_origin:
             self._nudge_scroll((old_origin.x() - origin.x()) * z, (old_origin.y() - origin.y()) * z)
@@ -611,6 +649,210 @@ class OverlayView(QtWidgets.QWidget):
             if alive(bar):
                 bar.setValue(bar.value() + int(round(dy)))
 
+    def _invalidate_static_layer(self):
+        self._static_pm = None
+        self._static_key = None
+        self._frame_pm = None
+        self._dirty_body_ids = None
+
+    def _static_layer_key(self):
+        """Geometry / style fingerprint — value ticks must not rebuild shadows."""
+        canvas = self.page_canvas
+        cw, ch = self.canvas_size()
+        parts = [
+            cw,
+            ch,
+            normalize_background_mode(canvas),
+            bool(is_onscreen_mode(canvas)),
+            str(canvas.get("chroma") or ""),
+            str(canvas.get("fill") or ""),
+            str(canvas.get("background_image") or ""),
+        ]
+        for item in self.scene.sorted_widgets(self._page_id):
+            wid = str(item.get("id") or "")
+            visible = bool(item.get("visible", True))
+            conditions_ok = widget_conditions_match(item)
+            if not visible or not conditions_ok:
+                parts.append((wid, False))
+                continue
+            shadow = resolve_widget_shadow(item.get("style"))
+            style = item.get("style") or {}
+            parts.append(
+                (
+                    wid,
+                    True,
+                    round(float(item.get("x") or 0), 2),
+                    round(float(item.get("y") or 0), 2),
+                    round(float(item.get("w") or 0), 2),
+                    round(float(item.get("h") or 0), 2),
+                    round(float(widget_rotation_deg(item)), 2),
+                    bool(shadow.get("on")),
+                    round(float(shadow.get("dx") or 0), 2),
+                    round(float(shadow.get("dy") or 0), 2),
+                    round(float(shadow.get("size") or 0), 2),
+                    round(float(shadow.get("spread") or 0), 2),
+                    str(shadow.get("color") or ""),
+                    str(style.get("image_path") or ""),
+                    str(style.get("image_path_on") or ""),
+                    bool(style.get("image_keep_aspect", True)),
+                    str(item.get("type") or ""),
+                )
+            )
+        return tuple(parts)
+
+    def _ensure_static_layer(self) -> QtGui.QPixmap | None:
+        """Background + drop shadows for the live HUD (not rebuilt on value polls)."""
+        if self.interactive:
+            return None
+        key = self._static_layer_key()
+        if self._static_pm is not None and not self._static_pm.isNull() and key == self._static_key:
+            return self._static_pm
+        cw, ch = self.canvas_size()
+        if cw <= 0 or ch <= 0:
+            return None
+        pm = QtGui.QPixmap(cw, ch)
+        pm.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(pm)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        canvas_rect = QtCore.QRect(0, 0, cw, ch)
+        # Clear/chroma is applied in paintEvent; this layer is bg image + shadows only.
+        if not is_onscreen_mode(self.page_canvas):
+            paint_background(painter, self.page_canvas, canvas_rect, preview=False, fallback_chroma=False)
+        set_live_fast_paint(True)
+        try:
+            for item in self.scene.sorted_widgets(self._page_id):
+                if not item.get("visible", True):
+                    continue
+                if not widget_conditions_match(item):
+                    continue
+                if abs(widget_rotation_deg(item)) < 0.001:
+                    paint_widget_drop_shadow(painter, item)
+                else:
+                    painter.save()
+                    apply_widget_rotation(painter, item)
+                    paint_widget_drop_shadow(painter, item)
+                    painter.restore()
+        finally:
+            set_live_fast_paint(False)
+        painter.end()
+        self._static_pm = pm
+        self._static_key = key
+        # Static rebuilt ⇒ frame must be rebuilt too.
+        self._frame_pm = None
+        self._dirty_body_ids = None
+        return pm
+
+    def _paint_live_clear(self, painter: QtGui.QPainter, canvas_rect: QtCore.QRect):
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+        if is_onscreen_mode(self.page_canvas):
+            painter.fillRect(canvas_rect, QtCore.Qt.transparent)
+        else:
+            painter.fillRect(canvas_rect, chroma_fill_color(self.page_canvas))
+        if is_interactive_overlay(self.page_canvas):
+            for item in self.scene.sorted_widgets(self._page_id):
+                if not widget_accepts_touch(item):
+                    continue
+                hit = widget_rotated_bounds(item)
+                if hit.intersects(QtCore.QRectF(canvas_rect)):
+                    painter.save()
+                    apply_widget_rotation(painter, item)
+                    painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
+                    painter.restore()
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
+
+    def _paint_live_bodies(self, painter: QtGui.QPainter, items: list):
+        set_live_fast_paint(True)
+        try:
+            for item in items:
+                if not item.get("visible", True):
+                    continue
+                if not widget_conditions_match(item):
+                    continue
+                value = self.bus.value_for(item)
+                paint_widget(painter, item, value, draw_shadow=False)
+        finally:
+            set_live_fast_paint(False)
+
+    def _rebuild_frame_pm(self, static_pm: QtGui.QPixmap) -> QtGui.QPixmap:
+        cw, ch = self.canvas_size()
+        frame = QtGui.QPixmap(cw, ch)
+        frame.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(frame)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        canvas_rect = QtCore.QRect(0, 0, cw, ch)
+        self._paint_live_clear(painter, canvas_rect)
+        if static_pm is not None and not static_pm.isNull():
+            painter.drawPixmap(0, 0, static_pm)
+        self._paint_live_bodies(painter, self.scene.sorted_widgets(self._page_id))
+        painter.end()
+        self._frame_pm = frame
+        self._dirty_body_ids = set()
+        return frame
+
+    def _ensure_frame_pm(self) -> QtGui.QPixmap | None:
+        """Full live composite. Only dirty widget bodies are repainted each tick."""
+        if self.interactive:
+            return None
+        static_pm = self._ensure_static_layer()
+        cw, ch = self.canvas_size()
+        if cw <= 0 or ch <= 0:
+            return None
+        frame = self._frame_pm
+        if frame is None or frame.isNull() or frame.width() != cw or frame.height() != ch:
+            return self._rebuild_frame_pm(static_pm if static_pm is not None else QtGui.QPixmap())
+
+        dirty_ids = self._dirty_body_ids
+        if dirty_ids is None:
+            return self._rebuild_frame_pm(static_pm if static_pm is not None else QtGui.QPixmap())
+        if not dirty_ids:
+            return frame
+
+        canvas_rect = QtCore.QRect(0, 0, cw, ch)
+        united = QtCore.QRect()
+        for wid in dirty_ids:
+            item = self.scene.widget_by_id(wid, self._page_id)
+            if not item:
+                continue
+            united = united.united(widget_dirty_rect(item)) if not united.isNull() else widget_dirty_rect(item)
+        united = united.intersected(canvas_rect)
+        self._dirty_body_ids = set()
+        if united.isNull():
+            return frame
+
+        # Any widget overlapping the dirty region must be redrawn for z-order.
+        overlapping = []
+        for item in self.scene.sorted_widgets(self._page_id):
+            if not item.get("visible", True):
+                continue
+            if not widget_conditions_match(item):
+                continue
+            if widget_dirty_rect(item).intersects(united):
+                overlapping.append(item)
+
+        painter = QtGui.QPainter(frame)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+        painter.setClipRect(united)
+        # Restore clear + static shadows under the dirty rect, then live bodies.
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+        if is_onscreen_mode(self.page_canvas):
+            painter.fillRect(united, QtCore.Qt.transparent)
+        else:
+            painter.fillRect(united, chroma_fill_color(self.page_canvas))
+        if is_interactive_overlay(self.page_canvas):
+            for item in overlapping:
+                if not widget_accepts_touch(item):
+                    continue
+                painter.save()
+                apply_widget_rotation(painter, item)
+                painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
+                painter.restore()
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
+        if static_pm is not None and not static_pm.isNull():
+            painter.drawPixmap(united.topLeft(), static_pm, united)
+        self._paint_live_bodies(painter, overlapping)
+        painter.end()
+        return frame
+
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         z = self._zoom if self.interactive else 1.0
@@ -636,6 +878,21 @@ class OverlayView(QtWidgets.QWidget):
         painter.setClipRect(scene_clip if not layered else canvas_rect)
         # Live updates skip antialiasing so the UI thread stays free for Input Viewer.
         painter.setRenderHint(QtGui.QPainter.Antialiasing, False)
+
+        # Live: patch only dirty widget bodies into a frame buffer, then blit.
+        if not self.interactive:
+            frame = self._ensure_frame_pm()
+            if frame is not None and not frame.isNull():
+                if layered:
+                    painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+                    painter.drawPixmap(0, 0, frame)
+                else:
+                    src = scene_clip if not scene_clip.isNull() else canvas_rect
+                    painter.drawPixmap(src.topLeft(), frame, src)
+            self._paint_control_target(painter)
+            painter.end()
+            return
+
         if layered:
             painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
             # Always clear the full canvas in layered mode. Clearing only the
@@ -646,16 +903,6 @@ class OverlayView(QtWidgets.QWidget):
                 painter.fillRect(clear_rect, QtCore.Qt.transparent)
             else:
                 painter.fillRect(clear_rect, chroma_fill_color(self.page_canvas))
-            if is_interactive_overlay(self.page_canvas) and not self.interactive:
-                for item in self.scene.sorted_widgets(self._page_id):
-                    if not widget_accepts_touch(item):
-                        continue
-                    hit = widget_rotated_bounds(item)
-                    if hit.intersects(QtCore.QRectF(clear_rect)):
-                        painter.save()
-                        apply_widget_rotation(painter, item)
-                        painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
-                        painter.restore()
             painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
             if not is_onscreen_mode(self.page_canvas):
                 paint_background(painter, self.page_canvas, canvas_rect, preview=False, fallback_chroma=False)
@@ -669,7 +916,7 @@ class OverlayView(QtWidgets.QWidget):
                 painter.drawRect(canvas_rect.adjusted(0, 0, -1, -1))
         if self.interactive and self.page_canvas.get("snap_to_grid"):
             self._paint_grid(painter)
-        paint_clip = canvas_rect if layered and not self.interactive else scene_clip
+        paint_clip = scene_clip
         for item in self.scene.sorted_widgets(self._page_id):
             dirty = widget_dirty_rect(item)
             if not dirty.intersects(paint_clip):
@@ -684,8 +931,6 @@ class OverlayView(QtWidgets.QWidget):
                     painter.restore()
                 continue
             conditions_ok = widget_conditions_match(item)
-            if not self.interactive and not conditions_ok:
-                continue
             # Designer tab: never mirror live inputs while a profile is running.
             if self.interactive and gremlin.shared_state.is_running:
                 value = None
@@ -698,9 +943,6 @@ class OverlayView(QtWidgets.QWidget):
                 painter.restore()
             else:
                 paint_widget(painter, item, value)
-        # Cyan dashed target outline: live overlay only, while the control panel is active.
-        if not self.interactive:
-            self._paint_control_target(painter)
         if self.interactive:
             self._paint_guides(painter)
             self._paint_selection(painter)
