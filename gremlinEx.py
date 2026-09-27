@@ -140,7 +140,7 @@ import gremlin.ui.profile_settings
 import gremlin.version
 from shiboken6 import Shiboken
 
-from gremlin.input_item import InputItem, InputItemWidget, BaseDeviceTabWidget
+from gremlin.input_item import InputItem, InputItemWidget, BaseDeviceTabWidget, ansiFail
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
 
@@ -1882,7 +1882,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el = gremlin.event_handler.EventListener()
         el.update_sidecar.emit()
 
-
         if self.profile.profile_file is not None:
             self.profile.save()
             # update the hash so we can detect changes
@@ -1904,7 +1903,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             old_xml = getattr(self.profile, "_profile_fname", None) or self.profile.profile_file
             if old_xml:
-
                 # notify modules to update their sidecar files
                 el = gremlin.event_handler.EventListener()
                 el.update_sidecar.emit()
@@ -1921,7 +1919,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     new_sidecar = os.path.join(base_dir, os.path.basename(sidecar).replace(old_stem, new_stem, 1))
                     file_pairs.append((sidecar, new_sidecar))
 
-
                 # copy the files
                 for old_file, new_file in file_pairs:
                     try:
@@ -1932,10 +1929,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             and os.path.normcase(os.path.abspath(old_file)) != os.path.normcase(os.path.abspath(new_file))
                             and not os.path.isfile(new_file)
                         ):
-                            shutil.copyfile(old_file, new_file) # overwrite if necessary
+                            shutil.copyfile(old_file, new_file)  # overwrite if necessary
                     except Exception as err:
                         syslog.warning(f"SAVE AS: could not copy file {old_file} to {new_file}: {err}")
-
 
             self.profile.setProfileFile(fname)
             self.profile.save()
@@ -4443,8 +4439,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not skip_selection_tracking:
                 self.saveLastSelection(device_guid, input_type, input_id)
 
-
-
             if completion_callback:
                 # fire the callback on completion
                 completion_callback(device_guid, input_type, input_id)
@@ -4474,8 +4468,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         verbose = gremlin.config.Configuration().verbose_mode_select
         if verbose:
-            device_name = gremlin.joystick_handling.getDeviceName(device_guid) or 'n/a'
-            syslog.info(f"last saved selected input: device_guid= [{device_guid}], device_name=[{device_name}], input_type=[{input_type.name}], input_id=[{input_id}]")
+            device_name = gremlin.joystick_handling.getDeviceName(device_guid) or "n/a"
+            syslog.info(
+                f"last saved selected input: device_guid= [{device_guid}], device_name=[{device_name}], input_type=[{input_type.name}], input_id=[{input_id}]"
+            )
 
     def _handle_item_selected(self, device_guid, input_type, input_id):
         """Handles item selection events from the list view"""
@@ -5475,7 +5471,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._delay_refresh_thread.quit()
         self._delay_refresh_thread.deleteLater()
 
-
         self._select_last_input()
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
@@ -5783,7 +5778,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
         except Exception as ex:
-            syslog.error(f"Failed to force close process {pid}: {ex}")
+            syslog.error(f"{ansiFail()} to force close process {pid}: {ex}")
 
     def _get_device_profile(self, device):
         """Returns a profile for the given device.

@@ -385,7 +385,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_process_started_ui(self, started: bool):
         verbose = gremlin.config.Configuration().verbose_mode_mouse
         if verbose:
-            syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+            syslog.info(f"MOUSE: profile start [{gremlin.util.ansiOk() if started else gremlin.util.ansiFail()}]")
         if started:
             hwnd = self.action_data.getProcessWindowHwnd()
             if hwnd:
@@ -972,7 +972,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         """callback on process start request"""
         verbose = gremlin.config.Configuration().verbose_mode_mouse
         if verbose:
-            syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+            syslog.info(f"MOUSE: profile start [{gremlin.util.ansiOk() if started else gremlin.util.ansiFail()}]")
         if started:
             # convert local coords to global coords
             hwnd = self.action_data.getProcessWindowHwnd()

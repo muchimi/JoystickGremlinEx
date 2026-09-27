@@ -1652,13 +1652,15 @@ class Buttons:
     @staticmethod
     def getDeleteWidget(
         label: str = None,
-        tooltip: str = "Delete",
+        tooltip: str = None,
         callback: Callable = None,
         no_keyboard: bool = True,
         data: object = None,
         size: int = 24,
         icon_size: int = 16,
     ):
+        if not tooltip:
+            tooltip = "Delete"
         button = Buttons._template(
             label=label, icon_source="mdi6.delete", tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, size=icon_size
         )
@@ -2387,6 +2389,7 @@ class QFloatLineEdit(QWidget):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self._widget = QLineEdit()
         self._widget.focusOut.connect(self._focus_out)
+        self._supressed_stack = 0
 
         # validate on field lost focus only
         # self._widget.textChanged.connect(self._validate)
@@ -2407,6 +2410,25 @@ class QFloatLineEdit(QWidget):
             self.setToolTip(tooltip)
         if callback:
             self.valueChanged.connect(callback)
+
+    def pushSuppressed(self):
+        self._supressed_stack += 1
+
+    def popSuppressed(self, reset: bool = False):
+        if self._supressed_stack > 0:
+            self._supressed_stack -= 1
+        if reset:
+            self._supressed_stack = 0
+
+    def setSuppressed(self, value: bool):
+        if value:
+            self.pushSuppressed()
+        else:
+            self.popSuppressed()
+
+    @property
+    def isSuppressed(self) -> bool:
+        return self._supressed_stack > 0
 
     def _focus_out(self):
         # syslog.info("focus loss")
@@ -2475,7 +2497,8 @@ class QFloatLineEdit(QWidget):
             # syslog.info("focus loss")
             self.setValue(self.value())
         elif t == QtCore.QEvent.Type.MouseButtonDblClick:
-            self.doubleClick.emit()
+            if not self.isSuppressed():
+                self.doubleClick.emit()
 
         return super().eventFilter(widget, event)
 
@@ -2509,7 +2532,7 @@ class QFloatLineEdit(QWidget):
             self._widget.setText(s_value)
         if current_value is None or current_value != value:
             self._value = value
-            if emit:
+            if emit and not self.isSuppressed:
                 self.valueChanged.emit(value)
 
     @QtCore.Slot()
@@ -2879,7 +2902,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._max_range = max_range
         self._step = step
 
-        self._supressed = False  # true if events are suppressed
+        self._supressed_stack = 0  # true if events are suppressed
 
         # self._validator = QtGui.QIntValidator(min_range, max_range)
 
@@ -2912,12 +2935,28 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if self._callback_ex:
             self._callback_ex(self, value)
 
+    def pushSuppressed(self):
+        self._supressed_stack += 1
+
+    def popSuppressed(self, reset: bool = False):
+        if self._supressed_stack > 0:
+            self._supressed_stack -= 1
+        if reset:
+            self._supressed_stack = 0
+
     def setSuppressed(self, value: bool):
-        self._supressed = value
+        if value:
+            self.pushSuppressed()
+        else:
+            self.popSuppressed()
+
+    @property
+    def isSuppressed(self) -> bool:
+        return self._supressed_stack > 0
 
     def unhook(self):
         """called on widget delete"""
-        self._supressed = True
+        self._supressed_stack = 1
 
     @property
     def chars(self) -> int:
@@ -2945,7 +2984,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._data = value
 
     def eventFilter(self, widget, event):
-        if self._supressed:
+        if self.isSuppressed:
             return True
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
@@ -2982,7 +3021,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             # format the input to the correct decimals
             self.setValue(self.value())
         elif t == QtCore.QEvent.Type.MouseButtonDblClick:
-            if not self._supressed:
+            if not self.isSuppressed:
                 self.doubleClick.emit()
         return False
 
@@ -2997,7 +3036,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if s_value != self.text():
             with QtCore.QSignalBlocker(self):
                 self.setText(s_value)
-        if emit and not self._supressed and other is not None and other != value:
+        if emit and not self.isSuppressed and other is not None and other != value:
             self.valueChanged.emit(v1)
 
     @QtCore.Slot()
@@ -3005,17 +3044,17 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         """called whenever the text changes"""
         if self.hasAcceptableInput():
             value = self.value()
-            if not self._supressed:
+            if not self.isSuppressed:
                 self.valueChanged.emit(value)
         else:
-            if not self._supressed:
+            if not self.isSuppressed:
                 self.invalid.emit()
 
     def setValue(self, value: int, emit=True):
         """sets the value"""
         v1 = int(value)
         self._update_value(v1, emit)
-        if emit and not self._supressed:
+        if emit and not self.isSuppressed:
             self.valueChanged.emit(v1)
 
     def value(self) -> int:
@@ -9255,7 +9294,7 @@ class QDelayWidget(QWidget):
         value=250,
         min_value_seconds=0,
         max_value_seconds=60,
-        is_seconds=False,
+        is_seconds=False,  # true if value is given in seconds, false if in milliseconds
         callback=None,
         invalid_callback=None,
         validation_callback=None,
@@ -9265,6 +9304,7 @@ class QDelayWidget(QWidget):
         tooltip=None,
         show_zero=False,
         shortcut_map: {str, float} = None,
+        display_in_seconds=False,  # true if the value should be displayed in seconds, false if in milliseconds
     ):
         """
         Delay widget for specifying a time interval in milliseconds or seconds.
@@ -9295,19 +9335,23 @@ class QDelayWidget(QWidget):
         self._validation_callback = validation_callback  # callback that accepts a value and returns True if the value can be used
 
         self._is_seconds = is_seconds
+        self._display_in_seconds = display_in_seconds
         self._max_value = max_value_seconds * 1000  # max value possible
         self._min_value = min_value_seconds * 1000  # min value
 
         width = get_char_width(8)
         self.delay_label = QtWidgets.QLabel(label) if label else None
-        self._delay_widget = QIntLineEdit()
-        self._delay_widget.invalid.connect(self._handle_invalid_input)
-        # self._delay_widget.setRange(0, self._max_value)
+        if self._display_in_seconds:
+            self._delay_widget = QFloatLineEdit(
+                value=value, min_range=self._min_value / 1000.0, max_range=self._max_value / 1000.0, callback=self._value_changed
+            )
+        else:
+            if is_seconds:
+                value = value / 1000.0
+            self._delay_widget = QIntLineEdit(value=value, min_range=self._min_value, max_range=self._max_value, callback=self._value_changed)
+            self._delay_widget.invalid.connect(self._handle_invalid_input)
+
         self._delay_widget.setMaximumWidth(width)
-        self._delay_widget.setMinimum(self._min_value)
-        self._delay_widget.setMaximum(self._max_value)
-        self._delay_widget.setValue(value)  # default
-        self._delay_widget.valueChanged.connect(self._value_changed)
 
         if label:
             widgets = [self.delay_label, self._delay_widget]
@@ -9320,7 +9364,8 @@ class QDelayWidget(QWidget):
             widgets = []
 
             if shortcut_map is not None:
-                shortcuts = shortcut_map
+                shortcuts = shortcut_map  # use direct
+
             else:
                 shortcuts = {
                     "0s": 0,
@@ -9371,28 +9416,24 @@ class QDelayWidget(QWidget):
 
     def value(self):
         """gets the delay in milliseconds"""
-        value = self._value
-        if self._is_seconds:
-            value /= 1000  # to seconds
-        return value
+        return self._value
 
     def setValue(self, value: float, emit=True):
         """sets the widget value
-        :param value: value in ms or in seconds if the widget mode is set to seconds
+        :param value: value in ms or in seconds if the widget mode is set to seconds, milliseconds if set to not display in seconds
         """
-        milliseconds = value * 1000 if self._is_seconds else value
         if self._validation_callback:
-            if not self._validation_callback(milliseconds):
+            if not self._validation_callback(value):
                 return
-        if milliseconds >= 0 and milliseconds != self._value:
-            self._value = milliseconds
-            self._delay_widget.setSuppressed(True)
-            self._delay_widget.setValue(milliseconds)
-            self._delay_widget.setSuppressed(False)
+        if value >= 0 and value != self._value:
+            self._value = value
+            self._delay_widget.pushSuppressed()
+            self._delay_widget.setValue(value)
+            self._delay_widget.popSuppressed()
             if emit and not self._supressed:
                 if self._callback:
-                    self._callback(milliseconds)
-                self.valueChanged.emit(milliseconds)
+                    self._callback(value)
+                self.valueChanged.emit(value)
 
     def setLabel(self, text: str):
         if self.delay_label:
@@ -17112,6 +17153,10 @@ class QSideBarContainer(QWidget):
             self.add_widget(widget)
 
     def add_widget(self, widget):
+        """Helper method to add widgets to the internal content area."""
+        self.content_layout.addWidget(widget)
+
+    def addWidget(self, widget):
         """Helper method to add widgets to the internal content area."""
         self.content_layout.addWidget(widget)
 

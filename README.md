@@ -49,9 +49,22 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T63)
+
+- Fix: UI: Delay widget stores data in seconds or milliseconds as needed.
+- Fix: DoubleTap Container: fix double tap.
+- Fix: DoubleTap Container: enable chain mode options.
+- Fix: DoubleTap Container: do not reset container on mode change (this could prevent container logic such as release events from executing). 
+- Fix: TempoEx Container: do not reset container on mode change (this could prevent container logic such as release events from executing). 
+- Fix: API: implement extend method for view models for calls using the older API.
+- Fix: UI: fixed an issue with actions not visible in the UI after a refresh.
+- Fix: API: added older extended scan codes encodings to the list of valid keys (right shift, right control) to support older keyboard event data so they are recognized when triggered.
+
 ### (m77T62B)
-- Fix: AFCS device tab not checking to see if AFCS module is enabled or not.  
+- Fix: AFCS device tab not checking to see if AFCS module is enabled or not.
 - Fix: AFCS missing module option in modules tab (global options)
+- Fix: VJoy Remap: profile start sync input id collision
 
 ### (m77T62A)
 - New: API (Voice): added a two tone beep to signal voice recognition is enabled/disabled.  This can be turned off in the voice settings options.

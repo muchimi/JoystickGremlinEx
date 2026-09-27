@@ -26,7 +26,7 @@ import gremlin.types
 from gremlin.types import ContainerViewTypes, ActivationRule
 import gremlin.input_item
 import gremlin.execution_graph
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget, ActionSelector, ansiResult
 
 from shiboken6 import Shiboken
 import logging
@@ -286,9 +286,9 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     logTabs = gremlin.shared_state.logTabs(True)
                     condition_name = condition.condition_name()
                     if isinstance(condition, gremlin.input_item.BaseActivationCondition):
-                        syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                        syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {ansiResult(result)}")
                     elif isinstance(condition, gremlin.actions.AbstractCondition):
-                        syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                        syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {ansiResult(result)}")
                     gremlin.shared_state.popLog()
 
                 match self.rule:
@@ -302,7 +302,7 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                             break
 
         if self.verbose:
-            syslog.info(f"TRIGGER CONTAINER: evaluate conditions: {'PASS' if result else 'FAIL'}")
+            syslog.info(f"TRIGGER CONTAINER: evaluate conditions: {ansiResult(result)}")
 
         if result:
             # conditions succeeded - run the functors

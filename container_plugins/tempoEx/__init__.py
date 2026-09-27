@@ -158,10 +158,10 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.timeout_input.setValue(self.container.timeout)
         self.timeout_input.valueChanged.connect(self._timeout_changed_cb)
 
-        widgets = [
+        widgets.extend([
             "<b>Chain Timeout:</b>",
             self.timeout_input,
-        ]
+        ])
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.options_layout.addWidget(widget)
@@ -220,7 +220,11 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         action_set = self.container.short_action_set
         syslog.info(f"short actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Short Action(s)", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(
+            action_set=action_set if action_set is not None else [],
+            label="Short Action(s)",
+            view_type=ContainerViewTypes.Action,
+        )
         self.short_layout.addWidget(widget)
         self.short_layout_widget_list.append(widget)
         widget.redraw()
@@ -229,7 +233,11 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # create long press container actions
         action_set = self.container.long_action_set
         syslog.info(f"long actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Long Action(s)", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(
+            action_set=action_set if action_set is not None else [],
+            label="Long Action(s)",
+            view_type=ContainerViewTypes.Action,
+        )
         self.long_layout.addWidget(widget)
         self.long_layout_widget_list.append(widget)
         widget.redraw()
@@ -238,7 +246,11 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # create double tap  container actions
         action_set = self.container.double_action_set
         syslog.info(f"double actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Double Tap Action(s)", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(
+            action_set=action_set if action_set is not None else [],
+            label="Double Tap Action(s)",
+            view_type=ContainerViewTypes.Action,
+        )
         self.double_layout.addWidget(widget)
         self.double_layout_widget_list.append(widget)
         widget.redraw()
@@ -312,9 +324,6 @@ class TempoExContainerWidget(AbstractContainerWidget):
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        # #action_sets = [action_set for action_set in self.container.short_action_set if action_set]
-        # self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
-
     def _paste_short_action(self, action, container):
         """called when a paste occurs"""
         syslog.info("Paste short action")
@@ -325,9 +334,6 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
-
-        # action_sets = [action_set for action_set in self.container.short_action_set if action_set]
-        # self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
 
     def _add_long_action(self, action_name):
         """Adds a new action to the long action list
@@ -546,8 +552,8 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         self.value_press = None
         self.event_press = None
-        self.chain_short = True  # chain by default
-        self.chain_long = True  # chain by default
+        self.chain_short = False
+        self.chain_long = False
         self.short_index = 0
         self.long_index = 0
         self.double_index = 0
@@ -717,11 +723,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             syslog.warning("TEMPOEX: warning: double tap delay exceeds long delay.  DoubleTap function disabled.")
             self.dtap_enabled = False
 
-    def profile_mode_changed(self, mode: str):
-        """called when the runtime mode changes"""
+    # def profile_mode_changed(self, mode: str):
+    #     """called when the runtime mode changes"""
 
-        # kill any executing timers on mode change
-        self._reset_timers()
+    #     # kill any executing timers on mode change
+    #     self._reset_timers()
 
     def _trigger_double_press(self, event, value, extra_data: dict = None):
         """called on double tap trigger"""
@@ -1228,49 +1234,54 @@ More than one action per short press or long press can be added."""
         self.autorelease_delay = 0.25  # autorelease in seconds
         self.activate_on = "release"
         self.timeout = 0.0
+        # chaining:
+        # if set, short, long, and double tap actions are chained.
+        # When chained, each action in the group executes, the index is bumped in roundrobin fashion.  Only one action executes per trigger.
+        # When not chained, all actions in the group are executed in sequence at every trigger based on their priority.
+
         self.chain_short = True
         self.chain_long = True
         self.chain_double = True
+        self.verbose = gremlin.config.Configuration().verbose_mode_container
 
-        # self.action_sets.addCallback(self._action_set_changed)
         self.ensureActionSets()
 
-        # self.action_sets.addOnItemChangedCallback(self._action_set_changed)
-        # self.long_action_set.addOnItemChangedCallback(self._long_action_set_changed)
-        # self.double_action_set.addOnItemChangedCallback(self._double_action_set_changed)
-        # self.short_action_set.addOnItemChangedCallback(self._short_action_set_changed)
+        if self.verbose:
+            self.action_sets.addOnItemChangedCallback(self._action_set_changed)
+            self.long_action_set.addOnItemChangedCallback(self._long_action_set_changed)
+            self.double_action_set.addOnItemChangedCallback(self._double_action_set_changed)
+            self.short_action_set.addOnItemChangedCallback(self._short_action_set_changed)
 
         assert len(self.action_sets) == 3, f"TempoEx container must have exactly 3 action sets: short, long, and double. got {len(self.action_sets)}"
         verbose = gremlin.config.Configuration().verbose_mode_container
         if verbose:
             syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
 
-    # def _action_set_changed(self, source, index, old_value, new_value, operation):
-    #     """Callback for when any action set changes."""
-    #     syslog.info(f"Action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
-    #     pass
+    def _action_set_changed(self, source, index, old_value, new_value, operation):
+        """Callback for when any action set changes."""
+        syslog.info(f"Action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
+        pass
 
-    # def _long_action_set_changed(self, source, index, old_value, new_value, operation):
-    #     """Callback for when the long action set changes."""
-    #     syslog.info(f"Long action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
-    #     pass
+    def _long_action_set_changed(self, source, index, old_value, new_value, operation):
+        """Callback for when the long action set changes."""
+        syslog.info(f"Long action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
+        pass
 
-    # def _double_action_set_changed(self, source, index, old_value, new_value, operation):
-    #     """Callback for when the double action set changes."""
-    #     syslog.info(f"Double action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
-    #     pass
+    def _double_action_set_changed(self, source, index, old_value, new_value, operation):
+        """Callback for when the double action set changes."""
+        syslog.info(f"Double action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
+        pass
 
-    # def _short_action_set_changed(self, source, index, old_value, new_value, operation):
-    #     """Callback for when the short action set changes."""
-    #     syslog.info(f"Short action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
-    #     pass
+    def _short_action_set_changed(self, source, index, old_value, new_value, operation):
+        """Callback for when the short action set changes."""
+        syslog.info(f"Short action set changed: source={source}, index={index}, old_value={old_value}, new_value={new_value}, operation={operation}")
+        pass
 
     def resetActionSets(self):
         """Resets all action sets in the container."""
         self.short_action_set.clear()
         self.long_action_set.clear()
         self.double_action_set.clear()
-
 
     def ensureActionSets(self):
         """Ensures that the container has exactly 3 action sets: short, long, and double."""
@@ -1279,12 +1290,6 @@ More than one action per short press or long press can be added."""
         self.action_sets.add(self.long_action_set, 1)  # 1
         self.action_sets.add(self.double_action_set, 2)  # 2
 
-    # def _action_set_changed(self, data, force: bool = False):
-    #     """Callback for when the action sets change."""
-    #     # update the UI
-    #     if gremlin.shared_state.is_running:
-    #         return
-    #     self.input_item.notifyContentChanged()
 
     def get_input_type(self):
         """override input type when actions check what input type they are hooked to"""
@@ -1367,15 +1372,19 @@ More than one action per short press or long press can be added."""
         # indicate always valid for saving
         return True
 
+    def is_valid(self):
+        """Returns whether or not this container is valid for use."""
+        return self._has_action_sets()
+
+    def _has_action_sets(self):
+        return len(self.short_action_set) > 0 or len(self.long_action_set) > 0 or len(self.double_action_set) > 0
+
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.
 
         :return True if the container is configured properly, False otherwise
         """
-        # count = len(self.short_action_set) + len(self.long_action_set) + len(self.double_action_set)
-        # valid = count > 0
-        valid = True
-        return valid
+        return self._has_action_sets()
 
     def get_action_set(self):
         """override method: returns action sets - override because we have custom sets"""

@@ -4734,6 +4734,17 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
         self.extra_data = extra_data or {}
 
+    def displayName(self) -> str:
+        """returns the display name for this container"""
+        if hasattr(self,"name"):
+            return f"Container: [{self.name}] id: [{self.id}] Input: [{self._input_item.display_name if self._input_item else 'None'}]"
+
+        return f"Container: [Unnamed] id: [{self.id}] Input: [{self._input_item.display_name if self._input_item else 'None'}]"
+
+    @property
+    def display_name(self) -> str:
+        return self.displayName()
+
     def setPriority(self, priority: int):
         """sets the execution priority for this container"""
         self._priority = priority
@@ -5270,7 +5281,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _generate_action_set_xml(self, parent_node: lxml.etree.Element):
         """generates the action set for the container, can be overriden"""
-        self.ensureActionSets()
         action_sets = self.action_sets
         for action_set in action_sets:
             node = action_set.to_xml()
@@ -7123,6 +7133,7 @@ class ActionSetView(AbstractView):
         icon=None,
         icon_size=24,
         interact_callback: Callable = None,
+        allowed_interactions: list[Interactions] = [],
         index: int = -1,
         title_widgets: list[QtWidgets.QWidget] = [],
         header_widgets: list[QtWidgets.QWidget] = [],
@@ -7141,6 +7152,7 @@ class ActionSetView(AbstractView):
         :param icon : optional icon to display
         :param icon_size: optional icon size in pixels
         :param interact_callback: optional callback when the user interacts with the view sends (action_set: ActionSet, interaction: Interactions)
+        :param allowed_interactions: list of allowed interactions for this view
         :param interact_enabled: whether interactions are enabled for this view
         :param separator: flag to indicate if a separator should be shown above
         :param action_interact_callback: optional callback when the user interacts with an action sends (action: Action, interaction: Interactions)
@@ -7166,7 +7178,8 @@ class ActionSetView(AbstractView):
         self.pushSuspended()  # supend redraw
 
         self._interact_callback = interact_callback
-        self._has_interactions = bool(container.interaction_types)
+        self._interaction_types = allowed_interactions
+        self._has_interactions = len(allowed_interactions) > 0
         self._last_action_hash = None  # hash of action model to detect changes
         self._separator = separator
 
@@ -7180,7 +7193,19 @@ class ActionSetView(AbstractView):
 
         self.has_edit_controls = False  # assume no edit controls
         self.view_type = view_type
-        self._main_layout = QtWidgets.QVBoxLayout(self)
+
+        self._main_layout = gremlin.ui.ui_common.QSideBarContainer(
+            bar_color=gremlin.ui.ui_common.Color.normalColor(),
+            )
+
+
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._main_layout)
+
+        # separator for the action set view
+        if self._separator:
+            self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(size = 4, color = gremlin.ui.ui_common.Color.normalColor()))
 
         # header widgets
         for widget in header_widgets:
@@ -7189,6 +7214,8 @@ class ActionSetView(AbstractView):
         self.label = label
         self._selected = False  # true if the object is selected
         title_widget = None
+
+
 
         if self.label:
             title_widget = gremlin.ui.ui_common.QStepTile(self.label, icon=icon)
@@ -7265,9 +7292,18 @@ class ActionSetView(AbstractView):
 
         self._drawn_once = False  # only load widgets on demand when a redraw is requested
 
+        self._model.addCallback(self._handle_model_changed)
+
         self.popSuspended()  # supend redraw
 
         self.refreshModel()  # load the data
+
+    def _handle_model_changed(self, data, force: bool):
+        """ called when the model changes"""
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(f"ActionSetView: model changed: force: [{force}]  items: {len(self.model)}")
+        self.redraw()
 
     @property
     def selected(self) -> bool:
@@ -7300,6 +7336,9 @@ class ActionSetView(AbstractView):
         """(re)creates the contents - content is displayed on page 2 of the stacked container"""
         import gremlin.config
         import gremlin.joystick_handling
+
+        if not Shiboken.isValid(self._stacked_widget):
+            return
 
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.disable()
@@ -7508,7 +7547,7 @@ class ActionSetView(AbstractView):
         :param allowed_interactions list of allowed interactions
         """
         self.has_edit_controls = False
-        allowed_interactions = self.container.interaction_types
+        allowed_interactions = self._interaction_types
         if allowed_interactions:
             widget = gremlin.ui.ui_common.QInteractWidget(
                 index=self._index,
@@ -8831,6 +8870,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             icon=icon,
             icon_size=icon_size,
             interact_callback=interact_callback,
+            allowed_interactions=allowed_interactions,
             index=index,
             title_widgets=title_widgets,
             header_widgets=header_widgets,
@@ -9497,6 +9537,7 @@ class ContainerView(AbstractView):
         input_item = model.input_item
         self._input_item = input_item
         self._model = model
+        self._last_hash = None
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -9516,12 +9557,24 @@ class ContainerView(AbstractView):
         self._main_layout.setContentsMargins(0, 0, 0, 0)
         self._redraw_lock = False
 
+
         if verbose:
             self._main_layout.addWidget(QtWidgets.QLabel(f"ContainerView: [{input_item.display_name}]"))
 
         self._create_ui()
 
+        self._model.addCallback(self._handle_model_changed)
+
         self.popSuspended()  # allow updates
+
+    def _handle_model_changed(self, data, force: bool):
+        """ called when the model changes"""
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(f"ContainerView: model changed: force: [{force}]  items: {len(self._model)}")
+        self.redraw()
+
+
 
     @property
     def input_item(self):
@@ -9640,7 +9693,6 @@ class ContainerView(AbstractView):
                         syslog.info(f"\tCreate container widget: [{container.name}]")
                     widget = container.widget(self.input_item, container)
                     widget.closed.connect(self._create_closed_cb(widget))
-                    # widget.container_modified.connect(self._handle_container_modified)
                     self._scroll_layout.addWidget(widget)
                     self._widget_map[container.id] = widget
 
@@ -9728,6 +9780,13 @@ class ContainerView(AbstractView):
         if not self._blank_widget or not self._stacked_widget or not Shiboken.isValid(self._stacked_widget) or not Shiboken.isValid(self._blank_widget):
             return
 
+
+        model_hash = self.model.hashKey()
+        if self._last_hash != model_hash:
+            self._last_hash = model_hash
+            force = True # changed
+
+
         try:
             self._redraw_lock = True
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
@@ -9737,7 +9796,7 @@ class ContainerView(AbstractView):
             widget_count = len(self._widget_map)
             model_count = self.model.count()
 
-            if force or not self._drawn_once or self.modelChanged() or widget_count != model_count:
+            if force or not self._drawn_once or widget_count != model_count:
                 if verbose:
                     syslog.info(f"\tcreate UI for [{model_count}] containers")
                 self.create_ui()
@@ -11196,7 +11255,10 @@ class InputActionConditionWidget(AbstractConditionWidget):
             self.condition.comparison = "pressed"
         self.state_dropdown.currentTextChanged.connect(self._state_selection_changed)
 
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=lambda: self.deleted.emit(self.condition))
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+            callback=lambda: self.deleted.emit(self.condition),
+            tooltip="Delete Condition",
+        )
         widgets, layout = gremlin.ui.ui_common.getHContainer(
             [
                 self.copy_widget,
@@ -11307,7 +11369,16 @@ class ConditionView(AbstractView):
         self.controls_layout.addWidget(copy_widget)
         self.controls_layout.addWidget(paste_widget)
 
+        self.model.addCallback(self._handle_model_changed)
+
         self._update_count_ui()
+
+    def _handle_model_changed(self, data, force: bool):
+        """ called when the model changes"""
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(f"ConditionView: model changed: force: [{force}]  items: {len(self.model)}")
+        self.redraw()
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """update the count whenever the model changes"""

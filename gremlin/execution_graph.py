@@ -51,6 +51,7 @@ from gremlin.types import DeviceType
 import gremlin.gated_handler
 from psygnal import Signal
 from gremlin.input_item import InputItem
+from gremlin.util import ansiResult, ansiFail, ansiOk
 
 syslog = logging.getLogger("system")
 
@@ -584,6 +585,29 @@ class ExecutionContext:
 
         self._handle_config_changed()  # update config params
 
+    def _find_top_level_descendants(self, node, target_type: list[ExecutionGraphNodeType]):
+        """
+        Recursively finds the highest-level descendants of a specific nodetype.
+        Does not look inside a matching node for further matches.
+        """
+        results = []
+
+        for child in node.children:
+            node_type = getattr(child, "nodeType", None)
+            if node_type == ExecutionGraphNodeType.Group:
+                results.extend(self._find_top_level_descendants(child, target_type))
+                continue  # skip further checks for group nodes
+            if node_type in target_type:
+                results.append(child)
+        return results
+
+    def getChainNodes(self, node):
+        """returns the nodes in the action set that are part of a chain"""
+        nodes = self._find_top_level_descendants(
+            node, [ExecutionGraphNodeType.Condition, ExecutionGraphNodeType.ActivationCondition, ExecutionGraphNodeType.Action]
+        )
+        return nodes
+
     @property
     def functor_map(self) -> dict:
         """map of container condition functors"""
@@ -664,7 +688,7 @@ class ExecutionContext:
 
         self._is_built = result
         if verbose:
-            syslog.info(f"CONTEXT: rebuild {'Ok' if result else 'Failed'}")
+            syslog.info(f"CONTEXT: rebuild {ansiResult(result)}")
 
         if result:
             # tell the ui the execution context changed
@@ -1418,7 +1442,7 @@ class ExecutionContext:
 
             if not container.is_valid():
                 # check = container.is_valid()
-                syslog.warning(f"Incomplete container ignored: container id: [{container.id}] returned validation FAIL")
+                syslog.warning(f"Incomplete container ignored: {container.display_name}: returned invalid {gremlin.util.ansiFAIL()}")
                 if config.allow_exec_tree_container_validation_fail:
                     syslog.warning("\tOverride allowed - build continuing...")
                 else:
@@ -1493,12 +1517,12 @@ class ExecutionContext:
 
             extra_data = {"container": container, "mode": mode_name, "device_node": device_node, "input_item": input_item}
 
-   
             if not container.action_sets:
                 input_item = container.input_item
-                syslog.warning(f"BUILD WARNING: Container has no action sets: [{container.name}] id [{container.id}] input item: [{input_item.display_name}] profile mode: [{mode_name}]")
+                syslog.warning(
+                    f"BUILD WARNING: Container has no action sets: [{container.name}] id [{container.id}] input item: [{input_item.display_name}] profile mode: [{mode_name}]"
+                )
             else:
-
                 for action_set in container.action_sets:
                     # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
                     # sort actions by priority low to high
@@ -1601,7 +1625,7 @@ class ExecutionContext:
                                         group_node.parent = gate_node
 
                                         containers = list(item_data.containers)
-                                        containers.sort(key=lambda c: c.priority) # lower priority runs first
+                                        containers.sort(key=lambda c: c.priority)  # lower priority runs first
 
                                         for container in containers:
                                             node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
@@ -1650,7 +1674,7 @@ class ExecutionContext:
                                         group_node.parent = range_node
 
                                         containers = list(item_data.containers)
-                                        containers.sort(key=lambda c: c.priority) # lower priority runs first
+                                        containers.sort(key=lambda c: c.priority)  # lower priority runs first
 
                                         for container in containers:
                                             node = self._build_container_tree(container, group_node, mode_name, device_node, input_item, m_input_node)
@@ -1700,7 +1724,7 @@ class ExecutionContext:
 
             container: gremlin.input_item.AbstractContainer
             containers = list(input_item.containers)
-            containers.sort(key=lambda c: c.priority) # lower priority runs first
+            containers.sort(key=lambda c: c.priority)  # lower priority runs first
 
             for container in containers:
                 node = self._build_container_tree(container, input_container_group, mode_name, device_node, input_item, m_input_node)
@@ -2046,11 +2070,11 @@ class ExecutionContext:
                         condition_name = functor.condition_name()
                         if isinstance(functor, gremlin.input_item.BaseActivationCondition):
                             syslog.info(
-                                f"{logTabs}>{'Executed latched activation condition' if is_latched else 'Executed activation condition'} {condition_name} result: {'PASS' if result else 'FAIL'}"
+                                f"{logTabs}>{'Executed latched activation condition' if is_latched else 'Executed activation condition'} {condition_name} result: {ansiResult(result)}"
                             )
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(
-                                f"{logTabs}>{'Executed latched condition' if is_latched else 'Executed condition'} {condition_name} result: {'PASS' if result else 'FAIL'}"
+                                f"{logTabs}>{'Executed latched condition' if is_latched else 'Executed condition'} {condition_name} result: {ansiResult(result)}"
                             )
 
                     if rule == ActivationRule.Any:
@@ -2092,7 +2116,7 @@ class ExecutionContext:
                     if len(container_nodes) > 1:
                         priorities = set((c.container.priority for c in container_nodes))
                         if len(priorities) > 1:
-                            container_nodes.sort(key=lambda c: c.container.priority) # lower priority runs first
+                            container_nodes.sort(key=lambda c: c.container.priority)  # lower priority runs first
                     for container_node in container_nodes:
                         result = self.execute_node(container_node, event, value, extra_data, manual, visited)
                 return True  # input item nodes always pass
@@ -2165,7 +2189,7 @@ class ExecutionContext:
                         if verbose_exec:
                             if not functor.manual_callback:  # manual callbacks will always fail so skip any message for those
                                 syslog.info(
-                                    f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {'PASS' if action_result else 'FAIL'}"
+                                    f"{logTabs}>!!! Executed action {functor.__class__.__name__} {description} action result: {ansiResult(action_result)}"
                                 )
 
             # execute children nodes
@@ -2185,7 +2209,7 @@ class ExecutionContext:
 
         finally:
             if verbose_exec:
-                syslog.info(f"{logTabs}>Overall Result: {gremlin.util.ansiText('PASS', 'green') if result else gremlin.util.ansiText('FAIL', 'red')}")
+                syslog.info(f"{logTabs}>Overall Result: {ansiResult(result)}")
             gremlin.shared_state.popLog()
 
     def execute_condition_functors(self, node, event, value, extra_data, manual) -> bool:
@@ -2199,9 +2223,9 @@ class ExecutionContext:
             if verbose_condition:
                 condition_name = functor.condition_name()
                 if isinstance(functor, gremlin.input_item.BaseActivationCondition):
-                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                    syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {ansiResult(result)}")
                 elif isinstance(functor, gremlin.actions.AbstractCondition):
-                    syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
+                    syslog.info(f"{logTabs}>Executed condition {condition_name} result: {ansiResult(result)}")
             match node.rule:
                 case ActivationRule.Any:
                     if result:
@@ -2430,7 +2454,7 @@ class VirtualButtonProcess(ContainerCallback):
         # self.virtual_button.process_event(event)
 
         if verbose:
-            syslog.info("VIRTUALBUTTON: execute FAIL")
+            syslog.info(f"VIRTUALBUTTON: execute {ansiFail()}")
 
 
 class AbstractExecutionGraph(QtCore.QObject):

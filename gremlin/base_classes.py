@@ -892,7 +892,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
         :return True if all required variables are set, False otherwise
         """
-        pass
+        return True # assume valid
 
     # @abstractmethod
     def _sanitize(self):
@@ -1120,6 +1120,17 @@ class AbstractCallbackModel(AbstractModel):
     def setFilterEnabled(self, value: bool):
         """enables or disables filtering"""
         self._filtered_enabled = value
+
+    def extend(self, items: list, emit=True):
+        """extends the model with a list of items"""
+        if not items:
+            return
+        for item in items:
+            self.add(item, emit=False)
+        if emit:
+            self.applyFilter(emit)
+            self._fireChanged()
+
 
     def __iter__(self):
         """iterator - gets an iterator to the contents"""
@@ -1778,7 +1789,7 @@ class AbstractCallbackModel(AbstractModel):
         self._suspend_stack = 0
         self._change_pending = False
 
-    def addCallback(self, callback: Callable):
+    def addCallback(self, callback: Callable[[object, bool], None]):
         """adds a change callback to be called when the model data changes"""
         if __debug__:
             if callback is not None and not callable(callback):
@@ -1794,7 +1805,7 @@ class AbstractCallbackModel(AbstractModel):
         if callback and callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
-    def addOnItemChangedCallback(self, callback: Callable):
+    def addOnItemChangedCallback(self, callback: Callable[[object, int, object, object, str], None]):
         """adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
 
         if __debug__:

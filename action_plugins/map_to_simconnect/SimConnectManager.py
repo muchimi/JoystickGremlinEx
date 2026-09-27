@@ -34,6 +34,7 @@ import enum
 import time
 import threading
 from psygnal import Signal
+from gremlin.util import ansiOk, ansiFail
 
 
 syslog = logging.getLogger("system")
@@ -1016,7 +1017,7 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_title_changed(self, request: Request):
         title = request.buffer
         if self.verbose:
-            syslog.info(f"SIMCONNECT: received new aircraft title: {title.decode() if title else '[FAILED]'}")
+            syslog.info(f"SIMCONNECT: received new aircraft title: {title.decode() if title else ansiFail()}")
         if title:
             title = title.decode()
             self._aircraft_title = title
@@ -1031,7 +1032,7 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_atc_id_changed(self, request: Request):
         data = request.buffer
         if self.verbose:
-            syslog.info(f"SIMCONNECT: received new aircraft atc id: {data.decode() if data else '[FAILED]'}")
+            syslog.info(f"SIMCONNECT: received new aircraft atc id: {data.decode() if data else ansiFail()}")
         if data:
             self._aircraft_atc_id = data.decode()
             self.sim_aircraft_info_changed.emit()
@@ -1039,7 +1040,7 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_atc_model_changed(self, request: Request):
         data = request.buffer
         if self.verbose:
-            syslog.info(f"SIMCONNECT: received new aircraft atc model: {data.decode() if data else '[FAILED]'}")
+            syslog.info(f"SIMCONNECT: received new aircraft atc model: {data.decode() if data else ansiFail()}")
         if data:
             self._aircraft_atc_model = data.decode()
             self.sim_aircraft_info_changed.emit()
@@ -1047,7 +1048,7 @@ class SimConnectManager(QtCore.QObject):
     def _aircraft_atc_type_changed(self, request: Request):
         data = request.buffer
         if self.verbose:
-            syslog.info(f"SIMCONNECT: received new aircraft atc type: {data.decode() if data else '[FAILED]'}")
+            syslog.info(f"SIMCONNECT: received new aircraft atc type: {data.decode() if data else ansiFail()}")
         if data:
             self._aircraft_atc_type = data.decode()
             self.sim_aircraft_info_changed.emit()
@@ -1179,7 +1180,7 @@ class SimConnectManager(QtCore.QObject):
                     pass
 
                 if not self._sm.ok:
-                    syslog.error("SIMCONNECT: connect failed")
+                    syslog.error(f"SIMCONNECT: connect {ansiFail()}")
                     el = gremlin.event_handler.EventListener()
                     if gremlin.shared_state.is_running:
                         if not self._connect_warning_issued:
