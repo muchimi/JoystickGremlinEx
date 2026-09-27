@@ -41,14 +41,16 @@ syslog = logging.getLogger("system")
 
 # general override flags for builds and execution - these override configuration settings from the config file
 # this is used to simplify diagnostics and help with development of work in progress modules
+# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules
+# works from a frozen exe without requiring launch_gex.cmd env vars.
 
-VOICE_ENABLED = "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+VOICE_ENABLED = True  # "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
 MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
 OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in ("1", "true", "yes")
-OVERLAY_ENABLED = "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-AFCS_ENABLED = "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
-STREAMDECK_ENABLED = "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
+OVERLAY_ENABLED = True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
+AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
+STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 
 

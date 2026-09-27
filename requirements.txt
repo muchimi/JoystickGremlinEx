@@ -34,6 +34,11 @@ ctranslate2
 huggingface_hub
 onnxruntime
 filelock>=3.12.0
+objprint>=0.3.0
+frozendict>=2.4.0
+rapidfuzz
+sympy
+pycaw
 OdenGraphQt
 
 # ffmpeg is included in the distro under ffmpeg
