@@ -3657,7 +3657,7 @@ class OverlayScene(QtCore.QObject):
         if not self._dirty:
             return True
         try:
-            return bool(self.save_owned() or self.save_to_profile())
+            return bool(self.persist_owned())
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: save_now failed: {err}")
             return False
@@ -3673,7 +3673,7 @@ class OverlayScene(QtCore.QObject):
         if not self._dirty:
             return
         try:
-            ok = bool(self.save_owned() or self.save_to_profile())
+            ok = bool(self.persist_owned())
             if not ok:
                 syslog.warning("OBS OVERLAY: deferred save did not write (profile may be unsaved)")
         except Exception as err:
@@ -3687,6 +3687,19 @@ class OverlayScene(QtCore.QObject):
         if current and _same_profile_path(current, self._profile_key):
             return self.save_to_profile()
         return self._persist_files(self._profile_key, self.to_dict())
+
+    def persist_owned(self) -> bool:
+        """Write dirty overlay only to the profile that owns this scene.
+
+        Never fall back to ``current_profile`` when that profile is a different
+        file (profile switch / deferred save) — that would paste the previous
+        layout into the newly loaded profile.
+        """
+        if self.save_owned():
+            return True
+        if self.belongs_to_profile():
+            return bool(self.save_to_profile())
+        return False
 
     def _write_json_file(self, path: str, data: dict[str, Any]) -> bool:
         try:

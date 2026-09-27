@@ -132,24 +132,28 @@ class OverlayManager:
         try:
             payload = self.scene.to_dict()
             if not _overlay_payload_has_content(payload):
-                existing = self.scene.read_stored_layout()
+                # Prefer the owned profile path — current_profile may already be
+                # the next profile during a switch.
+                owned = getattr(self.scene, "_profile_key", None)
+                existing = self.scene.read_stored_layout(dest_xml=owned) if owned else self.scene.read_stored_layout()
                 if _overlay_payload_has_content(existing):
                     syslog.info("OBS OVERLAY: skip flush of empty default over saved layout")
                     self.scene._dirty = False
                     return True
-            return bool(self.scene.save_owned() or self.scene.save_to_profile())
+            if self.scene.persist_owned():
+                return True
+            # No safe destination (unsaved profile / mid-switch). Drop dirty so
+            # the incoming profile can replace the in-memory scene.
+            syslog.warning("OBS OVERLAY: flush skipped — scene does not belong to current profile")
+            self.scene._dirty = False
+            return True
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: flush before profile event failed: {err}")
             return False
 
     def _on_profile_loaded_ui(self):
-        if self.scene.belongs_to_profile():
-            # Same profile path: flush any unsaved edits, then reload from disk
-            # so Save + Reload actually verifies what was written (skipping the
-            # reload used to keep RAM state and hide sidecar write failures).
-            self._flush_dirty_scene()
-            self._load_current_profile_scene()
-            return
+        # Persist previous layout only to the profile that owned it, then always
+        # replace the designer scene with the newly loaded profile's overlay.
         self._flush_dirty_scene()
         self._load_current_profile_scene()
 
@@ -167,6 +171,8 @@ class OverlayManager:
         # could write that empty layout over the profile that is about to load.
         if gremlin.shared_state.current_profile is None:
             return
+        # Worker already pointed current_profile at the next file — load it now
+        # so the Overlay tab does not keep showing the previous layout.
         self._load_current_profile_scene()
 
     def _on_tabs_loaded(self):
@@ -445,9 +451,7 @@ class OverlayManager:
     def _ensure_current_profile_scene(self):
         if self.scene.belongs_to_profile():
             return
-        if self.scene.dirty and not self._flush_dirty_scene():
-            # Keep the in-memory layout rather than reloading a stale profile JSON.
-            return
+        self._flush_dirty_scene()
         self._load_current_profile_scene()
 
     def _on_scene_changed(self):

@@ -2353,6 +2353,16 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         title.setText(f"Overlay — {profile_display_name()}")
         self._refresh_overlay_button()
+        # Profile switch replaces scene contents; force panes/canvas to catch up.
+        pane = getattr(self, "_selection_pane", None)
+        if pane is not None and alive(pane):
+            pane._structure_sig = None
+            pane._schedule_refresh()
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None and alive(canvas):
+            canvas._on_scene_changed()
+        self._refresh_page_tabs()
+        self._refresh_action_banner()
 
     def _overlay_file_start(self) -> str:
         sidecar = overlay_path_for_profile()

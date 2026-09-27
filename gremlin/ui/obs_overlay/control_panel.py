@@ -22,6 +22,7 @@ from .model import (
     ANCHOR_LABELS,
     OverlayScene,
     is_onscreen_mode,
+    widget_display_name,
 )
 
 syslog = logging.getLogger("system")
@@ -680,7 +681,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
 
         if kind_filter in ("all", "widgets"):
             for widget in self.scene.widgets_for(page_id):
-                name = str(widget.get("name") or "").strip() or str(widget.get("type") or "widget")
+                name = widget_display_name(widget)
                 label = f"Widget: {name}"
                 if not _match(name) and not _match(label) and not _match(widget.get("type")):
                     continue

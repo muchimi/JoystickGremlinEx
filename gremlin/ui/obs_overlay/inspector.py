@@ -1779,7 +1779,7 @@ class OverlayInspector(QtWidgets.QWidget):
             clear = Buttons.getClearWidget(
                 label="Clear",
                 tooltip="Use the built-in vector paddle.",
-                callback=lambda wid=item["id"]: self._style(wid, paddle_image="", rebuild=True),
+                callback=lambda _btn=None, wid=item["id"]: self._style(wid, paddle_image="", rebuild=True),
             )
             path_edit.editingFinished.connect(
                 lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
@@ -2067,7 +2067,7 @@ class OverlayInspector(QtWidgets.QWidget):
         add_btn = Buttons.getAddWidget(
             label="Add condition",
             tooltip="Add a mode, state, or input. It is assigned the next letter (A, B, C…).",
-            callback=lambda wid=item["id"], box=add_kind: self._add_visibility_condition(
+            callback=lambda _btn=None, wid=item["id"], box=add_kind: self._add_visibility_condition(
                 wid, str(box.currentData() or "mode")
             ),
         )
@@ -2148,7 +2148,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         remove = Buttons.getRemoveWidget(
             label="Remove",
-            callback=lambda wid=item["id"], cid=cond_id: self._remove_visibility_condition(wid, cid),
+            callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._remove_visibility_condition(wid, cid),
         )
         form.addRow("", remove)
         return box
@@ -3061,7 +3061,7 @@ class OverlayInspector(QtWidgets.QWidget):
         browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_image(wid))
         paste = Buttons.getPasteWidget(
             tooltip="Paste a screenshot from the clipboard (Windows Snipping Tool / Win+Shift+S).",
-            callback=lambda wid=item["id"]: self._paste_image(wid),
+            callback=lambda _btn=None, wid=item["id"]: self._paste_image(wid),
         )
         path_edit.editingFinished.connect(lambda wid=item["id"], w=path_edit: self._style(wid, image_path=w.text()))
         path_layout.addWidget(path_edit)
@@ -3339,7 +3339,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(self._stat_entry_box(item, entry, index))
         add = Buttons.getAddWidget(
             label="Add stat",
-            callback=lambda wid=item["id"]: self._add_stat_entry(wid),
+            callback=lambda _btn=None, wid=item["id"]: self._add_stat_entry(wid),
         )
         form.addRow(add)
 
@@ -3414,7 +3414,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if len(self._stats_for(item)) > 1:
             remove = Buttons.getRemoveWidget(
                 label="Remove",
-                callback=lambda wid=item["id"], ident=sid: self._remove_stat_entry(wid, ident),
+                callback=lambda _btn=None, wid=item["id"], ident=sid: self._remove_stat_entry(wid, ident),
             )
             form.addRow("", remove)
         return box
@@ -3655,7 +3655,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(self._graph_series_box(item, entry, index))
         add = Buttons.getAddWidget(
             label="Add dataset",
-            callback=lambda wid=item["id"]: self._add_graph_series(wid),
+            callback=lambda _btn=None, wid=item["id"]: self._add_graph_series(wid),
         )
         form.addRow(add)
 
@@ -3783,7 +3783,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         remove = Buttons.getRemoveWidget(
             label="Remove",
-            callback=lambda wid=item["id"], sid=series_id: self._remove_graph_series(wid, sid),
+            callback=lambda _btn=None, wid=item["id"], sid=series_id: self._remove_graph_series(wid, sid),
         )
         form.addRow("", remove)
         return box
@@ -4019,7 +4019,7 @@ class OverlayInspector(QtWidgets.QWidget):
         browse.clicked.connect(lambda _=False, wid=item["id"], k=key: self._browse_style_image(wid, k))
         clear = Buttons.getClearWidget(
             label="Clear",
-            callback=lambda wid=item["id"], k=key: self._style(wid, **{k: ""}),
+            callback=lambda _btn=None, wid=item["id"], k=key: self._style(wid, **{k: ""}),
         )
         path_edit.editingFinished.connect(
             lambda wid=item["id"], w=path_edit, k=key: self._style(wid, **{k: w.text().strip()})
@@ -4903,7 +4903,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(note)
         if show_clear:
             clear = Buttons.getClearWidget(
-                callback=lambda wid=item["id"], ch=channel: self._bind(
+                callback=lambda _btn=None, wid=item["id"], ch=channel: self._bind(
                     wid,
                     ch,
                     rebuild=True,
