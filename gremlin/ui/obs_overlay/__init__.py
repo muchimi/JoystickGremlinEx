@@ -166,10 +166,18 @@ class OverlayManager:
         self._flush_dirty_scene()
         self._stop_runtime_toggle()
         self.hide_overlay()
-        # current_profile is often None during the swap. Reloading then resets
-        # the scene to an empty default; the following profile_loaded flush
-        # could write that empty layout over the profile that is about to load.
+        # current_profile is often None during a swap or File → New. Drop the
+        # previous layout from memory so the Overlay tab does not keep showing
+        # it. Flush already wrote owned dirty state via persist_owned; empty
+        # defaults are not dirty, so a later profile_loaded flush will not
+        # overwrite the old profile. File open emits profile_loaded to replace
+        # this blank; New Profile leaves the blank scene in place.
         if gremlin.shared_state.current_profile is None:
+            self.scene._profile_key = None
+            self.scene._path = None
+            self.scene._reset_default_pages(emit=True)
+            self.scene._dirty = False
+            self._refresh_page_chrome()
             return
         # Worker already pointed current_profile at the next file — load it now
         # so the Overlay tab does not keep showing the previous layout.

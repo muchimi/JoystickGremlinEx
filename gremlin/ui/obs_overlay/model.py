@@ -3561,7 +3561,16 @@ class OverlayScene(QtCore.QObject):
             self._undo.clear()
             self._redo.clear()
             return True
-        if not path and (self._dirty or _overlay_payload_has_content(self.to_dict())):
+        # Keep an in-memory draft only when this scene never belonged to a saved
+        # profile and the current profile is still unsaved. After File → New
+        # (or leaving a saved profile), clear so the Overlay tab does not keep
+        # showing the previous layout under "Unsaved profile".
+        previous_key = self._profile_key
+        if (
+            not path
+            and not previous_key
+            and (self._dirty or _overlay_payload_has_content(self.to_dict()))
+        ):
             return False
         self._profile_key = path
         self._path = json_path

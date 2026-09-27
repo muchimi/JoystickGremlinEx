@@ -1871,6 +1871,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._update_status_bar()
         self._select_last_tab()
 
+        # Match file-load: modules (overlay, Stream Deck, AFCS, …) listen for
+        # profile_loaded. Without this, File → New only emits unload and the
+        # Overlay tab can keep showing the previous profile's layout.
+        el.profile_loaded.emit()
+
     def save_profile(self):
         """Saves the current profile to the hard drive.
 
