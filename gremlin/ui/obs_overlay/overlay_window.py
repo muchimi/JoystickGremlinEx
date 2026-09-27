@@ -20,7 +20,7 @@ from shiboken6 import Shiboken
 
 import gremlin.shared_state
 
-from .bindings import OverlayValueBus, widget_accepts_touch, widget_conditions_match
+from .bindings import OverlayValueBus, widget_accepts_touch, widget_conditions_match, widget_is_live_visible
 from .model import DEFAULT_GUIDE_COLOR, OVERLAY_WINDOW_TITLE, OverlayScene, is_interactive_overlay, is_onscreen_mode, normalize_background_mode, overlay_window_title
 from .qt_guard import alive
 from .touch import OverlayTouchHandler
@@ -75,6 +75,20 @@ def touchable_item_at(scene: OverlayScene, x: float, y: float, page_id: str | No
 
 
 def _screen_point_from_lparam(lparam) -> QtCore.QPoint:
+    """Screen position for WM_NCHITTEST hit-testing.
+
+    Prefer Qt's logical cursor position. WM_NCHITTEST's lParam is often in
+    physical pixels under Per-Monitor DPI, while ``mapFromGlobal`` expects
+    device-independent coords — a mismatch makes hit-tests miss painted
+    widgets so the whole overlay stays click-through (keyboard nudge still
+    works). Falling back to lParam only when Qt has no cursor.
+    """
+    try:
+        pos = QtGui.QCursor.pos()
+        if pos is not None:
+            return QtCore.QPoint(int(pos.x()), int(pos.y()))
+    except Exception:
+        pass
     import ctypes
 
     x = ctypes.c_int16(lparam & 0xFFFF).value
@@ -671,7 +685,7 @@ class OverlayView(QtWidgets.QWidget):
         for item in self.scene.sorted_widgets(self._page_id):
             wid = str(item.get("id") or "")
             visible = bool(item.get("visible", True))
-            conditions_ok = widget_conditions_match(item)
+            conditions_ok = widget_is_live_visible(item)
             if not visible or not conditions_ok:
                 parts.append((wid, False))
                 continue
@@ -723,7 +737,7 @@ class OverlayView(QtWidgets.QWidget):
             for item in self.scene.sorted_widgets(self._page_id):
                 if not item.get("visible", True):
                     continue
-                if not widget_conditions_match(item):
+                if not widget_is_live_visible(item):
                     continue
                 if abs(widget_rotation_deg(item)) < 0.001:
                     paint_widget_drop_shadow(painter, item)
@@ -742,22 +756,49 @@ class OverlayView(QtWidgets.QWidget):
         self._dirty_body_ids = None
         return pm
 
+    def _paint_hit_pads(
+        self,
+        painter: QtGui.QPainter,
+        canvas_rect: QtCore.QRect,
+        items: list | None = None,
+    ):
+        """Near-invisible alpha fills so layered HWNDs still receive mouse hits.
+
+        Windows passes clicks through fully transparent pixels before Qt sees them.
+        Interactive touch pads cover touchable widgets; mouse-reposition pads cover
+        every designer-visible widget (including condition-hidden ones) so the cyan
+        control-target outline remains draggable when the body is not painted.
+        """
+        pad = QtGui.QColor(0, 0, 0, 1)
+        clip = QtCore.QRectF(canvas_rect)
+        interactive = is_interactive_overlay(self.page_canvas)
+        reposition = bool(getattr(self.scene, "mouse_reposition_enabled", False))
+        if not interactive and not reposition:
+            return
+        for item in items if items is not None else self.scene.sorted_widgets(self._page_id):
+            if not item.get("visible", True):
+                continue
+            if interactive and not reposition and not widget_accepts_touch(item):
+                continue
+            hit = widget_rotated_bounds(item)
+            if not hit.intersects(clip):
+                continue
+            painter.save()
+            apply_widget_rotation(painter, item)
+            painter.fillRect(widget_rect(item), pad)
+            painter.restore()
+        if reposition:
+            bounds = self._control_target_bounds()
+            if bounds is not None and not bounds.isEmpty() and bounds.intersects(clip):
+                painter.fillRect(bounds.toAlignedRect(), pad)
+
     def _paint_live_clear(self, painter: QtGui.QPainter, canvas_rect: QtCore.QRect):
         painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
         if is_onscreen_mode(self.page_canvas):
             painter.fillRect(canvas_rect, QtCore.Qt.transparent)
         else:
             painter.fillRect(canvas_rect, chroma_fill_color(self.page_canvas))
-        if is_interactive_overlay(self.page_canvas):
-            for item in self.scene.sorted_widgets(self._page_id):
-                if not widget_accepts_touch(item):
-                    continue
-                hit = widget_rotated_bounds(item)
-                if hit.intersects(QtCore.QRectF(canvas_rect)):
-                    painter.save()
-                    apply_widget_rotation(painter, item)
-                    painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
-                    painter.restore()
+        self._paint_hit_pads(painter, canvas_rect)
         painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
 
     def _paint_live_bodies(self, painter: QtGui.QPainter, items: list):
@@ -766,7 +807,7 @@ class OverlayView(QtWidgets.QWidget):
             for item in items:
                 if not item.get("visible", True):
                     continue
-                if not widget_conditions_match(item):
+                if not widget_is_live_visible(item):
                     continue
                 value = self.bus.value_for(item)
                 paint_widget(painter, item, value, draw_shadow=False)
@@ -824,7 +865,7 @@ class OverlayView(QtWidgets.QWidget):
         for item in self.scene.sorted_widgets(self._page_id):
             if not item.get("visible", True):
                 continue
-            if not widget_conditions_match(item):
+            if not widget_is_live_visible(item):
                 continue
             if widget_dirty_rect(item).intersects(united):
                 overlapping.append(item)
@@ -838,14 +879,14 @@ class OverlayView(QtWidgets.QWidget):
             painter.fillRect(united, QtCore.Qt.transparent)
         else:
             painter.fillRect(united, chroma_fill_color(self.page_canvas))
-        if is_interactive_overlay(self.page_canvas):
-            for item in overlapping:
-                if not widget_accepts_touch(item):
-                    continue
-                painter.save()
-                apply_widget_rotation(painter, item)
-                painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
-                painter.restore()
+        # Include condition-hidden visible widgets so reposition pads survive dirty patches.
+        pad_items = []
+        for item in self.scene.sorted_widgets(self._page_id):
+            if not item.get("visible", True):
+                continue
+            if widget_dirty_rect(item).intersects(united):
+                pad_items.append(item)
+        self._paint_hit_pads(painter, united, items=pad_items)
         painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
         if static_pm is not None and not static_pm.isNull():
             painter.drawPixmap(united.topLeft(), static_pm, united)
@@ -1428,6 +1469,12 @@ class OverlayWindow(QtWidgets.QWidget):
             # Ensure the painted view receives mouse while repositioning.
             view.setMouseTracking(True)
             view.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+            # Rebuild frame so layered hit-pads appear/disappear with the toggle.
+            try:
+                view._invalidate_static_layer()
+            except Exception:
+                view._frame_pm = None
+                view._dirty_body_ids = None
         self._apply_window_flags()
         if self.isVisible():
             self.show_without_activating()

@@ -145,6 +145,10 @@ _PANE_PREF_KEY = "show_selection_pane"
 _PALETTE_VIEW_KEY = "palette_view"
 _PANE_DEFAULT_WIDTH = 220
 _PANE_MIN_WIDTH = 200
+_PANE_MAX_WIDTH = 280
+_PALETTE_DEFAULT_WIDTH = 280
+_PALETTE_MIN_WIDTH = 220
+_PALETTE_MAX_WIDTH = 320
 # Inspector (right column): default = max so it never opens at the old 320/420 ≈ 75% width.
 _INSPECTOR_MIN_WIDTH = 300
 _INSPECTOR_WIDTH = 420
@@ -172,7 +176,8 @@ def _set_banner_pref_visible(visible: bool):
 
 
 def _pane_pref_visible() -> bool:
-    raw = QtCore.QSettings(*_BANNER_SETTINGS).value(_PANE_PREF_KEY, False)
+    # Default True: selection pane opens at full width on first visit.
+    raw = QtCore.QSettings(*_BANNER_SETTINGS).value(_PANE_PREF_KEY, True)
     if isinstance(raw, bool):
         return raw
     if isinstance(raw, (int, float)):
@@ -1573,10 +1578,12 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         splitter.setCollapsible(1, False)
         splitter.setCollapsible(2, True)
         splitter.setCollapsible(3, False)
-        splitter.setSizes([220, 700, 0, _INSPECTOR_WIDTH])
+        # Open all side panels at full default width; selection pane starts expanded.
+        splitter.setSizes([_PALETTE_DEFAULT_WIDTH, 700, _PANE_DEFAULT_WIDTH, _INSPECTOR_WIDTH])
         self._splitter = splitter
         self._pane_width = _PANE_DEFAULT_WIDTH
-        self._pane_collapsed = True
+        self._pane_collapsed = False
+        self._did_initial_fit = False
         root.addWidget(splitter, 1)
         self.canvas.zoom_changed.connect(self._on_canvas_zoom)
         self.scene.changed.connect(self._on_scene_ui)
@@ -1753,7 +1760,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self._overlay_button = QDataPushButton(
             "Show overlay",
-            tooltip="Show or hide the live window for the selected overlay page",
+            tooltip=(
+                "Show or hide the live window for the selected overlay page. "
+                "While shown from this button, all designer-visible widgets are drawn "
+                "(visibility conditions are ignored until Hide or profile Activate)."
+            ),
             clicked=lambda: self._toggle_overlay(),
         )
         self._control_button = QDataPushButton(
@@ -1773,7 +1784,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._hints_box.setChecked(_banner_pref_visible())
         self._pane_box = QtWidgets.QCheckBox("Selection pane")
         self._pane_box.setToolTip("Show a PowerPoint-style list of widgets: name, type, show/hide, lock, group.")
-        self._pane_box.setChecked(False)
+        self._pane_box.setChecked(_pane_pref_visible())
         export = QDataPushButton(
             "Export overlay...",
             tooltip="Copy this overlay to a JSON file you choose. The profile still keeps its own overlay.",
@@ -1813,9 +1824,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._zoom_value = QtWidgets.QLabel("100%")
         self._zoom_value.setMinimumWidth(44)
         reset_zoom = QDataPushButton(
-            "100%",
-            tooltip="Reset designer zoom to 100%",
-            clicked=lambda: self._set_zoom_percent(100),
+            "Fit",
+            tooltip="Zoom the designer so the whole overlay fits in the center view",
+            clicked=self._fit_canvas_to_viewport,
             width=48,
         )
         layout.addWidget(zoom_label)
@@ -1892,7 +1903,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         if visible:
             pane.setMinimumWidth(_PANE_MIN_WIDTH)
-            pane.setMaximumWidth(280)
+            pane.setMaximumWidth(_PANE_MAX_WIDTH)
             pane.setVisible(True)
         else:
             pane.setMinimumWidth(0)
@@ -1903,18 +1914,14 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         splitter = getattr(self, "_splitter", None)
         if splitter is None or not Shiboken.isValid(splitter):
             return
-        sizes = splitter.sizes()
-        pal = 220
-        # Always restore the inspector to full width (not the old 320px / ~75% default).
+        # Always open side panels at their full default widths (not a shrunk remnant).
+        pal = _PALETTE_DEFAULT_WIDTH
         insp = _INSPECTOR_WIDTH
-        if len(sizes) >= 4:
-            if sizes[0] >= 180:
-                pal = min(280, max(220, sizes[0]))
         pane_w = _PANE_DEFAULT_WIDTH if visible else 0
         if visible:
             stored = int(getattr(self, "_pane_width", 0) or 0)
             if stored >= _PANE_MIN_WIDTH:
-                pane_w = min(280, stored)
+                pane_w = min(_PANE_MAX_WIDTH, stored)
         total = splitter.width()
         if total < 200:
             total = pal + 700 + pane_w + insp
@@ -1939,11 +1946,56 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         if len(sizes) < 4:
             return
         pane_ok = (sizes[2] >= _PANE_MIN_WIDTH) if visible else (sizes[2] <= 2)
-        # Also re-apply when the inspector shrank below full width (page change / re-entry).
+        # Re-apply when palette/inspector shrank below full defaults.
+        pal_ok = sizes[0] >= (_PALETTE_DEFAULT_WIDTH - 8)
         insp_ok = sizes[3] >= (_INSPECTOR_WIDTH - 8)
-        if sizes[1] >= 160 and pane_ok and insp_ok:
+        if sizes[1] >= 160 and pane_ok and pal_ok and insp_ok:
             return
         self._apply_splitter_sizes(visible)
+
+    def _fit_canvas_to_viewport(self):
+        """Zoom the designer so the overlay canvas fits in the center scroll area."""
+        if not alive(self):
+            return
+        scroll = getattr(self, "_canvas_scroll", None)
+        canvas = getattr(self, "canvas", None)
+        if scroll is None or canvas is None or not alive(scroll) or not alive(canvas):
+            return
+        viewport = scroll.viewport()
+        if viewport is None or not alive(viewport):
+            return
+        content = canvas._content_rect()
+        cw = max(1.0, float(content.width()))
+        ch = max(1.0, float(content.height()))
+        # Leave a little margin so the border is not clipped.
+        margin = 24.0
+        vw = max(64.0, float(viewport.width()) - margin)
+        vh = max(64.0, float(viewport.height()) - margin)
+        zoom = min(vw / cw, vh / ch, 1.0)
+        zoom = max(0.25, min(4.0, zoom))
+        zoom = round(zoom * 100.0) / 100.0
+        self._set_zoom_percent(int(round(zoom * 100)))
+        # Center after the canvas resizes to the new zoom.
+        QtCore.QTimer.singleShot(0, lambda: self._center_canvas_viewport())
+
+    def _center_canvas_viewport(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas is None or not alive(canvas):
+            return
+        try:
+            rect = QtCore.QRectF(canvas._content_rect())
+            canvas.center_on_scene_rect(rect)
+        except Exception:
+            pass
+
+    def _initial_layout_pass(self):
+        """Full side panels + autofit canvas once the Overlay tab is shown."""
+        self._ensure_splitter_layout()
+        self._apply_splitter_sizes(
+            bool(self._pane_box.isChecked()) if getattr(self, "_pane_box", None) is not None else True
+        )
+        self._fit_canvas_to_viewport()
+        self._did_initial_fit = True
 
     def _set_pane_visible(self, visible: bool, persist: bool = True):
         box = getattr(self, "_pane_box", None)
@@ -1992,7 +2044,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         page_id = self._page_tabs.tabData(index)
         if page_id:
             self.scene.set_active_page(str(page_id))
-        QtCore.QTimer.singleShot(0, self._ensure_splitter_layout)
+        QtCore.QTimer.singleShot(0, self._initial_layout_pass)
 
     def _rename_page_tab(self, index: int):
         if index < 0:
@@ -2056,8 +2108,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
 
     def _palette(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
-        panel.setMinimumWidth(220)
-        panel.setMaximumWidth(320)
+        panel.setMinimumWidth(_PALETTE_MIN_WIDTH)
+        panel.setMaximumWidth(_PALETTE_MAX_WIDTH)
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(6)
@@ -2418,13 +2470,14 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._apply_runtime_lock()
         self._refresh_overlay_button()
         super().showEvent(event)
-        QtCore.QTimer.singleShot(0, self._ensure_splitter_layout)
+        QtCore.QTimer.singleShot(0, self._initial_layout_pass)
 
     def hideEvent(self, event):
         if hasattr(self, "canvas") and Shiboken.isValid(self.canvas):
             self.canvas.detach_bus()
         if self.scene.dirty:
             self.scene.save_later()
+        self._did_initial_fit = False
         super().hideEvent(event)
 
     def _on_profile_runtime_changed(self):

@@ -727,10 +727,19 @@ def widget_conditions_match(item: dict[str, Any] | None) -> bool:
     return eval_visibility_node(node, env)
 
 
-def widget_is_live_visible(item: dict[str, Any] | None) -> bool:
+def widget_is_live_visible(item: dict[str, Any] | None, *, ignore_conditions: bool = False) -> bool:
     """True when the widget should appear on the live overlay window."""
     if not item or not item.get("visible", True):
         return False
+    if ignore_conditions:
+        return True
+    try:
+        from gremlin.ui.obs_overlay import OverlayManager
+
+        if OverlayManager().scene.preview_show_all:
+            return True
+    except Exception:
+        pass
     return widget_conditions_match(item)
 
 

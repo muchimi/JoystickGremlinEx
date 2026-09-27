@@ -192,6 +192,8 @@ class OverlayManager:
     def _on_profile_started_ui(self):
         # Flush renames/edits before runtime so deactivate cannot reload stale names.
         self._flush_dirty_scene()
+        # Runtime must honor widget visibility conditions (not designer Show-all).
+        self.scene.set_preview_show_all(False)
         # Snapshot designed layout so the control panel can Reset to canvas settings.
         self.scene.capture_layout_baseline()
         self._start_runtime_toggle()
@@ -333,9 +335,20 @@ class OverlayManager:
                     continue
                 if page_id != self.scene.active_page_id and not self.page_is_visible(page_id):
                     continue
+                dx, dy = RUNTIME_NUDGE_DELTA.get(action, (0, 0))
+                # Latched state/mode bindings must not continuous-scroll the layout
+                # (looks like a widget "drifting" after Center / even with mouse off).
+                if toggle_follows_level(binding):
+                    if previous:
+                        continue
+                    self.scene.nudge_control_target(dx * 8, dy * 8)
+                    try:
+                        self.scene.set_control_highlight(True)
+                    except Exception:
+                        pass
+                    continue
                 ticks = self._runtime_nudge_ticks.get(key, 0) + 1
                 self._runtime_nudge_ticks[key] = ticks
-                dx, dy = RUNTIME_NUDGE_DELTA.get(action, (0, 0))
                 if ticks == 1:
                     self.scene.nudge_control_target(dx * 8, dy * 8)
                     try:
@@ -535,6 +548,8 @@ class OverlayManager:
             window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False)
         )
         self._hide_page_ui(page_id)
+        if not self._overlays:
+            self.scene.set_preview_show_all(False)
         if reclaim:
             self._reclaim_main_window_focus()
             QtCore.QTimer.singleShot(50, self._reclaim_main_window_focus)
@@ -543,6 +558,10 @@ class OverlayManager:
     def _show_overlay_ui(self, auto: bool = False, page_ids: list[str] | None = None):
         try:
             self._ensure_current_profile_scene()
+            # Manual Show (designer / control panel) paints every designer-visible
+            # widget so condition-gated HUDs are not an invisible layered window.
+            # Profile-start auto-show keeps conditions for real runtime.
+            self.scene.set_preview_show_all(not bool(auto))
             self._apply_all_onscreen()
             if page_ids is None:
                 active = self.scene.active_page_id
@@ -644,6 +663,7 @@ class OverlayManager:
             if window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False):
                 reclaim = True
             self._hide_page_ui(page_id)
+        self.scene.set_preview_show_all(False)
         self._emit_visibility()
         if reclaim:
             self._reclaim_main_window_focus()

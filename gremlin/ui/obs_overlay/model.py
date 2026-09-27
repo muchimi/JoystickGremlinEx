@@ -1668,6 +1668,8 @@ class OverlayScene(QtCore.QObject):
         self._control_highlight = False
         # Runtime-only: drag control target on the live overlay (suspends interactive touch).
         self._mouse_reposition = False
+        # Designer Show overlay: paint every visible widget, ignoring mode/state conditions.
+        self._preview_show_all = False
         # Persist: open Overlay control panel automatically when the profile starts.
         self.show_control_panel_on_profile_start = False
         self._widget_clipboard: list[dict[str, Any]] = []
@@ -2783,6 +2785,22 @@ class OverlayScene(QtCore.QObject):
     @property
     def mouse_reposition_enabled(self) -> bool:
         return bool(getattr(self, "_mouse_reposition", False))
+
+    def set_preview_show_all(self, enabled: bool):
+        """When True, live windows paint all designer-visible widgets (ignore conditions).
+
+        Used by the Overlay tab Show button so gated layouts are still visible for
+        layout checks. Auto-show on profile start leaves this False.
+        """
+        flag = bool(enabled)
+        if bool(getattr(self, "_preview_show_all", False)) == flag:
+            return
+        self._preview_show_all = flag
+        self._emit()
+
+    @property
+    def preview_show_all(self) -> bool:
+        return bool(getattr(self, "_preview_show_all", False))
 
     def _ensure_control_target(self):
         kind = str((self.control_target or {}).get("kind") or "page").casefold()
