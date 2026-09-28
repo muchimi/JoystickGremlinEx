@@ -1632,11 +1632,12 @@ class KeyMap:
         # Right shift key appears to exist in both extended and
         # non-extended version
         "rightshift": ("Right Shift", 0x36, True, win32con.VK_RSHIFT),
+        "rightshift2": ("Right Shift", 0x2A, True, win32con.VK_RSHIFT),
         # "rightshift2": ("Right Shift", 0x36, True, win32con.VK_RSHIFT),
         "rightcontrol": ("Right Control", 0x1D, True, win32con.VK_RCONTROL),
         "rightwin": ("Right Win", 0x5C, True, win32con.VK_RWIN),
         "rightalt": ("Right Alt", 0x38, True, win32con.VK_RMENU),
-        "rightalt2": ("Right Alt", 0x38, True, win32con.VK_RMENU),
+        "rightalt2": ("Right Alt", 0x1D, True, win32con.VK_RMENU),
         "apps": ("Apps", 0x5D, True, win32con.VK_APPS),
         "enter": ("Enter", 0x1C, False, win32con.VK_RETURN),
         "esc": ("Esc", 0x01, False, win32con.VK_ESCAPE),

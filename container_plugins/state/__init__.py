@@ -22,7 +22,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, ansiResult
 import gremlin.base_profile
 
 from shiboken6 import Shiboken
@@ -319,7 +319,7 @@ class StateContainerFunctor(gremlin.base_profile.AbstractFunctor):
         state_value = state.value
         result = state_value == required_value
         if self.verbose:
-            syslog.info(f"STATE CONTAINER: required value [{required_value}] state [{key}] value [{state_value}]: {'SUCCESS' if result else 'FAIL'}")
+            syslog.info(f"STATE CONTAINER: required value [{required_value}] state [{key}] value [{state_value}]: {ansiResult(result)}")
         return result
 
 

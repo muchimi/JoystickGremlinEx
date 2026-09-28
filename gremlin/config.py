@@ -2133,7 +2133,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_voice(self):
         """true if verbose mode for voice"""
-        return True
+        # return True
         return self.verbose and VerboseMode.Voice in self.verbose_mode
 
     @property
@@ -2939,15 +2939,6 @@ class Configuration(QtCore.QObject):
     @osc_last_target_port.setter
     def osc_last_target_port(self, port: int):
         self._set_data("osc_last_target_port", port)
-
-    # @property
-    # def splitter_pos(self) -> int:
-    #     ''' splitter config  '''
-    #     return self._get_data("splitter_config", 250)
-
-    # @splitter_pos.setter
-    # def splitter_pos(self, data : int):
-    #     self._data["splitter_config"] = data
 
     @property
     def mapping_rollover_mode(self):

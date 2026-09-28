@@ -36,7 +36,7 @@ from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 
 import gremlin.util
-from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, hashString
+from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, hashString, InvokeUiMethod
 from collections import deque
 import queue
 import sounddevice as sd
@@ -53,6 +53,7 @@ import os
 import numpy as np
 import time
 import concurrent.futures
+
 try:
     from rapidfuzz import process, fuzz
 except ImportError:
@@ -118,8 +119,10 @@ def apply_gain(audio, gain_db):
         1.0,
     )
 
+
 class CommandTree:
-    """ tree of words for word matching against each command """
+    """tree of words for word matching against each command"""
+
     def __init__(self):
         self.root = {}
         self.COMMAND_END = "__END__"
@@ -128,7 +131,7 @@ class CommandTree:
         """Clears the entire command tree."""
         self.root.clear()
 
-    def insert(self, command_words, command : VoiceCommand):
+    def insert(self, command_words, command: VoiceCommand):
         """Adds a list of sequential words to the trie."""
         current = self.root
         for word in command_words:
@@ -168,7 +171,7 @@ class CommandTree:
             if w in current:
                 current = current[w]
             else:
-                return None # Path broke, no match
+                return None  # Path broke, no match
 
         return current.get(self.COMMAND_END)
 
@@ -222,7 +225,7 @@ class CommandTree:
 
         for i, key in enumerate(keys):
             # Check if this is the last item at the current depth for formatting lines
-            is_last = (i == len(keys) - 1)
+            is_last = i == len(keys) - 1
             marker = "└── " if is_last else "├── "
             next_indent = indent + ("    " if is_last else "│   ")
 
@@ -233,6 +236,7 @@ class CommandTree:
                 # Print the word node and step deeper into the tree
                 syslog.info(f"{indent}{marker}[{key}]")
                 self._dump_recursive(current_node[key], next_indent)
+
 
 class SpeechAudioProcessor:
     """
@@ -252,7 +256,7 @@ class SpeechAudioProcessor:
     def __init__(
         self,
         sample_rate=16000,
-        blocksize=1600, # 100ms at 16kHz
+        blocksize=1600,  # 100ms at 16kHz
         # AGC
         target_db=-20.0,
         max_gain_db=20.0,
@@ -597,19 +601,15 @@ class SpeechRecognizer:
         self.sample_rate = sample_rate
         self.callback = callback
 
-
-
         self.verbose = gremlin.config.Configuration().verbose_mode_voice
 
-
         if WhisperModel is None:
-            raise RuntimeError(
-                "faster_whisper is not installed — cannot start speech recognition"
-            )
+            raise RuntimeError("faster_whisper is not installed — cannot start speech recognition")
 
         voice = Voice()
 
         # convert the model path to something whisper recognizes
+
         model_path = str(Path(voice._local_model_path).resolve())
 
         # get the model name form the downloaded model
@@ -621,7 +621,7 @@ class SpeechRecognizer:
             device=device,
             compute_type=compute_type,
             local_files_only=True,
-       )
+        )
 
         if self.verbose:
             syslog.info(f"Voice: Initialized Whisper model with path: {model_path}")
@@ -631,8 +631,6 @@ class SpeechRecognizer:
         self._audio = []
         self._running = False
         self._abort_event = threading.Event()
-
-
 
     def _get_whisper_model_name(self, model_path):
         # Check model.json if available
@@ -652,8 +650,6 @@ class SpeechRecognizer:
 
         # Fallback: Use the parent directory name
         return os.path.basename(os.path.normpath(model_path))
-
-
 
     def start(self):
         """Start the recognition thread."""
@@ -772,7 +768,6 @@ class SpeechRecognizer:
 
         # Ignore extremely short utterances.
         duration = len(audio) / self.sample_rate
-
 
         if duration < 0.15:
             return
@@ -978,7 +973,7 @@ class CommandMatcher:
         filler_penalty=2,
         swap_penalty=10,
         max_extra_words=5,
-        callback: Callable = None,
+        callback: Callable[[VoiceCommand], None] = None,
     ):
         """
         Initializes the CommandMatcher with the given commands and matching parameters.
@@ -996,7 +991,7 @@ class CommandMatcher:
             callback (Callable, optional): Callback function when a command is matched. Passes the recognized command.
         """
 
-        self.tree = CommandTree() # search tree for matching words
+        self.tree = CommandTree()  # search tree for matching words
 
         self.fuzzy_match = fuzzy_match
         self.fuzzy_threshold = fuzzy_threshold
@@ -1167,7 +1162,6 @@ class CommandMatcher:
         if verbose:
             syslog.info(f"\t current word buffer: {words}")
 
-
         # tree search
         start = 0
 
@@ -1180,6 +1174,8 @@ class CommandMatcher:
             if verbose:
                 syslog.info(f"\tTRIGGER: (tree) [{command.phrase}] ")
             command.trigger()
+            if self.callback:
+                self.callback(command)
             return command
 
         return None
@@ -1607,22 +1603,6 @@ class Voice:
         self._audio_lock = threading.RLock()  # lock when adding new recognized words
         self._model_size = config.voice_model_name  # possible models: "tiny", "base", "small", "medium", "large-v3"
         self._model_valid = False
-        folder = os.path.join(gremlin.shared_state.data_path,"sounds","managed","models",self._model_size)
-        if not os.path.exists(folder):
-            os.makedirs(folder) # create
-        self._local_model_path = os.path.join(folder, self._model_size)
-        if not os.path.exists(self._local_model_path):
-            syslog.info(f"Voice: downloading voice recognition model [{self._model_size}]...")
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning,module="huggingface_hub")
-                download_model(self._model_size, self._local_model_path)
-                syslog.info("Voice: downloaded voice recognition model.")
-
-        if not os.path.exists(self._local_model_path):
-            syslog.error(f"Voice: failed to find voice recognition model [{self._model_size}].")
-        else:
-            self._model_valid = True
-            syslog.info(f"Voice: using local voice recognition model [{self._model_size}]")
 
         self._listening = False  # true if actively listening for voice input
         self._listen_enabled = False  # true if listening is enabled while monitoring
@@ -1643,10 +1623,11 @@ class Voice:
 
         self._beep_valid = False
         self._beep_enabled = True
+        self._beep_on_recognize_enabled = True
         self._sound = None
         self._beep_on_path = None
         self._beep_off_path = None
-        self._beep_init() # setup beep on voice flip
+        self._beep_init()  # setup beep on voice flip
 
         self._callbacks = []
 
@@ -1658,21 +1639,92 @@ class Voice:
         el.profile_start.connect(self.start)
         el.profile_stop.connect(self.stop)
 
+    def ensureModel(self):
+        """ ensure the voice recognition model is loaded """
+        InvokeUiMethod(self._ensure_model_ui)
+
+    def _ensure_model_ui(self):
+        """ load the model if needed """
+
+        if self._model_valid:
+            # nothing to do
+            return
+
+        folder = os.path.join(gremlin.shared_state.data_path, "sounds", "managed", "models", self._model_size)
+        if not os.path.exists(folder):
+            os.makedirs(folder)  # create
+        self._local_model_path = os.path.join(folder, self._model_size)
+        if not os.path.exists(self._local_model_path):
+            dialog = None
+            app = QtWidgets.QApplication.instance()
+            on_gui_thread = app is not None and QtCore.QThread.currentThread() is app.thread()
+            if on_gui_thread:
+                parent = app.activeWindow()
+                css = gremlin.ui.ui_common.Color.cssProgressDialog()
+                dialog = QtWidgets.QProgressDialog(f"Downloading {self._model_size} voice recognition model...", None, 0, 0, parent)
+                dialog.setWindowModality(QtCore.Qt.WindowModal)
+                dialog.setCancelButton(None)
+                dialog.setAutoClose(True)
+                dialog.setAutoReset(True)
+                dialog.setValue(0)
+                dialog.setStyleSheet(css)
+                dialog.show()
+                QtWidgets.QApplication.processEvents()
+
+            try:
+                syslog.info(f"Voice: downloading voice recognition model [{self._model_size}]...")
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
+                    download_model(self._model_size, self._local_model_path)
+                    syslog.info("Voice: downloaded voice recognition model.")
+            finally:
+                if dialog is not None:
+                    dialog.close()
+                    dialog.deleteLater()
+
+        if not os.path.exists(self._local_model_path):
+            syslog.error(f"Voice: failed to find voice recognition model [{self._model_size}].")
+        else:
+            self._model_valid = True
+            syslog.info(f"Voice: using local voice recognition model [{self._model_size}]")
+
+
+
+
+
     def _beep_init(self):
         # audio beep when toggling voice
 
         self._sound = None
-        self._bee_valid = False  # enable or disable audio beep for voice toggling
-        self._beep_on_path = gremlin.util.find_file("voice_beep_on.wav")
-        self._beep_off_path = gremlin.util.find_file("voice_beep_off.wav")
+        root_folder = gremlin.shared_state.root_path
+        sound_folder = os.path.join(root_folder, "sounds")
+
+        self._beep_valid = False  # enable or disable audio beep for voice toggling
+        self._beep_on_recognize_path = os.path.join(sound_folder, "voice_recognize.wav")
+        self._beep_on_path = os.path.join(sound_folder, "voice_beep_on.wav")
+        self._beep_off_path = os.path.join(sound_folder, "voice_beep_off.wav")
+
 
         # sound files located
-        if self._beep_on_path and self._beep_off_path and os.path.isfile(self._beep_on_path) and os.path.isfile(self._beep_off_path):
+        if (
+            self._beep_on_path
+            and self._beep_off_path
+            and self._beep_on_recognize_path
+            and os.path.isfile(self._beep_on_path)
+            and os.path.isfile(self._beep_off_path)
+            and os.path.isfile(self._beep_on_recognize_path)
+        ):
             self._beep_valid = True
+            self._beep_options = PlaybackOptions("voice_beep",blocking=True)
             self._sound = Sound()
-            self._beep_options = PlaybackOptions("voice_beep")
 
-    def _beep(self, enabled : bool):
+    def ensureBeep(self):
+        if self._beep_valid:
+            return
+        self._beep_init()
+
+
+    def _beep(self, enabled: bool):
         if not self._beep_valid:
             return
         if enabled:
@@ -1680,10 +1732,10 @@ class Voice:
         else:
             self._sound.play(self._beep_off_path, self._beep_options)
 
-
-
-
-
+    def _beep_on_recognize(self):
+        if not self._beep_valid:
+            return
+        self._sound.play(self._beep_on_recognize_path, self._beep_options)
 
     @property
     def model_valid(self):
@@ -1705,6 +1757,8 @@ class Voice:
 
     def _handle_command_trigger(self, command: VoiceCommand):
         """trigger all registered callbacks with the given command  when that command is triggered"""
+        if self._beep_valid and self._beep_on_recognize_enabled:
+            self._beep_on_recognize()
         for callback in self._callbacks:
             callback(command)
 
@@ -1771,6 +1825,14 @@ class Voice:
         """returns whether the audio beep is enabled"""
         return self._beep_enabled
 
+    def beepOnRecognizeEnabled(self) -> bool:
+        """returns whether the beep on recognize is enabled"""
+        return self._beep_on_recognize_enabled
+
+    def setBeepOnRecognize(self, enabled: bool):
+        """enable or disable the beep on recognize"""
+        self._beep_on_recognize_enabled = enabled
+
     def test(self):
 
         # channels=1 ensures mono audio, and dtype='float32' matches Whisper's expected input
@@ -1788,6 +1850,9 @@ class Voice:
         if not gremlin.config.Configuration().voice_enabled:
             # disabled
             return
+
+        # ensure model is ok
+        self.ensureModel()
 
         if not self._model_valid:
             syslog.error("Voice: cannot start listening because the voice recognition model is not valid.")
@@ -1830,7 +1895,6 @@ class Voice:
         if self.verbose:
             syslog.info("Recognizer started.")
 
-
         if self.verbose:
             syslog.info("Starting rolling matcher...")
         self._rolling_matcher.start()
@@ -1870,16 +1934,14 @@ class Voice:
             self._listen_thread = None
             self.recognizer.stop()
 
-
         self._rolling_matcher.stop()
-
 
     def _listen_runner(self, abort_event: threading.Event):
         """Internal method run in a separate thread to handle listening."""
 
         if self.verbose:
             syslog.info("Voice listen runner started...")
-        audio_queue = queue.Queue(maxsize=16) # use a small queue for real time reading to not block
+        audio_queue = queue.Queue(maxsize=16)  # use a small queue for real time reading to not block
 
         def callback(indata, frames, time_info, status):
             if status:
@@ -1909,7 +1971,7 @@ class Voice:
                 # do not use empty() as it blocks and can cause significant delays in real-time processing
                 # use the try/catch in case the queue is empty instead
                 try:
-                    audio = audio_queue.get(timeout=0.1) # @IgnoreException
+                    audio = audio_queue.get(timeout=0.1)  # @IgnoreException
                 except queue.Empty:
                     continue
 

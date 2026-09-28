@@ -100,7 +100,6 @@ class FileWatcher(QtCore.QObject):
         gremlin.util.safeJoin(self._watch_thread)
         self._watch_thread = None
 
-
     def _monitor(self):
         """Continuously monitors files for change."""
         while self._is_running:
@@ -760,18 +759,30 @@ class SearchCache:
     def __init__(self):
         self.cache = {}
 
+    @staticmethod
+    def _cache_key(file_path, root_folder=None):
+        root_folder = os.path.abspath(root_folder) if root_folder else None
+        normalized_path = os.path.normcase(os.path.normpath(file_path))
+        return (root_folder, normalized_path)
+
     def find_file(self, file_path, root_folder=None):
-        if file_path not in self.cache:
+        key = self._cache_key(file_path, root_folder)
+        if key not in self.cache:
             item = _find_file(file_path, root_folder)
-            if item is not None:
-                self.cache[file_path] = item
+            self.cache[key] = item
             return item
-        return self.cache[file_path]
+        return self.cache[key]
 
 
 def find_file(file_path, root_folder=None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
+
+def find_sound(file_path):
+    """locates a sound file"""
+    root_folder = gremlin.shared_state.root_path
+    return find_file(file_path, os.path.join(root_folder, "sounds"))
+
 
 
 def find_icon(icon_file):
@@ -781,7 +792,7 @@ def find_icon(icon_file):
 
     root_folder = get_root_folder()
     # usual locations for images
-    folder_list = ["icons","sounds"]
+    folder_list = ["icons", "sounds"]
     for folder in folder_list:
         full_folder = os.path.join(root_folder, folder)
         if os.path.isdir(full_folder):
@@ -851,6 +862,22 @@ def _find_file(file_path, root_folder=None):
         root_folder = gremlin.shared_state.root_path
     if not os.path.isdir(root_folder):
         return None
+
+    # Fast path: if the caller already provided a direct path or a path relative to the root,
+    # avoid walking the entire tree before checking the obvious candidate locations.
+    direct_candidates = []
+    if os.path.isabs(file_path):
+        direct_candidates.append(file_path)
+    else:
+        direct_candidates.extend([
+            os.path.join(root_folder, file_path),
+            os.path.join(root_folder, os.path.basename(file_path)),
+        ])
+
+    for candidate in direct_candidates:
+        if os.path.isfile(candidate):
+            return candidate
+
     circuit_breaker = 1000
     if os.sep in file_path:
         # we have folders
@@ -868,12 +895,11 @@ def _find_file(file_path, root_folder=None):
         else:
             extensions = [".svg", ".png"]
 
-        for dirpath, _, filenames in os.walk(root_folder):
+        for dirpath, dirnames, filenames in os.walk(root_folder):
+            # prune hidden folders before descending to reduce the search space and avoid traversing
+            # git metadata and other non-user content that won't contain game resources.
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
             if any([part.startswith(".") for part in Path(dirpath).relative_to(root_folder).parts]):
-                # ignore hidden folders, anywhere between the search root and the current file
-                # note: this also allows skipping non-hidden folders within hidden ones (like in .git),
-                #     : thereby saving quite a bit of room in the "circuit breaker", when running from
-                #     : a git repository
                 continue
             circuit_breaker -= 1
             if circuit_breaker == 0:
@@ -1039,11 +1065,13 @@ def load_pixmap(path, size=24, qta_color=None):
     icon: QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
     return icon.pixmap(desired_size)
 
+
 def load_icon(*paths, use_qta=False, qta_color=None):
     icon = _load_icon(*paths, use_qta=use_qta, qta_color=qta_color)
     if not icon:
         icon = get_generic_icon()
     return icon
+
 
 def _load_icon(*paths, use_qta=False, qta_color=None):
     """gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search"""
@@ -1113,8 +1141,6 @@ def _load_icon(*paths, use_qta=False, qta_color=None):
             syslog.info(f"LoadIcon() found icon: {paths}  path: {toUrl(the_path)}")
 
     return icon
-
-
 
 
 def dark_file(image_path):
@@ -1188,7 +1214,6 @@ def load_image(*paths):
 def get_generic_icon():
     """gets a generic icon"""
     return load_icon("mdi.alert-circle-outline", qta_color="#FFAE00")  # fallback icon
-
 
 
 def write_guid(guid):
@@ -2665,8 +2690,7 @@ def save_xml(file_name, root):
 
 
 def ansiText(value, color=None, bold=False):
-    """converts a value to an ansi colored expression
-        """
+    """converts a value to an ansi colored expression"""
     import gremlin.ui.ui_common
 
     ansiReset = gremlin.ui.ui_common.Color.ansiReset()
@@ -2698,13 +2722,66 @@ def ansiText(value, color=None, bold=False):
 
     return f"{ansiColor}{value}{ansiReset}"
 
-def ansiBold(value : str):
+
+def ansiBold(value: str):
     """converts a value to an ansi bold expression"""
     import gremlin.ui.ui_common
 
     ansiReset = gremlin.ui.ui_common.Color.ansiReset()
     ansiBold = gremlin.ui.ui_common.Color.ansiBold()
     return f"{ansiBold}{value}{ansiReset}"
+
+
+def ansiRed(value: str, bold=False):
+    return ansiText(value, color="red", bold=bold)
+
+
+def ansiGreen(value: str, bold=False):
+    return ansiText(value, color="green", bold=bold)
+
+
+def ansiYellow(value: str, bold=False):
+    return ansiText(value, color="yellow", bold=bold)
+
+
+def ansiBlue(value: str, bold=False):
+    return ansiText(value, color="blue", bold=bold)
+
+
+def ansiMagenta(value: str, bold=False):
+    return ansiText(value, color="magenta", bold=bold)
+
+
+def ansiCyan(value: str, bold=False):
+    return ansiText(value, color="cyan", bold=bold)
+
+
+def ansiWhite(value: str, bold=False):
+    return ansiText(value, color="white", bold=bold)
+
+
+def ansiBlack(value: str, bold=False):
+    return ansiText(value, color="black", bold=bold)
+
+
+def ansiResult(result: bool):
+    """returns an ansi colored result based on the boolean value"""
+    if result:
+        return ansiOk()
+    else:
+        return ansiFail()
+
+
+def ansiFail():
+    return ansiRed("FAIL", bold=True)
+
+
+def ansiOk():
+    return ansiGreen("OK", bold=True)
+
+
+def ansiPass():
+    return ansiGreen("PASS", bold=True)
 
 
 def triplets(items):
@@ -3019,8 +3096,8 @@ def clearFolder(folder_path: str):
 
 
 def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
-    """ safely join a thread while guarding against intermittent runtime lock errors
-        started with some versions of Python 3.14 - handles daemon threads
+    """safely join a thread while guarding against intermittent runtime lock errors
+    started with some versions of Python 3.14 - handles daemon threads
     """
     if thread is None:
         return
@@ -3031,14 +3108,14 @@ def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
     except RuntimeError as ex:
         pass
 
-
     return
+
 
 def phraseSplit(phrase: str) -> list[str]:
     """Splits a phrase into segments based on |, newline, or carriage return + newline or <br> tags."""
     if not phrase:
         return []
-    pattern = r'\||\n|\r\n|<br\s*/?>'
+    pattern = r"\||\n|\r\n|<br\s*/?>"
     phrase = phrase.casefold().strip()
     result = [item.strip() for item in re.split(pattern, phrase) if item.strip()]
     return result
@@ -3047,6 +3124,7 @@ def phraseSplit(phrase: str) -> list[str]:
 def getSidecarFiles(path: str) -> list[str]:
     """Returns a list of sidecar JSON files for the given XML file path."""
     from pathlib import Path
+
     xml_path = Path(path)
     if not xml_path.is_file():
         return []
