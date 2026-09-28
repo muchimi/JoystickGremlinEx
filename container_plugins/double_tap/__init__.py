@@ -24,9 +24,6 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui
 import time
 
-from sympy.physics import sho
-
-
 import gremlin
 import gremlin.ui.ui_common
 import gremlin.input_item
@@ -456,7 +453,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
         self.short_press_timer = None
         self.value_press = None
         self.event_press = None
-        
+
         self.short_index = 0 # index of the first short action when chaining
         self.dtap_index = 0 # index of the first double tap action when chaining
 

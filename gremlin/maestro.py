@@ -40,7 +40,7 @@ import sys
 import time
 import threading
 
-from sympy.physics.mechanics import System
+
 import gremlin.util
 import dinput
 
