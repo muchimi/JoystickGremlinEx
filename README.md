@@ -60,6 +60,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Voice Device: input description shows verbose mapping details.
 - Fix: API: search file collision detection.
 - Fix: various fixes in Overlay, Streamdeck and AFCS and core API stability.
+- Fix: Input Viewer: exception on UI refresh if a widget has to be deleted.
+- Fix: Input Viewer: QT exception on keyboard visualizer if it's in the process of being deleted.
 
 
  

@@ -1502,6 +1502,11 @@ States can be toggled by clicking on the state button.  Expression states will u
         assert gremlin.util.is_ui_thread()
         if self._keyboard_visible:
             return
+
+
+        if self.keyboard_widget_selector and not Shiboken.isValid(self.keyboard_widget_selector):
+            return
+
         vc = VisualizationConfig()
         key = vc.keyboard_key
         viewer_widget = self._viewer_widget_map.get(key, None)
@@ -1793,7 +1798,7 @@ class InputViewerArea(QtWidgets.QWidget):
             self.scroll_layout.removeWidget(widget)
             del self._viewer_widgets[key]
 
-        gremlin.util.delete_widget(widget)
+            gremlin.util.delete_widget(widget)
 
     def clear(self):
         """clears all widgets"""
