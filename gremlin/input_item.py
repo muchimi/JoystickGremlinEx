@@ -440,6 +440,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
         description: str = None,
         description_readonly: bool = None,
+        custom_description_handler: Callable[['InputItem'], str] = None,
         tooltip: str = None,
         data: object = None,
         extra_data: dict = None,
@@ -453,7 +454,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         :param custom_input_id_handler: handler() returns the input id, optional, to override the default input id handling
         :param description: optional description text
         :param description_readonly: optional flag to indicate if the description of the input can be user edited
+        :param custom_description_handler: handler() returns the description text, optional, to override the default description handling
         :param tooltip: optional tooltip text
+        :param data: optional arbitrary data associated with the input item
+        :param extra_data: optional dictionary for additional data
 
         """
         import gremlin.base_profile
@@ -524,6 +528,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler  # special callback to use to get the profile mode for this item (if special)
         self._containers = ContainerModel(self, content_callback=self._handle_content_changed)  # holds the containers for this input
+
+
+        if custom_description_handler is not None:
+            assert callable(custom_description_handler), "Description handler must be callable "
+        self._custom_description_handler = custom_description_handler  # custom handler for description text
+
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
 
@@ -797,6 +807,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def description(self):
+        if self._custom_description_handler is not None:
+            return self._custom_description_handler(self)
+
         if self._description is None:
             # see if there is a container
             if self.containers:

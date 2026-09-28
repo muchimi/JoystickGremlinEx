@@ -83,6 +83,7 @@ class VoiceInputItem(InputItem):
             input_type=InputType.Voice,
             override_input_type=InputType.JoystickButton,
             custom_input_id_handler=self._handle_input_id_callback,
+            custom_description_handler=self._custom_description_handler
         )
         assert key is None or isinstance(key, str), "key must be a string"
 
@@ -193,6 +194,11 @@ class VoiceInputItem(InputItem):
     def _handle_input_id_callback(self):
         """input id is self for a voice input"""
         return self._guid # unique input ID is the guid of this input item so it's unique
+
+    def _custom_description_handler(self, input_item : 'InputItem'):
+        """returns the description text for the input item"""
+        return None
+
 
 
     def hook(self):
