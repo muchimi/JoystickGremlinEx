@@ -51,7 +51,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T64)
-- New: Voice Device: option to play an audio queue on voice match
+- New: Voice Device: option to play an audio cue on voice match
 - New: Voice Device: AI model download will show a dialog while the download is in progress (models are only downloaded if they don't exist in the local GEX files).
 - Change: Overlay:  Overlay editor polish (control panel, keybinds, groups, shadows, inspector/selection performance), Stream Deck designer tweaks, and AFCS enable toggle. (courtesy Lolo350)
 - Change: Voice Device: AI model check occurs on profile start and/or when voice recognition is started to avoid a download if voice is not used/enabled, as well as reducing GEX startup time if a model has to be downloaded.
