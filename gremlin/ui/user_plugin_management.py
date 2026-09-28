@@ -301,15 +301,31 @@ class ModuleManagementController(QtCore.QObject):
             variable.value = data
         elif variable.type == PluginVariableType.PhysicalInput:
             variable.value = data
-            button = widget.itemAtPosition(0, 1).widget()
+            # Plugin config can be rebuilt/closed while InputListenerWidget is
+            # still up. The QGridLayout is then a deleted C++ object.
+            try:
+                from shiboken6 import isValid
+                if widget is None or not isValid(widget):
+                    variable.is_valid = True
+                    return
+                button = widget.itemAtPosition(0, 1).widget()
+                if button is None or not isValid(button):
+                    variable.is_valid = True
+                    return
+            except RuntimeError:
+                variable.is_valid = True
+                return
             input_id = f"{data["input_id"]:d}"
             if data["input_type"] == InputType.JoystickAxis:
                 input_id = gremlin.types.AxisNames.to_string(
                     gremlin.types.AxisNames(data["input_id"])
                 )
-            button.setText(
-                f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"
+            try:
+                button.setText(
+                    f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"
                 )
+            except RuntimeError:
+                pass
 
         verbose = gremlin.config.Configuration().verbose_mode_plugin
         if verbose:

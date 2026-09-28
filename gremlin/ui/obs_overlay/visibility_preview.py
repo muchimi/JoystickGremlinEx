@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+import gremlin.ui.ui_common
+
 from .visibility_logic import (
     VisibilityExprError,
     eval_visibility_node,
@@ -143,9 +145,9 @@ class VisibilityVennWidget(QtWidgets.QWidget):
         painter.end()
 
 
-class VisibilityPreviewDialog(QtWidgets.QDialog):
+class VisibilityPreviewDialog(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, expression: str, legend: list[tuple[str, str]], parent=None):
-        super().__init__(parent)
+        super().__init__("overlay_visibility_preview", parent=parent)
         self.setWindowTitle("Visibility preview")
         self.resize(760, 540)
         layout = QtWidgets.QVBoxLayout(self)
@@ -226,10 +228,10 @@ class VisibilityPreviewDialog(QtWidgets.QDialog):
         split.setStretchFactor(1, 1)
         layout.addWidget(split, 1)
 
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        layout.addWidget(buttons)
+        close_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Close", callback=self.accept)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", close_btn], widget_only=True)
+        )
 
 
 def _truth_table_widget(node, letters: list[str], parent=None) -> QtWidgets.QTableWidget:
@@ -368,11 +370,11 @@ _BOOLEAN_OPERATORS = (
 )
 
 
-class BooleanOperatorsDialog(QtWidgets.QDialog):
+class BooleanOperatorsDialog(gremlin.ui.ui_common.QRememberDialog):
     """Graphical reference for every visibility boolean operator."""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__("overlay_boolean_operators", parent=parent)
         self.setWindowTitle("Boolean operators")
         self.resize(920, 720)
         layout = QtWidgets.QVBoxLayout(self)
@@ -427,7 +429,7 @@ class BooleanOperatorsDialog(QtWidgets.QDialog):
         scroll.setWidget(host)
         layout.addWidget(scroll, 1)
 
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        layout.addWidget(buttons)
+        close_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Close", callback=self.accept)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", close_btn], widget_only=True)
+        )

@@ -797,6 +797,7 @@ def split_display_keys(keys) -> tuple[list, list]:
 
 
 def _build_picker_class():
+    import gremlin.ui.ui_common
     from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 
     class OverlayInputDisplayPicker(InputKeyboardDialog):
@@ -807,9 +808,11 @@ def _build_picker_class():
             self.setWindowTitle("Select keys and mouse buttons to display")
             self.clear_widget.setText("Deselect all")
             self.clear_widget.setToolTip("Clear every selected key and mouse button.")
-            self.select_all_widget = QtWidgets.QPushButton("Select all")
-            self.select_all_widget.setToolTip("Select every key and mouse button on this picker.")
-            self.select_all_widget.clicked.connect(self._select_all_cb)
+            self.select_all_widget = gremlin.ui.ui_common.QDataPushButton(
+                "Select all",
+                tooltip="Select every key and mouse button on this picker.",
+                clicked=self._select_all_cb,
+            )
             self.button_layout.insertWidget(1, self.select_all_widget)
 
         def _unique_key_widgets(self):

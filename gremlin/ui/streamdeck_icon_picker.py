@@ -22,7 +22,9 @@ from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
 from shiboken6 import Shiboken
 
 import gremlin.config
+import gremlin.ui.ui_common
 import gremlin.util
+from gremlin.ui.ui_common import Buttons, Color, QDataPushButton
 
 syslog = logging.getLogger("system")
 
@@ -400,18 +402,20 @@ class _PackSection(QtWidgets.QWidget):
         self._header = QtWidgets.QPushButton()
         self._header.setFlat(True)
         self._header.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        hdr = Color.headerBarBackgroundColor()
+        fg = Color.normalColor()
         self._header.setStyleSheet(
-            """
-            QPushButton {
-                color: #e8e8e8;
+            f"""
+            QPushButton {{
+                color: {fg};
                 font-weight: 600;
                 font-size: 13px;
                 text-align: left;
                 padding: 6px 4px;
                 border: none;
                 background: transparent;
-            }
-            QPushButton:hover { color: #ffffff; background-color: #2a2a2a; border-radius: 4px; }
+            }}
+            QPushButton:hover {{ color: {Color.normalLightColor()}; background-color: {hdr}; border-radius: 4px; }}
             """
         )
         self._header.clicked.connect(self._toggle)
@@ -508,11 +512,11 @@ class _PackSection(QtWidgets.QWidget):
                 tile.setChecked(False)
 
 
-class IconLibraryDialog(QtWidgets.QDialog):
+class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
     """Elgato-style categorized icon browser."""
 
     def __init__(self, parent=None, title: str = "Icon Library — Stream Deck"):
-        super().__init__(parent)
+        super().__init__("streamdeck_icon_library", parent=parent)
         self.setWindowTitle(title)
         self.setMinimumSize(640, 520)
         self.resize(720, 560)
@@ -561,12 +565,8 @@ class IconLibraryDialog(QtWidgets.QDialog):
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_filter)
         search_row.addWidget(self._search, 1)
-        new_cat_btn = QtWidgets.QPushButton("New category…")
-        new_cat_btn.setToolTip("Create a personal icon category (stored for your user, not in the profile)")
-        new_cat_btn.clicked.connect(self._new_category)
-        import_btn = QtWidgets.QPushButton("Import icons…")
-        import_btn.setToolTip("Import image files into a personal category")
-        import_btn.clicked.connect(lambda: self._import_icons())
+        new_cat_btn = QDataPushButton("New category…", tooltip="Create a personal icon category (stored for your user, not in the profile)", clicked=self._new_category)
+        import_btn = QDataPushButton("Import icons…", tooltip="Import image files into a personal category", clicked=lambda: self._import_icons())
         search_row.addWidget(new_cat_btn)
         search_row.addWidget(import_btn)
         layout.addLayout(search_row)
@@ -574,7 +574,7 @@ class IconLibraryDialog(QtWidgets.QDialog):
         hint = QtWidgets.QLabel(
             "Personal categories & imports are saved for your Windows user — not inside a profile."
         )
-        hint.setStyleSheet("color: #8a9aaa; font-size: 11px;")
+        hint.setStyleSheet(f"color: {Color.inactiveColor()}; font-size: 11px;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -603,12 +603,8 @@ class IconLibraryDialog(QtWidgets.QDialog):
         self._color_swatch.clicked.connect(self._pick_color)
         self._update_color_swatch()
         color_row.addWidget(self._color_swatch)
-        color_btn = QtWidgets.QPushButton("Color…")
-        color_btn.setToolTip("Pick a tint color for the selected icon")
-        color_btn.clicked.connect(self._pick_color)
-        white_btn = QtWidgets.QPushButton("White")
-        white_btn.setToolTip("Reset to white")
-        white_btn.clicked.connect(self._reset_color)
+        color_btn = QDataPushButton("Color…", tooltip="Pick a tint color for the selected icon", clicked=self._pick_color)
+        white_btn = QDataPushButton("White", tooltip="Reset to white", clicked=self._reset_color)
         # Quick presets
         for name, hex_color in (
             ("Red", "#e74c3c"),
@@ -617,7 +613,7 @@ class IconLibraryDialog(QtWidgets.QDialog):
             ("Amber", "#f1c40f"),
             ("Cyan", "#1abc9c"),
         ):
-            b = QtWidgets.QPushButton(name)
+            b = QDataPushButton(name)
             b.setToolTip(hex_color)
             b.clicked.connect(lambda checked=False, c=hex_color: self._set_color(QtGui.QColor(c)))
             color_row.addWidget(b)
@@ -644,17 +640,13 @@ class IconLibraryDialog(QtWidgets.QDialog):
         footer.addWidget(zoom_down)
         footer.addWidget(zoom_up)
         footer.addStretch(1)
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setDefault(True)
-        buttons.accepted.connect(self._accept_selection)
-        buttons.rejected.connect(self.reject)
-        footer.addWidget(buttons)
-        layout.addLayout(footer)
-
-        self._ok = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        self._ok = Buttons.getOkWidget(callback=self._accept_selection)
         self._ok.setEnabled(False)
+        cancel_btn = Buttons.getCancelWidget(callback=self.reject)
+        footer.addWidget(
+            gremlin.ui.ui_common.getHContainer([self._ok, cancel_btn], widget_only=True)
+        )
+        layout.addLayout(footer)
 
     def _update_color_swatch(self):
         c = self._color
@@ -705,7 +697,7 @@ class IconLibraryDialog(QtWidgets.QDialog):
             self._sections.append(section)
         if not icons:
             empty = QtWidgets.QLabel("No icons found. Import some or use New category…")
-            empty.setStyleSheet("color: #aaa; padding: 24px;")
+            empty.setStyleSheet(f"color: {Color.inactiveColor()}; padding: 24px;")
             self._body_layout.addWidget(empty)
         self._body_layout.addStretch(1)
         # Re-apply active search filter
@@ -833,14 +825,14 @@ class IconLibraryDialog(QtWidgets.QDialog):
         return render_icon_to_png(self._selected.path, color=tint)
 
 
-class IconSourceDialog(QtWidgets.QDialog):
+class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
     """Choose Icon Library vs Custom file, with optional drag-drop tip."""
 
     SOURCE_LIBRARY = "library"
     SOURCE_CUSTOM = "custom"
 
     def __init__(self, parent=None, *, pressed: bool = False):
-        super().__init__(parent)
+        super().__init__("streamdeck_icon_source", parent=parent)
         kind = "pressed" if pressed else "released"
         self.setWindowTitle(f"Choose {kind} icon")
         self.setMinimumWidth(440)
@@ -852,37 +844,22 @@ class IconSourceDialog(QtWidgets.QDialog):
         show_tip = should_show_icon_source_tip()
         self._again: QtWidgets.QCheckBox | None = None
         if show_tip:
-            banner = QtWidgets.QFrame()
-            banner.setObjectName("sdIconTipBanner")
-            banner.setStyleSheet(
-                """
-                QFrame#sdIconTipBanner {
-                    background-color: #1e2832;
-                    border: 1px solid #5a7a90;
-                    border-radius: 8px;
-                }
-                QLabel { color: #c5d8e8; }
-                """
-            )
-            banner_layout = QtWidgets.QVBoxLayout(banner)
-            tip = QtWidgets.QLabel(
+            banner = gremlin.ui.ui_common.QInfoBox(
                 "Tip: you can also drag and drop an image file directly onto a "
                 "Stream Deck key (or onto the Released / Pressed icon preview)."
             )
-            tip.setWordWrap(True)
-            banner_layout.addWidget(tip)
             self._again = QtWidgets.QCheckBox("Don't show this again")
-            banner_layout.addWidget(self._again)
-            layout.addWidget(banner)
+            tip_wrap = QtWidgets.QWidget()
+            tip_layout = QtWidgets.QVBoxLayout(tip_wrap)
+            tip_layout.setContentsMargins(0, 0, 0, 0)
+            tip_layout.addWidget(banner)
+            tip_layout.addWidget(self._again)
+            layout.addWidget(tip_wrap)
 
         layout.addWidget(QtWidgets.QLabel("Where should the icon come from?"))
 
-        lib_btn = QtWidgets.QPushButton("Icon Library…")
-        lib_btn.setToolTip("Browse built-in Stream Deck style icons by category")
-        lib_btn.clicked.connect(self._choose_library)
-        custom_btn = QtWidgets.QPushButton("Custom File…")
-        custom_btn.setToolTip("Open a file from disk (PNG, JPG, …)")
-        custom_btn.clicked.connect(self._choose_custom)
+        lib_btn = QDataPushButton("Icon Library…", tooltip="Browse built-in Stream Deck style icons by category", clicked=self._choose_library)
+        custom_btn = QDataPushButton("Custom File…", tooltip="Open a file from disk (PNG, JPG, …)", clicked=self._choose_custom)
         for btn in (lib_btn, custom_btn):
             btn.setMinimumHeight(36)
 
@@ -891,9 +868,10 @@ class IconSourceDialog(QtWidgets.QDialog):
         row.addWidget(custom_btn, 1)
         layout.addLayout(row)
 
-        cancel = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Cancel)
-        cancel.rejected.connect(self.reject)
-        layout.addWidget(cancel)
+        cancel_btn = Buttons.getCancelWidget(callback=self.reject)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", cancel_btn], widget_only=True)
+        )
 
     def _persist_tip(self):
         if self._again is not None and self._again.isChecked():

@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import gremlin.ui.ui_common
+
 import copy
 from typing import Any
 
@@ -62,6 +64,13 @@ _IDENTITY_STYLE_KEYS = {
     "font_scale_base",
 }
 
+# Asset paths — appearance is colors/borders/effects, not the widget's image files.
+_APPEARANCE_ASSET_KEYS = {
+    "image_path",
+    "image_path_on",
+    "paddle_image",
+}
+
 _clipboard: dict[str, Any] | None = None
 
 
@@ -75,9 +84,9 @@ def clipboard_groups() -> list[str]:
     return list(_clipboard.get("groups") or [])
 
 
-class PropertyGroupsDialog(QtWidgets.QDialog):
+class PropertyGroupsDialog(gremlin.ui.ui_common.QRememberDialog):
     def __init__(self, title: str, action: str, groups: list[str] | None = None, parent=None):
-        super().__init__(parent)
+        super().__init__("overlay_property_groups", parent=parent)
         self.setWindowTitle(title)
         layout = QtWidgets.QVBoxLayout(self)
         hint = QtWidgets.QLabel("Choose which properties to include. Items that do not apply to the target widget are skipped.")
@@ -91,11 +100,11 @@ class PropertyGroupsDialog(QtWidgets.QDialog):
             box.setEnabled(key in allowed)
             self._boxes[key] = box
             layout.addWidget(box)
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText(action)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label=action, callback=self.accept)
+        cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
+        layout.addWidget(
+            gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
+        )
 
     def selected_groups(self) -> list[str]:
         return [key for key, box in self._boxes.items() if box.isChecked() and box.isEnabled()]
@@ -130,7 +139,7 @@ def collect_widget_properties(item: dict[str, Any] | None, groups: list[str]) ->
         payload["label"] = str(item.get("label") or "")
         payload["label_style"] = {key: copy.deepcopy(style[key]) for key in LABEL_STYLE_KEYS if key in style}
     if "appearance" in groups:
-        skip = set(LABEL_STYLE_KEYS) | _IDENTITY_STYLE_KEYS
+        skip = set(LABEL_STYLE_KEYS) | _IDENTITY_STYLE_KEYS | _APPEARANCE_ASSET_KEYS
         payload["appearance"] = {key: copy.deepcopy(value) for key, value in style.items() if key not in skip}
         payload["blink"] = copy.deepcopy(normalize_blink(item.get("blink")))
     return payload
@@ -173,7 +182,7 @@ def paste_widget_properties(item: dict[str, Any] | None, payload: dict[str, Any]
                 style_update[key] = copy.deepcopy(value)
     if "appearance" in use:
         for key, value in (clip.get("appearance") or {}).items():
-            if key in _IDENTITY_STYLE_KEYS or key in LABEL_STYLE_KEYS:
+            if key in _IDENTITY_STYLE_KEYS or key in LABEL_STYLE_KEYS or key in _APPEARANCE_ASSET_KEYS:
                 continue
             if key in allowed_style:
                 style_update[key] = copy.deepcopy(value)

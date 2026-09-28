@@ -28,4 +28,3 @@ APPLICATION_VERSION = f"{APPLICATION_MAIN} ({APPLICATION_BASE})"
 @SingletonDecorator
 class Version():
     version = APPLICATION_VERSION
-

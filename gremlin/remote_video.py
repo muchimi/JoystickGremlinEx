@@ -110,7 +110,27 @@ def _find_hwnd_by_title(needle: str) -> int:
     needle = (needle or "").strip().casefold()
     if not needle:
         return 0
-    for hwnd, title in list_top_windows():
+    windows = list_top_windows()
+    # Exact title first (avoids locking onto the first "GEX Overlay — …").
+    for hwnd, title in windows:
+        if title.casefold() == needle:
+            return hwnd
+    starts = [(hwnd, title) for hwnd, title in windows if title.casefold().startswith(needle)]
+    if starts:
+        if len(starts) > 1 and needle.startswith("gex overlay"):
+            try:
+                from gremlin.ui.obs_overlay import OverlayManager
+                from gremlin.ui.obs_overlay.model import overlay_window_title
+
+                page = OverlayManager().scene.active_page()
+                want = overlay_window_title(page).casefold()
+                for hwnd, title in starts:
+                    if title.casefold() == want:
+                        return hwnd
+            except Exception:
+                pass
+        return starts[0][0]
+    for hwnd, title in windows:
         if needle in title.casefold():
             return hwnd
     return 0

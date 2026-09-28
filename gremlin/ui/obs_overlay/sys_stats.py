@@ -561,11 +561,51 @@ class ManualCounterTracker:
             if ident not in keys:
                 self._state.pop(ident, None)
 
+    def clear(self):
+        """Drop runtime tallies (profile reload). Persisted entry values are the source of truth."""
+        self._state.clear()
+        self._persist_dirty = False
+
     def take_persist_dirty(self) -> bool:
         """True once since last call if any manual tally changed (for overlay save)."""
         dirty = self._persist_dirty
         self._persist_dirty = False
         return dirty
+
+    def sync_into_scene(self, scene) -> bool:
+        """Copy live tallies onto scene widgets so to_dict() persists the displayed values."""
+        if scene is None or not self._state:
+            return False
+        changed = False
+        for key, st in list(self._state.items()):
+            if ":" not in key:
+                continue
+            widget_id, entry_id = key.split(":", 1)
+            if not widget_id or not entry_id:
+                continue
+            item = scene.widget_by_id(widget_id)
+            if not item or item.get("type") != "sys_stats":
+                continue
+            try:
+                value = max(0, int(st.get("value") or 0))
+            except (TypeError, ValueError):
+                value = 0
+            for entry in item.get("stats") or []:
+                if not isinstance(entry, dict):
+                    continue
+                if str(entry.get("id") or "") != entry_id:
+                    continue
+                if normalize_stat(entry.get("stat")) != "manual":
+                    continue
+                try:
+                    prior = int(entry.get("value") or 0)
+                except (TypeError, ValueError):
+                    prior = 0
+                if prior != value:
+                    entry["value"] = value
+                    changed = True
+                break
+        return changed
 
     def sample(self, item: dict[str, Any] | None, entry: dict[str, Any] | None) -> int:
         if not item or not entry:

@@ -2389,36 +2389,33 @@ class Sound:
             if self._ffmpeg_exe:
                 return True
 
+            candidates = []
+
             if getattr(sys, "frozen", False):
-                # Running as a packaged executable - ffmpeg ships in _internal
+                # Packaged exe: ffmpeg ships next to the binary under _internal
                 current_dir = os.path.dirname(sys.executable)
-                ffmpeg_exe = os.path.join(current_dir, "_internal", "ffmpeg.exe")
+                candidates.append(os.path.join(current_dir, "_internal", "ffmpeg.exe"))
+                candidates.append(os.path.join(current_dir, "ffmpeg", "ffmpeg.exe"))
+            else:
+                # Script mode: look next to gremlinEx.py
+                main_module = sys.modules.get("__main__")
+                if main_module is not None and hasattr(main_module, "__file__") and main_module.__file__:
+                    current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
+                    candidates.append(os.path.join(current_dir, "ffmpeg", "ffmpeg.exe"))
+
+            for ffmpeg_exe in candidates:
                 if os.path.isfile(ffmpeg_exe):
                     self._ffmpeg_exe = ffmpeg_exe
                     return True
-                syslog.error("FFmpeg not found.")
-                return False
 
-            # Running as a normal Python script
-            main_module = sys.modules["__main__"]
-            if not hasattr(main_module, "__file__"):
-                return False
-            current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
-
-            # 1. Look for a local ./ffmpeg/ffmpeg.exe next to the script
-            ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
-            if os.path.isfile(ffmpeg_exe):
-                self._ffmpeg_exe = ffmpeg_exe
-                return True
-
-            # 2. Fall back to ffmpeg on the system PATH
+            # Fall back to ffmpeg on the system PATH
             path_ffmpeg = shutil.which("ffmpeg")
             if path_ffmpeg:
                 self._ffmpeg_exe = path_ffmpeg
                 syslog.info(f"FFmpeg found on PATH: {path_ffmpeg}")
                 return True
 
-            # 3. Last resort: auto-download a static build into ./ffmpeg/
+            # Last resort: auto-download a static build into a writable folder
             downloaded = self._downloadFFmpeg()
             if downloaded and os.path.isfile(downloaded):
                 self._ffmpeg_exe = downloaded
@@ -2431,6 +2428,25 @@ class Sound:
             syslog.error(f"Failed to ensure FFmpeg: {str(e)}")
             return False
 
+    def _ffmpeg_download_dir(self) -> str | None:
+        """Writable directory for a one-time FFmpeg download."""
+        try:
+            import gremlin.config
+
+            base = gremlin.config.Configuration().data_path()
+            if base:
+                return os.path.join(base, "ffmpeg")
+        except Exception:
+            pass
+
+        if getattr(sys, "frozen", False):
+            return os.path.join(os.path.dirname(sys.executable), "ffmpeg")
+
+        main_module = sys.modules.get("__main__")
+        if main_module is not None and hasattr(main_module, "__file__") and main_module.__file__:
+            return os.path.join(os.path.dirname(os.path.abspath(main_module.__file__)), "ffmpeg")
+        return None
+
     def _downloadFFmpeg(self) -> str | None:
         """Download a static FFmpeg build from gyan.dev into ./ffmpeg/ on first use.
 
@@ -2442,14 +2458,13 @@ class Sound:
         import tempfile
 
         try:
-            # Determine target directory next to the main script
-            main_module = sys.modules["__main__"]
-            if not hasattr(main_module, "__file__"):
+            target_dir = self._ffmpeg_download_dir()
+            if not target_dir:
                 return None
-            base_dir = os.path.dirname(os.path.abspath(main_module.__file__))
-            target_dir = os.path.join(base_dir, "ffmpeg")
             os.makedirs(target_dir, exist_ok=True)
             target_exe = os.path.join(target_dir, "ffmpeg.exe")
+            if os.path.isfile(target_exe):
+                return target_exe
 
             url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
             sha_url = url + ".sha256"

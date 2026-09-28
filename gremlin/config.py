@@ -41,14 +41,16 @@ syslog = logging.getLogger("system")
 
 # general override flags for builds and execution - these override configuration settings from the config file
 # this is used to simplify diagnostics and help with development of work in progress modules
+# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules
+# works from a frozen exe without requiring launch_gex.cmd env vars.
 
-VOICE_ENABLED = "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+VOICE_ENABLED = True  # "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
 MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
 OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in ("1", "true", "yes")
-OVERLAY_ENABLED = "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-AFCS_ENABLED = "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
-STREAMDECK_ENABLED = "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
+OVERLAY_ENABLED = True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
+AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
+STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 
 
@@ -494,12 +496,29 @@ class Configuration(QtCore.QObject):
 
     def getTemporaryFile(self, ext=None, dir=None):
         """gets a temporary file - the temporary file location is in the user folder"""
-        data_path = dir if dir else self.data_path()
-        tmp_path = os.path.join(data_path, "temp")
-        os.makedirs(tmp_path, exist_ok=True)
+        import tempfile as _tempfile
 
-        os.makedirs(tmp_path, exist_ok=True)
-        tmp_file = os.path.join(tmp_path, gremlin.util.get_guid())
+        data_path = dir if dir else self.data_path()
+        user_profile = os.path.join(data_path, "temp")
+        try:
+            # A leftover FILE named "temp" causes WinError 183 on makedirs.
+            if os.path.isfile(user_profile):
+                try:
+                    os.replace(user_profile, user_profile + ".bak_file")
+                except OSError:
+                    try:
+                        os.unlink(user_profile)
+                    except OSError:
+                        user_profile = os.path.join(_tempfile.gettempdir(), "JoystickGremlinEx_temp")
+            os.makedirs(user_profile, exist_ok=True)
+            if not os.path.isdir(user_profile):
+                raise OSError(f"temp path is not a directory: {user_profile}")
+        except OSError as ex:
+            syslog.warning(f"CONFIG: profile temp folder unavailable ({ex}); using system temp")
+            user_profile = os.path.join(_tempfile.gettempdir(), "JoystickGremlinEx_temp")
+            os.makedirs(user_profile, exist_ok=True)
+
+        tmp_file = os.path.join(user_profile, gremlin.util.get_guid())
         if ext:
             if not ext.startswith("."):
                 tmp_file += "."
@@ -617,10 +636,6 @@ class Configuration(QtCore.QObject):
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
         self.ensureProfilePath()
-        data_path = self.data_path()
-        tmp = os.path.join(data_path, "temp")
-        os.makedirs(tmp, exist_ok=True)
-
         is_error = False
         try:
             if not fname:
@@ -662,6 +677,23 @@ class Configuration(QtCore.QObject):
         else:
             self._save_profile_ui()
 
+    @staticmethod
+    def _streamdeck_pages_custom_count(pages) -> int:
+        """How many non-generic Stream Deck page labels a sidecar blob holds."""
+        if not isinstance(pages, dict):
+            return 0
+        count = 0
+        for meta in pages.values():
+            if not isinstance(meta, dict):
+                continue
+            names = meta.get("names") or {}
+            if not isinstance(names, dict):
+                continue
+            for pk, pv in names.items():
+                if pv and str(pv) != f"Page {pk}":
+                    count += 1
+        return count
+
     def _save_profile_ui(self):
         """saves to the profile specific config file"""
         if not self._lock.acquire(blocking=False):
@@ -687,11 +719,24 @@ class Configuration(QtCore.QObject):
                 except Exception as err:
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
+            disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
+
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
             # on top of on-disk data before writing.
             if pending_profile_data:
                 merged.update(pending_profile_data)
 
+            # Critical: after a version-folder port / empty load, _profile_data can
+            # carry streamdeck_pages={} and update() would clobber rich on-disk names.
+            mem_pages = merged.get("streamdeck_pages")
+            disk_custom = self._streamdeck_pages_custom_count(disk_pages)
+            mem_custom = self._streamdeck_pages_custom_count(mem_pages)
+            if disk_custom > 0 and mem_custom < disk_custom:
+                merged["streamdeck_pages"] = disk_pages
+                syslog.info(
+                    "CONFIG: preserved on-disk streamdeck_pages "
+                    f"(disk_custom={disk_custom}, memory_custom={mem_custom})"
+                )
             self._profile_data = merged
 
             try:

@@ -20,6 +20,7 @@ from typing import Any
 from PySide6 import QtCore
 from psygnal import Signal
 
+import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.util
 
@@ -28,8 +29,115 @@ from .visibility_logic import assign_condition_letters
 
 syslog = logging.getLogger("system")
 
-SCENE_VERSION = 2
+SCENE_VERSION = 3
 OVERLAY_WINDOW_TITLE = "GEX Overlay"
+
+# Nine screen/canvas anchors + cycle order used by runtime control.
+ANCHOR_KEYS = ("tl", "tm", "tr", "ml", "center", "mr", "bl", "bm", "br")
+ANCHOR_LABELS = {
+    "tl": "Top left",
+    "tm": "Top middle",
+    "tr": "Top right",
+    "ml": "Middle left",
+    "center": "Center",
+    "mr": "Middle right",
+    "bl": "Bottom left",
+    "bm": "Bottom middle",
+    "br": "Bottom right",
+}
+
+RUNTIME_BINDING_ACTIONS = (
+    "anchor_tl",
+    "anchor_tm",
+    "anchor_tr",
+    "anchor_ml",
+    "anchor_center",
+    "anchor_mr",
+    "anchor_bl",
+    "anchor_bm",
+    "anchor_br",
+    "anchor_cycle",
+    "nudge_up",
+    "nudge_down",
+    "nudge_left",
+    "nudge_right",
+    "toggle_mouse_reposition",
+    "toggle_page_visible",
+    "toggle_target_visible",
+    "reset_layout",
+    "save",
+    "save_as",
+    "open_control_panel",
+)
+
+RUNTIME_BINDING_LABELS = {
+    "anchor_tl": "Anchor top left",
+    "anchor_tm": "Anchor top middle",
+    "anchor_tr": "Anchor top right",
+    "anchor_ml": "Anchor middle left",
+    "anchor_center": "Anchor center",
+    "anchor_mr": "Anchor middle right",
+    "anchor_bl": "Anchor bottom left",
+    "anchor_bm": "Anchor bottom middle",
+    "anchor_br": "Anchor bottom right",
+    "anchor_cycle": "Cycle anchor",
+    "nudge_up": "Nudge up",
+    "nudge_down": "Nudge down",
+    "nudge_left": "Nudge left",
+    "nudge_right": "Nudge right",
+    "toggle_mouse_reposition": "Toggle mouse repositioning",
+    "toggle_page_visible": "Toggle page visibility",
+    "toggle_target_visible": "Toggle target visibility",
+    "reset_layout": "Reset layout",
+    "save": "Save",
+    "save_as": "Save as new page",
+    "open_control_panel": "Open control panel",
+}
+
+# Hold-style actions: fire while the input stays active (poll loop).
+RUNTIME_HOLD_ACTIONS = frozenset({"nudge_up", "nudge_down", "nudge_left", "nudge_right"})
+
+RUNTIME_NUDGE_DELTA = {
+    "nudge_up": (0, -1),
+    "nudge_down": (0, 1),
+    "nudge_left": (-1, 0),
+    "nudge_right": (1, 0),
+}
+
+# Grouping for the runtime keybinds dialog / inspector sections.
+RUNTIME_BINDING_GROUPS = (
+    (
+        "Anchor points",
+        (
+            "anchor_tl",
+            "anchor_tm",
+            "anchor_tr",
+            "anchor_ml",
+            "anchor_center",
+            "anchor_mr",
+            "anchor_bl",
+            "anchor_bm",
+            "anchor_br",
+            "anchor_cycle",
+        ),
+    ),
+    (
+        "Nudge",
+        ("nudge_up", "nudge_down", "nudge_left", "nudge_right", "toggle_mouse_reposition"),
+    ),
+    (
+        "Visibility",
+        ("toggle_page_visible", "toggle_target_visible"),
+    ),
+    (
+        "Layout / Save",
+        ("reset_layout", "save", "save_as"),
+    ),
+    (
+        "Panel",
+        ("open_control_panel",),
+    ),
+)
 
 
 def overlay_window_title(page: dict[str, Any] | None = None, name: str | None = None) -> str:
@@ -207,6 +315,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
         "border": "#2c3a52",
         "border_on": "#ffb347",
         "border_width": 2.0,
+        "border_enabled": True,
         "corner_radius": 6.0,
         "indicator": "#ff5a3c",
         "indicator_size": 12.0,
@@ -257,6 +366,23 @@ def default_style(widget_type: str) -> dict[str, Any]:
         "axis_label_font_stroke_width": 0,
         "axis_label_font_stroke_color": "#000000",
         "axis_label_font_color": "#f4efe4",
+        "caption_font_family": "Segoe UI",
+        "caption_font_size": 10,
+        "caption_font_bold": True,
+        "caption_font_italic": False,
+        "caption_font_underline": False,
+        "caption_font_strike": False,
+        "caption_font_shadow": False,
+        "caption_font_shadow_color": "#80000000",
+        "caption_font_shadow_angle": 135.0,
+        "caption_font_shadow_distance": 3.0,
+        "caption_font_shadow_spread": 0.0,
+        "caption_font_shadow_size": 0.0,
+        "caption_font_shadow_dx": 2,
+        "caption_font_shadow_dy": 2,
+        "caption_font_stroke_width": 0,
+        "caption_font_stroke_color": "#000000",
+        "caption_font_color": "#f4efe4",
         "label_offset_x": 0,
         "label_offset_y": 0,
         "show_label": True,
@@ -463,6 +589,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "fill": "#00000000",
                 "border": "#ff2a2a",
                 "border_width": 0.0,
+                "border_enabled": False,
                 "corner_radius": 4.0,
                 "font_size": 13,
                 "show_label": True,
@@ -476,6 +603,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "border_width": 2.0,
                 "corner_radius": 8.0,
                 "font_size": 22,
+                "caption_font_size": 9,
                 "show_label": False,
                 "show_caption": True,
                 "stat": "time",
@@ -492,6 +620,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "border_width": 2.0,
                 "corner_radius": 8.0,
                 "font_size": 22,
+                "caption_font_size": 11,
                 "show_label": False,
                 "stopwatch_face": "digital",
                 "stopwatch_format": "mmss",
@@ -542,6 +671,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "fill": "#00000000",
                 "border": "#1e2a3a",
                 "border_width": 0.0,
+                "border_enabled": False,
                 "opacity": 1.0,
                 "show_label": False,
                 "image_path": "",
@@ -605,6 +735,7 @@ def _refresh_font_scale_base(item: dict[str, Any], style_updates: dict[str, Any]
         "auto_scale_font" in updates
         or "font_size" in updates
         or "axis_label_font_size" in updates
+        or "caption_font_size" in updates
         or not style.get("font_scale_base")
     ):
         return
@@ -1106,6 +1237,98 @@ def normalize_toggle_binding(raw) -> dict[str, Any]:
     return binding
 
 
+def default_runtime_bindings() -> dict[str, dict[str, Any]]:
+    return {action: default_toggle_binding() for action in RUNTIME_BINDING_ACTIONS}
+
+
+def normalize_runtime_bindings(raw) -> dict[str, dict[str, Any]]:
+    result = default_runtime_bindings()
+    if isinstance(raw, dict):
+        for action in RUNTIME_BINDING_ACTIONS:
+            if action in raw:
+                result[action] = normalize_toggle_binding(raw.get(action))
+    return result
+
+
+def normalize_group_registry(raw) -> dict[str, dict[str, Any]]:
+    """Map group_id -> {name}."""
+    out: dict[str, dict[str, Any]] = {}
+    if isinstance(raw, dict):
+        for gid, meta in raw.items():
+            key = str(gid or "").strip()
+            if not key:
+                continue
+            if isinstance(meta, dict):
+                name = str(meta.get("name") or "").strip()
+            else:
+                name = str(meta or "").strip()
+            out[key] = {"name": name or "Group"}
+    elif isinstance(raw, list):
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            key = str(entry.get("id") or "").strip()
+            if not key:
+                continue
+            out[key] = {"name": str(entry.get("name") or "").strip() or "Group"}
+    return out
+
+
+def normalize_anchor_key(value) -> str:
+    key = str(value or "center").casefold().replace("-", "").replace(" ", "").replace("_", "")
+    aliases = {
+        "topleft": "tl",
+        "topmiddle": "tm",
+        "topcenter": "tm",
+        "topright": "tr",
+        "middleleft": "ml",
+        "midleft": "ml",
+        "middlecenter": "center",
+        "midcenter": "center",
+        "middleright": "mr",
+        "midright": "mr",
+        "bottomleft": "bl",
+        "bottommiddle": "bm",
+        "bottomcenter": "bm",
+        "bottomright": "br",
+        "c": "center",
+    }
+    key = aliases.get(key, key)
+    return key if key in ANCHOR_KEYS else "center"
+
+
+def _anchor_point_on_rect(x: float, y: float, w: float, h: float, anchor: str) -> tuple[float, float]:
+    anchor = normalize_anchor_key(anchor)
+    if anchor in ("tm", "center", "bm"):
+        ax = x + w / 2.0
+    elif anchor in ("tr", "mr", "br"):
+        ax = x + w
+    else:
+        ax = x
+    if anchor in ("ml", "center", "mr"):
+        ay = y + h / 2.0
+    elif anchor in ("bl", "bm", "br"):
+        ay = y + h
+    else:
+        ay = y
+    return ax, ay
+
+
+def _clamp_rect_delta(x: float, y: float, w: float, h: float, dx: float, dy: float, rw: float, rh: float) -> tuple[int, int]:
+    """Translate (x,y,w,h) by (dx,dy) then clamp fully inside (0,0,rw,rh)."""
+    nx = x + dx
+    ny = y + dy
+    if w >= rw:
+        nx = 0.0
+    else:
+        nx = max(0.0, min(rw - w, nx))
+    if h >= rh:
+        ny = 0.0
+    else:
+        ny = max(0.0, min(rh - h, ny))
+    return int(round(nx - x)), int(round(ny - y))
+
+
 VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard")
 
 
@@ -1187,11 +1410,12 @@ def default_canvas() -> dict[str, Any]:
     return {
         "width": 1280,
         "height": 720,
-        "background_mode": "chroma",
+        "background_mode": "windowed",
         "chroma_color": "#00FF00",
         "image_path": "",
         "grid_size": 8,
         "snap_to_grid": True,
+        "snap_to_widgets": True,
         "always_on_top": False,
         "frameless": False,
         "show_drag_bar": True,
@@ -1201,6 +1425,7 @@ def default_canvas() -> dict[str, Any]:
         "attach_window_title": "",
         "attach_window_exe": "",
         "toggle_binding": default_toggle_binding(),
+        "runtime_bindings": default_runtime_bindings(),
         "monitor_index": 0,
         "monitor_name": "",
         "capture_width": 1280,
@@ -1247,12 +1472,11 @@ def normalize_guides(canvas: dict[str, Any] | None) -> list[dict[str, Any]]:
 
 
 def normalize_background_mode(value) -> str:
-    mode = str(value or "chroma").casefold().replace("_", "-").replace(" ", "-")
+    mode = str(value or "windowed").casefold().replace("_", "-").replace(" ", "-")
     if mode in ("onscreen", "on-screen"):
         return "onscreen"
-    if mode == "image":
-        return "image"
-    return "chroma"
+    # Legacy names: chroma / image → windowed capture window.
+    return "windowed"
 
 
 def is_onscreen_mode(canvas: dict[str, Any] | None) -> bool:
@@ -1361,11 +1585,10 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
 
 
 def profile_xml_path(profile=None) -> str | None:
-    assert profile is None or isinstance(profile, gremlin.base_profile.Profile), "invalid profile object"
     profile = profile or gremlin.shared_state.current_profile
     if profile is None:
         return None
-    return profile.profile_file # getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
+    return getattr(profile, "profile_file", None) or getattr(profile, "_profile_fname", None)
 
 
 def profile_display_name(profile=None) -> str:
@@ -1386,19 +1609,14 @@ def overlay_path_for_profile(profile=None) -> str | None:
     fname = profile_xml_path(profile)
     if not fname:
         return None
-    return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
+    return gremlin.util.swap_ext(fname, "overlay.json")
 
 
 def profile_json_path(profile=None, dest_xml: str | None = None) -> str | None:
-    if profile is not None:
-        fname = profile.profile_file
-        if fname:
-            return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
-
     fname = dest_xml or profile_xml_path(profile)
     if not fname:
         return None
-    return gremlin.util.swap_ext(fname, "json", suffix = ".obs")
+    return gremlin.util.swap_ext(fname, "json")
 
 
 def _same_profile_path(left: str | None, right: str | None) -> bool:
@@ -1425,7 +1643,14 @@ class OverlayScene(QtCore.QObject):
     """Versioned overlay layout: pages of canvas + widgets. canvas/widgets alias the active page."""
 
     changed = Signal()
+    # Position/size/rotation only — views should repaint; do not rebuild panels/trees.
+    geometry_changed = Signal()
     selection_changed = Signal()
+    # page_id, x, y — OverlayManager moves the live windowed OverlayWindow.
+    page_window_move_requested = Signal(str, int, int)
+    control_target_changed = Signal()
+    control_highlight_changed = Signal()
+    mouse_reposition_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1434,6 +1659,20 @@ class OverlayScene(QtCore.QObject):
         self.canvas: dict[str, Any] = {}
         self.widgets: list[dict[str, Any]] = []
         self.selected_ids: list[str] = []
+        self.groups: dict[str, dict[str, Any]] = {}
+        self.control_target: dict[str, Any] = {"kind": "page", "id": None}
+        self._last_anchor: str = "center"
+        # Designed layout snapshot for runtime "Reset" (page_id -> geometry dict).
+        self._layout_baseline: dict[str, dict[str, Any]] = {}
+        # Live overlay cyan target outline (control panel interaction only).
+        self._control_highlight = False
+        # Runtime-only: drag control target on the live overlay (suspends interactive touch).
+        self._mouse_reposition = False
+        # Designer Show overlay: paint every visible widget, ignoring mode/state conditions.
+        self._preview_show_all = False
+        # Persist: open Overlay control panel automatically when the profile starts.
+        self.show_control_panel_on_profile_start = False
+        self._widget_clipboard: list[dict[str, Any]] = []
         self._undo: list[str] = []
         self._redo: list[str] = []
         self._suspend = 0
@@ -1443,18 +1682,31 @@ class OverlayScene(QtCore.QObject):
         self._save_later_pending = False
         self._sorted_cache: list[dict[str, Any]] | None = None
         self._identity_hooks = False
+        # True while the designer is mid move/resize/rotate — inspectors skip live churn.
+        self.geometry_gesture = False
+        # Transient alignment lines while snapping to other widgets (cleared on release).
+        self.active_snap_lines: list[tuple[str, float]] = []
+        self._geometry_pending = False
+        self._geometry_timer = QtCore.QTimer(self)
+        self._geometry_timer.setSingleShot(True)
+        self._geometry_timer.setInterval(16)
+        self._geometry_timer.timeout.connect(self._flush_geometry)
         self._reset_default_pages(emit=False)
         self._bind_identity_hooks()
+        self._ensure_control_target()
 
-        # hook sidecar updates
+        # Hook sidecar updates so profile save requests persist overlay JSON.
         el = gremlin.event_handler.EventListener()
         el.update_sidecar.connect(self._handle_save_sidecar)
 
     def _handle_save_sidecar(self):
-        """ handle update requests to store the configuration file"""
-        sidecar = overlay_path_for_profile()
-        if sidecar:
-            self.save(sidecar)
+        """Persist overlay into the profile JSON sidecar (obs_overlay key).
+
+        Must not write only to *.overlay.json — load reads profile.json, so a
+        sidecar-only write looks saved in-session but is lost after restart.
+        """
+        if not self.save_to_profile():
+            syslog.warning("OBS OVERLAY: update_sidecar did not write the layout to the profile JSON")
 
     def _bind_identity_hooks(self):
         """Keep overlay state/mode names in sync with JG Ex unique IDs."""
@@ -1505,11 +1757,14 @@ class OverlayScene(QtCore.QObject):
         page = default_page("Overlay")
         self.pages = [page]
         self.active_page_id = page["id"]
+        self.groups = {}
         self._sync_active_aliases()
         self.selected_ids = []
+        self._ensure_control_target()
         if emit:
             self._emit()
             self.selection_changed.emit()
+            self.control_target_changed.emit()
 
     def _sync_active_aliases(self):
         page = self.active_page()
@@ -1535,6 +1790,7 @@ class OverlayScene(QtCore.QObject):
             canvas.update(raw)
         canvas["background_mode"] = normalize_background_mode(canvas.get("background_mode"))
         canvas["toggle_binding"] = normalize_toggle_binding(canvas.get("toggle_binding"))
+        canvas["runtime_bindings"] = normalize_runtime_bindings(canvas.get("runtime_bindings"))
         canvas["attach_to_window"] = bool(canvas.get("attach_to_window"))
         canvas["attach_window_title"] = str(canvas.get("attach_window_title") or "").strip()
         canvas["attach_window_exe"] = str(canvas.get("attach_window_exe") or "").strip()
@@ -1644,7 +1900,7 @@ class OverlayScene(QtCore.QObject):
             item["id"] = _new_id()
             old_group = str(item.get("group") or "").strip()
             if old_group:
-                item["group"] = group_map.setdefault(old_group, _new_id())
+                item["group"] = self._map_group_id(old_group, group_map)
         self.pages.append(page)
         self._dirty = True
         if activate:
@@ -1743,12 +1999,96 @@ class OverlayScene(QtCore.QObject):
         if emit:
             self._emit()
 
+    def capture_layout_baseline(self, page_id: str | None = None):
+        """Snapshot designed positions (widgets + window) for later Reset."""
+        pages = [self.page_by_id(page_id)] if page_id else list(self.pages)
+        for page in pages:
+            if page is None:
+                continue
+            pid = page["id"]
+            widgets = []
+            for item in page.get("widgets") or []:
+                widgets.append(
+                    {
+                        "id": item["id"],
+                        "x": int(item.get("x") or 0),
+                        "y": int(item.get("y") or 0),
+                        "w": int(item.get("w") or 1),
+                        "h": int(item.get("h") or 1),
+                        "visible": bool(item.get("visible", True)),
+                    }
+                )
+            self._layout_baseline[pid] = {
+                "window_x": page.get("window_x"),
+                "window_y": page.get("window_y"),
+                "widgets": widgets,
+            }
+
+    def restore_layout_baseline(self, page_id: str | None = None) -> bool:
+        """Restore widget/window geometry from the last capture_layout_baseline()."""
+        page = self.page_by_id(page_id) or self.active_page()
+        if page is None:
+            return False
+        pid = page["id"]
+        snap = self._layout_baseline.get(pid)
+        if not isinstance(snap, dict):
+            # No snapshot yet — fall back to clearing saved window offset only.
+            self.reset_page_position(page_id=pid, emit=True)
+            if not is_onscreen_mode(page.get("canvas")):
+                sx, sy, sw, sh = self._available_screen_rect(page)
+                cw, ch = self._canvas_size_for_page(page)
+                nx = sx + max(0, (sw - cw) // 2)
+                ny = sy + max(0, (sh - ch) // 2)
+                self.record_page_position(nx, ny, page_id=pid, emit=False)
+                self.page_window_move_requested.emit(pid, nx, ny)
+            return True
+        by_id = {w["id"]: w for w in (snap.get("widgets") or []) if isinstance(w, dict) and w.get("id")}
+        changed = False
+        for item in page.get("widgets") or []:
+            src = by_id.get(item["id"])
+            if not src:
+                continue
+            for key in ("x", "y", "w", "h"):
+                try:
+                    value = int(src.get(key))
+                except (TypeError, ValueError):
+                    continue
+                if int(item.get(key) or 0) != value:
+                    item[key] = value
+                    changed = True
+            vis = bool(src.get("visible", True))
+            if bool(item.get("visible", True)) != vis:
+                item["visible"] = vis
+                changed = True
+        wx = snap.get("window_x")
+        wy = snap.get("window_y")
+        if page.get("window_x") != wx or page.get("window_y") != wy:
+            page["window_x"] = wx
+            page["window_y"] = wy
+            changed = True
+        if not is_onscreen_mode(page.get("canvas")):
+            if wx is None or wy is None:
+                sx, sy, sw, sh = self._available_screen_rect(page)
+                cw, ch = self._canvas_size_for_page(page)
+                nx = sx + max(0, (sw - cw) // 2)
+                ny = sy + max(0, (sh - ch) // 2)
+            else:
+                nx, ny = int(wx), int(wy)
+            self.page_window_move_requested.emit(pid, nx, ny)
+        if changed:
+            self._dirty = True
+            self._emit()
+        return True
+
     def to_dict(self) -> dict[str, Any]:
         self._sync_active_aliases()
+        self._prune_group_registry()
         return {
             "version": SCENE_VERSION,
             "saved_at": time.time(),
             "active_page_id": self.active_page_id,
+            "groups": copy.deepcopy(self.groups),
+            "show_control_panel_on_profile_start": bool(self.show_control_panel_on_profile_start),
             "pages": copy.deepcopy(self.pages),
         }
 
@@ -1772,10 +2112,15 @@ class OverlayScene(QtCore.QObject):
         if not self.page_by_id(active):
             active = self.pages[0]["id"]
         self.active_page_id = active
+        self.groups = normalize_group_registry(data.get("groups"))
+        self.show_control_panel_on_profile_start = bool(data.get("show_control_panel_on_profile_start"))
         self._sync_active_aliases()
+        self._ensure_group_registry_from_widgets()
         self.selected_ids = [wid for wid in self.selected_ids if self.widget_by_id(wid)]
+        self._ensure_control_target()
         self._emit()
         self.selection_changed.emit()
+        self.control_target_changed.emit()
 
     def _normalize_widget(self, raw: dict[str, Any]) -> dict[str, Any]:
         from .shapes import default_shape_points, normalize_shape_kind, normalize_shape_points
@@ -1895,6 +2240,51 @@ class OverlayScene(QtCore.QObject):
         if self._suspend <= 0:
             self.changed.emit()
 
+    def _emit_geometry(self):
+        """Notify views of a move/resize without rebuilding inspectors/panels.
+
+        Coalesce rapid drag updates (~60 Hz) so large group rotates do not flood the UI thread.
+        """
+        if self._suspend > 0:
+            return
+        self._geometry_pending = True
+        if not self._geometry_timer.isActive():
+            self._geometry_timer.start()
+
+    def _flush_geometry(self):
+        if not self._geometry_pending:
+            return
+        self._geometry_pending = False
+        if self._suspend <= 0:
+            self.geometry_changed.emit()
+
+    def flush_geometry(self):
+        """Emit any coalesced geometry change immediately (end of a drag gesture)."""
+        if self._geometry_timer.isActive():
+            self._geometry_timer.stop()
+        self._flush_geometry()
+
+    def begin_geometry_gesture(self):
+        self.geometry_gesture = True
+        self.active_snap_lines = []
+        try:
+            from .widgets import set_interaction_paint
+
+            set_interaction_paint(True)
+        except Exception:
+            pass
+
+    def end_geometry_gesture(self):
+        self.geometry_gesture = False
+        self.active_snap_lines = []
+        try:
+            from .widgets import set_interaction_paint
+
+            set_interaction_paint(False)
+        except Exception:
+            pass
+        self.flush_geometry()
+
     def begin_edit(self):
         self.push_undo()
         self._suspend += 1
@@ -2009,6 +2399,9 @@ class OverlayScene(QtCore.QObject):
             new_style["show_label"] = False
             new_style["image_path"] = str(old_style.get("image_path") or "")
             new_style.setdefault("image_keep_aspect", True)
+            new_style["fill"] = "#00000000"
+            new_style["border"] = "#00000000"
+            new_style["border_enabled"] = False
             item["label"] = ""
         elif old_type == "image" and widget_type == "axis_paddle":
             new_style["show_label"] = False
@@ -2137,13 +2530,53 @@ class OverlayScene(QtCore.QObject):
             item["z"] = (max((w.get("z", 0) for w in self.widgets), default=0) + 1)
             old_group = str(item.get("group") or "").strip()
             if old_group:
-                item["group"] = group_map.setdefault(old_group, _new_id())
+                item["group"] = self._map_group_id(old_group, group_map)
             self.widgets.append(item)
             copies.append(item["id"])
         self.selected_ids = copies
         self._dirty = True
         self._emit()
         self.selection_changed.emit()
+
+    def copy_selected(self) -> bool:
+        """Copy selected widgets into the scene widget clipboard (Ctrl+C)."""
+        items = []
+        for widget_id in list(self.selected_ids):
+            src = self.widget_by_id(widget_id)
+            if src:
+                items.append(copy.deepcopy(src))
+        self._widget_clipboard = items
+        return bool(items)
+
+    def has_widget_clipboard(self) -> bool:
+        return bool(getattr(self, "_widget_clipboard", None))
+
+    def paste_clipboard(self) -> bool:
+        """Paste widgets from the scene widget clipboard (Ctrl+V)."""
+        clip = list(getattr(self, "_widget_clipboard", None) or [])
+        if not clip:
+            return False
+        self.push_undo()
+        copies = []
+        group_map: dict[str, str] = {}
+        grid = max(1, int(self.canvas.get("grid_size", 8)))
+        base_z = max((w.get("z", 0) for w in self.widgets), default=0)
+        for index, src in enumerate(clip):
+            item = copy.deepcopy(src)
+            item["id"] = _new_id()
+            item["x"] = int(item.get("x") or 0) + grid * 2
+            item["y"] = int(item.get("y") or 0) + grid * 2
+            item["z"] = base_z + 1 + index
+            old_group = str(item.get("group") or "").strip()
+            if old_group:
+                item["group"] = self._map_group_id(old_group, group_map)
+            self.widgets.append(item)
+            copies.append(item["id"])
+        self.selected_ids = copies
+        self._dirty = True
+        self._emit()
+        self.selection_changed.emit()
+        return bool(copies)
 
     def expand_group_ids(self, ids: list[str]) -> list[str]:
         """Include every widget that shares a group with any of the given ids."""
@@ -2170,7 +2603,7 @@ class OverlayScene(QtCore.QObject):
                 idset.add(item["id"])
         return seen
 
-    def group_selected(self) -> bool:
+    def group_selected(self, name: str | None = None) -> bool:
         ids = list(self.selected_ids)
         if len(ids) < 2:
             return False
@@ -2180,6 +2613,8 @@ class OverlayScene(QtCore.QObject):
             item = self.widget_by_id(widget_id)
             if item:
                 item["group"] = gid
+        label = str(name or "").strip() or self._next_group_name()
+        self.groups[gid] = {"name": label}
         self._dirty = True
         self._emit()
         self.selection_changed.emit()
@@ -2190,13 +2625,443 @@ class OverlayScene(QtCore.QObject):
         if not ids:
             return
         self.push_undo()
+        cleared: set[str] = set()
         for widget_id in ids:
             item = self.widget_by_id(widget_id)
             if item:
+                gid = str(item.get("group") or "").strip()
+                if gid:
+                    cleared.add(gid)
                 item["group"] = ""
+        for gid in cleared:
+            if not self._group_has_members(gid):
+                self.groups.pop(gid, None)
         self._dirty = True
         self._emit()
         self.selection_changed.emit()
+
+    def _map_group_id(self, old_group: str, group_map: dict[str, str], name_suffix: str = " copy") -> str:
+        """Remap a group id for duplicate/paste and register a display name."""
+        old_group = str(old_group or "").strip()
+        if not old_group:
+            return ""
+        if old_group in group_map:
+            return group_map[old_group]
+        new_id = _new_id()
+        group_map[old_group] = new_id
+        meta = self.groups.get(old_group) or {}
+        name = str(meta.get("name") or "").strip()
+        if name:
+            self.groups[new_id] = {"name": f"{name}{name_suffix}"}
+        else:
+            self.groups[new_id] = {"name": self._next_group_name()}
+        return new_id
+
+    def _next_group_name(self) -> str:
+        used = {str(meta.get("name") or "") for meta in self.groups.values()}
+        index = 1
+        while f"Group {index}" in used:
+            index += 1
+        return f"Group {index}"
+
+    def _group_has_members(self, group_id: str, page_id: str | None = None) -> bool:
+        gid = str(group_id or "").strip()
+        if not gid:
+            return False
+        pages = [self.page_by_id(page_id)] if page_id else self.pages
+        for page in pages:
+            if page is None:
+                continue
+            for item in page.get("widgets") or []:
+                if str(item.get("group") or "").strip() == gid:
+                    return True
+        return False
+
+    def _ensure_group_registry_from_widgets(self):
+        """Register any widget group ids missing from the name map."""
+        seen: set[str] = set()
+        for page in self.pages:
+            for item in page.get("widgets") or []:
+                gid = str(item.get("group") or "").strip()
+                if not gid or gid in seen:
+                    continue
+                seen.add(gid)
+                if gid not in self.groups:
+                    self.groups[gid] = {"name": self._next_group_name()}
+
+    def _prune_group_registry(self):
+        live = set()
+        for page in self.pages:
+            for item in page.get("widgets") or []:
+                gid = str(item.get("group") or "").strip()
+                if gid:
+                    live.add(gid)
+        for gid in list(self.groups):
+            if gid not in live:
+                self.groups.pop(gid, None)
+
+    def group_display_name(self, group_id: str) -> str:
+        gid = str(group_id or "").strip()
+        meta = self.groups.get(gid) or {}
+        name = str(meta.get("name") or "").strip()
+        return name or "Group"
+
+    def set_group_name(self, group_id: str, name: str) -> bool:
+        gid = str(group_id or "").strip()
+        if not gid:
+            return False
+        label = str(name or "").strip() or "Group"
+        current = self.groups.get(gid) or {}
+        if str(current.get("name") or "") == label and gid in self.groups:
+            return False
+        self.groups[gid] = {"name": label}
+        self._dirty = True
+        self._emit()
+        return True
+
+    def list_named_groups(self, page_id: str | None = None) -> list[dict[str, Any]]:
+        """Groups that have at least one widget on the page (active page if omitted)."""
+        page = self.page_by_id(page_id) if page_id else self.active_page()
+        if page is None:
+            return []
+        found: dict[str, int] = {}
+        for item in page.get("widgets") or []:
+            gid = str(item.get("group") or "").strip()
+            if not gid:
+                continue
+            found[gid] = found.get(gid, 0) + 1
+        rows = []
+        for gid, count in found.items():
+            rows.append({"id": gid, "name": self.group_display_name(gid), "count": count})
+        rows.sort(key=lambda r: (str(r["name"]).casefold(), r["id"]))
+        return rows
+
+    def set_control_target(self, kind: str, target_id: str | None = None, emit: bool = True) -> bool:
+        kind = str(kind or "page").casefold()
+        if kind not in ("page", "group", "widget"):
+            kind = "page"
+        tid = str(target_id or "").strip() or None
+        if kind == "page":
+            page = self.page_by_id(tid) if tid else self.active_page()
+            if page is None:
+                return False
+            tid = page["id"]
+        elif kind == "group":
+            if not tid or not self._group_has_members(tid):
+                return False
+        else:
+            if not tid or not self.widget_by_id(tid):
+                return False
+        new_target = {"kind": kind, "id": tid}
+        if new_target == self.control_target:
+            return False
+        self.control_target = new_target
+        if emit:
+            self.control_target_changed.emit()
+        return True
+
+    def set_control_highlight(self, active: bool):
+        """Show/hide the live-overlay cyan dashed target outline."""
+        flag = bool(active)
+        if bool(getattr(self, "_control_highlight", False)) == flag:
+            return
+        self._control_highlight = flag
+        self.control_highlight_changed.emit()
+
+    @property
+    def control_highlight_active(self) -> bool:
+        return bool(getattr(self, "_control_highlight", False))
+
+    def set_mouse_reposition(self, enabled: bool):
+        """Allow dragging the control target on the live overlay (session-only)."""
+        flag = bool(enabled)
+        if bool(getattr(self, "_mouse_reposition", False)) == flag:
+            return
+        self._mouse_reposition = flag
+        if flag:
+            self.set_control_highlight(True)
+        self.mouse_reposition_changed.emit()
+
+    @property
+    def mouse_reposition_enabled(self) -> bool:
+        return bool(getattr(self, "_mouse_reposition", False))
+
+    def set_preview_show_all(self, enabled: bool):
+        """When True, live windows paint all designer-visible widgets (ignore conditions).
+
+        Used by the Overlay tab Show button so gated layouts are still visible for
+        layout checks. Auto-show on profile start leaves this False.
+        """
+        flag = bool(enabled)
+        if bool(getattr(self, "_preview_show_all", False)) == flag:
+            return
+        self._preview_show_all = flag
+        self._emit()
+
+    @property
+    def preview_show_all(self) -> bool:
+        return bool(getattr(self, "_preview_show_all", False))
+
+    def _ensure_control_target(self):
+        kind = str((self.control_target or {}).get("kind") or "page").casefold()
+        tid = str((self.control_target or {}).get("id") or "").strip() or None
+        if kind == "widget" and tid and self.widget_by_id(tid):
+            self.control_target = {"kind": "widget", "id": tid}
+            return
+        if kind == "group" and tid and self._group_has_members(tid):
+            self.control_target = {"kind": "group", "id": tid}
+            return
+        page = self.active_page()
+        self.control_target = {"kind": "page", "id": page["id"] if page else None}
+
+    def control_target_widget_ids(self, target: dict[str, Any] | None = None, page_id: str | None = None) -> list[str]:
+        target = target if isinstance(target, dict) else self.control_target
+        kind = str(target.get("kind") or "page").casefold()
+        tid = str(target.get("id") or "").strip()
+        page = self.page_by_id(page_id) if page_id else self.active_page()
+        if kind == "widget":
+            item = self.widget_by_id(tid)
+            return [tid] if item else []
+        if kind == "group":
+            widgets = (page.get("widgets") if page else None) or self.widgets
+            return [item["id"] for item in widgets if str(item.get("group") or "").strip() == tid]
+        # Entire page
+        widgets = (page.get("widgets") if page else None) or self.widgets
+        if page and page.get("id"):
+            # Prefer widgets on the targeted page when kind is page
+            target_page = self.page_by_id(tid) if tid else page
+            if target_page is not None:
+                widgets = target_page.get("widgets") or []
+        return [item["id"] for item in widgets]
+
+    def _union_bounds_for_ids(self, ids: list[str], page_id: str | None = None) -> tuple[float, float, float, float] | None:
+        left = top = None
+        right = bottom = None
+        for wid in ids:
+            item = self.widget_by_id(wid) if not page_id else None
+            if item is None and page_id:
+                for candidate in self.widgets_for(page_id):
+                    if candidate.get("id") == wid:
+                        item = candidate
+                        break
+            if item is None:
+                item = self.widget_by_id(wid)
+            if not item or widget_is_locked(item):
+                continue
+            x = float(item.get("x") or 0)
+            y = float(item.get("y") or 0)
+            w = max(1.0, float(item.get("w") or 1))
+            h = max(1.0, float(item.get("h") or 1))
+            left = x if left is None else min(left, x)
+            top = y if top is None else min(top, y)
+            right = x + w if right is None else max(right, x + w)
+            bottom = y + h if bottom is None else max(bottom, y + h)
+        if left is None:
+            return None
+        return left, top, right - left, bottom - top
+
+    def _translate_widget_ids(self, ids: list[str], dx: int, dy: int, page_id: str | None = None) -> bool:
+        if dx == 0 and dy == 0:
+            return False
+        moved = False
+        lookup = {item["id"]: item for item in (self.widgets_for(page_id) if page_id else self.widgets)}
+        for wid in ids:
+            item = lookup.get(wid) or self.widget_by_id(wid)
+            if not item or widget_is_locked(item):
+                continue
+            item["x"] = int(item.get("x") or 0) + dx
+            item["y"] = int(item.get("y") or 0) + dy
+            moved = True
+        return moved
+
+    def _canvas_size_for_page(self, page: dict[str, Any] | None) -> tuple[int, int]:
+        canvas = (page or {}).get("canvas") if isinstance(page, dict) else None
+        canvas = canvas if isinstance(canvas, dict) else self.canvas
+        try:
+            w = int(canvas.get("width") or 1280)
+        except (TypeError, ValueError):
+            w = 1280
+        try:
+            h = int(canvas.get("height") or 720)
+        except (TypeError, ValueError):
+            h = 720
+        return max(1, w), max(1, h)
+
+    def _available_screen_rect(self, page: dict[str, Any] | None, hint_x: int | None = None, hint_y: int | None = None):
+        from PySide6 import QtWidgets
+
+        from .overlay_window import resolve_overlay_screen
+
+        app = QtWidgets.QApplication.instance()
+        canvas = (page or {}).get("canvas") if isinstance(page, dict) else self.canvas
+        info = resolve_overlay_screen(canvas if isinstance(canvas, dict) else None)
+        screen = None
+        if app is not None and info is not None:
+            screens = app.screens()
+            index = int(info.get("index") or 0)
+            if 0 <= index < len(screens):
+                screen = screens[index]
+        if screen is None and app is not None:
+            if hint_x is not None and hint_y is not None:
+                screen = app.screenAt(QtCore.QPoint(int(hint_x), int(hint_y)))
+            if screen is None:
+                screen = app.primaryScreen()
+        if screen is None:
+            return 0, 0, 1920, 1080
+        geo = screen.availableGeometry()
+        return int(geo.x()), int(geo.y()), int(geo.width()), int(geo.height())
+
+    def nudge_control_target(self, dx: int, dy: int, target: dict[str, Any] | None = None) -> bool:
+        target = target if isinstance(target, dict) else self.control_target
+        kind = str(target.get("kind") or "page").casefold()
+        if kind == "page":
+            page = self.page_by_id(target.get("id")) or self.active_page()
+            if page is None:
+                return False
+            if not is_onscreen_mode(page.get("canvas")):
+                cw, ch = self._canvas_size_for_page(page)
+                wx = page.get("window_x")
+                wy = page.get("window_y")
+                sx, sy, sw, sh = self._available_screen_rect(page, wx, wy)
+                if wx is None or wy is None:
+                    wx = sx + max(0, (sw - cw) // 2)
+                    wy = sy + max(0, (sh - ch) // 2)
+                desired_x = int(wx) + int(dx)
+                desired_y = int(wy) + int(dy)
+                sx, sy, sw, sh = self._available_screen_rect(page, desired_x, desired_y)
+                cdx, cdy = _clamp_rect_delta(
+                    float(desired_x - sx),
+                    float(desired_y - sy),
+                    float(cw),
+                    float(ch),
+                    0.0,
+                    0.0,
+                    float(sw),
+                    float(sh),
+                )
+                nx = int(sx + (desired_x - sx) + cdx)
+                ny = int(sy + (desired_y - sy) + cdy)
+                self.record_page_position(nx, ny, page_id=page["id"], emit=False)
+                self._dirty = True
+                self.page_window_move_requested.emit(page["id"], nx, ny)
+                self._emit_geometry()
+                return True
+        ids = self.control_target_widget_ids(target)
+        if not ids:
+            return False
+        page = self.active_page()
+        if kind == "page":
+            page = self.page_by_id(target.get("id")) or page
+        bounds = self._union_bounds_for_ids(ids, page_id=page["id"] if page else None)
+        if bounds is None:
+            return False
+        cw, ch = self._canvas_size_for_page(page)
+        cdx, cdy = _clamp_rect_delta(bounds[0], bounds[1], bounds[2], bounds[3], float(dx), float(dy), float(cw), float(ch))
+        if not self._translate_widget_ids(ids, cdx, cdy, page_id=page["id"] if page else None):
+            return False
+        self._dirty = True
+        self._emit_geometry()
+        return True
+
+    def anchor_target(self, anchor: str, target: dict[str, Any] | None = None) -> bool:
+        """Align the control target to an anchor. Windowed pages emit page_window_move_requested."""
+        anchor = normalize_anchor_key(anchor)
+        target = target if isinstance(target, dict) else self.control_target
+        kind = str(target.get("kind") or "page").casefold()
+        self._last_anchor = anchor
+
+        if kind == "page":
+            page = self.page_by_id(target.get("id")) or self.active_page()
+            if page is None:
+                return False
+            if not is_onscreen_mode(page.get("canvas")):
+                return self._anchor_windowed_page(page, anchor)
+
+        ids = self.control_target_widget_ids(target)
+        if not ids:
+            return False
+        page = self.active_page()
+        if kind == "page":
+            page = self.page_by_id(target.get("id")) or page
+        bounds = self._union_bounds_for_ids(ids, page_id=page["id"] if page else None)
+        if bounds is None:
+            return False
+        x, y, w, h = bounds
+        cw, ch = self._canvas_size_for_page(page)
+        ax, ay = _anchor_point_on_rect(x, y, w, h, anchor)
+        rx, ry = _anchor_point_on_rect(0.0, 0.0, float(cw), float(ch), anchor)
+        dx, dy = rx - ax, ry - ay
+        cdx, cdy = _clamp_rect_delta(x, y, w, h, dx, dy, float(cw), float(ch))
+        if not self._translate_widget_ids(ids, cdx, cdy, page_id=page["id"] if page else None):
+            return False
+        self._dirty = True
+        self._emit()
+        return True
+
+    def _anchor_windowed_page(self, page: dict[str, Any], anchor: str) -> bool:
+        cw, ch = self._canvas_size_for_page(page)
+        wx = page.get("window_x")
+        wy = page.get("window_y")
+        sx, sy, sw, sh = self._available_screen_rect(page, wx, wy)
+        if wx is None or wy is None:
+            wx = sx + max(0, (sw - cw) // 2)
+            wy = sy + max(0, (sh - ch) // 2)
+        ax, ay = _anchor_point_on_rect(float(wx), float(wy), float(cw), float(ch), anchor)
+        rx, ry = _anchor_point_on_rect(float(sx), float(sy), float(sw), float(sh), anchor)
+        desired_x = float(wx) + (rx - ax)
+        desired_y = float(wy) + (ry - ay)
+        cdx, cdy = _clamp_rect_delta(
+            float(desired_x - sx),
+            float(desired_y - sy),
+            float(cw),
+            float(ch),
+            0.0,
+            0.0,
+            float(sw),
+            float(sh),
+        )
+        nx = int(sx + (desired_x - sx) + cdx)
+        ny = int(sy + (desired_y - sy) + cdy)
+        self.record_page_position(nx, ny, page_id=page["id"], emit=False)
+        self._dirty = True
+        self.page_window_move_requested.emit(page["id"], nx, ny)
+        self._emit()
+        return True
+
+    def cycle_anchor(self, target: dict[str, Any] | None = None) -> str:
+        current = normalize_anchor_key(self._last_anchor)
+        try:
+            index = ANCHOR_KEYS.index(current)
+        except ValueError:
+            index = -1
+        nxt = ANCHOR_KEYS[(index + 1) % len(ANCHOR_KEYS)]
+        self.anchor_target(nxt, target=target)
+        return nxt
+
+    def set_widgets_visible(self, widget_ids: list[str], visible: bool) -> bool:
+        flag = bool(visible)
+        changed = False
+        for wid in widget_ids:
+            item = self.widget_by_id(wid)
+            if not item:
+                continue
+            if bool(item.get("visible", True)) == flag:
+                continue
+            item["visible"] = flag
+            changed = True
+        if changed:
+            self._dirty = True
+            self._emit()
+        return changed
+
+    def set_group_widgets_visible(self, group_id: str, visible: bool, page_id: str | None = None) -> bool:
+        ids = []
+        widgets = self.widgets_for(page_id) if page_id else self.widgets
+        gid = str(group_id or "").strip()
+        for item in widgets:
+            if str(item.get("group") or "").strip() == gid:
+                ids.append(item["id"])
+        return self.set_widgets_visible(ids, visible)
 
     def set_selection(self, ids: list[str], additive: bool = False):
         ids = [i for i in ids if self.widget_by_id(i)]
@@ -2207,9 +3072,12 @@ class OverlayScene(QtCore.QObject):
                     merged.remove(i)
                 else:
                     merged.append(i)
-            self.selected_ids = merged
+            new_ids = merged
         else:
-            self.selected_ids = ids
+            new_ids = ids
+        if new_ids == list(self.selected_ids):
+            return
+        self.selected_ids = new_ids
         self.selection_changed.emit()
 
     def primary_selection(self) -> dict[str, Any] | None:
@@ -2338,6 +3206,29 @@ class OverlayScene(QtCore.QObject):
         self._dirty = True
         self._emit()
 
+    def _widget_snap_targets(self, exclude_ids: set[str] | None = None) -> tuple[list[float], list[float]]:
+        """X and Y snap lines from other widgets (left/center/right and top/middle/bottom)."""
+        from .widgets import widget_rotated_bounds
+
+        exclude = {str(i) for i in (exclude_ids or set())}
+        vertical: list[float] = []
+        horizontal: list[float] = []
+        for item in self.widgets:
+            wid = str(item.get("id") or "")
+            if not wid or wid in exclude:
+                continue
+            if not item.get("visible", True):
+                continue
+            try:
+                bounds = widget_rotated_bounds(item)
+            except Exception:
+                continue
+            if bounds.isNull() or bounds.width() <= 0 or bounds.height() <= 0:
+                continue
+            vertical.extend([bounds.left(), bounds.center().x(), bounds.right()])
+            horizontal.extend([bounds.top(), bounds.center().y(), bounds.bottom()])
+        return vertical, horizontal
+
     def snap_geom_to_guides(
         self,
         x: float,
@@ -2348,9 +3239,12 @@ class OverlayScene(QtCore.QObject):
         y_edges: tuple[str, ...] | None = None,
         mode: str = "move",
         previous: tuple[float, float, float, float] | None = None,
+        exclude_ids: set[str] | None = None,
     ) -> tuple[float, float, float, float]:
         guides = self.canvas.get("guides") or []
-        if not guides:
+        snap_widgets = bool(self.canvas.get("snap_to_widgets", True))
+        self.active_snap_lines = []
+        if not guides and not snap_widgets:
             return x, y, w, h
         cw = max(1.0, float(self.canvas.get("width") or 1280))
         ch = max(1.0, float(self.canvas.get("height") or 720))
@@ -2361,9 +3255,21 @@ class OverlayScene(QtCore.QObject):
             y_edges = ("top", "center", "bottom")
         vertical = [float(g.get("position") or 0) * cw for g in guides if g.get("axis") == "v"]
         horizontal = [float(g.get("position") or 0) * ch for g in guides if g.get("axis") == "h"]
+        widget_v: list[float] = []
+        widget_h: list[float] = []
+        if snap_widgets:
+            if exclude_ids is None:
+                exclude_ids = {str(i) for i in self.selected_ids}
+            widget_v, widget_h = self._widget_snap_targets(exclude_ids)
+            vertical.extend(widget_v)
+            horizontal.extend(widget_h)
 
         def _best(current: dict[str, float], targets: list[float], previous: dict[str, float] | None = None):
-            best_dist = threshold + 1.0
+            # Engage when approaching a line; release after 1px away so one arrow key
+            # or a tiny mouse nudge can leave a magnet without fighting the threshold.
+            engage = threshold
+            release = 1.0
+            best_dist = engage + 1.0
             best = None
             for name, value in current.items():
                 for target in targets:
@@ -2371,17 +3277,20 @@ class OverlayScene(QtCore.QObject):
                     if dist < best_dist:
                         best_dist = dist
                         best = (name, target)
-            if best is None or previous is None:
-                return best
+            if best is None:
+                return None
+            if previous is None:
+                return best if best_dist <= engage else None
             name, target = best
             old = previous.get(name)
-            if old is None:
-                return best
             new = current.get(name)
-            if new is None:
+            if old is None or new is None:
                 return best
-            unstick = max(2.0, threshold * 0.25)
-            if abs(new - target) > abs(old - target) + 0.01 and abs(new - target) >= unstick:
+            # Break free as soon as we move away from the locked line by `release`.
+            if abs(old - target) <= 0.51 and abs(new - target) >= release and abs(new - target) > abs(old - target) + 0.01:
+                return None
+            # Also break if the nearest line is a different one we're leaving past release.
+            if abs(new - target) > abs(old - target) + 0.01 and abs(new - target) >= release:
                 return None
             return best
 
@@ -2405,6 +3314,8 @@ class OverlayScene(QtCore.QObject):
         hit = _best(x_map, vertical, prev_x) if vertical else None
         if hit:
             edge, target = hit
+            if any(abs(float(target) - t) < 0.05 for t in widget_v):
+                self.active_snap_lines.append(("v", float(target)))
             if mode == "resize":
                 if edge == "left":
                     right = x + w
@@ -2442,6 +3353,8 @@ class OverlayScene(QtCore.QObject):
         hit = _best(y_map, horizontal, prev_y) if horizontal else None
         if hit:
             edge, target = hit
+            if any(abs(float(target) - t) < 0.05 for t in widget_h):
+                self.active_snap_lines.append(("h", float(target)))
             if mode == "resize":
                 if edge == "top":
                     bottom = y + h
@@ -2505,7 +3418,7 @@ class OverlayScene(QtCore.QObject):
         if snap:
             self.snap_selection_to_guides(previous=previous)
         self._dirty = True
-        self._emit()
+        self._emit_geometry()
 
     def apply_widget_update(self, widget_id: str, **fields):
         item = self.widget_by_id(widget_id)
@@ -2611,22 +3524,20 @@ class OverlayScene(QtCore.QObject):
             return None
 
     def load_for_profile(self, profile=None) -> bool:
-        """ loads for a profile - account for the profile not being saved yet (so having no file)"""
         profile = profile or gremlin.shared_state.current_profile
         self._undo.clear()
         self._redo.clear()
         self.selected_ids = []
-        path = profile_xml_path(profile)
-        json_path = profile_json_path(profile) if path else None
-        if profile and json_path:
-            if not os.path.isfile(json_path):
-                # fallback to old sidecar without "obs" suffix
-                json_path = gremlin.util.swap_ext(path, "json")
+        try:
+            from .sys_stats import ManualCounterTracker
 
+            ManualCounterTracker().clear()
+        except Exception:
+            pass
+        path = profile_xml_path(profile)
+        json_path = profile_json_path(profile)
         data = None
-        if not json_path:
-            return False
-        if os.path.isfile(json_path):
+        if profile is not None:
             try:
                 cfg = profile._readConfig(force=True) or {}
                 candidate = cfg.get(OVERLAY_CONFIG_KEY)
@@ -2636,16 +3547,29 @@ class OverlayScene(QtCore.QObject):
                 syslog.warning(f"OBS OVERLAY: profile overlay read failed: {err}")
         if not isinstance(data, dict) or not (data.get("pages") or data.get("widgets") or data.get("canvas")):
             data = self.read_stored_layout(profile)
-        # One-time import of a leftover .overlay.json from older builds.
-        if not _overlay_payload_has_content(data):
-            legacy = self._read_json_file(overlay_path_for_profile(profile))
-            if isinstance(legacy, dict) and (legacy.get("pages") or legacy.get("widgets") or legacy.get("canvas")):
+        # Prefer a newer *.overlay.json export/sidecar if profile.json is stale.
+        # update_sidecar used to write only that file; load reads profile.json.
+        legacy = self._read_json_file(overlay_path_for_profile(profile))
+        if isinstance(legacy, dict) and _overlay_payload_has_content(legacy):
+            if not _overlay_payload_has_content(data):
                 data = legacy
-                if profile is not None:
-                    try:
-                        profile._setConfig(OVERLAY_CONFIG_KEY, data)
-                    except Exception:
-                        pass
+            else:
+                try:
+                    legacy_ts = float(legacy.get("saved_at") or 0)
+                    data_ts = float((data or {}).get("saved_at") or 0)
+                except (TypeError, ValueError):
+                    legacy_ts, data_ts = 0.0, 0.0
+                if legacy_ts > data_ts + 0.01:
+                    syslog.info(
+                        "OBS OVERLAY: adopting newer layout from .overlay.json "
+                        f"(sidecar {legacy_ts:g} > profile {data_ts:g})"
+                    )
+                    data = legacy
+                    if profile is not None:
+                        try:
+                            profile._setConfig(OVERLAY_CONFIG_KEY, copy.deepcopy(data))
+                        except Exception:
+                            pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
             self._profile_key = path
             self._path = json_path
@@ -2655,7 +3579,16 @@ class OverlayScene(QtCore.QObject):
             self._undo.clear()
             self._redo.clear()
             return True
-        if not path and (self._dirty or _overlay_payload_has_content(self.to_dict())):
+        # Keep an in-memory draft only when this scene never belonged to a saved
+        # profile and the current profile is still unsaved. After File → New
+        # (or leaving a saved profile), clear so the Overlay tab does not keep
+        # showing the previous layout under "Unsaved profile".
+        previous_key = self._profile_key
+        if (
+            not path
+            and not previous_key
+            and (self._dirty or _overlay_payload_has_content(self.to_dict()))
+        ):
             return False
         self._profile_key = path
         self._path = json_path
@@ -2688,12 +3621,29 @@ class OverlayScene(QtCore.QObject):
             syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
             return False
         data = self.to_dict()
-        ok = self._persist_files(path, data)
+        current = profile_xml_path(profile)
+        # Prefer Profile._setConfig so we merge against the live sidecar and keep
+        # _config_data in sync — a direct file write can be overwritten moments
+        # later by Stream Deck / last_input using a stale in-memory cache.
+        use_set_config = (
+            profile is not None
+            and hasattr(profile, "_setConfig")
+            and (not dest_xml or _same_profile_path(dest_xml, current))
+        )
+        ok = False
+        if use_set_config:
+            try:
+                profile._setConfig(OVERLAY_CONFIG_KEY, copy.deepcopy(data))
+                ok = True
+            except Exception as err:
+                syslog.warning(f"OBS OVERLAY: profile _setConfig failed, falling back to file merge: {err}")
+        if not ok:
+            ok = self._persist_files(path, data)
         if ok:
+            self._dirty = False
             self._profile_key = path
-            self._path = profile_json_path(dest_xml=path)
-            #self._path = gremlin.util.swap_ext(path, "json")
-            if profile is not None:
+            self._path = gremlin.util.swap_ext(path, "json")
+            if profile is not None and not use_set_config:
                 cfg = getattr(profile, "_config_data", None)
                 if not isinstance(cfg, dict):
                     cfg = {}
@@ -2711,23 +3661,50 @@ class OverlayScene(QtCore.QObject):
         return ok
 
     def save_later(self):
-        """Persist after the current Qt event finishes. Never call save() from hideEvent."""
-        if not gremlin.util.is_ui_thread():
-            gremlin.util.InvokeUiMethod(self.save_later)
-            return
+        """Persist after the current Qt event finishes. Never call save() from hideEvent.
+
+        Must not call InvokeUiMethod(self.save_later): a false-negative UI-thread
+        check + DirectConnection re-enters forever (RecursionError on tab switch).
+        QTimer.singleShot with `self` as context posts to this QObject's thread.
+        """
         if self._save_later_pending:
             return
         self._save_later_pending = True
-        QtCore.QTimer.singleShot(0, self._save_later_run)
+        QtCore.QTimer.singleShot(0, self, self._save_later_run)
+
+    def save_now(self) -> bool:
+        """Synchronously persist the overlay (e.g. on overlay hide / app quit)."""
+        self._save_later_pending = False
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().sync_into_scene(self)
+        except Exception:
+            pass
+        if not self._dirty:
+            return True
+        try:
+            return bool(self.persist_owned())
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: save_now failed: {err}")
+            return False
 
     def _save_later_run(self):
         self._save_later_pending = False
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().sync_into_scene(self)
+        except Exception:
+            pass
         if not self._dirty:
             return
         try:
-            self.save_to_profile()
-        except Exception:
-            pass
+            ok = bool(self.persist_owned())
+            if not ok:
+                syslog.warning("OBS OVERLAY: deferred save did not write (profile may be unsaved)")
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: deferred save failed: {err}")
 
     def save_owned(self) -> bool:
         """Persist this scene to the profile it was loaded from, even after a switch."""
@@ -2738,6 +3715,19 @@ class OverlayScene(QtCore.QObject):
             return self.save_to_profile()
         return self._persist_files(self._profile_key, self.to_dict())
 
+    def persist_owned(self) -> bool:
+        """Write dirty overlay only to the profile that owns this scene.
+
+        Never fall back to ``current_profile`` when that profile is a different
+        file (profile switch / deferred save) — that would paste the previous
+        layout into the newly loaded profile.
+        """
+        if self.save_owned():
+            return True
+        if self.belongs_to_profile():
+            return bool(self.save_to_profile())
+        return False
+
     def _write_json_file(self, path: str, data: dict[str, Any]) -> bool:
         try:
             folder = os.path.dirname(path)
@@ -2745,9 +3735,6 @@ class OverlayScene(QtCore.QObject):
                 os.makedirs(folder, exist_ok=True)
             with open(path, "w", encoding="utf-8") as handle:
                 json.dump(data, handle, indent=2)
-                handle.flush()  # Push Python internal buffers to OS cache
-                os.fsync(handle.fileno())  # Force OS cache flush to physical storage
-
             return True
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to save layout {path}: {err}")
@@ -2764,9 +3751,8 @@ class OverlayScene(QtCore.QObject):
             syslog.warning(f"OBS OVERLAY: failed to load layout {path}: {err}")
             return None
 
-    def _persist_files_v0(self, profile_xml: str, data: dict[str, Any]) -> bool:
-        config_path = profile_json_path(profile_xml)
-        # config_path = gremlin.util.swap_ext(profile_xml, "json")
+    def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
+        config_path = gremlin.util.swap_ext(profile_xml, "json")
         merged: dict[str, Any] | None = {}
         if os.path.isfile(config_path):
             try:
@@ -2793,58 +3779,6 @@ class OverlayScene(QtCore.QObject):
             return True
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}")
-            return False
-
-    def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
-        config_path = profile_json_path(dest_xml = profile_xml)
-        merged: dict[str, Any] = {}
-
-        if os.path.isfile(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as handle:
-                    loaded = json.load(handle)
-
-                if isinstance(loaded, dict):
-                    merged = loaded
-                else:
-                    syslog.error(
-                        f"OBS OVERLAY: profile config is not an object: {config_path}"
-                    )
-                    return False
-            except Exception as err:
-                syslog.error(
-                    f"OBS OVERLAY: could not read/parse overlay at {config_path}: {err}"
-                )
-                return False
-
-        # 2. Update configuration payload
-        merged[OVERLAY_CONFIG_KEY] = data
-
-        # 3. Persist back to disk safely
-        tmp_path = f"{config_path}.tmp"
-        try:
-            folder = os.path.dirname(config_path)
-            if folder:
-                os.makedirs(folder, exist_ok=True)
-
-            with open(tmp_path, "w", encoding="utf-8") as handle:
-                json.dump(merged, handle, indent=4, sort_keys=True)
-                handle.flush()  # Push Python internal buffers to OS cache
-                os.fsync(handle.fileno())  # Force OS cache flush to physical storage
-
-            os.replace(tmp_path, config_path)
-            self._dirty = False
-            return True
-
-        except Exception as err:
-            syslog.error(
-                f"OBS OVERLAY: failed to write profile overlay config {config_path}: {err}"
-            )
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
             return False
 
     @property

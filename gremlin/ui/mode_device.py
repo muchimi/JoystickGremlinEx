@@ -682,7 +682,12 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.current_mode = mode
         self.inputItemListModel.mode = mode
         self.inputItemListModel.refresh()
-
+        # List view is delay-created; selection is a no-op until ensureLoaded finishes.
+        if getattr(self, "_input_item_list_view", None) is None:
+            try:
+                self.ensureLoaded()
+            except Exception:
+                return
         self.selectInputItemIndex(self._last_selected_index)
 
     def refresh(self, emit=True):

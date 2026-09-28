@@ -727,10 +727,19 @@ def widget_conditions_match(item: dict[str, Any] | None) -> bool:
     return eval_visibility_node(node, env)
 
 
-def widget_is_live_visible(item: dict[str, Any] | None) -> bool:
+def widget_is_live_visible(item: dict[str, Any] | None, *, ignore_conditions: bool = False) -> bool:
     """True when the widget should appear on the live overlay window."""
     if not item or not item.get("visible", True):
         return False
+    if ignore_conditions:
+        return True
+    try:
+        from gremlin.ui.obs_overlay import OverlayManager
+
+        if OverlayManager().scene.preview_show_all:
+            return True
+    except Exception:
+        pass
     return widget_conditions_match(item)
 
 
@@ -1083,12 +1092,12 @@ def read_widget_value(item: dict[str, Any]):
 class OverlayValueBus(QtCore.QObject):
     """Live physical / vJoy / state values for overlay widgets.
 
-    Steady 60 Hz DirectInput poll. Per-event UI callbacks are not used:
+    Steady ~30 Hz DirectInput poll. Per-event UI callbacks are not used:
     HID packets from every device starve Qt's paint timer and look worse.
     """
 
     values_changed = QtCore.Signal(object)
-    POLL_INTERVAL_MS = 16  # ~60 Hz
+    POLL_INTERVAL_MS = 33  # ~30 Hz — keeps UI/GIL free for vJoy while overlay is up
 
     def __init__(self):
         super().__init__()
@@ -1122,6 +1131,23 @@ class OverlayValueBus(QtCore.QObject):
             self._widget_sources.pop(id(source), None)
         self._refcount = max(0, self._refcount - 1)
         if self._refcount == 0:
+            # Last live listener — flush tallies synchronously (hide/quit can
+            # kill the event loop before save_later's timer fires).
+            try:
+                from .sys_stats import ManualCounterTracker
+                from gremlin.ui.obs_overlay import OverlayManager
+
+                tracker = ManualCounterTracker()
+                scene = OverlayManager().scene
+                dirty = tracker.take_persist_dirty()
+                if tracker.sync_into_scene(scene):
+                    dirty = True
+                if dirty:
+                    scene._dirty = True
+                if scene.dirty:
+                    scene.save_now()
+            except Exception:
+                pass
             self._widget_sources.clear()
             self._disconnect()
 
@@ -1272,19 +1298,30 @@ class OverlayValueBus(QtCore.QObject):
         ApplicationViewTracker().retain(application_ids)
         RemoteVideoHub().retain(remote_ids)
         if ManualCounterTracker().take_persist_dirty():
-            try:
-                from gremlin.ui.obs_overlay import OverlayManager
-
-                scene = OverlayManager().scene
-                scene._dirty = True
-                scene.save_later()
-            except Exception:
-                pass
+            self._persist_manual_counters()
         if self._emit_all:
             self._emit_all = False
             self.values_changed.emit([])
         elif changed_ids:
             self.values_changed.emit(changed_ids)
+
+    def _persist_manual_counters(self):
+        """Write manual tallies into the scene and schedule a profile sidecar save."""
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+            from .sys_stats import ManualCounterTracker
+
+            scene = OverlayManager().scene
+            ManualCounterTracker().sync_into_scene(scene)
+            scene._dirty = True
+            scene.save_later()
+        except Exception as err:
+            try:
+                import logging
+
+                logging.getLogger("system").warning(f"OBS OVERLAY: manual counter persist failed: {err}")
+            except Exception:
+                pass
 
     def value_for(self, item: dict[str, Any]):
         widget_id = item.get("id")
