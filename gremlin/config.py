@@ -2088,7 +2088,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_voice(self):
         """true if verbose mode for voice"""
-        return True
+        # return True
         return self.verbose and VerboseMode.Voice in self.verbose_mode
 
     @property

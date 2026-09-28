@@ -909,6 +909,8 @@ class Color:
         button_background_color = Color.buttonBackgroundColor()
         button_hover_color = Color.buttonHoverBackgroundColor()
 
+        progress_start, progress_stop = Color.ChannelColors()[0]
+
         css = f"""
 
             QDialog {{
@@ -1061,9 +1063,47 @@ class Color:
                         border: 1px solid {border_color};
                     }}
 
+
             """
 
         return css
+
+    @staticmethod
+    def cssProgressDialog():
+
+
+        progress_start, progress_stop = Color.ChannelColors()[0]
+        css = f"""
+            QProgressDialog QProgressBar {{
+                border: 2px solid {Color.borderColor()};
+                border-radius: 5px;
+                text-align: center;
+                background-color: {Color.backgroundColor()};
+                color: {Color.normalColor()}; /* Text color inside the bar */
+            }}
+
+
+            QProgressDialog QProgressBar::chunk {{
+                background-color: {Color.selectGradientAltColor()};
+                width: 10px; /* Width of chunks for blocks, omit for smooth fill */
+                margin: 0.5px;
+            }}
+
+            QProgressDialog QProgressBar:indeterminate {{
+                background-color: {Color.selectGradientAltColor()};
+                border: 1px solid {Color.borderColor()};
+            }}
+
+            QProgressDialog QProgressBar::chunk:indeterminate {{
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                    stop:0 {progress_start}, stop:1 {progress_stop});
+            }}
+
+
+            """
+        return css
+
+
 
     @staticmethod
     def cssButtonState():

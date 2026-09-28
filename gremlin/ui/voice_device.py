@@ -413,11 +413,19 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
         # voice options
-        beep_widget = gremlin.ui.ui_common.QDataCheckBox(value=self._beep_enabled,
-                                                         text="Audio beep on voice recognition toggle",
+
+        beep_widget = gremlin.ui.ui_common.QDataCheckbox(value=self._voice_data.beep_enabled,
+                                                         label="on PTT",
                                                          callback=self._handle_beep_toggle,
                                                          tooltip="Enable or disable a two tone audio beep when voice recognition is toggled, plays to the default device.")
-        self.main_layout.addWidget(beep_widget)
+
+        beep_on_recognize_widget = gremlin.ui.ui_common.QDataCheckbox(value=self._voice_data.beep_on_recognize_enabled,
+                                                         label="on recognition",
+                                                         callback=self._handle_beep_recognize_toggle,
+                                                         tooltip="Enable or disable a sound when voice is matched to a command.")
+
+        widget = gremlin.ui.ui_common.getHContainer(["Audible Queues:",beep_widget,"|", beep_on_recognize_widget, "||"], widget_only=True)
+        self.main_layout.addWidget(widget)
 
         # voice model
          # possible models: "tiny", "base", "small", "medium", "large-v3"
@@ -482,7 +490,10 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_volume_monitor()
 
     def _handle_beep_toggle(self, enabled):
-        self._beep_enabled = enabled
+        self._voice_data.beep_enabled = enabled
+
+    def _handle_beep_recognize_toggle(self, enabled):
+        self._voice_data.beep_on_recognize_enabled = enabled
 
     @property
     def voice_data(self):
@@ -962,12 +973,13 @@ class VoiceData:
 
         self._device_name: str = None  # name of the selected audio device
         self._device_index: int = None  # index of the selected audio device
+        self._beep_enabled: bool = True  # whether the beep sound is enabled when the voice recognition is toggled
+        self._beep_on_recognize_enabled: bool = True  # whether a beep sounds when voice is recognized and matched to a command
 
         self._sound = Sound()
 
         self._gain = 1.0  # default gain value
         self._ptt_mode: VoicePTTMode = VoicePTTMode.PressToSuspend
-        self._beep_enabled = True # whether the beep sound is enabled when the voice recognition is toggled
         self._last_event = None
         self._ptt_input_item = None  # input to use/monitor for PTT - can be a KeyboardInputItem, OSCInputItem, JoystickInputItem, etc...
 
@@ -980,6 +992,22 @@ class VoiceData:
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.profile_unloaded.connect(self._handle_profile_unload)
+
+    @property
+    def beep_on_recognize_enabled(self):
+        return self._beep_on_recognize_enabled
+
+    @beep_on_recognize_enabled.setter
+    def beep_on_recognize_enabled(self, value: bool):
+        self._beep_on_recognize_enabled = value
+
+    @property
+    def beep_enabled(self):
+        return self._beep_enabled
+
+    @beep_enabled.setter
+    def beep_enabled(self, value: bool):
+        self._beep_enabled = value
 
     def registerGraphNode(self, input_item : InputItem, input_node : "gremlin.execution_graph.ExecutionGraphNode"):
         """registers an execution graph input node for the given input item"""
@@ -1229,7 +1257,9 @@ class VoiceData:
         # set initial state of voice recognition
 
         # update beep mode
-        self._voice.setBeep(self._beep_enabled)
+        self._voice.ensureBeep()
+        self._voice.setBeep(self.beep_enabled)
+        self._voice.setBeepOnRecognize(self.beep_on_recognize_enabled)
 
         # set startup mode
         self._update_listen_mode(False)
@@ -1499,6 +1529,7 @@ class VoiceData:
 
         root.set("gain", safe_format(self._gain, float))
         root.set("beep", safe_format(self._beep_enabled, bool))
+        root.set("beep-on-recognize", safe_format(self._beep_on_recognize_enabled, bool))
 
         return root
 
@@ -1519,6 +1550,7 @@ class VoiceData:
         self._device_name = safe_read(root, "device", str, None)
         self._ptt_mode = VoicePTTMode.from_string(safe_read(root, "ptt-mode", str, None))
         self._beep_enabled = safe_read(root, "beep", bool, True)
+        self._beep_on_recognize_enabled = safe_read(root, "beep-on-recognize", bool, True)
 
         master_mode = gremlin.shared_state.master_mode
 

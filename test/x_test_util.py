@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
 import sys
+
 sys.path.append(".")
 
 import pytest
@@ -57,53 +58,38 @@ xml_bad = """
 </action>
 """
 
+
 def test_read_action_id():
     doc = ElementTree.fromstring(xml_doc)
-    assert gremlin.util.read_action_id(doc) == \
-           uuid.UUID("ac905a47-9ad3-4b65-b702-fbae1d133609")
+    assert gremlin.util.read_action_id(doc) == uuid.UUID("ac905a47-9ad3-4b65-b702-fbae1d133609")
 
     xml_bad = """
         <action id="ac905a47-9ad3-4b65-b702" type="description"></action>
     """
     doc = ElementTree.fromstring(xml_bad)
-    with pytest.raises(gremlin.error.ProfileError,
-                       match=r"Failed parsing id from"):
+    with pytest.raises(gremlin.error.ProfileError, match=r"Failed parsing id from"):
         gremlin.util.read_action_id(doc)
 
     xml_bad = """
             <action type="description"></action>
         """
     doc = ElementTree.fromstring(xml_bad)
-    with pytest.raises(gremlin.error.ProfileError,
-                       match=r"Reading id entry failed due"):
+    with pytest.raises(gremlin.error.ProfileError, match=r"Reading id entry failed due"):
         gremlin.util.read_action_id(doc)
 
 
 def test_read_property():
     doc = ElementTree.fromstring(xml_doc)
 
-    assert gremlin.util.read_property(
-        doc, "description", gremlin.types.PropertyType.String
-    ) == "This is a test"
-    assert gremlin.util.read_property(
-        doc, "answer-to-life-and-everything", gremlin.types.PropertyType.Int
-    ) == 42
-    assert gremlin.util.read_property(
-        doc, "pi", gremlin.types.PropertyType.Float
-    ) == 3.14
-    assert gremlin.util.read_property(
-        doc, "lies", gremlin.types.PropertyType.Bool
-    ) == True
-
+    assert gremlin.util.read_property(doc, "description", gremlin.types.PropertyType.String) == "This is a test"
+    assert gremlin.util.read_property(doc, "answer-to-life-and-everything", gremlin.types.PropertyType.Int) == 42
+    assert gremlin.util.read_property(doc, "pi", gremlin.types.PropertyType.Float) == 3.14
+    assert gremlin.util.read_property(doc, "lies", gremlin.types.PropertyType.Bool) == True
 
     with pytest.raises(gremlin.error.ProfileError, match=r"No property name"):
-        gremlin.util.read_property(
-            doc, "does not exist", gremlin.types.PropertyType.Bool
-        )
+        gremlin.util.read_property(doc, "does not exist", gremlin.types.PropertyType.Bool)
     with pytest.raises(gremlin.error.ProfileError, match=r"Property type mismatch"):
-        gremlin.util.read_property(
-            doc, "lies", gremlin.types.PropertyType.Float
-        )
+        gremlin.util.read_property(doc, "lies", gremlin.types.PropertyType.Float)
 
     xml_bad = """
         <action id="ac905a47-9ad3-4b65-b702-fbae1d133609" type="description">
@@ -115,9 +101,7 @@ def test_read_property():
     """
     doc = ElementTree.fromstring(xml_bad)
     with pytest.raises(gremlin.error.ProfileError, match=r"Failed parsing property"):
-        gremlin.util.read_property(
-            doc, "value", gremlin.types.PropertyType.Int
-        )
+        gremlin.util.read_property(doc, "value", gremlin.types.PropertyType.Int)
 
     xml_bad = """
         <action id="ac905a47-9ad3-4b65-b702-fbae1d133609" type="description">
@@ -128,9 +112,7 @@ def test_read_property():
     """
     doc = ElementTree.fromstring(xml_bad)
     with pytest.raises(gremlin.error.ProfileError, match=r"Value element of property"):
-        gremlin.util.read_property(
-            doc, "value", gremlin.types.PropertyType.Int
-        )
+        gremlin.util.read_property(doc, "value", gremlin.types.PropertyType.Int)
 
     xml_bad = """
         <action id="ac905a47-9ad3-4b65-b702-fbae1d133609" type="description">
@@ -142,6 +124,19 @@ def test_read_property():
     """
     doc = ElementTree.fromstring(xml_bad)
     with pytest.raises(gremlin.error.ProfileError, match=r"Property element is missing"):
-        gremlin.util.read_property(
-            doc, "value", gremlin.types.PropertyType.Int
-        )
+        gremlin.util.read_property(doc, "value", gremlin.types.PropertyType.Int)
+
+
+def test_find_file_uses_root_specific_cache(tmp_path):
+    root_a = tmp_path / "root_a"
+    root_b = tmp_path / "root_b"
+    root_a.mkdir()
+    root_b.mkdir()
+
+    file_a = root_a / "shared.txt"
+    file_b = root_b / "shared.txt"
+    file_a.write_text("a")
+    file_b.write_text("b")
+
+    assert gremlin.util.find_file("shared.txt", str(root_a)) == str(file_a)
+    assert gremlin.util.find_file("shared.txt", str(root_b)) == str(file_b)

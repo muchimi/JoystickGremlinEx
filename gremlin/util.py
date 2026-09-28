@@ -761,18 +761,30 @@ class SearchCache:
     def __init__(self):
         self.cache = {}
 
+    @staticmethod
+    def _cache_key(file_path, root_folder=None):
+        root_folder = os.path.abspath(root_folder) if root_folder else None
+        normalized_path = os.path.normcase(os.path.normpath(file_path))
+        return (root_folder, normalized_path)
+
     def find_file(self, file_path, root_folder=None):
-        if file_path not in self.cache:
+        key = self._cache_key(file_path, root_folder)
+        if key not in self.cache:
             item = _find_file(file_path, root_folder)
-            if item is not None:
-                self.cache[file_path] = item
+            self.cache[key] = item
             return item
-        return self.cache[file_path]
+        return self.cache[key]
 
 
 def find_file(file_path, root_folder=None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
+
+def find_sound(file_path):
+    """locates a sound file"""
+    root_folder = gremlin.shared_state.root_path
+    return find_file(file_path, os.path.join(root_folder, "sounds"))
+
 
 
 def find_icon(icon_file):
@@ -852,6 +864,22 @@ def _find_file(file_path, root_folder=None):
         root_folder = gremlin.shared_state.root_path
     if not os.path.isdir(root_folder):
         return None
+
+    # Fast path: if the caller already provided a direct path or a path relative to the root,
+    # avoid walking the entire tree before checking the obvious candidate locations.
+    direct_candidates = []
+    if os.path.isabs(file_path):
+        direct_candidates.append(file_path)
+    else:
+        direct_candidates.extend([
+            os.path.join(root_folder, file_path),
+            os.path.join(root_folder, os.path.basename(file_path)),
+        ])
+
+    for candidate in direct_candidates:
+        if os.path.isfile(candidate):
+            return candidate
+
     circuit_breaker = 1000
     if os.sep in file_path:
         # we have folders
@@ -869,12 +897,11 @@ def _find_file(file_path, root_folder=None):
         else:
             extensions = [".svg", ".png"]
 
-        for dirpath, _, filenames in os.walk(root_folder):
+        for dirpath, dirnames, filenames in os.walk(root_folder):
+            # prune hidden folders before descending to reduce the search space and avoid traversing
+            # git metadata and other non-user content that won't contain game resources.
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
             if any([part.startswith(".") for part in Path(dirpath).relative_to(root_folder).parts]):
-                # ignore hidden folders, anywhere between the search root and the current file
-                # note: this also allows skipping non-hidden folders within hidden ones (like in .git),
-                #     : thereby saving quite a bit of room in the "circuit breaker", when running from
-                #     : a git repository
                 continue
             circuit_breaker -= 1
             if circuit_breaker == 0:

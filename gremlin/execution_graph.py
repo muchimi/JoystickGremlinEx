@@ -1442,7 +1442,7 @@ class ExecutionContext:
 
             if not container.is_valid():
                 # check = container.is_valid()
-                syslog.warning(f"Incomplete container ignored: {container.display_name}: returned invalid {gremlin.util.ansiFAIL()}")
+                syslog.warning(f"Incomplete container ignored: {container.display_name}: returned invalid {gremlin.util.ansiFail()}")
                 if config.allow_exec_tree_container_validation_fail:
                     syslog.warning("\tOverride allowed - build continuing...")
                 else:
