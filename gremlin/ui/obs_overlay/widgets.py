@@ -2896,12 +2896,23 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
     running = tracker.running(widget_id)
     fmt = normalize_stopwatch_format(style.get("stopwatch_format"))
     face = normalize_stopwatch_face(style.get("stopwatch_face"))
+    label_text = str(item.get("label") or "").strip() if style.get("show_label", False) else ""
+    label_font = _font(style, item, prefix="caption_") if label_text else None
+    label_h = 0.0
+    if label_font is not None:
+        label_h = float(QtGui.QFontMetricsF(label_font).height()) + 6.0
+        label_h = min(label_h, max(12.0, rect.height() * 0.45))
+    content = (
+        QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h))
+        if label_h > 0
+        else QtCore.QRectF(rect)
+    )
     painter.save()
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
     if face == "analog":
-        side = min(rect.width(), rect.height())
-        dial = QtCore.QRectF(rect.center().x() - side / 2.0, rect.center().y() - side / 2.0, side, side)
+        side = min(content.width(), content.height())
+        dial = QtCore.QRectF(content.center().x() - side / 2.0, content.center().y() - side / 2.0, side, side)
         painter.setPen(_pen(style.get("border"), _border_w(style)))
         painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
         painter.drawEllipse(dial)
@@ -2972,13 +2983,27 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         _draw_text_ex(
             painter,
             format_stopwatch(elapsed, fmt),
-            rect,
+            content.adjusted(4, 2, -4, -2),
             _font(style, item),
             style.get("needle_second_color") if running else style.get("font_color"),
             style,
         )
-    if style.get("show_label", False):
-        _draw_label(painter, item, rect, font_prefix="caption_")
+    if label_text and label_font is not None:
+        label_rect = QtCore.QRectF(rect.left(), rect.top() + 4.0, rect.width(), max(1.0, label_h - 2.0))
+        label_rect.translate(
+            float(style.get("label_offset_x") or 0),
+            float(style.get("label_offset_y") or 0),
+        )
+        _draw_text_ex(
+            painter,
+            label_text,
+            label_rect,
+            label_font,
+            style.get("caption_font_color") or style.get("font_color"),
+            style,
+            prefix="caption_",
+            flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
+        )
     painter.restore()
 
 

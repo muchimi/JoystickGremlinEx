@@ -88,10 +88,11 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_shutdown_ui)
 
     def _on_shutdown_ui(self):
+        # Overlay disk writes happen only on profile save — sync tallies in memory.
         try:
             self.scene.save_now()
         except Exception as err:
-            syslog.warning(f"OBS OVERLAY: shutdown flush failed: {err}")
+            syslog.warning(f"OBS OVERLAY: shutdown sync failed: {err}")
 
     def _apply_all_onscreen(self):
         for page in self.scene.pages:
@@ -119,7 +120,10 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_loaded_ui)
 
     def _flush_dirty_scene(self) -> bool:
-        """Write unsaved overlay edits (page names, etc.) before start/stop/reload."""
+        """Sync live tallies into memory before start/stop/reload. No disk write.
+
+        Overlay layout is persisted only when the GEX profile is saved.
+        """
         try:
             from .sys_stats import ManualCounterTracker
 
@@ -127,29 +131,7 @@ class OverlayManager:
                 self.scene._dirty = True
         except Exception:
             pass
-        if not self.scene.dirty:
-            return True
-        try:
-            payload = self.scene.to_dict()
-            if not _overlay_payload_has_content(payload):
-                # Prefer the owned profile path — current_profile may already be
-                # the next profile during a switch.
-                owned = getattr(self.scene, "_profile_key", None)
-                existing = self.scene.read_stored_layout(dest_xml=owned) if owned else self.scene.read_stored_layout()
-                if _overlay_payload_has_content(existing):
-                    syslog.info("OBS OVERLAY: skip flush of empty default over saved layout")
-                    self.scene._dirty = False
-                    return True
-            if self.scene.persist_owned():
-                return True
-            # No safe destination (unsaved profile / mid-switch). Drop dirty so
-            # the incoming profile can replace the in-memory scene.
-            syslog.warning("OBS OVERLAY: flush skipped — scene does not belong to current profile")
-            self.scene._dirty = False
-            return True
-        except Exception as err:
-            syslog.warning(f"OBS OVERLAY: flush before profile event failed: {err}")
-            return False
+        return True
 
     def _on_profile_loaded_ui(self):
         # Persist previous layout only to the profile that owned it, then always
@@ -168,10 +150,9 @@ class OverlayManager:
         self.hide_overlay()
         # current_profile is often None during a swap or File → New. Drop the
         # previous layout from memory so the Overlay tab does not keep showing
-        # it. Flush already wrote owned dirty state via persist_owned; empty
-        # defaults are not dirty, so a later profile_loaded flush will not
-        # overwrite the old profile. File open emits profile_loaded to replace
-        # this blank; New Profile leaves the blank scene in place.
+        # it. Overlay edits are not flushed to disk here — only a profile save
+        # persists them. File open emits profile_loaded to replace this blank;
+        # New Profile leaves the blank scene in place.
         if gremlin.shared_state.current_profile is None:
             self.scene._profile_key = None
             self.scene._path = None
@@ -396,8 +377,12 @@ class OverlayManager:
                 self.scene.restore_layout_baseline(page_id)
             elif action == "save":
                 try:
-                    if self.scene.save_to_profile():
+                    ui = gremlin.shared_state.ui
+                    if ui is not None and hasattr(ui, "save_profile"):
+                        ui.save_profile()
                         self.scene.capture_layout_baseline()
+                    else:
+                        syslog.warning("OBS OVERLAY: save the GEX profile to keep overlay changes")
                 except Exception:
                     syslog.exception("OBS OVERLAY: runtime save binding failed")
             elif action == "save_as":
@@ -743,6 +728,12 @@ def persist_for_profile(profile, dest_xml: str | None = None) -> bool:
         if OverlayManager.instance is None:
             return False
         scene = OverlayManager.instance.scene
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            ManualCounterTracker().sync_into_scene(scene)
+        except Exception:
+            pass
         ok = scene.save_to_profile(profile, dest_xml=dest_xml)
         if not ok:
             syslog.warning("OBS OVERLAY: profile save did not write the overlay layout")

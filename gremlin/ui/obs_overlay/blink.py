@@ -20,6 +20,7 @@ _SWAP_KEYS = (
 
 def default_blink() -> dict[str, Any]:
     return {
+        "enabled": False,
         "off_to_on": False,
         "on_to_off": False,
         "while_on": False,
@@ -57,11 +58,24 @@ def normalize_blink(raw) -> dict[str, Any]:
         blink["hz"] = max(0.2, min(12.0, float(raw.get("hz") or 2.0)))
     except (TypeError, ValueError):
         blink["hz"] = 2.0
+    if "enabled" in raw:
+        blink["enabled"] = bool(raw.get("enabled"))
+    else:
+        # Legacy layouts: any configured trigger counted as blinking on.
+        blink["enabled"] = bool(
+            blink["off_to_on"]
+            or blink["on_to_off"]
+            or blink["while_on"]
+            or blink["while_off"]
+            or blink["state"]
+        )
     return blink
 
 
 def blink_is_armed(blink: dict[str, Any] | None) -> bool:
     blink = blink or {}
+    if not blink.get("enabled", True):
+        return False
     return bool(
         blink.get("off_to_on")
         or blink.get("on_to_off")

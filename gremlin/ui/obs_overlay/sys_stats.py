@@ -572,6 +572,40 @@ class ManualCounterTracker:
         self._persist_dirty = False
         return dirty
 
+    def peek_value(self, widget_id: str, entry_id: str, default: int = 0) -> int:
+        """Live tally if tracked, otherwise the persisted default."""
+        try:
+            fallback = max(0, int(default or 0))
+        except (TypeError, ValueError):
+            fallback = 0
+        key = f"{widget_id}:{entry_id}"
+        st = self._state.get(key)
+        if st is None:
+            return fallback
+        try:
+            return max(0, int(st.get("value") or 0))
+        except (TypeError, ValueError):
+            return fallback
+
+    def set_value(self, widget_id: str, entry_id: str, value: int) -> int:
+        """Force the live tally (designer edit). Returns the clamped value."""
+        widget_id = str(widget_id or "")
+        entry_id = str(entry_id or "")
+        try:
+            value = max(0, int(value))
+        except (TypeError, ValueError):
+            value = 0
+        if not widget_id or not entry_id:
+            return value
+        key = f"{widget_id}:{entry_id}"
+        st = self._state.get(key)
+        if st is None:
+            self._state[key] = {"inc": False, "dec": False, "reset": False, "value": value}
+        else:
+            st["value"] = value
+        self._persist_dirty = True
+        return value
+
     def sync_into_scene(self, scene) -> bool:
         """Copy live tallies onto scene widgets so to_dict() persists the displayed values."""
         if scene is None or not self._state:

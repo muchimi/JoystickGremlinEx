@@ -4981,6 +4981,18 @@ class Profile:
             data = {}
         data[key] = value
         self._writeConfig(data)
+        # Configuration.reload_profile() also caches this sidecar. Keep its copy of
+        # module-owned keys in sync so a later Configuration.save_profile() cannot
+        # push a pre-edit obs_overlay blob back over what we just wrote.
+        try:
+            import gremlin.config
+
+            cfg = gremlin.config.Configuration()
+            foreign = getattr(cfg, "_PROFILE_SIDECAR_FOREIGN_KEYS", ("obs_overlay",))
+            if key in foreign and isinstance(getattr(cfg, "_profile_data", None), dict):
+                cfg._profile_data[key] = copy.deepcopy(value)
+        except Exception:
+            pass
 
     @property
     def saveConfigEnabled(self) -> bool:
