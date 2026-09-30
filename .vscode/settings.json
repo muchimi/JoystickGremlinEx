@@ -33,4 +33,5 @@
     "editor.formatOnSave": true
   },
   "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "update.mode": "default",
 }
