@@ -796,6 +796,171 @@ def split_display_keys(keys) -> tuple[list, list]:
     return keyboard, mouse
 
 
+def _mouse_key_by_lookup(mouse_keys: list, lookup: str):
+    want = str(lookup or "").casefold()
+    for key in mouse_keys or []:
+        if key_lookup(key) == want:
+            return key
+    return None
+
+
+def input_display_hit_targets(item: dict[str, Any] | None) -> list[tuple[Any, Any]]:
+    """Return ``(key, QRectF)`` targets in widget/scene coordinates matching paint layout."""
+    from PySide6 import QtCore
+
+    from .widgets import _map_unit_rect, widget_rect
+
+    item = item if isinstance(item, dict) else {}
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    keys = overlay_keys_from_item(item)
+    keyboard_keys, mouse_keys = split_display_keys(keys)
+    show_keyboard = bool(style.get("show_keyboard", True)) and bool(keyboard_keys)
+    show_mouse = bool(style.get("show_mouse", True)) and bool(mouse_keys)
+    if not show_keyboard and not show_mouse:
+        return []
+
+    targets: list[tuple[Any, Any]] = []
+    inner = rect.adjusted(6, 6, -6, -6)
+    mouse_width = 0.0
+    if show_mouse:
+        mouse_width = min(inner.height() * 0.95, inner.width() * (0.34 if show_keyboard else 0.9))
+    key_area = QtCore.QRectF(inner)
+    mouse_area = QtCore.QRectF()
+    if show_mouse:
+        mouse_area = QtCore.QRectF(inner.right() - mouse_width, inner.top(), mouse_width, inner.height())
+        if show_keyboard:
+            key_area = QtCore.QRectF(
+                inner.left(),
+                inner.top(),
+                max(12.0, inner.width() - mouse_width - 8.0),
+                inner.height(),
+            )
+
+    if show_keyboard:
+        cells = []
+        extra = []
+        for key in keyboard_keys:
+            cell = keyboard_cell_for_key(key)
+            if cell is None:
+                extra.append(key)
+                continue
+            cells.append((cell, key))
+        if cells:
+            min_c = min(cell.col for cell, _key in cells)
+            min_r = min(cell.row for cell, _key in cells)
+            max_c = max(cell.col + cell.colspan for cell, _key in cells)
+            max_r = max(cell.row + cell.rowspan for cell, _key in cells)
+            extra_rows = 1 if extra else 0
+            grid_w = max(1, max_c - min_c)
+            grid_h = max(1, max_r - min_r + extra_rows)
+            gap = max(2.0, min(key_area.width(), key_area.height()) * 0.018)
+            unit = min((key_area.width() - gap) / grid_w, (key_area.height() - gap) / grid_h)
+            used_w = unit * grid_w
+            used_h = unit * grid_h
+            ox = key_area.left() + max(0.0, (key_area.width() - used_w) / 2.0)
+            oy = key_area.top() + max(0.0, (key_area.height() - used_h) / 2.0)
+            for cell, key in cells:
+                kx = ox + (cell.col - min_c) * unit + gap * 0.5
+                ky = oy + (cell.row - min_r) * unit + gap * 0.5
+                kw = cell.colspan * unit - gap
+                kh = cell.rowspan * unit - gap
+                targets.append((key, QtCore.QRectF(kx, ky, max(4.0, kw), max(4.0, kh))))
+            if extra:
+                extra_unit = min(unit, (used_w - gap) / max(1, len(extra)))
+                ey = oy + (max_r - min_r) * unit + gap * 0.5
+                for index, key in enumerate(extra):
+                    targets.append(
+                        (
+                            key,
+                            QtCore.QRectF(
+                                ox + index * extra_unit + gap * 0.5,
+                                ey,
+                                max(4.0, extra_unit - gap),
+                                max(4.0, unit - gap),
+                            ),
+                        )
+                    )
+        elif extra:
+            count = max(1, len(extra))
+            cols = min(count, 8)
+            rows = max(1, (count + cols - 1) // cols)
+            unit_w = key_area.width() / cols
+            unit_h = key_area.height() / rows
+            for index, key in enumerate(extra):
+                col = index % cols
+                row = index // cols
+                targets.append(
+                    (
+                        key,
+                        QtCore.QRectF(
+                            key_area.left() + col * unit_w + 2,
+                            key_area.top() + row * unit_h + 2,
+                            max(4.0, unit_w - 4),
+                            max(4.0, unit_h - 4),
+                        ),
+                    )
+                )
+
+    if show_mouse and mouse_area.width() > 8:
+        selected = {key_lookup(key) for key in mouse_keys}
+        if normalize_mouse_graphic(style.get("mouse_graphic")) == "buttons":
+            regions = (
+                ("mouse_1", _map_unit_rect(mouse_area, 0.02, 0.08, 0.22, 0.44)),
+                ("wheel_up", _map_unit_rect(mouse_area, 0.28, 0.02, 0.26, 0.16)),
+                ("mouse_3", _map_unit_rect(mouse_area, 0.28, 0.20, 0.26, 0.18)),
+                ("wheel_down", _map_unit_rect(mouse_area, 0.28, 0.40, 0.26, 0.14)),
+                ("mouse_2", _map_unit_rect(mouse_area, 0.58, 0.08, 0.22, 0.44)),
+                ("mouse_5", _map_unit_rect(mouse_area, 0.06, 0.56, 0.18, 0.16)),
+                ("mouse_4", _map_unit_rect(mouse_area, 0.12, 0.74, 0.16, 0.16)),
+                ("wheel_left", _map_unit_rect(mouse_area, 0.54, 0.60, 0.18, 0.16)),
+                ("wheel_right", _map_unit_rect(mouse_area, 0.74, 0.60, 0.18, 0.16)),
+                ("mouse_d_1", _map_unit_rect(mouse_area, 0.02, 0.00, 0.22, 0.08)),
+                ("mouse_d_2", _map_unit_rect(mouse_area, 0.58, 0.00, 0.22, 0.08)),
+                ("mouse_d_3", _map_unit_rect(mouse_area, 0.28, 0.54, 0.26, 0.08)),
+            )
+            for lookup, mrect in regions:
+                if lookup not in selected:
+                    continue
+                key = _mouse_key_by_lookup(mouse_keys, lookup)
+                if key is not None:
+                    targets.append((key, mrect))
+        else:
+            regions = (
+                ("mouse_1", _map_unit_rect(mouse_area, 0.20, 0.08, 0.28, 0.30)),
+                ("mouse_2", _map_unit_rect(mouse_area, 0.52, 0.08, 0.28, 0.30)),
+                ("mouse_3", _map_unit_rect(mouse_area, 0.44, 0.16, 0.12, 0.16)),
+                ("wheel_up", _map_unit_rect(mouse_area, 0.45, 0.10, 0.10, 0.08)),
+                ("wheel_down", _map_unit_rect(mouse_area, 0.45, 0.30, 0.10, 0.08)),
+                ("mouse_5", _map_unit_rect(mouse_area, 0.08, 0.40, 0.12, 0.14)),
+                ("mouse_4", _map_unit_rect(mouse_area, 0.08, 0.56, 0.12, 0.14)),
+                ("wheel_left", _map_unit_rect(mouse_area, 0.40, 0.18, 0.06, 0.10)),
+                ("wheel_right", _map_unit_rect(mouse_area, 0.54, 0.18, 0.06, 0.10)),
+                ("mouse_d_1", _map_unit_rect(mouse_area, 0.22, 0.40, 0.18, 0.08)),
+                ("mouse_d_2", _map_unit_rect(mouse_area, 0.60, 0.40, 0.18, 0.08)),
+                ("mouse_d_3", _map_unit_rect(mouse_area, 0.42, 0.42, 0.16, 0.08)),
+            )
+            for lookup, mrect in regions:
+                if lookup not in selected and lookup not in ("mouse_1", "mouse_2", "mouse_3"):
+                    continue
+                key = _mouse_key_by_lookup(mouse_keys, lookup)
+                if key is not None:
+                    targets.append((key, mrect))
+    return targets
+
+
+def input_display_key_at_point(item: dict[str, Any] | None, x: float, y: float):
+    """Topmost key/mouse target under a point in widget coordinates, or None."""
+    from PySide6 import QtCore
+
+    point = QtCore.QPointF(float(x), float(y))
+    # Reverse so later (higher) keys win if they overlap.
+    for key, rect in reversed(input_display_hit_targets(item)):
+        if rect.contains(point):
+            return key
+    return None
+
+
 def _build_picker_class():
     import gremlin.ui.ui_common
     from gremlin.ui.virtual_keyboard import InputKeyboardDialog

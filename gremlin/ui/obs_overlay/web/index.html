@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <!-- Home Screen removes Safari chrome only. The iPad system status bar
+       (time/Wi‑Fi/battery) cannot be hidden by meta tags — use the Fullscreen
+       button in Safari on iPad for that (native Fullscreen API). -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GEX Overlay" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>GEX Overlay</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="stage">
+    <img id="frame" alt="" draggable="false" />
+    <canvas id="hit"></canvas>
+    <div id="offline" class="offline" hidden aria-live="polite">
+      <div class="offline-glow" aria-hidden="true"></div>
+      <div class="offline-card">
+        <div class="offline-brand">JG Ex</div>
+        <div class="offline-rule" aria-hidden="true"></div>
+        <div class="offline-state">Offline</div>
+        <div class="offline-hint">Profile inactive — reconnecting…</div>
+      </div>
+    </div>
+  </div>
+  <div id="toolbar">
+    <span id="status" class="badge">Connecting…</span>
+    <button type="button" id="btn-fs" title="Fullscreen">Fullscreen</button>
+    <button type="button" id="btn-fit" title="Cycle fit mode">Fit: contain</button>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

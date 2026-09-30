@@ -32,6 +32,7 @@ _TYPE_TITLES = {
     "axis_graph": "Temporal graph",
     "axis_bars": "Bar graph",
     "button": "Button",
+    "toggle": "2-position switch",
     "hat": "Hat",
     "switch_4way": "4-way switch",
     "switch_2way": "2-way toggle",

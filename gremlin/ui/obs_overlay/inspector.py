@@ -60,6 +60,7 @@ from .model import (
     default_visibility_condition,
     deserialize_overlay_key,
     is_onscreen_mode,
+    is_websocket_mode,
     normalize_background_mode,
     normalize_graph_series,
     normalize_overlay_keys,
@@ -70,11 +71,16 @@ from .model import (
     normalize_switch_appearance,
     normalize_toggle_binding,
     normalize_visibility,
+    normalize_ws_device_preset,
+    normalize_ws_fit_mode,
     serialize_overlay_key,
     switch_channel,
     widget_display_name,
     widget_is_switch,
     widget_uses_series,
+    WS_DEVICE_PRESETS,
+    WS_DEFAULT_PORT,
+    ws_preset_size,
 )
 from .shapes import (
     button_uses_shape_path,
@@ -131,6 +137,62 @@ def _set_form_rows_visible(form, fields, visible: bool):
             if label is not None:
                 label.setVisible(visible)
         field.setVisible(visible)
+
+
+class MultilineTextField(QtWidgets.QPlainTextEdit):
+    """Compact multiline editor: Shift+Enter inserts a line, Enter commits."""
+
+    editingFinished = QtCore.Signal()
+
+    def __init__(self, text: str = "", parent=None, lines: int = 2, placeholder: str = ""):
+        super().__init__(parent)
+        self.setPlainText(str(text or ""))
+        if placeholder:
+            self.setPlaceholderText(placeholder)
+        self.setTabChangesFocus(True)
+        self.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setToolTip("Shift+Enter adds a new line. Enter or leaving the field saves.")
+        self._set_visible_lines(max(1, int(lines)))
+        self._emit_guard = False
+
+    def _set_visible_lines(self, lines: int):
+        fm = self.fontMetrics()
+        frame = self.frameWidth() * 2
+        # Enough room for *lines* plus a little padding so the caret is not clipped.
+        self.setFixedHeight(fm.lineSpacing() * lines + fm.leading() + frame + 10)
+
+    def text(self) -> str:
+        return self.toPlainText()
+
+    def setText(self, value: str):
+        self.setPlainText(str(value or ""))
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            if event.modifiers() & QtCore.Qt.ShiftModifier:
+                self.insertPlainText("\n")
+                return
+            # Plain Enter commits like a single-line field.
+            self.clearFocus()
+            return
+        super().keyPressEvent(event)
+
+    def focusOutEvent(self, event: QtGui.QFocusEvent):
+        super().focusOutEvent(event)
+        if self._emit_guard:
+            return
+        self._emit_guard = True
+        try:
+            self.editingFinished.emit()
+        finally:
+            self._emit_guard = False
+
+
+def _multiline_text_field(text: str = "", parent=None, lines: int = 2, placeholder: str = "") -> MultilineTextField:
+    return MultilineTextField(text, parent=parent, lines=lines, placeholder=placeholder)
 
 
 class ColorButton(QtWidgets.QPushButton):
@@ -689,6 +751,12 @@ class OverlayInspector(QtWidgets.QWidget):
         self._identity_hooks = False
         self._bind_identity_hooks()
         try:
+            from . import OverlayManager
+
+            OverlayManager().websocket_status_changed.connect(self._on_ws_status_changed)
+        except Exception:
+            pass
+        try:
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             StreamDeckBridge().devices_changed.connect(self._on_streamdeck_devices_changed)
@@ -746,6 +814,12 @@ class OverlayInspector(QtWidgets.QWidget):
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             StreamDeckBridge().devices_changed.disconnect(self._on_streamdeck_devices_changed)
+        except Exception:
+            pass
+        try:
+            from . import OverlayManager
+
+            OverlayManager().websocket_status_changed.disconnect(self._on_ws_status_changed)
         except Exception:
             pass
         try:
@@ -1167,10 +1241,12 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow(touch_hint)
 
         current = normalize_background_mode(canvas.get("background_mode"))
+        websocket = is_websocket_mode(canvas)
         mode = _enum_radios(
             [
                 ("Windowed", "windowed", "Capture window with a solid background (OBS chromakey / custom size)."),
                 ("On-screen", "onscreen", "Transparent HUD sized to a monitor."),
+                ("Websocket", "websocket", "LAN browser stream + touch control (no local overlay window)."),
             ],
             current,
             self._on_background_mode,
@@ -1179,7 +1255,9 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("Mode", mode)
 
-        if onscreen:
+        if websocket:
+            self._build_websocket_canvas_rows(form, canvas)
+        elif onscreen:
             screens = list_overlay_screens()
             monitor = QDataComboBox(parent=self._host)
             selected = resolve_overlay_screen(canvas)
@@ -1220,9 +1298,10 @@ class OverlayInspector(QtWidgets.QWidget):
         height = QtWidgets.QSpinBox(self._host)
         height.setRange(120, 4320)
         height.setValue(int(canvas.get("height") or 720))
-        width.setEnabled(not onscreen)
-        height.setEnabled(not onscreen)
-        if not onscreen:
+        size_locked = onscreen and not websocket
+        width.setEnabled(not size_locked)
+        height.setEnabled(not size_locked)
+        if not size_locked:
             width.valueChanged.connect(lambda v: self._set_canvas("width", int(v)))
             height.valueChanged.connect(lambda v: self._set_canvas("height", int(v)))
         form.addRow("Width", width)
@@ -1249,7 +1328,7 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Snap to widget", snap_widgets)
         self._build_guides(form, canvas)
 
-        if not onscreen:
+        if not onscreen and not websocket:
             top = QtWidgets.QCheckBox(self._host)
             top.setChecked(bool(canvas.get("always_on_top")))
             top.toggled.connect(lambda v: self._set_canvas("always_on_top", v))
@@ -1265,7 +1344,7 @@ class OverlayInspector(QtWidgets.QWidget):
             drag.toggled.connect(lambda v: self._set_canvas("show_drag_bar", v))
             form.addRow("Overlay drag bar", drag)
 
-        if onscreen:
+        if onscreen and not websocket:
             attach = QtWidgets.QCheckBox(self._host)
             attach.setChecked(bool(canvas.get("attach_to_window")))
             attach.setToolTip(
@@ -1334,6 +1413,154 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow(reset)
         self._build_toggle_binding()
         self._build_runtime_bindings()
+
+    def _build_websocket_canvas_rows(self, form, canvas: dict):
+        """Port / URL / fit / device preset / connection badge for Websocket mode."""
+        from .websocket_server import find_free_http_ws_ports, lan_ipv4_addresses
+
+        port = QtWidgets.QSpinBox(self._host)
+        port.setRange(1024, 65534)
+        port.setValue(int(canvas.get("ws_port") or WS_DEFAULT_PORT))
+        port.setToolTip(
+            "Preferred HTTP port (WebSocket uses the next free port). "
+            "GEX skips reserved ports (6012, 6013, 8000, 8001, 9020) and occupied binds."
+        )
+        port.valueChanged.connect(lambda v: self._set_canvas("ws_port", int(v)))
+        form.addRow("Port", port)
+
+        suggest = QDataPushButton("Suggest free port", parent=self._host)
+        suggest.setToolTip("Probe for a free HTTP/WS port pair starting near the current value.")
+
+        def _suggest():
+            try:
+                http_port, _ws = find_free_http_ws_ports(int(port.value()))
+                port.setValue(http_port)
+                self._set_canvas("ws_port", http_port)
+            except Exception as err:
+                QtWidgets.QMessageBox.warning(self._host, "Websocket", f"No free port found:\n{err}")
+
+        suggest.clicked.connect(_suggest)
+        form.addRow(suggest)
+
+        ips = lan_ipv4_addresses()
+        preferred = int(canvas.get("ws_port") or WS_DEFAULT_PORT)
+        url_text = "\n".join(f"http://{ip}:{preferred}/" for ip in ips)
+        url_edit = QtWidgets.QPlainTextEdit(url_text, self._host)
+        url_edit.setReadOnly(True)
+        url_edit.setMaximumHeight(64)
+        url_edit.setToolTip(
+            "Open this URL on a phone/tablet on the same LAN while the overlay page is shown."
+        )
+        form.addRow("LAN URL", url_edit)
+
+        copy_btn = QDataPushButton("Copy URL", parent=self._host)
+
+        def _copy():
+            clip = QtWidgets.QApplication.clipboard()
+            if clip is not None:
+                clip.setText(f"http://{ips[0]}:{preferred}/" if ips else url_text)
+
+        copy_btn.clicked.connect(_copy)
+        form.addRow(copy_btn)
+
+        status = QtWidgets.QLabel(self._ws_status_text(), self._host)
+        status.setObjectName("overlayWsStatus")
+        status.setWordWrap(True)
+        if self._ws_client_count() > 0:
+            status.setStyleSheet("color: #2e7d32; font-weight: 600;")
+        else:
+            status.setStyleSheet("color: #666;")
+        form.addRow("Connection", status)
+
+        fit = QDataComboBox(parent=self._host)
+        for key, label in (
+            ("contain", "Contain (letterbox)"),
+            ("cover", "Cover"),
+            ("stretch", "Stretch"),
+        ):
+            fit.addItem(label, key)
+        fit_mode = normalize_ws_fit_mode(canvas.get("ws_fit_mode"))
+        idx = fit.findData(fit_mode)
+        if idx >= 0:
+            fit.setCurrentIndex(idx)
+        fit.currentIndexChanged.connect(
+            lambda _i, box=fit: self._set_canvas(
+                "ws_fit_mode", normalize_ws_fit_mode(box.currentData())
+            )
+        )
+        form.addRow("Fit mode", fit)
+
+        preset = QDataComboBox(parent=self._host)
+        preset.setToolTip(
+            "Sets this page’s canvas width/height in GEX to a common tablet/phone size. "
+            "The browser always shows that canvas; it does not pick a device on its own."
+        )
+        for ident, label, _w, _h in WS_DEVICE_PRESETS:
+            preset.addItem(label, ident)
+        cur_preset = normalize_ws_device_preset(canvas.get("ws_device_preset"))
+        pidx = preset.findData(cur_preset)
+        if pidx >= 0:
+            preset.setCurrentIndex(pidx)
+
+        def _on_preset(_i, box=preset):
+            pid = normalize_ws_device_preset(box.currentData())
+            self._set_canvas("ws_device_preset", pid)
+            size = ws_preset_size(pid)
+            if size:
+                self._set_canvas("width", size[0])
+                self._set_canvas("height", size[1])
+                self._schedule_rebuild()
+
+        preset.currentIndexChanged.connect(_on_preset)
+        form.addRow("Device preset", preset)
+
+        color_btn = ColorButton(
+            canvas.get("chroma_color") or "#00FF00",
+            parent=self._host,
+            preserve_transparent=True,
+            allow_gradient=False,
+        )
+        color_btn.setFixedWidth(36)
+        color_btn.setToolTip("Background fill streamed to the browser (same paint path as windowed).")
+        color_btn.color_changed.connect(lambda v: self._set_canvas("chroma_color", v))
+        form.addRow("Background color", color_btn)
+
+        hint = QtWidgets.QLabel(
+            "No local overlay window. Show this page to start the LAN server; open the URL on a "
+            "tablet/phone. Interactive must be on for remote touch writes. Open LAN — anyone on "
+            "the network can connect.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+    def _ws_client_count(self) -> int:
+        try:
+            from . import OverlayManager
+
+            return int(OverlayManager().websocket_client_count(self.scene.active_page_id))
+        except Exception:
+            return 0
+
+    def _ws_status_text(self) -> str:
+        try:
+            from . import OverlayManager
+
+            return OverlayManager().websocket_status_text(self.scene.active_page_id)
+        except Exception:
+            return "Websocket: stopped"
+
+    def _on_ws_status_changed(self, *_args):
+        if not self._is_alive():
+            return
+        label = self._host.findChild(QtWidgets.QLabel, "overlayWsStatus") if self._host else None
+        if label is None or not Shiboken.isValid(label):
+            return
+        label.setText(self._ws_status_text())
+        if self._ws_client_count() > 0:
+            label.setStyleSheet("color: #2e7d32; font-weight: 600;")
+        else:
+            label.setStyleSheet("color: #666;")
 
     # Standard OBS / capture chromakey colors for Windowed mode quick picks.
     _WINDOWED_COLOR_PRESETS = (
@@ -1613,15 +1840,15 @@ class OverlayInspector(QtWidgets.QWidget):
             if show_mode:
                 from .bindings import current_profile_mode
 
-                label = QtWidgets.QLineEdit(current_profile_mode(), self._host)
+                label = _multiline_text_field(current_profile_mode(), self._host, lines=2)
                 label.setReadOnly(True)
                 label.setToolTip("This label follows the active profile mode. Uncheck Show current mode to type your own text.")
             else:
-                label = QtWidgets.QLineEdit(item.get('label') or '', self._host)
+                label = _multiline_text_field(item.get("label") or "", self._host, lines=3)
                 label.editingFinished.connect(lambda wid=item["id"], w=label: self._update(wid, label=w.text()))
             text_title = "Label" if widget_type in ("stopwatch", "sys_stats") else "Text"
             if widget_type == "stopwatch":
-                label.setToolTip("Title shown at the top of the stopwatch when Show label is on.")
+                label.setToolTip("Title shown at the top of the stopwatch when Show label is on. Shift+Enter for a new line.")
             label_form.addRow(text_title, label)
         if not show_mode:
             self._style_bool(label_form, item, "show_label", "Show label")
@@ -1708,6 +1935,12 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Keep image aspect",
                 tooltip="Fit the off/on image inside the button. Off stretches it to the button size.",
             )
+        elif widget_type == "toggle":
+            self._orientation_combo(look, item, default="horizontal")
+            self._style_color(look, item, "fill", "Off fill")
+            self._style_color(look, item, "fill_on", "On fill")
+            self._style_color(look, item, "indicator", "Knob")
+            self._indicator_shape(look, item)
         elif widget_type == "axis_bar":
             self._orientation_combo(look, item)
             self._style_color(look, item, "fill", "Fill")
@@ -1972,6 +2205,11 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_color(look, item, "fill", "Fill")
         if types <= {"button"}:
             self._style_color(look, item, "fill_on", "On fill")
+        if types <= {"toggle"}:
+            self._orientation_combo(look, item, default="horizontal")
+            self._style_color(look, item, "fill_on", "On fill")
+            self._style_color(look, item, "indicator", "Knob")
+            self._indicator_shape(look, item)
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
         if types <= {"switch_4way", "switch_2way"}:
@@ -2012,6 +2250,13 @@ class OverlayInspector(QtWidgets.QWidget):
             self._deadzone_field(look, item)
         if types <= {"button"}:
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
+        elif types <= {"toggle"}:
+            self._border_appearance(
+                look,
+                item,
+                colors=(("border", "Off border"), ("border_on", "On border")),
+                include_radius=True,
+            )
         elif types <= {"input_display"}:
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
         elif types <= {"axis_radio"}:
@@ -2527,7 +2772,7 @@ class OverlayInspector(QtWidgets.QWidget):
         elif ends == "ew":
             pairs = pairs[2:]
         for key, title in pairs:
-            edit = QtWidgets.QLineEdit(item['style'].get(key) or '', self._host)
+            edit = _multiline_text_field(item["style"].get(key) or "", self._host, lines=2)
             edit.editingFinished.connect(lambda wid=item["id"], k=key, w=edit: self._style(wid, **{k: w.text()}))
             form.addRow(title, edit)
         spread = item["style"].get("axis_label_spread")
@@ -2975,6 +3220,13 @@ class OverlayInspector(QtWidgets.QWidget):
             self._deadzone_field(look, item)
         if widget_type == "button":
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
+        elif widget_type == "toggle":
+            self._border_appearance(
+                look,
+                item,
+                colors=(("border", "Off border"), ("border_on", "On border")),
+                include_radius=True,
+            )
         elif widget_type == "input_display":
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
         elif widget_type == "axis_radio":
@@ -3539,8 +3791,12 @@ class OverlayInspector(QtWidgets.QWidget):
         color = ColorButton(entry.get("color") or GRAPH_SERIES_COLORS[index % len(GRAPH_SERIES_COLORS)])
         color.color_changed.connect(lambda v, wid=item["id"], ident=sid: self._set_stat_entry(wid, ident, color=v))
         form.addRow("Color", color)
-        label = QtWidgets.QLineEdit(str(entry.get('label') or ''), self._host)
-        label.setPlaceholderText(stat_caption(kind))
+        label = _multiline_text_field(
+            str(entry.get("label") or ""),
+            self._host,
+            lines=2,
+            placeholder=stat_caption(kind),
+        )
         label.editingFinished.connect(lambda wid=item["id"], ident=sid, w=label: self._set_stat_entry(wid, ident, label=w.text()))
         form.addRow("Caption", label)
         if kind == "manual":
@@ -3987,8 +4243,12 @@ class OverlayInspector(QtWidgets.QWidget):
         color.color_changed.connect(lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, color=v))
         form.addRow("Color", color)
 
-        label = QtWidgets.QLineEdit(str(series.get('label') or ''), self._host)
-        label.setPlaceholderText("Legend name (optional)")
+        label = _multiline_text_field(
+            str(series.get("label") or ""),
+            self._host,
+            lines=2,
+            placeholder="Legend name (optional)",
+        )
         label.editingFinished.connect(
             lambda wid=item["id"], sid=series_id, w=label: self._set_graph_series(wid, sid, rebuild=True, label=w.text())
         )
@@ -4859,9 +5119,10 @@ class OverlayInspector(QtWidgets.QWidget):
             open_overlay_control_panel(self.scene, parent=self.window())
 
     def _build_binding(self, item: dict):
+        form = self._section("Bindings")
         if widget_needs_xy(item.get("type")):
-            self._build_channel(item, "binding", "Axis X", force_type="axis")
-            self._build_channel(item, "binding_y", "Axis Y", force_type="axis")
+            self._build_channel(item, "binding", "Axis X", force_type="axis", form=form)
+            self._build_channel(item, "binding_y", "Axis Y", force_type="axis", form=form)
             return
         widget_type = item.get("type")
         if widget_type == "stopwatch":
@@ -4871,6 +5132,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Start / stop",
                 force_type="button",
                 extra_hint="Press toggles the clock. A GEX state or mode follows the value (running while on).",
+                form=form,
             )
             self._build_channel(
                 item,
@@ -4878,6 +5140,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Reset",
                 force_type="button",
                 extra_hint="Optional. A press sets the counter back to zero.",
+                form=form,
             )
             return
         if widget_is_switch(widget_type):
@@ -4885,6 +5148,11 @@ class OverlayInspector(QtWidgets.QWidget):
                 "switch_4way": "Each direction is a separate button. Center is optional (some hats press it at rest).",
                 "switch_2way": "Position 1, Center, and Position 2. Center is optional. Interactive overlay latches the last press.",
                 "switch_3way": "Spring-loaded center: an Interactive overlay returns to center when you lift.",
+                "toggle": (
+                    "Bind Off and On as separate buttons or keys. "
+                    "A press of On latches On until Off is pressed (and the reverse). "
+                    "Interactive: press the left/right (or top/bottom) half to latch that side."
+                ),
             }
             rows = list(SWITCH_POSITION_TITLES.get(widget_type) or ())
             for index, (position, title) in enumerate(rows):
@@ -4894,6 +5162,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     title,
                     force_type="button",
                     extra_hint=hints.get(widget_type) if index == 0 else None,
+                    form=form,
                 )
             return
         force = None
@@ -4903,7 +5172,7 @@ class OverlayInspector(QtWidgets.QWidget):
             force = "hat"
         elif widget_type and str(widget_type).startswith("axis"):
             force = "axis"
-        self._build_channel(item, "binding", "Binding", force_type=force)
+        self._build_channel(item, "binding", "", force_type=force, form=form)
 
     def _channel_binding(self, item: dict, channel: str) -> dict:
         if channel.startswith("bindings."):

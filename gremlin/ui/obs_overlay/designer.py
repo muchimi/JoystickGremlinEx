@@ -95,6 +95,7 @@ WIDGET_TITLES = {
     "axis_graph": "Temporal graph",
     "axis_bars": "Bar graph",
     "button": "Button",
+    "toggle": "2-position switch",
     "hat": "Hat",
     "switch_4way": "4-way switch",
     "switch_2way": "2-way toggle",
@@ -112,6 +113,7 @@ WIDGET_TITLES = {
 
 WIDGET_TOOLTIPS = {
     "button": "On/off button. Bind a physical, vJoy, state, mode, or keyboard input.",
+    "toggle": "Two-position switch (left/right). Bind Off and On separately.",
     "hat": "Hat / POV rose (4 or 8 positions).",
     "switch_4way": "Four-way cardinal switch (N/E/S/W).",
     "switch_2way": "Two-way toggle with a center rest.",
@@ -275,6 +277,12 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector: VJoy (arrow from rest) or Standard (mouse icon). Max displacement and idle recenter apply to Standard.")
     elif widget_type == "button":
         lines.append("Inspector: shape, off/on fill. Binding is a physical, vJoy, state, mode, or keyboard/mouse button (Listen or Select…).")
+    elif widget_type == "toggle":
+        lines.append(
+            "Inspector: horizontal or vertical track, corner radius, circle or square knob. "
+            "Bind Off and On as separate buttons/keys (vJoy, state, mode, or keyboard). "
+            "On latches until Off is pressed (and the reverse). Interactive: tap a side to latch it."
+        )
     elif widget_type == "hat":
         lines.append("Inspector: 4- or 8-position, axis labels. Binding is a hat. Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type == "switch_4way":
@@ -1591,6 +1599,10 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         if self._overlay_manager is not None:
             try:
                 self._overlay_manager.visibility_changed.connect(self._refresh_overlay_button)
+                try:
+                    self._overlay_manager.websocket_status_changed.connect(self._refresh_overlay_button)
+                except Exception:
+                    pass
             except Exception:
                 pass
         self._set_hints_visible(_banner_pref_visible(), persist=False)
@@ -1678,6 +1690,10 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         if self._overlay_manager is not None:
             try:
                 self._overlay_manager.visibility_changed.disconnect(self._refresh_overlay_button)
+                try:
+                    self._overlay_manager.websocket_status_changed.disconnect(self._refresh_overlay_button)
+                except Exception:
+                    pass
             except Exception:
                 pass
         if getattr(self, "_profile_hooks", False):
@@ -1767,6 +1783,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             ),
             clicked=lambda: self._toggle_overlay(),
         )
+        self._overlay_button_base_tip = self._overlay_button.toolTip()
         self._control_button = QDataPushButton(
             "Runtime control…",
             tooltip="Open the overlay control panel. Controls are active while the profile is running.",
@@ -2393,6 +2410,25 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         page_id = self.scene.active_page_id
         visible = bool(self._overlay_manager and page_id and self._overlay_manager.page_is_visible(page_id))
         button.setText("Hide overlay" if visible else "Show overlay")
+        base_tip = getattr(self, "_overlay_button_base_tip", "") or button.toolTip()
+        try:
+            from .model import is_websocket_mode
+
+            if (
+                visible
+                and page_id
+                and is_websocket_mode(self.scene.canvas_for(page_id))
+                and self._overlay_manager is not None
+            ):
+                n = self._overlay_manager.websocket_client_count(page_id)
+                if n > 0:
+                    button.setToolTip(f"Websocket live — {n} client{'s' if n != 1 else ''} connected.")
+                else:
+                    button.setToolTip("Websocket page is live (waiting for LAN clients).")
+                return
+        except Exception:
+            pass
+        button.setToolTip(base_tip)
 
     def refresh_profile_title(self):
         if not alive(self):

@@ -1,0 +1,273 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --bar: rgba(12, 14, 18, 0.88);
+  --fg: #e8eaed;
+  --muted: #9aa0a6;
+  --ok: #34a853;
+  --warn: #fbbc04;
+  --bad: #ea4335;
+  --accent: #8ab4f8;
+  --vv-top: 0px;
+  --vv-left: 0px;
+  --vv-width: 100%;
+  --vv-height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* iOS: fill the dynamic viewport including under the notch when possible. */
+  height: 100dvh;
+  width: 100dvw;
+}
+
+/* Home Screen / standalone: draw under the translucent status bar. */
+@media all and (display-mode: standalone),
+       all and (display-mode: fullscreen) {
+  html, body {
+    background: #000;
+  }
+  #stage {
+    /* Fill the full display; status glyphs sit on top of black/frame. */
+    inset: 0;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media all and (display-mode: standalone),
+         all and (display-mode: fullscreen) {
+    html, body {
+      /* Prefer the full layout viewport when launched from the Home Screen. */
+      height: 100%;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+  }
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+#frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  background: #000;
+  opacity: 0;
+}
+
+#hit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Profile stopped / websocket torn down — replace the frozen last frame. */
+.offline {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 24px
+    max(24px, env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(40, 52, 68, 0.55), transparent 70%),
+    linear-gradient(165deg, #0e1218 0%, #07090c 55%, #050607 100%);
+  color: var(--fg);
+  pointer-events: none;
+}
+
+.offline[hidden] {
+  display: none !important;
+}
+
+.offline-glow {
+  position: absolute;
+  width: min(520px, 80vw);
+  height: min(520px, 80vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(138, 180, 248, 0.14), transparent 68%);
+  animation: offline-pulse 3.2s ease-in-out infinite;
+}
+
+.offline-card {
+  position: relative;
+  text-align: center;
+  max-width: 22rem;
+}
+
+.offline-brand {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(2.6rem, 9vw, 4.2rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #f1f3f4;
+  text-shadow: 0 0 40px rgba(138, 180, 248, 0.25);
+}
+
+.offline-rule {
+  width: 3.5rem;
+  height: 2px;
+  margin: 1rem auto 0.85rem;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.85;
+}
+
+.offline-state {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(1.15rem, 3.6vw, 1.55rem);
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #c5cad3;
+}
+
+.offline-hint {
+  margin-top: 0.85rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+@keyframes offline-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offline-glow {
+    animation: none;
+  }
+}
+
+#toolbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--bar);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+
+#toolbar button,
+#toolbar select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #3c4043;
+  background: #1f1f1f;
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font: inherit;
+  min-height: 44px;
+}
+
+#toolbar button:active {
+  background: #2a2a2a;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #1a1a1a;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bad);
+}
+
+.badge.ok::before { background: var(--ok); }
+.badge.warn::before { background: var(--warn); }
+
+body.toolbar-hidden #toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+body:not(.toolbar-hidden) #toolbar {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* Native Fullscreen API (iPad Safari) — fill the display once chrome is gone. */
+:fullscreen,
+:-webkit-full-screen {
+  background: #000;
+  width: 100%;
+  height: 100%;
+}
+
+:fullscreen #stage,
+:-webkit-full-screen #stage,
+html:fullscreen,
+html:-webkit-full-screen {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+:fullscreen body,
+:-webkit-full-screen body,
+html:fullscreen body,
+html:-webkit-full-screen body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: #000;
+}
+
+body.immersive #stage {
+  inset: 0;
+}
+
+body.immersive #toolbar {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}

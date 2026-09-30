@@ -29,11 +29,13 @@ from .model import (
     OverlayScene,
     RUNTIME_HOLD_ACTIONS,
     RUNTIME_NUDGE_DELTA,
+    is_websocket_mode,
     normalize_background_mode,
     normalize_runtime_bindings,
     _overlay_payload_has_content,
 )
 from .overlay_window import OverlayWindow, apply_onscreen_geometry
+from .websocket_server import OverlayWebsocketSession
 from .widgets import live_window_is_layered
 
 syslog = logging.getLogger("system")
@@ -44,10 +46,12 @@ class OverlayManager:
     """Owns the shared scene, designer, and overlay windows (one per visible page)."""
 
     visibility_changed = Signal()
+    websocket_status_changed = Signal()
 
     def __init__(self):
         self.scene = OverlayScene()
         self._overlays: dict[str, OverlayWindow] = {}
+        self._ws_sessions: dict[str, OverlayWebsocketSession] = {}
         self._hooks = False
         self._auto_shown = False
         self._page_chrome: dict[str, tuple] = {}
@@ -93,6 +97,7 @@ class OverlayManager:
             self.scene.save_now()
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: shutdown sync failed: {err}")
+        self._stop_all_ws_sessions()
 
     def _apply_all_onscreen(self):
         for page in self.scene.pages:
@@ -223,7 +228,7 @@ class OverlayManager:
         # Always tear down live / app-share overlays on deactivate — a detached
         # child that Qt still thinks is hidden leaves a ghost HWND + host cursor
         # over JG Ex.
-        if auto or attached or self._overlays:
+        if auto or attached or self._overlays or self._ws_sessions:
             self.hide_overlay()
 
     def _start_runtime_toggle(self):
@@ -469,6 +474,9 @@ class OverlayManager:
         for page_id in list(self._overlays):
             if page_id not in live_ids:
                 self._hide_page_ui(page_id)
+        for page_id in list(self._ws_sessions):
+            if page_id not in live_ids:
+                self._hide_page_ui(page_id)
         recreate = []
         for page in self.scene.pages:
             page_id = page["id"]
@@ -509,9 +517,12 @@ class OverlayManager:
         syslog.warning("OBS OVERLAY: main window is not ready; Overlay tab cannot be selected")
 
     def overlay_is_visible(self) -> bool:
-        return any(self.page_is_visible(page_id) for page_id in list(self._overlays))
+        return any(self.page_is_visible(page_id) for page_id in set(self._overlays) | set(self._ws_sessions))
 
     def page_is_visible(self, page_id: str) -> bool:
+        session = self._ws_sessions.get(page_id)
+        if session is not None and session.running:
+            return True
         window = self._overlays.get(page_id)
         if window is None or not Shiboken.isValid(window):
             return False
@@ -520,6 +531,28 @@ class OverlayManager:
         if window.isVisible():
             return True
         return bool(getattr(window, "_host_attached", False))
+
+    def websocket_client_count(self, page_id: str | None = None) -> int:
+        if page_id:
+            session = self._ws_sessions.get(page_id)
+            return int(session.client_count) if session is not None else 0
+        return sum(s.client_count for s in self._ws_sessions.values())
+
+    def websocket_status_text(self, page_id: str | None = None) -> str:
+        if page_id:
+            session = self._ws_sessions.get(page_id)
+            if session is None:
+                return "Websocket: stopped"
+            return session.status_text()
+        total = self.websocket_client_count()
+        if not self._ws_sessions:
+            return "Websocket: stopped"
+        n_pages = len(self._ws_sessions)
+        label = "client" if total == 1 else "clients"
+        return f"Websocket: {total} {label} ({n_pages} page{'s' if n_pages != 1 else ''})"
+
+    def any_websocket_clients(self) -> bool:
+        return self.websocket_client_count() > 0
 
     def show_overlay(self, auto: bool = False, page_ids: list[str] | None = None):
         gremlin.util.InvokeUiMethod(self._show_overlay_ui, auto, page_ids)
@@ -533,7 +566,7 @@ class OverlayManager:
             window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False)
         )
         self._hide_page_ui(page_id)
-        if not self._overlays:
+        if not self._overlays and not self._ws_sessions:
             self.scene.set_preview_show_all(False)
         if reclaim:
             self._reclaim_main_window_focus()
@@ -567,8 +600,115 @@ class OverlayManager:
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to open overlay window: {err}")
 
+    def _start_ws_session(self, page_id: str) -> bool:
+        existing = self._ws_sessions.get(page_id)
+        if existing is not None and existing.running:
+            return True
+        if existing is not None:
+            existing.stop()
+            self._ws_sessions.pop(page_id, None)
+        # Keep page Visible so the scene change handler does not immediately tear down.
+        page = self.scene.page_by_id(page_id)
+        if page is not None and not page.get("visible", True):
+            page["visible"] = True
+            self._page_visible_flags[page_id] = True
+            self.scene._dirty = True
+        session = OverlayWebsocketSession(self.scene, page_id, parent=None)
+        session.clients_changed.connect(lambda _n: self._on_ws_clients_changed())
+        session.status_changed.connect(self._on_ws_clients_changed)
+        if not session.start():
+            err = session.metrics_snapshot().get("last_error") or "start failed"
+            syslog.error(f"OBS OVERLAY WS: failed to start page {page_id}: {err}")
+            try:
+                session.stop()
+                session.deleteLater()
+            except Exception:
+                pass
+            self._emit_ws_status()
+            return False
+        self._ws_sessions[page_id] = session
+        self._page_chrome[page_id] = self._page_chrome_tuple(page_id)
+        self._emit_visibility()
+        self._emit_ws_status()
+        # Port may have been remapped — refresh inspector without tearing the session down.
+        QtCore.QTimer.singleShot(0, lambda: self._emit_ws_port_sync(page_id))
+        return True
+
+    def _emit_ws_port_sync(self, page_id: str):
+        """Refresh chrome snapshot after bind without recreate-stop races."""
+        if page_id not in self._ws_sessions:
+            return
+        self._page_chrome[page_id] = self._page_chrome_tuple(page_id)
+        try:
+            self.scene.changed.emit()
+        except Exception:
+            pass
+        self._emit_ws_status()
+
+    def websocket_last_error(self, page_id: str | None = None) -> str:
+        session = self._ws_sessions.get(page_id) if page_id else None
+        if session is None and page_id is None:
+            for s in self._ws_sessions.values():
+                err = (s.metrics_snapshot().get("last_error") or "").strip()
+                if err:
+                    return err
+            return ""
+        if session is None:
+            return ""
+        return str(session.metrics_snapshot().get("last_error") or "")
+
+    def websocket_live_urls(self, page_id: str | None = None) -> list[str]:
+        session = self._ws_sessions.get(page_id) if page_id else None
+        if session is None or not session.running:
+            return []
+        return list(session.urls)
+
+    def _stop_ws_session(self, page_id: str):
+        session = self._ws_sessions.pop(page_id, None)
+        if session is None:
+            return
+        try:
+            session.stop()
+            session.deleteLater()
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY WS: stop failed: {err}")
+        self._emit_ws_status()
+
+    def _stop_all_ws_sessions(self):
+        for page_id in list(self._ws_sessions):
+            self._stop_ws_session(page_id)
+
+    def _on_ws_clients_changed(self, *_args):
+        self._emit_visibility()
+        self._emit_ws_status()
+
+    def _emit_ws_status(self):
+        try:
+            self.websocket_status_changed.emit()
+        except Exception:
+            pass
+
     def _show_page_ui(self, page_id: str, auto: bool = False):
         apply_onscreen_geometry(self.scene, emit=False, page_id=page_id)
+        canvas = self.scene.canvas_for(page_id)
+        if is_websocket_mode(canvas):
+            # Websocket pages never own a local HWND.
+            window = self._overlays.pop(page_id, None)
+            if window is not None and Shiboken.isValid(window):
+                try:
+                    window.detach_from_scene()
+                    window.hide()
+                    window.close()
+                    window.deleteLater()
+                except Exception:
+                    pass
+            if not self._start_ws_session(page_id):
+                syslog.error("OBS OVERLAY WS: Show overlay could not start the LAN server")
+            return
+
+        # Windowed / on-screen: tear down any websocket session for this page.
+        self._stop_ws_session(page_id)
+
         window = self._overlays.get(page_id)
         if window is not None and Shiboken.isValid(window):
             # Already live (including app-share child): avoid flag rebuild / re-show storms.
@@ -648,6 +788,8 @@ class OverlayManager:
             if window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False):
                 reclaim = True
             self._hide_page_ui(page_id)
+        for page_id in list(self._ws_sessions):
+            self._hide_page_ui(page_id)
         self.scene.set_preview_show_all(False)
         self._emit_visibility()
         if reclaim:
@@ -675,8 +817,10 @@ class OverlayManager:
             syslog.debug(f"OBS OVERLAY: reclaim UI focus skipped: {err}")
 
     def _hide_page_ui(self, page_id: str):
+        self._stop_ws_session(page_id)
         window = self._overlays.pop(page_id, None)
         if window is None:
+            self._emit_visibility()
             return
         try:
             if Shiboken.isValid(window):
@@ -702,6 +846,13 @@ class OverlayManager:
             view = getattr(window, "view", None)
             if view is not None and Shiboken.isValid(view):
                 view.release_touch()
+        for session in list(self._ws_sessions.values()):
+            view = getattr(session, "_view", None)
+            if view is not None and Shiboken.isValid(view):
+                try:
+                    view.release_touch()
+                except Exception:
+                    pass
 
     def _emit_visibility(self):
         try:

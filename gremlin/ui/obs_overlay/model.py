@@ -171,6 +171,7 @@ WIDGET_TYPES = (
     "switch_4way",
     "switch_2way",
     "switch_3way",
+    "toggle",
     "label",
     "sys_stats",
     "stopwatch",
@@ -190,6 +191,7 @@ PALETTE_TYPES = (
     "switch_4way",
     "switch_2way",
     "switch_3way",
+    "toggle",
     "axis_bar",
     "axis_radio",
     "axis_fader",
@@ -214,7 +216,7 @@ PALETTE_TYPES = (
 )
 
 PALETTE_GROUPS = (
-    ("Buttons", ("button", "hat", "switch_4way", "switch_2way", "switch_3way")),
+    ("Buttons", ("button", "toggle", "hat", "switch_4way", "switch_2way", "switch_3way")),
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
@@ -236,6 +238,7 @@ DEFAULT_SIZES = {
     "axis_crosshair": (220, 220),
     "axis_mouse": (180, 180),
     "button": (88, 32),
+    "toggle": (88, 32),
     "hat": (108, 108),
     "switch_4way": (120, 120),
     "switch_2way": (100, 100),
@@ -267,6 +270,7 @@ DEFAULT_LABELS = {
     "axis_crosshair": "",
     "axis_mouse": "",
     "button": "BTN",
+    "toggle": "",
     "hat": "",
     "switch_4way": "",
     "switch_2way": "",
@@ -519,6 +523,22 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_path": "",
                 "image_path_on": "",
                 "image_keep_aspect": True,
+            }
+        )
+    elif widget_type == "toggle":
+        style.update(
+            {
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "border_width": 2.0,
+                # Large radius clamps to half the short side → pill like other rounded widgets.
+                "corner_radius": 100.0,
+                "indicator": "#e8eaed",
+                "indicator_shape": "circle",
+                "orientation": "horizontal",
+                "show_label": False,
             }
         )
     elif widget_type == "hat":
@@ -779,19 +799,22 @@ NO_BINDING_WIDGET_TYPES = (
 )
 NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
     "stopwatch",
+    "toggle",
     "switch_4way",
     "switch_2way",
     "switch_3way",
 )
 
-SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way")
+SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way", "toggle")
 SWITCH_4WAY_POSITIONS = ("n", "e", "s", "w", "center")
 SWITCH_2WAY_POSITIONS = ("a", "center", "b")
 SWITCH_3WAY_POSITIONS = ("up", "center", "down")
+SWITCH_TOGGLE_POSITIONS = ("off", "on")
 SWITCH_POSITION_TITLES = {
     "switch_4way": (("n", "North"), ("e", "East"), ("s", "South"), ("w", "West"), ("center", "Center")),
     "switch_2way": (("a", "North / Position 1"), ("center", "Center"), ("b", "South / Position 2")),
     "switch_3way": (("up", "Up"), ("center", "Center"), ("down", "Down")),
+    "toggle": (("off", "Off / Position 1"), ("on", "On / Position 2")),
 }
 _SWITCH_POSITION_ALIASES = {
     "a": "up",
@@ -800,6 +823,8 @@ _SWITCH_POSITION_ALIASES = {
     "down": "b",
     "n": "up",
     "s": "down",
+    "off": "a",
+    "on": "b",
 }
 
 
@@ -819,6 +844,8 @@ def switch_positions(widget_type: str | None) -> tuple[str, ...]:
         return SWITCH_2WAY_POSITIONS
     if kind == "switch_3way":
         return SWITCH_3WAY_POSITIONS
+    if kind == "toggle":
+        return SWITCH_TOGGLE_POSITIONS
     return ()
 
 
@@ -1432,6 +1459,9 @@ def default_canvas() -> dict[str, Any]:
         "capture_width": 1280,
         "capture_height": 720,
         "guides": [],
+        "ws_port": 9100,
+        "ws_fit_mode": "contain",
+        "ws_device_preset": "custom",
     }
 
 
@@ -1448,6 +1478,44 @@ def default_page(name: str = "Overlay") -> dict[str, Any]:
 
 
 DEFAULT_GUIDE_COLOR = "#c44cff"
+
+# Preferred LAN port for overlay websocket HTTP; WS uses preferred+1 (or next free).
+WS_DEFAULT_PORT = 9100
+WS_RESERVED_PORTS = frozenset({6012, 6013, 8000, 8001, 9020})
+
+# Logical canvas size hints for tablet / phone browsing (id, label, width, height).
+WS_DEVICE_PRESETS: tuple[tuple[str, str, int | None, int | None], ...] = (
+    ("custom", "Custom (canvas size)", None, None),
+    ("ipad_land", "iPad landscape", 1180, 820),
+    ("ipad_port", "iPad portrait", 820, 1180),
+    ("iphone_land", "iPhone landscape", 844, 390),
+    ("iphone_port", "iPhone portrait", 390, 844),
+    ("android_tab", "Android tablet", 1280, 800),
+    ("android_phone", "Android phone", 412, 915),
+)
+
+
+def normalize_ws_fit_mode(value) -> str:
+    mode = str(value or "contain").casefold().strip()
+    if mode in ("cover", "stretch", "contain"):
+        return mode
+    if mode in ("auto", "auto-adjust", "fit"):
+        return "contain"
+    return "contain"
+
+
+def normalize_ws_device_preset(value) -> str:
+    raw = str(value or "custom").casefold().strip()
+    known = {row[0] for row in WS_DEVICE_PRESETS}
+    return raw if raw in known else "custom"
+
+
+def ws_preset_size(preset_id: str) -> tuple[int, int] | None:
+    pid = normalize_ws_device_preset(preset_id)
+    for ident, _label, width, height in WS_DEVICE_PRESETS:
+        if ident == pid and width and height:
+            return int(width), int(height)
+    return None
 
 
 def normalize_guides(canvas: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -1476,12 +1544,18 @@ def normalize_background_mode(value) -> str:
     mode = str(value or "windowed").casefold().replace("_", "-").replace(" ", "-")
     if mode in ("onscreen", "on-screen"):
         return "onscreen"
+    if mode in ("websocket", "web-socket", "ws"):
+        return "websocket"
     # Legacy names: chroma / image → windowed capture window.
     return "windowed"
 
 
 def is_onscreen_mode(canvas: dict[str, Any] | None) -> bool:
     return normalize_background_mode((canvas or {}).get("background_mode")) == "onscreen"
+
+
+def is_websocket_mode(canvas: dict[str, Any] | None) -> bool:
+    return normalize_background_mode((canvas or {}).get("background_mode")) == "websocket"
 
 
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
@@ -1795,6 +1869,13 @@ class OverlayScene(QtCore.QObject):
         canvas["attach_to_window"] = bool(canvas.get("attach_to_window"))
         canvas["attach_window_title"] = str(canvas.get("attach_window_title") or "").strip()
         canvas["attach_window_exe"] = str(canvas.get("attach_window_exe") or "").strip()
+        try:
+            port = int(canvas.get("ws_port") if canvas.get("ws_port") is not None else WS_DEFAULT_PORT)
+        except (TypeError, ValueError):
+            port = WS_DEFAULT_PORT
+        canvas["ws_port"] = max(1024, min(65534, port))
+        canvas["ws_fit_mode"] = normalize_ws_fit_mode(canvas.get("ws_fit_mode"))
+        canvas["ws_device_preset"] = normalize_ws_device_preset(canvas.get("ws_device_preset"))
         normalize_guides(canvas)
         return canvas
 
@@ -2158,6 +2239,36 @@ class OverlayScene(QtCore.QObject):
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
             if widget_type in ("switch_4way", "switch_2way"):
                 style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
+            if widget_type == "toggle":
+                # Migrate older single-binding toggles onto the On position.
+                legacy = raw.get("binding")
+                on_bind = item["bindings"].get("on") if isinstance(item.get("bindings"), dict) else None
+                if isinstance(legacy, dict) and legacy and not (
+                    isinstance(on_bind, dict) and (on_bind.get("device_guid") or on_bind.get("source") in ("state", "mode", "keyboard"))
+                ):
+                    item["bindings"]["on"] = normalize_toggle_binding(legacy)
+                # First-ship cyan/silver palette → same housing/accent as other switches.
+                _legacy_toggle = {
+                    "fill": "#1a1d22",
+                    "fill_on": "#2a3548",
+                    "border": "#c8d0dc",
+                    "border_on": "#c8d0dc",
+                    "indicator": "#9fd6ff",
+                }
+                if all(str(style.get(k) or "").casefold() == v for k, v in _legacy_toggle.items()):
+                    style.update(
+                        {
+                            "fill": "#1a2230",
+                            "fill_on": "#ff6b35",
+                            "border": "#3a4a62",
+                            "border_on": "#ffcc66",
+                            "border_width": 2.0,
+                            "corner_radius": 100.0,
+                            "indicator": "#e8eaed",
+                        }
+                    )
+                style.setdefault("corner_radius", 100.0)
+                style.setdefault("indicator_shape", "circle")
         else:
             item["bindings"] = {}
         if widget_type == "shape":
@@ -2453,9 +2564,12 @@ class OverlayScene(QtCore.QObject):
             if widget_type in ("switch_4way", "switch_2way"):
                 new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
             if old_kind == "button":
-                first = next(iter(switch_positions(widget_type)), None)
-                if first:
-                    item["bindings"][first] = normalize_toggle_binding(saved_binding)
+                if widget_type == "toggle":
+                    item["bindings"]["on"] = normalize_toggle_binding(saved_binding)
+                else:
+                    first = next(iter(switch_positions(widget_type)), None)
+                    if first:
+                        item["bindings"][first] = normalize_toggle_binding(saved_binding)
         elif old_kind == "switch":
             item["bindings"] = {}
         if new_kind == "none" or old_kind == new_kind:
