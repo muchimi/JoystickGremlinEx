@@ -520,13 +520,15 @@ class Key:
         virtual_code = safe_read(node, "virtual-code", int, 0)
         if virtual_code > 0:
             key = KeyMap.find_virtual(virtual_code)
-            self._scan_code = key.scan_code
-            self._is_extended = key.is_extended
-            self._virtual_code = key.virtual_code
+            scan_code = key.scan_code
+            is_extended = key.is_extended
+            virtual_code = key.virtual_code
         else:
-            self._scan_code = int(node.get("scan-code", 0))
-            self._is_extended = parse_bool(node.get("extended", ""))
-            self._virtual_code = KeyMap.key_to_virtual(self._scan_code, self._is_extended)
+            scan_code = int(node.get("scan-code", 0))
+            is_extended = parse_bool(node.get("extended", ""))
+            virtual_code = KeyMap.key_to_virtual(self._scan_code, self._is_extended)
+
+        self._load(scan_code, is_extended, virtual_code, is_mouse = scan_code >= 0x1000)
 
         self._latched_keys = []
         latched_nodes = node.xpath(f".//{latched_tag}")

@@ -232,9 +232,10 @@ class SwitchWidget(QtWidgets.QWidget):
     def _handle_delay_changed(self, value: int):
         self.data.releaseDelay = value
 
-    def _handle_input_changed(self, device, input_id):
+    def _handle_input_changed(self, device, input_type, input_id):
         """occurs when the input is changed"""
         self.data.device_guid = device.device_guid
+        self.data.input_type = input_type
         self.data.input_id = input_id
 
     @QtCore.Slot()

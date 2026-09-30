@@ -3214,7 +3214,10 @@ class EventHandler(QtCore.QObject):
             elif event.event_type == InputType.State:
                 verbose = gremlin.config.Configuration().verbose
                 state_input = event.identifier
-                key = state_input.message_key
+                if isinstance(state_input, str):
+                    key = state_input
+                else:
+                    key = state_input.key
                 if device_guid not in self.state_callbacks.keys():
                     self.state_callbacks[device_guid] = {}
                 # these callbacks work in multi modes
@@ -3761,6 +3764,7 @@ class EventHandler(QtCore.QObject):
 
         self.registry.update(event)  # record the event
 
+
         try:
             # mode to act on
             mode = event.mode if event.mode else self.runtime_mode
@@ -3790,6 +3794,7 @@ class EventHandler(QtCore.QObject):
 
             else:
                 input_item = data
+
 
             if verbose:
                 syslog.info(
@@ -3873,7 +3878,7 @@ class EventHandler(QtCore.QObject):
 
                 latched_inputs = input_item.getLatchedInputIds()
                 if verbose:
-                    syslog.info(f"Found {len(latched_inputs)} latched inputs for input item: {input_item.name}")
+                    syslog.info(f"Found {len(latched_inputs)} latched inputs for input item: {input_item.display_name}")
                     for index, latched_input in enumerate(latched_inputs):
                         syslog.info(f"\t[{index}]: {latched_input}")
 
@@ -4341,7 +4346,7 @@ class EventHandler(QtCore.QObject):
         import gremlin.ui.voice_device
 
         vd = gremlin.ui.voice_device.VoiceData()
-        if vd.input_item == input_item:
+        if vd.ptt_input_item == input_item:
             return [vd.execute_callback]
         return []
 

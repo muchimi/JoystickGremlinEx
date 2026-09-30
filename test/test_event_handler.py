@@ -67,3 +67,16 @@ def test_octavi_run_yields_after_read_failures():
 
     assert not thread.is_alive()
     assert interface._device.calls < 25
+
+
+def test_blank_keyboard_input_xml_serializes_without_key():
+    from gremlin.base_profile import ProfileModeNode
+    from gremlin.ui.keyboard_device import KeyboardInputItem
+
+    mode = ProfileModeNode(name="Default")
+    item = KeyboardInputItem(mode)
+
+    node = item.to_xml()
+
+    assert node is not None
+    assert node.tag == "keyboard"

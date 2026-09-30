@@ -2086,6 +2086,19 @@ def extract_remap_actions(action_sets):
             #     remap_actions.append(action)
     return remap_actions
 
+def getMasterModeObject():
+    """gets the master mode object"""
+    master_mode = gremlin.shared_state.master_mode
+    profile = gremlin.shared_state.current_profile
+    # device = gremlin.joystick_handling.getDevice(StateDeviceTabWidget.device_guid)
+    device_modes = profile.get_device_modes(
+        gremlin.shared_state.voice_tab_guid,
+        DeviceType.Voice,
+        DeviceType.to_string(DeviceType.Voice),
+    )
+    mode_object = device_modes.ensure_mode_exists(master_mode)
+    return mode_object
+
 
 class ProfileRegistry:
     """holds data about a profile in a central location for easier reference and to avoid duplication of object references in data structures"""

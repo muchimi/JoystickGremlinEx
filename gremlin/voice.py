@@ -1979,8 +1979,8 @@ class Voice:
                     listen_enabled = self._listen_enabled
 
                 if not listen_enabled:
-                    if self.verbose:
-                        syslog.info("Voice listen runner: listening disabled")
+                    # if self.verbose:
+                    #     syslog.info("Voice listen runner: listening disabled")
                     continue
 
                 output, info = self.processor.process(audio)

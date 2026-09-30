@@ -5191,7 +5191,7 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
             case DeviceType.Overlay:
                 return config.overlay_enabled
             case DeviceType.StreamDeck:
-                return config.stream_deck_enabled
+                return config.streamdeck_enabled
             case DeviceType.OctaviIFR1:
                 return config.octavi_enabled
         return True

@@ -55,11 +55,11 @@ syslog = logging.getLogger("system")
 class KeyboardInputItem(InputItem):
     """holds a keyboard input item"""
 
-    def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode):
+    def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode, key : Key = None):
         """Keyboard input id
         :param mode: the profile mode for this input
         """
-        self._key: Key = None  # associated primary key (containing latched items)
+        self._key: Key = key  # associated primary key (containing latched items)
         super().__init__(
             mode_object,
             device_guid=KeyboardDeviceTabWidget.device_guid,
@@ -298,10 +298,15 @@ class KeyboardInputItem(InputItem):
         input_node.set("guid", write_guid(self.id))
         node.append(input_node)
 
-        # key entry
-
-        child = etree.Element("key")
         root_key = self._key
+        if root_key is None:
+            # A blank keyboard input can still be saved as an empty node; XML consumers
+            # expect the key payload to exist only when an actual key has been assigned.
+            super().to_xml(node)
+            return node
+
+        # key entry
+        child = etree.Element("key")
         child.set("virtual-code", str(root_key.virtual_code))
         child.set("scan-code", str(root_key.scan_code))
         child.set("extended", str(root_key.is_extended))
