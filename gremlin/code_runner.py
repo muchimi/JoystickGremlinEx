@@ -131,8 +131,7 @@ class CodeRunner:
         vs = gremlin.joystick_handling.VjoyStart()
         vs.reset()  # reset the vjoy start data
 
-
-        el.profile_before_start.emit() # tell components the profile is about to start
+        el.profile_before_start.emit()  # tell components the profile is about to start
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild=True)  # rebuild the execution tree
@@ -182,11 +181,9 @@ class CodeRunner:
         if not start_mode:
             start_mode = gremlin.shared_state.current_profile.get_start_mode()
 
-
         syslog.info(f"Startup mode: {start_mode}")
-        syslog.info(f"Verbosity options: {gremlin.util.ansiText('on','green') if config.verbose else gremlin.util.ansiText('off','red')}")
+        syslog.info(f"Verbosity options: {gremlin.util.ansiText('on', 'green') if config.verbose else gremlin.util.ansiText('off', 'red')}")
         config.dumpVerboseModes()
-
 
         # Set default macro action delay
         gremlin.macro.MacroManager().default_delay = settings.default_delay
@@ -252,9 +249,6 @@ class CodeRunner:
             for mode_name in gremlin.profile.mode_list():
                 self.event_handler.addCallback(gremlin.joystick_handling.invalidDeviceGuid(), mode_name, None, lambda x: x, False)
 
-
-
-
             # reset functor latching
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             container_plugins.reset_functors()
@@ -284,7 +278,6 @@ class CodeRunner:
                         syslog.info("CALLBACK: skipping a device (this is normal if the device is disabled):")
                         syslog.info(f"\t{str(device_node)}")
                     continue
-
 
                 device_name = device.name
                 if verbose:
@@ -329,7 +322,9 @@ class CodeRunner:
                             for container in input_item.containers:
                                 if not container.hasOutput():
                                     if verbose:
-                                        syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: zero output container ignored")
+                                        syslog.warning(
+                                            f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: zero output container ignored"
+                                        )
                                     continue
                                 if not container.is_valid():
                                     continue
@@ -370,12 +365,23 @@ class CodeRunner:
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
 
-
-                                    self.event_handler.addCallback(device_node.device_guid, mode_name, event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
+                                    self.event_handler.addCallback(
+                                        device_node.device_guid,
+                                        mode_name,
+                                        event,
+                                        cb_data.callback,
+                                        input_item.always_execute,
+                                        extra_data={"input_item": input_item},
+                                    )
                                 else:
-                                    self.event_handler.addCallback(dinput.GUID_Virtual, mode_name, cb_data.event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
-
-
+                                    self.event_handler.addCallback(
+                                        dinput.GUID_Virtual,
+                                        mode_name,
+                                        cb_data.event,
+                                        cb_data.callback,
+                                        input_item.always_execute,
+                                        extra_data={"input_item": input_item},
+                                    )
 
             # handle multimode actions - ensure they are hooked - these actions are actions that can process data for multiple modes such as gated axis
             nodes = ec.findActions("gated-axis")
@@ -417,10 +423,7 @@ class CodeRunner:
                         continue
                     callbacks.extend(container.generate_callbacks())
                 if callbacks:
-                    syslog.info(
-                        f"CALLBACK: State [{key}]: registered {len(callbacks)} "
-                        f"container callback(s)"
-                    )
+                    syslog.info(f"CALLBACK: State [{key}]: registered {len(callbacks)} container callback(s)")
                 for cb_data in callbacks:
                     event = gremlin.event_handler.Event(
                         event_type=InputType.State, device_guid=state_device_guid, identifier=input_item.input_id, extra_data={"input_item": input_item}
@@ -429,38 +432,67 @@ class CodeRunner:
                     self.event_handler.registerMappedInput(state_device_guid, master_mode, InputType.State, magic, input_item)
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
 
-            # setup callbacks for voice input items if a trigger is identified
+            # voice recognition callback setup
             if config.voice_enabled:
                 vd = gremlin.ui.voice_device.VoiceData()
-                input_item = vd.ptt_input_item
-
+                input_item = vd.getVoiceInputItem()  # latch input
+                vd.ptt_input_item = input_item
                 if input_item:
-                    # voice device is latched to an input
-                    event = gremlin.event_handler.Event(
-                        event_type=input_item.input_type,
-                        device_guid=input_item.device_guid,
-                        identifier=input_item.input_id,
-                        extra_data={"input_item": input_item}
-                    )
-                    callback = vd.execute_callback # what to call
-                    magic = eh.getMagic(event)
+                    # voice device is latched to an input to manage recognition on/off and toggle
+                    syslog.info(f"Voice latch input found for input item: {input_item.display_name}")
+                    valid = True
+                    match input_item.input_type:
+                        case InputType.JoystickButton | InputType.JoystickHat:
+                            # latch is a joystick button or hat
+                            identifier = input_item.input_id
 
-                    self.event_handler.registerMappedInput(input_item.device_guid, master_mode, input_item.input_type, magic, input_item)
+                        case InputType.KeyboardLatched:
+                            # latch is a latched keyboard key
+                            key: gremlin.keyboard.Key = input_item.key
+                            if key is None:
+                                valid = False
+                            else:
+                                identifier = key.key_tuple
 
+                        case InputType.State:
+                            # latch is a state mode
+                            identifier = input_item.key
+                            if identifier is None:
+                                valid = False
+                    if valid:
+                        # event to respond to
+                        device_guid = input_item.device_guid
+                        input_type = input_item.input_type
 
-                    self.event_handler.addCallback(
-                        device_guid = input_item.device_guid,
-                        mode = master_mode,
-                        event = event,
-                        callback = callback,
-                        permanent = input_item.always_execute,
-                        extra_data = event.extra_data
-                    )
+                        event = gremlin.event_handler.Event(
+                            event_type=input_type,
+                            device_guid=device_guid,
+                            identifier=identifier,
+                            extra_data={"input_item": input_item}
+                        )
+                        # callback to execute when that input event occurs
+                        callback = vd.execute_callback  # what to call on the hook
+                        magic = eh.getMagic(event)
+                        self.event_handler.registerMappedInput(
+                            device_guid = device_guid,
+                            mode =  master_mode,
+                            input_type = input_type,
+                            magic = magic,
+                            input_item = input_item
+                        )
+
+                        self.event_handler.addCallback(
+                            device_guid=device_guid,
+                            mode=master_mode,
+                            event=event,
+                            callback=callback,
+                            permanent=input_item.always_execute,
+                            extra_data=event.extra_data,
+                        )
 
                 # mappings for voice inputs
                 vd.clearCallbacks()
                 for key, input_item in vd.items():
-
                     input_node = ec.getInputItemNode(input_item)
                     assert input_node is not None, f"Input node not found for input item: {input_item}"
                     vd.registerGraphNode(input_item, input_node)
@@ -468,26 +500,19 @@ class CodeRunner:
                     # mapping callbacks for voice inputs
                     callbacks = []
                     for container in input_item.containers:
-                            if not container.is_valid():
-                                # test = container.is_valid()
-                                syslog.warning(
-                                    f"CALLBACK: device: Voice: input: {input_item.display_name}: "
-                                    f"warning: Incomplete container ignored "
-                                    f"(id={getattr(container, 'id', '?')})"
-                                )
-                                continue
-                            callbacks.extend(container.generate_callbacks())
+                        if not container.is_valid():
+                            # test = container.is_valid()
+                            syslog.warning(
+                                f"CALLBACK: device: Voice: input: {input_item.display_name}: "
+                                f"warning: Incomplete container ignored "
+                                f"(id={getattr(container, 'id', '?')})"
+                            )
+                            continue
+                        callbacks.extend(container.generate_callbacks())
                     if callbacks:
-                        syslog.info(
-                            f"CALLBACK: Voice [{key}]: registered {len(callbacks)} "
-                            f"container callback(s)"
-                        )
+                        syslog.info(f"CALLBACK: Voice [{key}]: registered {len(callbacks)} container callback(s)")
                     for cb_data in callbacks:
                         vd.addCallback(input_item, cb_data.callback)
-
-
-
-
 
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
@@ -532,8 +557,6 @@ class CodeRunner:
             # hook vjoy debug data based on state
             vjoy_debug = vjoy.VjoyDebug()
             vjoy_debug.Hook()
-
-
 
             # Connect signals
             evt_listener = gremlin.event_handler.EventListener()
@@ -830,7 +853,6 @@ class CodeRunner:
         # clear execution context
         ec = gremlin.execution_graph.ExecutionContext()
         ec.clear()
-
 
     def _reset_state(self):
         """Resets all states to their default values."""

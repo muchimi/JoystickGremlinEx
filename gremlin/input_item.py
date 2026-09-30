@@ -1191,7 +1191,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     if "id" in node.attrib:
                         str_id = node.get("id")
                         if not str_id.isnumeric():
-                            self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
+                            self.input_id = 1 # gremlin.base_classes.SpecialInputItem(str_id)
                         else:
                             self.input_id = safe_read(node, "id", int, 0)
                 case InputType.OctaviIfr1:
@@ -7419,6 +7419,8 @@ class ActionSetView(AbstractView):
         return action.id in self._widget_map
 
     def _show_blank(self):
+        if not Shiboken.isValid(self._stacked_widget):
+            return
         if self._stacked_widget.currentIndex() != 0:
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
@@ -7426,6 +7428,8 @@ class ActionSetView(AbstractView):
             self._stacked_widget.setCurrentIndex(0)
 
     def _show_content(self):
+        if not Shiboken.isValid(self._stacked_widget):
+            return
         if self._model.count() == 0:
             # no actions to show
             self._show_blank()
@@ -10046,12 +10050,16 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             self._show_blank()
 
     def _show_blank(self):
+        if not Shiboken.isValid(self._stacked_widget):
+            return
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("InputItemMappingWidget: show blank")
         self._stacked_widget.setCurrentIndex(0)
 
     def _show_content(self):
+        if not Shiboken.isValid(self._stacked_widget):
+            return
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"InputItemMappingWidget: show content: [{self._input_item.display_name}]")

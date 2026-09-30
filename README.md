@@ -49,6 +49,23 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T65)
+- Change: Voice Device: display a message if no states are defined and state latching is selected.
+- Fix: Voice Device: settings: handle blank keyboard or state latching.
+- Fix: Voice Device: settings: load state latching correctly.
+- Fix: Voice Device: settings: exception on some input types when selecting a PTT latch input.
+- Fix: API: do not attempt to persist keyboard entries that are not attached to a key (or keys).
+- Fix: UI: Joystick selector may update the input, not the selected device.
+- Fix: UI: ActionSetView: added two QT memory manager guardrails 
+- Fix: API: Keyboard: key name does not update on key objects
+- Fix: API: optional modules enabled by default when they should be disabled if they should be enabled by the user (this is to reduce default overhead/system for vanilla installs).
+- Fix: UI: input widget cache creation and diagnostics code around creation failures.
+
+### (m77T64B)
+- Fix: keyboard input - allow to save empty (blank) items.
+
+### (m77T64A)
+- Fix: options dialog streamdeck reference invalid.
 
 ### (m77T64)
 - New: Voice Device: option to play an audio cue on voice match

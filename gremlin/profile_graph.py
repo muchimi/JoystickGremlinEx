@@ -1537,7 +1537,10 @@ class ProfileInputItemNode(ProfileBaseNode):
         node = etree.Element(InputType.to_string(self.input_type))
 
         if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            if isinstance(self.input_id, Key):
+            if self.input_id is None:
+                node.set("id", "0")
+                node.set("extended", safe_format(False, bool))
+            elif isinstance(self.input_id, Key):
                 # keyboard key item
                 key: Key
                 key = self.input_id
@@ -1552,9 +1555,12 @@ class ProfileInputItemNode(ProfileBaseNode):
             elif hasattr(self.input_id, "to_xml"):
                 child = self.input_id.to_xml()
                 node.append(child)
-            else:
+            elif isinstance(self.input_id, tuple) and len(self.input_id) >= 2:
                 node.set("id", safe_format(self.input_id[0], int))
                 node.set("extended", safe_format(self.input_id[1], bool))
+            else:
+                node.set("id", "0")
+                node.set("extended", safe_format(False, bool))
         elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
             # write midi or OSC nodes
             child = self.input_id.to_xml()

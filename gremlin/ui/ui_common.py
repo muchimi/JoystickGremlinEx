@@ -10493,9 +10493,17 @@ class WidgetCacheTracker:
                     return (None, created)
                 if verbose:
                     syslog.info(f"WidgetCache: create instance from parameter for key [{key}] [{instance_type.__name__}]")
-                widget = instance_type.fromParams(params)
-                self.addWidget(key, widget)  # update the cache
-                created = True
+                try:
+                    widget = instance_type()
+                    widget.fromParams(params)
+                    self.addWidget(key, widget)  # update the cache
+                    created = True
+                except Exception as e:
+                    syslog.error(f"WidgetCache: failed to create widget for key [{key}]")
+                    syslog.error(f"\tparams: {params}")
+                    syslog.error(f"\texception: {e}")
+                    syslog.error(f"\tstack trace: {traceback.format_exc()}")
+                    return (None, created)
             else:
                 # existing widget in the cache
                 widget = self._widget_map[key]
@@ -14917,7 +14925,7 @@ class QJoystickSelectorWidget(QWidget):
         default_input_id=None,
         virtual_only=False,
         show_listen=False,  # true if show a listen button
-        callback=None,
+        callback : Callable[[DeviceSummary, InputType, int], None]=None,
         parent=None,
     ):
         """
@@ -14944,8 +14952,9 @@ class QJoystickSelectorWidget(QWidget):
             key=lambda x: x.name,
         )
 
-        for dev in self._devices:
-            syslog.info(f"Found device: {dev.name}")
+
+        # for dev in self._devices:
+        #     syslog.info(f"Found device: {dev.name}")
 
         container_selector_widget = QWidget()
         main_layout.addWidget(container_selector_widget)
@@ -14977,8 +14986,10 @@ class QJoystickSelectorWidget(QWidget):
         self.device_selector_widget.currentIndexChanged.connect(self._handle_device_changed)
         self.input_selector_widget.currentIndexChanged.connect(self._handle_input_changed)
 
-    def select(self, device, input_type, input_id, emit=False):
+    def select(self, device : DeviceSummary, input_type : InputType, input_id : int, emit : bool =False):
         """selects the specified entries if they exist"""
+        if device:
+            self._selected_device = device
         with QtCore.QSignalBlocker(self.device_selector_widget):
             index = self.device_selector_widget.findData(self._selected_device)
             if index != -1:
@@ -15086,33 +15097,38 @@ class QJoystickSelectorWidget(QWidget):
 
     @QtCore.Slot()
     def _handle_device_changed(self):
-        import dinput
-
         dev: dinput.DeviceSummary = self.device_selector_widget.currentData()
-        if dev:
-            if self._selected_device != dev:
-                self._update_inputs(dev)
-                self._selected_device = dev
-                if self.input_selector_widget.count:
-                    self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
-                    return
-                else:
-                    self._selected_input_type = self._selected_input_id = None
-                self._selected_device = dev
-        else:
-            self._selected_device = None
+        try:
+            if dev:
+                if self._selected_device != dev:
+                    self._update_inputs(dev)
+                    self._selected_device = dev
+                    if self.input_selector_widget.count:
+                        self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+                        return
+                    else:
+                        self._selected_input_type = self._selected_input_id = None
+                    self._selected_device = dev
+            else:
+                self._selected_device = None
 
-        if self._callback:
-            self._callback(self._selected_device, self._selected_input_id)
-        self._emit()
+            self._emit()
+        finally:
+            if self._callback:
+                self._callback(self._selected_device, self._selected_input_type, self._selected_input_id)
+
 
     @QtCore.Slot()
     def _handle_input_changed(self):
         if self.input_selector_widget.count:
             self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
             if self._callback:
-                self._callback(self._selected_device, self._selected_input_id)
+                self._callback(self._selected_device, self._selected_input_type,self._selected_input_id)
             self._emit()
+
+    def getSelectionData(self):
+        """ gets the current selection """
+        return (self._selected_device, self._selected_input_type, self._selected_input_id)
 
     def _emit(self):
         """fire the change event if the data is valid"""
@@ -15181,6 +15197,15 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
     ):
 
         super().__init__(self.__class__.__name__, parent=parent)
+        config = gremlin.config.getConfig()
+
+        # recall defaults if not specified
+        if default_device is None:
+            default_device = config.last_selected_joystick_device
+            if default_device:
+                default_input_type = config.last_selected_joystick_input_type
+                default_input_id = config.last_selected_joystick_input_id
+
 
         self._selected_data = (default_device, default_input_type, default_input_id)
         self._input_types = input_types
@@ -15220,6 +15245,7 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
     def _handle_selection_changed(self, data):
         self._selected_device, self._selected_input_type, self._selected_input_id = data
         self._selected_data = data
+
 
     def _handle_listen_request(self):
         """calls up a listen box to select the input"""
@@ -15284,6 +15310,14 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
                 gremlin.input_types.InputType(self._selected_input_type),
                 self._selected_input_id,
             )
+
+        # remember the selection
+        if self._selected_device:
+            config = gremlin.config.Configuration()
+            config.last_selected_joystick_device_id = self._selected_device.device_id
+            config.last_selected_joystick_input_type = self._selected_input_type
+            config.last_selected_joystick_input_id = self._selected_input_id
+
         self.close()
 
     @property

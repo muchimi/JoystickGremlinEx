@@ -2850,7 +2850,7 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # disabled by default
+        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
@@ -2861,8 +2861,8 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self) -> bool:
         """True if OSC support is enabled"""
         if self._osc_enabled is None:
-            self._osc_enabled = self._get_data("osc_enabled", True)
-        return self._osc_enabled
+            self._osc_enabled = self._get_data("osc_enabled", True)  # defaults to OFF and must be explicitly enabled by the user
+        return OSC_ENABLED and self._osc_enabled
 
     @osc_enabled.setter
     def osc_enabled(self, value: bool):
@@ -2884,9 +2884,6 @@ class Configuration(QtCore.QObject):
         """True if OSC support is enabled"""
         return OSC_ENABLED and self._get_data("osc_enabled", True)
 
-    @osc_enabled.setter
-    def osc_enabled(self, value: bool):
-        self._set_data("osc_enabled", value)
 
     @property
     def overlay_enabled(self) -> bool:
@@ -2900,7 +2897,7 @@ class Configuration(QtCore.QObject):
     @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", True)
+        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False) # defaults to OFF and must be explicitly enabled by the user
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -4083,3 +4080,63 @@ class Configuration(QtCore.QObject):
     @voice_model_name.setter
     def voice_model_name(self, value: str):
         self._set_data("voice_model_name", value)
+
+    @property
+    def last_selected_joystick_device_id(self) -> str:
+        """returns the device id of the last selected joystick"""
+        return self._get_data("last_selected_joystick_device_id", "")
+
+    @last_selected_joystick_device_id.setter
+    def last_selected_joystick_device_id(self, value: str):
+        self._set_data("last_selected_joystick_device_id", value)
+
+    @property
+    def last_selected_joystick_input_type(self) -> InputType:
+        """returns the input type of the last selected joystick"""
+        input_type = self._get_data("last_selected_joystick_input_type", "")
+        if not input_type:
+            device_id = self.last_selected_joystick_device_id
+            if device_id:
+                import gremlin.joystick_handling
+                device = gremlin.joystick_handling.getDevice(device_id)
+                if device:
+                    if device.axis_count:
+                        return InputType.JoystickAxis
+                    if device.button_count:
+                        return InputType.JoystickButton
+                    if device.hat_count:
+                        return InputType.JoystickHat
+            return InputType.JoystickButton
+        return InputType(input_type)
+
+    @last_selected_joystick_input_type.setter
+    def last_selected_joystick_input_type(self, value: InputType):
+        self._set_data("last_selected_joystick_input_type", value)
+
+    @property
+    def last_selected_joystick_input_id(self) -> int:
+        """returns the input id of the last selected joystick"""
+        return self._get_data("last_selected_joystick_input_id", 1)
+
+    @last_selected_joystick_input_id.setter
+    def last_selected_joystick_input_id(self, value: int):
+        self._set_data("last_selected_joystick_input_id", value)
+
+    @property
+    def last_selected_joystick_input(self) -> tuple[str, InputType, int]:
+        return (
+            self.last_selected_joystick_device_id,
+            self.last_selected_joystick_input_type,
+            self.last_selected_joystick_input_id,
+        )
+
+    @property
+    def last_selected_joystick_device(self):
+        """ gets the last joystick device object, or None if not available"""
+        device_id = self.last_selected_joystick_device_id
+        if device_id:
+            import gremlin.joystick_handling
+            device = gremlin.joystick_handling.getDevice(device_id)
+            if device:
+                return device
+        return None
