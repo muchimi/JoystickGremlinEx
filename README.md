@@ -49,6 +49,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T67)
+- Fix: UI: Voice Device: Clear deletes voices (was deleting incorrect inputs)
+- Fix: UI (Core): resolve an issue with ensuring input changes are synchronized with the mapping when an input is deleted or unselected.
+- Fix: Voice Device: delete entry does not delete command from voice engine until profile reload.
+
+### (m77T66)
+- Fix: UI: added more QT desync guardrails when UI needs to refresh.
+- Fix: UI (Options): removed duplicate AFCS entry in the modules tab.
+
 ### (m77T65)
 - Change: Voice Device: display a message if no states are defined and state latching is selected.
 - Fix: Voice Device: settings: handle blank keyboard or state latching.
