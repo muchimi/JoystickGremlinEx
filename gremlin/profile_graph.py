@@ -51,8 +51,14 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 
+
 from OdenGraphQt import NodeGraph, BaseNode, NodeBaseWidget
+from OdenGraphQt.constants import LayoutDirectionEnum
+
 from gremlin.ui.ui_common import getVContainer, getHContainer, getGridContainer, synchronize_grids
+from gremlin.ui.state_device import StateInputItem
+from gremlin.ui.voice_device import VoiceInputItem
+from gremlin.ui.keyboard_device import KeyboardInputItem
 
 
 from PySide6 import QtCore, QtWidgets
@@ -142,12 +148,15 @@ class ProfileRootNode(ProfileBaseNode):
         self._graph_modes = {}  # list of mode definitions in the graph
         self._load_default_devices()
         self._registry = gremlin.base_profile.ProfileRegistry(self)
+        self.profile = None
+
 
     @staticmethod
     def fromProfile(profile: gremlin.base_profile.Profile):
         """creates a graph from the profile"""
         root_node = ProfileRootNode()
         root_node.source_xml = profile.profile_file
+        root_node.profile = profile
         for profile_device_node in profile.devices:
             device_node = ProfileDeviceNode.fromProfileDevice(profile_device_node, root_node)
             root_node.devices[device_node.device_guid] = device_node
@@ -323,6 +332,11 @@ class GraphBaseNode(BaseNode):
 
     def connect(self, target_node: GraphBaseNode, source_output_index: int = 0, target_input_index: int = 0):
         """connects this node's output to the target node's input"""
+        # ensure the output/input ports at the requested indices exist, adding any that are missing
+        while len(self.output_ports()) <= source_output_index:
+            self.add_output(f"output_{len(self.output_ports())}")
+        while len(target_node.input_ports()) <= target_input_index:
+            target_node.add_input(f"input_{len(target_node.input_ports())}")
         self.set_output(source_output_index, target_node.input(target_input_index))
 
     @property
@@ -341,6 +355,16 @@ class GraphBaseNode(BaseNode):
     def load(self, data: ProfileBaseNode):
         """implemented by derived nodes based on what they need to show"""
         pass
+
+    def ensure_input(self, input_index: int):
+        """Ensures that the input port at the specified index exists, adding any that are missing."""
+        while len(self.input_ports()) <= input_index:
+            self.add_input(f"input_{len(self.input_ports())}")
+
+    def ensure_output(self, output_index: int):
+        """Ensures that the output port at the specified index exists, adding any that are missing."""
+        while len(self.output_ports()) <= output_index:
+            self.add_output(f"output_{len(self.output_ports())}")
 
 
 class GridNodeWidget(QtWidgets.QWidget):
@@ -391,7 +415,7 @@ class ProfileNodeWidget(WrapperNodeBaseWidget):
 
     def __init__(self, profile: gremlin.base_profile.Profile, parent=None):
         super().__init__("Profile", parent)
-        f_name = profile.profile_file
+        f_name = profile.source_xml
         base_name = os.path.basename(f_name) if f_name else "n/a"
         data = {
             "Profile Name": base_name,
@@ -400,7 +424,7 @@ class ProfileNodeWidget(WrapperNodeBaseWidget):
         self.set_label("Profile")
         self.setToolTip(f"Profile {base_name}")
 
-class ProfileDeviceNode(GraphBaseNode):
+class GraphProfileNode(GraphBaseNode):
     """represents a device node in the profile tree"""
     def __init__(self):
         super().__init__()
@@ -468,7 +492,17 @@ class InputItemNodeWidget(WrapperNodeBaseWidget):
             case InputType.JoystickHat:
                 data["Hat"] = input_item.input_id
             case InputType.Keyboard | InputType.KeyboardLatched:
-                data["Key"] = input_item.input_id
+                item : KeyboardInputItem = input_item
+                key = item.key
+                data["Key"] = str(key)
+            case InputType.State:
+                item : StateInputItem = input_item
+                data["State"] = item.key
+            case InputType.Voice:
+                item : VoiceInputItem = input_item
+                command_string = "|".join(c.key for c in item.commands)
+                data ["Commands:"] = command_string
+
 
         widget = GridNodeWidget(data)
 
@@ -591,16 +625,9 @@ class GraphActionNode(GraphBaseNode):
 
 
 
-class GraphProfileNode(GraphBaseNode):
-    """represents a profile node in the profile tree"""
-
-    def __init__(self):
-        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Profile", multi=True)
-        super().__init__(outputs=c1)
-
-
 class ModeNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, mode: str, parent=None):
+    def __init__(self, data, parent=None):
+        mode = gremlin.shared_state.translateMode(data.name)
         super().__init__(f"Mode [{mode}]", parent)
         self.mode = mode
         self.set_label(mode)
@@ -649,17 +676,19 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
         self.main_layout.addWidget(self._fallback_widget)
 
         try:
-            self._node_graph = NodeGraph()
+            self._node_graph = NodeGraph() # the node graph instance
+            self._node_graph.set_layout_direction(LayoutDirectionEnum.HORIZONTAL.value) # horizontal layout
 
             # registered example nodes.
             self._node_graph.register_nodes(
                 [
                     GraphProfileNode,
+                    GraphModeNode,
                     GraphDeviceNode,
                     GraphInputItemNode,
                     GraphContainerNode,
                     GraphActionNode,
-                    GraphModeNode,
+                    GraphActionSetNode,
                 ]
             )
 
@@ -675,8 +704,10 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
             self._build_tree()
 
+            self._node_graph.auto_layout_nodes()
+
             # do the layout of the nodes
-            self._apply_layout(self._node_map)
+            # self._apply_layout(self._node_map)
 
         except Exception as exc:  # pragma: no cover - optional dependency may be missing
             syslog.warning(f"ProfileTreeDialogUI: unable to initialize NodeGraphQt: {exc}")
@@ -696,7 +727,62 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
         root_node.set_pos(0, 0)
         self._node_map[self._graph.root] = root_node
 
-        self._recursive_add(graph=self._graph.root, parent_node=self._graph.root, level=0)
+        self._graph.dump()
+
+        for node in anytree.PreOrderIter(self._graph.root):
+            parent = node.parent
+            level = node.depth + 1
+            graph_parent = self._node_map.get(parent) if parent is not None else None
+
+            match node.nodeType:
+                case ProfileNodeType.Profile:
+                    instance = GraphProfileNode
+
+                case ProfileNodeType.Device:
+                    instance = GraphDeviceNode
+
+                case ProfileNodeType.Input:
+                    instance = GraphInputItemNode
+
+                case ProfileNodeType.Container:
+                    instance = GraphContainerNode
+
+                case ProfileNodeType.Action:
+                    instance = GraphActionNode
+
+                case ProfileNodeType.Mode:
+                    instance = GraphModeNode
+
+                case _:
+                    continue
+
+            instance_name = instance.type_
+            graph_child = self._node_graph.create_node(instance_name)
+            if node.description:
+                graph_child.nodeName = node.description
+            else:
+                graph_child.nodeName = node.nodeType.name
+
+
+            if graph_parent is not None:
+                graph_parent.ensure_output(0)                  # Ensure the first output port exists
+                graph_child.ensure_input(0)                    # Ensure the first input port exists
+
+                parent_output = graph_parent.output(0)          # First output port
+                child_input = graph_child.input(0)               # First input port
+                parent_output.connect_to(child_input)
+
+            graph_child.level = level
+            graph_child.position = node.parent.children.index(node) if parent is not None else 0
+            graph_child.load(node)  # populate the node with the relevant node information
+
+
+
+
+        # self._recursive_add(graph=self._graph.root, parent_node=self._graph.root, level=0)
+
+
+
 
     def _recursive_add(self, graph: ProfileGraph, parent_node, level: int):
         if graph is None:
@@ -704,6 +790,8 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
         child_nodes = list(graph.children)
         child: ProfileBaseNode
+
+        graph_parent_node = self._node_map.get(parent_node)
 
         for index, child in enumerate(child_nodes):
             instance = None
@@ -735,12 +823,18 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
             child_node.level = level
             child_node.position = index
-
             child_node.load(child)  # populate the node with the relevant node information
 
-            parent_graph_node: GraphBaseNode = self._node_map.get(parent_node)
-            if parent_graph_node:
-                parent_graph_node.connect(child_node)
+
+            # connect parent to child
+            if graph_parent_node:
+                graph_parent_node.ensure_output(0)                  # Ensure the first output port exists
+                child_node.ensure_input(0)                    # Ensure the first input port exists
+
+                parent_output = graph_parent_node.output(0)          # First output port
+                child_input = child_node.input(0)              # First input port
+                parent_output.connect_to(child_input)
+
 
             self._node_map[child] = child_node
 
@@ -1516,7 +1610,7 @@ class ProfileModeNode(ProfileBaseNode):
         super().__init__(ProfileNodeType.Mode)
 
         assert isinstance(mode_name, str) if mode_name is not None else True, "invalid mode name"
-        assert isinstance(inherit, str) if inherit is not None else True, "invalid inherit mode"
+        assert isinstance(inherit, (bool, str)) if inherit is not None else True, "invalid inherit mode"
         self.name = mode_name  # mode name
         self.inherit = inherit
 
@@ -1643,7 +1737,7 @@ class ProfileInputItemNode(ProfileBaseNode):
             current_mode = gremlin.shared_state.edit_mode
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
-            self._input_item = gremlin.input_item.InputItem(mode_object=mode_object)
+            self._input_item = gremlin.input_item.InputItem(mode_node = mode_object, input_type = InputType.ModeControl)
             self._input_item.setDeviceType(DeviceType.ModeControl)
             self._input_item.setInputId(0)
 
@@ -2147,7 +2241,9 @@ class ProfileGraph:
 
     def show_tree_dialog(self, parent=None):
         """show the profile tree in a NodeGraphQt view"""
-        dialog = ProfileTreeDialogUI(self, parent=parent)
+        profile = gremlin.shared_state.current_profile
+        graph = gremlin.profile_graph.ProfileGraph.fromProfile(profile)
+        dialog = ProfileTreeDialogUI(graph, parent=parent)
         gremlin.util.centerDialog(dialog)
         dialog.exec()
 

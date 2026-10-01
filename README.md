@@ -50,9 +50,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T67)
+- New (experimental): overlay web browser support (courtesy Lolo350): enables an  overlay to be displayed via a web browser on a networked device (such as a tablet or phone).  Supports touch input/interactions, HTTP frame fallback, and a GEX Offline screen when the profile is deactivated.  This feature aims at enabling touch-screen interaction from any device, not just a Windows device, as an interactive touch surface to send inputs to GEX.
+- Changes: Overlay module (courtesy Lolo350)
+	- Add a dual-bind 2-position switch (toggle) with latching Off/On behavior, plus multiline label/caption/axis-label fields (Shift+Enter for a new line)
+	- Improve overlay binding UI, profile sidecar persistence, windowed chroma paint, and related inspector/control-panel polish
 - Fix: UI: Voice Device: Clear deletes voices (was deleting incorrect inputs)
 - Fix: UI (Core): resolve an issue with ensuring input changes are synchronized with the mapping when an input is deleted or unselected.
 - Fix: Voice Device: delete entry does not delete command from voice engine until profile reload.
+
 
 ### (m77T66)
 - Fix: UI: added more QT desync guardrails when UI needs to refresh.

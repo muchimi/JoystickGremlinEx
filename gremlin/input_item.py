@@ -995,6 +995,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return self._device_type
 
     @property
+    def device(self) -> DeviceSummary:
+        return gremlin.joystick_handling.getDevice(self._device_guid)   
+
+    @property
     def device_name(self):
         return self._device_name
 
