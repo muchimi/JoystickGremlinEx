@@ -10176,8 +10176,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
     def _redraw_ui(self, force=False):
 
-        if not Shiboken.isValid(self):
-            # destroyed
+        if not Shiboken.isValid(self) or (self._container_view is not None and not Shiboken.isValid(self._container_view)):
+            # destroyed or in the process of being destroyed
             return
 
         assert self._input_item is not None, "invalid item data "

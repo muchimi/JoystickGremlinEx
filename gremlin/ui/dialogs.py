@@ -2285,7 +2285,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "OSC",
                 "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
             ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
-            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS module for advanced flight control systems.", 'GEX_AFCS_ENABLED'),
+
         ]
 
         widgets = []
@@ -4842,6 +4842,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             value=self.config.ReportShowFolder,
         )
 
+
         self.show_profile_tree_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Show profile tree",
             tooltip="Opens the profile tree dialog after the report is generated",
@@ -4857,7 +4858,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             self.show_files_widget,
         ]
 
-        if __debug__:
+        if gremlin.config.Configuration().ReportShowProfileTree:
             widgets.append(self.show_profile_tree_widget)
 
         widgets.append(gremlin.ui.ui_common.QHorizontalLine())
@@ -4909,6 +4910,8 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         options.show_folder = self.config.ReportShowFolder
 
         report.generate(options)
+
+
 
         if self.config.ReportShowProfileTree:
             profile = gremlin.shared_state.current_profile
@@ -5194,6 +5197,8 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
                 return config.streamdeck_enabled
             case DeviceType.OctaviIFR1:
                 return config.octavi_enabled
+            case DeviceType.Afcs:
+                return config.afcs_enabled
         return True
 
     def _populate_list_widget(self, tab_map):

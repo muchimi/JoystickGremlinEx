@@ -471,10 +471,13 @@ def clear_layout(layout):
 
 
 def _clear_layout(layout):
+    """ clear all widgets and layouts from the given layout """
+    if not layout or not Shiboken.isValid(layout):
+        return
     for index in reversed(range(layout.count())):
         item = layout.takeAt(index)
         widget = item.widget()
-        if widget is not None:
+        if widget is not None and Shiboken.isValid(widget):
             # Hide and delete in place. setParent(None) promotes the widget to a
             # top-level window and causes visible flashes over the main UI.
             widget.hide()

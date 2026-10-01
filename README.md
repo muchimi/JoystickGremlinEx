@@ -49,6 +49,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T66)
+- Fix: UI: added more QT desync guardrails when UI needs to refresh.
+- Fix: UI (Options): removed duplicate AFCS entry in the modules tab.
+
 ### (m77T65)
 - Change: Voice Device: display a message if no states are defined and state latching is selected.
 - Fix: Voice Device: settings: handle blank keyboard or state latching.
