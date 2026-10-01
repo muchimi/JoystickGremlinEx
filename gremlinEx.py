@@ -655,24 +655,55 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
         look_for_containers = True
-        # special devices
-        if device_guid == gremlin.shared_state.state_tab_guid:
-            # state
-            sd = gremlin.ui.state_device.StateData()
-            names = sd.getStateNames()
-            return {edit_mode: True} if names else {}
-        elif device_guid == gremlin.shared_state.settings_tab_guid:
-            return {}
-        elif device_guid == gremlin.shared_state.plugins_tab_guid:
-            # plugins
-            plugins = gremlin.shared_state.current_profile.plugins
-            return {edit_mode: True} if len(plugins) > 0 else {}
-        elif device_guid == gremlin.shared_state.overlay_tab_guid:
-            return {}
-        elif device_guid == gremlin.shared_state.afcs_tab_guid:
-            return {}
-        elif device_guid == gremlin.shared_state.keyboard_tab_guid:
-            look_for_containers = False
+
+
+        # # get the device widget
+        # widget = self.getRegisteredWidget(device_guid)
+        # if hasattr(widget, "inputCount"):
+        #     count = widget.inputCount
+        #     return {edit_mode: True} if count > 0 else {}
+
+        match device_guid:
+            # case gremlin.shared_state.state_tab_guid:
+            #     sd = gremlin.ui.state_device.StateData()
+            #     names = sd.getStateNames()
+            #     return {edit_mode: True} if names else {}
+            case gremlin.shared_state.settings_tab_guid:
+                return {}
+            case gremlin.shared_state.plugins_tab_guid:
+                # plugins
+                plugins = gremlin.shared_state.current_profile.plugins
+                return {edit_mode: True} if len(plugins) > 0 else {}
+            case gremlin.shared_state.overlay_tab_guid:
+                return {}
+            case gremlin.shared_state.afcs_tab_guid:
+                return {}
+            case gremlin.shared_state.keyboard_tab_guid:
+                look_for_containers = False
+            case gremlin.shared_state.voice_tab_guid | gremlin.shared_state.state_tab_guid:
+                look_for_containers = False
+                widget = self.getRegisteredWidget(device_guid)
+                count = widget.inputCount
+                return {edit_mode: True} if count > 0 else {}
+
+        # # special devices
+        # if device_guid == gremlin.shared_state.state_tab_guid:
+        #     # state
+        #     sd = gremlin.ui.state_device.StateData()
+        #     names = sd.getStateNames()
+        #     return {edit_mode: True} if names else {}
+        # elif device_guid == gremlin.shared_state.settings_tab_guid:
+        #     return {}
+        # elif device_guid == gremlin.shared_state.plugins_tab_guid:
+        #     # plugins
+        #     plugins = gremlin.shared_state.current_profile.plugins
+        #     return {edit_mode: True} if len(plugins) > 0 else {}
+        # elif device_guid == gremlin.shared_state.overlay_tab_guid:
+        #     return {}
+        # elif device_guid == gremlin.shared_state.afcs_tab_guid:
+        #     return {}
+        # elif device_guid == gremlin.shared_state.keyboard_tab_guid:
+        #     look_for_containers = False
 
         mode_map = {}
 

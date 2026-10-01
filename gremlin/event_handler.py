@@ -702,6 +702,7 @@ class EventListener(QtCore.QObject):
     input_item_selected = Signal(object, int)  # widget item was selected, parameter = InputItem, index of input item in the listview
     input_unselected = Signal(object)  # widget item was unselected selected, parameter = InputItemWidget
     input_deleted = Signal(object)  # called when an input item is deleted, parameter = InputItem
+    all_inputs_deleted = Signal(object)  # called when all inputs are deleted, passes the device_id as the parameter of the impacted device
 
     tab_selected = Signal(
         str

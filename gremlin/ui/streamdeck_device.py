@@ -198,13 +198,13 @@ def normalize_page(page) -> int:
 # Elgato DeviceType → (columns, rows) for the key grid (Companion viewport).
 # Only types listed here are treated as supported in the designer.
 DEVICE_GRID_LAYOUTS = {
-    0: (5, 3),   # Stream Deck / MK.2
-    1: (3, 2),   # Mini
-    2: (8, 4),   # XL
-    3: (5, 3),   # Mobile
-    7: (4, 2),   # Stream Deck + (keys; dials are separate)
-    8: (4, 2),   # Stream Deck + (alt type id)
-    9: (4, 2),   # Neo
+    0: (5, 3),  # Stream Deck / MK.2
+    1: (3, 2),  # Mini
+    2: (8, 4),  # XL
+    3: (5, 3),  # Mobile
+    7: (4, 2),  # Stream Deck + (keys; dials are separate)
+    8: (4, 2),  # Stream Deck + (alt type id)
+    9: (4, 2),  # Neo
 }
 
 # Known Elgato types that connect but have no JG Ex key/dial grid yet
@@ -323,6 +323,7 @@ def _same_physical_streamdeck_key(a, b) -> bool:
     if _page_of(a) != _page_of(b):
         return False
     return _same_live_slot(a, b)
+
 
 def ensure_streamdeck_special_device(device_id: str, name: str = None, device_type=None):
     """Ensure a special DeviceType.StreamDeck exists for this Elgato deviceId."""
@@ -1202,6 +1203,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
             node.set("column", str(self._column))
         super().to_xml(node)
         return node
+
     def __hash__(self):
         key = self.message_key
         return hash(key) if key else hash(self.id)
@@ -1374,7 +1376,7 @@ class StreamDeckBridge(QtCore.QObject):
         """Physical key slots that currently have a JG Ex Button (willAppear)."""
         coords = set()
         for meta in self.live_inputs_for_device(device_id):
-            kind = (meta.get("kind") or "button")
+            kind = meta.get("kind") or "button"
             if kind not in ("button", "", None):
                 continue
             row, column = meta.get("row"), meta.get("column")
@@ -1390,7 +1392,7 @@ class StreamDeckBridge(QtCore.QObject):
         """Physical dial columns that currently have a JG Ex Dial (willAppear)."""
         cols = set()
         for meta in self.live_inputs_for_device(device_id):
-            kind = (meta.get("kind") or "")
+            kind = meta.get("kind") or ""
             if kind not in ("dial", "dial_press"):
                 continue
             column = meta.get("column")
@@ -1560,11 +1562,7 @@ class StreamDeckBridge(QtCore.QObject):
         def _custom_score(device_id: str) -> tuple[int, int]:
             names = self._page_names.get(device_id) or {}
             order = self._page_order.get(device_id) or []
-            custom = sum(
-                1
-                for page, label in names.items()
-                if label and label != f"Page {page}"
-            )
+            custom = sum(1 for page, label in names.items() if label and label != f"Page {page}")
             return (custom, max(len(names), len(order)))
 
         for live_id in targets:
@@ -1599,9 +1597,7 @@ class StreamDeckBridge(QtCore.QObject):
             self._page_names[live_id] = dict(self._page_names.get(best) or {})
             if best in self._page_order:
                 self._page_order[live_id] = list(self._page_order[best])
-            syslog.info(
-                f"STREAMDECK: adopted page metadata {best[:12]}… → {live_id[:12]}…"
-            )
+            syslog.info(f"STREAMDECK: adopted page metadata {best[:12]}… → {live_id[:12]}…")
 
     def _dedupe_live_page_metadata(self, live_ids: list[str] | None = None):
         """Keep page banks per device: undo shared copies between connected decks."""
@@ -1636,21 +1632,14 @@ class StreamDeckBridge(QtCore.QObject):
                 # own. Never persist a wipe of real labels (Save As / reload bugs
                 # previously left only generic Page N and then overwrote JSON).
                 drop_names = self._page_names.get(drop) or {}
-                drop_custom = sum(
-                    1
-                    for page, label in drop_names.items()
-                    if label and label != f"Page {page}"
-                )
+                drop_custom = sum(1 for page, label in drop_names.items() if label and label != f"Page {page}")
                 if drop_custom > 0:
                     continue
                 drop_pages = sorted(drop_inputs) or [1]
                 self._page_order[drop] = list(drop_pages)
                 self._page_names[drop] = {}
                 changed = True
-                syslog.info(
-                    f"STREAMDECK: split shared page metadata; reset {drop[:12]}… "
-                    f"to pages {drop_pages}"
-                )
+                syslog.info(f"STREAMDECK: split shared page metadata; reset {drop[:12]}… to pages {drop_pages}")
         if changed:
             try:
                 self._persist_page_metadata()
@@ -1668,9 +1657,7 @@ class StreamDeckBridge(QtCore.QObject):
                 cfg = dict(profile._readConfig(force=True) or {})
             payload = dict(cfg.get(STREAMDECK_PAGES_CONFIG_KEY) or {})
             prior_payload = dict(payload)
-            device_ids = [device_id] if device_id else sorted(
-                set(list(self._page_names.keys()) + list(self._page_order.keys()))
-            )
+            device_ids = [device_id] if device_id else sorted(set(list(self._page_names.keys()) + list(self._page_order.keys())))
             # Empty memory + empty device list must not rewrite streamdeck_pages to {}.
             if not device_ids:
                 return
@@ -1683,44 +1670,26 @@ class StreamDeckBridge(QtCore.QObject):
                     names = meta.get("names") or {}
                     if not isinstance(names, dict):
                         continue
-                    total += sum(
-                        1
-                        for pk, pv in names.items()
-                        if pv and str(pv) != f"Page {pk}"
-                    )
+                    total += sum(1 for pk, pv in names.items() if pv and str(pv) != f"Page {pk}")
                 return total
 
             for did in device_ids:
                 if not did:
                     continue
                 order = list(self._page_order.get(did) or self.list_pages(did))
-                names = {
-                    str(p): self.page_name(did, p)
-                    for p in order
-                }
+                names = {str(p): self.page_name(did, p) for p in order}
                 # Never replace a rich saved name map with an empty/generic one.
                 existing = payload.get(did) or {}
                 existing_names = existing.get("names") or {}
-                existing_custom = sum(
-                    1
-                    for pk, pv in existing_names.items()
-                    if pv and str(pv) != f"Page {pk}"
-                )
-                new_custom = sum(
-                    1
-                    for pk, pv in names.items()
-                    if pv and str(pv) != f"Page {pk}"
-                )
+                existing_custom = sum(1 for pk, pv in existing_names.items() if pv and str(pv) != f"Page {pk}")
+                new_custom = sum(1 for pk, pv in names.items() if pv and str(pv) != f"Page {pk}")
                 if existing_custom > 0 and new_custom == 0:
                     continue
                 payload[did] = {"order": order, "names": names}
             prior_custom = _custom_count(prior_payload)
             new_total = _custom_count(payload)
             if prior_custom > 0 and new_total == 0:
-                syslog.warning(
-                    "STREAMDECK: refused to persist empty page metadata over "
-                    f"{prior_custom} custom name(s)"
-                )
+                syslog.warning(f"STREAMDECK: refused to persist empty page metadata over {prior_custom} custom name(s)")
                 return
             profile._setConfig(STREAMDECK_PAGES_CONFIG_KEY, payload)
         except Exception as err:
@@ -1788,10 +1757,7 @@ class StreamDeckBridge(QtCore.QObject):
             keys = payload.get("keys") or []
             img_len = len(payload.get("image") or "")
             with_img = sum(1 for k in keys if isinstance(k, dict) and k.get("image"))
-            syslog.info(
-                f"STREAMDECK: send_command [{command}] clients={n} "
-                f"keys={len(keys)} with_image={with_img} image_chars={img_len}"
-            )
+            syslog.info(f"STREAMDECK: send_command [{command}] clients={n} keys={len(keys)} with_image={with_img} image_chars={img_len}")
         elif gremlin.config.Configuration().verbose_mode_streamdeck:
             syslog.info(f"STREAMDECK: send_command [{command}] clients={n} data={payload}")
         else:
@@ -1819,10 +1785,7 @@ class StreamDeckBridge(QtCore.QObject):
             syslog.warning("STREAMDECK: set_virtual_page — empty device_id")
             return False
         if self.devices and device_id not in self.devices:
-            syslog.warning(
-                f"STREAMDECK: set_virtual_page — unknown device "
-                f"[{device_id[:12]}…] (not in connected decks)"
-            )
+            syslog.warning(f"STREAMDECK: set_virtual_page — unknown device [{device_id[:12]}…] (not in connected decks)")
             return False
         previous = normalize_page(self._active_page.get(device_id, 1))
         if previous != page:
@@ -1841,18 +1804,12 @@ class StreamDeckBridge(QtCore.QObject):
         device_id = device_id or ""
         last = self.get_last_page(device_id)
         if last is None:
-            syslog.info(
-                f"STREAMDECK: Return to Last — no previous page for "
-                f"device={device_id[:12] if device_id else '?'}"
-            )
+            syslog.info(f"STREAMDECK: Return to Last — no previous page for device={device_id[:12] if device_id else '?'}")
             return False
         current = self.get_active_page(device_id)
         if last == current:
             return True
-        syslog.info(
-            f"STREAMDECK: Return to Last {current} -> {last} "
-            f"device={device_id[:12] if device_id else '?'}"
-        )
+        syslog.info(f"STREAMDECK: Return to Last {current} -> {last} device={device_id[:12] if device_id else '?'}")
         return self.set_virtual_page(device_id, last)
 
     def change_page(self, device_id: str, page: int, profile: str = "") -> bool:
@@ -1982,9 +1939,7 @@ class StreamDeckBridge(QtCore.QObject):
     def held_slot_keys(self, device_id: str) -> frozenset[str]:
         """Physical slot keys currently held on this deck."""
         device_id = device_id or ""
-        return frozenset(
-            str(k[2]) for k in self._held_slots if k[0] == device_id and k[1] == "slot" and k[2]
-        )
+        return frozenset(str(k[2]) for k in self._held_slots if k[0] == device_id and k[1] == "slot" and k[2])
 
     def overlay_slots(self, device_id: str, page: int) -> dict[tuple, object]:
         """Map (kind, row, col) → StreamDeckInputItem for overlay paint.
@@ -2117,16 +2072,11 @@ class StreamDeckBridge(QtCore.QObject):
                 return current
             oid = id(current)
             if oid in visited:
-                syslog.warning(
-                    f"STREAMDECK: linked_page cycle at page={current.page} "
-                    f"slot={current.slot_key}"
-                )
+                syslog.warning(f"STREAMDECK: linked_page cycle at page={current.page} slot={current.slot_key}")
                 return None
             visited.add(oid)
             if link == current.page:
-                syslog.warning(
-                    f"STREAMDECK: linked_page points at itself page={link} slot={current.slot_key}"
-                )
+                syslog.warning(f"STREAMDECK: linked_page points at itself page={link} slot={current.slot_key}")
                 return None
             meta = {
                 "kind": current.kind or "button",
@@ -2224,7 +2174,7 @@ class StreamDeckBridge(QtCore.QObject):
                     except Exception as err:
                         syslog.error(f"STREAMDECK: resolve image failed: {err}")
                         image = ""
-            live_kind = (meta.get("kind") or "button")
+            live_kind = meta.get("kind") or "button"
             # Unassigned / icon-less slots must not fall back to the blue plugin default.
             if not image:
                 if live_kind in ("dial", "dial_press"):
@@ -2441,9 +2391,7 @@ class StreamDeckBridge(QtCore.QObject):
         )
         if action in ("connected", "update"):
             # Keep a strong previous label if this update only has a weak id fallback.
-            if previous and _is_weak_streamdeck_name(name, device_id) and not _is_weak_streamdeck_name(
-                previous.get("name") or "", device_id
-            ):
+            if previous and _is_weak_streamdeck_name(name, device_id) and not _is_weak_streamdeck_name(previous.get("name") or "", device_id):
                 name = previous.get("name")
             guid = streamdeck_guid_for_device(device_id)
             ensure_streamdeck_special_device(device_id, name, raw_type)
@@ -2474,10 +2422,7 @@ class StreamDeckBridge(QtCore.QObject):
                     # Sidecar/profile already registered this id: the in-flight tab
                     # pass will add it. A new live id still needs one coalesced rebuild.
                     known = device_id in self._page_names or device_id in self._page_order
-                    loading = bool(
-                        ui is not None
-                        and (getattr(ui, "_creating_tabs", False) or gremlin.shared_state.is_tab_loading)
-                    )
+                    loading = bool(ui is not None and (getattr(ui, "_creating_tabs", False) or gremlin.shared_state.is_tab_loading))
                     if known and loading:
                         pass
                     else:
@@ -2788,10 +2733,7 @@ class StreamDeckBridge(QtCore.QObject):
                     pass
                 config.pop(old_key, None)
                 removed += 1
-                syslog.info(
-                    f"STREAMDECK: pruned duplicate input {old_key!r} "
-                    f"(kept page={keeper.page} buttonId={keeper.button_id!r} title={keeper.title!r})"
-                )
+                syslog.info(f"STREAMDECK: pruned duplicate input {old_key!r} (kept page={keeper.page} buttonId={keeper.button_id!r} title={keeper.title!r})")
 
             new_key = keeper.message_key
             if keep_key in config and keep_key != new_key:
@@ -2849,10 +2791,7 @@ class StreamDeckBridge(QtCore.QObject):
             item.setOverrideInputType(InputType.JoystickButton)
             mode_object.addInputItem(item)
             profile.registry.registerInputItem(item)
-            syslog.info(
-                f"STREAMDECK: created input title={item.display_name!r} "
-                f"page={item.page} buttonId={item.button_id!r} key={item.message_key}"
-            )
+            syslog.info(f"STREAMDECK: created input title={item.display_name!r} page={item.page} buttonId={item.button_id!r} key={item.message_key}")
         else:
             if isinstance(item, StreamDeckInputItem):
                 old_title = item.title
@@ -2879,10 +2818,7 @@ class StreamDeckBridge(QtCore.QObject):
                     )
                 elif new_title is not None:
                     # Title forced equal after prune — still log when plugin asserts a value.
-                    syslog.info(
-                        f"STREAMDECK: sync title={item.title!r} "
-                        f"page={item.page} buttonId={item.button_id!r}"
-                    )
+                    syslog.info(f"STREAMDECK: sync title={item.title!r} page={item.page} buttonId={item.button_id!r}")
             if hasattr(item, "setOverrideInputType"):
                 item.setOverrideInputType(InputType.JoystickButton)
 
@@ -3172,9 +3108,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.clearLeftPanelHeaderWidget()
 
         if self._is_legacy_tab:
-            banner = gremlin.ui.ui_common.QInfoBox(
-                "Legacy Stream Deck tab (pre multi-device). New keys appear on per-device tabs."
-            )
+            banner = gremlin.ui.ui_common.QInfoBox("Legacy Stream Deck tab (pre multi-device). New keys appear on per-device tabs.")
             self.addLeftPanelHeaderWidget(banner)
         else:
             from gremlin.ui.streamdeck_designer import StreamDeckDesignerWidget
@@ -3261,7 +3195,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         lay.addStretch(1)
         self._no_map_hint_title = title
         self._no_map_hint_body = body
-        self.registerWidget("streamdeck_lcd_hint", w)
+        self.registerMappingWidget("streamdeck_lcd_hint", w)
         self._lcd_hint_widget = w
         self._update_no_mapping_hint()
         return w
@@ -3406,7 +3340,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 object_name=f"StreamDeck: {input_item.display_name}",
             )
             input_item.setMappingWidget(widget)
-            self.registerWidget(key, widget)
+            self.registerMappingWidget(key, widget)
         return widget
 
     def isLoaded(self) -> bool:
@@ -3586,9 +3520,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             item = data.input_item if hasattr(data, "input_item") else data
         if isinstance(item, StreamDeckInputItem):
             input_widget.setTitle(item.display_name)
-            input_widget.setInputDescription(
-                f"Page {item.page} · ID {item.button_id} ({item.kind})"
-            )
+            input_widget.setInputDescription(f"Page {item.page} · ID {item.button_id} ({item.kind})")
         elif item is not None:
             input_widget.setTitle(str(getattr(item, "display_name", getattr(item, "input_id", item))))
 

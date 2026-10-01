@@ -42,6 +42,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
+from gremlin.ui.ui_common import QEmptyContainerWidget
 import gremlin.base_profile
 import gremlin.input_item
 
@@ -440,7 +441,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
         description: str = None,
         description_readonly: bool = None,
-        custom_description_handler: Callable[['InputItem'], str] = None,
+        custom_description_handler: Callable[["InputItem"], str] = None,
         tooltip: str = None,
         data: object = None,
         extra_data: dict = None,
@@ -528,7 +529,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler  # special callback to use to get the profile mode for this item (if special)
         self._containers = ContainerModel(self, content_callback=self._handle_content_changed)  # holds the containers for this input
-
 
         if custom_description_handler is not None:
             assert callable(custom_description_handler), "Description handler must be callable "
@@ -1191,7 +1191,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     if "id" in node.attrib:
                         str_id = node.get("id")
                         if not str_id.isnumeric():
-                            self.input_id = 1 # gremlin.base_classes.SpecialInputItem(str_id)
+                            self.input_id = 1  # gremlin.base_classes.SpecialInputItem(str_id)
                         else:
                             self.input_id = safe_read(node, "id", int, 0)
                 case InputType.OctaviIfr1:
@@ -1728,6 +1728,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         confirm_delete_callback: Callable = None,
         title_callback: Callable = None,
         get_state_callback: Callable = None,
+        delete_callback: Callable = None,
         config_external=False,
         model_index: int = -1,
         data=None,
@@ -1744,6 +1745,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         :param confirm_delete_callback: Optional callback for confirming deletion
         :param title_callback: Optional callback to get the title of the input item
         :param get_state_callback: Optional callback to get the current state of the input
+        :param delete_callback: Optional callback for delete action
         :param config_external: True if the widget is configured externally
         :param data: Optional additional data
 
@@ -1764,6 +1766,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.data = data
         self._selected = False
         self._confirm_delete_callback = confirm_delete_callback
+        self._delete_callback = delete_callback
         self.setContentsMargins(0, 0, 0, 0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
 
@@ -3177,12 +3180,16 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             if not self._confirm_delete_callback(self._input_item):
                 # request failed
                 return
+        else:
+            # prompt
+            ui = gremlin.shared_state.ui
+            result = gremlin.ui.ui_common.ConfirmBox(prompt="Remove this input?", parent=ui)
+            if not result:
+                return
 
-        # prompt
-        ui = gremlin.shared_state.ui
-        result = gremlin.ui.ui_common.ConfirmBox(prompt="Remove this input?", parent=ui)
-        if not result:
-            return
+        # call the delete callback if it exists
+        if self._delete_callback:
+            self._delete_callback(self._input_item)
 
         # remove the tracker objects
         widget_tracker = gremlin.ui.ui_common.StateTracker()
@@ -3220,6 +3227,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._update_axis_icons_ui()
 
     QtCore.Slot()
+
     def _clear_curve_cb(self, widget):
         self.delete_curve.emit(self)
         # el = gremlin.event_handler.EventListener()
@@ -3318,10 +3326,14 @@ class InputItemListModel(AbstractCallbackModel):
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given model index"""
+        input_item = self.getItemAt(index)
         if self._custom_remove_handler:
             self._custom_remove_handler(self, index, emit)
         else:
             super().removeAt(index, emit=emit)
+
+        el = gremlin.event_handler.EventListener()
+        el.input_deleted.emit(input_item)
 
     def clear(self, emit=True):
         """clears all entries from the model"""
@@ -3329,6 +3341,9 @@ class InputItemListModel(AbstractCallbackModel):
             self._custom_clear_handler()
         else:
             super().clear(emit=emit)
+
+        el = gremlin.event_handler.EventListener()
+        el.all_inputs_deleted.emit(self._device_guid)
 
     def _handle_sort(self, items) -> list:
         """returns new indices for items ordered by sortKey (for applySort)."""
@@ -3861,6 +3876,11 @@ class InputItemListView(AbstractView):
     def removeRow(self, index):
         """removes the item at the given index"""
 
+        # deselect the current item and pick the next one
+        next_index = index + 1 if index + 1 < self.model.rows() else index - 1 if index - 1 >= 0 else None
+        if next_index is not None:
+            self.selectItemAt(next_index)
+
         input_item = self.model.itemAt(index)
         if input_item:
             self.model.remove(input_item)
@@ -4225,10 +4245,13 @@ class InputItemListView(AbstractView):
             self._redraw_force = False
             self._redraw_pending = False
             self.resetModelChanged()  # indicate changes are handled
-            if widget_count == 0:
+            if self.model.rows() == 0:
                 self.showBlank()
             else:
                 self.showContent()
+
+            el = gremlin.event_handler.EventListener()
+            el.device_mapping_changed.emit(self._device.device_id)
 
     def _deselect_all_ui(self):
         """Deselects all input item widgets."""
@@ -4333,6 +4356,10 @@ class InputItemListView(AbstractView):
     def _confirmed_close(self, index):
         # item = self.model.data(index)
         # self.item_closed.emit(self, index, item)  # widget, index, data
+
+        # widget = self.itemAt(index)
+        # input_item = widget.input_item
+
         self.removeRow(index)
 
     def _edit_item_cb(self, input_item: InputItem):
@@ -4342,7 +4369,7 @@ class InputItemListView(AbstractView):
 
     def _edit_curve_item_cb(self, input_item: InputItem):
         index = self.model.indexOf(input_item)
-        self.item_edit_curve.emit(self, index,  input_item)
+        self.item_edit_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
         el.curve_edit.emit(index, input_item)
 
@@ -4351,7 +4378,6 @@ class InputItemListView(AbstractView):
         self.item_delete_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
         el.curve_delete.emit(index, input_item)
-
 
     def _update_value_changed(self, index: int, value: float):
         self.item_input_value_changed.emit(self, index, self.model.data(index), value)
@@ -4749,7 +4775,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def displayName(self) -> str:
         """returns the display name for this container"""
-        if hasattr(self,"name"):
+        if hasattr(self, "name"):
             return f"Container: [{self.name}] id: [{self.id}] Input: [{self._input_item.display_name if self._input_item else 'None'}]"
 
         return f"Container: [Unnamed] id: [{self.id}] Input: [{self._input_item.display_name if self._input_item else 'None'}]"
@@ -6841,7 +6867,7 @@ class ActionSets(AbstractCallbackModel):
             while self.count() < count:
                 self.append(ActionSet(content_callback=self._content_callback))
 
-    def clear(self, recursive = True):
+    def clear(self, recursive=True):
         """clears all the actions"""
         action_set: ActionSet
         if recursive:
@@ -7209,16 +7235,14 @@ class ActionSetView(AbstractView):
 
         self._main_layout = gremlin.ui.ui_common.QSideBarContainer(
             bar_color=gremlin.ui.ui_common.Color.normalColor(),
-            )
-
-
+        )
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self._main_layout)
 
         # separator for the action set view
         if self._separator:
-            self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(size = 4, color = gremlin.ui.ui_common.Color.normalColor()))
+            self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(size=4, color=gremlin.ui.ui_common.Color.normalColor()))
 
         # header widgets
         for widget in header_widgets:
@@ -7227,8 +7251,6 @@ class ActionSetView(AbstractView):
         self.label = label
         self._selected = False  # true if the object is selected
         title_widget = None
-
-
 
         if self.label:
             title_widget = gremlin.ui.ui_common.QStepTile(self.label, icon=icon)
@@ -7312,7 +7334,7 @@ class ActionSetView(AbstractView):
         self.refreshModel()  # load the data
 
     def _handle_model_changed(self, data, force: bool):
-        """ called when the model changes"""
+        """called when the model changes"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ActionSetView: model changed: force: [{force}]  items: {len(self.model)}")
@@ -9574,7 +9596,6 @@ class ContainerView(AbstractView):
         self._main_layout.setContentsMargins(0, 0, 0, 0)
         self._redraw_lock = False
 
-
         if verbose:
             self._main_layout.addWidget(QtWidgets.QLabel(f"ContainerView: [{input_item.display_name}]"))
 
@@ -9585,13 +9606,11 @@ class ContainerView(AbstractView):
         self.popSuspended()  # allow updates
 
     def _handle_model_changed(self, data, force: bool):
-        """ called when the model changes"""
+        """called when the model changes"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ContainerView: model changed: force: [{force}]  items: {len(self._model)}")
         self.redraw()
-
-
 
     @property
     def input_item(self):
@@ -9700,8 +9719,6 @@ class ContainerView(AbstractView):
                 # has containers
                 # display container widgets in the defined order
 
-
-
                 for container in self.model:  # in range(container_count):
                     # data = self.model.data(model_index)
 
@@ -9797,12 +9814,10 @@ class ContainerView(AbstractView):
         if not self._blank_widget or not self._stacked_widget or not Shiboken.isValid(self._stacked_widget) or not Shiboken.isValid(self._blank_widget):
             return
 
-
         model_hash = self.model.hashKey()
         if self._last_hash != model_hash:
             self._last_hash = model_hash
-            force = True # changed
-
+            force = True  # changed
 
         try:
             self._redraw_lock = True
@@ -9950,9 +9965,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._container_widget = None
 
         # blank mapping widget
-        self._blank_widget = QtWidgets.QLabel("Please select an input.")
-        widget = gremlin.ui.ui_common.getVContainer(self._blank_widget, widget_only=True)
-        widget.setContentsMargins(4, 4, 4, 4)
+        widget = QEmptyContainerWidget("Please select an input.")
+        self._blank_widget = widget
         self._stacked_widget.addWidget(widget)  # index 0
 
         self._spacer_height = spacer_height
@@ -10119,12 +10133,10 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         # header widget - shows what mappings this is for
         widget = gremlin.ui.ui_common.QStepTile(
-                    f"Mappings for input {self.input_item.display_name}",
-                    background_color=gremlin.ui.ui_common.Color.selectColor(),
-                    foreground_color=gremlin.ui.ui_common.Color.normalLightColor(),
-
-                )
-
+            f"Mappings for input {self.input_item.display_name}",
+            background_color=gremlin.ui.ui_common.Color.selectColor(),
+            foreground_color=gremlin.ui.ui_common.Color.normalLightColor(),
+        )
 
         container_layout.addWidget(widget)
         # container_layout.addWidget(QtWidgets.QLabel("Content Area"))
@@ -11395,7 +11407,7 @@ class ConditionView(AbstractView):
         self._update_count_ui()
 
     def _handle_model_changed(self, data, force: bool):
-        """ called when the model changes"""
+        """called when the model changes"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ConditionView: model changed: force: [{force}]  items: {len(self.model)}")
@@ -11702,7 +11714,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el = gremlin.event_handler.EventListener()
         el.tab_selected.connect(self._handle_tab_changed)
         el.input_deleted.connect(self._handle_input_deleted)
+        el.all_inputs_deleted.connect(self._handle_all_inputs_deleted)
         el.jump_to_mapped_input.connect(self._handle_jump_to_mapped_input)
+        el.device_mapping_changed.connect(self._handle_device_mapping_changed)
+
         if self.filtersEnabled:
             el.input_filtered_change.connect(self._handle_input_filter_changed)
 
@@ -11718,6 +11733,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.listview_container)
         self._blank_input()
+
+    def notifyInputsChanged(self):
+        """tell the UI the inputs changed"""
+        if self.device:
+            el = gremlin.event_handler.EventListener()
+            el.device_mapping_changed.emit(self.device.device_id)
 
     def pushSuspended(self):
         """pushes the input item list view into a suspended state"""
@@ -11769,6 +11790,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.input_deleted.disconnect(self._handle_input_deleted)
 
     def _handle_input_deleted(self, input_item: InputItem):
+        """handles the input_deleted event - marshals to UI thread"""
+        if input_item is None:
+            return
+        if not gremlin.util.compare_guid(input_item.device_guid, self.device_guid):
+            # not ours
+            return
         if not Shiboken.isValid(self):
             return
         gremlin.util.InvokeUiMethod(self._handle_input_deleted_ui, input_item)
@@ -11776,8 +11803,35 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _handle_input_deleted_ui(self, input_item: InputItem):
         gremlin.util.assert_ui_thread()
         """handles the input_deleted event"""
-        if input_item:
-            self.clearInputItemMappingWidget(input_item)
+        self.clearInputItemMappingWidget(input_item)
+
+    def _handle_all_inputs_deleted(self, device_guid: str):
+        """handles the all_inputs_deleted event - marshals to UI thread"""
+        if not gremlin.util.compare_guid(device_guid, self.device_guid):
+            # not ours
+            return
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.InvokeUiMethod(self._handle_all_inputs_deleted_ui, device_guid)
+
+    def _handle_all_inputs_deleted_ui(self, device_guid: str):
+        gremlin.util.assert_ui_thread()
+        """handles the all_inputs_deleted event"""
+        self._handle_device_mapping_changed_ui(device_guid)
+
+    def _handle_device_mapping_changed(self, device_guid):
+        """handles the device_mapping_changed event - marshals to UI thread"""
+        if not gremlin.util.compare_guid(device_guid, self.device_guid):
+            # not ours
+            return
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.InvokeUiMethod(self._handle_device_mapping_changed_ui, device_guid)
+
+    def _handle_device_mapping_changed_ui(self, device_guid: str):
+        gremlin.util.assert_ui_thread()
+        """handles the device_mapping_changed event"""
+        self.showContent()
 
     def ensureInputVisible(self, input_item: InputItem):
         """ensures the specified input is visible in the input list view"""
@@ -11965,6 +12019,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # remove the reference
             self._last_selected_widget = None
 
+        # self.inputItemListModel.refresh()  # indicate the list should be refreshed because it has changed
+
     def _handle_jump_to_mapped_input(self):
         gremlin.util.InvokeUiMethod(self._handle_jump_to_mapped_input_ui)
 
@@ -12094,7 +12150,15 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def getSelectedInputItem(self) -> gremlin.base_profile.input_item:
         """gets the last selected input item"""
-        return self._last_selected_input_item
+        # make sure the item is still in the input list
+        view = self.inputItemListView
+        if not view:
+            return None
+        selected_item = view.getSelectedItem()
+        if not selected_item:
+            return None
+        return selected_item
+        # return self._last_selected_input_item
 
     @property
     def inputItemCount(self) -> int:
@@ -12111,23 +12175,29 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def showContent(self):
         """shows the mapping widget for the currently selected input"""
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         input_item = self.getSelectedInputItem()
+        if verbose:
+            syslog.info(f"BASE DEVICE: Showing content for selected input item: {input_item}")
         if input_item:
-            key = self.getInputItemWidgetKey(input_item)
-            mapping_widget = self.getRegisteredWidget(key)
+            mapping_widget = self.getInputItemMappingWidget(input_item)
             if mapping_widget:
                 index = self._right_panel_stacked_widget.indexOf(mapping_widget)
+                if verbose:
+                    syslog.info(f"\tFound mapping widget index [{index}]")
                 if index != -1:
                     self._right_panel_stacked_widget.setCurrentIndex(index)
         else:
             # indicate no input is selected
+            if verbose:
+                syslog.info("\tShowing blank.")
             self.showBlank()
 
     def updateMappingContent(self, input_item: InputItem = None):
         """updates the mapping content for the given input item or all input items if none is specified"""
         if input_item:
-            key = self.getInputItemWidgetKey(input_item)
-            mapping_widget: InputItemMappingWidget = self.getRegisteredWidget(key)
+            self.showInputItemMapping(input_item)
+            mapping_widget: InputItemMappingWidget = self.getInputItemMappingWidget(input_item)
             if mapping_widget:
                 index = self._right_panel_stacked_widget.indexOf(mapping_widget)
                 if index != -1:
@@ -12152,7 +12222,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     # create a new widget and register it (this adds it to the page)
                     widget = self._handle_create_widget(input_item)
 
-                self.registerWidget(key, widget)
+                self.registerMappingWidget(key, widget)
 
             assert widget is not None, f"failed to get a mapping widget for [{input_item.display_name}]"
             if __debug__:
@@ -12195,13 +12265,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if input_item:
             widget = self.getInputItemMappingWidget(input_item)
             if widget:
-                assert widget is not None, f"failed to get a widget for [{input_item.display_name}]"
-                result = self.selectRegisteredWidget(widget)
-                if not result:
-                    widget = self.getInputItemMappingWidget(input_item)
-                    result = self.selectRegisteredWidget(widget)
-                    pass
-
+                # show the mapping for the selected input item in the right panel
+                self.showInputItemMapping(input_item)
                 self.setLastSelectedInputItem(input_item)
                 self.setLastSelectedWidget(widget)
                 widget.redraw()  # update if needed
@@ -12235,7 +12300,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.inputItemListModel.trigger(False)
         self.selectInputItemIndex(index, force=force, emit=emit)
 
-
     def selectInputItem(self, input_item: InputItem, force=False, emit=True):
         """selects a specific input item"""
         if self._input_item_list_view is None:
@@ -12266,8 +12330,15 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 syslog.info(f"DeviceTabWidget: select input index [{index}]")
             self._input_item_list_view.selectInputItemAt(index, force=force, emit=emit)
             self._input_item_list_view.ensureVisibleIndex(index)
+
+            # display the correspnding mapping
+            input_item = self._input_item_list_view.itemAt(index)
+            self._select_input_item_mapping_widget_ui(input_item)
+
+
         elif verbose:
             syslog.info("DeviceTabWidget: select input index - nothing to select")
+
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str):
         """called when the input item widget reports a mapping change for its associated input item"""
@@ -12324,6 +12395,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # make the mapping widget visible and redraw if needed
         self._select_input_item_mapping_widget_ui(input_item)
+
         # update container display if blank
         self._update_container_view_blank_message_ui(input_item)
 

@@ -1071,7 +1071,6 @@ class Color:
     @staticmethod
     def cssProgressDialog():
 
-
         progress_start, progress_stop = Color.ChannelColors()[0]
         css = f"""
             QProgressDialog QProgressBar {{
@@ -1102,8 +1101,6 @@ class Color:
 
             """
         return css
-
-
 
     @staticmethod
     def cssButtonState():
@@ -10599,7 +10596,13 @@ class QSplitTabWidget(QDataWidget):
 
         # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
         self._right_panel_stacked_widget = QtWidgets.QStackedWidget()
-        self._right_panel_stacked_widget.addWidget(QtWidgets.QLabel("No input selected"))  # index 0
+
+        # blank input - aligned top
+
+        widget = getVContainer([QtWidgets.QLabel("No input selected"), "||", QEmptyWidget(), "||"], widget_only=True)
+        widget.setContentsMargins(4, 4, 0, 0)
+
+        self._right_panel_stacked_widget.addWidget(widget)  # index 0
         # self._right_panel_stacked_widget.setProperty("class", "hack")
 
         self.addRightPanelWidget(self._right_panel_stacked_widget)
@@ -10803,7 +10806,7 @@ class QSplitTabWidget(QDataWidget):
         gremlin.util.clear_layout(self._left_container_layout)
         gremlin.util.clear_layout(self._right_container_layout)
 
-    def registerWidget(self, key, widget) -> int:
+    def registerMappingWidget(self, key, widget) -> int:
         """adds a new config input to the right panel"""
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
@@ -10832,6 +10835,16 @@ class QSplitTabWidget(QDataWidget):
             callback(key, index, widget)
 
         return index
+
+    def showInputItemMapping(self, input_item):
+        """shows the mapping for the given input item in the right panel"""
+        mapping_widget = self.getInputItemMappingWidget(input_item)
+        if mapping_widget is not None:
+            index = self._right_panel_stacked_widget.indexOf(mapping_widget)
+            if index != -1:
+                self._right_panel_stacked_widget.setCurrentIndex(index)
+            else:
+                syslog.warning(f"RIGHT PANEL: Mapping widget for input item [{input_item}] not found in stacked widget")
 
     def _handle_expired_widget(self, key, widget):
         gremlin.util.InvokeUiMethod(self._handle_expired_widget_ui, key, widget)
@@ -10982,7 +10995,7 @@ class QSplitTabWidget(QDataWidget):
                     # widget in the cach or recreated
                     if recreated:
                         # register the widget if recreated
-                        self.registerWidget(key, widget)
+                        self.registerMappingWidget(key, widget)
 
                 else:
                     # widget removed from cache - sync up if needed
@@ -11118,7 +11131,7 @@ class QSplitTabWidget(QDataWidget):
     def _ensure_blank_widget(self):
         widget = self.getRegisteredWidget(self._blank_input_id)
         if not widget:
-            label = QtWidgets.QLabel(f"Please select an input to configure for {self.objectName()}.")
+            label = QEmptyContainerWidget(f"Please select an input to configure for {self.objectName()}.")
 
             show_id = gremlin.config.Configuration().show_container_id
             if show_id:
@@ -11131,7 +11144,7 @@ class QSplitTabWidget(QDataWidget):
             contents, _ = getVContainer(widget)
             contents.setObjectName(f"Blank Input for [{self.objectName()}]")
 
-            self.registerWidget(self._blank_input_id, contents)
+            self.registerMappingWidget(self._blank_input_id, contents)
 
     def setLeftPanelWidget(self, widget: QWidget):
         """sets the left panel widget"""
@@ -14925,7 +14938,7 @@ class QJoystickSelectorWidget(QWidget):
         default_input_id=None,
         virtual_only=False,
         show_listen=False,  # true if show a listen button
-        callback : Callable[[DeviceSummary, InputType, int], None]=None,
+        callback: Callable[[DeviceSummary, InputType, int], None] = None,
         parent=None,
     ):
         """
@@ -14951,7 +14964,6 @@ class QJoystickSelectorWidget(QWidget):
             gremlin.joystick_handling.filtered_input_devices(self._input_types, virtual_only),
             key=lambda x: x.name,
         )
-
 
         # for dev in self._devices:
         #     syslog.info(f"Found device: {dev.name}")
@@ -14986,7 +14998,7 @@ class QJoystickSelectorWidget(QWidget):
         self.device_selector_widget.currentIndexChanged.connect(self._handle_device_changed)
         self.input_selector_widget.currentIndexChanged.connect(self._handle_input_changed)
 
-    def select(self, device : DeviceSummary, input_type : InputType, input_id : int, emit : bool =False):
+    def select(self, device: DeviceSummary, input_type: InputType, input_id: int, emit: bool = False):
         """selects the specified entries if they exist"""
         if device:
             self._selected_device = device
@@ -15117,17 +15129,16 @@ class QJoystickSelectorWidget(QWidget):
             if self._callback:
                 self._callback(self._selected_device, self._selected_input_type, self._selected_input_id)
 
-
     @QtCore.Slot()
     def _handle_input_changed(self):
         if self.input_selector_widget.count:
             self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
             if self._callback:
-                self._callback(self._selected_device, self._selected_input_type,self._selected_input_id)
+                self._callback(self._selected_device, self._selected_input_type, self._selected_input_id)
             self._emit()
 
     def getSelectionData(self):
-        """ gets the current selection """
+        """gets the current selection"""
         return (self._selected_device, self._selected_input_type, self._selected_input_id)
 
     def _emit(self):
@@ -15206,7 +15217,6 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
                 default_input_type = config.last_selected_joystick_input_type
                 default_input_id = config.last_selected_joystick_input_id
 
-
         self._selected_data = (default_device, default_input_type, default_input_id)
         self._input_types = input_types
         self._selected_device = default_device
@@ -15245,7 +15255,6 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
     def _handle_selection_changed(self, data):
         self._selected_device, self._selected_input_type, self._selected_input_id = data
         self._selected_data = data
-
 
     def _handle_listen_request(self):
         """calls up a listen box to select the input"""
@@ -16364,6 +16373,18 @@ class QEmptyWidget(QWidget):
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout = QVBoxLayout(self)
         layout.addWidget(label, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.setLayout(layout)
+
+
+class QEmptyContainerWidget(QWidget):
+    """not loaded visual - indicates something is not loaded with a label"""
+
+    def __init__(self, text="No input selected", parent=None):
+        super().__init__(parent=parent)
+        widget = getVContainer([QtWidgets.QLabel(text), "||", QEmptyWidget(), "||"], widget_only=True)
+        widget.setContentsMargins(4, 4, 0, 0)
+        layout = QVBoxLayout(self)
+        layout.addWidget(widget)
         self.setLayout(layout)
 
 

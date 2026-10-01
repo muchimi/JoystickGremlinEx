@@ -1108,17 +1108,26 @@ class CommandMatcher:
             vc.registerCallback(self._handle_command_trigger)
         self._update_commands()
 
-    def removeCommand(self, command: Union[VoiceCommand, str]):
+    def removeCommand(self, command: list[VoiceCommand] | VoiceCommand ):
         """removes a single command from the matcher"""
+
         if isinstance(command, VoiceCommand):
-            key = command.key
+            commands = [command]
         else:
-            key = VoiceCommand(command).key
-        if key in self._command_map:
-            vc = self._command_map[key]
-            vc.removeCallback(self._handle_command_trigger)
-            self.tree.remove(vc.words)
-            del self._command_map[key]
+            commands = command
+
+        if commands:
+            for command in commands:
+                if isinstance(command, VoiceCommand):
+                    key = command.key
+                else:
+                    key = VoiceCommand(command).key
+                if key in self._command_map:
+                    vc = self._command_map[key]
+                    vc.removeCallback(self._handle_command_trigger)
+                    self.tree.remove(vc.words)
+                    del self._command_map[key]
+
             self._update_commands()
 
     def clearCommands(self):
@@ -1777,6 +1786,10 @@ class Voice:
     def clearCommands(self):
         """clears all commands from the matcher"""
         self._rolling_matcher.clearCommands()
+
+    def removeCommand(self, command: VoiceCommand | list[VoiceCommand]):
+        """removes a specific command from the matcher"""
+        self._rolling_matcher.removeCommand(command)
 
     def pushSuspend(self):
         """increment the suspend stack to suspend listening"""

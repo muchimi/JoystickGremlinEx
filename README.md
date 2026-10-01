@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T67)
+- Fix: UI: Voice Device: Clear deletes voices (was deleting incorrect inputs)
+- Fix: UI (Core): resolve an issue with ensuring input changes are synchronized with the mapping when an input is deleted or unselected.
+- Fix: Voice Device: delete entry does not delete command from voice engine until profile reload.
 
 ### (m77T66)
 - Fix: UI: added more QT desync guardrails when UI needs to refresh.

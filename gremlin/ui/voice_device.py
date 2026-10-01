@@ -166,47 +166,7 @@ class VoiceInputItem(InputItem):
     def _handle_voice_trigger(self, vc):
         """called when the voice triggers a command - passes the command triggered"""
         pass
-        # if vc.owner != self:
-        #     # not our command
-        #     return
-        # # if self._emit:
-        #     self._last_triggered_command = vc
-        #     syslog.info(f"VOICE: triggered [{self._key}] with phrase [{vc.phrase}]")
-        #     # handle the voice command here
-        #     event = gremlin.event_handler.Event(
-        #         event_type=InputType.Voice,
-        #         value=True,
-        #         is_pressed=True,
-        #         identifier=self,
-        #         device_guid=VoiceDeviceTabWidget.device_guid,
-        #         override_input_type=InputType.JoystickButton,
-        #         extra_data={"command": vc},
-        #     )
-        #     config = gremlin.config.Configuration()
-        #     el = gremlin.event_handler.EventListener()
-        #     el.queueJoystickEvent(event)
 
-        #     timer = threading.Timer(config.voice_command_release_delay, self._get_release_trigger_callback(vc))
-        #     timer.start()
-
-    # def _get_release_trigger_callback(self, vc):
-    #     return lambda: self._trigger_release_event(vc)
-
-    # def _trigger_release_event(self, vc: VoiceCommand):
-    #     if self._emit:
-    #         syslog.info(f"VOICE: released [{self._key}] with phrase [{vc.phrase}]")
-    #         # handle the voice command here
-    #         event = gremlin.event_handler.Event(
-    #             event_type=InputType.Voice,
-    #             value=True,
-    #             is_pressed=False,
-    #             identifier=self,
-    #             device_guid=VoiceDeviceTabWidget.device_guid,
-    #             override_input_type=InputType.JoystickButton,
-    #             extra_data={"command": vc},
-    #         )
-    #         el = gremlin.event_handler.EventListener()
-    #         el.queueJoystickEvent(event)
 
     def suppressEvents(self):
         """disable events"""
@@ -1281,6 +1241,12 @@ class VoiceData:
         """clears all commands from the matcher"""
         self._voice.clearCommands()
 
+    def removeCommand(self, command : list[VoiceCommand] | VoiceCommand):
+        """deletes one or more specific commands from the matcher"""
+        self._voice.removeCommand(command)
+
+
+
     def getDefaultAudioDevice(self):
         """gets the default input device"""
         if self._device_name is None:
@@ -1590,12 +1556,12 @@ class VoiceData:
             self._id_map.clear()
             self.crud.emit()
 
-    def remove(self, state: VoiceInputItem | str):
+    def remove(self, item: VoiceInputItem | str):
 
-        if isinstance(state, str):
-            key = state.casefold().strip()
+        if isinstance(item, str):
+            key = item.casefold().strip()
         else:
-            key = state.key
+            key = item.key
         if key in self._data:
             data = self._data[key]
             data.unhook()
@@ -2029,6 +1995,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             item_changed_handler=self.onItemChanged,
         )
 
+        self._model = model
         self.setInputItemListModel(model)
         model.sorted.connect(self._handle_model_sorted)
 
@@ -2036,7 +2003,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         clear_button = ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
         icon = Icons.trashIcon()
         clear_button.setIcon(icon)
-        clear_button.setToolTip("Deletes all states")
+        clear_button.setToolTip("Deletes all inputs")
         clear_button.confirmed.connect(self._confirm_clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
 
@@ -2047,7 +2014,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # configure button
         configure_widget = QIconPushButton(
             icon=Icons.gearIcon(),
-            text="Voice Recognition Options",
+            text="Recognition Options",
             tooltip="Voice Recognition Options",
             callback=self._handle_configure,
             height=24,
@@ -2161,6 +2128,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             populate_ui_callback=self._populate_input_widget_ui,
             mapping_changed_callback=self._update_input_widget,
             confirm_delete_callback=self._handle_confirm_delete,
+            delete_callback=self._handle_delete,
             config_external=True,
             parent=parent,
             data=data,
@@ -2204,10 +2172,18 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         container_widget = getVContainer(widgets, widget_only=True)
         input_widget.setCustomContent(container_widget)
 
+
+
     def _handle_confirm_delete(self, input_item: gremlin.input_item.InputItem):
         """confirms if an input should be deleted"""
         result = ConfirmBox("Delete this input?")
         return result
+
+    def _handle_delete(self, input_item: VoiceInputItem):
+        """handles the delete action for an input item"""
+        self.inputItemListModel.remove(input_item)
+        commands = input_item.commands
+        self._voice_data.removeCommand(commands)
 
     def _load_handler(self, model: VoiceInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
@@ -2240,6 +2216,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def onItemChanged(self, model, index, new_item, old_item, operation):
         redraw = False
         vd = VoiceData()
+
         match operation:
             case "add":
                 # handle add operation
@@ -2250,6 +2227,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 redraw = True
         if redraw:
             self.inputItemListView.redraw()  # tell the list
+
 
     def onInputListViewCreated(self):
         """called when list view is created"""
@@ -2390,12 +2368,14 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             syslog.info(f"selecting state index: [{index}] for [{input_item.input_id}]")
             self.selectInputItemIndex(index)
 
-            el = gremlin.event_handler.EventListener()
-            el.device_mapping_changed.emit(self._device_id)
+
+
         finally:
             self._edit_dialog.deleteLater()
             self._edit_dialog = None
             self.inputItemListView.redraw()
+            self.notifyInputsChanged()
+
 
     def _sort_input_cb(self):
         """sorts states by key name"""
@@ -2425,18 +2405,15 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _close_item_cb(self, widget, index, data):
         """called when the close button is clicked"""
-        key = self.getRegisteredKeyIndex(index)
-        self.unregisterWidget(key)
-        if not self.inputItemListModel.rows():
+        self._model.removeAt(index)
+        if not self._model.rows():
             # display blank page if no item left
             self._blank_input()
 
     def _confirm_clear_inputs_cb(self):
         """clears all input keys"""
-        sd = VoiceData()
-        sd.clear()
-        profile = gremlin.shared_state.current_profile
-        profile.state.clear()
+        vd = VoiceData()
+        vd.clear()
 
         self.inputItemListModel.clear()
 
