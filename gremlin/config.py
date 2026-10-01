@@ -695,6 +695,11 @@ class Configuration(QtCore.QObject):
                     count += 1
         return count
 
+    # Sidecar keys owned by other modules (Profile._setConfig / overlay / Stream Deck).
+    # Configuration.reload_profile() loads the whole JSON into _profile_data; a later
+    # save_profile() must not push those stale blobs back over a newer on-disk value.
+    _PROFILE_SIDECAR_FOREIGN_KEYS = ("obs_overlay",)
+
     def _save_profile_ui(self):
         """saves to the profile specific config file"""
         if not self._lock.acquire(blocking=False):
@@ -721,11 +726,28 @@ class Configuration(QtCore.QObject):
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
             disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
+            disk_foreign = {
+                key: merged[key]
+                for key in self._PROFILE_SIDECAR_FOREIGN_KEYS
+                if isinstance(merged, dict) and key in merged
+            }
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
-            # on top of on-disk data before writing.
+            # on top of on-disk data before writing — never foreign module payloads.
             if pending_profile_data:
-                merged.update(pending_profile_data)
+                pending = {
+                    key: value
+                    for key, value in pending_profile_data.items()
+                    if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS
+                }
+                merged.update(pending)
+
+            # Restore foreign keys captured from disk before update(). Without this,
+            # a stale obs_overlay loaded at profile open clobbered layouts the
+            # overlay module had just written (label/counter/style edits looked saved
+            # then vanished after restart).
+            for key, value in disk_foreign.items():
+                merged[key] = value
 
             # Critical: after a version-folder port / empty load, _profile_data can
             # carry streamdeck_pages={} and update() would clobber rich on-disk names.
@@ -738,6 +760,25 @@ class Configuration(QtCore.QObject):
                     "CONFIG: preserved on-disk streamdeck_pages "
                     f"(disk_custom={disk_custom}, memory_custom={mem_custom})"
                 )
+
+            # Re-read foreign keys immediately before write so an overlay/Stream Deck
+            # save that landed during this merge is not rolled back.
+            if os.path.isfile(fname) and os.path.getsize(fname):
+                try:
+                    with open(fname, "r", encoding="utf-8") as hdl:
+                        latest = json.load(hdl)
+                    if isinstance(latest, dict):
+                        for key in self._PROFILE_SIDECAR_FOREIGN_KEYS:
+                            if key in latest:
+                                merged[key] = latest[key]
+                        latest_pages = latest.get("streamdeck_pages")
+                        latest_custom = self._streamdeck_pages_custom_count(latest_pages)
+                        mem_custom = self._streamdeck_pages_custom_count(merged.get("streamdeck_pages"))
+                        if latest_custom > mem_custom:
+                            merged["streamdeck_pages"] = latest_pages
+                except Exception as err:
+                    syslog.warning(f"CONFIG: could not refresh foreign sidecar keys before save: {err}")
+
             self._profile_data = merged
 
             try:

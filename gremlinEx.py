@@ -1786,6 +1786,25 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if gremlin.config.Configuration().input_viewer_disables_repeaters:
             gremlin.shared_state.pop_repeater()
 
+    @QtCore.Slot()
+    def overlay_control(self):
+        """Show or hide the Overlay control panel (stays available while the profile runs)."""
+        if not getattr(self.config, "overlay_enabled", False):
+            self.ui.actionOverlayControl.setChecked(False)
+            self.ui.actionOverlayControl.setVisible(False)
+            return
+        try:
+            from gremlin.ui.obs_overlay.control_panel import (
+                overlay_control_panel_is_open,
+                toggle_overlay_control_panel,
+            )
+
+            visible = toggle_overlay_control_panel()
+            self.ui.actionOverlayControl.setChecked(bool(visible) or overlay_control_panel_is_open())
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: toolbar control panel toggle failed: {err}")
+            self.ui.actionOverlayControl.setChecked(False)
+
     def backup_config(self):
         config = gremlin.config.Configuration()
         config.backup()
@@ -2037,6 +2056,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionInputRepeater.triggered.connect(self.input_repeater)
         # self.ui.actionCalibration.triggered.connect(self.calibration)
         self.ui.actionInputViewer.triggered.connect(self.input_viewer)
+        self.ui.actionOverlayControl.triggered.connect(self.overlay_control)
 
         self.ui.actionReloadDevices.triggered.connect(self._reload_devices)
         self.ui.actionReorderDevices.triggered.connect(self._reorder_tabs)
@@ -4821,6 +4841,40 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         viewer_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
         self.ui.actionInputViewer.setCheckable(True)
         self.ui.actionInputViewer.setIcon(viewer_icon)
+
+        # Overlay control panel — square pad with center dot (X/Y widget motif).
+        # Checkable like Input Viewer; intentionally not disabled while the profile runs.
+        # Green only when checked (On), not on hover (Active + Off).
+        def _overlay_control_pixmap(qta_color):
+            pm = QtGui.QPixmap(24, 24)
+            pm.fill(QtCore.Qt.transparent)
+            painter = QtGui.QPainter(pm)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            color = QtGui.QColor(qta_color)
+            pen = QtGui.QPen(color, 2.0)
+            pen.setJoinStyle(QtCore.Qt.MiterJoin)
+            painter.setPen(pen)
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.drawRect(QtCore.QRectF(4.5, 4.5, 15.0, 15.0))
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(color)
+            painter.drawEllipse(QtCore.QPointF(12.0, 12.0), 2.4, 2.4)
+            painter.end()
+            return pm
+
+        pm_off = _overlay_control_pixmap(normal_color)
+        pm_on = _overlay_control_pixmap(active_color)
+        overlay_icon = QtGui.QIcon()
+        overlay_icon.addPixmap(pm_off, QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        overlay_icon.addPixmap(pm_off, QtGui.QIcon.Active, QtGui.QIcon.Off)
+        overlay_icon.addPixmap(pm_on, QtGui.QIcon.Normal, QtGui.QIcon.On)
+        overlay_icon.addPixmap(pm_on, QtGui.QIcon.Active, QtGui.QIcon.On)
+        self.ui.actionOverlayControl.setCheckable(True)
+        self.ui.actionOverlayControl.setIcon(overlay_icon)
+        try:
+            self.ui.actionOverlayControl.setVisible(bool(self.config.overlay_enabled))
+        except Exception:
+            pass
 
         # Toolbar actions
 

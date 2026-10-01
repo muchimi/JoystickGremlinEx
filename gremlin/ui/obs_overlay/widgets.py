@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from typing import Any
@@ -23,6 +24,8 @@ from .model import (
     switch_2way_cardinal_to_value,
     switch_2way_value_to_cardinal,
 )
+
+syslog = logging.getLogger("system")
 from .shapes import button_uses_shape_path, normalize_shape_kind, shape_path, uses_shape_geometry
 
 
@@ -407,6 +410,43 @@ def _paint_font_shadow(
     _fill_text(core, dx, dy)
 
 
+def _multiline_text_size(font: QtGui.QFont, text: str) -> tuple[float, float, list[float]]:
+    """Return (block_width, block_height, per-line widths) for hard-broken text."""
+    lines = str(text).split("\n") or [""]
+    metrics = QtGui.QFontMetricsF(font)
+    widths = [float(metrics.horizontalAdvance(line)) for line in lines]
+    line_h = float(metrics.lineSpacing())
+    return (max(widths) if widths else 0.0, line_h * max(1, len(lines)), widths)
+
+
+def _multiline_text_path(
+    font: QtGui.QFont,
+    text: str,
+    rect: QtCore.QRectF | None,
+    point: QtCore.QPointF | None,
+) -> QtGui.QPainterPath:
+    """Vector outline for multiline text (addText does not honor \\n)."""
+    lines = str(text).split("\n") or [""]
+    metrics = QtGui.QFontMetricsF(font)
+    line_h = float(metrics.lineSpacing())
+    widths = [float(metrics.horizontalAdvance(line)) for line in lines]
+    block_w = max(widths) if widths else 0.0
+    block_h = line_h * len(lines)
+    if rect is not None:
+        left = rect.center().x() - block_w / 2.0
+        top = rect.center().y() - block_h / 2.0
+        base0 = top + metrics.ascent()
+    else:
+        origin = point if point is not None else QtCore.QPointF(0.0, 0.0)
+        left = origin.x() - block_w / 2.0
+        base0 = origin.y() - block_h / 2.0 + metrics.ascent()
+    path = QtGui.QPainterPath()
+    for index, line in enumerate(lines):
+        x = left + (block_w - widths[index]) / 2.0
+        path.addText(QtCore.QPointF(x, base0 + index * line_h), font, line)
+    return path
+
+
 def _draw_text_ex(
     painter: QtGui.QPainter,
     text: str,
@@ -421,7 +461,8 @@ def _draw_text_ex(
     if not text:
         return
     style = style or {}
-    flags = int(QtCore.Qt.AlignCenter if flags is None else flags)
+    # AlignCenter + TextWordWrap: soft-wrap long lines; hard breaks from \\n / Shift+Enter.
+    flags = int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap if flags is None else flags)
     fill = qcolor(color, "#f4efe4")
     shadow = resolve_font_shadow(style, prefix)
     try:
@@ -434,16 +475,7 @@ def _draw_text_ex(
     rect = target if isinstance(target, QtCore.QRectF) else None
     point = target if isinstance(target, QtCore.QPointF) else None
     if stroke_w > 0:
-        metrics = QtGui.QFontMetricsF(font)
-        if rect is not None:
-            br = metrics.boundingRect(text)
-            x = rect.center().x() - br.width() / 2.0 - br.left()
-            y = rect.center().y() + (metrics.ascent() - metrics.descent()) / 2.0
-        else:
-            x = point.x() if point is not None else 0.0
-            y = point.y() if point is not None else 0.0
-        path = QtGui.QPainterPath()
-        path.addText(QtCore.QPointF(x, y), font, text)
+        path = _multiline_text_path(font, text, rect, point)
         _paint_font_shadow(painter, text, font, shadow, rect, point, flags, path=path)
         painter.strokePath(path, _pen(stroke_color, stroke_w))
         painter.fillPath(path, fill)
@@ -1751,6 +1783,63 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
+def paint_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Two-position switch: track with solid circle/square knob (left/off, right/on)."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    on = value == "on" or (value not in ("off", "on", None, "") and _pressed(value))
+    vertical = str(style.get("orientation") or "horizontal").casefold() == "vertical"
+    painter.save()
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    painter.setOpacity(_opacity(style))
+
+    track_fill = style.get("fill_on") if on else style.get("fill")
+    border = style.get("border_on") if on else style.get("border")
+    border_w = _border_w(style, 2.0)
+
+    # Edge-to-edge like button / switch family (stroke centered on bounds).
+    if rect.width() < 4 or rect.height() < 4:
+        painter.restore()
+        return
+    max_r = min(rect.width(), rect.height()) * 0.5
+    radius = min(max_r, _corner_radius(style, max_r))
+    set_fill_and_outline(
+        painter,
+        track_fill,
+        border,
+        border_w,
+        "#1a2230",
+        default_border="#3a4a62",
+        rect=rect,
+    )
+    if radius > 0:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+
+    inset = max(2.0, border_w + 1.0)
+    inner = rect.adjusted(inset, inset, -inset, -inset)
+    kn = max(4.0, min(inner.width(), inner.height()))
+    margin = max(0.0, (min(inner.width(), inner.height()) - kn) * 0.5)
+    if vertical:
+        cx = inner.center().x()
+        cy = (inner.bottom() - margin - kn * 0.5) if on else (inner.top() + margin + kn * 0.5)
+    else:
+        cy = inner.center().y()
+        cx = (inner.right() - margin - kn * 0.5) if on else (inner.left() + margin + kn * 0.5)
+
+    # Solid knob — no bloom/glint. Temporarily size the shared indicator helper.
+    knob_style = dict(style)
+    knob_style.setdefault("indicator", "#e8eaed")
+    knob_style["indicator_size"] = kn
+    knob_style["show_dot_shadow"] = False
+    _indicator(painter, QtCore.QPointF(cx, cy), knob_style, glow=False)
+
+    if style.get("show_label", False):
+        _draw_label(painter, item, rect)
+    painter.restore()
+
+
 def _axis_label_spread(style: dict[str, Any]) -> float:
     try:
         value = style.get("axis_label_spread")
@@ -1764,9 +1853,8 @@ def _axis_label_spread(style: dict[str, Any]) -> float:
 def _draw_axis_label_at(painter: QtGui.QPainter, text: str, x: float, y: float, font: QtGui.QFont, style: dict[str, Any], item: dict[str, Any] | None = None):
     if not text:
         return
-    metrics = QtGui.QFontMetricsF(font)
-    bounds = metrics.tightBoundingRect(text)
-    rect = QtCore.QRectF(x - bounds.width() / 2.0, y - bounds.height() / 2.0, max(1.0, bounds.width()), max(1.0, bounds.height()))
+    block_w, block_h, _widths = _multiline_text_size(font, text)
+    rect = QtCore.QRectF(x - block_w / 2.0, y - block_h / 2.0, max(1.0, block_w), max(1.0, block_h))
     _draw_text_ex(
         painter,
         text,
@@ -1784,7 +1872,6 @@ def _draw_axis_labels(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCor
         return
     painter.save()
     font = _axis_label_font(style, item)
-    metrics = QtGui.QFontMetrics(font)
     spread = _axis_label_spread(style)
     edge_pad = max(0.0, _border_w(style)) * 0.5 + 4.0
     cx = rect.center().x()
@@ -1793,8 +1880,8 @@ def _draw_axis_labels(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCor
     ew = ends in (None, "all", "ew")
 
     def _reach(text: str, vertical: bool) -> float:
-        bounds = metrics.tightBoundingRect(text or "X")
-        half = (bounds.height() if vertical else bounds.width()) / 2.0
+        block_w, block_h, _ = _multiline_text_size(font, text or "X")
+        half = (block_h if vertical else block_w) / 2.0
         span = (rect.height() if vertical else rect.width()) / 2.0
         return max(0.0, span - edge_pad - half)
 
@@ -2792,62 +2879,79 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
     rect = widget_rect(item)
     radius = _corner_radius(style, 8.0)
     painter.save()
-    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-    painter.setOpacity(_opacity(style))
-    fill_value = style.get("fill")
-    border_w = _border_w(style, 0)
-    fill_alpha = 255 if is_gradient(fill_value) else qcolor(fill_value, "#121826").alpha()
-    if fill_alpha > 0 or border_w > 0 or fill_alpha <= 0:
-        set_fill_and_outline(painter, fill_value, style.get("border"), border_w, "#00000000", rect=rect)
-        if radius > 0:
-            painter.drawPath(_rounded(rect, radius))
-        else:
-            painter.drawRect(rect)
-    inner = rect.adjusted(6, 4, -6, -4)
-    rows = value if isinstance(value, tuple) else sample_counter_widget(item)
-    if not rows:
-        rows = sample_counter_widget(item)
-    caption_on = bool(style.get("show_caption", True))
-    vertical = str(style.get("orientation") or "vertical").casefold() != "horizontal"
-    count = max(1, len(rows))
-    if vertical:
-        cell_h = inner.height() / count
-        cell_w = inner.width()
-    else:
-        cell_h = inner.height()
-        cell_w = inner.width() / count
-    base_font = _font(style, item)
-    cap_font = _font(style, item, prefix="caption_")
-    for index, row in enumerate(rows):
-        _sid, text, color, caption = row if len(row) >= 4 else ("", str(row), style.get("font_color") or "#f4efe4", "")
+    try:
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setOpacity(_opacity(style))
+        fill_value = style.get("fill")
+        border_w = _border_w(style, 0)
+        fill_alpha = 255 if is_gradient(fill_value) else qcolor(fill_value, "#121826").alpha()
+        if fill_alpha > 0 or border_w > 0 or fill_alpha <= 0:
+            set_fill_and_outline(painter, fill_value, style.get("border"), border_w, "#00000000", rect=rect)
+            if radius > 0:
+                painter.drawPath(_rounded(rect, radius))
+            else:
+                painter.drawRect(rect)
+        inner = rect.adjusted(6, 4, -6, -4)
+
+        def _valid_rows(raw) -> bool:
+            if not isinstance(raw, (tuple, list)) or not raw:
+                return False
+            # Each row must be a sequence (id, text, color, caption) — not a bare int/str.
+            first = raw[0]
+            return isinstance(first, (tuple, list)) and not isinstance(first, (str, bytes))
+
+        rows = value if _valid_rows(value) else sample_counter_widget(item)
+        if not _valid_rows(rows):
+            rows = sample_counter_widget(item)
+        caption_on = bool(style.get("show_caption", True))
+        vertical = str(style.get("orientation") or "vertical").casefold() != "horizontal"
+        count = max(1, len(rows))
         if vertical:
-            cell = QtCore.QRectF(inner.left(), inner.top() + index * cell_h, cell_w, cell_h)
+            cell_h = inner.height() / count
+            cell_w = inner.width()
         else:
-            cell = QtCore.QRectF(inner.left() + index * cell_w, inner.top(), cell_w, cell_h)
-        if caption_on and caption:
-            cap_h = QtGui.QFontMetrics(cap_font).height()
-            _draw_text_ex(
-                painter,
-                caption,
-                QtCore.QRectF(cell.left(), cell.top(), cell.width(), min(cap_h, cell.height() * 0.45)),
-                cap_font,
-                style.get("caption_font_color") or color,
-                style,
-                prefix="caption_",
-                flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
-            )
-            value_rect = QtCore.QRectF(
-                cell.left(),
-                cell.top() + cap_h - 2,
-                cell.width(),
-                max(12.0, cell.height() - cap_h + 2),
-            )
-        else:
-            value_rect = cell
-        _draw_text_ex(painter, str(text or ""), value_rect, base_font, color, style)
-    if style.get("show_label", False):
-        _draw_label(painter, item, rect, font_prefix="caption_")
-    painter.restore()
+            cell_h = inner.height()
+            cell_w = inner.width() / count
+        base_font = _font(style, item)
+        cap_font = _font(style, item, prefix="caption_")
+        for index, row in enumerate(rows):
+            if isinstance(row, (tuple, list)) and len(row) >= 4:
+                _sid, text, color, caption = row[0], row[1], row[2], row[3]
+            elif isinstance(row, (tuple, list)) and len(row) >= 2:
+                _sid, text = row[0], row[1]
+                color = style.get("font_color") or "#f4efe4"
+                caption = str(row[2]) if len(row) >= 3 else ""
+            else:
+                continue
+            if vertical:
+                cell = QtCore.QRectF(inner.left(), inner.top() + index * cell_h, cell_w, cell_h)
+            else:
+                cell = QtCore.QRectF(inner.left() + index * cell_w, inner.top(), cell_w, cell_h)
+            if caption_on and caption:
+                cap_h = QtGui.QFontMetrics(cap_font).height()
+                _draw_text_ex(
+                    painter,
+                    caption,
+                    QtCore.QRectF(cell.left(), cell.top(), cell.width(), min(cap_h, cell.height() * 0.45)),
+                    cap_font,
+                    style.get("caption_font_color") or color,
+                    style,
+                    prefix="caption_",
+                    flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
+                )
+                value_rect = QtCore.QRectF(
+                    cell.left(),
+                    cell.top() + cap_h - 2,
+                    cell.width(),
+                    max(12.0, cell.height() - cap_h + 2),
+                )
+            else:
+                value_rect = cell
+            _draw_text_ex(painter, str(text or ""), value_rect, base_font, color, style)
+        if style.get("show_label", False):
+            _draw_label(painter, item, rect, font_prefix="caption_")
+    finally:
+        painter.restore()
 
 
 def _watch_point(cx: float, cy: float, length: float, clock_deg: float) -> QtCore.QPointF:
@@ -2896,12 +3000,23 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
     running = tracker.running(widget_id)
     fmt = normalize_stopwatch_format(style.get("stopwatch_format"))
     face = normalize_stopwatch_face(style.get("stopwatch_face"))
+    label_text = str(item.get("label") or "").strip() if style.get("show_label", False) else ""
+    label_font = _font(style, item, prefix="caption_") if label_text else None
+    label_h = 0.0
+    if label_font is not None:
+        label_h = float(QtGui.QFontMetricsF(label_font).height()) + 6.0
+        label_h = min(label_h, max(12.0, rect.height() * 0.45))
+    content = (
+        QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h))
+        if label_h > 0
+        else QtCore.QRectF(rect)
+    )
     painter.save()
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
     if face == "analog":
-        side = min(rect.width(), rect.height())
-        dial = QtCore.QRectF(rect.center().x() - side / 2.0, rect.center().y() - side / 2.0, side, side)
+        side = min(content.width(), content.height())
+        dial = QtCore.QRectF(content.center().x() - side / 2.0, content.center().y() - side / 2.0, side, side)
         painter.setPen(_pen(style.get("border"), _border_w(style)))
         painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
         painter.drawEllipse(dial)
@@ -2972,13 +3087,27 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
         _draw_text_ex(
             painter,
             format_stopwatch(elapsed, fmt),
-            rect,
+            content.adjusted(4, 2, -4, -2),
             _font(style, item),
             style.get("needle_second_color") if running else style.get("font_color"),
             style,
         )
-    if style.get("show_label", False):
-        _draw_label(painter, item, rect, font_prefix="caption_")
+    if label_text and label_font is not None:
+        label_rect = QtCore.QRectF(rect.left(), rect.top() + 4.0, rect.width(), max(1.0, label_h - 2.0))
+        label_rect.translate(
+            float(style.get("label_offset_x") or 0),
+            float(style.get("label_offset_y") or 0),
+        )
+        _draw_text_ex(
+            painter,
+            label_text,
+            label_rect,
+            label_font,
+            style.get("caption_font_color") or style.get("font_color"),
+            style,
+            prefix="caption_",
+            flags=int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
+        )
     painter.restore()
 
 
@@ -3497,6 +3626,7 @@ _PAINTERS = {
     "axis_graph": paint_axis_graph,
     "axis_bars": paint_axis_bars,
     "button": paint_button,
+    "toggle": paint_toggle,
     "hat": paint_hat,
     "switch_4way": paint_switch_4way,
     "switch_2way": paint_switch_2way,
@@ -3521,17 +3651,21 @@ def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value, *, draw_s
 
     item = blink_paint_item(item, value) or item
     fn = _PAINTERS.get(item.get("type"), paint_button)
-    if abs(widget_rotation_deg(item)) < 0.001:
+    # Always isolate widget paint so a mid-draw exception cannot leave the
+    # caller's QPainter with an unbalanced save stack (QBackingStore spam).
+    painter.save()
+    try:
+        if abs(widget_rotation_deg(item)) >= 0.001:
+            apply_widget_rotation(painter, item)
         if draw_shadow:
             paint_widget_drop_shadow(painter, item)
         fn(painter, item, value)
-        return
-    painter.save()
-    apply_widget_rotation(painter, item)
-    if draw_shadow:
-        paint_widget_drop_shadow(painter, item)
-    fn(painter, item, value)
-    painter.restore()
+    except Exception:
+        syslog.exception(
+            f"OBS OVERLAY: paint failed for {item.get('type')} id={item.get('id')}"
+        )
+    finally:
+        painter.restore()
 
 
 def _math_angle_deg(px: float, py: float, cx: float, cy: float) -> float:
@@ -3552,8 +3686,16 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch", "input_display"):
+    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
         return None
+    if widget_type == "input_display":
+        from .input_display import input_display_key_at_point
+
+        return input_display_key_at_point(item, x, y)
+    if widget_type == "toggle":
+        vertical = str(style.get("orientation") or "horizontal").casefold() == "vertical"
+        t = (y - rect.y()) / max(1.0, rect.height()) if vertical else (x - rect.x()) / max(1.0, rect.width())
+        return "on" if t >= 0.5 else "off"
     if widget_type == "switch_4way":
         geo = _switch_4way_geometry(item)
         cx, cy = geo["cx"], geo["cy"]

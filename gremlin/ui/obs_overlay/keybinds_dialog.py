@@ -17,19 +17,21 @@ from PySide6 import QtCore, QtWidgets
 from shiboken6 import Shiboken
 
 import gremlin.joystick_handling
-import gremlin.keyboard
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 from gremlin.ui.ui_common import Buttons, QDataComboBox, QDataPushButton
 
-from .bindings import binding_is_configured
+from .bindings import (
+    overlay_device_label,
+    overlay_physical_devices,
+    overlay_vjoy_devices,
+)
 from .inspector import OverlayKeyCombinationWidget, _enum_radios
 from .model import (
     OverlayScene,
     RUNTIME_BINDING_GROUPS,
     RUNTIME_BINDING_LABELS,
     RUNTIME_HOLD_ACTIONS,
-    deserialize_overlay_key,
     normalize_overlay_keys,
     normalize_runtime_bindings,
     normalize_toggle_binding,
@@ -45,40 +47,13 @@ def _alive(widget) -> bool:
         return False
 
 
-def _physical_devices():
-    devices = gremlin.joystick_handling.getPhysicalDevices() or []
-    return sorted(devices, key=lambda d: (d.name or "").casefold())
-
-
 def _button_choices(device) -> list[tuple[int, str]]:
-    count = int(getattr(device, "button_count", 0) or 0) if device else 16
-    return [(i, f"Button {i}") for i in range(1, max(1, count) + 1)]
-
-
-def _binding_summary(binding: dict) -> str:
-    if not binding_is_configured(binding):
-        return "(none)"
-    source = (binding.get("source") or "physical").casefold()
-    if source in ("keyboard", "keyboard/mouse", "mouse"):
-        names = []
-        for raw in binding.get("keys") or []:
-            key = deserialize_overlay_key(raw)
-            if key is None:
-                continue
-            names.append(gremlin.keyboard.KeyMap.get_name(key) or str(getattr(key, "name", "") or ""))
-        return " + ".join(n for n in names if n) or "(none)"
-    try:
-        input_id = int(binding.get("input_id") or 0)
-    except (TypeError, ValueError):
-        input_id = 0
-    if input_id <= 0:
-        return "(none)"
-    name = binding.get("device_name") or "—"
-    return f"{name}  Button {input_id}"
+    count = int(getattr(device, "button_count", 0) or 0) if device else 0
+    return [(i, f"Button {i}") for i in range(1, count + 1)]
 
 
 class RuntimeActionBindingEditor(QtWidgets.QWidget):
-    """One action row: Physical / vJoy / Keyboard-mouse + Listen/Clear."""
+    """One action row: Physical / vJoy / Keyboard-mouse + device/button dropdowns."""
 
     changed = QtCore.Signal()
 
@@ -124,12 +99,6 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
         canvas = self._canvas()
         bindings = normalize_runtime_bindings(canvas.get("runtime_bindings"))
         binding = normalize_toggle_binding(bindings.get(self.action))
-        if (fields.get("source") or "").casefold() == "vjoy" and not int(fields.get("vjoy_id") or 0):
-            devices = gremlin.joystick_handling.vjoy_devices(connected_only=False) or []
-            if devices:
-                fields["vjoy_id"] = int(devices[0].vjoy_id)
-                fields.setdefault("device_guid", str(devices[0].device_guid))
-                fields.setdefault("device_name", devices[0].name)
         binding.update(fields)
         binding = normalize_toggle_binding(binding)
         binding["input_type"] = "keyboard" if binding.get("source") == "keyboard" else "button"
@@ -153,34 +122,20 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             input_type="button",
         )
 
-    def _device_from_combo(self, device_box: QtWidgets.QComboBox, source: str):
-        data = device_box.currentData()
-        if source == "vjoy":
-            try:
-                vjoy_id = int(data or 0)
-            except (TypeError, ValueError):
-                return None
-            if vjoy_id <= 0:
-                return None
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                if int(getattr(dev, "vjoy_id", 0) or 0) == vjoy_id:
-                    return dev
-            return None
-        guid = str(data or "").strip()
-        if not guid:
-            return None
-        return gremlin.joystick_handling.getDevice(guid, show_error=False)
-
     def _listen(self):
         def _captured(event):
             if not _alive(self):
                 return
             device = gremlin.joystick_handling.getDevice(event.device_guid, show_error=False)
+            if device is not None and getattr(device, "disabled", False):
+                return
+            if device is not None and getattr(device, "is_virtual", False):
+                return
             payload = {
-                "source": "vjoy" if getattr(device, "is_virtual", False) else "physical",
+                "source": "physical",
                 "device_guid": str(event.device_guid),
-                "device_name": device.name if device else str(event.device_guid),
-                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0),
+                "device_name": overlay_device_label(device) if device else str(event.device_guid),
+                "vjoy_id": 0,
                 "input_type": "button",
                 "input_id": int(event.identifier),
                 "keys": [],
@@ -198,6 +153,7 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
         listener = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.JoystickButton],
             callback=_captured,
+            virtual_only=False,
             parent=self,
         )
         self._listen_dialog = listener
@@ -222,7 +178,11 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
                 ("Keyboard/mouse", "keyboard"),
             ],
             source,
-            lambda v: self._save(rebuild=True, source=str(v or "physical"), input_type="keyboard" if v == "keyboard" else "button"),
+            lambda v: self._save(
+                rebuild=True,
+                source=str(v or "physical"),
+                input_type="keyboard" if v == "keyboard" else "button",
+            ),
             parent=self,
         )
         self._form.addRow("Source", source_group)
@@ -241,57 +201,120 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             self._form.addRow(picker)
         else:
             device_box = QDataComboBox(self)
+            device_box.addItem("(none)", 0 if source == "vjoy" else "")
             if source == "vjoy":
-                for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                    device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
+                for dev in overlay_vjoy_devices("button"):
+                    device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
                 current = int(binding.get("vjoy_id") or 0)
+                selected = 0
                 for i in range(device_box.count()):
-                    if int(device_box.itemData(i) or 0) == current:
-                        device_box.setCurrentIndex(i)
+                    if int(device_box.itemData(i) or 0) == current and current > 0:
+                        selected = i
                         break
+                if selected == 0 and current > 0:
+                    missing = binding.get("device_name") or f"vJoy {current}"
+                    device_box.addItem(f"{missing} (missing)", current)
+                    selected = device_box.count() - 1
+                device_box.setCurrentIndex(selected)
             else:
-                for dev in _physical_devices():
-                    device_box.addItem(dev.name, str(dev.device_guid))
+                for dev in overlay_physical_devices("button"):
+                    device_box.addItem(overlay_device_label(dev), str(dev.device_guid))
                 current = str(binding.get("device_guid") or "")
+                selected = 0
                 for i in range(device_box.count()):
                     guid = str(device_box.itemData(i) or "")
-                    if guid and guid.casefold() == current.casefold():
-                        device_box.setCurrentIndex(i)
+                    if guid and current and guid.casefold() == current.casefold():
+                        selected = i
                         break
+                if selected == 0 and current:
+                    missing = binding.get("device_name") or current
+                    device_box.addItem(f"{missing} (missing)", current)
+                    selected = device_box.count() - 1
+                device_box.setCurrentIndex(selected)
 
             def _device_changed():
                 if self._building or not _alive(self):
                     return
-                src = source
-                dev = self._device_from_combo(device_box, src)
+                if source == "vjoy":
+                    try:
+                        vjoy_id = int(device_box.currentData() or 0)
+                    except (TypeError, ValueError):
+                        vjoy_id = 0
+                    if vjoy_id <= 0:
+                        self._save(
+                            rebuild=True,
+                            device_guid="",
+                            device_name="",
+                            vjoy_id=0,
+                            input_id=0,
+                            source=source,
+                            input_type="button",
+                            keys=[],
+                        )
+                        return
+                    dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+                else:
+                    guid = str(device_box.currentData() or "").strip()
+                    if not guid:
+                        self._save(
+                            rebuild=True,
+                            device_guid="",
+                            device_name="",
+                            vjoy_id=0,
+                            input_id=0,
+                            source=source,
+                            input_type="button",
+                            keys=[],
+                        )
+                        return
+                    dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
                 if not dev:
                     return
-                payload = {"device_name": dev.name, "device_guid": str(dev.device_guid), "source": src, "input_type": "button"}
-                if src == "vjoy":
-                    payload["vjoy_id"] = int(dev.vjoy_id)
-                self._save(rebuild=True, **payload)
+                self._save(
+                    rebuild=True,
+                    device_name=overlay_device_label(dev),
+                    device_guid=str(dev.device_guid),
+                    vjoy_id=int(getattr(dev, "vjoy_id", 0) or 0) if source == "vjoy" else 0,
+                    source=source,
+                    input_type="button",
+                )
 
             device_box.currentIndexChanged.connect(_device_changed)
             self._form.addRow("Device", device_box)
 
-            listen = Buttons.getListenWidget(
-                label="Listen...",
-                tooltip="Assign from the next physical or vJoy button",
-                callback=self._listen,
-            )
-            self._form.addRow("", listen)
+            listen = None
+            if source == "physical":
+                listen = Buttons.getListenWidget(
+                    label="Listen...",
+                    tooltip="Assign from the next physical button",
+                    callback=self._listen,
+                )
 
-            device = self._device_from_combo(device_box, source)
+            device = None
+            if source == "vjoy":
+                try:
+                    vjoy_id = int(device_box.currentData() or 0)
+                except (TypeError, ValueError):
+                    vjoy_id = 0
+                if vjoy_id > 0:
+                    device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+            else:
+                guid = str(device_box.currentData() or "").strip()
+                if guid:
+                    device = gremlin.joystick_handling.getDevice(guid, show_error=False)
+
             id_box = QDataComboBox(self)
             id_box.addItem("(none)", 0)
             try:
                 current_id = int(binding.get("input_id") or 0)
             except (TypeError, ValueError):
                 current_id = 0
+            if device is None:
+                current_id = 0
             found = False
             for bid, label in _button_choices(device):
                 id_box.addItem(label, bid)
-                if int(bid) == current_id:
+                if int(bid) == current_id and current_id > 0:
                     id_box.setCurrentIndex(id_box.count() - 1)
                     found = True
             if not found and current_id > 0:
@@ -309,12 +332,18 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             )
             self._form.addRow("Button", id_box)
 
-        assigned = QtWidgets.QLabel(_binding_summary(self._binding()), self)
-        assigned.setWordWrap(True)
-        self._form.addRow("Assigned", assigned)
+            actions = QtWidgets.QHBoxLayout()
+            actions.setContentsMargins(0, 0, 0, 0)
+            if listen is not None:
+                actions.addWidget(listen)
+            clear = Buttons.getClearWidget(callback=self._clear)
+            actions.addWidget(clear)
+            actions.addStretch(1)
+            self._form.addRow("", actions)
 
-        clear = Buttons.getClearWidget(callback=self._clear)
-        self._form.addRow("", clear)
+        else:
+            clear = Buttons.getClearWidget(callback=self._clear)
+            self._form.addRow("", clear)
 
         self._building = False
 

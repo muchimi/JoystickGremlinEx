@@ -29,8 +29,11 @@ from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton,
 
 from .bindings import (
     find_overlay_state,
+    overlay_device_label,
     overlay_mode_combo_fields,
+    overlay_physical_devices,
     overlay_state_combo_fields,
+    overlay_vjoy_devices,
     populate_overlay_mode_combo,
     populate_overlay_state_combo,
     resolve_overlay_mode,
@@ -57,6 +60,7 @@ from .model import (
     default_visibility_condition,
     deserialize_overlay_key,
     is_onscreen_mode,
+    is_websocket_mode,
     normalize_background_mode,
     normalize_graph_series,
     normalize_overlay_keys,
@@ -67,11 +71,16 @@ from .model import (
     normalize_switch_appearance,
     normalize_toggle_binding,
     normalize_visibility,
+    normalize_ws_device_preset,
+    normalize_ws_fit_mode,
     serialize_overlay_key,
     switch_channel,
     widget_display_name,
     widget_is_switch,
     widget_uses_series,
+    WS_DEVICE_PRESETS,
+    WS_DEFAULT_PORT,
+    ws_preset_size,
 )
 from .shapes import (
     button_uses_shape_path,
@@ -128,6 +137,62 @@ def _set_form_rows_visible(form, fields, visible: bool):
             if label is not None:
                 label.setVisible(visible)
         field.setVisible(visible)
+
+
+class MultilineTextField(QtWidgets.QPlainTextEdit):
+    """Compact multiline editor: Shift+Enter inserts a line, Enter commits."""
+
+    editingFinished = QtCore.Signal()
+
+    def __init__(self, text: str = "", parent=None, lines: int = 2, placeholder: str = ""):
+        super().__init__(parent)
+        self.setPlainText(str(text or ""))
+        if placeholder:
+            self.setPlaceholderText(placeholder)
+        self.setTabChangesFocus(True)
+        self.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setToolTip("Shift+Enter adds a new line. Enter or leaving the field saves.")
+        self._set_visible_lines(max(1, int(lines)))
+        self._emit_guard = False
+
+    def _set_visible_lines(self, lines: int):
+        fm = self.fontMetrics()
+        frame = self.frameWidth() * 2
+        # Enough room for *lines* plus a little padding so the caret is not clipped.
+        self.setFixedHeight(fm.lineSpacing() * lines + fm.leading() + frame + 10)
+
+    def text(self) -> str:
+        return self.toPlainText()
+
+    def setText(self, value: str):
+        self.setPlainText(str(value or ""))
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            if event.modifiers() & QtCore.Qt.ShiftModifier:
+                self.insertPlainText("\n")
+                return
+            # Plain Enter commits like a single-line field.
+            self.clearFocus()
+            return
+        super().keyPressEvent(event)
+
+    def focusOutEvent(self, event: QtGui.QFocusEvent):
+        super().focusOutEvent(event)
+        if self._emit_guard:
+            return
+        self._emit_guard = True
+        try:
+            self.editingFinished.emit()
+        finally:
+            self._emit_guard = False
+
+
+def _multiline_text_field(text: str = "", parent=None, lines: int = 2, placeholder: str = "") -> MultilineTextField:
+    return MultilineTextField(text, parent=parent, lines=lines, placeholder=placeholder)
 
 
 class ColorButton(QtWidgets.QPushButton):
@@ -396,7 +461,6 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
         self._display.setMinimumHeight(int(sample.desiredHeight) + 4)
         layout.addWidget(self._display)
         layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        clear = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear)
         listen = gremlin.ui.ui_common.Buttons.getListenWidget(callback=lambda: self._listen(False), no_keyboard=False)
         listen.setToolTip("Listen for a single keyboard or mouse input.")
         listen_multi = gremlin.ui.ui_common.Buttons.getListenWidget(
@@ -405,12 +469,13 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
             no_keyboard=False,
         )
         listen_multi.setToolTip("Listen for multiple inputs. Click OK when done.")
+        clear = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear)
         select = gremlin.ui.ui_common.QIconPushButton("Select...")
         select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color.listenColor()))
         select.setToolTip("Select keys using the virtual keyboard")
         select.setFixedHeight(24)
         select.clicked.connect(self._select)
-        actions = gremlin.ui.ui_common.getHContainer([clear, listen, listen_multi, select], widget_only=True)
+        actions = gremlin.ui.ui_common.getHContainer([listen, listen_multi, clear, select], widget_only=True)
         layout.addWidget(actions)
         self.set_keys(keys)
 
@@ -686,6 +751,12 @@ class OverlayInspector(QtWidgets.QWidget):
         self._identity_hooks = False
         self._bind_identity_hooks()
         try:
+            from . import OverlayManager
+
+            OverlayManager().websocket_status_changed.connect(self._on_ws_status_changed)
+        except Exception:
+            pass
+        try:
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             StreamDeckBridge().devices_changed.connect(self._on_streamdeck_devices_changed)
@@ -743,6 +814,12 @@ class OverlayInspector(QtWidgets.QWidget):
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             StreamDeckBridge().devices_changed.disconnect(self._on_streamdeck_devices_changed)
+        except Exception:
+            pass
+        try:
+            from . import OverlayManager
+
+            OverlayManager().websocket_status_changed.disconnect(self._on_ws_status_changed)
         except Exception:
             pass
         try:
@@ -1164,10 +1241,12 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow(touch_hint)
 
         current = normalize_background_mode(canvas.get("background_mode"))
+        websocket = is_websocket_mode(canvas)
         mode = _enum_radios(
             [
                 ("Windowed", "windowed", "Capture window with a solid background (OBS chromakey / custom size)."),
                 ("On-screen", "onscreen", "Transparent HUD sized to a monitor."),
+                ("Websocket", "websocket", "LAN browser stream + touch control (no local overlay window)."),
             ],
             current,
             self._on_background_mode,
@@ -1176,7 +1255,9 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("Mode", mode)
 
-        if onscreen:
+        if websocket:
+            self._build_websocket_canvas_rows(form, canvas)
+        elif onscreen:
             screens = list_overlay_screens()
             monitor = QDataComboBox(parent=self._host)
             selected = resolve_overlay_screen(canvas)
@@ -1217,9 +1298,10 @@ class OverlayInspector(QtWidgets.QWidget):
         height = QtWidgets.QSpinBox(self._host)
         height.setRange(120, 4320)
         height.setValue(int(canvas.get("height") or 720))
-        width.setEnabled(not onscreen)
-        height.setEnabled(not onscreen)
-        if not onscreen:
+        size_locked = onscreen and not websocket
+        width.setEnabled(not size_locked)
+        height.setEnabled(not size_locked)
+        if not size_locked:
             width.valueChanged.connect(lambda v: self._set_canvas("width", int(v)))
             height.valueChanged.connect(lambda v: self._set_canvas("height", int(v)))
         form.addRow("Width", width)
@@ -1246,7 +1328,7 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Snap to widget", snap_widgets)
         self._build_guides(form, canvas)
 
-        if not onscreen:
+        if not onscreen and not websocket:
             top = QtWidgets.QCheckBox(self._host)
             top.setChecked(bool(canvas.get("always_on_top")))
             top.toggled.connect(lambda v: self._set_canvas("always_on_top", v))
@@ -1262,7 +1344,7 @@ class OverlayInspector(QtWidgets.QWidget):
             drag.toggled.connect(lambda v: self._set_canvas("show_drag_bar", v))
             form.addRow("Overlay drag bar", drag)
 
-        if onscreen:
+        if onscreen and not websocket:
             attach = QtWidgets.QCheckBox(self._host)
             attach.setChecked(bool(canvas.get("attach_to_window")))
             attach.setToolTip(
@@ -1331,6 +1413,154 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow(reset)
         self._build_toggle_binding()
         self._build_runtime_bindings()
+
+    def _build_websocket_canvas_rows(self, form, canvas: dict):
+        """Port / URL / fit / device preset / connection badge for Websocket mode."""
+        from .websocket_server import find_free_http_ws_ports, lan_ipv4_addresses
+
+        port = QtWidgets.QSpinBox(self._host)
+        port.setRange(1024, 65534)
+        port.setValue(int(canvas.get("ws_port") or WS_DEFAULT_PORT))
+        port.setToolTip(
+            "Preferred HTTP port (WebSocket uses the next free port). "
+            "GEX skips reserved ports (6012, 6013, 8000, 8001, 9020) and occupied binds."
+        )
+        port.valueChanged.connect(lambda v: self._set_canvas("ws_port", int(v)))
+        form.addRow("Port", port)
+
+        suggest = QDataPushButton("Suggest free port", parent=self._host)
+        suggest.setToolTip("Probe for a free HTTP/WS port pair starting near the current value.")
+
+        def _suggest():
+            try:
+                http_port, _ws = find_free_http_ws_ports(int(port.value()))
+                port.setValue(http_port)
+                self._set_canvas("ws_port", http_port)
+            except Exception as err:
+                QtWidgets.QMessageBox.warning(self._host, "Websocket", f"No free port found:\n{err}")
+
+        suggest.clicked.connect(_suggest)
+        form.addRow(suggest)
+
+        ips = lan_ipv4_addresses()
+        preferred = int(canvas.get("ws_port") or WS_DEFAULT_PORT)
+        url_text = "\n".join(f"http://{ip}:{preferred}/" for ip in ips)
+        url_edit = QtWidgets.QPlainTextEdit(url_text, self._host)
+        url_edit.setReadOnly(True)
+        url_edit.setMaximumHeight(64)
+        url_edit.setToolTip(
+            "Open this URL on a phone/tablet on the same LAN while the overlay page is shown."
+        )
+        form.addRow("LAN URL", url_edit)
+
+        copy_btn = QDataPushButton("Copy URL", parent=self._host)
+
+        def _copy():
+            clip = QtWidgets.QApplication.clipboard()
+            if clip is not None:
+                clip.setText(f"http://{ips[0]}:{preferred}/" if ips else url_text)
+
+        copy_btn.clicked.connect(_copy)
+        form.addRow(copy_btn)
+
+        status = QtWidgets.QLabel(self._ws_status_text(), self._host)
+        status.setObjectName("overlayWsStatus")
+        status.setWordWrap(True)
+        if self._ws_client_count() > 0:
+            status.setStyleSheet("color: #2e7d32; font-weight: 600;")
+        else:
+            status.setStyleSheet("color: #666;")
+        form.addRow("Connection", status)
+
+        fit = QDataComboBox(parent=self._host)
+        for key, label in (
+            ("contain", "Contain (letterbox)"),
+            ("cover", "Cover"),
+            ("stretch", "Stretch"),
+        ):
+            fit.addItem(label, key)
+        fit_mode = normalize_ws_fit_mode(canvas.get("ws_fit_mode"))
+        idx = fit.findData(fit_mode)
+        if idx >= 0:
+            fit.setCurrentIndex(idx)
+        fit.currentIndexChanged.connect(
+            lambda _i, box=fit: self._set_canvas(
+                "ws_fit_mode", normalize_ws_fit_mode(box.currentData())
+            )
+        )
+        form.addRow("Fit mode", fit)
+
+        preset = QDataComboBox(parent=self._host)
+        preset.setToolTip(
+            "Sets this page’s canvas width/height in GEX to a common tablet/phone size. "
+            "The browser always shows that canvas; it does not pick a device on its own."
+        )
+        for ident, label, _w, _h in WS_DEVICE_PRESETS:
+            preset.addItem(label, ident)
+        cur_preset = normalize_ws_device_preset(canvas.get("ws_device_preset"))
+        pidx = preset.findData(cur_preset)
+        if pidx >= 0:
+            preset.setCurrentIndex(pidx)
+
+        def _on_preset(_i, box=preset):
+            pid = normalize_ws_device_preset(box.currentData())
+            self._set_canvas("ws_device_preset", pid)
+            size = ws_preset_size(pid)
+            if size:
+                self._set_canvas("width", size[0])
+                self._set_canvas("height", size[1])
+                self._schedule_rebuild()
+
+        preset.currentIndexChanged.connect(_on_preset)
+        form.addRow("Device preset", preset)
+
+        color_btn = ColorButton(
+            canvas.get("chroma_color") or "#00FF00",
+            parent=self._host,
+            preserve_transparent=True,
+            allow_gradient=False,
+        )
+        color_btn.setFixedWidth(36)
+        color_btn.setToolTip("Background fill streamed to the browser (same paint path as windowed).")
+        color_btn.color_changed.connect(lambda v: self._set_canvas("chroma_color", v))
+        form.addRow("Background color", color_btn)
+
+        hint = QtWidgets.QLabel(
+            "No local overlay window. Show this page to start the LAN server; open the URL on a "
+            "tablet/phone. Interactive must be on for remote touch writes. Open LAN — anyone on "
+            "the network can connect.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+    def _ws_client_count(self) -> int:
+        try:
+            from . import OverlayManager
+
+            return int(OverlayManager().websocket_client_count(self.scene.active_page_id))
+        except Exception:
+            return 0
+
+    def _ws_status_text(self) -> str:
+        try:
+            from . import OverlayManager
+
+            return OverlayManager().websocket_status_text(self.scene.active_page_id)
+        except Exception:
+            return "Websocket: stopped"
+
+    def _on_ws_status_changed(self, *_args):
+        if not self._is_alive():
+            return
+        label = self._host.findChild(QtWidgets.QLabel, "overlayWsStatus") if self._host else None
+        if label is None or not Shiboken.isValid(label):
+            return
+        label.setText(self._ws_status_text())
+        if self._ws_client_count() > 0:
+            label.setStyleSheet("color: #2e7d32; font-weight: 600;")
+        else:
+            label.setStyleSheet("color: #666;")
 
     # Standard OBS / capture chromakey colors for Windowed mode quick picks.
     _WINDOWED_COLOR_PRESETS = (
@@ -1593,6 +1823,13 @@ class OverlayInspector(QtWidgets.QWidget):
 
         self._rotation_slider(form, item)
         self._lock_position_row(form, item)
+        self._style_bool(
+            form,
+            item,
+            "auto_scale_font",
+            "Scale font with size",
+            tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
+        )
 
         self._build_visibility(item)
 
@@ -1603,13 +1840,16 @@ class OverlayInspector(QtWidgets.QWidget):
             if show_mode:
                 from .bindings import current_profile_mode
 
-                label = QtWidgets.QLineEdit(current_profile_mode(), self._host)
+                label = _multiline_text_field(current_profile_mode(), self._host, lines=2)
                 label.setReadOnly(True)
                 label.setToolTip("This label follows the active profile mode. Uncheck Show current mode to type your own text.")
             else:
-                label = QtWidgets.QLineEdit(item.get('label') or '', self._host)
+                label = _multiline_text_field(item.get("label") or "", self._host, lines=3)
                 label.editingFinished.connect(lambda wid=item["id"], w=label: self._update(wid, label=w.text()))
-            label_form.addRow("Text", label)
+            text_title = "Label" if widget_type in ("stopwatch", "sys_stats") else "Text"
+            if widget_type == "stopwatch":
+                label.setToolTip("Title shown at the top of the stopwatch when Show label is on. Shift+Enter for a new line.")
+            label_form.addRow(text_title, label)
         if not show_mode:
             self._style_bool(label_form, item, "show_label", "Show label")
         if widget_type == "label":
@@ -1625,23 +1865,47 @@ class OverlayInspector(QtWidgets.QWidget):
                 hint = QtWidgets.QLabel('Updates live: edit mode now, runtime mode while the profile is running.', self._host)
                 hint.setWordWrap(True)
                 label_form.addRow(hint)
-        self._style_label_fonts(label_form, item, widget_type)
-        self._slider_int(
-            label_form,
-            "Label offset X",
-            int(item["style"].get("label_offset_x") or 0),
-            -400,
-            400,
-            lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
-        )
-        self._slider_int(
-            label_form,
-            "Label offset Y",
-            int(item["style"].get("label_offset_y") or 0),
-            -400,
-            400,
-            lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
-        )
+        if widget_type == "stopwatch":
+            # Keep every label control together, then a separate Timer block.
+            self._style_font(label_form, item, prefix="caption_", title="Label font")
+            self._style_color(label_form, item, "caption_font_color", "Label color")
+            self._slider_int(
+                label_form,
+                "Label offset X",
+                int(item["style"].get("label_offset_x") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
+            )
+            self._slider_int(
+                label_form,
+                "Label offset Y",
+                int(item["style"].get("label_offset_y") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
+            )
+            timer_form = self._section("Timer")
+            self._style_font(timer_form, item, title="Timer font")
+            self._style_color(timer_form, item, "font_color", "Timer color")
+        else:
+            self._style_label_fonts(label_form, item, widget_type)
+            self._slider_int(
+                label_form,
+                "Label offset X",
+                int(item["style"].get("label_offset_x") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
+            )
+            self._slider_int(
+                label_form,
+                "Label offset Y",
+                int(item["style"].get("label_offset_y") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
+            )
         widget_type = canonical_widget_type(item.get("type"))
         if widget_type == "label":
             self._style_color(label_form, item, "fill", "Fill")
@@ -1671,6 +1935,12 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Keep image aspect",
                 tooltip="Fit the off/on image inside the button. Off stretches it to the button size.",
             )
+        elif widget_type == "toggle":
+            self._orientation_combo(look, item, default="horizontal")
+            self._style_color(look, item, "fill", "Off fill")
+            self._style_color(look, item, "fill_on", "On fill")
+            self._style_color(look, item, "indicator", "Knob")
+            self._indicator_shape(look, item)
         elif widget_type == "axis_bar":
             self._orientation_combo(look, item)
             self._style_color(look, item, "fill", "Fill")
@@ -1871,32 +2141,62 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(key.upper(), spin)
         self._rotation_slider(form, item)
         self._lock_position_row(form, item)
+        self._style_bool(
+            form,
+            item,
+            "auto_scale_font",
+            "Scale font with size",
+            tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
+        )
         self._build_visibility(item)
 
         label_form = self._section("Label")
         self._style_bool(label_form, item, "show_label", "Show label")
         meter_types = {canonical_widget_type(t) for t in types}
-        if meter_types <= {"sys_stats", "stopwatch"} and len(meter_types) == 1:
-            self._style_label_fonts(label_form, item, next(iter(meter_types)))
+        if meter_types == {"stopwatch"}:
+            self._style_font(label_form, item, prefix="caption_", title="Label font")
+            self._style_color(label_form, item, "caption_font_color", "Label color")
+            self._slider_int(
+                label_form,
+                "Label offset X",
+                int(item["style"].get("label_offset_x") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
+            )
+            self._slider_int(
+                label_form,
+                "Label offset Y",
+                int(item["style"].get("label_offset_y") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
+            )
+            timer_form = self._section("Timer")
+            self._style_font(timer_form, item, title="Timer font")
+            self._style_color(timer_form, item, "font_color", "Timer color")
         else:
-            self._style_font(label_form, item)
-            self._style_color(label_form, item, "font_color", "Font color")
-        self._slider_int(
-            label_form,
-            "Label offset X",
-            int(item["style"].get("label_offset_x") or 0),
-            -400,
-            400,
-            lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
-        )
-        self._slider_int(
-            label_form,
-            "Label offset Y",
-            int(item["style"].get("label_offset_y") or 0),
-            -400,
-            400,
-            lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
-        )
+            if meter_types <= {"sys_stats", "stopwatch"} and len(meter_types) == 1:
+                self._style_label_fonts(label_form, item, next(iter(meter_types)))
+            else:
+                self._style_font(label_form, item)
+                self._style_color(label_form, item, "font_color", "Font color")
+            self._slider_int(
+                label_form,
+                "Label offset X",
+                int(item["style"].get("label_offset_x") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_x=int(v)),
+            )
+            self._slider_int(
+                label_form,
+                "Label offset Y",
+                int(item["style"].get("label_offset_y") or 0),
+                -400,
+                400,
+                lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
+            )
 
         look = self._section("Appearance")
         if len(types) == 1:
@@ -1905,6 +2205,11 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_color(look, item, "fill", "Fill")
         if types <= {"button"}:
             self._style_color(look, item, "fill_on", "On fill")
+        if types <= {"toggle"}:
+            self._orientation_combo(look, item, default="horizontal")
+            self._style_color(look, item, "fill_on", "On fill")
+            self._style_color(look, item, "indicator", "Knob")
+            self._indicator_shape(look, item)
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
         if types <= {"switch_4way", "switch_2way"}:
@@ -1945,6 +2250,13 @@ class OverlayInspector(QtWidgets.QWidget):
             self._deadzone_field(look, item)
         if types <= {"button"}:
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
+        elif types <= {"toggle"}:
+            self._border_appearance(
+                look,
+                item,
+                colors=(("border", "Off border"), ("border_on", "On border")),
+                include_radius=True,
+            )
         elif types <= {"input_display"}:
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
         elif types <= {"axis_radio"}:
@@ -2156,65 +2468,115 @@ class OverlayInspector(QtWidgets.QWidget):
     def _fill_visibility_input(self, form: QtWidgets.QFormLayout, item: dict, cond: dict):
         kind = str(cond.get("kind") or "physical").casefold()
         cond_id = str(cond.get("id") or "")
+        src = "vjoy" if kind == "vjoy" else "physical"
+
         device_box = QDataComboBox()
-        if kind == "vjoy":
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
+        device_box.addItem("(none)", 0 if src == "vjoy" else "")
+        if src == "vjoy":
+            for dev in overlay_vjoy_devices("button"):
+                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
             current = int(cond.get("vjoy_id") or 0)
+            selected = 0
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current:
-                    device_box.setCurrentIndex(i)
+                if int(device_box.itemData(i) or 0) == current and current > 0:
+                    selected = i
                     break
+            if selected == 0 and current > 0:
+                missing = cond.get("device_name") or f"vJoy {current}"
+                device_box.addItem(f"{missing} (missing)", current)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
         else:
-            for dev in self._physical_joystick_devices():
-                device_box.addItem(dev.name, str(dev.device_guid))
+            for dev in overlay_physical_devices("button"):
+                device_box.addItem(overlay_device_label(dev), str(dev.device_guid))
             current = str(cond.get("device_guid") or "")
+            selected = 0
             for i in range(device_box.count()):
                 guid = str(device_box.itemData(i) or "")
-                if guid and guid.casefold() == current.casefold():
-                    device_box.setCurrentIndex(i)
+                if guid and current and guid.casefold() == current.casefold():
+                    selected = i
                     break
+            if selected == 0 and current:
+                missing = cond.get("device_name") or current
+                device_box.addItem(f"{missing} (missing)", current)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
 
         def _device_changed():
             if not self._is_alive():
                 return
-            src = "vjoy" if kind == "vjoy" else "physical"
-            dev = self._device_from_combo(device_box, src)
+            if src == "vjoy":
+                try:
+                    vjoy_id = int(device_box.currentData() or 0)
+                except (TypeError, ValueError):
+                    vjoy_id = 0
+                if vjoy_id <= 0:
+                    self._set_visibility_condition(
+                        item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+            else:
+                guid = str(device_box.currentData() or "").strip()
+                if not guid:
+                    self._set_visibility_condition(
+                        item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
             if not dev:
                 return
-            payload = {"device_name": dev.name, "device_guid": str(dev.device_guid)}
-            if kind == "vjoy":
-                payload["vjoy_id"] = int(dev.vjoy_id)
-            self._set_visibility_condition(item["id"], cond_id, rebuild=True, **payload)
+            self._set_visibility_condition(
+                item["id"],
+                cond_id,
+                rebuild=True,
+                device_name=overlay_device_label(dev),
+                device_guid=str(dev.device_guid),
+                vjoy_id=int(getattr(dev, "vjoy_id", 0) or 0) if src == "vjoy" else 0,
+            )
 
         device_box.currentIndexChanged.connect(_device_changed)
         form.addRow("Device", device_box)
 
-        listen = Buttons.getListenWidget(
-            label="Listen...",
-            tooltip="Assign from the next physical or vJoy button press",
-            # ListenWidget calls callback(button); keep widget dict in defaults.
-            callback=lambda _btn=None, it=item, cid=cond_id: self._listen_visibility(it, cid),
-        )
-        form.addRow("", listen)
+        listen = None
+        if src == "physical":
+            listen = Buttons.getListenWidget(
+                label="Listen...",
+                tooltip="Assign from the next physical button press",
+                callback=lambda _btn=None, it=item, cid=cond_id: self._listen_visibility(it, cid, virtual_only=False),
+            )
 
-        device = self._device_from_combo(device_box, "vjoy" if kind == "vjoy" else "physical")
+        device = None
+        if src == "vjoy":
+            try:
+                vjoy_id = int(device_box.currentData() or 0)
+            except (TypeError, ValueError):
+                vjoy_id = 0
+            if vjoy_id > 0:
+                device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+        else:
+            guid = str(device_box.currentData() or "").strip()
+            if guid:
+                device = gremlin.joystick_handling.getDevice(guid, show_error=False)
+
         id_box = QDataComboBox()
         id_box.addItem("(none)", 0)
-        choices = self._input_choices(device, "button")
+        choices = self._input_choices(device, "button") if device is not None else []
         try:
             current_id = int(cond.get("input_id") or 0)
         except (TypeError, ValueError):
+            current_id = 0
+        if device is None:
             current_id = 0
         found = current_id <= 0
         if found:
             id_box.setCurrentIndex(0)
         for button_id, label in choices:
             id_box.addItem(label, button_id)
-            if int(button_id) == current_id:
+            if int(button_id) == current_id and current_id > 0:
                 id_box.setCurrentIndex(id_box.count() - 1)
                 found = True
-        if not found:
+        if not found and current_id > 0:
             id_box.addItem(f"Button {current_id}", current_id)
             id_box.setCurrentIndex(id_box.count() - 1)
         id_box.currentIndexChanged.connect(
@@ -2223,6 +2585,19 @@ class OverlayInspector(QtWidgets.QWidget):
             )
         )
         form.addRow("Button", id_box)
+
+        actions = QtWidgets.QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        if listen is not None:
+            actions.addWidget(listen)
+        clear = Buttons.getClearWidget(
+            callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._set_visibility_condition(
+                wid, cid, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+            )
+        )
+        actions.addWidget(clear)
+        actions.addStretch(1)
+        form.addRow("", actions)
 
     def _set_visibility(self, widget_id: str, rebuild: bool = False, **fields):
         if self._building:
@@ -2304,19 +2679,25 @@ class OverlayInspector(QtWidgets.QWidget):
         self._update(widget_id, visibility=vis)
         self.rebuild()
 
-    def _listen_visibility(self, item: dict, cond_id: str):
+    def _listen_visibility(self, item: dict, cond_id: str, virtual_only: bool = False):
         def _captured(event):
             if not self._is_alive():
                 return
             if event.event_type != InputType.JoystickButton:
                 return
             device = gremlin.joystick_handling.getDevice(event.device_guid, show_error=False)
+            if device is not None and getattr(device, "disabled", False):
+                return
             virtual = bool(getattr(device, "is_virtual", False))
+            if virtual_only and not virtual:
+                return
+            if not virtual_only and virtual:
+                return
             payload = {
                 "kind": "vjoy" if virtual else "physical",
                 "device_guid": str(event.device_guid),
-                "device_name": device.name if device else str(event.device_guid),
-                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0),
+                "device_name": overlay_device_label(device) if device else str(event.device_guid),
+                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0) if virtual else 0,
                 "input_id": int(event.identifier),
             }
             self._set_visibility_condition(item["id"], cond_id, rebuild=True, **payload)
@@ -2329,7 +2710,12 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickButton], callback=_captured, parent=self)
+        listener = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.JoystickButton],
+            callback=_captured,
+            virtual_only=bool(virtual_only),
+            parent=self,
+        )
         self._listen_dialog = listener
         listener.show()
 
@@ -2386,7 +2772,7 @@ class OverlayInspector(QtWidgets.QWidget):
         elif ends == "ew":
             pairs = pairs[2:]
         for key, title in pairs:
-            edit = QtWidgets.QLineEdit(item['style'].get(key) or '', self._host)
+            edit = _multiline_text_field(item["style"].get(key) or "", self._host, lines=2)
             edit.editingFinished.connect(lambda wid=item["id"], k=key, w=edit: self._style(wid, **{k: w.text()}))
             form.addRow(title, edit)
         spread = item["style"].get("axis_label_spread")
@@ -2834,6 +3220,13 @@ class OverlayInspector(QtWidgets.QWidget):
             self._deadzone_field(look, item)
         if widget_type == "button":
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
+        elif widget_type == "toggle":
+            self._border_appearance(
+                look,
+                item,
+                colors=(("border", "Off border"), ("border_on", "On border")),
+                include_radius=True,
+            )
         elif widget_type == "input_display":
             self._border_appearance(look, item, colors=(("border", "Off border"), ("border_on", "On border")))
         elif widget_type == "axis_radio":
@@ -2902,9 +3295,24 @@ class OverlayInspector(QtWidgets.QWidget):
 
         blink = self._blink_for(item)
         form = self._section("Blinking")
-        hint = QtWidgets.QLabel('Off by default. While blinking, the widget swaps Off and On appearance. Check one or more triggers. Temporary runs for the duration after a trigger; Permanent keeps blinking while the condition holds.', self._host)
+        enabled = bool(blink.get("enabled"))
+        dependents: list[QtWidgets.QWidget] = []
+
+        toggle = _enum_radios(
+            [("On", "on"), ("Off", "off")],
+            "on" if enabled else "off",
+            None,
+        )
+        form.addRow("Blinking", toggle)
+
+        hint = QtWidgets.QLabel(
+            "While blinking, the widget swaps Off and On appearance. Check one or more triggers. "
+            "Temporary runs for the duration after a trigger; Permanent keeps blinking while the condition holds.",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
+        dependents.append(hint)
 
         def _box(key, title, tooltip):
             box = QtWidgets.QCheckBox(self._host)
@@ -2915,6 +3323,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 lambda _s, wid=item["id"], k=key, b=box: self._on_blink_flag(b, wid, k)
             )
             form.addRow(title, box)
+            dependents.append(box)
 
         _box("off_to_on", "Off → On", "Blink when the widget turns on.")
         _box("on_to_off", "On → Off", "Blink when the widget turns off.")
@@ -2943,6 +3352,7 @@ class OverlayInspector(QtWidgets.QWidget):
         state_layout.addWidget(state_combo, 1)
         state_layout.addWidget(when)
         form.addRow("State", state_row)
+        dependents.append(state_row)
 
         mode = _enum_radios(
             [
@@ -2953,6 +3363,7 @@ class OverlayInspector(QtWidgets.QWidget):
             None,
         )
         form.addRow("Duration mode", mode)
+        dependents.append(mode)
         dur = QtWidgets.QDoubleSpinBox(self._host)
         dur.setRange(0.1, 30.0)
         dur.setSingleStep(0.1)
@@ -2961,6 +3372,7 @@ class OverlayInspector(QtWidgets.QWidget):
         dur.setToolTip("How long a temporary blink lasts after Off→On, On→Off, or a matching state change.")
         dur.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, duration_s=float(v)))
         form.addRow("Temporary for", dur)
+        dependents.append(dur)
 
         def _sync_temporary_enabled(value=None, spin=dur):
             if value is None:
@@ -2982,11 +3394,24 @@ class OverlayInspector(QtWidgets.QWidget):
         hz.setToolTip("How many times per second the off/on appearance swaps.")
         hz.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, hz=float(v)))
         form.addRow("Frequency", hz)
-        if not blink_is_armed(blink):
-            note = QtWidgets.QLabel('No blink triggers are on.', self._host)
+        dependents.append(hz)
+
+        note = None
+        if enabled and not blink_is_armed(blink):
+            note = QtWidgets.QLabel("No blink triggers are on.", self._host)
             note.setWordWrap(True)
             form.addRow(note)
+            dependents.append(note)
 
+        def _sync(on: bool):
+            _set_form_rows_visible(form, dependents, on)
+
+        def _on_toggle(value, wid=item["id"]):
+            on = str(value or "off") == "on"
+            self._set_blink(wid, rebuild=True, enabled=on)
+
+        toggle._callback = _on_toggle
+        _sync(enabled)
     def _on_blink_flag(self, box: QtWidgets.QCheckBox, widget_id: str, key: str):
         if self._building:
             return
@@ -3366,11 +3791,30 @@ class OverlayInspector(QtWidgets.QWidget):
         color = ColorButton(entry.get("color") or GRAPH_SERIES_COLORS[index % len(GRAPH_SERIES_COLORS)])
         color.color_changed.connect(lambda v, wid=item["id"], ident=sid: self._set_stat_entry(wid, ident, color=v))
         form.addRow("Color", color)
-        label = QtWidgets.QLineEdit(str(entry.get('label') or ''), self._host)
-        label.setPlaceholderText(stat_caption(kind))
+        label = _multiline_text_field(
+            str(entry.get("label") or ""),
+            self._host,
+            lines=2,
+            placeholder=stat_caption(kind),
+        )
         label.editingFinished.connect(lambda wid=item["id"], ident=sid, w=label: self._set_stat_entry(wid, ident, label=w.text()))
         form.addRow("Caption", label)
         if kind == "manual":
+            from .sys_stats import ManualCounterTracker
+
+            try:
+                persisted = int(entry.get("value") or 0)
+            except (TypeError, ValueError):
+                persisted = 0
+            current = ManualCounterTracker().peek_value(str(item.get("id") or ""), sid, persisted)
+            value = QtWidgets.QSpinBox(self._host)
+            value.setRange(0, 999999)
+            value.setValue(max(0, current))
+            value.setToolTip("Current counter value. Edits apply immediately and are saved with the profile.")
+            value.valueChanged.connect(
+                lambda v, wid=item["id"], ident=sid: self._set_manual_stat_value(wid, ident, int(v))
+            )
+            form.addRow("Value", value)
             step = QtWidgets.QSpinBox(self._host)
             step.setRange(1, 100)
             step.setValue(int(entry.get("step") or 1))
@@ -3396,8 +3840,6 @@ class OverlayInspector(QtWidgets.QWidget):
                 "binding_y",
                 "Decrement",
                 force_type="button",
-                allow_none=True,
-                show_clear=True,
                 extra_hint="Optional. Press subtracts Step (not below zero).",
                 form=form,
             )
@@ -3406,8 +3848,6 @@ class OverlayInspector(QtWidgets.QWidget):
                 "binding_z",
                 "Reset",
                 force_type="button",
-                allow_none=True,
-                show_clear=True,
                 extra_hint="Optional. Press sets the counter to 0.",
                 form=form,
             )
@@ -3418,6 +3858,15 @@ class OverlayInspector(QtWidgets.QWidget):
             )
             form.addRow("", remove)
         return box
+
+    def _set_manual_stat_value(self, widget_id: str, stat_id: str, value: int):
+        """Update a manual counter's persisted and live tally from the designer."""
+        if self._building:
+            return
+        from .sys_stats import ManualCounterTracker
+
+        clamped = ManualCounterTracker().set_value(widget_id, stat_id, value)
+        self._set_stat_entry(widget_id, stat_id, value=clamped)
 
     def _set_stat_entry(self, widget_id: str, stat_id: str, rebuild: bool = False, **fields):
         if self._building:
@@ -3467,12 +3916,6 @@ class OverlayInspector(QtWidgets.QWidget):
     def _bind_stat(self, widget_id: str, stat_id: str, channel: str, rebuild: bool = False, **fields):
         if self._building:
             return
-        if (fields.get("source") or "").casefold() == "vjoy" and not int(fields.get("vjoy_id") or 0):
-            devices = gremlin.joystick_handling.vjoy_devices(connected_only=False) or []
-            if devices:
-                fields["vjoy_id"] = int(devices[0].vjoy_id)
-                fields.setdefault("device_guid", str(devices[0].device_guid))
-                fields.setdefault("device_name", devices[0].name)
         item = self.scene.widget_by_id(widget_id)
         if not item:
             return
@@ -3679,64 +4122,114 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Source", source)
 
         device_box = QDataComboBox()
+        device_box.addItem("(none)", 0 if src == "vjoy" else "")
         if src == "vjoy":
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
+            for dev in overlay_vjoy_devices("axis"):
+                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
             current = int(series.get("vjoy_id") or 0)
+            selected = 0
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current:
-                    device_box.setCurrentIndex(i)
+                if int(device_box.itemData(i) or 0) == current and current > 0:
+                    selected = i
                     break
+            if selected == 0 and current > 0:
+                missing = series.get("device_name") or f"vJoy {current}"
+                device_box.addItem(f"{missing} (missing)", current)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
         else:
-            for dev in self._physical_joystick_devices():
-                device_box.addItem(dev.name, str(dev.device_guid))
+            for dev in overlay_physical_devices("axis"):
+                device_box.addItem(overlay_device_label(dev), str(dev.device_guid))
             current_guid = str(series.get("device_guid") or "")
+            selected = 0
             for i in range(device_box.count()):
                 guid = str(device_box.itemData(i) or "")
-                if guid and guid.casefold() == current_guid.casefold():
-                    device_box.setCurrentIndex(i)
+                if guid and current_guid and guid.casefold() == current_guid.casefold():
+                    selected = i
                     break
+            if selected == 0 and current_guid:
+                missing = series.get("device_name") or current_guid
+                device_box.addItem(f"{missing} (missing)", current_guid)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
 
         def _device_changed():
             if not self._is_alive():
                 return
-            combo_src = "vjoy" if src == "vjoy" else "physical"
-            dev = self._device_from_combo(device_box, combo_src)
+            if src == "vjoy":
+                try:
+                    vjoy_id = int(device_box.currentData() or 0)
+                except (TypeError, ValueError):
+                    vjoy_id = 0
+                if vjoy_id <= 0:
+                    self._set_graph_series(
+                        item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+            else:
+                guid = str(device_box.currentData() or "").strip()
+                if not guid:
+                    self._set_graph_series(
+                        item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
             if not dev:
                 return
-            payload = {"device_name": dev.name, "device_guid": str(dev.device_guid)}
-            if src == "vjoy":
-                payload["vjoy_id"] = int(dev.vjoy_id)
-            self._set_graph_series(item["id"], series_id, rebuild=True, **payload)
+            self._set_graph_series(
+                item["id"],
+                series_id,
+                rebuild=True,
+                device_name=overlay_device_label(dev),
+                device_guid=str(dev.device_guid),
+                vjoy_id=int(getattr(dev, "vjoy_id", 0) or 0) if src == "vjoy" else 0,
+            )
 
         device_box.currentIndexChanged.connect(_device_changed)
         form.addRow("Device", device_box)
 
-        listen = Buttons.getListenWidget(
-            label="Listen...",
-            tooltip="Assign from the next matching physical or vJoy axis",
-            # ListenWidget calls callback(button); keep widget dict in defaults.
-            callback=lambda _btn=None, it=item, sid=series_id: self._listen_graph_series(it, sid),
-        )
-        form.addRow("", listen)
+        listen = None
+        if src == "physical":
+            listen = Buttons.getListenWidget(
+                label="Listen...",
+                tooltip="Assign from the next matching physical axis",
+                callback=lambda _btn=None, it=item, sid=series_id: self._listen_graph_series(
+                    it, sid, virtual_only=False
+                ),
+            )
 
-        device = self._device_from_combo(device_box, "vjoy" if src == "vjoy" else "physical")
+        device = None
+        if src == "vjoy":
+            try:
+                vjoy_id = int(device_box.currentData() or 0)
+            except (TypeError, ValueError):
+                vjoy_id = 0
+            if vjoy_id > 0:
+                device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+        else:
+            guid = str(device_box.currentData() or "").strip()
+            if guid:
+                device = gremlin.joystick_handling.getDevice(guid, show_error=False)
+
         id_box = QDataComboBox()
         id_box.addItem("(none)", 0)
-        choices = self._input_choices(device, "axis")
+        choices = self._input_choices(device, "axis") if device is not None else []
         try:
             current_id = int(series.get("input_id") or 0)
         except (TypeError, ValueError):
+            current_id = 0
+        if device is None:
             current_id = 0
         found = current_id <= 0
         if found:
             id_box.setCurrentIndex(0)
         for axis_id, label in choices:
             id_box.addItem(label, axis_id)
-            if int(axis_id) == current_id:
+            if int(axis_id) == current_id and current_id > 0:
                 id_box.setCurrentIndex(id_box.count() - 1)
                 found = True
-        if not found:
+        if not found and current_id > 0:
             id_box.addItem(f"Axis {current_id}", current_id)
             id_box.setCurrentIndex(id_box.count() - 1)
         id_box.currentIndexChanged.connect(
@@ -3750,8 +4243,12 @@ class OverlayInspector(QtWidgets.QWidget):
         color.color_changed.connect(lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, color=v))
         form.addRow("Color", color)
 
-        label = QtWidgets.QLineEdit(str(series.get('label') or ''), self._host)
-        label.setPlaceholderText("Legend name (optional)")
+        label = _multiline_text_field(
+            str(series.get("label") or ""),
+            self._host,
+            lines=2,
+            placeholder="Legend name (optional)",
+        )
         label.editingFinished.connect(
             lambda wid=item["id"], sid=series_id, w=label: self._set_graph_series(wid, sid, rebuild=True, label=w.text())
         )
@@ -3785,7 +4282,25 @@ class OverlayInspector(QtWidgets.QWidget):
             label="Remove",
             callback=lambda _btn=None, wid=item["id"], sid=series_id: self._remove_graph_series(wid, sid),
         )
-        form.addRow("", remove)
+        clear = Buttons.getClearWidget(
+            callback=lambda _btn=None, wid=item["id"], sid=series_id: self._set_graph_series(
+                wid,
+                sid,
+                rebuild=True,
+                device_guid="",
+                device_name="",
+                vjoy_id=0,
+                input_id=0,
+            )
+        )
+        actions = QtWidgets.QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        if listen is not None:
+            actions.addWidget(listen)
+        actions.addWidget(clear)
+        actions.addWidget(remove)
+        actions.addStretch(1)
+        form.addRow("", actions)
         return box
 
     def _set_graph_series(self, widget_id: str, series_id: str, rebuild: bool = False, **fields):
@@ -3834,19 +4349,25 @@ class OverlayInspector(QtWidgets.QWidget):
         self._update(widget_id, series=next_series)
         self.rebuild()
 
-    def _listen_graph_series(self, item: dict, series_id: str):
+    def _listen_graph_series(self, item: dict, series_id: str, virtual_only: bool = False):
         def _captured(event):
             if not self._is_alive():
                 return
             if event.event_type != InputType.JoystickAxis:
                 return
             device = gremlin.joystick_handling.getDevice(event.device_guid, show_error=False)
+            if device is not None and getattr(device, "disabled", False):
+                return
             virtual = bool(getattr(device, "is_virtual", False))
+            if virtual_only and not virtual:
+                return
+            if not virtual_only and virtual:
+                return
             payload = {
                 "source": "vjoy" if virtual else "physical",
                 "device_guid": str(event.device_guid),
-                "device_name": device.name if device else str(event.device_guid),
-                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0),
+                "device_name": overlay_device_label(device) if device else str(event.device_guid),
+                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0) if virtual else 0,
                 "input_id": int(event.identifier),
             }
             self._set_graph_series(item["id"], series_id, rebuild=True, **payload)
@@ -3859,7 +4380,12 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickAxis], callback=_captured, parent=self)
+        listener = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.JoystickAxis],
+            callback=_captured,
+            virtual_only=bool(virtual_only),
+            parent=self,
+        )
         self._listen_dialog = listener
         listener.show()
 
@@ -4178,7 +4704,7 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow(title, box)
 
     def _style_label_fonts(self, form, item, widget_type: str | None = None):
-        """Font controls for the Label section; counters/stopwatches get separate caption fonts."""
+        """Font controls for the Label section; counters get separate caption fonts."""
         widget_type = canonical_widget_type(widget_type or item.get("type"))
         if widget_type == "sys_stats":
             self._style_font(form, item, title="Counter font")
@@ -4187,10 +4713,11 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(form, item, "caption_font_color", "Caption color")
             return
         if widget_type == "stopwatch":
+            # Prefer the dedicated Label / Timer sections; keep this as fallback only.
+            self._style_font(form, item, prefix="caption_", title="Label font")
+            self._style_color(form, item, "caption_font_color", "Label color")
             self._style_font(form, item, title="Timer font")
             self._style_color(form, item, "font_color", "Timer color")
-            self._style_font(form, item, prefix="caption_", title="Caption font")
-            self._style_color(form, item, "caption_font_color", "Caption color")
             return
         self._style_font(form, item)
         self._style_color(form, item, "font_color", "Font color")
@@ -4264,14 +4791,6 @@ class OverlayInspector(QtWidgets.QWidget):
         label = title
         form.addRow(label, combo)
         form.addRow(f"{label} size", style_row)
-        if not prefix:
-            self._style_bool(
-                form,
-                item,
-                "auto_scale_font",
-                "Scale font with size",
-                tooltip="Keep the same relative font size when this widget is resized.",
-            )
 
         self._style_drop_shadow(
             form,
@@ -4538,8 +5057,6 @@ class OverlayInspector(QtWidgets.QWidget):
             "binding",
             "Toggle overlay",
             force_type="button",
-            allow_none=True,
-            show_clear=True,
             show_invert=False,
             extra_hint=(
                 "While the profile is running, this page’s overlay is shown while the state is pressed and hidden while it is released."
@@ -4587,8 +5104,6 @@ class OverlayInspector(QtWidgets.QWidget):
                 "binding",
                 RUNTIME_BINDING_LABELS.get(action, action),
                 force_type="button",
-                allow_none=True,
-                show_clear=True,
                 show_invert=False,
                 form=form,
             )
@@ -4604,9 +5119,10 @@ class OverlayInspector(QtWidgets.QWidget):
             open_overlay_control_panel(self.scene, parent=self.window())
 
     def _build_binding(self, item: dict):
+        form = self._section("Bindings")
         if widget_needs_xy(item.get("type")):
-            self._build_channel(item, "binding", "Axis X", force_type="axis")
-            self._build_channel(item, "binding_y", "Axis Y", force_type="axis")
+            self._build_channel(item, "binding", "Axis X", force_type="axis", form=form)
+            self._build_channel(item, "binding_y", "Axis Y", force_type="axis", form=form)
             return
         widget_type = item.get("type")
         if widget_type == "stopwatch":
@@ -4616,15 +5132,15 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Start / stop",
                 force_type="button",
                 extra_hint="Press toggles the clock. A GEX state or mode follows the value (running while on).",
+                form=form,
             )
             self._build_channel(
                 item,
                 "binding_y",
                 "Reset",
                 force_type="button",
-                allow_none=True,
-                show_clear=True,
                 extra_hint="Optional. A press sets the counter back to zero.",
+                form=form,
             )
             return
         if widget_is_switch(widget_type):
@@ -4632,6 +5148,11 @@ class OverlayInspector(QtWidgets.QWidget):
                 "switch_4way": "Each direction is a separate button. Center is optional (some hats press it at rest).",
                 "switch_2way": "Position 1, Center, and Position 2. Center is optional. Interactive overlay latches the last press.",
                 "switch_3way": "Spring-loaded center: an Interactive overlay returns to center when you lift.",
+                "toggle": (
+                    "Bind Off and On as separate buttons or keys. "
+                    "A press of On latches On until Off is pressed (and the reverse). "
+                    "Interactive: press the left/right (or top/bottom) half to latch that side."
+                ),
             }
             rows = list(SWITCH_POSITION_TITLES.get(widget_type) or ())
             for index, (position, title) in enumerate(rows):
@@ -4640,9 +5161,8 @@ class OverlayInspector(QtWidgets.QWidget):
                     switch_channel(position),
                     title,
                     force_type="button",
-                    allow_none=True,
-                    show_clear=True,
                     extra_hint=hints.get(widget_type) if index == 0 else None,
+                    form=form,
                 )
             return
         force = None
@@ -4652,7 +5172,7 @@ class OverlayInspector(QtWidgets.QWidget):
             force = "hat"
         elif widget_type and str(widget_type).startswith("axis"):
             force = "axis"
-        self._build_channel(item, "binding", "Binding", force_type=force)
+        self._build_channel(item, "binding", "", force_type=force, form=form)
 
     def _channel_binding(self, item: dict, channel: str) -> dict:
         if channel.startswith("bindings."):
@@ -4678,9 +5198,9 @@ class OverlayInspector(QtWidgets.QWidget):
         channel: str,
         title: str,
         force_type: str | None = None,
-        allow_none: bool = False,
+        allow_none: bool = True,
         extra_hint: str | None = None,
-        show_clear: bool = False,
+        show_clear: bool = True,
         show_invert: bool = True,
         form=None,
     ):
@@ -4769,75 +5289,6 @@ class OverlayInspector(QtWidgets.QWidget):
             self._finish_channel(form, item, channel, extra_hint, show_clear)
             return
 
-        device_box = QDataComboBox()
-        if active_source == "vjoy":
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                # Store vjoy id only — DeviceSummary instances are discarded on m77 refresh.
-                device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
-            current = int(binding.get("vjoy_id") or 0)
-            for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current:
-                    device_box.setCurrentIndex(i)
-                    break
-            shown = self._device_from_combo(device_box, "vjoy")
-            if shown is not None and current <= 0:
-                payload = {
-                    "vjoy_id": int(shown.vjoy_id),
-                    "device_guid": str(shown.device_guid),
-                    "device_name": shown.name,
-                }
-                binding.update(payload)
-                wid = str(item.get("id") or "")
-                if wid.startswith("stat:"):
-                    parts = wid.split(":", 2)
-                    live = self.scene.widget_by_id(parts[1]) if len(parts) == 3 else None
-                    if live:
-                        for entry in live.get("stats") or []:
-                            if str(entry.get("id") or "") != parts[2]:
-                                continue
-                            target = entry.get(channel)
-                            if not isinstance(target, dict):
-                                target = {}
-                                entry[channel] = target
-                            target.update(payload)
-                            self.scene._dirty = True
-                            break
-                else:
-                    self._channel_binding(item, channel).update(payload)
-                    self.scene._dirty = True
-        else:
-            for dev in self._physical_joystick_devices():
-                device_box.addItem(dev.name, str(dev.device_guid))
-            current = str(binding.get("device_guid") or "")
-            for i in range(device_box.count()):
-                guid = str(device_box.itemData(i) or "")
-                if guid and guid.casefold() == current.casefold():
-                    device_box.setCurrentIndex(i)
-                    break
-
-        def _device_changed():
-            if not self._is_alive():
-                return
-            src = str(source.currentData() or "physical")
-            dev = self._device_from_combo(device_box, src)
-            if not dev:
-                return
-            payload = {"device_name": dev.name, "device_guid": str(dev.device_guid)}
-            if src == "vjoy":
-                payload["vjoy_id"] = int(dev.vjoy_id)
-            self._bind(item["id"], channel, rebuild=True, **payload)
-
-        device_box.currentIndexChanged.connect(_device_changed)
-        form.addRow("Device", device_box)
-
-        listen = Buttons.getListenWidget(
-            label="Listen...",
-            tooltip="Assign from the next matching physical or vJoy input",
-            # ListenWidget calls callback(button); keep widget dict in defaults.
-            callback=lambda _btn=None, it=item, ch=channel, kind=force_type: self._listen(it, ch, kind),
-        )
-        form.addRow("", listen)
-
         input_kind = force_type or binding.get("input_type") or "axis"
         if not force_type:
             types = ["axis", "button", "hat"]
@@ -4854,30 +5305,133 @@ class OverlayInspector(QtWidgets.QWidget):
                 binding["input_type"] = force_type
             input_kind = force_type
 
-        device = self._device_from_combo(device_box, str(source.currentData() or "physical"))
+        device_box = QDataComboBox()
+        device_box.addItem("(none)", 0 if active_source == "vjoy" else "")
+        if active_source == "vjoy":
+            for dev in overlay_vjoy_devices(input_kind):
+                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
+            current = int(binding.get("vjoy_id") or 0)
+            selected = 0
+            for i in range(device_box.count()):
+                if int(device_box.itemData(i) or 0) == current and current > 0:
+                    selected = i
+                    break
+            if selected == 0 and current > 0:
+                # Bound device not currently connected — keep it visible.
+                missing = binding.get("device_name") or f"vJoy {current}"
+                device_box.addItem(f"{missing} (missing)", current)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
+        else:
+            for dev in overlay_physical_devices(input_kind):
+                device_box.addItem(overlay_device_label(dev), str(dev.device_guid))
+            current = str(binding.get("device_guid") or "")
+            selected = 0
+            for i in range(device_box.count()):
+                guid = str(device_box.itemData(i) or "")
+                if guid and current and guid.casefold() == current.casefold():
+                    selected = i
+                    break
+            if selected == 0 and current:
+                missing = binding.get("device_name") or current
+                device_box.addItem(f"{missing} (missing)", current)
+                selected = device_box.count() - 1
+            device_box.setCurrentIndex(selected)
+
+        def _device_changed():
+            if not self._is_alive():
+                return
+            src = str(source.currentData() or "physical")
+            if src == "vjoy":
+                try:
+                    vjoy_id = int(device_box.currentData() or 0)
+                except (TypeError, ValueError):
+                    vjoy_id = 0
+                if vjoy_id <= 0:
+                    self._bind(
+                        item["id"],
+                        channel,
+                        rebuild=True,
+                        device_guid="",
+                        device_name="",
+                        vjoy_id=0,
+                        input_id=0,
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+            else:
+                guid = str(device_box.currentData() or "").strip()
+                if not guid:
+                    self._bind(
+                        item["id"],
+                        channel,
+                        rebuild=True,
+                        device_guid="",
+                        device_name="",
+                        vjoy_id=0,
+                        input_id=0,
+                    )
+                    return
+                dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
+            if not dev:
+                return
+            payload = {
+                "device_name": overlay_device_label(dev),
+                "device_guid": str(dev.device_guid),
+                "vjoy_id": int(getattr(dev, "vjoy_id", 0) or 0) if src == "vjoy" else 0,
+            }
+            self._bind(item["id"], channel, rebuild=True, **payload)
+
+        device_box.currentIndexChanged.connect(_device_changed)
+        form.addRow("Device", device_box)
+
+        listen = None
+        if active_source == "physical":
+            listen = Buttons.getListenWidget(
+                label="Listen...",
+                tooltip="Assign from the next matching physical input",
+                callback=lambda _btn=None, it=item, ch=channel, kind=input_kind: self._listen(
+                    it, ch, kind, virtual_only=False
+                ),
+            )
+
+        device = None
+        if active_source == "vjoy":
+            try:
+                vjoy_id = int(device_box.currentData() or 0)
+            except (TypeError, ValueError):
+                vjoy_id = 0
+            if vjoy_id > 0:
+                device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+        else:
+            guid = str(device_box.currentData() or "").strip()
+            if guid:
+                device = gremlin.joystick_handling.getDevice(guid, show_error=False)
+
         id_box = QDataComboBox()
         if allow_none:
             id_box.addItem("(none)", 0)
-        choices = self._input_choices(device, input_kind)
+        choices = self._input_choices(device, input_kind) if device is not None else []
         try:
             current_id = int(binding.get("input_id") or 0)
         except (TypeError, ValueError):
             current_id = 0
-        if not allow_none and current_id <= 0:
-            current_id = int(choices[0][0]) if choices else 1
+        if device is None:
+            current_id = 0
         found = False
         for axis_id, label in choices:
             id_box.addItem(label, axis_id)
-            if int(axis_id) == current_id:
+            if int(axis_id) == current_id and current_id > 0:
                 id_box.setCurrentIndex(id_box.count() - 1)
                 found = True
         if not found:
             if allow_none and current_id <= 0:
                 id_box.setCurrentIndex(0)
-                found = True
-            else:
+            elif current_id > 0:
                 id_box.addItem(f"{input_kind.capitalize()} {current_id}", current_id)
                 id_box.setCurrentIndex(id_box.count() - 1)
+            elif id_box.count() > 0:
+                id_box.setCurrentIndex(0)
         id_box.currentIndexChanged.connect(
             lambda _i, wid=item["id"], ch=channel, box=id_box, kind=input_kind: self._bind(
                 wid, ch, input_type=kind, input_id=int(box.currentData() if box.currentData() is not None else 0)
@@ -4885,22 +5439,33 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("Axis" if input_kind == "axis" else input_kind.capitalize(), id_box)
 
-        if show_invert:
+        if show_invert and input_kind == "axis":
             inv = QtWidgets.QCheckBox(self._host)
             inv.setChecked(bool(binding.get("invert")))
             inv.toggled.connect(lambda v, wid=item["id"], ch=channel: self._bind(wid, ch, invert=v))
             form.addRow("Invert", inv)
 
-        hint = QtWidgets.QLabel(self._channel_summary(binding, input_kind), self._host)
-        hint.setWordWrap(True)
-        form.addRow("Assigned", hint)
-        self._finish_channel(form, item, channel, extra_hint, show_clear)
+        self._finish_channel(form, item, channel, extra_hint, show_clear, listen_widget=listen)
 
-    def _finish_channel(self, form, item: dict, channel: str, extra_hint: str | None, show_clear: bool):
+    def _finish_channel(
+        self,
+        form,
+        item: dict,
+        channel: str,
+        extra_hint: str | None,
+        show_clear: bool,
+        listen_widget=None,
+    ):
         if extra_hint:
             note = QtWidgets.QLabel(extra_hint, self._host)
             note.setWordWrap(True)
             form.addRow(note)
+        if listen_widget is None and not show_clear:
+            return
+        actions = QtWidgets.QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        if listen_widget is not None:
+            actions.addWidget(listen_widget)
         if show_clear:
             clear = Buttons.getClearWidget(
                 callback=lambda _btn=None, wid=item["id"], ch=channel: self._bind(
@@ -4918,7 +5483,9 @@ class OverlayInspector(QtWidgets.QWidget):
                     keys=[],
                 )
             )
-            form.addRow("", clear)
+            actions.addWidget(clear)
+        actions.addStretch(1)
+        form.addRow("", actions)
 
     def _input_choices(self, device, input_kind: str) -> list[tuple[int, str]]:
         if input_kind == "axis":
@@ -4942,46 +5509,15 @@ class OverlayInspector(QtWidgets.QWidget):
                 choices.append((int(axis_id), label))
             if choices:
                 return choices
-            count = int(getattr(device, "axis_count", 0) or 0) if device else 8
-            for i in range(1, max(1, count) + 1):
-                try:
-                    axis_name = gremlin.joystick_handling.get_axis_name(i)
-                except Exception:
-                    axis_name = str(i)
-                choices.append((i, f"Axis {i} ({axis_name})"))
-            return choices or [(1, "Axis 1 (X)"), (2, "Axis 2 (Y)")]
+            count = int(getattr(device, "axis_count", 0) or 0) if device else 0
+            return [(i, f"Axis {i}") for i in range(1, count + 1)]
         if input_kind == "button":
-            count = int(getattr(device, "button_count", 0) or 0) if device else 16
-            return [(i, f"Button {i}") for i in range(1, max(1, count) + 1)]
-        count = int(getattr(device, "hat_count", 0) or 0) if device else 4
-        return [(i, f"Hat {i}") for i in range(1, max(1, count) + 1)]
+            count = int(getattr(device, "button_count", 0) or 0) if device else 0
+            return [(i, f"Button {i}") for i in range(1, count + 1)]
+        count = int(getattr(device, "hat_count", 0) or 0) if device else 0
+        return [(i, f"Hat {i}") for i in range(1, count + 1)]
 
-    def _channel_summary(self, binding: dict, input_kind: str) -> str:
-        source = binding.get("source") or "physical"
-        if source == "state":
-            state = find_overlay_state(binding.get("state_id"), binding.get("state_name"))
-            return (state.key if state is not None else binding.get("state_name")) or "(none)"
-        if source == "mode":
-            _mid, name = resolve_overlay_mode(binding.get("mode_id"), binding.get("mode_name"))
-            return name or binding.get("mode_name") or "(none)"
-        if source in ("keyboard", "keyboard/mouse", "mouse"):
-            names = []
-            for raw in binding.get("keys") or []:
-                key = deserialize_overlay_key(raw)
-                if key is None:
-                    continue
-                names.append(gremlin.keyboard.KeyMap.get_name(key) or str(key.name or ""))
-            return " + ".join(n for n in names if n) or "(none)"
-        try:
-            input_id = int(binding.get("input_id") or 0)
-        except (TypeError, ValueError):
-            input_id = 0
-        if input_id <= 0:
-            return "(none)"
-        name = binding.get("device_name") or "—"
-        return f"{name}  {input_kind.capitalize()} {input_id}"
-
-    def _listen(self, item: dict, channel: str = "binding", force_type: str | None = None):
+    def _listen(self, item: dict, channel: str = "binding", force_type: str | None = None, virtual_only: bool = False):
         types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
         widget_type = item.get("type")
         if force_type == "axis" or (widget_type and str(widget_type).startswith("axis")):
@@ -5000,11 +5536,18 @@ class OverlayInspector(QtWidgets.QWidget):
             elif event.event_type == InputType.JoystickHat:
                 input_type = "hat"
             device = gremlin.joystick_handling.getDevice(event.device_guid, show_error=False)
+            if device is not None and getattr(device, "disabled", False):
+                return
+            is_virtual = bool(getattr(device, "is_virtual", False))
+            if virtual_only and not is_virtual:
+                return
+            if not virtual_only and is_virtual:
+                return
             payload = {
-                "source": "vjoy" if getattr(device, "is_virtual", False) else "physical",
+                "source": "vjoy" if is_virtual else "physical",
                 "device_guid": str(event.device_guid),
-                "device_name": device.name if device else str(event.device_guid),
-                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0),
+                "device_name": overlay_device_label(device) if device else str(event.device_guid),
+                "vjoy_id": int(getattr(device, "vjoy_id", 0) or 0) if is_virtual else 0,
                 "input_type": input_type,
                 "input_id": int(event.identifier),
             }
@@ -5018,34 +5561,14 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget(types, callback=_captured, parent=self)
+        listener = gremlin.ui.ui_common.InputListenerWidget(
+            types,
+            callback=_captured,
+            virtual_only=bool(virtual_only),
+            parent=self,
+        )
         self._listen_dialog = listener
         listener.show()
-
-    @staticmethod
-    def _physical_joystick_devices():
-        """Physical HID joysticks only — not Keyboard/State/OSC/Stream Deck/etc."""
-        devices = gremlin.joystick_handling.getPhysicalDevices() or []
-        return sorted(devices, key=lambda d: (d.name or "").casefold())
-
-    def _device_from_combo(self, device_box: QtWidgets.QComboBox, source: str):
-        """Resolve a live DeviceSummary from combo itemData (guid or vjoy id)."""
-        data = device_box.currentData()
-        if source == "vjoy":
-            try:
-                vjoy_id = int(data or 0)
-            except (TypeError, ValueError):
-                return None
-            if vjoy_id <= 0:
-                return None
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                if int(getattr(dev, "vjoy_id", 0) or 0) == vjoy_id:
-                    return dev
-            return None
-        guid = str(data or "").strip()
-        if not guid:
-            return None
-        return gremlin.joystick_handling.getDevice(guid, show_error=False)
 
     def _update(self, widget_id: str, **fields):
         if self._building:
@@ -5065,12 +5588,6 @@ class OverlayInspector(QtWidgets.QWidget):
     def _bind(self, widget_id: str, channel: str = "binding", rebuild: bool = False, **fields):
         if self._building:
             return
-        if (fields.get("source") or "").casefold() == "vjoy" and not int(fields.get("vjoy_id") or 0):
-            devices = gremlin.joystick_handling.vjoy_devices(connected_only=False) or []
-            if devices:
-                fields["vjoy_id"] = int(devices[0].vjoy_id)
-                fields.setdefault("device_guid", str(devices[0].device_guid))
-                fields.setdefault("device_name", devices[0].name)
         if str(widget_id).startswith("stat:"):
             parts = str(widget_id).split(":", 2)
             if len(parts) == 3:

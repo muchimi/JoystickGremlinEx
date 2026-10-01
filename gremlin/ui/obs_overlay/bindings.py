@@ -52,6 +52,86 @@ def _warn_once(key: str, message: str):
         pass
 
 
+def overlay_input_types_for_kind(input_kind: str | None):
+    """Map overlay binding kinds to GEX InputType lists (JoystickSelector / listen)."""
+    from gremlin.input_types import InputType
+
+    kind = (input_kind or "").casefold()
+    if kind == "axis":
+        return [InputType.JoystickAxis]
+    if kind == "button":
+        return [InputType.JoystickButton]
+    if kind == "hat":
+        return [InputType.JoystickHat]
+    return [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
+
+
+def _device_has_input_types(device, valid_types) -> bool:
+    from gremlin.input_types import InputType
+
+    counts = {
+        InputType.JoystickAxis: int(getattr(device, "axis_count", 0) or 0),
+        InputType.JoystickButton: int(getattr(device, "button_count", 0) or 0),
+        InputType.JoystickHat: int(getattr(device, "hat_count", 0) or 0),
+    }
+    return any(counts.get(input_type, 0) > 0 for input_type in valid_types)
+
+
+def overlay_physical_devices(input_kind: str | None = None):
+    """Connected, enabled *physical* joysticks only (never vJoy / Maestro)."""
+    from gremlin.types import DeviceType
+
+    valid_types = overlay_input_types_for_kind(input_kind)
+    devices = []
+    seen: set[str] = set()
+    for dev in sorted(
+        gremlin.joystick_handling.joystick_devices() or [],
+        key=lambda x: ((x.name or "").casefold(), str(getattr(x, "device_guid", ""))),
+    ):
+        if getattr(dev, "is_virtual", False):
+            continue
+        if getattr(dev, "device_type", None) != DeviceType.Joystick:
+            continue
+        if getattr(dev, "disabled", False):
+            continue
+        if not getattr(dev, "connected", True):
+            continue
+        guid = str(getattr(dev, "device_guid", "") or "")
+        if guid and guid in seen:
+            continue
+        if guid:
+            seen.add(guid)
+        if not _device_has_input_types(dev, valid_types):
+            continue
+        devices.append(dev)
+    return devices
+
+
+def overlay_vjoy_devices(input_kind: str | None = None):
+    """Connected, enabled vJoy devices only."""
+    valid_types = overlay_input_types_for_kind(input_kind)
+    devices = []
+    for dev in sorted(
+        gremlin.joystick_handling.vjoy_devices(connected_only=True) or [],
+        key=lambda x: int(getattr(x, "vjoy_id", 0) or 0),
+    ):
+        if getattr(dev, "disabled", False):
+            continue
+        if not getattr(dev, "connected", True):
+            continue
+        if not _device_has_input_types(dev, valid_types):
+            continue
+        devices.append(dev)
+    return devices
+
+
+def overlay_device_label(device) -> str:
+    """Stable display name for a device summary."""
+    if device is None:
+        return ""
+    return str(getattr(device, "name", "") or "")
+
+
 def current_profile_mode() -> str:
     """Active edit mode, or runtime mode while the profile is running."""
     try:
@@ -579,9 +659,18 @@ def binding_is_configured(binding: dict[str, Any] | None) -> bool:
     if source in ("keyboard", "keyboard/mouse", "mouse") or kind == "keyboard":
         return bool(binding.get("keys"))
     try:
-        return int(binding.get("input_id") or 0) > 0
+        if int(binding.get("input_id") or 0) <= 0:
+            return False
     except (TypeError, ValueError):
         return False
+    if source == "vjoy":
+        try:
+            if int(binding.get("vjoy_id") or 0) > 0:
+                return True
+        except (TypeError, ValueError):
+            pass
+        return bool(str(binding.get("device_guid") or "").strip())
+    return bool(str(binding.get("device_guid") or "").strip())
 
 
 def _vjoy_target(binding: dict[str, Any] | None) -> tuple[int, Any]:
@@ -615,9 +704,10 @@ def _vjoy_target(binding: dict[str, Any] | None) -> tuple[int, Any]:
             return vjoy_id, device
     if (binding.get("source") or "").casefold() == "vjoy":
         try:
-            devices = gremlin.joystick_handling.vjoy_devices(connected_only=False) or []
+            devices = gremlin.joystick_handling.vjoy_devices(connected_only=True) or []
         except Exception:
             devices = []
+        devices = [dev for dev in devices if not getattr(dev, "disabled", False) and getattr(dev, "connected", True)]
         if devices:
             device = devices[0]
             try:
@@ -630,13 +720,15 @@ def _vjoy_target(binding: dict[str, Any] | None) -> tuple[int, Any]:
 
 
 def binding_is_writable(binding: dict[str, Any] | None) -> bool:
-    """True when touch may write this binding (vJoy or GEX state, never physical)."""
+    """True when touch may write this binding (vJoy, GEX state/mode, or keyboard)."""
     if not binding_is_configured(binding):
         return False
     if binding_source(binding) == "state":
         return True
     if binding_source(binding) == "mode":
         return True
+    if binding_source(binding) == "keyboard":
+        return bool(overlay_keys_from_binding(binding))
     return vjoy_binding_writable(binding)
 
 
@@ -747,6 +839,11 @@ def widget_accepts_touch(item: dict[str, Any] | None) -> bool:
     if not item or not widget_is_live_visible(item):
         return False
     widget_type = item.get("type")
+    if widget_type == "input_display":
+        # Virtual keyboard / mouse pad — injects OS key/mouse events while Interactive.
+        from .input_display import overlay_keys_from_item
+
+        return bool(overlay_keys_from_item(item))
     if widget_type in NO_BINDING_WIDGET_TYPES:
         return False
     if widget_type == "stopwatch":
@@ -760,6 +857,41 @@ def widget_accepts_touch(item: dict[str, Any] | None) -> bool:
     if widget_needs_xy(widget_type):
         return vjoy_binding_writable(binding_for_axis(item, "x")) or vjoy_binding_writable(binding_for_axis(item, "y"))
     return vjoy_binding_writable(item.get("binding"))
+
+
+def write_input_display_key(key, pressed: bool) -> bool:
+    """Inject a keyboard or mouse event for an input_display keycap."""
+    if key is None:
+        return False
+    try:
+        from gremlin.macro import _send_key_down, _send_key_up
+        from gremlin.types import MouseButton
+    except Exception as err:
+        _warn_once("input-display-import", f"OBS OVERLAY: input_display inject unavailable: {err}")
+        return False
+    try:
+        button = getattr(key, "mouse_button", None)
+        # Wheel / double-click: fire on press only (macro treats release as no-op for those).
+        if button in (
+            MouseButton.WheelUp,
+            MouseButton.WheelDown,
+            MouseButton.WheelLeft,
+            MouseButton.WheelRight,
+            MouseButton.DoubleLeft,
+            MouseButton.DoubleRight,
+            MouseButton.DoubleMiddle,
+        ):
+            if pressed:
+                _send_key_down(key)
+            return True
+        if pressed:
+            _send_key_down(key)
+        else:
+            _send_key_up(key)
+        return True
+    except Exception as err:
+        _warn_once(f"input-display:{getattr(key, 'name', '?')}", f"OBS OVERLAY: input_display inject failed: {err}")
+        return False
 
 
 def _clamp_axis(value: float) -> float:
@@ -820,6 +952,15 @@ def write_button(binding: dict[str, Any] | None, pressed: bool) -> bool:
         if not fallback or fallback == name or fallback not in names:
             fallback = next((choice[1] for choice in profile_mode_choices() if choice[1] != name), name)
         return _set_profile_mode(fallback)
+    if source == "keyboard":
+        keys = overlay_keys_from_binding(binding)
+        if not keys:
+            return False
+        ok = False
+        for key in keys:
+            if write_input_display_key(key, bool(pressed)):
+                ok = True
+        return ok
     try:
         input_id = int(binding.get("input_id") or 0)
     except (TypeError, ValueError):
@@ -864,9 +1005,46 @@ def _switch_position_pressed(binding: dict[str, Any] | None) -> bool:
     return bool(pressed)
 
 
+# Latched 2-position toggle: last rising-edge side sticks until the other side fires.
+_toggle_latch: dict[str, str] = {}
+_toggle_prev_pressed: dict[str, tuple[bool, bool]] = {}
+
+
+def set_toggle_latch(widget_id: str | None, position: str | None):
+    """Force the sticky On/Off state (Interactive press or external sync)."""
+    wid = str(widget_id or "")
+    if not wid:
+        return
+    pos = "on" if str(position or "").casefold() == "on" else "off"
+    _toggle_latch[wid] = pos
+
+
+def read_toggle_latched(item: dict[str, Any] | None) -> str:
+    """Sticky off/on from rising edges of the Off and On bindings."""
+    if not item:
+        return "off"
+    wid = str(item.get("id") or "")
+    off_pressed = _switch_position_pressed(switch_binding(item, "off"))
+    on_pressed = _switch_position_pressed(switch_binding(item, "on"))
+    prev_off, prev_on = _toggle_prev_pressed.get(wid, (False, False))
+    latched = _toggle_latch.get(wid, "off")
+    # Rising edge of On → stay On; rising edge of Off → stay Off.
+    # If both rise in the same poll, Off wins so it can cancel.
+    if on_pressed and not prev_on:
+        latched = "on"
+    if off_pressed and not prev_off:
+        latched = "off"
+    _toggle_prev_pressed[wid] = (off_pressed, on_pressed)
+    if wid:
+        _toggle_latch[wid] = latched
+    return latched
+
+
 def read_switch_position(item: dict[str, Any] | None) -> str:
     """Active switch slot, or empty string when idle (spring rest is not lit)."""
     widget_type = (item or {}).get("type")
+    if widget_type == "toggle":
+        return read_toggle_latched(item)
     rest = switch_rest_position(widget_type)
     for position in switch_positions(widget_type):
         if position == rest:
@@ -1131,8 +1309,7 @@ class OverlayValueBus(QtCore.QObject):
             self._widget_sources.pop(id(source), None)
         self._refcount = max(0, self._refcount - 1)
         if self._refcount == 0:
-            # Last live listener — flush tallies synchronously (hide/quit can
-            # kill the event loop before save_later's timer fires).
+            # Last live listener — flush any pending counter tallies to the sidecar.
             try:
                 from .sys_stats import ManualCounterTracker
                 from gremlin.ui.obs_overlay import OverlayManager
@@ -1144,8 +1321,7 @@ class OverlayValueBus(QtCore.QObject):
                     dirty = True
                 if dirty:
                     scene._dirty = True
-                if scene.dirty:
-                    scene.save_now()
+                    scene.save_to_profile()
             except Exception:
                 pass
             self._widget_sources.clear()
@@ -1306,7 +1482,7 @@ class OverlayValueBus(QtCore.QObject):
             self.values_changed.emit(changed_ids)
 
     def _persist_manual_counters(self):
-        """Write manual tallies into the scene and schedule a profile sidecar save."""
+        """Copy manual tallies into the scene and write the profile JSON sidecar."""
         try:
             from gremlin.ui.obs_overlay import OverlayManager
             from .sys_stats import ManualCounterTracker
@@ -1314,7 +1490,14 @@ class OverlayValueBus(QtCore.QObject):
             scene = OverlayManager().scene
             ManualCounterTracker().sync_into_scene(scene)
             scene._dirty = True
-            scene.save_later()
+            # Counters are runtime state — persist immediately so a crash/quit
+            # does not lose tallies. Designer layout still waits for profile save.
+            if not scene.save_to_profile():
+                import logging
+
+                logging.getLogger("system").warning(
+                    "OBS OVERLAY: manual counter changed but profile sidecar was not written"
+                )
         except Exception as err:
             try:
                 import logging

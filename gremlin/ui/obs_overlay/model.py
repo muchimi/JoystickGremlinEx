@@ -171,6 +171,7 @@ WIDGET_TYPES = (
     "switch_4way",
     "switch_2way",
     "switch_3way",
+    "toggle",
     "label",
     "sys_stats",
     "stopwatch",
@@ -190,6 +191,7 @@ PALETTE_TYPES = (
     "switch_4way",
     "switch_2way",
     "switch_3way",
+    "toggle",
     "axis_bar",
     "axis_radio",
     "axis_fader",
@@ -214,7 +216,7 @@ PALETTE_TYPES = (
 )
 
 PALETTE_GROUPS = (
-    ("Buttons", ("button", "hat", "switch_4way", "switch_2way", "switch_3way")),
+    ("Buttons", ("button", "toggle", "hat", "switch_4way", "switch_2way", "switch_3way")),
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
@@ -236,6 +238,7 @@ DEFAULT_SIZES = {
     "axis_crosshair": (220, 220),
     "axis_mouse": (180, 180),
     "button": (88, 32),
+    "toggle": (88, 32),
     "hat": (108, 108),
     "switch_4way": (120, 120),
     "switch_2way": (100, 100),
@@ -267,6 +270,7 @@ DEFAULT_LABELS = {
     "axis_crosshair": "",
     "axis_mouse": "",
     "button": "BTN",
+    "toggle": "",
     "hat": "",
     "switch_4way": "",
     "switch_2way": "",
@@ -519,6 +523,22 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_path": "",
                 "image_path_on": "",
                 "image_keep_aspect": True,
+            }
+        )
+    elif widget_type == "toggle":
+        style.update(
+            {
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "border_width": 2.0,
+                # Large radius clamps to half the short side → pill like other rounded widgets.
+                "corner_radius": 100.0,
+                "indicator": "#e8eaed",
+                "indicator_shape": "circle",
+                "orientation": "horizontal",
+                "show_label": False,
             }
         )
     elif widget_type == "hat":
@@ -779,19 +799,22 @@ NO_BINDING_WIDGET_TYPES = (
 )
 NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
     "stopwatch",
+    "toggle",
     "switch_4way",
     "switch_2way",
     "switch_3way",
 )
 
-SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way")
+SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way", "toggle")
 SWITCH_4WAY_POSITIONS = ("n", "e", "s", "w", "center")
 SWITCH_2WAY_POSITIONS = ("a", "center", "b")
 SWITCH_3WAY_POSITIONS = ("up", "center", "down")
+SWITCH_TOGGLE_POSITIONS = ("off", "on")
 SWITCH_POSITION_TITLES = {
     "switch_4way": (("n", "North"), ("e", "East"), ("s", "South"), ("w", "West"), ("center", "Center")),
     "switch_2way": (("a", "North / Position 1"), ("center", "Center"), ("b", "South / Position 2")),
     "switch_3way": (("up", "Up"), ("center", "Center"), ("down", "Down")),
+    "toggle": (("off", "Off / Position 1"), ("on", "On / Position 2")),
 }
 _SWITCH_POSITION_ALIASES = {
     "a": "up",
@@ -800,6 +823,8 @@ _SWITCH_POSITION_ALIASES = {
     "down": "b",
     "n": "up",
     "s": "down",
+    "off": "a",
+    "on": "b",
 }
 
 
@@ -819,6 +844,8 @@ def switch_positions(widget_type: str | None) -> tuple[str, ...]:
         return SWITCH_2WAY_POSITIONS
     if kind == "switch_3way":
         return SWITCH_3WAY_POSITIONS
+    if kind == "toggle":
+        return SWITCH_TOGGLE_POSITIONS
     return ()
 
 
@@ -978,7 +1005,8 @@ def normalize_overlay_keys(raw) -> list[dict[str, Any]]:
     return keys
 
 
-def default_binding(axis_id: int = 1) -> dict[str, Any]:
+def default_binding(axis_id: int = 0) -> dict[str, Any]:
+    """Empty binding by default — no device or input until the user assigns one."""
     return {
         "source": "physical",
         "device_guid": "",
@@ -1211,7 +1239,7 @@ def bars_value_range(item: dict[str, Any] | None) -> tuple[float, float]:
 
 
 def default_toggle_binding() -> dict[str, Any]:
-    binding = default_binding(1)
+    binding = default_binding()
     binding["input_type"] = "button"
     binding["input_id"] = 0
     return binding
@@ -1431,6 +1459,9 @@ def default_canvas() -> dict[str, Any]:
         "capture_width": 1280,
         "capture_height": 720,
         "guides": [],
+        "ws_port": 9100,
+        "ws_fit_mode": "contain",
+        "ws_device_preset": "custom",
     }
 
 
@@ -1447,6 +1478,44 @@ def default_page(name: str = "Overlay") -> dict[str, Any]:
 
 
 DEFAULT_GUIDE_COLOR = "#c44cff"
+
+# Preferred LAN port for overlay websocket HTTP; WS uses preferred+1 (or next free).
+WS_DEFAULT_PORT = 9100
+WS_RESERVED_PORTS = frozenset({6012, 6013, 8000, 8001, 9020})
+
+# Logical canvas size hints for tablet / phone browsing (id, label, width, height).
+WS_DEVICE_PRESETS: tuple[tuple[str, str, int | None, int | None], ...] = (
+    ("custom", "Custom (canvas size)", None, None),
+    ("ipad_land", "iPad landscape", 1180, 820),
+    ("ipad_port", "iPad portrait", 820, 1180),
+    ("iphone_land", "iPhone landscape", 844, 390),
+    ("iphone_port", "iPhone portrait", 390, 844),
+    ("android_tab", "Android tablet", 1280, 800),
+    ("android_phone", "Android phone", 412, 915),
+)
+
+
+def normalize_ws_fit_mode(value) -> str:
+    mode = str(value or "contain").casefold().strip()
+    if mode in ("cover", "stretch", "contain"):
+        return mode
+    if mode in ("auto", "auto-adjust", "fit"):
+        return "contain"
+    return "contain"
+
+
+def normalize_ws_device_preset(value) -> str:
+    raw = str(value or "custom").casefold().strip()
+    known = {row[0] for row in WS_DEVICE_PRESETS}
+    return raw if raw in known else "custom"
+
+
+def ws_preset_size(preset_id: str) -> tuple[int, int] | None:
+    pid = normalize_ws_device_preset(preset_id)
+    for ident, _label, width, height in WS_DEVICE_PRESETS:
+        if ident == pid and width and height:
+            return int(width), int(height)
+    return None
 
 
 def normalize_guides(canvas: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -1475,12 +1544,18 @@ def normalize_background_mode(value) -> str:
     mode = str(value or "windowed").casefold().replace("_", "-").replace(" ", "-")
     if mode in ("onscreen", "on-screen"):
         return "onscreen"
+    if mode in ("websocket", "web-socket", "ws"):
+        return "websocket"
     # Legacy names: chroma / image → windowed capture window.
     return "windowed"
 
 
 def is_onscreen_mode(canvas: dict[str, Any] | None) -> bool:
     return normalize_background_mode((canvas or {}).get("background_mode")) == "onscreen"
+
+
+def is_websocket_mode(canvas: dict[str, Any] | None) -> bool:
+    return normalize_background_mode((canvas or {}).get("background_mode")) == "websocket"
 
 
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
@@ -1553,8 +1628,8 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "group": "",
         "style": default_style(widget_type),
         "blink": default_blink(),
-        "binding": default_binding(1),
-        "binding_y": default_binding(2),
+        "binding": default_binding(),
+        "binding_y": default_binding(),
         "bindings": {},
         "points": [],
         "series": [],
@@ -1574,6 +1649,10 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
     if widget_type == "stopwatch":
         item["binding"] = default_toggle_binding()
         item["binding_y"] = default_toggle_binding()
+    elif widget_type == "button":
+        item["binding"]["input_type"] = "button"
+    elif widget_type == "hat":
+        item["binding"]["input_type"] = "hat"
     if widget_type in SWITCH_WIDGET_TYPES:
         item["bindings"] = default_switch_bindings(widget_type)
     if widget_type == "shape":
@@ -1695,18 +1774,14 @@ class OverlayScene(QtCore.QObject):
         self._bind_identity_hooks()
         self._ensure_control_target()
 
-        # Hook sidecar updates so profile save requests persist overlay JSON.
+        # Overlay layout is persisted only when the GEX profile is saved
+        # (see persist_for_profile). Do not auto-write the sidecar on edits.
         el = gremlin.event_handler.EventListener()
         el.update_sidecar.connect(self._handle_save_sidecar)
 
     def _handle_save_sidecar(self):
-        """Persist overlay into the profile JSON sidecar (obs_overlay key).
-
-        Must not write only to *.overlay.json — load reads profile.json, so a
-        sidecar-only write looks saved in-session but is lost after restart.
-        """
-        if not self.save_to_profile():
-            syslog.warning("OBS OVERLAY: update_sidecar did not write the layout to the profile JSON")
+        """Sidecar flush is profile-save only — keep overlay edits in memory."""
+        return
 
     def _bind_identity_hooks(self):
         """Keep overlay state/mode names in sync with JG Ex unique IDs."""
@@ -1794,6 +1869,13 @@ class OverlayScene(QtCore.QObject):
         canvas["attach_to_window"] = bool(canvas.get("attach_to_window"))
         canvas["attach_window_title"] = str(canvas.get("attach_window_title") or "").strip()
         canvas["attach_window_exe"] = str(canvas.get("attach_window_exe") or "").strip()
+        try:
+            port = int(canvas.get("ws_port") if canvas.get("ws_port") is not None else WS_DEFAULT_PORT)
+        except (TypeError, ValueError):
+            port = WS_DEFAULT_PORT
+        canvas["ws_port"] = max(1024, min(65534, port))
+        canvas["ws_fit_mode"] = normalize_ws_fit_mode(canvas.get("ws_fit_mode"))
+        canvas["ws_device_preset"] = normalize_ws_device_preset(canvas.get("ws_device_preset"))
         normalize_guides(canvas)
         return canvas
 
@@ -1951,13 +2033,6 @@ class OverlayScene(QtCore.QObject):
         page["name"] = label
         self._dirty = True
         self._emit()
-        # Persist immediately: activate/deactivate can reload the profile sidecar
-        # and would otherwise wipe an in-memory-only rename.
-        try:
-            if profile_xml_path():
-                self.save_to_profile()
-        except Exception as err:
-            syslog.warning(f"OBS OVERLAY: page rename autosave failed: {err}")
         return True
 
     def set_page_visible(self, visible: bool, page_id: str | None = None) -> bool:
@@ -2164,6 +2239,36 @@ class OverlayScene(QtCore.QObject):
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
             if widget_type in ("switch_4way", "switch_2way"):
                 style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
+            if widget_type == "toggle":
+                # Migrate older single-binding toggles onto the On position.
+                legacy = raw.get("binding")
+                on_bind = item["bindings"].get("on") if isinstance(item.get("bindings"), dict) else None
+                if isinstance(legacy, dict) and legacy and not (
+                    isinstance(on_bind, dict) and (on_bind.get("device_guid") or on_bind.get("source") in ("state", "mode", "keyboard"))
+                ):
+                    item["bindings"]["on"] = normalize_toggle_binding(legacy)
+                # First-ship cyan/silver palette → same housing/accent as other switches.
+                _legacy_toggle = {
+                    "fill": "#1a1d22",
+                    "fill_on": "#2a3548",
+                    "border": "#c8d0dc",
+                    "border_on": "#c8d0dc",
+                    "indicator": "#9fd6ff",
+                }
+                if all(str(style.get(k) or "").casefold() == v for k, v in _legacy_toggle.items()):
+                    style.update(
+                        {
+                            "fill": "#1a2230",
+                            "fill_on": "#ff6b35",
+                            "border": "#3a4a62",
+                            "border_on": "#ffcc66",
+                            "border_width": 2.0,
+                            "corner_radius": 100.0,
+                            "indicator": "#e8eaed",
+                        }
+                    )
+                style.setdefault("corner_radius", 100.0)
+                style.setdefault("indicator_shape", "circle")
         else:
             item["bindings"] = {}
         if widget_type == "shape":
@@ -2187,11 +2292,11 @@ class OverlayScene(QtCore.QObject):
     def _normalize_bindings(self, widget_type: str, raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
         raw_x = dict(raw.get("binding") or {})
         raw_y = raw.get("binding_y")
-        x = default_binding(1)
+        x = default_binding()
         x.update(raw_x)
         legacy_y_id = x.pop("input_id_y", None)
         legacy_y_inv = x.pop("invert_y", None)
-        y = default_binding(2)
+        y = default_binding()
         if isinstance(raw_y, dict) and raw_y:
             y.update(raw_y)
             y.pop("input_id_y", None)
@@ -2201,7 +2306,11 @@ class OverlayScene(QtCore.QObject):
                 if x.get(key) not in (None, ""):
                     y[key] = x.get(key)
             y["input_type"] = "axis"
-            y["input_id"] = int(legacy_y_id or y.get("input_id") or 2)
+            if legacy_y_id is not None:
+                try:
+                    y["input_id"] = int(legacy_y_id)
+                except (TypeError, ValueError):
+                    y["input_id"] = 0
             y["invert"] = bool(legacy_y_inv)
         for binding in (x, y):
             if str(binding.get("source") or "").casefold() in ("keyboard", "keyboard/mouse", "mouse"):
@@ -2295,9 +2404,16 @@ class OverlayScene(QtCore.QObject):
         self._emit()
 
     def widget_by_id(self, widget_id: str, page_id: str | None = None) -> dict[str, Any] | None:
-        for item in self.widgets_for(page_id):
-            if item["id"] == widget_id:
-                return item
+        if page_id is not None:
+            for item in self.widgets_for(page_id):
+                if item.get("id") == widget_id:
+                    return item
+            return None
+        # Ids are unique across the scene — search every page.
+        for page in self.pages or []:
+            for item in page.get("widgets") or []:
+                if item.get("id") == widget_id:
+                    return item
         return None
 
     def sorted_widgets(self, page_id: str | None = None) -> list[dict[str, Any]]:
@@ -2448,24 +2564,27 @@ class OverlayScene(QtCore.QObject):
             if widget_type in ("switch_4way", "switch_2way"):
                 new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
             if old_kind == "button":
-                first = next(iter(switch_positions(widget_type)), None)
-                if first:
-                    item["bindings"][first] = normalize_toggle_binding(saved_binding)
+                if widget_type == "toggle":
+                    item["bindings"]["on"] = normalize_toggle_binding(saved_binding)
+                else:
+                    first = next(iter(switch_positions(widget_type)), None)
+                    if first:
+                        item["bindings"][first] = normalize_toggle_binding(saved_binding)
         elif old_kind == "switch":
             item["bindings"] = {}
         if new_kind == "none" or old_kind == new_kind:
             return
         if {old_kind, new_kind} <= {"axis", "xy"}:
-            binding = item.get("binding") or default_binding(1)
+            binding = item.get("binding") or default_binding()
             if binding.get("input_type") != "axis":
-                item["binding"] = default_binding(1)
+                item["binding"] = default_binding()
             if new_kind == "xy":
                 y = item.get("binding_y")
                 if not isinstance(y, dict) or not y:
-                    item["binding_y"] = default_binding(2)
+                    item["binding_y"] = default_binding()
             return
-        item["binding"] = default_binding(1)
-        item["binding_y"] = default_binding(2)
+        item["binding"] = default_binding()
+        item["binding_y"] = default_binding()
         if new_kind == "button":
             item["binding"]["input_type"] = "button"
             if widget_type == "stopwatch":
@@ -3610,11 +3729,13 @@ class OverlayScene(QtCore.QObject):
             return False
 
     def save(self, path: str | None = None) -> bool:
+        """Export to an explicit path, or persist with the GEX profile save path."""
         if path:
             return self._write_json_file(path, self.to_dict())
         return self.save_to_profile()
 
     def save_to_profile(self, profile=None, dest_xml: str | None = None) -> bool:
+        """Write overlay into the profile JSON. Call only from profile save / export."""
         profile = profile or gremlin.shared_state.current_profile
         path = dest_xml or profile_xml_path(profile)
         if not path:
@@ -3660,12 +3781,21 @@ class OverlayScene(QtCore.QObject):
             syslog.info(f"OBS OVERLAY: saved layout {gremlin.util.toUrl(self._path)}")
         return ok
 
+    def _sync_runtime_into_scene(self):
+        """Pull live tallies into the scene dict without writing disk."""
+        try:
+            from .sys_stats import ManualCounterTracker
+
+            if ManualCounterTracker().sync_into_scene(self):
+                self._dirty = True
+        except Exception:
+            pass
+
     def save_later(self):
-        """Persist after the current Qt event finishes. Never call save() from hideEvent.
+        """Keep overlay edits in memory only — disk write happens on profile save.
 
         Must not call InvokeUiMethod(self.save_later): a false-negative UI-thread
         check + DirectConnection re-enters forever (RecursionError on tab switch).
-        QTimer.singleShot with `self` as context posts to this QObject's thread.
         """
         if self._save_later_pending:
             return
@@ -3673,59 +3803,21 @@ class OverlayScene(QtCore.QObject):
         QtCore.QTimer.singleShot(0, self, self._save_later_run)
 
     def save_now(self) -> bool:
-        """Synchronously persist the overlay (e.g. on overlay hide / app quit)."""
+        """Sync live tallies into memory. Does not write the profile sidecar."""
         self._save_later_pending = False
-        try:
-            from .sys_stats import ManualCounterTracker
-
-            ManualCounterTracker().sync_into_scene(self)
-        except Exception:
-            pass
-        if not self._dirty:
-            return True
-        try:
-            return bool(self.persist_owned())
-        except Exception as err:
-            syslog.warning(f"OBS OVERLAY: save_now failed: {err}")
-            return False
+        self._sync_runtime_into_scene()
+        return True
 
     def _save_later_run(self):
         self._save_later_pending = False
-        try:
-            from .sys_stats import ManualCounterTracker
-
-            ManualCounterTracker().sync_into_scene(self)
-        except Exception:
-            pass
-        if not self._dirty:
-            return
-        try:
-            ok = bool(self.persist_owned())
-            if not ok:
-                syslog.warning("OBS OVERLAY: deferred save did not write (profile may be unsaved)")
-        except Exception as err:
-            syslog.warning(f"OBS OVERLAY: deferred save failed: {err}")
+        self._sync_runtime_into_scene()
 
     def save_owned(self) -> bool:
-        """Persist this scene to the profile it was loaded from, even after a switch."""
-        if not self._profile_key:
-            return False
-        current = profile_xml_path()
-        if current and _same_profile_path(current, self._profile_key):
-            return self.save_to_profile()
-        return self._persist_files(self._profile_key, self.to_dict())
+        """Legacy name — overlay disk writes are profile-save only."""
+        return False
 
     def persist_owned(self) -> bool:
-        """Write dirty overlay only to the profile that owns this scene.
-
-        Never fall back to ``current_profile`` when that profile is a different
-        file (profile switch / deferred save) — that would paste the previous
-        layout into the newly loaded profile.
-        """
-        if self.save_owned():
-            return True
-        if self.belongs_to_profile():
-            return bool(self.save_to_profile())
+        """Legacy name — overlay disk writes are profile-save only."""
         return False
 
     def _write_json_file(self, path: str, data: dict[str, Any]) -> bool:

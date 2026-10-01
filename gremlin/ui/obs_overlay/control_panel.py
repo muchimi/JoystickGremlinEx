@@ -16,6 +16,7 @@ import logging
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 
+import gremlin.shared_state
 from gremlin.ui.ui_common import QDataPushButton
 
 from .model import (
@@ -535,10 +536,12 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._ensure_interactive()
         self._rebuild()
         self._pulse_control_highlight()
+        _sync_toolbar_overlay_control_checked(True)
 
     def hideEvent(self, event):
         self._stop_nudge()
         self._hide_control_highlight()
+        _sync_toolbar_overlay_control_checked(False)
         super().hideEvent(event)
 
     def _on_mouse_reposition_toggled(self, checked: bool):
@@ -848,10 +851,16 @@ class OverlayControlPanel(QtWidgets.QWidget):
 
     def _save(self):
         try:
-            ok = self.scene.save_to_profile()
-            if ok:
-                self.scene.capture_layout_baseline()
-            self._status.setText("Saved to profile." if ok else "Save failed.")
+            ui = gremlin.shared_state.ui
+            if ui is not None and hasattr(ui, "save_profile"):
+                ui.save_profile()
+                if not self.scene.dirty:
+                    self.scene.capture_layout_baseline()
+                    self._status.setText("Saved with profile.")
+                else:
+                    self._status.setText("Profile save did not clear overlay edits.")
+            else:
+                self._status.setText("Save the Gremlin Ex profile to keep overlay changes.")
         except Exception as err:
             syslog.exception("OBS OVERLAY: control panel save failed")
             self._status.setText(f"Save failed: {err}")
@@ -876,12 +885,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         label = str(name or "").strip() or f"{base} copy"
         self.scene.rename_page(label, page_id=dup["id"])
         self.scene.set_control_target("page", dup["id"])
-        try:
-            self.scene.save_to_profile()
-            self.scene.capture_layout_baseline()
-            self._status.setText(f"Saved as new page “{label}”.")
-        except Exception as err:
-            self._status.setText(f"Page created but save failed: {err}")
+        self._status.setText(f"Created page “{label}”. Save the Gremlin Ex profile to keep it.")
         self._rebuild()
 
     def _open_keybinds(self):
@@ -892,6 +896,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
 
 
 _panel: OverlayControlPanel | None = None
+
+
+def overlay_control_panel_is_open() -> bool:
+    return _panel is not None and _alive(_panel) and bool(_panel.isVisible())
 
 
 def open_overlay_control_panel(scene: OverlayScene | None = None, parent=None) -> OverlayControlPanel:
@@ -910,9 +918,38 @@ def open_overlay_control_panel(scene: OverlayScene | None = None, parent=None) -
         _panel.raise_()
         _panel.activateWindow()
         _panel.show()
+        _sync_toolbar_overlay_control_checked(True)
         return _panel
     _panel = OverlayControlPanel(scene, parent=None)
     _panel.show()
     _panel.raise_()
     _panel.activateWindow()
+    _sync_toolbar_overlay_control_checked(True)
     return _panel
+
+
+def toggle_overlay_control_panel(scene: OverlayScene | None = None, parent=None) -> bool:
+    """Show or hide the overlay control panel. Returns True when visible after the call."""
+    if overlay_control_panel_is_open():
+        try:
+            _panel.hide()
+        except RuntimeError:
+            pass
+        _sync_toolbar_overlay_control_checked(False)
+        return False
+    open_overlay_control_panel(scene, parent=parent)
+    return True
+
+
+def _sync_toolbar_overlay_control_checked(visible: bool):
+    try:
+        import gremlin.shared_state
+
+        ui = getattr(getattr(gremlin.shared_state, "ui", None), "ui", None)
+        action = getattr(ui, "actionOverlayControl", None) if ui is not None else None
+        if action is not None:
+            action.blockSignals(True)
+            action.setChecked(bool(visible))
+            action.blockSignals(False)
+    except Exception:
+        pass

@@ -21,6 +21,7 @@ from .bindings import (
     binding_for_axis,
     binding_source,
     read_widget_value,
+    set_toggle_latch,
     toggle_mode,
     toggle_state,
     vjoy_binding_writable,
@@ -29,6 +30,7 @@ from .bindings import (
     write_axis,
     write_button,
     write_hat,
+    write_input_display_key,
     write_switch_position,
 )
 from .model import is_interactive_overlay, switch_rest_position, widget_is_switch
@@ -69,12 +71,33 @@ class OverlayTouchHandler:
         item = self.view.scene.hit_test(scene_pos.x(), scene_pos.y(), self.view.page_id)
         if not item or not widget_accepts_touch(item):
             if item and not widget_accepts_touch(item):
-                self._ignore(f"{item.get('type')} is not bound to vJoy or a state")
+                self._ignore(f"{item.get('type')} is not bound to a writable input (vJoy, state, mode, or keyboard)")
             return False
         if any(grab.get("item_id") == item["id"] for grab in self._grabs.values()):
-            return False
+            # Allow multiple fingers on different input_display keys of the same widget.
+            if item.get("type") != "input_display":
+                return False
         widget_type = item.get("type")
         grab = {"item_id": item["id"], "type": widget_type, "held": False}
+        if widget_type == "input_display":
+            key = value_from_point(item, scene_pos.x(), scene_pos.y())
+            if key is None:
+                return False
+            # One finger per key lookup.
+            from .input_display import key_lookup
+
+            lookup = key_lookup(key)
+            if any(g.get("kind") == "input_display" and g.get("lookup") == lookup for g in self._grabs.values()):
+                return False
+            if not write_input_display_key(key, True):
+                return False
+            grab["kind"] = "input_display"
+            grab["held"] = True
+            grab["key"] = key
+            grab["lookup"] = lookup
+            self._grabs[pointer_id] = grab
+            self._poke_input_display(item)
+            return True
         if widget_type == "button":
             binding = item.get("binding") or {}
             from .model import button_appearance_mode
@@ -106,8 +129,11 @@ class OverlayTouchHandler:
             if not write_switch_position(item, position or None):
                 return False
             grab["kind"] = "switch"
+            # 4-way / 3-way spring to center; 2-way and toggle latch the last side.
             grab["spring"] = widget_type in ("switch_4way", "switch_3way")
             grab["position"] = position
+            if widget_type == "toggle":
+                set_toggle_latch(item.get("id"), position or "off")
             self._poke(item, position)
         else:
             grab["kind"] = "value"
@@ -120,6 +146,8 @@ class OverlayTouchHandler:
         grab = self._grabs.get(pointer_id)
         if not grab:
             return False
+        if grab.get("kind") == "input_display":
+            return True
         item = self.view.scene.widget_by_id(grab["item_id"], self.view.page_id)
         if not item:
             return False
@@ -131,6 +159,8 @@ class OverlayTouchHandler:
             if not write_switch_position(item, position or None):
                 return False
             grab["position"] = position
+            if item.get("type") == "toggle":
+                set_toggle_latch(item.get("id"), position or "off")
             self._poke(item, position)
             return True
         if grab.get("kind") != "value":
@@ -146,7 +176,10 @@ class OverlayTouchHandler:
         try:
             if not item:
                 return True
-            if grab.get("kind") == "button" and grab.get("held"):
+            if grab.get("kind") == "input_display" and grab.get("held"):
+                write_input_display_key(grab.get("key"), False)
+                self._poke_input_display(item)
+            elif grab.get("kind") == "button" and grab.get("held"):
                 write_button(item.get("binding"), bool(grab.get("up_value")))
                 from .model import button_appearance_mode
 
@@ -157,7 +190,12 @@ class OverlayTouchHandler:
             elif grab.get("kind") == "switch":
                 rest = switch_rest_position(item.get("type")) if grab.get("spring") else grab.get("position")
                 write_switch_position(item, rest or None)
-                self._poke(item, rest or "")
+                if item.get("type") == "toggle":
+                    # Keep sticky On/Off after the finger lifts (and after keybind release).
+                    set_toggle_latch(item.get("id"), rest or "off")
+                    self._poke(item, rest or "off")
+                else:
+                    self._poke(item, rest or "")
             elif grab.get("kind") == "value" and grab.get("spring"):
                 self._spring(item)
             return True
@@ -167,6 +205,19 @@ class OverlayTouchHandler:
     def release_all(self):
         for pointer_id in list(self._grabs):
             self.release(pointer_id)
+
+    def _poke_input_display(self, item: dict[str, Any]):
+        """Light held keys on the widget while remote/local fingers are down."""
+        held = tuple(
+            sorted(
+                {
+                    str(g.get("lookup") or "")
+                    for g in self._grabs.values()
+                    if g.get("kind") == "input_display" and g.get("item_id") == item.get("id") and g.get("lookup")
+                }
+            )
+        )
+        self._poke(item, held)
 
     def _apply_value(self, item: dict[str, Any], scene_pos: QtCore.QPointF):
         mapped = value_from_point(item, scene_pos.x(), scene_pos.y())

@@ -209,6 +209,12 @@ class Ui_Gremlin(object):
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")
 
+        self.actionOverlayControl = QtGui.QAction(main_window)
+        self.actionOverlayControl.setObjectName("actionOverlayControl")
+        self.actionOverlayControl.setToolTip(
+            "Show or hide the Overlay control panel (anchors, visibility, save). Stays available while the profile is running."
+        )
+
         self.actionConvertLegacy = QtGui.QAction(main_window)
         self.actionConvertLegacy.setText("Convert legacy actions")
         self.actionConvertLegacy.setToolTip(
@@ -257,6 +263,7 @@ class Ui_Gremlin(object):
 
         # self.menuTools.addAction(self.actionCalibration)
         self.menuTools.addAction(self.actionInputViewer)
+        self.menuTools.addAction(self.actionOverlayControl)
         main_window.add_custom_tools_menu(self.menuTools)
         self.menuTools.addSeparator()
         # self.menuTools.addAction(self.actionViewInput)
@@ -302,6 +309,7 @@ class Ui_Gremlin(object):
         self.toolbar_options.addAction(self.actionToggleRemoteControl)
         self.toolbar_options.addSeparator()
         self.toolbar_options.addAction(self.actionInputViewer)
+        self.toolbar_options.addAction(self.actionOverlayControl)
         self.toolbar_options.addAction(self.actionOptions)
 
         self.actionSimconnectOptions = QtGui.QAction(main_window, text="Simconnect...")
@@ -453,3 +461,4 @@ class Ui_Gremlin(object):
         self.actionEmpty.setText(_translate("GremlinEx", "Empty"))
         # self.actionSwapDevices.setText(_translate("GremlinEx", "Swap Devices"))
         self.actionInputViewer.setText(_translate("GremlinEx", "Input Viewer"))
+        self.actionOverlayControl.setText(_translate("GremlinEx", "Overlay Control"))
