@@ -3416,6 +3416,7 @@ class Profile:
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
         look_for_containers = True
+
         # special devices
         if device_guid == gremlin.shared_state.state_tab_guid:
             # state
@@ -3434,6 +3435,9 @@ class Profile:
             return True
         elif device_guid == gremlin.shared_state.keyboard_tab_guid:
             look_for_containers = False
+        elif device_guid == gremlin.shared_state.voice_tab_guid:
+            look_for_containers = False
+
 
         if device_guid in devices:
             device_data = devices[device_guid]

@@ -2161,6 +2161,9 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         """called when the widget has to update itself on a data change"""
+        gremlin.util.assert_ui_thread()
+        if input_widget is None or not Shiboken.isValid(input_widget):
+            return
         input_item: VoiceInputItem = input_widget.input_item
         if not input_item.commands:
             input_widget.setCustomContent(QtWidgets.QLabel("No commands found"))
@@ -2324,7 +2327,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._edit_dialog.showNormal()
 
     def _dialog_cancel_cb(self):
-        self._edit_dialog.deleteLater()
+        gremlin.util.delete_widget(self._edit_dialog)
         self._edit_dialog = None
 
     def _dialog_ok_confirm_cb(self):
@@ -2371,7 +2374,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
 
         finally:
-            self._edit_dialog.deleteLater()
+            gremlin.util.delete_widget(self._edit_dialog)
             self._edit_dialog = None
             self.inputItemListView.redraw()
             self.notifyInputsChanged()

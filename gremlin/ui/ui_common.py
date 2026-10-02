@@ -99,11 +99,7 @@ def clearStackedWidget(stacked_widget: QtWidgets.QStackedWidget):
     for i in range(stacked_widget.count() - 1, -1, -1):
         widget = stacked_widget.widget(i)
         stacked_widget.removeWidget(widget)
-        if hasattr(widget, "_cleanup_ui"):
-            # tell the widget it's being deleted
-            widget._cleanup_ui()
-        widget.hide()
-        widget.deleteLater()
+        gremlin.util.delete_widget(widget)
 
 
 class Ansi:
@@ -1959,20 +1955,15 @@ class WidgetTracker:
     def unregisterWidget(self, widget):
         """removes a widget from the cleanup list"""
         if widget in self._widget_cache:
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
             del self._widget_cache[widget]
-            widget.setParent(None)
-            widget.deleteLater()
+            gremlin.util.delete_widget(widget)
 
     def clearRegisteredWidgets(self):
         """cleanup all widgets"""
-        for widget in self._widget_cache.values():
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-            widget.setParent(None)
-            widget.deleteLater()
+        widgets = list(self._widget_cache.values())
         self._widget_cache = {}
+        for widget in widgets:
+            gremlin.util.delete_widget(widget)
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("TRACKER: clear()")
@@ -10446,11 +10437,7 @@ class WidgetCacheTracker:
             if Shiboken.isValid(widget):
                 try:
                     widget.expired.emit(key, widget)
-                    widget.hide()
-                    # delete the widget proper
-                    if hasattr(widget, "_cleanup_ui"):
-                        widget._cleanup_ui()
-                    widget.deleteLater()
+                    gremlin.util.delete_widget(widget)
                 except Exception as e:
                     pass  # C++ exception might occur here
 
@@ -10933,10 +10920,7 @@ class QSplitTabWidget(QDataWidget):
                         callback(key, index, widget)
 
                     # not in the cache - straight up delete
-                    if hasattr(widget, "_cleanup_ui"):
-                        widget._cleanup_ui()
-                    widget.hide()
-                    widget.deleteLater()
+                    gremlin.util.delete_widget(widget)
 
                 if key in self._widget_config_index_map:
                     del self._widget_config_index_map[key]
@@ -14092,7 +14076,7 @@ class QJoystickInputWidget(QWidget):
         fcolor = Color.blueColor()
         if self._widget:
             self.main_layout.removeWidget(self._widget)
-            self._widget.deleteLater()
+            gremlin.util.delete_widget(self._widget)
 
         widget = None
         device = gremlin.joystick_handling.getDevice(self.device_guid)
@@ -16329,8 +16313,7 @@ class WidgetManager(QtWidgets.QDialog):
         while self._stacked_widget.count() > 0:
             widget = self._stacked_widget.widget(0)
             self._stacked_widget.removeWidget(widget)
-            widget.hide()
-            widget.deleteLater()
+            gremlin.util.delete_widget(widget)
 
     def registerWidget(self, key, widget):
         self._cache[key] = widget
@@ -16354,7 +16337,7 @@ class WidgetManager(QtWidgets.QDialog):
                 del self._cache[key]
                 if self._stacked_widget.indexOf(widget) != -1:
                     self._stacked_widget.removeWidget(widget)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
 
 
 class QEmptyWidget(QWidget):
@@ -16806,8 +16789,8 @@ class AutohideContainer(QtWidgets.QWidget):
 
     def setContent(self, widget: QtWidgets.QWidget):
         if self._content_widget is not None:
-            self._content_widget.setParent(None)  # delete
-            self._content_widget.deleteLater()  # schedule for deletion
+            self._main_layout.removeWidget(self._content_widget)
+            gremlin.util.delete_widget(self._content_widget)
         self._content_widget = widget
         if widget is not None:
             self._main_layout.addWidget(widget)
@@ -17325,7 +17308,7 @@ class QKeyboardKeysWidget(QWidget):
             self._widget_map = {}
         for widget in self._widget_map.values():
             self.layout.removeWidget(widget)
-            widget.deleteLater()
+            gremlin.util.delete_widget(widget)
         self._widget_map.clear()
 
         key_list = self.keys

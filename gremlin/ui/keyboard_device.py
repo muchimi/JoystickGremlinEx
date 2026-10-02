@@ -1163,7 +1163,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _dialog_close_cb(self):
         gremlin.shared_state.pop_suspend_ui_keyinput()
-        self._keyboard_dialog.deleteLater()
+        gremlin.util.delete_widget(self._keyboard_dialog)
         self._keyboard_dialog = None
         self._update_input_widget(self.getContentWidget(), self.getContentWidget().parent)
 
@@ -1179,7 +1179,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             latched_key = self._keyboard_dialog.latched_key
             self._process_input_keys(keys, index, latched_key)
 
-            self._keyboard_dialog.deleteLater()
+            gremlin.util.delete_widget(self._keyboard_dialog)
             self._keyboard_dialog = None
 
             el = gremlin.event_handler.EventListener()

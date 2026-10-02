@@ -630,11 +630,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if device_guid in self._tab_device_map:
             widget = self.getRegisteredWidget(device_guid)
             if widget:
-                widget.hide()
-                if hasattr(widget, "_cleanup_ui"):
-                    widget._cleanup_ui()
-                widget.setParent(None)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
 
             index = self._tab_device_map[device_guid]
             self.ui.devices_tab_header_widget.removeTab(index)
@@ -655,7 +651,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
         look_for_containers = True
-
 
         # # get the device widget
         # widget = self.getRegisteredWidget(device_guid)
@@ -1282,11 +1277,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """substitution complete - reload profile"""
         # profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         # self.load_profile(profile.profile_file)
-        self._dialog_substitute.deleteLater()
+        gremlin.util.delete_widget(self._dialog_substitute)
         self._dialog_substitute = None
 
     def _handle_substitute_rejected(self):
-        self._dialog_substitute.deleteLater()
+        gremlin.util.delete_widget(self._dialog_substitute)
         self._dialog_substitute = None
 
     def _reload(self):
@@ -2541,10 +2536,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             index = self._widget_device_index_map[device_guid]
             if index != -1:
                 widget = self.ui.device_page_widget.widget(index)
-                if hasattr(widget, "_cleanup_ui"):
-                    widget._cleanup_ui()
                 self.ui.device_page_widget.removeWidget(widget)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
             del self._widget_device_index_map[device_guid]
             del self._widget_index_device_map[index]
 
@@ -3198,6 +3191,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             def add_tab_if_missing(device, tab_type, override_name=None):
                 if device in tab_device_set:
                     return False
+                if verbose:
+                    syslog.info(f"Adding tab for device [{device.name}] of type [{tab_type}]")
                 self._add_tab(device, tab_type, override_name=override_name)
                 tab_device_set.add(device)
                 tab_device_list.append(device)
@@ -3207,15 +3202,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 device_id = device.device_id
                 device_name = device.name
 
+                if "voice" in device_name.lower():
+                    pass
+
                 if device.disabled:
                     if verbose_l1:
                         syslog.info(f"\tdevice [{device_name}] is disabled - skipping tab")
                     continue
 
                 if not device.visible:
-                    if verbose_l1:
-                        syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
-                    continue
+
+                    if  not self._has_mapping(device.device_guid, True):
+                    # check if the profile has a mapping in which case the device should still be shown
+                        if verbose_l1:
+                            syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
+                        continue
 
                 if self.profile.isRemovedDevice(device_id):
                     if verbose_l1:
@@ -3661,6 +3662,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             self._reindex_tabs()
 
+            if verbose:
+                syslog.info(f"Final loaded tabs: {self.ui.devices_tab_header_widget.count()}")
+                pass
+
             el = gremlin.event_handler.EventListener()
             el.tabs_loaded.emit()
 
@@ -3677,6 +3682,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # select last items
 
             gremlin.shared_state.pop_redraw()
+
+
 
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections

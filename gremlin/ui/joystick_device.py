@@ -1102,7 +1102,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     self.inputItemListView._select_item_ui(index)
 
             finally:
-                dialog.deleteLater()
+                gremlin.util.delete_widget(dialog)
 
     def _handle_locked_changed(self, value: bool):
         if value:
@@ -1140,8 +1140,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 pass
 
         if self.inputItemListView is not None and Shiboken.isValid(self.inputItemListView):
-            self.inputItemListView.setParent(None)
-            self.inputItemListView.deleteLater()
+            gremlin.util.delete_widget(self.inputItemListView)
 
     def _edit_curve_item_cb(self, index: int, input_item: InputItem):
         gremlin.util.InvokeUiMethod(self._edit_curve_item_ui, index, input_item)

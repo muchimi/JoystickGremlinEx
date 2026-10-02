@@ -2225,8 +2225,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             item = layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
-                widget.hide()
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
             child = item.layout()
             if child is not None:
                 gremlin.util.clear_layout(child)
@@ -2306,7 +2305,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             item = layout.takeAt(0)
             widget = item.widget()
             if widget:
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
         entries = list_user_templates()
         if not entries:
             hint = QtWidgets.QLabel("None yet — use + to save the current widgets.")

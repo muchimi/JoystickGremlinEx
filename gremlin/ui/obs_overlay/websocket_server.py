@@ -26,6 +26,8 @@ from urllib.parse import parse_qs, urlparse
 from PySide6 import QtCore, QtGui, QtNetwork, QtWebSockets
 from shiboken6 import Shiboken
 
+import gremlin.util
+
 from .model import (
     WS_DEFAULT_PORT,
     WS_RESERVED_PORTS,
@@ -539,7 +541,7 @@ class OverlayWebsocketSession(QtCore.QObject):
         except Exception:
             pass
         try:
-            view.deleteLater()
+            gremlin.util.delete_widget(view)
         except Exception:
             pass
 

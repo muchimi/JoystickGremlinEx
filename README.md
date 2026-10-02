@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T67A)
+- Fix: UI: more hardening for QT memory desync that appeared in T64 and refresh changes.  
+- Fix: UI: filter button - moved. This is temporary until the issue is investigated further: workaround for QT not drawing device tabs in all situations when inside a container.  
+
 ### (m77T67)
 - New (experimental): overlay web browser support (courtesy Lolo350): enables an  overlay to be displayed via a web browser on a networked device (such as a tablet or phone).  Supports touch input/interactions, HTTP frame fallback, and a GEX Offline screen when the profile is deactivated.  This feature aims at enabling touch-screen interaction from any device, not just a Windows device, as an interactive touch surface to send inputs to GEX.
 - Changes: Overlay module (courtesy Lolo350)

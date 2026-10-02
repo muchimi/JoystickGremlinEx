@@ -18,6 +18,7 @@ from shiboken6 import Shiboken
 
 import gremlin.joystick_handling
 import gremlin.ui.ui_common
+import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.ui.ui_common import Buttons, QDataComboBox, QDataPushButton
 
@@ -341,10 +342,6 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             actions.addStretch(1)
             self._form.addRow("", actions)
 
-        else:
-            clear = Buttons.getClearWidget(callback=self._clear)
-            self._form.addRow("", clear)
-
         self._building = False
 
 
@@ -410,7 +407,7 @@ class OverlayRuntimeKeybindsDialog(QtWidgets.QDialog):
             item = self._host_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
         self._editors.clear()
         for group_title, actions in RUNTIME_BINDING_GROUPS:
             box = QtWidgets.QGroupBox(group_title, self)

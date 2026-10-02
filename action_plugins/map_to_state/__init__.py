@@ -340,11 +340,11 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         state = self.button_press_dialog.state
         self.action_data.state = state
         self.populate_selector()
-        self.button_press_dialog.deleteLater()
+        gremlin.util.delete_widget(self.button_press_dialog)
         self.button_press_dialog = None
 
     def _handle_button_press_dialog_rejected(self):
-        self.button_press_dialog.deleteLater()
+        gremlin.util.delete_widget(self.button_press_dialog)
         self.button_press_dialog = None
 
     def _state_crud(self):

@@ -1284,14 +1284,10 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             item = self._grid_layout.takeAt(0)
             w = item.widget()
             if w is not None:
-                w.hide()
-                w.setParent(None)
-                w.deleteLater()
+                gremlin.util.delete_widget(w)
         for w in old:
             if Shiboken.isValid(w):
-                w.hide()
-                w.setParent(None)
-                w.deleteLater()
+                gremlin.util.delete_widget(w)
 
     def _build_toolbar(self) -> QtWidgets.QWidget:
         bar = QtWidgets.QWidget()

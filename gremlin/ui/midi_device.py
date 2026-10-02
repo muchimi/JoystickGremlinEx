@@ -1667,7 +1667,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 self._midi_data_b_widget.setValue(v2)
 
         if self.listener_dialog is not None:
-            self.listener_dialog.deleteLater()
+            gremlin.util.delete_widget(self.listener_dialog)
             self.listener_dialog = None
 
 

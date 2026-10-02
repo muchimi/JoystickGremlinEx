@@ -3836,12 +3836,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             gremlin.util.InvokeUiMethod(self._refresh_grid_ui)  # ensure on UI thread
 
     def _refresh_grid_ui(self):
-        if Shiboken.isValid(self):
-            with QtCore.QSignalBlocker(self.grid_visible_widget):
-                self.grid_visible_widget.setChecked(self.action_data.grid_visible)
+        if self.grid_visible_widget is None or not Shiboken.isValid(self.grid_visible_widget):
+            return
+        
+        with QtCore.QSignalBlocker(self.grid_visible_widget):
+            self.grid_visible_widget.setChecked(self.action_data.grid_visible)
 
-            self._populate_grid()
-            self._update_ui()
+        self._populate_grid()
+        self._update_ui()
 
     def notify_device_changed(self):
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
@@ -4381,7 +4383,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             widget.hide()
             self.button_grid_stack_widget.removeWidget(widget)
             gremlin.util.delete_widget(widget)
-            widget.deleteLater()
 
         # add the legend
         label_used_here_widget = QtWidgets.QLabel("Used in this mapping")

@@ -272,6 +272,20 @@ class AbstractView(QtWidgets.QWidget):
             self._model_change_callbacks.append(callback)
 
         self._model_call_stack = 0  # stack to manage when the model change event is fired
+        self._model_callback_cleaned = False
+
+    def _cleanup_ui(self):
+        """Unregister model callbacks before this view's Qt objects are destroyed."""
+        if self._model_callback_cleaned:
+            return
+        self._model_callback_cleaned = True
+        if self._model is not None:
+            self._model.removeCallback(self._handle_model_changed)
+        self._model_change_callbacks.clear()
+        widget_map = getattr(self, "_widget_map", None)
+        if isinstance(widget_map, dict):
+            widget_map.clear()
+        gremlin.util.clear_widget_references(self)
 
     def addSelectionChangeCallback(self, callback: Callable):
         """adds a callback to be called when the model changes - this is used by the container
@@ -906,6 +920,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             id = container.id
             for c in self._containers:
                 if c.id == id:
+                    el = gremlin.event_handler.EventListener()
+                    el.container_delete.emit(self, c)
                     self._containers.remove(c)
                     break
             return
@@ -916,10 +932,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 if hasattr(action, "actionDeleted"):
                     action.actionDeleted()
 
+        el = gremlin.event_handler.EventListener()
+        el.container_delete.emit(self, container)
         self._containers.remove(container)
 
         # tell the UI about the change
-        el = gremlin.event_handler.EventListener()
         # el.mapping_changed.emit(self)
 
         if not len(self._containers):
@@ -996,7 +1013,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def device(self) -> DeviceSummary:
-        return gremlin.joystick_handling.getDevice(self._device_guid)   
+        return gremlin.joystick_handling.getDevice(self._device_guid)
 
     @property
     def device_name(self):
@@ -2398,7 +2415,17 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._disconnect_events()
 
         if self.input_item:
+            self.input_item.containers.removeCallback(self.handleMappingChanged)
             self.input_item.setInputWidget(None)  # clear reference on the input
+
+        self._selection_change_callbacks.clear()
+        self._mapping_changed_callbacks.clear()
+        self._confirm_delete_callback = None
+        self._delete_callback = None
+        self._title_callback = None
+        self._get_state_callback = None
+        self.populate_ui = None
+        self.populate_name = None
 
         if self._container_id_widget and Shiboken.isValid(self._container_id_widget):
             self._container_id_widget.setWidget(None)
@@ -2707,6 +2734,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setCustomContent(self, items: QtWidgets.QWidget | list[QtWidgets.QWidget]):
         """adds custom content to the input widget (vertical container)"""
+        gremlin.util.assert_ui_thread()
+        if self._custom_container_layout is None or not Shiboken.isValid(self._custom_container_layout):
+            return
         gremlin.util.clear_layout(self._custom_container_layout)
 
         if items:
@@ -2717,9 +2747,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                 # multiple widgets
                 container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
                 self._custom_container_layout.addWidget(container)
-
-        # hint = self._custom_container_widget.sizeHint()
-        # self._custom_container_widget.setFixedHeight(hint.height())
 
     def setInputDescription(self, description: str | None):
         gremlin.util.InvokeUiMethod(self._set_input_description_ui, description)
@@ -3960,6 +3987,8 @@ class InputItemListView(AbstractView):
     def _cleanup_ui(self):
         """clears this list view"""
         self._clear_widgets()
+        self._selection_change_callbacks.clear()
+        super()._cleanup_ui()
 
     def create_ui(self):
         """creates or recreates the contents of the input list view (left side input selector)"""
@@ -8236,6 +8265,10 @@ class ConditionStateTracker:
 
     @QtCore.Slot(object, object)
     def _container_delete(self, input_item, container):
+        gremlin.util.InvokeUiMethod(self._container_delete_ui, input_item, container)
+
+    def _container_delete_ui(self, input_item, container):
+        gremlin.util.assert_ui_thread()
         if not isinstance(container, AbstractContainer):
             return
         self.unregister(input_item, container)
@@ -8688,6 +8721,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._cleanup_ui()
 
     def _cleanup_ui(self):
+        for view in self.findChildren(AbstractView):
+            try:
+                view._cleanup_ui()
+            except Exception:
+                pass
         try:
             if self.container is not None:
                 tracker = ConditionStateTracker()
@@ -8708,7 +8746,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             except Exception:
                 pass
         self._widget_map.clear()
+        self._container_changed_callbacks.clear()
         self._container_id_widget = None
+        gremlin.util.clear_widget_references(self)
 
     def _create_action_tab(self):
         """create the widget for the container's action tab"""
@@ -9543,14 +9583,19 @@ class ContainerModel(AbstractCallbackModel):
 
     def clear(self):
         """clears all containers from the model"""
-        for container in self:
+        for container in list(self):
             self.removeContainer(container)
-        super().clear()
 
     def removeContainer(self, container: AbstractContainer):
         """Removes an existing container from the model.
         :param container the container instance to remove
         """
+
+        if container not in self:
+            return
+
+        el = gremlin.event_handler.EventListener()
+        el.container_delete.emit(self._input_item, container)
 
         # tell actions in this container they are being deleted
         for action_set in container.action_sets:
@@ -9900,8 +9945,7 @@ class ContainerView(AbstractView):
         if not self._is_alive():
             return
         if gremlin.ui.ui_common.ConfirmBox("Delete this container?"):
-            container.clear()  # delete all actions in the container
-            self.model.remove(container)
+            self.model.removeContainer(container)
             self._redraw_ui()
             # el = gremlin.event_handler.EventListener()
             # el.update_action_icons.emit(self._input_item)
@@ -10004,8 +10048,15 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         """true if not associated with any data (blank widget)"""
         return self._input_item is None
 
+    def _disconnect_model_callbacks(self):
+        if self._container_model is not None:
+            self._container_model.removeOnItemChangedCallback(self.onContainerModelChanged)
+        if self._input_item is not None:
+            self._input_item.containerModel.removeCallback(self._mapping_changed)
+
     def _cleanup_ui(self):
         """called when widget is deleted"""
+        self._disconnect_model_callbacks()
         if self._container_view:
             self._container_view._cleanup_ui()
             self._container_view = None
@@ -10032,6 +10083,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
     def clearInputItem(self):
         """clears the associated item data"""
+        self._disconnect_model_callbacks()
         self._input_item = None
         self._input_type = None
         self._container_model = None
@@ -10108,9 +10160,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                 except Exception:
                     pass
             if widget is not None and Shiboken.isValid(widget):
-                widget.hide()
                 self._stacked_widget.removeWidget(widget)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
             input_item.setMappingWidget(None)
 
         # main widget container
@@ -10568,7 +10619,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         if result == QtWidgets.QMessageBox.StandardButton.Cancel:
             return
 
-        self._container_model.removeAllContainers()
+        self._container_model.clear()
 
         # update
         self.redraw()
@@ -11790,6 +11841,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self.filtersEnabled:
             el.input_filtered_change.disconnect(self._handle_input_filter_changed)
 
+        if self._input_item_list_model is not None:
+            self._input_item_list_model.removeOnItemChangedCallback(self.onInputItemChange)
+            model_callback = getattr(self, "_handle_model_changed", None)
+            if model_callback is not None:
+                self._input_item_list_model.removeCallback(model_callback)
+
         self.setInputItemListView(None)
         el.input_deleted.disconnect(self._handle_input_deleted)
 
@@ -12085,6 +12142,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def setInputItemListModel(self, model: InputItemListModel):
         """sets the model"""
         if self._input_item_list_model != model:
+            if self._input_item_list_model is not None:
+                self._input_item_list_model.removeOnItemChangedCallback(self.onInputItemChange)
+                model_callback = getattr(self, "_handle_model_changed", None)
+                if model_callback is not None:
+                    self._input_item_list_model.removeCallback(model_callback)
             self._input_item_list_model = model
         if self._input_item_list_view is not None:
             self._input_item_list_view.setModel(model)
@@ -12339,10 +12401,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             input_item = self._input_item_list_view.itemAt(index)
             self._select_input_item_mapping_widget_ui(input_item)
 
-
         elif verbose:
             syslog.info("DeviceTabWidget: select input index - nothing to select")
-
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str):
         """called when the input item widget reports a mapping change for its associated input item"""

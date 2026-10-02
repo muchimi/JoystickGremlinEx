@@ -2583,11 +2583,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             if index != -1:
                 self._category_selector_widget.setCurrentIndex(index)
 
-        self._category_dialog.deleteLater()
+        gremlin.util.delete_widget(self._category_dialog)
         self._category_dialog = None
 
     def _handle_category_dialog_rejected(self):
-        self._category_dialog.deleteLater()
+        gremlin.util.delete_widget(self._category_dialog)
         self._category_dialog = None
 
     def _category_change_cb(self, category):
@@ -3332,7 +3332,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._edit_dialog.showNormal()
 
     def _dialog_cancel_cb(self):
-        self._edit_dialog.deleteLater()
+        gremlin.util.delete_widget(self._edit_dialog)
         self._edit_dialog = None
 
     def _dialog_ok_confirm_cb(self):
@@ -3399,7 +3399,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             el = gremlin.event_handler.EventListener()
             el.device_mapping_changed.emit(self._device_id)
         finally:
-            self._edit_dialog.deleteLater()
+            gremlin.util.delete_widget(self._edit_dialog)
             self._edit_dialog = None
             self.inputItemListView.redraw()
 

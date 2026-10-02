@@ -445,8 +445,7 @@ class _PackSection(QtWidgets.QWidget):
             item = self._grid.takeAt(0)
             w = item.widget()
             if w is not None:
-                w.setParent(None)
-                w.deleteLater()
+                gremlin.util.delete_widget(w)
         self._tiles.clear()
         cols = self._columns()
         for i, entry in enumerate(self._entries):
@@ -671,16 +670,14 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         """Rebuild pack sections from built-in + user libraries."""
         # Clear existing sections
         for section in self._sections:
-            section.setParent(None)
-            section.deleteLater()
+            gremlin.util.delete_widget(section)
         self._sections.clear()
         # Remove leftover widgets (empty label / stretch)
         while self._body_layout.count():
             item = self._body_layout.takeAt(0)
             w = item.widget()
             if w is not None:
-                w.setParent(None)
-                w.deleteLater()
+                gremlin.util.delete_widget(w)
 
         icons = list_library_icons()
         by_pack: dict[str, list[IconEntry]] = {}

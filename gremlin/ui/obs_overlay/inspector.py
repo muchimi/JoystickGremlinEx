@@ -922,7 +922,7 @@ class OverlayInspector(QtWidgets.QWidget):
             widget.hide()
             widget.setAttribute(QtCore.Qt.WA_DontShowOnScreen, True)
             widget.setParent(self._detach_sink())
-            widget.deleteLater()
+            gremlin.util.delete_widget(widget)
         except RuntimeError:
             return
 

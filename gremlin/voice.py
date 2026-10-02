@@ -1689,7 +1689,7 @@ class Voice:
             finally:
                 if dialog is not None:
                     dialog.close()
-                    dialog.deleteLater()
+                    gremlin.util.delete_widget(dialog)
 
         if not os.path.exists(self._local_model_path):
             syslog.error(f"Voice: failed to find voice recognition model [{self._model_size}].")

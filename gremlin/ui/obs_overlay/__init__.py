@@ -699,7 +699,7 @@ class OverlayManager:
                     window.detach_from_scene()
                     window.hide()
                     window.close()
-                    window.deleteLater()
+                    gremlin.util.delete_widget(window)
                 except Exception:
                     pass
             if not self._start_ws_session(page_id):
@@ -834,7 +834,7 @@ class OverlayManager:
                 window.detach_from_scene()
                 window.hide()
                 window.close()
-                window.deleteLater()
+                gremlin.util.delete_widget(window)
         except Exception as err:
             syslog.warning(f"OBS OVERLAY: failed to close overlay window: {err}")
         self._emit_visibility()

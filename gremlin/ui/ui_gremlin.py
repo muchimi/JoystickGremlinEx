@@ -45,14 +45,28 @@ class Ui_Gremlin(object):
         self.devices_tab_header_widget.setObjectName("devices")
         self.devices_tab_header_widget.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
 
-        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget], widget_only=True)
-        tab_container_widget.setContentsMargins(0, 0, 0, 0)
-        tab_container_widget.setMaximumHeight(30)
+        # tab_container_widget = QtWidgets.QWidget()
+        # tab_container_layout = QtWidgets.QHBoxLayout(tab_container_widget)
+        # tab_container_layout.setContentsMargins(0, 0, 0, 0)
+        # tab_container_layout.setSpacing(0)
+        # tab_container_layout.addWidget(self.tab_filter_widget)
+        # tab_container_layout.addWidget(self.devices_tab_header_widget)
+
+        # self.tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget], widget_only=True)
+        # # self.tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget, "||"], widget_only=True)
+        # self.tab_container_widget.setContentsMargins(0, 0, 0, 0)
+        # self.tab_container_widget.setMaximumHeight(30)
+
+        # tab_content_layout.addWidget(tab_container_widget)
+
+
+        tab_content_layout.addWidget(self.devices_tab_header_widget)
+        tab_content_layout.addWidget(self.tab_filter_widget)
 
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         self.device_page_widget.setContentsMargins(0, 0, 0, 0)
 
-        tab_content_layout.addWidget(tab_container_widget)
+        # tab_content_layout.addWidget(self.tab_container_widget)
         tab_content_layout.addWidget(self.device_page_widget)
 
         # blank input for device content

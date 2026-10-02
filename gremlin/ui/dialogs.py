@@ -3322,12 +3322,10 @@ Enabled modules may not show until the device filter is updated.
 
         for widget in self._profile_map_exe_widgets.values():
             if widget:
-                widget.setParent(None)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
         for widget in self._profile_map_xml_widgets.values():
             if widget:
-                widget.setParent(None)
-                widget.deleteLater()
+                gremlin.util.delete_widget(widget)
 
         self._profile_map_exe_widgets = {}
         self._profile_map_xml_widgets = {}

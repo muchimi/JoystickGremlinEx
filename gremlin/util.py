@@ -478,16 +478,13 @@ def _clear_layout(layout):
         item = layout.takeAt(index)
         widget = item.widget()
         if widget is not None and Shiboken.isValid(widget):
-            # Hide and delete in place. setParent(None) promotes the widget to a
-            # top-level window and causes visible flashes over the main UI.
-            widget.hide()
-            widget.deleteLater()
+            delete_widget(widget)
         elif item.layout():
             _clear_layout(item.layout())
 
 
 def delete_widget(widget: QtWidgets.QWidget):
-    """removes a widget from memory"""
+    """removes a widget from memory - calls teardown methods if available on the object to avoid a desync between python and QT memory management"""
     if widget and Shiboken.isValid(widget):
         widget.hide()  # hide the widget from the UI
         # clear any widget layout to release contents as well
