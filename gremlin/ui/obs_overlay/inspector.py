@@ -77,7 +77,6 @@ from .model import (
     switch_channel,
     widget_display_name,
     widget_is_switch,
-    widget_uses_series,
     WS_DEVICE_PRESETS,
     WS_DEFAULT_PORT,
     ws_preset_size,
@@ -732,6 +731,8 @@ class OverlayInspector(QtWidgets.QWidget):
         self._collapsible_sections: list[CollapsibleSection] = []
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        layout.addWidget(self._make_section_toolbar())
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
         self._host = QtWidgets.QWidget(self)
@@ -1040,26 +1041,33 @@ class OverlayInspector(QtWidgets.QWidget):
         except RuntimeError:
             return
 
-    def _add_expand_collapse_toolbar(self):
-        """Expand all / Collapse all sits above Geometry (and other sections)."""
-        if self._form is None:
-            return
-        row = QtWidgets.QWidget(self._host)
-        layout = QtWidgets.QHBoxLayout(row)
+    def _make_section_toolbar(self) -> QtWidgets.QWidget:
+        """Pinned Expand all / Collapse all row above the scrolling inspector."""
+        bar = QtWidgets.QWidget(self)
+        layout = QtWidgets.QHBoxLayout(bar)
         layout.setContentsMargins(0, 0, 0, 4)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
         expand_btn = Buttons.getExpandAllWidget(
             tooltip="Expand every collapsible section in this panel.",
             callback=self._expand_all_sections,
         )
+        expand_btn.setParent(bar)
+        expand_lbl = QtWidgets.QLabel("Expand all", bar)
+        expand_lbl.setBuddy(expand_btn)
         collapse_btn = Buttons.getCollapseAllWidget(
             tooltip="Collapse every collapsible section in this panel.",
             callback=self._collapse_all_sections,
         )
+        collapse_btn.setParent(bar)
+        collapse_lbl = QtWidgets.QLabel("Collapse all", bar)
+        collapse_lbl.setBuddy(collapse_btn)
         layout.addWidget(expand_btn)
+        layout.addWidget(expand_lbl)
+        layout.addSpacing(10)
         layout.addWidget(collapse_btn)
+        layout.addWidget(collapse_lbl)
         layout.addStretch()
-        self._form.addWidget(row)
+        return bar
 
     def _expand_all_sections(self):
         for section in list(self._collapsible_sections):
@@ -1201,7 +1209,6 @@ class OverlayInspector(QtWidgets.QWidget):
             return
 
     def _build_canvas(self):
-        self._add_expand_collapse_toolbar()
         form = self._section("Canvas")
         canvas = self.scene.canvas
         page = self.scene.active_page() or {}
@@ -1769,7 +1776,6 @@ class OverlayInspector(QtWidgets.QWidget):
         self.rebuild()
 
     def _build_widget(self, item: dict):
-        self._add_expand_collapse_toolbar()
         form = self._section("Geometry")
         if self._multi:
             types = sorted({(w.get("type") or "").replace("_", " ") for w in self.scene.selected_widgets()})
@@ -1831,10 +1837,12 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
         )
 
+        widget_type = canonical_widget_type(item.get("type"))
+        self._build_widget_core(item, widget_type)
+
         self._build_visibility(item)
 
         label_form = self._section("Label")
-        widget_type = canonical_widget_type(item.get("type"))
         show_mode = widget_type == "label" and bool((item.get("style") or {}).get("show_current_mode"))
         if not self._multi:
             if show_mode:
@@ -1906,7 +1914,6 @@ class OverlayInspector(QtWidgets.QWidget):
                 400,
                 lambda v, wid=item["id"]: self._style(wid, label_offset_y=int(v)),
             )
-        widget_type = canonical_widget_type(item.get("type"))
         if widget_type == "label":
             self._style_color(label_form, item, "fill", "Fill")
             self._border_appearance(label_form, item)
@@ -2009,68 +2016,16 @@ class OverlayInspector(QtWidgets.QWidget):
             look.addRow("Steps", ticks)
             self._style_bool(look, item, "invert_display", "Invert")
         elif widget_type == "axis_paddle":
-            start = QtWidgets.QDoubleSpinBox(self._host)
-            start.setRange(-360.0, 360.0)
-            start.setDecimals(1)
-            start.setSuffix("°")
-            start.setValue(float(item["style"].get("paddle_start_deg") or 0.0))
-            start.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_start_deg=float(v)))
-            look.addRow("Start angle", start)
-            end = QtWidgets.QDoubleSpinBox(self._host)
-            end.setRange(-360.0, 360.0)
-            end.setDecimals(1)
-            end.setSuffix("°")
-            end.setValue(float(item["style"].get("paddle_end_deg") or 70.0))
-            end.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_end_deg=float(v)))
-            look.addRow("End angle", end)
-            cur_dir = normalize_paddle_direction(item["style"].get("paddle_direction"))
-            direction = _enum_radios(
-                [("Clockwise", "cw"), ("Counter-clockwise", "ccw")],
-                cur_dir,
-                lambda v, wid=item["id"]: self._style(wid, paddle_direction=v),
-            )
-            look.addRow("Rotation", direction)
             self._style_color(look, item, "fill", "Off fill")
             self._style_color(look, item, "fill_on", "On fill")
             self._style_color(look, item, "indicator", "Pivot")
             self._style_float(look, item, "indicator_size", "Pivot size", 4, 80)
-            path_row = QtWidgets.QWidget(self._host)
-            path_layout = QtWidgets.QHBoxLayout(path_row)
-            path_layout.setContentsMargins(0, 0, 0, 0)
-            path_edit = QtWidgets.QLineEdit(item['style'].get('paddle_image') or '', self._host)
-            path_edit.setPlaceholderText("Optional — replaces built-in art (pivot = image center)")
-            browse = Buttons.getFolderWidget(tooltip="Browse")
-            browse.setFixedWidth(28)
-            browse.setToolTip(
-                "Choose a custom paddle image. PNG with transparency works best. "
-                "Pivot is the center of the image. Clear uses the built-in silhouette from your reference."
-            )
-            browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_paddle_image(wid))
-            clear = Buttons.getClearWidget(
-                label="Clear",
-                tooltip="Use the built-in vector paddle.",
-                callback=lambda _btn=None, wid=item["id"]: self._style(wid, paddle_image="", rebuild=True),
-            )
-            path_edit.editingFinished.connect(
-                lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
-            )
-            path_layout.addWidget(path_edit)
-            path_layout.addWidget(browse)
-            path_layout.addWidget(clear)
-            look.addRow("Custom image", path_row)
             self._style_bool(look, item, "invert_display", "Invert")
         elif widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair", "hat"):
             self._style_color(look, item, "fill", "Fill")
             self._style_color(look, item, "indicator", "Dot")
             self._style_float(look, item, "indicator_size", "Dot size", 2, 80)
             if widget_type == "hat":
-                current = 8 if int(item["style"].get("hat_positions") or 4) >= 8 else 4
-                positions = _enum_radios(
-                    [("4-position", 4), ("8-position", 8)],
-                    current,
-                    lambda v, wid=item["id"]: self._style(wid, hat_positions=int(v or 4)),
-                )
-                look.addRow("Positions", positions)
                 self._crosshair_appearance(look, item, show_toggle=False)
             else:
                 self._indicator_shape(look, item)
@@ -2096,40 +2051,70 @@ class OverlayInspector(QtWidgets.QWidget):
         elif widget_type in ("shape", "panel"):
             self._shape_appearance(look, item)
         elif widget_type == "image":
-            self._image_appearance(look, item)
+            self._image_look(look, item)
         elif widget_type == "application":
-            self._application_appearance(look, item)
+            self._application_look(look, item)
         elif widget_type == "remote_view":
-            self._remote_view_appearance(look, item)
+            self._remote_view_look(look, item)
         elif widget_type == "streamdeck":
-            self._streamdeck_appearance(look, item)
+            self._streamdeck_look(look, item)
         elif widget_type == "axis_mouse":
-            self._mouse_appearance(look, item)
+            self._mouse_look(look, item)
         elif widget_type == "axis_graph":
-            self._graph_appearance(look, item)
+            self._graph_look(look, item)
         elif widget_type == "axis_bars":
-            self._bars_appearance(look, item)
+            self._bars_look(look, item)
         elif widget_type == "sys_stats":
-            self._stats_appearance(look, item)
+            self._stats_look(look, item)
         elif widget_type == "stopwatch":
-            self._stopwatch_appearance(look, item)
+            self._stopwatch_look(look, item)
         elif widget_type == "input_display":
-            self._input_display_appearance(look, item)
+            self._input_display_look(look, item)
         elif widget_type != "label":
             self._style_color(look, item, "fill", "Fill")
 
         self._append_shared_appearance(look, item, widget_type)
-        if widget_uses_series(widget_type) and not self._multi:
-            self._build_graph_datasets(item)
-        if widget_type == "sys_stats" and not self._multi:
-            self._build_stat_datasets(item)
-        if widget_type == "input_display" and not self._multi:
-            self._build_input_display_keys(item)
+
+    def _build_widget_core(self, item: dict, widget_type: str):
+        """Identity / source / behavior controls sit under Geometry, not Appearance."""
+        if widget_type == "application":
+            self._application_source(self._section("Application"), item)
+        elif widget_type == "remote_view":
+            self._remote_view_source(self._section("Remote"), item)
+        elif widget_type == "streamdeck":
+            self._streamdeck_source(self._section("Stream Deck"), item)
+        elif widget_type == "image":
+            self._image_source(self._section("Image"), item)
+        elif widget_type == "axis_mouse":
+            self._mouse_source(self._section("Mouse"), item)
+        elif widget_type == "axis_graph":
+            self._graph_source(self._section("Graph"), item)
+            if not self._multi:
+                self._build_graph_datasets(item)
+        elif widget_type == "axis_bars":
+            self._bars_source(self._section("Bars"), item)
+            if not self._multi:
+                self._build_graph_datasets(item)
+        elif widget_type == "sys_stats":
+            self._stats_source(self._section("Stats"), item)
+            if not self._multi:
+                self._build_stat_datasets(item)
+        elif widget_type == "input_display":
+            self._input_display_source(self._section("Input display"), item)
+            if not self._multi:
+                self._build_input_display_keys(item)
+        elif widget_type == "axis_paddle":
+            self._paddle_source(self._section("Paddle"), item)
+        elif widget_type == "stopwatch":
+            self._stopwatch_source(self._section("Stopwatch"), item)
+        elif widget_type == "hat":
+            self._hat_source(self._section("Hat"), item)
+        if widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
+            self._build_binding(item)
 
     def _build_mixed(self, items: list[dict]):
         types = {item.get("type") for item in items}
         item = items[0]
-        self._add_expand_collapse_toolbar()
         form = self._section("Geometry")
         form.addRow("Selection", QtWidgets.QLabel(f'{len(items)} grouped widgets', self._host))
         form.addRow("Types", QtWidgets.QLabel(', '.join(sorted(((t or '').replace('_', ' ') for t in types))), self._host))
@@ -2148,6 +2133,8 @@ class OverlayInspector(QtWidgets.QWidget):
             "Scale font with size",
             tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
         )
+        if len(types) == 1:
+            self._build_widget_core(item, canonical_widget_type(next(iter(types))))
         self._build_visibility(item)
 
         label_form = self._section("Label")
@@ -3249,8 +3236,6 @@ class OverlayInspector(QtWidgets.QWidget):
             include_radius = widget_type not in NO_CORNER_RADIUS_TYPES
             self._border_appearance(look, item, include_radius=include_radius)
         self._style_widget_shadow(look, item)
-        if widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
-            self._build_binding(item)
         self._build_blink(item)
 
     def _lock_position_row(self, form, item: dict):
@@ -3475,7 +3460,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_color(form, item, "fill", "Fill")
         self._border_appearance(form, item, include_radius=(current == "rectangle"))
 
-    def _image_appearance(self, form, item: dict):
+    def _image_source(self, form, item: dict):
         path_row = QtWidgets.QWidget(self._host)
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
@@ -3493,6 +3478,11 @@ class OverlayInspector(QtWidgets.QWidget):
         path_layout.addWidget(browse)
         path_layout.addWidget(paste)
         form.addRow("Image", path_row)
+        hint = QtWidgets.QLabel('PNG, WebP, GIF, and SVG keep transparency. SVG is vector (Illustrator-friendly) and stays sharp at any size. Fill is only a backdrop behind those pixels. JPEG has no alpha.', self._host)
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+    def _image_look(self, form, item: dict):
         self._style_bool(
             form,
             item,
@@ -3500,11 +3490,66 @@ class OverlayInspector(QtWidgets.QWidget):
             "Keep aspect ratio",
             tooltip="Fit the picture inside the widget. Off stretches it to the widget size.",
         )
-        hint = QtWidgets.QLabel('PNG, WebP, GIF, and SVG keep transparency. SVG is vector (Illustrator-friendly) and stays sharp at any size. Fill is only a backdrop behind those pixels. JPEG has no alpha.', self._host)
-        hint.setWordWrap(True)
-        form.addRow(hint)
         self._style_color(form, item, "fill", "Fill")
         self._border_appearance(form, item, include_radius=False)
+
+    def _paddle_source(self, form, item: dict):
+        start = QtWidgets.QDoubleSpinBox(self._host)
+        start.setRange(-360.0, 360.0)
+        start.setDecimals(1)
+        start.setSuffix("°")
+        start.setValue(float(item["style"].get("paddle_start_deg") or 0.0))
+        start.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_start_deg=float(v)))
+        form.addRow("Start angle", start)
+        end = QtWidgets.QDoubleSpinBox(self._host)
+        end.setRange(-360.0, 360.0)
+        end.setDecimals(1)
+        end.setSuffix("°")
+        end.setValue(float(item["style"].get("paddle_end_deg") or 70.0))
+        end.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_end_deg=float(v)))
+        form.addRow("End angle", end)
+        cur_dir = normalize_paddle_direction(item["style"].get("paddle_direction"))
+        direction = _enum_radios(
+            [("Clockwise", "cw"), ("Counter-clockwise", "ccw")],
+            cur_dir,
+            lambda v, wid=item["id"]: self._style(wid, paddle_direction=v),
+        )
+        form.addRow("Rotation", direction)
+        path_row = QtWidgets.QWidget(self._host)
+        path_layout = QtWidgets.QHBoxLayout(path_row)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_edit = QtWidgets.QLineEdit(item['style'].get('paddle_image') or '', self._host)
+        path_edit.setPlaceholderText("Optional — replaces built-in art (pivot = image center)")
+        browse = Buttons.getFolderWidget(tooltip="Browse")
+        browse.setFixedWidth(28)
+        browse.setToolTip(
+            "Choose a custom paddle image. PNG with transparency works best. "
+            "Pivot is the center of the image. Clear uses the built-in silhouette from your reference."
+        )
+        browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_paddle_image(wid))
+        clear = Buttons.getClearWidget(
+            label="Clear",
+            tooltip="Use the built-in vector paddle.",
+            callback=lambda _btn=None, wid=item["id"]: self._style(wid, paddle_image="", rebuild=True),
+        )
+        path_edit.editingFinished.connect(
+            lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
+        )
+        path_layout.addWidget(path_edit)
+        path_layout.addWidget(browse)
+        path_layout.addWidget(clear)
+        form.addRow("Custom image", path_row)
+
+    def _hat_source(self, form, item: dict):
+        current = 8 if int(item["style"].get("hat_positions") or 4) >= 8 else 4
+        positions = _enum_radios(
+            [("4-position", 4), ("8-position", 8)],
+            current,
+            lambda v, wid=item["id"]: self._style(wid, hat_positions=int(v or 4)),
+        )
+        form.addRow("Positions", positions)
+
+    def _application_source(self, form, item: dict):
         from .app_view import list_application_windows, window_choice_label
 
         style = item.get("style") or {}
@@ -3514,26 +3559,35 @@ class OverlayInspector(QtWidgets.QWidget):
         box = QDataComboBox()
         box.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         box.setMinimumContentsLength(24)
-        box.addItem("(none)", ("", ""))
+        box.addItem("(none)", ("", "", ""))
         selected = 0
         for window in windows:
             title = str(window.get("title") or "")
             exe = str(window.get("exe") or "")
-            box.addItem(window_choice_label(title, exe), (title, exe))
+            path = str(window.get("path") or "")
+            box.addItem(window_choice_label(title, exe), (title, exe, path))
             if title == current_title and (not current_exe or exe.casefold() == current_exe.casefold()):
                 selected = box.count() - 1
         if current_title and selected == 0:
-            box.addItem(f"{current_title}  (not running)", (current_title, current_exe))
+            box.addItem(f"{current_title}  (not running)", (current_title, current_exe, str(style.get("launch_path") or "")))
             selected = box.count() - 1
         box.setCurrentIndex(selected)
 
         def _on_window_chosen(_index, combo=box, wid=item["id"]):
-            data = combo.currentData() or ("", "")
-            title, exe = data if isinstance(data, tuple) else ("", "")
-            self._style(wid, window_title=str(title or ""), window_exe=str(exe or ""))
+            data = combo.currentData() or ("", "", "")
+            if not isinstance(data, tuple):
+                data = ("", "", "")
+            title = str(data[0] if len(data) > 0 else "")
+            exe = str(data[1] if len(data) > 1 else "")
+            path = str(data[2] if len(data) > 2 else "")
+            fields = {"window_title": title, "window_exe": exe}
+            if path:
+                fields["launch_path"] = path
+            self._style(wid, **fields)
 
         box.currentIndexChanged.connect(_on_window_chosen)
         form.addRow("Application", box)
+
         def _on_refresh_windows():
             QtCore.QTimer.singleShot(0, self.rebuild)
 
@@ -3543,9 +3597,51 @@ class OverlayInspector(QtWidgets.QWidget):
             callback=_on_refresh_windows,
         )
         form.addRow(refresh)
-        hint = QtWidgets.QLabel('Shows a live picture of the selected window. The match is stored by window title (and process name when available) so it can reconnect after a restart. Some exclusive full-screen games cannot be captured.', self._host)
+
+        path_row = QtWidgets.QWidget(self._host)
+        path_layout = QtWidgets.QHBoxLayout(path_row)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_edit = QtWidgets.QLineEdit(str(style.get("launch_path") or ""), self._host)
+        path_edit.setPlaceholderText("Optional — exe to start if the window is not running")
+        browse = Buttons.getFolderWidget(tooltip="Browse")
+        browse.setFixedWidth(28)
+        browse.setToolTip("Choose the executable to launch.")
+        browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_launch_path(wid))
+        clear = Buttons.getClearWidget(
+            label="Clear",
+            callback=lambda _btn=None, wid=item["id"]: self._style(wid, launch_path=""),
+        )
+        path_edit.editingFinished.connect(
+            lambda wid=item["id"], w=path_edit: self._style(wid, launch_path=w.text().strip())
+        )
+        path_layout.addWidget(path_edit)
+        path_layout.addWidget(browse)
+        path_layout.addWidget(clear)
+        form.addRow("Launch path", path_row)
+
+        args_edit = QtWidgets.QLineEdit(str(style.get("launch_args") or ""), self._host)
+        args_edit.setPlaceholderText('Command-line arguments, e.g. --profile "My Pit"')
+        args_edit.setToolTip("Arguments passed to the executable when it is launched. Quoted tokens stay together.")
+        args_edit.editingFinished.connect(
+            lambda wid=item["id"], w=args_edit: self._style(wid, launch_args=w.text())
+        )
+        form.addRow("Arguments", args_edit)
+
+        launch_now = QDataPushButton("Launch now")
+        launch_now.setToolTip("Start this executable with the arguments above.")
+        launch_now.clicked.connect(lambda _=False, wid=item["id"]: self._launch_application_now(wid))
+        form.addRow(launch_now)
+
+        hint = QtWidgets.QLabel(
+            "Shows a live picture of the selected window. Match is stored by window title "
+            "(and process name when available). If the window is missing and Launch path is set, "
+            "the overlay starts that program with the arguments. Some exclusive full-screen games cannot be captured.",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
+
+    def _application_look(self, form, item: dict):
         self._style_bool(
             form,
             item,
@@ -3556,7 +3652,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_color(form, item, "fill", "Fill")
         self._border_appearance(form, item)
 
-    def _remote_view_appearance(self, form, item: dict):
+    def _remote_view_source(self, form, item: dict):
         from gremlin.remote_video import RemoteVideoHub
 
         style = item.get("style") or {}
@@ -3594,6 +3690,8 @@ class OverlayInspector(QtWidgets.QWidget):
         hint = QtWidgets.QLabel('Clients must enable Remote Control → Video return. Dot (●) means the peer advertised a video port. Master connects to that peer over TCP (default 6013).', self._host)
         hint.setWordWrap(True)
         form.addRow(hint)
+
+    def _remote_view_look(self, form, item: dict):
         self._style_bool(
             form,
             item,
@@ -3604,7 +3702,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_color(form, item, "fill", "Fill")
         # Border controls come from _append_shared_appearance.
 
-    def _mouse_appearance(self, form, item: dict):
+    def _mouse_source(self, form, item: dict):
         style = item.get("style") or {}
         current = normalize_mouse_mode(style.get("mouse_mode"))
         mode = _enum_radios(
@@ -3640,6 +3738,10 @@ class OverlayInspector(QtWidgets.QWidget):
             idle.setToolTip("Return the mouse to the center after this much time with no movement. Off keeps the last position.")
             idle.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, mouse_idle_s=float(v)))
             form.addRow("Recenter after", idle)
+
+    def _mouse_look(self, form, item: dict):
+        style = item.get("style") or {}
+        current = normalize_mouse_mode(style.get("mouse_mode"))
         self._style_color(form, item, "fill", "Fill")
         self._style_color(form, item, "indicator", "Arrow / mouse")
         if current == "vjoy":
@@ -3650,9 +3752,8 @@ class OverlayInspector(QtWidgets.QWidget):
         self._grid_appearance(form, item)
         self._crosshair_appearance(form, item)
 
-    def _graph_appearance(self, form, item: dict):
+    def _graph_source(self, form, item: dict):
         style = item.get("style") or {}
-        self._style_color(form, item, "fill", "Fill")
         period = QtWidgets.QDoubleSpinBox(self._host)
         period.setRange(0.5, 120.0)
         period.setSingleStep(0.5)
@@ -3690,15 +3791,17 @@ class OverlayInspector(QtWidgets.QWidget):
         unit.setToolTip("Shown next to the min / mid / max labels on the left.")
         unit.editingFinished.connect(lambda wid=item["id"], w=unit: self._style(wid, unit=w.text()))
         form.addRow("Unit", unit)
+
+    def _graph_look(self, form, item: dict):
+        self._style_color(form, item, "fill", "Fill")
         self._style_bool(form, item, "show_legend", "Show legend")
         self._grid_appearance(form, item)
 
-    def _bars_appearance(self, form, item: dict):
+    def _bars_source(self, form, item: dict):
         from .model import bars_value_range
 
         style = item.get("style") or {}
         self._orientation_combo(form, item)
-        self._style_color(form, item, "fill", "Fill")
         auto = QtWidgets.QCheckBox(self._host)
         auto.setChecked(bool(style.get("range_auto", True)))
         auto.setToolTip("Use −100…+100 when any selected axis is centered; 0…100 when every axis is 0–100%.")
@@ -3725,12 +3828,14 @@ class OverlayInspector(QtWidgets.QWidget):
             note = QtWidgets.QLabel(f'Current scale: {vmin:g} to {vmax:g} %', self._host)
             note.setWordWrap(True)
             form.addRow(note)
+
+    def _bars_look(self, form, item: dict):
+        self._style_color(form, item, "fill", "Fill")
         self._style_bool(form, item, "show_legend", "Show legend")
         self._grid_appearance(form, item)
 
-    def _stats_appearance(self, form, item: dict):
+    def _stats_source(self, form, item: dict):
         style = item.get("style") or {}
-        self._style_color(form, item, "fill", "Fill")
         self._orientation_combo(form, item)
         clock_cur = "12h" if str(style.get("time_format") or "24h").casefold() in ("12h", "12", "ampm") else "24h"
         clock = _enum_radios(
@@ -3746,10 +3851,13 @@ class OverlayInspector(QtWidgets.QWidget):
             lambda v, wid=item["id"]: self._style(wid, temp_unit=str(v or "C")),
         )
         form.addRow("Temperature", unit)
-        self._style_bool(form, item, "show_caption", "Show stat names")
         hint = QtWidgets.QLabel('Add one or more stats in Datasets, each with its own color. FPS is in-game (MSI Afterburner / RTSS). A Manual counter increments and decrements from keybinds.', self._host)
         hint.setWordWrap(True)
         form.addRow(hint)
+
+    def _stats_look(self, form, item: dict):
+        self._style_color(form, item, "fill", "Fill")
+        self._style_bool(form, item, "show_caption", "Show stat names")
 
     def _stats_for(self, item: dict) -> list[dict]:
         return normalize_stat_series(item.get("stats"), (item.get("style") or {}).get("stat") or "time")
@@ -3935,11 +4043,10 @@ class OverlayInspector(QtWidgets.QWidget):
         if rebuild:
             self.rebuild()
 
-    def _stopwatch_appearance(self, form, item: dict):
+    def _stopwatch_source(self, form, item: dict):
         from .stopwatch_track import normalize_stopwatch_face, normalize_stopwatch_format
 
         style = item.get("style") or {}
-        self._style_color(form, item, "fill", "Fill")
         face = _enum_radios(
             [("Digital", "digital"), ("Analog", "analog")],
             normalize_stopwatch_face(style.get("stopwatch_face")),
@@ -3952,6 +4059,12 @@ class OverlayInspector(QtWidgets.QWidget):
             lambda v, wid=item["id"]: self._style(wid, stopwatch_format=str(v or "mmss")),
         )
         form.addRow("Format", fmt)
+
+    def _stopwatch_look(self, form, item: dict):
+        from .stopwatch_track import normalize_stopwatch_face
+
+        style = item.get("style") or {}
+        self._style_color(form, item, "fill", "Fill")
         if normalize_stopwatch_face(style.get("stopwatch_face")) == "analog":
             self._look_heading(form, "Hour needle")
             self._style_color(form, item, "needle_hour_color", "Color")
@@ -3966,12 +4079,10 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_float(form, item, "needle_second_width", "Width", 0.5, 16, step=0.5)
             self._style_bool(form, item, "needle_second_arrow", "Arrow at tip")
 
-    def _input_display_appearance(self, form, item: dict):
+    def _input_display_source(self, form, item: dict):
         from .input_display import MOUSE_GRAPHIC_CHOICES, normalize_mouse_graphic
 
         style = item.get("style") or {}
-        self._style_color(form, item, "fill", "Off fill")
-        self._style_color(form, item, "fill_on", "On fill")
         self._style_bool(form, item, "show_keyboard", "Show keyboard")
         self._style_bool(form, item, "show_mouse", "Show mouse")
         current = normalize_mouse_graphic(style.get("mouse_graphic"))
@@ -3982,6 +4093,10 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip="Silhouette is a top-down mouse. Button map labels every mouse button (M1–M5, wheel, tilt).",
         )
         form.addRow("Mouse graphic", graphic)
+
+    def _input_display_look(self, form, item: dict):
+        self._style_color(form, item, "fill", "Off fill")
+        self._style_color(form, item, "fill_on", "On fill")
 
     def _build_input_display_keys(self, item: dict):
         from .input_display import PRESET_CHOICES, matching_preset
@@ -4393,7 +4508,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style(widget_id, mouse_mode=normalize_mouse_mode(mode))
         self.rebuild()
 
-    def _streamdeck_appearance(self, form, item: dict):
+    def _streamdeck_source(self, form, item: dict):
         try:
             from gremlin.ui.streamdeck_device import (
                 StreamDeckBridge,
@@ -4454,13 +4569,6 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("Follow hardware page", follow_box)
         form.addRow("Page", page_combo)
-        self._style_bool(
-            form,
-            item,
-            "show_bezel",
-            "Show bezel",
-            tooltip="Draw the Stream Deck body around the keys.",
-        )
         fit = QDataPushButton("Fit to device", tooltip="Resize this widget to the key layout of the selected Stream Deck.", clicked=lambda wid=item["id"]: self._fit_streamdeck_item(wid, force=True))
         form.addRow(fit)
         hint = QtWidgets.QLabel(
@@ -4469,6 +4577,15 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         hint.setWordWrap(True)
         form.addRow(hint)
+
+    def _streamdeck_look(self, form, item: dict):
+        self._style_bool(
+            form,
+            item,
+            "show_bezel",
+            "Show bezel",
+            tooltip="Draw the Stream Deck body around the keys.",
+        )
         self._style_color(form, item, "fill", "Bezel")
         self._border_appearance(form, item)
 
@@ -4596,6 +4713,43 @@ class OverlayInspector(QtWidgets.QWidget):
         self._fit_item_to_image(item, fname)
         self.scene._dirty = True
         self.scene._emit()
+
+    def _browse_launch_path(self, widget_id: str):
+        if self._building:
+            return
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        start = (item.get("style") or {}).get("launch_path") or ""
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Application to launch",
+            start,
+            "Programs (*.exe);;All files (*.*)",
+        )
+        if not fname:
+            return
+        import os
+
+        fields = {"launch_path": fname}
+        if not str((item.get("style") or {}).get("window_exe") or "").strip():
+            fields["window_exe"] = os.path.basename(fname)
+        self._style(widget_id, **fields)
+
+    def _launch_application_now(self, widget_id: str):
+        if self._building:
+            return
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        from .app_view import launch_application
+
+        style = item.get("style") or {}
+        ok, err = launch_application(style.get("launch_path"), style.get("launch_args"))
+        if not ok:
+            QtWidgets.QMessageBox.warning(self, "OBS Overlay", err or "Could not launch the application.")
+            return
+        QtCore.QTimer.singleShot(800, self.rebuild)
 
     def _browse_paddle_image(self, widget_id: str):
         if self._building:
