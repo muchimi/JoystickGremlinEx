@@ -239,20 +239,23 @@ def _banner_type_help(item: dict) -> list[str]:
         )
     elif widget_type == "image":
         lines.append(
-            "Inspector: browse to a PNG, WebP, GIF, JPEG, or BMP, or Paste a screenshot from the clipboard "
+            "Inspector Image section: browse to a PNG, WebP, GIF, JPEG, or BMP, or Paste a screenshot from the clipboard "
             "(Windows Snipping Tool / Win+Shift+S). Ctrl+V on the canvas does the same. Formats with alpha keep transparency. "
-            "Keep aspect ratio is on by default. Right-click: Turn into button (image as off background, no label) "
+            "Keep aspect ratio is under Appearance. Right-click: Turn into button (image as off background, no label) "
             "or Turn into paddle (image rotates around its center)."
         )
     elif widget_type == "application":
         lines.append(
-            "Inspector: pick a running window to show inside this widget. Refresh the list if the app was started later. "
-            "Keep aspect ratio fits the capture; off stretches it. This widget has no joystick binding."
+            "Inspector Application section: pick a running window to show inside this widget. Optional Launch path + Arguments start the "
+            "program if it is not running. Refresh the list if the app was started later. "
+            "Keep aspect ratio is under Appearance. This widget has no joystick binding."
         )
+    elif widget_type == "remote_view":
+        lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
     elif widget_type == "streamdeck":
-        lines.append("Inspector: pick the deck (or First connected), follow the GEX page or set a page, Show bezel, Fit to device. No joystick binding.")
+        lines.append("Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding.")
     elif widget_type == "axis_graph":
-        lines.append("Inspector: Datasets add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding.")
+        lines.append("Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding.")
     elif widget_type == "axis_bars":
         lines.append(
             "Inspector: Orientation (vertical/horizontal). Datasets are the bars — color and Range per axis "

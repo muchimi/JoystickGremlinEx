@@ -1458,7 +1458,7 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.setPen(qcolor(style.get("font_color"), "#8899aa"))
         msg = tracker.status(item) or "Select a running application"
         painter.drawText(rect, int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap), msg)
-        if not (style.get("window_title") or style.get("window_exe")):
+        if not (style.get("window_title") or style.get("window_exe") or style.get("launch_path")):
             _draw_label(painter, item, rect)
     painter.restore()
 
