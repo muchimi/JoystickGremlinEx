@@ -3055,6 +3055,8 @@ Enabled modules may not show until the device filter is updated.
         plugins = gremlin.plugin_manager.ActionPlugins()
 
         for act in sorted(plugins.repository.values(), key=lambda x: x.name):
+            if not plugins.is_action_available(act):
+                continue
             self.default_action_dropdown.addItem(act.name)
         self.default_action_dropdown.setCurrentText(self.config.default_action)
         self.default_action_dropdown.currentTextChanged.connect(self._update_default_action)

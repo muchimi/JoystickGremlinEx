@@ -168,9 +168,10 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         action_label = QtWidgets.QLabel("Actions")
         self.ui_action_dropdown = gremlin.ui.ui_common.QDataComboBox()
-        # entries = list(gremlin.plugin_manager.ActionPlugins().repository.values())
-        # for entry in entries:
-        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+        action_plugins = gremlin.plugin_manager.ActionPlugins()
+        for entry in action_plugins.repository.values():
+            if not action_plugins.is_action_available(entry):
+                continue
             self.ui_action_dropdown.addItem(entry.name, entry)
 
         cfg = gremlin.config.Configuration()
