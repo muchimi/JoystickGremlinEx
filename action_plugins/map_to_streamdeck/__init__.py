@@ -117,10 +117,7 @@ def schedule_auto_return(device_id: str, page_0based: int, seconds: float) -> No
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             bridge = StreamDeckBridge()
-            syslog.info(
-                f"Map to Stream Deck: Auto-return -> GEX bank {int(page_0based)+1} "
-                f"device={device_id[:12] if device_id else '?'}"
-            )
+            syslog.info(f"Map to Stream Deck: Auto-return -> GEX bank {int(page_0based) + 1} device={device_id[:12] if device_id else '?'}")
             bridge.change_page(device_id, int(page_0based), "")
         except Exception as exc:
             syslog.warning(f"Map to Stream Deck: auto-return failed: {exc}")
@@ -248,9 +245,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
             idx = 0
         self.function_widget.setCurrentIndex(idx)
         self.function_widget.currentIndexChanged.connect(self._function_changed)
-        self.main_layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(self.function_widget, "Function:", widget_only=True)
-        )
+        self.main_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.function_widget, "Function:", widget_only=True))
 
         self.page_widget = gremlin.ui.ui_common.QDataComboBox()
         self.page_widget.setMinimumWidth(220)
@@ -263,9 +258,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.page_row)
 
         self.auto_return_widget = QtWidgets.QCheckBox("Auto-return to previous page")
-        self.auto_return_widget.setToolTip(
-            "After switching, automatically return to the page that was active before this action."
-        )
+        self.auto_return_widget.setToolTip("After switching, automatically return to the page that was active before this action.")
         self.auto_return_widget.setChecked(bool(self.action_data.auto_return))
         self.auto_return_widget.toggled.connect(self._auto_return_toggled)
 
@@ -306,7 +299,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
 
             bridge = StreamDeckBridge()
             bridge.devices_changed.connect(self._refresh_devices)
-            bridge.plugin_connected.connect(lambda _c: self._refresh_devices())
+            bridge.plugin_connected.connect(self._refresh_devices)
             bridge.virtual_page_changed.connect(self._on_virtual_page_changed)
         except Exception:
             pass
@@ -419,9 +412,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         show_auto = cmd in AUTO_RETURN_COMMANDS
         self.page_row.setVisible(cmd == "changePage")
         self.auto_return_row.setVisible(show_auto)
-        self.auto_return_seconds_widget.setVisible(
-            show_auto and bool(self.action_data.auto_return)
-        )
+        self.auto_return_seconds_widget.setVisible(show_auto and bool(self.action_data.auto_return))
 
     def _send_page_command_now(self) -> bool:
         """Shared path for Test button and runtime functor."""
@@ -477,10 +468,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
             detail = (
                 "Returned to the previously displayed page."
                 if cmd == "returnToLast"
-                else (
-                    "Live JG Ex keys should show that bank's titles. "
-                    "Presses now run mappings for that page."
-                )
+                else ("Live JG Ex keys should show that bank's titles. Presses now run mappings for that page.")
             )
             gremlin.ui.ui_common.MessageBoxInfo(
                 title="Map to Stream Deck",
@@ -489,24 +477,19 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         elif not connected:
             gremlin.ui.ui_common.MessageBoxWarning(
                 title="Map to Stream Deck",
-                prompt=(
-                    "Plugin is not connected.\n"
-                    "Enable the Stream Deck bridge and confirm the PI shows Connected."
-                ),
+                prompt=("Plugin is not connected.\nEnable the Stream Deck bridge and confirm the PI shows Connected."),
             )
         elif cmd == "returnToLast":
             gremlin.ui.ui_common.MessageBoxWarning(
                 title="Map to Stream Deck",
-                prompt=(
-                    "No previous page is stored yet.\n"
-                    "Change to another page first, then use Return to Last."
-                ),
+                prompt=("No previous page is stored yet.\nChange to another page first, then use Return to Last."),
             )
         else:
             gremlin.ui.ui_common.MessageBoxWarning(
                 title="Map to Stream Deck",
                 prompt="Could not change page. Check the Stream Deck bridge connection.",
             )
+
     @QtCore.Slot()
     def _device_changed(self):
         self.action_data.device_id = self.device_widget.currentData() or ""
@@ -574,32 +557,24 @@ class MapToStreamDeckFunctor(gremlin.base_profile.AbstractFunctor):
         # tab GUID 72bbc0f4…) — using that here sent Change Page to a non-deck.
         if event.event_type == InputType.StreamDeck:
             ident = event.identifier
-            elgato_id = getattr(ident, "device_id", None) or getattr(
-                ident, "_elgato_device_id", None
-            )
+            elgato_id = getattr(ident, "device_id", None) or getattr(ident, "_elgato_device_id", None)
             if elgato_id and elgato_id in bridge.devices:
                 device_id = elgato_id
 
         devices = bridge.devices
         if device_id and device_id not in devices:
             syslog.warning(
-                f"Map to Stream Deck: device [{device_id[:12]}] is not a connected "
-                f"Stream Deck (src={event.event_type.name}) — check Device selection."
+                f"Map to Stream Deck: device [{device_id[:12]}] is not a connected Stream Deck (src={event.event_type.name}) — check Device selection."
             )
             device_id = ""
         if not device_id:
             if len(devices) == 1:
                 device_id = next(iter(devices.keys()))
             elif len(devices) > 1:
-                syslog.warning(
-                    "Map to Stream Deck: no device selected and multiple decks "
-                    "are connected — pick a Device in the action."
-                )
+                syslog.warning("Map to Stream Deck: no device selected and multiple decks are connected — pick a Device in the action.")
                 return True
             else:
-                syslog.warning(
-                    "Map to Stream Deck: no Stream Deck connected (plugin bridge)."
-                )
+                syslog.warning("Map to Stream Deck: no Stream Deck connected (plugin bridge).")
                 return True
 
         if cmd in PAGE_COMMANDS:
@@ -612,26 +587,17 @@ class MapToStreamDeckFunctor(gremlin.base_profile.AbstractFunctor):
                 f"device={device_id[:12] if device_id else '?'} "
                 f"page0={int(page)} pressed={is_pressed} "
                 f"src={event.event_type.name}"
-                + (
-                    f" (auto-return {float(self.action_data.auto_return_seconds or DEFAULT_AUTO_RETURN_SECONDS):g}s)"
-                    if self.action_data.auto_return
-                    else ""
-                )
+                + (f" (auto-return {float(self.action_data.auto_return_seconds or DEFAULT_AUTO_RETURN_SECONDS):g}s)" if self.action_data.auto_return else "")
             )
             ok = apply_page_command(
                 device_id,
                 cmd,
                 int(page),
                 auto_return=bool(self.action_data.auto_return),
-                auto_return_seconds=float(
-                    self.action_data.auto_return_seconds or DEFAULT_AUTO_RETURN_SECONDS
-                ),
+                auto_return_seconds=float(self.action_data.auto_return_seconds or DEFAULT_AUTO_RETURN_SECONDS),
             )
             if not ok:
-                syslog.warning(
-                    f"Map to Stream Deck: {label} failed for device="
-                    f"{device_id[:12] if device_id else '?'}"
-                )
+                syslog.warning(f"Map to Stream Deck: {label} failed for device={device_id[:12] if device_id else '?'}")
         else:
             syslog.warning(f"Map to Stream Deck: unsupported function [{cmd}]")
 

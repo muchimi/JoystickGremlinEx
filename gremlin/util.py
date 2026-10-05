@@ -2771,6 +2771,10 @@ def ansiResult(result: bool):
     else:
         return ansiFail()
 
+def ansiBool(value: bool):
+    """returns an ansi colored boolean value"""
+    return ansiGreen("True", bold=True) if value else ansiRed("False", bold=True)
+
 
 def ansiFail():
     return ansiRed("FAIL", bold=True)

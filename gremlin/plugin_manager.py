@@ -296,21 +296,39 @@ class ActionPlugins:
         return self._plugins_folder_map
 
     def _validate_plugin(self, plugin):
-        """Validates a plugin based on the current configuration."""
-        import gremlin.config
-        config = gremlin.config.Configuration()
+        """Validates that a module is a JG Ex action plugin.
+
+        Optional features (Stream Deck / OSC / SimConnect / AFCS) must NOT gate
+        discovery here. Skipping those plugins made profile load treat their XML
+        tags as unknown and drop the actions; a later save then blanked mappings.
+        Gate the Add Action UI via :meth:`is_action_available` instead.
+        """
         if "version" not in plugin.__dict__:
             # not one of our plugins
             return False
-        if not config.osc_enabled and "map-to-osc" in plugin.name.casefold():
-            return False
-        if not config.simconnect_enabled and "simconnect" in plugin.name.casefold():
-            return False
-        if not config.streamdeck_enabled and "streamdeck" in plugin.name.casefold():
-            return False
-        if not config.afcs_enabled and "afcs" in plugin.name.casefold():
-            return False
+        return True
 
+    @staticmethod
+    def is_action_available(entry) -> bool:
+        """True if *entry* may be offered in the Add Action list.
+
+        Always keep the plugin loaded for profile load/save; only hide it from
+        the picker when the related Options module toggle is off.
+        """
+        import gremlin.config
+
+        config = gremlin.config.Configuration()
+        tag = str(getattr(entry, "tag", "") or "").casefold()
+        name = str(getattr(entry, "name", "") or "").casefold()
+        key = f"{tag} {name}"
+        if "streamdeck" in key and not config.streamdeck_enabled:
+            return False
+        if ("map-to-osc" in key or "map_to_osc" in key) and not config.osc_enabled:
+            return False
+        if "simconnect" in key and not config.simconnect_enabled:
+            return False
+        if "afcs" in key and not config.afcs_enabled:
+            return False
         return True
 
     def _discover_plugins(self):

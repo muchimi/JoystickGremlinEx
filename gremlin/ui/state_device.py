@@ -423,6 +423,8 @@ class StateInputItem(InputItem):
         self.hook()  # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name  # states all belong to the master mode
 
+
+
     def _handle_input_id_callback(self):
         """input id is self for STATE"""
         return self
@@ -542,9 +544,11 @@ class StateInputItem(InputItem):
     @property
     def value(self) -> bool:
         """gets the state value"""
-        value = self.evaluate()
-        # return False on invalid state value
-        return value if value is not None else False
+        if self._is_expression:
+            return self.evaluate()
+
+        # syslog.info(f"STATE getValue(): get [{self.key}]  -> [{self._value}]")
+        return self._value if self._value is not None else False
 
     @value.setter
     def value(self, data: bool):
@@ -593,7 +597,11 @@ class StateInputItem(InputItem):
             # only set value on non expression states and only if the value has changed
             self._last_value = self._value
             self._value = data
+
+            syslog.info(f"STATE setValue(): set [{self.key}]  -> [{data}]")
+
             self._fire_changed(data)
+            self.changed.emit(self)
 
             if is_auto:
                 trigger_mode = self._autorelease_trigger_mode
@@ -1487,9 +1495,38 @@ class StateData:
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._reset)
         el.profile_unloaded.connect(self._handle_profile_unload)
+        self._state_change_callbacks = {}
+        self._hooked_states = set()
+
+    def registerStateChangeCallback(self, key : str, callback : Callable[[StateInputItem], None]):
+        """registers a callback to be invoked when a state changes"""
+        key = key.casefold().strip()
+        if key not in self._state_change_callbacks:
+            self._state_change_callbacks[key] = []
+        if callback not in self._state_change_callbacks[key]:
+            self._state_change_callbacks[key].append(callback)
+
+    def unregisterStateChangeCallback(self, key : str, callback):
+        """unregisters a previously registered state change callback"""
+        key = key.casefold().strip()
+        if key in self._state_change_callbacks:
+            if callback in self._state_change_callbacks[key]:
+                self._state_change_callbacks[key].remove(callback)
+
+    def _fire_callbacks(self, state : StateInputItem):
+        """invokes all registered state change callbacks for the given state"""
+        key = state.key
+        # syslog.info(f"State Fire change callbacks: [{key}] -> {gremlin.util.ansiBool(state.value)}")
+        if key in self._state_change_callbacks:
+            for callback in self._state_change_callbacks[key]:
+                callback(state)
 
     def _handle_profile_unload(self):
         """occurs on profile unload before a new profile is loaded"""
+
+        for state in self._data.values():
+            # disconnect hooks
+            state.changed.disconnect(self._handle_state_changed)
 
         self._data = {}
         self._id_map = {}
@@ -1504,6 +1541,8 @@ class StateData:
         to_evaluate = []
         verbose = gremlin.config.Configuration().verbose_mode_state
         for state in self._data.values():
+
+
             if state.expression:
                 # initial evaluation
                 to_evaluate.append(state)
@@ -1540,13 +1579,21 @@ class StateData:
             return self._data[key]
 
         state = StateInputItem(key, value, description)
-        self._data[key] = state
+        self._add_state(state)
+        return state
+
+    def _add_state(self, state: StateInputItem):
+        if state not in self._hooked_states:
+            self._hooked_states.add(state)
+            state.changed.connect(self._handle_state_changed)
+        self._data[state.key] = state
         self._id_map[state.id] = state
-        # Skip UI refresh during profile XML load — MacroWidgets still listen
-        # to crud and would rebuild VJoy dropdowns on the worker thread.
         if not gremlin.shared_state.profile_loading:
             self.crud.emit()
-        return state
+
+    def _handle_state_changed(self, state: StateInputItem):
+        """ called when a state change occurs"""
+        self._fire_callbacks(state) # fire registered callbacks to the state manager on state change
 
     def getCount(self) -> int:
         """returns the number of registered states"""
@@ -1563,6 +1610,9 @@ class StateData:
         """occurs on a key change"""
         if state.id not in self._id_map:
             self._id_map[state.id] = state
+        if state not in self._hooked_states:
+            self._hooked_states.add(state)
+            state.changed.connect(self._handle_state_changed)
         self._data[new_name] = state
         self.key_changed.emit(state, old_name, new_name)
         # remove the old state AFTER updates or things referencing the old state won't find it
@@ -1585,10 +1635,14 @@ class StateData:
         """removes a state from the list"""
         key = key.casefold().strip()
         if key in self._data:
-            state_data = self._data[key]
-            state_data.unhook()
+            state = self._data[key]
 
-            id = state_data.id
+            state.unhook()
+            state.changed.disconnect(self._handle_state_changed)
+            if state in self._hooked_states:
+                self._hooked_states.remove(state)
+
+            id = state.id
             del self._data[key]
             del self._id_map[id]
 
@@ -1601,18 +1655,20 @@ class StateData:
 
     def toggle(self, key: str):
         """toggles a state"""
+
         key = key.casefold().strip()
         if key in self._data:
+            state = self._data[key]
+            if state not in self._hooked_states:
+                self._hooked_states.add(state)
+                state.changed.connect(self._handle_state_changed)
             return self._data[key].toggle()
         return None
 
     def add(self, data: StateInputItem, emit=True):
         if data and data.key not in self._data:
-            self._data[data.key] = data
-            self._id_map[data.id] = data
+            self._add_state(data)
             self._sort()
-            if emit and not gremlin.shared_state.profile_loading:
-                self.crud.emit()
 
     def _sort(self):
         self._data = dict(sorted(self._data.items()))
@@ -1664,7 +1720,11 @@ class StateData:
         if key in self._data:
             if verbose:
                 syslog.info(f"STATE SET: set state [{key}] -> {value}")
-            self._data[key].setValue(value, force)
+            state = self._data[key]
+            if state not in self._hooked_states:
+                self._hooked_states.add(state)
+                state.changed.connect(self._handle_state_changed)
+            state.setValue(value, force)
         else:
             syslog.error(f"STATE: latch state: [{key}] not found")
 
@@ -1921,6 +1981,9 @@ class StateData:
         )
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)
+
+
+        self._fire_callbacks(input_item.key, input_item.value)
 
 
 class CategoryModel(QtCore.QAbstractListModel):
@@ -2592,6 +2655,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _category_change_cb(self, category):
         """category was changed"""
+        if not Shiboken.isValid(self._category_selector_widget):
+            return
         self._cm.updateSelector(self._category_selector_widget)
         index = self._category_selector_widget.findData(category)
         if index == -1:
@@ -3109,6 +3174,11 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+        el.state_added.connect(self._handle_state_added)
+
+    def _handle_state_added(self, state):
+        """called when a new state is added"""
+        self.inputItemListModel.refresh()
 
     def onItemChanged(self, model, index, new_item, old_item, operation):
         redraw = False

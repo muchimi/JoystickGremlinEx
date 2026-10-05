@@ -25,6 +25,7 @@ from lxml import etree
 import os
 import uuid
 import time
+import weakref
 import lxml.etree
 import traceback
 import collections
@@ -7822,13 +7823,17 @@ class ActionSelector(QtWidgets.QWidget):
         _control_enabled = config.show_input_enable
 
         # all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
-        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+        action_plugins = gremlin.plugin_manager.ActionPlugins()
+        for entry in action_plugins.repository.values():
             # if entry.tag == "gremlin-control":
             #     pass
             if not entry.input_types or input_type in entry.input_types:
                 if convert_vjoy and entry.name == "Remap":
                     continue
                 elif convert_curve and entry.name == "Response Curve":
+                    continue
+                # Optional modules stay loaded for profile round-trip; hide from picker when disabled.
+                if not action_plugins.is_action_available(entry):
                     continue
                 # if entry.name == "Control" and not control_enabled:
                 #     continue
@@ -7838,8 +7843,11 @@ class ActionSelector(QtWidgets.QWidget):
     def _valid_action_map(self, input_type: InputType):
         """Returns a dictionary mapping valid action names to their corresponding plugin entries for this InputItemWidget."""
         action_map = {}
-        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+        action_plugins = gremlin.plugin_manager.ActionPlugins()
+        for entry in action_plugins.repository.values():
             if not entry.input_types or input_type in entry.input_types:
+                if not action_plugins.is_action_available(entry):
+                    continue
                 if hasattr(entry, "aliases"):
                     for alias in entry.aliases:
                         action_map[alias] = entry
@@ -10773,8 +10781,11 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             else:
                 raise gremlin.error.GremlinError("Response curve plugin is missing")
         else:
-            for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+            action_plugins = gremlin.plugin_manager.ActionPlugins()
+            for entry in action_plugins.repository.values():
                 if self._input_item.input_type in entry.input_types:
+                    if not action_plugins.is_action_available(entry):
+                        continue
                     action_names.append(entry.name)
         return sorted(action_names)
 
@@ -12040,7 +12051,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
         widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} input item: [{input_item.display_name}] ")
         widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
-        widget.description_clear.connect(lambda: self._description_clear_cb(index, widget))
+        widget_ref = weakref.ref(widget)  # avoid widget -> lambda -> widget cycle
+        widget.description_clear.connect(lambda: self._description_clear_cb(index, widget_ref()))
         input_item.setMappingWidget(widget)  # keep a reference to the mapping widget
         return widget
 

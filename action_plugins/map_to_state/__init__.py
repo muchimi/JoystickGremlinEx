@@ -25,6 +25,9 @@ import gremlin.util
 import gremlin.ui.state_device
 import html
 from shiboken6 import Shiboken
+import threading
+import time
+from gremlin.ui.ui_common import QDataCheckbox, QDataLineEdit, QDataRadioButton, getHContainer, getVContainer, getGridContainer, QDelayWidget
 
 syslog = logging.getLogger("system")
 
@@ -42,29 +45,29 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
 
         widgets = []
 
-        self.state_widget = gremlin.ui.ui_common.QDataLineEdit()
-        widget, layout = gremlin.ui.ui_common.getGridContainer(["State:", self.state_widget])
+        self.state_widget = QDataLineEdit()
+        widget, layout = getGridContainer(["State:", self.state_widget])
         widgets.append(widget)
 
         self._state = None
 
         main_layout.addWidget(widget)
 
-        self.description_widget = gremlin.ui.ui_common.QDataLineEdit()
-        widget, layout = gremlin.ui.ui_common.getGridContainer(["Description:", self.description_widget])
+        self.description_widget = QDataLineEdit()
+        widget, layout = getGridContainer(["Description:", self.description_widget])
         widgets.append(widget)
 
         main_layout.addWidget(widget)
 
         gremlin.ui.ui_common.synchronize_grids(widgets)
 
-        self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
-        self._default_off_widget = gremlin.ui.ui_common.QDataRadioButton("Off", False)
+        self._default_on_widget = QDataRadioButton("On", True)
+        self._default_off_widget = QDataRadioButton("Off", False)
         self._default_off_widget.setChecked(True)
         self._default_off_widget.clicked.connect(self._default_changed)
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(["Default:", self._default_on_widget, self._default_off_widget], widget_only=True)
+        widget = getHContainer(["Default:", self._default_on_widget, self._default_off_widget], widget_only=True)
         main_layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -73,7 +76,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
         main_layout.addWidget(widget)
 
     @QtCore.Slot(bool)
@@ -147,30 +150,41 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only=True)
         self.main_layout.addWidget(widget)
 
-        self.button_pulse_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.button_pulse_widget = QDelayWidget()
         self.button_pulse_widget.setToolTip("Delay in milliseconds")
         self.button_pulse_widget.setValue(self.action_data.pulse_delay)
         self.button_pulse_widget.valueChanged.connect(self._value_changed)
 
-        self.button_pulse_repeat_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.button_pulse_repeat_widget = QDelayWidget()
         self.button_pulse_repeat_widget.setToolTip("Repeat delay in milliseconds")
         self.button_pulse_repeat_widget.setValue(self.action_data.pulse_repeat_delay)
-        self.button_pulse_repeat_widget.valueChanged.connect(self._pulse_repeat_value_changed)
+        self.button_pulse_repeat_widget.valueChanged.connect(self._handle_pulse_repeat_value_changed)
 
-        self.button_repeat_widget = QtWidgets.QCheckBox("Pulse repeat")
-        self.button_repeat_widget.setToolTip("When enabled, pulses are repeated while the input is triggered.")
-        self.button_repeat_widget.setChecked(self.action_data.pulse_repeat)
-        self.button_repeat_widget.clicked.connect(self._pulse_repeat_mode_changed)
+        self.button_repeat_widget = QDataCheckbox(
+            "Pulse repeat",
+            value=self.action_data.pulse_repeat,
+            tooltip="When enabled, pulses are repeated while the input is triggered.",
+            callback=self._handle_pulse_repeat_mode_changed,
+        )
+
+
+
+        self.button_pulse_toggles_widget = QDataCheckbox(
+            "Pulse inverts state",
+            tooltip="When enabled, pulses will toggle the state to its inverted value while pulsed.\nWhen disabled, the state will be on when pulsed, off when not.",
+            value=self.action_data.pulse_toggles,
+            callback=self._handle_pulse_toggles_changed,
+        )
 
         widgets = [
             self.button_pulse_widget,
             self.button_repeat_widget,
             self.button_pulse_repeat_widget,
+            self.button_pulse_toggles_widget,
             "||",
-
         ]
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, label = "Pulse Options:", widget_only=True)
+        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, label="Pulse Options:", widget_only=True)
 
         mode = self.action_data.mode
         widgets = []
@@ -317,14 +331,17 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.action_data.exec_on_release = checked
 
     @QtCore.Slot(bool)
-    def _pulse_repeat_mode_changed(self, checked: bool):
+    def _handle_pulse_repeat_mode_changed(self, checked: bool):
         self.action_data.pulse_repeat = checked
         self._update_ui()
 
-    def _pulse_repeat_value_changed(self, value):
+    def _handle_pulse_repeat_value_changed(self, value : int):
         """called when the pulse value changes"""
         if value >= 0:
             self.action_data.pulse_repeat_delay = value
+
+    def _handle_pulse_toggles_changed(self, checked: bool):
+        self.action_data.pulse_toggles = checked
 
     @QtCore.Slot()
     def _add_state(self):
@@ -342,6 +359,9 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.populate_selector()
         gremlin.util.delete_widget(self.button_press_dialog)
         self.button_press_dialog = None
+        # update the UI to reflect the newly added state
+        el = gremlin.event_handler.EventListener()
+        el.state_added.emit(state)
 
     def _handle_button_press_dialog_rejected(self):
         gremlin.util.delete_widget(self.button_press_dialog)
@@ -584,7 +604,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.action_data.hat_sticky = checked
 
     @QtCore.Slot(bool)
-    def _pulse_repeat_mode_changed(self, checked: bool):
+    def _handle_pulse_repeat_mode_changed(self, checked: bool):
         self.action_data.pulse_repeat = checked
         self._update_ui()
 
@@ -756,9 +776,11 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.verbose = gremlin.config.Configuration().verbose_mode_state
 
+
         # create the state if it doesn't exist
         self.sd = gremlin.ui.state_device.StateData()
         key = self.action_data.key
+        self._pulse_lock = threading.Lock()
 
         self.hat_state_map = {}  # holds the list of states to hat
         input_type = self.action_data.get_input_type()
@@ -777,11 +799,23 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         # self.last_event = None
         self.pulse_worker_map = {}
 
+        self.sd.registerStateChangeCallback(key, self._handle_state_changed)
+
+    def _handle_state_changed(self, state: gremlin.ui.state_device.StateInputItem):
+        """callback for when the state changes"""
+        if self.verbose:
+            syslog.info(f"STATE FUNCTOR: state changed: [{state.key}] = {state.value}")
+        if not state.value:
+            pass
+
     def profile_start(self):
         import gremlin.event_handler
         import gremlin.shared_state
 
+
         self.verbose = gremlin.config.Configuration().verbose_mode_state
+        # self.verbose = True
+
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
         input_type = self.action_data.get_input_type()
@@ -912,21 +946,46 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     def _pulse_on(self, data):
         """called when pulse is off"""
         state_name = data
-        if self.verbose:
-            syslog.info(f"Pulse ON {state_name}")
-        self.sd.setValue(state_name, True)
+        # invert the value
+        if self.action_data.pulse_toggles:
+            state = self.sd.getValue(state_name)
+            if self.verbose:
+                syslog.info(f"Pulse toggle ON {state_name} (state: {gremlin.util.ansiBool(state)} -> {gremlin.util.ansiBool(not state)})")
+            self.sd.setValue(state_name, not state, force = True)
+            if self.verbose:
+                syslog.info(f"State [{state_name}] changed successfully to {gremlin.util.ansiBool(self.sd.getValue(state_name))}")
+        else:
+            if self.verbose:
+                syslog.info(f"Pulse ON [{state_name}]")
+            self.sd.setValue(state_name, True)
+
 
     def _pulse_off(self, data):
         """called when pulse is off"""
         state_name = data
-        if self.verbose:
-            syslog.info(f"Pulse OFF {state_name}")
-        self.sd.setValue(state_name, False)
+
+        if self.action_data.pulse_toggles:
+            state = self.sd.getValue(state_name)
+            if self.verbose:
+                syslog.info(f"Pulse toggle OFF [{state_name}] (state: {gremlin.util.ansiBool(state)} -> {gremlin.util.ansiBool(not state)})")
+            self.sd.setValue(state_name, not state, force = True)
+            # wait for the state to change
+
+            # while self.sd.getValue(state_name) == state:
+            #     time.sleep(0.001)  # small delay to prevent busy-waiting
+            if self.verbose:
+                syslog.info(f"State [{state_name}] changed successfully to {gremlin.util.ansiBool(self.sd.getValue(state_name))}")
+
+
+        else:
+            if self.verbose:
+                syslog.info(f"Pulse OFF [{state_name}]")
+            self.sd.setValue(state_name, False)
 
     def pulse_start(self, key: str, duration: float, interval: float):
         """pulse setup"""
         if self.verbose:
-            syslog.info(f"Pulse START state {key}duration: {duration:0.3f} interval: {interval:0.3f}")
+            syslog.info(f"Pulse START state [{key}] duration: {duration:0.3f} interval: {interval:0.3f}")
         worker: gremlin.repeater.PulseWorker
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
@@ -941,7 +1000,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             self.pulse_worker_map[key] = worker
 
         if self.verbose:
-            syslog.info("\activate")
+            syslog.info("\tactivate")
         worker.start()
 
     def pulse_stop(self, key: str):
@@ -1022,8 +1081,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                     syslog.info(f"STATE: trigger start range pulse state {key}")
                                 repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
                                 self.pulse_start(key, self.action_data.pulse_delay / 1000, repeat_interval)
-                            else:
-                                self.pulse_stop(key)
+                            # else:
+                                # if verbose:
+                                #     syslog.info(f"STATE: trigger start range pulse state {key}")
+                                # self.pulse_stop(key)
 
                         case "invert":
                             state = not is_pressed
@@ -1161,6 +1222,7 @@ class MapToState(gremlin.input_item.AbstractAction):
         self.pulse_delay = 250  # delay for pulse mode in milliseconds
         self.pulse_repeat = False  # true if the pulse repeats while down
         self.pulse_repeat_delay = 250  # repeat delay for pulse mode in milliseconds
+        self.pulse_toggles = True  # true if the pulse toggles the state instead of just activating it
         self.exec_on_press = True  # true if trigger should execute on input press event
         self.exec_on_release = False  # true if trigger should execute on input release event
         self.sync_mode = SyncMode.Ignore  # ignore by default
@@ -1254,6 +1316,8 @@ class MapToState(gremlin.input_item.AbstractAction):
             self.pulse_repeat_delay = safe_read(node, "repeat-delay", int, 250)
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node, "sync-mode", int, 0))
+        if "pulse-toggles" in node.attrib:
+            self.pulse_toggles = safe_read(node, "pulse-toggles", bool, True)
 
         self.latch_delay = safe_read(node, "latch-delay", int, 1000)
 
@@ -1306,6 +1370,7 @@ class MapToState(gremlin.input_item.AbstractAction):
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
             node.set("latch-delay", safe_format(self.latch_delay, int))
             node.set("sync-mode", safe_format(self.sync_mode, int))
+            node.set("pulse-toggles", safe_format(self.pulse_toggles, bool))
             if self.pulse_repeat:
                 node.set("repeat", safe_format(self.pulse_repeat, bool))
                 node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))

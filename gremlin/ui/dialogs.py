@@ -3055,6 +3055,8 @@ Enabled modules may not show until the device filter is updated.
         plugins = gremlin.plugin_manager.ActionPlugins()
 
         for act in sorted(plugins.repository.values(), key=lambda x: x.name):
+            if not plugins.is_action_available(act):
+                continue
             self.default_action_dropdown.addItem(act.name)
         self.default_action_dropdown.setCurrentText(self.config.default_action)
         self.default_action_dropdown.currentTextChanged.connect(self._update_default_action)
@@ -5238,7 +5240,7 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
                 tab_map[index] = (device.device_id, visible)
         self.config.tab_list = tab_map
         visible_map = {device_id: visible for device_id, visible in tab_map.values()}
-        self.config.tab_visible_map = visible_map
+        self.config.device_visible_map = visible_map
 
         # this will cause tab movement and/or tab redraw if devices visibility changed
         ui._create_tabs_ui()
@@ -5246,9 +5248,15 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _close_cb(self):
         # validate the mode name
-        self._update_tabs()
-        self.accept()
-        self.close()
+        wm = gremlin.worker.WorkManager()
+        try:
+            wm.pushCursor()
+            self._update_tabs()
+            self.accept()
+            self.close()
+        finally:
+            wm.popCursor()
+
 
     @QtCore.Slot()
     def _cancel_cb(self):

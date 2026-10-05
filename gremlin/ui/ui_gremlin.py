@@ -31,9 +31,9 @@ class Ui_Gremlin(object):
         # holds the device widget
         self.tab_content_widget = QtWidgets.QWidget()
         self.tab_content_widget.setContentsMargins(0, 0, 0, 0)
-        tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
-        tab_content_layout.setContentsMargins(0, 0, 0, 0)
-        tab_content_layout.setSpacing(0)
+        self.tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
+        self.tab_content_layout.setContentsMargins(0, 0, 0, 0)
+        self.tab_content_layout.setSpacing(0)
 
         self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
 
@@ -43,31 +43,20 @@ class Ui_Gremlin(object):
         self.devices_tab_header_widget.setMovable(True)
         self.devices_tab_header_widget.setUsesScrollButtons(True)
         self.devices_tab_header_widget.setObjectName("devices")
-        self.devices_tab_header_widget.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
 
-        # tab_container_widget = QtWidgets.QWidget()
-        # tab_container_layout = QtWidgets.QHBoxLayout(tab_container_widget)
-        # tab_container_layout.setContentsMargins(0, 0, 0, 0)
-        # tab_container_layout.setSpacing(0)
-        # tab_container_layout.addWidget(self.tab_filter_widget)
-        # tab_container_layout.addWidget(self.devices_tab_header_widget)
+        tab_header_layout = QtWidgets.QHBoxLayout()
+        tab_header_layout.setContentsMargins(0, 0, 0, 0)
+        tab_header_layout.addWidget(self.tab_filter_widget)
+        tab_header_layout.addWidget(self.devices_tab_header_widget)
 
-        # self.tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget], widget_only=True)
-        # # self.tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget, "||"], widget_only=True)
-        # self.tab_container_widget.setContentsMargins(0, 0, 0, 0)
-        # self.tab_container_widget.setMaximumHeight(30)
+        self.tab_content_layout.addLayout(tab_header_layout)
 
-        # tab_content_layout.addWidget(tab_container_widget)
-
-
-        tab_content_layout.addWidget(self.devices_tab_header_widget)
-        tab_content_layout.addWidget(self.tab_filter_widget)
 
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         self.device_page_widget.setContentsMargins(0, 0, 0, 0)
 
         # tab_content_layout.addWidget(self.tab_container_widget)
-        tab_content_layout.addWidget(self.device_page_widget)
+        self.tab_content_layout.addWidget(self.device_page_widget)
 
         # blank input for device content
         self.device_page_widget.addWidget(gremlin.ui.ui_common.QEmptyWidget(mode="wait"))  # index 0
@@ -249,7 +238,7 @@ class Ui_Gremlin(object):
         # ktts = gremlin.ktts.KTTS()
         # enabled = ktts.is_available()
         # self.actionConvertTTS.setEnabled(enabled)
-        #self.actionGenerateTTS.setEnabled(False)
+        # self.actionGenerateTTS.setEnabled(False)
 
         self.menuRecent.addAction(self.actionEmpty)
         self.menuFile.addAction(self.actionNewProfile)
@@ -285,7 +274,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionClearManagedSound)
         self.menuTools.addAction(self.actionConvertLegacy)
         self.menuTools.addAction(self.actionConvertTTS)
-        #self.menuTools.addAction(self.actionGenerateTTS)
+        # self.menuTools.addAction(self.actionGenerateTTS)
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionOptions)
