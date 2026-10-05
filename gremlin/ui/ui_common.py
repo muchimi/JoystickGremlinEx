@@ -22,7 +22,25 @@ import anytree
 import os
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtWidgets import QLayout, QMainWindow, QMainWindow, QVBoxLayout, QWidget, QProxyStyle, QStyle, QStyleFactory, QWidget, QHBoxLayout, QLayoutItem
+from PySide6.QtWidgets import (
+    QSizePolicy,
+    QLayout,
+    QMainWindow,
+    QMainWindow,
+    QTabBar,
+    QVBoxLayout,
+    QWidget,
+    QProxyStyle,
+    QStyle,
+    QStyleFactory,
+    QWidget,
+    QHBoxLayout,
+    QLayoutItem,
+    QStylePainter,
+    QStyleOptionTabBarBase,
+    QStyle,
+)
+
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent, QPen, QFont, QFontMetrics, QKeyEvent, QWheelEvent, QMouseEvent
 import collections
@@ -767,6 +785,9 @@ class Color:
         QTabWidget::pane {{
             background-color: {selected_tab_color};
         }}
+
+
+        #fixedTabBar {{ background-color: {background_color}; }}
 
 
 
@@ -8112,7 +8133,7 @@ class StateVisualizerWidget(QWidget):
 
                 layout.addWidget(btn)
 
-                state.changed.connect(lambda x: self._state_changed(x))
+                state.changed.connect(self._state_changed)
 
                 if state.key in self._state_buttons:
                     # remove the prior button reference
@@ -11552,75 +11573,6 @@ class QDataTab(QtWidgets.QTabWidget):
         self._data = value
 
 
-class QTabHeader(QtWidgets.QTabBar):
-    """wrapper for tab bar to catch mouse events on tab bar"""
-
-    tabMoveCompleted = QtCore.Signal(int, int)  # triggers once a tab moved has been completed
-    tabChanged = QtCore.Signal(int)  # triggers when a tab is selected, aware of tab drag ops
-    tabContextMenu = QtCore.Signal(int)  # triggers a context menu request (index of the tab)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.installEventFilter(self)
-        self._mouse_down = False
-        self._to_index = None
-        self._from_index = None
-        self._mouse_down_index = None
-        self._move_in_progress = False
-        self.tabMoved.connect(self._tab_moved)
-
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._open_context_menu)
-        self.setExpanding(False)
-
-        # self.currentChanged.connect(self._tab_selected)
-
-    @property
-    def moveInProgress(self) -> bool:
-        return self._move_in_progress or self._mouse_down
-
-    @QtCore.Slot(int)
-    def _tab_selected(self, index):
-        # print (f"internal tab selected {index}")
-        self._current_index = index
-        if not (self._move_in_progress or self._mouse_down):
-            self.tabChanged.emit(index)
-
-    @QtCore.Slot(int, int)
-    def _tab_moved(self, from_index, to_index):
-        self._move_in_progress = True
-        self._from_index = from_index
-        self._to_index = to_index
-        # print (f"internal tab move {from_index} {to_index}")
-
-    @QtCore.Slot(QPoint)
-    def _open_context_menu(self, position: QPoint):
-        index = self.tabAt(position)
-        if index != -1:
-            self.tabContextMenu.emit(index)
-
-    def eventFilter(self, widget, event):
-        t = event.type()
-        if t == QtCore.QEvent.Type.MouseButtonPress:
-            self._mouse_down = True
-            self._mouse_down_index = self.currentIndex()
-
-        elif t == QtCore.QEvent.Type.MouseButtonRelease:
-            self._mouse_down = False
-            index = self.currentIndex()
-            # print (f"mouse up {index}")
-            if self._move_in_progress:
-                # print (f"move completed: {self._from_index} to {self._to_index}")
-                self._move_in_progress = False
-                self.tabMoveCompleted.emit(self._from_index, self._to_index)
-            elif index != self._mouse_down_index:
-                # fire the tab change on release if there is a tab change
-                self.tabChanged.emit(index)
-
-        return super().eventFilter(widget, event)
-
-
 def getRadioContainer(
     label_data_pairs,
     callback,
@@ -13596,7 +13548,7 @@ class QAutoResizingTextEdit(QtWidgets.QTextEdit):
         size_policy.setVerticalPolicy(QtWidgets.QSizePolicy.Preferred)
         self.setSizePolicy(size_policy)
 
-        self.textChanged.connect(lambda: self.updateGeometry())
+        self.textChanged.connect(self.updateGeometry)
 
     def setMinimumLines(self, num_lines):
         """Sets minimum widget height to a value corresponding to specified number of lines
@@ -17760,3 +17712,88 @@ class QDataRepeaterWidget(QtWidgets.QWidget):
 
     def value(self) -> float:
         return self._value
+
+
+class FixedTabBar(QTabBar):
+    """
+    fixes stylesheet drops and geometry layout caching bugs in PyQt6.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Give it a unique object name so you can target it reliably in CSS
+        self.setObjectName("fixedTabBar")
+        # lets the stylesheet background-color paint on the bar itself
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+    # def setStyleSheet(self, css: str):
+    #     # cssTab() only targets QTabWidget/pane, which never match a bare tab bar
+    #     bar_css = f"#fixedTabBar {{ background-color: {Color.backgroundColor()}; }}"
+    #     super().setStyleSheet(f"{css or ''}\n{bar_css}")
+
+
+class QTabHeader(FixedTabBar):
+    """wrapper for tab bar to catch mouse events on tab bar"""
+
+    tabMoveCompleted = QtCore.Signal(int, int)  # triggers once a tab moved has been completed
+    tabChanged = QtCore.Signal(int)  # triggers when a tab is selected, aware of tab drag ops
+    tabContextMenu = QtCore.Signal(int)  # triggers a context menu request (index of the tab)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.installEventFilter(self)
+        self._mouse_down = False
+        self._to_index = None
+        self._from_index = None
+        self._mouse_down_index = None
+        self._move_in_progress = False
+        self.tabMoved.connect(self._tab_moved)
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._open_context_menu)
+
+        self.setStyleSheet(Color.cssTab())
+
+
+    @property
+    def moveInProgress(self) -> bool:
+        return self._move_in_progress or self._mouse_down
+
+    @QtCore.Slot(int)
+    def _tab_selected(self, index):
+        self._current_index = index
+        if not (self._move_in_progress or self._mouse_down):
+            self.tabChanged.emit(index)
+
+    @QtCore.Slot(int, int)
+    def _tab_moved(self, from_index, to_index):
+        self._move_in_progress = True
+        self._from_index = from_index
+        self._to_index = to_index
+
+
+    @QtCore.Slot(QPoint)
+    def _open_context_menu(self, position: QPoint):
+        index = self.tabAt(position)
+        if index != -1:
+            self.tabContextMenu.emit(index)
+
+    def eventFilter(self, widget, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.MouseButtonPress:
+            self._mouse_down = True
+            self._mouse_down_index = self.currentIndex()
+
+        elif t == QtCore.QEvent.Type.MouseButtonRelease:
+            self._mouse_down = False
+            index = self.currentIndex()
+            if self._move_in_progress:
+                self._move_in_progress = False
+                self.tabMoveCompleted.emit(self._from_index, self._to_index)
+            elif index != self._mouse_down_index:
+                # fire the tab change on release if there is a tab change
+                self.tabChanged.emit(index)
+
+        return super().eventFilter(widget, event)
+

@@ -842,8 +842,7 @@ class EventListener(QtCore.QObject):
 
     find_next = Signal()  # find next event
 
-    # container_modified = Signal(object) # indicates a container was modified
-    # data_changed = Signal(object) # indicates a model was changed
+    state_added = Signal(object)  # emitted when a new state is added, passes the new state added
 
     def postInit(self):
         """Post-initialization hook for the event handler"""

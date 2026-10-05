@@ -54,6 +54,7 @@ import dinput
 from dinput import DeviceSummary
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QThread, QTimer, Signal
 from gremlin.types import TabDeviceType, DeviceType, DeviceCategory
 from shiboken6 import Shiboken
@@ -233,10 +234,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # cache of widget references so they don't get garbage collected by QT
 
-        self.ui.devices_tab_header_widget.tabChanged.connect(self._tab_selected)
-        self.ui.devices_tab_header_widget.tabMoveCompleted.connect(self._tab_moved_cb)
-        self.ui.devices_tab_header_widget.tabContextMenu.connect(self._tab_context_menu_cb)
-        self.ui.devices_tab_header_widget.currentChanged.connect(self._tab_changed)
+        # self.ui.devices_tab_header_widget.tabChanged.connect(self._tab_selected)
+        # self.ui.devices_tab_header_widget.tabMoveCompleted.connect(self._tab_moved_cb)
+        # self.ui.devices_tab_header_widget.tabContextMenu.connect(self._tab_context_menu_cb)
+        # self.ui.devices_tab_header_widget.currentChanged.connect(self._tab_changed)
 
         self._last_input_item = None  # last selected input item
         self._last_state_device_guid = None
@@ -426,6 +427,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         GremlinUi.ui = self
 
+        # device headers
+        self.ui.devices_tab_header_widget.tabChanged.connect(self._tab_selected)
+        self.ui.devices_tab_header_widget.tabMoveCompleted.connect(self._tab_moved_cb)
+        self.ui.devices_tab_header_widget.tabContextMenu.connect(self._tab_context_menu_cb)
+        self.ui.devices_tab_header_widget.currentChanged.connect(self._tab_changed)
+
+
+        # toolbar
+
         self.ui.update_toolbar()
         self._update_status_bar()
         el.config_option_changed.connect(self._config_options_changed)
@@ -516,6 +526,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _update_start_tab(self):
         """forces a tab index reload on init"""
+        if not self.ui.devices_tab_header_widget:
+            return
         tab_index = self.ui.devices_tab_header_widget.currentIndex()
         gremlin.util.InvokeUiMethod(self._tab_selected, tab_index)
 
@@ -541,6 +553,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._tab_index_map = {}  # map of device_guids indexed by their tab index from the tab header  (index -> device_guid)
         self._tab_device_map = {}  # map of tab positions index mapped by device guid for the tab header (device_guid -> index)
         self._tab_name_map = {}  # map fo device guid to device name for tabs
+        self._tab_data_map = {}  # map of tab positions to arbitrary tab data
 
         # self._current_tab_widget = None # selected content widget for the current device
         self._current_tab_input_id = None  # selected input in the current tab
@@ -553,6 +566,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.util.InvokeUiMethod(self._clear_tabs_ui)  # ensure on UI thread
 
     def getTabCount(self) -> int:
+        if not self.ui.devices_tab_header_widget:
+            return 0
         return self.ui.devices_tab_header_widget.count()
 
     def _clear_tabs_ui(self):
@@ -574,7 +589,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """gets the name of a device"""
         return gremlin.joystick_handling.getDeviceName(device_guid)
 
-    def _add_tab(self, device: DeviceSummary, tab_type, index=None, override_name=None) -> int:
+    def _add_tab_ui(self, device: DeviceSummary, tab_type, index=None, override_name=None) -> int:
         """adds a tab to the tab header
         :param device: the device to add
         :param index: optiona, if specified, the index to add
@@ -591,10 +606,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         ts = gremlin.tabstate.TabState()
 
+        position = len(self._tab_index_map)
+
         tab_name = override_name if override_name else device_name
         with QtCore.QSignalBlocker(self.ui.devices_tab_header_widget):
             if index is None:
                 position = self.ui.devices_tab_header_widget.addTab(tab_name)
+
             else:
                 position = self.ui.devices_tab_header_widget.insertTab(index, tab_name)
 
@@ -605,6 +623,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._tab_device_map[device_guid] = position
         self._tab_index_map[position] = device_guid
         self._tab_name_map[device_guid] = tab_name
+        self._tab_data_map[position] = data
 
         if tab_type == TabDeviceType.Joystick:
             self._joystick_device_guids.append(device_guid)
@@ -2786,8 +2805,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         color = gremlin.ui.ui_common.Color.tabForegroundColor()
                         icon = QtGui.QIcon()
 
-                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
-                self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
+                # self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+                # self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
 
     def _handle_feature_changed(self, feature):
         """called when a feature changes"""
@@ -3173,7 +3192,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if verbose_l1:
                 syslog.info(f"TABS: active device: [{active_device.name}] id: [{active_device.device_id}]")
 
-            # visible_map = config.device_visible_map
+
+            visible_map = self.config.device_visible_map
+
             # add disconnected devices to the visible list so they show up in the tabs
 
             # reset tab selector
@@ -3188,12 +3209,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             config_set = set(config_devices)
             disconnected_set = set(disconnected_devices)
 
+
+
             def add_tab_if_missing(device, tab_type, override_name=None):
+                """ adds a tab header if not already added """
                 if device in tab_device_set:
                     return False
                 if verbose:
                     syslog.info(f"Adding tab for device [{device.name}] of type [{tab_type}]")
-                self._add_tab(device, tab_type, override_name=override_name)
+                self._add_tab_ui(device, tab_type, override_name=override_name)
                 tab_device_set.add(device)
                 tab_device_list.append(device)
                 return True
@@ -3211,12 +3235,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     continue
 
                 if not device.visible:
-
-                    if  not self._has_mapping(device.device_guid, True):
-                    # check if the profile has a mapping in which case the device should still be shown
+                    if not self._has_mapping(device.device_guid, True):
+                        # check if the profile has a mapping in which case the device should still be shown
                         if verbose_l1:
                             syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
                         continue
+
+                # check device visibility filter - this is a sparse matrix so if a device is not on that list, the default is visible.
+                visible = visible_map.get(device_id, True)
+                if not visible:
+                    if verbose_l1:
+                        syslog.info(f"\tdevice [{device_name}] is not visible according to the visible map - skipping tab")
+                    continue
 
                 if self.profile.isRemovedDevice(device_id):
                     if verbose_l1:
@@ -3683,7 +3713,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             gremlin.shared_state.pop_redraw()
 
-
+            # # self.ui.devices_tab_header_widget.adjustSize()
+            # syslog.info(
+            #     f"Adjusted devices tab header widget size : tab count: {self.ui.devices_tab_header_widget.count()}  size: {self.ui.devices_tab_header_widget.size()}"
+            # )
 
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections
@@ -4196,6 +4229,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         return
 
                     # index of current device tab
+                    if not self.ui.devices_tab_header_widget:
+                        return
                     index = self.ui.devices_tab_header_widget.currentIndex()
                     if index == -1:
                         # no current index
@@ -4560,6 +4595,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def ensureTabLoaded(self):
         """ensures a tab device UI is loaded/refreshed"""
 
+        if not self.ui.devices_tab_header_widget:
+            return
         position = self.ui.devices_tab_header_widget.currentIndex()
         if position == -1:
             # no tab selected yet
@@ -4750,7 +4787,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 tab_type = getattr(item, "tab_type", None)
             device = gremlin.joystick_handling.getDevice(device_guid)
             if device and tab_type is not None:
-                self._add_tab(device, tab_type, index)
+                self._add_tab_ui(device, tab_type, index)
 
         tab_map = self._get_tab_map()
         if self.config.verbose:
@@ -6400,6 +6437,8 @@ if __name__ == "__main__":
     # disable dark mode for now while we sort icons in a future version
 
     config = gremlin.config.Configuration()
+    QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
     theme = config.theme
     match theme:
@@ -6420,7 +6459,9 @@ if __name__ == "__main__":
 
     # application style and css
     # app.setStyle("Fusion")
+
     app.setQuitOnLastWindowClosed(False)  # don't quit when the main window is hidden (minimize to tray)
+
     app.setStyle(gremlin.ui.ui_common.GexAppStyle())
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
     icon = gremlin.util.load_icon("gex.ico")

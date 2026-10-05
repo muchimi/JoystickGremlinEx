@@ -25,6 +25,7 @@ from lxml import etree
 import os
 import uuid
 import time
+import weakref
 import lxml.etree
 import traceback
 import collections
@@ -12040,7 +12041,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
         widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} input item: [{input_item.display_name}] ")
         widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
-        widget.description_clear.connect(lambda: self._description_clear_cb(index, widget))
+        widget_ref = weakref.ref(widget)  # avoid widget -> lambda -> widget cycle
+        widget.description_clear.connect(lambda: self._description_clear_cb(index, widget_ref()))
         input_item.setMappingWidget(widget)  # keep a reference to the mapping widget
         return widget
 

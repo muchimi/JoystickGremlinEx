@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import weakref
 from typing import Any
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -598,7 +599,8 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
 
         gremlin.shared_state.push_suspend_ui_keyinput()
         dialog = InputKeyboardDialog(sequence=list(self._keys), parent=self.window())
-        dialog.accepted.connect(lambda: self._apply_keys(dialog.keys))
+        dialog_ref = weakref.ref(dialog)  # avoid dialog -> lambda -> dialog cycle
+        dialog.accepted.connect(lambda: self._apply_keys(dialog_ref().keys) if dialog_ref() else None)
         dialog.closed.connect(self._select_closed)
         dialog.setModal(True)
         self._keyboard_dialog = dialog
@@ -4051,7 +4053,10 @@ class OverlayInspector(QtWidgets.QWidget):
             return
         gremlin.shared_state.push_suspend_ui_keyinput()
         dialog = OverlayInputDisplayPicker(sequence=list(overlay_keys_from_item(item)), parent=self.window())
-        dialog.accepted.connect(lambda: self._apply_input_display_picker_keys(widget_id, dialog.keys))
+        dialog_ref = weakref.ref(dialog)  # avoid dialog -> lambda -> dialog cycle
+        dialog.accepted.connect(
+            lambda: self._apply_input_display_picker_keys(widget_id, dialog_ref().keys) if dialog_ref() else None
+        )
         dialog.closed.connect(self._input_display_picker_closed)
         dialog.setModal(True)
         self._input_display_dialog = dialog

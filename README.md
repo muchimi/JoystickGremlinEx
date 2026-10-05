@@ -49,9 +49,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T67A)
-- Fix: UI: more hardening for QT memory desync that appeared in T64 and refresh changes.  
-- Fix: UI: filter button - moved. This is temporary until the issue is investigated further: workaround for QT not drawing device tabs in all situations when inside a container.  
+### (m77T68)
+- New: Map to State pulse mode: the pulse mode defaults to an option that inverts the value of the state while pulsed, rather than turning it on and off. This was always the intended behavior and should not change behavior provided that the state is set to a known value.  This would only require a profile update if you use the pulse feature to turn a state off using pulse.  This is usually not the case.  This can be turned off via the new option in pulse mode.  Defaults to enabled.
+- Fix: UI: hardening around life cycle object management of Python references to QT objects causing C++ memory desync that appeared in T64 and refresh changes, some of it is timing related, some of it is behavior related.
+- Fix: UI: revise lambdas to avoid a potential memory leak due to a Python behavior (late binding) in lambda expressions used to hook QT events. The behavior could cause Python to retain or keep on adding references in memory to QT objects that should not be kept. This is due to how QT and Python manage their own objects.
+- Fix: UI: workaround for a QT tab header bug around style and painting that could cause the device tabs to not display or redraw correctly.
+- Fix: UI: device filter user selections can be ignored in some situations.
+- Fix: API (State):  added state via map to state action did not refresh list of states on state device.
+
 
 ### (m77T67)
 - New (experimental): overlay web browser support (courtesy Lolo350): enables an  overlay to be displayed via a web browser on a networked device (such as a tablet or phone).  Supports touch input/interactions, HTTP frame fallback, and a GEX Offline screen when the profile is deactivated.  This feature aims at enabling touch-screen interaction from any device, not just a Windows device, as an interactive touch surface to send inputs to GEX.

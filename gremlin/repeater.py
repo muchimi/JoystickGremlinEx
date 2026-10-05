@@ -197,7 +197,7 @@ class Repeater(QtCore.QObject):
         self._update_func("Waiting for input")
 
 
-# class PulseWorker(QtCore.QObject):
+
 class PulseWorker:
     """helper object to schedule repeated triggers (callback) at a given interval until the object is stopped."""
 
@@ -231,6 +231,8 @@ class PulseWorker:
         self._thread = None  # holds the running thread
         self._data = data  # any data
         self._repeat_count = count
+        self._abort_event = threading.Event()
+
 
         el = gremlin.event_handler.EventListener()
         el.profile_stop.connect(self.stop)  # stop processing on profile stop
@@ -248,7 +250,8 @@ class PulseWorker:
         """request a start"""
         if self._thread and self._thread.is_alive():
             return
-        self._thread = threading.Thread(target=self._run, daemon=False)
+        self._abort_event.clear()  # reset the abort event before starting the thread
+        self._thread = threading.Thread(target=self._run, daemon=False, args = (self._abort_event,))
         self._thread.name = "PulseRepeater"
         self._keep_running = True
         self._thread.start()
@@ -265,6 +268,7 @@ class PulseWorker:
                     self._off_callback()
 
             self._keep_running = False  # tell the worker to stop whatever it's doing
+            self._abort_event.set()  # signal the thread to abort
             # wait for the thread to terminate
             gremlin.util.safeJoin(self._thread)
             self._thread = None
@@ -272,71 +276,76 @@ class PulseWorker:
             self._is_interval = False  # true if we're waiting for the next pulse
             self.is_running = False
 
-    def _run(self):
+    def _run(self, abort_event: threading.Event):
         """pulse worker"""
         syslog = logging.getLogger("system")
         # verbose = gremlin.config.Configuration().verbose
         verbose = False
+        verbose = True
         if not self._thread.is_alive():
             return
-        while self._keep_running:
-            self._is_pulse = True  # indicate pulsing phase
-            self._is_interval = False
 
-            # if verbose: syslog.info("Fire on callback")
-            if self._on_callback:
-                if self.data:
-                    # has a callback data param
-                    self._on_callback(self.data)
-                else:
-                    # does not have a callback param
-                    self._on_callback()
+        try:
+            while not abort_event.is_set():
+                self._is_pulse = True  # indicate pulsing phase
+                self._is_interval = False
 
-            # start the pulse timer
-            if self._pulse_duration:
-                time_lapsed = time.time() + self._pulse_duration
-                while self._keep_running and time.time() < time_lapsed:
-                    time.sleep(0)
+                # if verbose: syslog.info("Fire on callback")
+                if self._on_callback:
+                    if self.data:
+                        # has a callback data param
+                        self._on_callback(self.data)
+                    else:
+                        # does not have a callback param
+                        self._on_callback()
 
-            if self._iteration_callback:
-                if self.data:
-                    self._iteration_callback(self.data)
-                else:
-                    self._iteration_callback()
+                # start the pulse timer
+                if self._pulse_duration:
+                    time_lapsed = time.time() + self._pulse_duration
+                    while not abort_event.is_set() and time.time() < time_lapsed:
+                        time.sleep(0)
 
-            self._is_pulse = False
+                if self._iteration_callback:
+                    if self.data:
+                        self._iteration_callback(self.data)
+                    else:
+                        self._iteration_callback()
 
-            # if verbose: syslog.info("Stop pulse")
-            if self._off_callback:
-                # fire the pulse off callback (or abort)
-                if verbose:
-                    syslog.info("Fire off callback")
-                if self.data:
-                    self._off_callback(self.data)
-                else:
-                    self._off_callback()
+                self._is_pulse = False
 
-            if self._repeat_count is not None:
-                self._repeat_count -= 1
-                self._keep_running = self._repeat_count > 0
+                # if verbose: syslog.info("Stop pulse")
+                if self._off_callback:
+                    # fire the pulse off callback (or abort)
+                    if verbose:
+                        syslog.info("Fire off callback")
+                    if self.data:
+                        self._off_callback(self.data)
+                    else:
+                        self._off_callback()
 
-            if not self._keep_running or self._repeat_interval < 0:
-                if verbose:
-                    syslog.info("End pulse worker")
-                return
+                if self._repeat_count is not None:
+                    self._repeat_count -= 1
+                    self._keep_running = self._repeat_count > 0
 
-            # start the repeat timer
-            if self._repeat_interval > 0:
-                if verbose:
-                    syslog.info("Start wait")
-                time_lapsed = time.time() + self._repeat_interval
-                while self._keep_running and time.time() < time_lapsed:
-                    time.sleep(0)
-                if verbose:
-                    syslog.info("Stop wait")
+                if not self._keep_running or self._repeat_interval < 0:
+                    abort_event.set()  # signal the thread to abort
+                    return
 
-        if verbose:
-            syslog.info("End pulse worker")
+                # start the repeat timer
+                if self._repeat_interval > 0:
+                    if verbose:
+                        syslog.info("Start wait")
+                    time_lapsed = time.time() + self._repeat_interval
+                    while self._keep_running and time.time() < time_lapsed:
+                        time.sleep(0)
+                    if verbose:
+                        syslog.info("Stop wait")
+
+        except Exception as e:
+            syslog.error(f"Pulse worker encountered an error: {e}")
+        finally:
+            if verbose:
+                syslog.info("End pulse worker")
 
     @property
     def is_pulse(self) -> bool:
