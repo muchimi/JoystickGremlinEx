@@ -433,7 +433,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.devices_tab_header_widget.tabContextMenu.connect(self._tab_context_menu_cb)
         self.ui.devices_tab_header_widget.currentChanged.connect(self._tab_changed)
 
-
         # toolbar
 
         self.ui.update_toolbar()
@@ -3192,7 +3191,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if verbose_l1:
                 syslog.info(f"TABS: active device: [{active_device.name}] id: [{active_device.device_id}]")
 
-
             visible_map = self.config.device_visible_map
 
             # add disconnected devices to the visible list so they show up in the tabs
@@ -3209,10 +3207,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             config_set = set(config_devices)
             disconnected_set = set(disconnected_devices)
 
-
-
             def add_tab_if_missing(device, tab_type, override_name=None):
-                """ adds a tab header if not already added """
+                """adds a tab header if not already added"""
                 if device in tab_device_set:
                     return False
                 if verbose:
@@ -6439,6 +6435,7 @@ if __name__ == "__main__":
     config = gremlin.config.Configuration()
     QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings, True)
 
     theme = config.theme
     match theme:

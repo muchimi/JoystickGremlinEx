@@ -115,6 +115,10 @@ class GlobalSequence:
         with self._lock:
             return self._sequence_count
 
+    def resetSequenceCount(self):
+        with self._lock:
+            self._sequence_count = 0
+
     def canExecute(self):
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
         if max_concurrent:
@@ -657,7 +661,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(self._warning_widget)
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.getHContainer([self._trigger_widget, (self.ignore_release_widget,100)], widget_only=True))
+        self.action_layout.addWidget(gremlin.ui.ui_common.getHContainer([self._trigger_widget, (self.ignore_release_widget, 100)], widget_only=True))
 
         self.action_layout.addLayout(self.widget_layout)
 
@@ -865,7 +869,6 @@ class SequenceContainerWidget(AbstractContainerWidget):
         stepped_enabled = mode == SequenceMode.Step
         normal_enabled = mode == SequenceMode.Normal
         resume_enabled = mode != SequenceMode.Normal and mode != SequenceMode.Step
-
 
         ignore_enabled = mode in (SequenceMode.Normal, SequenceMode.Wiggle)
         self.ignore_release_widget.setVisible(ignore_enabled)
@@ -1118,7 +1121,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
         gs = GlobalSequence()
-        gs.sequence_count = 0
+        gs.resetSequenceCount()
 
         # stepped mode current step
         if self.container.stepped_exec_reset:
@@ -1233,6 +1236,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         mode = self.action_data.mode
 
         verbose = self._verbose
+        verbose = True
 
         if verbose:
             profile_mode = gremlin.shared_state.current_mode
@@ -1326,8 +1330,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
-
-
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
 
@@ -1415,7 +1417,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             time.sleep(0)  # free up resources for other things to run
 
             # ---------------------- end of runner loop
-
 
         # send special end of sequence event to steps so they can stop whatever they are doing
         extra_data = {"sequence_end": True}
@@ -1703,7 +1704,7 @@ Unlike a macro, any action suitable for the input can be used."""
         self.last_step = None  # stores the last step
         self.normal_exec_delay = 0  # wait time between steps when running normally
         self.normal_autorelease_delay = 250  # wait time between autoreleases of each step when running normally
-        self.ignore_release = False  # if set, normal mode will ignore input release events and the sequence will continue running when the trigger changes while the sequence is running
+        self.ignore_release = True  # if set, normal mode will ignore input release events and the sequence will continue running when the trigger changes while the sequence is running
         self.step_options = {}  # map of step options indexed by step number
         self.stepped_exec_reset = True  # true if the stepped execution should reset on profile start, or continue from the last step otherwise
         self.wiggle_count_min = 1  # min number of wiggle steps to take.
@@ -1734,7 +1735,7 @@ Unlike a macro, any action suitable for the input can be used."""
             self.exec_on_press = safe_read(node, "trigger-on-press", bool, True)
 
         self.exec_on_release = safe_read(node, "trigger-on-release", bool, False)
-        self.ignore_release = safe_read(node, "ignore-release", bool, False)
+        self.ignore_release = safe_read(node, "ignore-release", bool, True)
 
         self.wiggle_min_delay = safe_read(node, "wiggle-min", int, 250)
         self.wiggle_max_delay = safe_read(node, "wiggle-max", int, 5000)

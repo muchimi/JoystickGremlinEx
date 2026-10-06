@@ -35,6 +35,7 @@ import logging
 import os
 
 
+
 import gremlin.joystick_handling
 import dinput
 import enum
@@ -59,6 +60,7 @@ from gremlin.ui.ui_common import getVContainer, getHContainer, getGridContainer,
 from gremlin.ui.state_device import StateInputItem
 from gremlin.ui.voice_device import VoiceInputItem
 from gremlin.ui.keyboard_device import KeyboardInputItem
+import networkx as nx
 
 
 from PySide6 import QtCore, QtWidgets
@@ -98,10 +100,10 @@ class ProfileNodeType(enum.Enum):
     Device = auto()
     Mode = auto()
     InputType = auto()
-    Input = auto() # holds input items
-    Container = auto() # holds containers
-    ActionSet = auto() # holds action sets
-    Action = auto() # holds actions
+    Input = auto()  # holds input items
+    Container = auto()  # holds containers
+    ActionSet = auto()  # holds action sets
+    Action = auto()  # holds actions
     MergedAxis = auto()
 
 
@@ -149,7 +151,6 @@ class ProfileRootNode(ProfileBaseNode):
         self._load_default_devices()
         self._registry = gremlin.base_profile.ProfileRegistry(self)
         self.profile = None
-
 
     @staticmethod
     def fromProfile(profile: gremlin.base_profile.Profile):
@@ -366,6 +367,11 @@ class GraphBaseNode(BaseNode):
         while len(self.output_ports()) <= output_index:
             self.add_output(f"output_{len(self.output_ports())}")
 
+    def setData(self, data: dict):
+        """Sets the data for the node."""
+        self._data = data
+        self.create_property('data_dict', data)
+
 
 class GridNodeWidget(QtWidgets.QWidget):
     """grid type node content representing a generic list of labels and values arranged as a grid"""
@@ -383,78 +389,33 @@ class GridNodeWidget(QtWidgets.QWidget):
 
 
 # Node widgets for different types of profile graph nodes
-
 class WrapperNodeBaseWidget(NodeBaseWidget):
-    """represents a wrapper node in the profile tree"""
-
-    def __init__(self, name : str, parent=None):
-        super().__init__(parent)
-        self._name = name
-
-    def on_value_change(self, value):
-        """
-        Triggers NodeGraphQt's built-in property tracking and undo/redo stacks.
-        """
-        self.value_changed.emit(self.get_name(), str(value))
-
-    def get_value(self):
-        """
-        Returns the data value currently held by the custom widget UI.
-        NodeGraphQt calls this method to serialize or read the value.
-        """
-        return self._name
-
-    def set_value(self, value):
-        """
-        Sets the value of the custom widget UI from an external state.
-        """
-        pass
-
-class ProfileNodeWidget(WrapperNodeBaseWidget):
     """represents a generic profile node in the profile tree"""
 
-    def __init__(self, profile: gremlin.base_profile.Profile, parent=None):
-        super().__init__("Profile", parent)
-        f_name = profile.source_xml
-        base_name = os.path.basename(f_name) if f_name else "n/a"
-        data = {
-            "Profile Name": base_name,
-        }
-        self.set_custom_widget(GridNodeWidget(data))
-        self.set_label("Profile")
-        self.setToolTip(f"Profile {base_name}")
+    def setData(self, data: dict):
+        """Sets the data for the wrapper node."""
+        self._data = data
+        self.create_property('data_dict', data)
+
 
 class GraphProfileNode(GraphBaseNode):
     """represents a device node in the profile tree"""
+
     def __init__(self):
         super().__init__()
 
-    def load(self, data: gremlin.base_profile.Profile):
-        widget = ProfileNodeWidget(data, self.view)
-        self.add_custom_widget(widget)
+    def load(self, node: gremlin.base_profile.Profile):
+        # widget = ProfileNodeWidget(data, self.view)
+        # self.add_custom_widget(widget)
 
-
-class DeviceNodeWidget(WrapperNodeBaseWidget):
-    """represents a device node in the profile tree"""
-
-    def __init__(self, device: DeviceSummary, parent=None):
-        super().__init__("Device", parent)
         data = {
-            "Device Name": device.name,
-            "Device GUID": device.device_id,
-            "Device Type": DeviceType.to_display_name(device.device_type),
-            "Enabled": device.enabled,
-            "Virtual": device.is_virtual,
-            "Axis Count": device.axis_count,
-            "Button Count": device.button_count,
-            "Hat Count": device.hat_count,
+            "Profile Name": os.path.basename(node.source_xml) if node.source_xml else "n/a",
         }
-        widget = GridNodeWidget(data)
-        self.set_custom_widget(widget)
+        self.setData(data)
 
-        self.device = device
-        self.set_label(device.name)
-        self.setToolTip(f"Device {device.name}")
+        self.set_name(data["Profile Name"])
+
+
 
 
 class GraphDeviceNode(GraphBaseNode):
@@ -466,50 +427,49 @@ class GraphDeviceNode(GraphBaseNode):
         c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Inputs", multi=True)
         super().__init__(inputs=c1, outputs=c2)
 
-
-    def load(self, data: ProfileDeviceNode):
+    def load(self, node: ProfileDeviceNode):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = DeviceNodeWidget(data.device, self.view)
-        self.add_custom_widget(widget)
-
-
-
-class InputItemNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, input_item: InputItem, parent=None):
-        super().__init__("Device Input", parent)
+        # widget = DeviceNodeWidget(data.device, self.view)
+        # self.add_custom_widget(widget)
         data = {
-            "Input Type": InputType.to_display_name(input_item.input_type),
+            "Device Name": node.device.name,
+            "Device GUID": node.device.device_id,
+            "Device Type": DeviceType.to_display_name(node.device.device_type),
+            "Enabled": node.device.enabled,
+            "Virtual": node.device.is_virtual,
+            "Axis Count": node.device.axis_count,
+            "Button Count": node.device.button_count,
+            "Hat Count": node.device.hat_count,
         }
-
-        device: DeviceSummary = input_item.device
-
-        match input_item.input_type:
-            case InputType.JoystickAxis:
-                data["Axis"] = device.get_axis_name(input_item.input_id)
-            case InputType.JoystickButton:
-                data["Button"] = input_item.input_id
-            case InputType.JoystickHat:
-                data["Hat"] = input_item.input_id
-            case InputType.Keyboard | InputType.KeyboardLatched:
-                item : KeyboardInputItem = input_item
-                key = item.key
-                data["Key"] = str(key)
-            case InputType.State:
-                item : StateInputItem = input_item
-                data["State"] = item.key
-            case InputType.Voice:
-                item : VoiceInputItem = input_item
-                command_string = "|".join(c.key for c in item.commands)
-                data ["Commands:"] = command_string
+        self.setData(data)
+        self.set_name(data["Device Name"])
 
 
-        widget = GridNodeWidget(data)
 
-        self.set_custom_widget(widget)
+def getGraphNodeColor(node_type: ProfileNodeType) -> str:
+    """returns the color associated with a given node type as a tuple (r, g, b)"""
 
-        self.set_label("Device Input")
-        self.setToolTip(input_item.display_name)
+    match node_type:
+        case ProfileNodeType.Device:
+            color = "#B43232"
+        case ProfileNodeType.Input:
+            color = "#32B432"
+        case ProfileNodeType.Container:
+            color = "#3232B4"
+        case ProfileNodeType.ActionSet:
+            color = "#B4B432"
+        case ProfileNodeType.Action:
+            color = "#B432B4"
+        case ProfileNodeType.MergedAxis:
+            color = "#32B4B4"
+        case ProfileNodeType.Mode:
+            color = "#B48232"
+        case _:
+            color = "#808080"
+
+    return gremlin.util.hex_to_rgb(color)
+
 
 class GraphInputItemNode(GraphBaseNode):
     """represents an input item node in the profile tree"""
@@ -520,32 +480,38 @@ class GraphInputItemNode(GraphBaseNode):
         c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Container", multi=True)
         super().__init__(inputs=c1, outputs=c2)
 
-    def load(self, data: ProfileInputItemNode):
+    def load(self, node: ProfileInputItemNode):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = InputItemNodeWidget(data.input_item, self.view)
-        self.add_custom_widget(widget)
+        input_item = node.input_item
+        device: DeviceSummary = input_item.device
 
 
+        data = {}
+
+        match input_item.input_type:
+            case InputType.JoystickAxis:
+                data["Axis"] = device.get_axis_name(input_item.input_id)
+            case InputType.JoystickButton:
+                data["Button"] =   input_item.input_id
+            case InputType.JoystickHat:
+                data["Hat"] = input_item.input_id
+            case InputType.Keyboard | InputType.KeyboardLatched:
+                item: KeyboardInputItem = input_item
+                key = item.key
+                data["Key"] = str(key)
+            case InputType.State:
+                item: StateInputItem = input_item
+                data["State"] = item.key
+            case InputType.Voice:
+                item: VoiceInputItem = input_item
+                command_string = "|".join(c.key for c in item.commands)
+                data["Commands:"] = command_string
+
+        self.setData(data)
+        self.set_name(input_item.display_name)
 
 
-class ContainerNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, container: AbstractContainer, parent=None):
-        super().__init__("Container", parent)
-        self.container = container
-        self.set_label(container.name)
-
-        data = {
-            "Container Name": container.name,
-            "Container ID": container.id,
-            "Description": container.description,
-            "Action Count": container.action_count,
-            "Condition Count": container.condition_count,
-        }
-
-        widget = GridNodeWidget(data)
-        self.set_custom_widget(widget)
-        self.setToolTip(container.display_name)
 
 class GraphContainerNode(GraphBaseNode):
     """represents a container node in the profile tree"""
@@ -555,29 +521,20 @@ class GraphContainerNode(GraphBaseNode):
         c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Action", multi=True)
         super().__init__(inputs=c1, outputs=c2)
 
-    def load(self, data: ProfileContainerNode):
+    def load(self, node: ProfileContainerNode):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = ContainerNodeWidget(data.container, self.view)
-        self.add_custom_widget(widget)
-
-
-class ActionSetNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, action_set: ActionSet, parent=None):
-        super().__init__("Action Set", parent)
-        self.action_set = action_set
-        self.set_label(action_set.name)
-
         data = {
-            "Action Set Name": action_set.name,
-            "Action Set ID": action_set.id,
-            "Description": action_set.description,
-            "Action Count": action_set.action_count,
+            "Container Name": node.container.name,
+            "Container ID": node.container.id,
+            "Description": node.container.description,
+            "Action Count": node.container.action_count,
+            "Condition Count": node.container.condition_count,
         }
+        self.setData(data)
+        self.set_name(node.container.name)
 
-        widget = GridNodeWidget(data)
-        self.set_custom_widget(widget)
-        self.setToolTip(action_set.display_name)
+
 
 class GraphActionSetNode(GraphBaseNode):
     """represents an action set node in the profile tree"""
@@ -590,55 +547,53 @@ class GraphActionSetNode(GraphBaseNode):
     def load(self, data: ProfileActionSetNode):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = ActionSetNodeWidget(data.action_set, self.view)
-        self.add_custom_widget(widget)
 
-class ActionNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, action: AbstractAction, parent=None):
-        super().__init__("Action", parent)
-        self.action = action
-        self.set_label(action.name)
+        self.setData({
+            "Action Set Name": f"Action Set [{data.action_set.index}]",
+            "Action Set ID": data.action_set.id,
+            "Action Set Index": f"{data.action_set.index}",
+            "Description": data.action_set.description,
+            "Action Count": f"{len(data.action_set)}",
+        })
 
-        data = {
-            "Action Name": action.name,
-            "Action ID": action.id,
-            "Description": action.display_name,
-        }
+        self.set_name(f"Action Set [{data.action_set.index}]")
 
-        widget = GridNodeWidget(data)
-        self.set_custom_widget(widget)
-        self.setToolTip(action.display_name)
+
 
 class GraphActionNode(GraphBaseNode):
     """represents an action node in the profile tree"""
 
     def __init__(self):
-        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Container", multi=False)
-        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Action", multi=True)
-        super().__init__(inputs=c1, outputs=c2)
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="ActionSet", multi=False)
+        super().__init__(inputs=c1)
 
-    def load(self, data: ProfileActionNode):
+    def load(self, node: ProfileActionNode):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = ActionNodeWidget(data.action, self.view)
-        self.add_custom_widget(widget)
-
-
-
-class ModeNodeWidget(WrapperNodeBaseWidget):
-    def __init__(self, data, parent=None):
-        mode = gremlin.shared_state.translateMode(data.name)
-        super().__init__(f"Mode [{mode}]", parent)
-        self.mode = mode
-        self.set_label(mode)
-
         data = {
-            "Mode": mode,
+            "Action Name": node.action.name,
+            "Action ID": node.action.id,
+            "Description": node.action.display_name(),
         }
 
-        widget = GridNodeWidget(data)
-        self.set_custom_widget(widget)
-        self.setToolTip(f"Mode: {mode}")
+        self.setData(data)
+        self.set_name(data["Description"])
+
+class GraphInputTypeNode(GraphBaseNode):
+    """represents an input type node in the profile tree"""
+
+    def __init__(self):
+        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Mode", multi=False)
+        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Inputs", multi=True)
+        super().__init__(inputs=c1, outputs=c2)
+
+    def load(self, data: ProfileInputTypeNode):
+        """implemented by derived nodes based on what they need to show"""
+
+        self.setData({
+            "Input Type": data.input_type.name,
+        })
+        self.set_name(InputType.to_display_name(data.input_type))
 
 class GraphModeNode(GraphBaseNode):
     """represents a mode node in the profile tree"""
@@ -648,13 +603,14 @@ class GraphModeNode(GraphBaseNode):
         c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Mode", multi=True)
         super().__init__(inputs=c1, outputs=c2)
 
-    def load(self, data: str):
+    def load(self, mode: str):
         """implemented by derived nodes based on what they need to show"""
 
-        widget = ModeNodeWidget(data, self.view)
-        self.add_custom_widget(widget)
-
-
+        data = {
+            "Mode": mode,
+        }
+        self.setData(data)
+        self.set_name(f"Mode [{mode}]")
 
 
 class ProfileTreeDialogUI(ui_common.BaseDialogUi):
@@ -676,14 +632,15 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
         self.main_layout.addWidget(self._fallback_widget)
 
         try:
-            self._node_graph = NodeGraph() # the node graph instance
-            self._node_graph.set_layout_direction(LayoutDirectionEnum.HORIZONTAL.value) # horizontal layout
+            self._node_graph = NodeGraph()  # the node graph instance
+            self._node_graph.set_layout_direction(LayoutDirectionEnum.HORIZONTAL.value)  # horizontal layout
 
             # registered example nodes.
             self._node_graph.register_nodes(
                 [
                     GraphProfileNode,
                     GraphModeNode,
+                    GraphInputTypeNode,
                     GraphDeviceNode,
                     GraphInputItemNode,
                     GraphContainerNode,
@@ -698,13 +655,24 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
                 syslog.info(f"Registered node type: {node_type}")
 
             self._node_graph_widget = self._node_graph.widget
-            self._node_graph.set_layout_direction(1)
+            self._node_graph.set_layout_direction(LayoutDirectionEnum.HORIZONTAL)
             self._node_graph_widget.setMinimumSize(700, 500)
             self.main_layout.addWidget(self._node_graph_widget)
 
+            view = self._node_graph.viewer()
+
+            view.setUpdatesEnabled(False)
+            self._node_graph.scene().blockSignals(True)
+
             self._build_tree()
 
-            self._node_graph.auto_layout_nodes()
+            self.apply_networkx_layout(self._node_map)
+
+            view.setUpdatesEnabled(True)
+            self._node_graph.scene().blockSignals(False)
+            view.update()
+
+            self._node_graph.fit_to_selection()
 
             # do the layout of the nodes
             # self._apply_layout(self._node_map)
@@ -716,22 +684,150 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
             close_button.clicked.connect(self.close)
             self.main_layout.addWidget(close_button)
 
+    def apply_networkx_layout(self, node_map: dict, rankdir="LR", nodesep=0.8, ranksep=1.5, scale=100.0, padding=50, min_x_gap=100.0, min_y_gap=60.0):
+        """
+        Applies a Graphviz 'dot' layout to NodeGraphQt nodes.
+
+        Parameters:
+            node_map (dict): Mapping of {anytree_node: nodegraphqt_node}.
+            rankdir (str): Layout direction ('LR' for Left-to-Right, 'TB' for Top-to-Bottom).
+            nodesep (float): Minimum space between adjacent nodes in the same rank (in inches).
+            ranksep (float): Minimum space between ranks/levels (in inches).
+            scale (float): Multiplier to scale Graphviz inch units to Qt scene pixels.
+
+        """
+        G = nx.DiGraph()
+
+        # Force Qt event loop / view update to ensure dimensions are accurate
+        try:
+            QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
+
+        # Add nodes and edges from parent-child relationships
+        for tree_node, qt_node in node_map.items():
+            G.add_node(tree_node)
+            width_px = qt_node.view.width + padding
+            height_px = qt_node.view.height + padding
+
+            # Convert pixels to inches for Graphviz (Graphviz uses 72 points/inches)
+            width_in = width_px / 72.0
+            height_in = height_px / 72.0
+
+            G.nodes[tree_node]["width"] = width_in
+            G.nodes[tree_node]["height"] = height_in
+            G.nodes[tree_node]["fixedsize"] = "true"  # Force Graphviz to honor width/height
+
+            if tree_node.parent and tree_node.parent in node_map:
+                G.add_edge(tree_node.parent, tree_node)
+
+        graphviz_args = f"-Grankdir={rankdir} -Gnodesep={nodesep} -Granksep={ranksep} -Goverlap=false"
+        # Generate tree layout positions
+        pos = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot", args=graphviz_args)
+
+        SCALE_FACTOR = 1.8
+        scaled_positions = {}
+
+        for tree_node, (x, y) in pos.items():
+            scaled_positions[tree_node] = [x * SCALE_FACTOR, -y * SCALE_FACTOR]
+
+        # 5. Iterative Collision Resolution Pass (Post-Graphviz Safety Net)
+        # Adjust Y coordinates for nodes at the same rank level if bounding boxes collide
+        nodes_by_rank = {}
+        for tree_node, (x, y) in scaled_positions.items():
+            # Group nodes by approximate X coordinate (same depth level)
+            rank_key = round(x / 50.0) * 50
+            nodes_by_rank.setdefault(rank_key, []).append(tree_node)
+
+        for rank_x, rank_nodes in nodes_by_rank.items():
+            # Sort nodes vertically
+            rank_nodes.sort(key=lambda n: scaled_positions[n][1])
+
+            for i in range(1, len(rank_nodes)):
+                prev_node = rank_nodes[i - 1]
+                curr_node = rank_nodes[i]
+
+                prev_qt = node_map[prev_node]
+                curr_qt = node_map[curr_node]
+
+                prev_h = prev_qt.view.boundingRect().height() if hasattr(prev_qt, "view") else 100.0
+                curr_h = curr_qt.view.boundingRect().height() if hasattr(curr_qt, "view") else 100.0
+
+                prev_y = scaled_positions[prev_node][1]
+                curr_y = scaled_positions[curr_node][1]
+
+                # Required Y clearance between centers
+                min_required_dist = (prev_h / 2.0) + (curr_h / 2.0) + min_y_gap
+
+                if (curr_y - prev_y) < min_required_dist:
+                    # Push current node and subsequent nodes down
+                    shift = min_required_dist - (curr_y - prev_y)
+                    scaled_positions[curr_node][1] += shift
+
+        # Apply positions to NodeGraphQt nodes
+        for tree_node, (x, y) in scaled_positions.items():
+            qt_node = node_map[tree_node]
+            qt_node.set_pos(x * (scale / 72.0), y * (scale / 72.0))
+
+    def _has_target_type_in_branch(self, node, node_type: ProfileNodeType):
+        """checks if a node type is in the tree"""
+        if any(d.nodeType == node_type for d in node.descendants):
+            return True
+        if any(a.nodeType == node_type for a in [node] + list(node.ancestors)):
+            return True
+
+        return False
+
+    def _has_target_leaf_in_branch(self, node, target_type):
+        """
+        Returns True if any leaf node in this node's subtree
+        (or the node itself if it's a leaf) matches target_type.
+        """
+        # nodes = [leaf for leaf in node.leaves]
+        # container_nodes = [leaf for leaf in node.leaves if isinstance(leaf, ProfileContainerNode)]
+        action_nodes = [leaf for leaf in node.leaves if isinstance(leaf, ProfileActionNode)]
+        has_action_nodes = len(action_nodes) > 0
+        return has_action_nodes
+
+    def _get_first_ancestor_of_type(self, node, target_type):
+        """
+        Traverses upward from node.parent to root and returns
+        the first ancestor that matches target_type.
+        Returns None if no matching ancestor is found.
+        """
+        for ancestor in reversed(node.ancestors):
+            if isinstance(ancestor, target_type):
+                return ancestor
+        return None
+
     def _build_tree(self):
         if self._node_graph is None:
             return
 
         # self._node_graph.clear_session()
 
-        root_label = "Profile"
-        root_node = self._node_graph.create_node("gex.nodes.GraphProfileNode", root_label)
-        root_node.set_pos(0, 0)
-        self._node_map[self._graph.root] = root_node
+        # root_label = "Root"
+        # root_node = self._node_graph.create_node("gex.nodes.GraphProfileNode", root_label)
+        # root_node.set_pos(0, 0)
+        # self._node_map[self._graph.root] = root_node
 
-        self._graph.dump()
+        # self._graph.dump()
 
+
+
+        # traverse the tree
         for node in anytree.PreOrderIter(self._graph.root):
+            # verify the branch ends with an action
+            action_nodes = [leaf for leaf in node.leaves if isinstance(leaf, ProfileActionNode)]
+            valid = len(action_nodes) > 0
+            if not valid:
+                # ignore branches without a container node defined to reduce the tree size
+                continue
+
             parent = node.parent
             level = node.depth + 1
+
+            # get the parent graph node
             graph_parent = self._node_map.get(parent) if parent is not None else None
 
             match node.nodeType:
@@ -743,15 +839,34 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
                 case ProfileNodeType.Input:
                     instance = GraphInputItemNode
+                    # attach inputs direct to modes
+                    device_node : ProfileDeviceNode = self._get_first_ancestor_of_type(node, ProfileDeviceNode)
+                    if device_node:
+                        parent_node = self._node_map.get(device_node)
+                        if parent_node:
+                            graph_parent = parent_node
+
 
                 case ProfileNodeType.Container:
                     instance = GraphContainerNode
 
                 case ProfileNodeType.Action:
                     instance = GraphActionNode
+                    # attach action directly to container if there is only one action set
+                    container_node : ProfileContainerNode = self._get_first_ancestor_of_type(node, ProfileContainerNode)
+                    if container_node and len(container_node.container.action_sets) == 1:
+                        parent_node = self._node_map.get(container_node)
+                        if parent_node:
+                            graph_parent = parent_node
+
+                case ProfileNodeType.ActionSet:
+                    instance = GraphActionSetNode
 
                 case ProfileNodeType.Mode:
                     instance = GraphModeNode
+
+                case ProfileNodeType.InputType:
+                    instance = GraphInputTypeNode
 
                 case _:
                     continue
@@ -763,82 +878,23 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
             else:
                 graph_child.nodeName = node.nodeType.name
 
+            # color code the node
+            graph_child.color = getGraphNodeColor(node.nodeType)
 
             if graph_parent is not None:
-                graph_parent.ensure_output(0)                  # Ensure the first output port exists
-                graph_child.ensure_input(0)                    # Ensure the first input port exists
-
-                parent_output = graph_parent.output(0)          # First output port
-                child_input = graph_child.input(0)               # First input port
-                parent_output.connect_to(child_input)
+                # link the parent graph node to its child
+                graph_parent.ensure_output(0)  # Ensure the first output port exists
+                graph_child.ensure_input(0)  # Ensure the first input port exists
+                graph_parent.output(0).connect_to(graph_child.input(0))
+            # else:
+            #     syslog.info(f"Warning: No parent graph node found for node [{node.nodeType.name}]")
 
             graph_child.level = level
             graph_child.position = node.parent.children.index(node) if parent is not None else 0
             graph_child.load(node)  # populate the node with the relevant node information
 
-
-
-
-        # self._recursive_add(graph=self._graph.root, parent_node=self._graph.root, level=0)
-
-
-
-
-    def _recursive_add(self, graph: ProfileGraph, parent_node, level: int):
-        if graph is None:
-            return
-
-        child_nodes = list(graph.children)
-        child: ProfileBaseNode
-
-        graph_parent_node = self._node_map.get(parent_node)
-
-        for index, child in enumerate(child_nodes):
-            instance = None
-            match child.nodeType:
-                case ProfileNodeType.Profile:
-                    instance = GraphProfileNode
-
-                case ProfileNodeType.Device:
-                    instance = GraphDeviceNode
-
-                case ProfileNodeType.Input:
-                    instance = GraphInputItemNode
-
-                case ProfileNodeType.Container:
-                    instance = GraphContainerNode
-
-                case ProfileNodeType.Action:
-                    instance = GraphActionNode
-
-                case ProfileNodeType.Mode:
-                    instance = GraphModeNode
-
-                case _:
-                    continue
-
-            instance_name = instance.type_
-            child_node = self._node_graph.create_node(instance_name)
-            child_node.nodeName = child.description
-
-            child_node.level = level
-            child_node.position = index
-            child_node.load(child)  # populate the node with the relevant node information
-
-
-            # connect parent to child
-            if graph_parent_node:
-                graph_parent_node.ensure_output(0)                  # Ensure the first output port exists
-                child_node.ensure_input(0)                    # Ensure the first input port exists
-
-                parent_output = graph_parent_node.output(0)          # First output port
-                child_input = child_node.input(0)              # First input port
-                parent_output.connect_to(child_input)
-
-
-            self._node_map[child] = child_node
-
-            self._recursive_add(child, child_node, level + 1)
+            # store a reference for lookup
+            self._node_map[node] = graph_child
 
     def _apply_layout(self, node_map: dict):
 
@@ -1629,8 +1685,9 @@ class ProfileModeNode(ProfileBaseNode):
             for input_id in mode_node._config[input_type]:
                 input_item = mode_node._config[input_type][input_id]
                 if input_item:
-                    input_item_node = ProfileInputItemNode(parent, input_type_node)
+                    input_item_node = ProfileInputItemNode(parent, input_type_node, input_item)
                     input_item_node.input_item = input_item
+
         if parent:
             node.parent = parent
         return node
@@ -1714,7 +1771,7 @@ class ProfileModeNode(ProfileBaseNode):
 class ProfileInputItemNode(ProfileBaseNode):
     """input node - represents an input for a device"""
 
-    def __init__(self, device_node: ProfileDeviceNode, parent: ProfileInputTypeNode):
+    def __init__(self, device_node: ProfileDeviceNode, parent: ProfileInputTypeNode, input_item: gremlin.input_item.InputItem = None):
         super().__init__(ProfileNodeType.Input)
         assert device_node is not None, "device node must be provided"
         self.device_node = device_node  # link to the device node this input belongs to
@@ -1726,7 +1783,7 @@ class ProfileInputItemNode(ProfileBaseNode):
         self.always_execute = False
         self.parent = parent
         self.input_entry = None  # the identifier
-        self._input_item = None  # the profile input item
+        self._input_item = input_item  # the profile input item
 
         if device_node.device_type == DeviceType.ModeControl:
             # create the special input item
@@ -1737,9 +1794,14 @@ class ProfileInputItemNode(ProfileBaseNode):
             current_mode = gremlin.shared_state.edit_mode
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
-            self._input_item = gremlin.input_item.InputItem(mode_node = mode_object, input_type = InputType.ModeControl)
+            self._input_item = gremlin.input_item.InputItem(mode_node=mode_object, input_type=InputType.ModeControl)
             self._input_item.setDeviceType(DeviceType.ModeControl)
             self._input_item.setInputId(0)
+
+        if input_item is not None:
+            for container in input_item.containers:
+                container_node = ProfileContainerNode(parent=self, container=container)
+                container_node.container = container
 
     @property
     def input_item(self) -> gremlin.input_item.InputItem:
@@ -1989,12 +2051,16 @@ class ProfileInputItemNode(ProfileBaseNode):
 
 
 class ProfileContainerNode(ProfileBaseNode):
-    """ container node """
+    """container node"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, container: AbstractContainer = None):
         super().__init__(ProfileNodeType.Container)
-        self.container = None
+        self.container = container
         self.parent = parent
+
+        if container is not None:
+            for action_set in container.action_sets:
+                action_set_node = ProfileActionSetNode(action_set, parent=self)
 
     def from_xml(self, node: Element, data=None, extra_data=None):
         """reads container data from the profile xml"""
@@ -2019,12 +2085,11 @@ class ProfileContainerNode(ProfileBaseNode):
             action_set = container.action_sets[0]
             for action in action_set.actions:
                 action_node = ProfileActionNode(action, parent=self)
+
         else:
             # multiple action sets
             for action_set in container.action_sets:
-                action_set_node = ProfileActionSetNode(action_set, parent = self)
-
-
+                action_set_node = ProfileActionSetNode(action_set, parent=self)
 
     def to_xml(self) -> Element:
         if self.container:
@@ -2033,19 +2098,42 @@ class ProfileContainerNode(ProfileBaseNode):
     def __str__(self):
         return f"{self.nodeType.name}: {str(self.container)}"
 
+
 class ProfileActionSetNode(ProfileBaseNode):
     """action set node"""
 
-    def __init__(self, action_set : ActionSet, parent=None):
+    def __init__(self, action_set: ActionSet, parent=None):
         super().__init__(ProfileNodeType.ActionSet)
         self.action_set = action_set
         self.parent = parent
 
+        if self.action_set is not None:
+            for action in self.action_set:
+                action_node = ProfileActionNode(action, parent=self)
+
     def setActionSet(self, action_set: ActionSet):
         self.action_set = action_set
 
+        for action in self.action_set:
+            action_node = ProfileActionNode(action, parent=self)
+
+    def from_xml(self, node: Element, data=None, extra_data=None):
+        """reads action set data from the profile xml"""
+        action_set_type = node.get("type")
+
+        action_plugins = gremlin.plugin_manager.ActionPlugins()
+        action_tag_map = action_plugins.tag_map
+        action_set = action_tag_map[action_set_type](self)
+        action_set.from_xml(node, data)
+
+        self.action_set = action_set
         for action in self.action_set.actions:
             action_node = ProfileActionNode(action, parent=self)
+            self.append(action_node)
+
+    def to_xml(self) -> Element:
+        if self.action_set:
+            return self.action_set.to_xml()
 
     def __str__(self):
         return f"{self.nodeType.name}: {str(self.action_set)}"
@@ -2053,6 +2141,7 @@ class ProfileActionSetNode(ProfileBaseNode):
 
 class ProfileActionNode(ProfileBaseNode):
     """action node"""
+
     def __init__(self, action: AbstractAction = None, parent=None):
         super().__init__(ProfileNodeType.Action)
         self.parent = parent
@@ -2061,8 +2150,24 @@ class ProfileActionNode(ProfileBaseNode):
     def setAction(self, action: AbstractAction):
         self.action = action
 
+    def from_xml(self, node: Element, data=None, extra_data=None):
+        """reads action data from the profile xml"""
+        action_type = node.get("type")
+
+        action_plugins = gremlin.plugin_manager.ActionPlugins()
+        action_tag_map = action_plugins.tag_map
+        action = action_tag_map[action_type](self)
+        action.from_xml(node, data)
+
+        self.action = action
+
+    def to_xml(self) -> Element:
+        if self.action:
+            return self.action.to_xml()
+
     def __str__(self):
         return f"{self.nodeType.name}: {str(self.action)}"
+
 
 class ProfileMergedAxisNode(ProfileBaseNode):
     """device node"""

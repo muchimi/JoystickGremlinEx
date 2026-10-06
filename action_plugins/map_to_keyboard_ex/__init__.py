@@ -739,6 +739,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        verbose = True
         auto_release = False
 
         # verbose = True
@@ -1170,7 +1171,7 @@ Can also send mouse buttons, mouse wheel events."""
         if "interval" in node.attrib:
             self.autorepeat_delay = safe_read(node, "interval", int, 250)  # pulse interval milliseconds
 
-        key_nodes = node.xpath(".//key")
+        key_nodes = node.xpath("./key")
         for child in key_nodes:
             key = None
             virtual_code = safe_read(child, "virtual-code", int, 0)

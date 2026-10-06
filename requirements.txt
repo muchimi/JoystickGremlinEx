@@ -18,6 +18,8 @@ psygnal >= 0.13.0
 lxml >= 6.0.0
 msgpack >= 1.1.0
 graphviz >= 0.21
+pygraphviz >= 1.7
+networkx >= 3.1
 sounddevice
 soundfile
 numpy

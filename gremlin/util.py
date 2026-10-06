@@ -3135,3 +3135,8 @@ def getSidecarFiles(path: str) -> list[str]:
     base_name = xml_path.stem
     sidecar_files = list(xml_path.parent.glob(f"{base_name}*.json"))
     return [str(f) for f in sidecar_files]
+
+def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+    """Converts a hexadecimal color string to an RGB tuple."""
+    hex_str = hex_str.lstrip('#')
+    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))

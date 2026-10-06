@@ -128,6 +128,8 @@ a = Analysis(
         "sympy",
         "qtawesome",
         "OdenGraphQt",
+        "pygraphviz",
+        "networkx",
         "gremlin.ui.obs_overlay",
         "gremlin.ui.obs_overlay.bindings",
         "gremlin.ui.obs_overlay.blink",

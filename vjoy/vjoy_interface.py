@@ -21,6 +21,7 @@ import enum
 import os
 import logging
 import atexit
+import threading
 import ctypes.wintypes as wintypes
 
 syslog = logging.getLogger("system")
@@ -110,6 +111,9 @@ class VJoyInterface:
     @classmethod
     def initialize(self):
         """Initializes the functions as class methods."""
+        if not self._is_ui_thread():
+            return self._call_on_ui_thread(self.initialize)
+
         from pathlib import Path
         from gremlin.util import (
             display_error,
@@ -163,12 +167,53 @@ class VJoyInterface:
                 dll_fn.argtypes = params["arguments"]
             if "returns" in params:
                 dll_fn.restype = params["returns"]
-            setattr(self, fn_name, dll_fn)
+            setattr(self, fn_name, staticmethod(self._wrap_ui_thread_call(dll_fn)))
 
         self.valid = True
 
     @classmethod
+    def _is_ui_thread(cls):
+        import gremlin.util
+
+        return gremlin.util.is_ui_thread()
+
+    @classmethod
+    def _call_on_ui_thread(cls, method, *args, **kwargs):
+        import gremlin.util
+
+        if cls._is_ui_thread():
+            return method(*args, **kwargs)
+
+        completed = threading.Event()
+        result = []
+        failure = []
+
+        def invoke():
+            try:
+                result.append(method(*args, **kwargs))
+            except BaseException as error:
+                failure.append(error)
+            finally:
+                completed.set()
+
+        gremlin.util.InvokeUiMethod(invoke)
+        completed.wait()
+        if failure:
+            raise failure[0]
+        return result[0] if result else None
+
+    @classmethod
+    def _wrap_ui_thread_call(cls, method):
+        def invoke(*args, **kwargs):
+            return cls._call_on_ui_thread(method, *args, **kwargs)
+
+        return invoke
+
+    @classmethod
     def shutdown(self):
+        if not self._is_ui_thread():
+            return self._call_on_ui_thread(self.shutdown)
+
         if self.vjoy_dll is not None:
             dll_handle = self.vjoy_dll._handle
             # use the correct kernel DLL for 64 bit

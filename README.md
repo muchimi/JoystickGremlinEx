@@ -50,7 +50,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T69)
-- New: Map to state: Other state action modes. When triggering a state, the action can also optionally globally touch other states, such as setting all on, off or us
+- New: Map to state: Other state action modes. When triggering a state, the action can also optionally globally touch all other states, such as setting all on, off or use a boolean comparison to determine the new value.  Default is do nothing.
+- Change: new dependency library: networkx (included in package)
+- Change: new dependency library: pygraphviz (included in package)
+- Fix: UI: continued hardening to guard against QT behavior and desync.
+- Fix: Map to Keyboard/Ex: some keys could be duplicated on profile read
+- Fix: VJOY: ensure vjoy calls are on the primary process (UI) thread to avoid potential boundary race conditions when interacting with the C++ layer.  This is specifically to handle process locking boundaries.
+
 
 ### (m77T68)
 - New: Map to State pulse mode: the pulse mode defaults to an option that inverts the value of the state while pulsed, rather than turning it on and off. This was always the intended behavior and should not change behavior provided that the state is set to a known value.  This would only require a profile update if you use the pulse feature to turn a state off using pulse.  This is usually not the case.  This can be turned off via the new option in pulse mode.  Defaults to enabled.
