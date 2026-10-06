@@ -50,6 +50,7 @@ class QSliderWidget(QtWidgets.QWidget):
         import gremlin.ui.ui_common
 
         super().__init__(parent)
+        self._disposed = False
         self._id = gremlin.util.get_guid()
         self._lock = False
         self._values = [
@@ -144,10 +145,33 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def unhook(self):
         """cleanup"""
+        if self._disposed:
+            return
+        self._disposed = True
         self.setMouseTracking(False)
-        if self._tooltip_timer:
+        if self._tooltip_timer is not None and Shiboken.isValid(self._tooltip_timer):
             self._tooltip_timer.stop()
+            try:
+                self._tooltip_timer.timeout.disconnect(self._handle_show_tooltip_ui)
+            except (RuntimeError, TypeError):
+                pass
+        self._tooltip_timer = None
         self._tooltip_message = None
+        self._tooltip_handle_map.clear()
+        self._tooltip_range_map.clear()
+        self._handle_hotspots.clear()
+        self._range_hotspots.clear()
+        self._range_hotspots_map = {}
+        self._drag_active = False
+        self._mouse_down = False
+        self._drag_handle_index = None
+        self._hover_lock = False
+        self._hover_handle = False
+        self._hover_range = False
+        QToolTip.hideText()
+
+    def _is_active(self) -> bool:
+        return not self._disposed and Shiboken.isValid(self)
 
     @property
     def desired_height(self) -> int:
@@ -159,6 +183,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_desired_height_ui(self, value: int):
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._desired_height = value
         self.resize(self.minimumSizeHint())
 
@@ -190,6 +216,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_single_range_ui(self, value):
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._single_range = value
         self._update_offsets_ui()
         self.update()
@@ -200,6 +228,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_tick_count_ui(self, value: int):
         """sets the number of ticks"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         value = gremlin.util.clamp(value, 0, 50)
         if self._tick_count != value:
             self._tick_count = value
@@ -211,6 +241,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_tick_marks_ui(self, value: int):
         """sets the tick marks for the axis as set values"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         if value:
             self._tick_marks = value
             self._tick_count = len(value)
@@ -225,6 +257,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_draw_handles_ui(self, value: bool):
         """enable/disables the drawing of handles"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._draw_handles = value
         self.update()
 
@@ -242,6 +276,8 @@ class QSliderWidget(QtWidgets.QWidget):
         """
 
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         if icon is None:
             # clear the entry
             if index in self._handle_icons:
@@ -258,6 +294,11 @@ class QSliderWidget(QtWidgets.QWidget):
         :param index: index of the handle
         :param message: message to display
         """
+        gremlin.util.InvokeUiMethod(self._set_handle_tooltip_ui, index, message)
+
+    def _set_handle_tooltip_ui(self, index: int, message: str):
+        if not self._is_active():
+            return
         if message is None and index in self._tooltip_handle_map:
             del self._tooltip_handle_map[index]
         else:
@@ -271,6 +312,11 @@ class QSliderWidget(QtWidgets.QWidget):
         :param message: message to display
 
         """
+        gremlin.util.InvokeUiMethod(self._set_range_tooltip_ui, a, b, message)
+
+    def _set_range_tooltip_ui(self, a: int, b: int, message: str):
+        if not self._is_active():
+            return
         key = (a, b)
         if message is None and key in self._tooltip_range_map:
             del self._tooltip_range_map[key]
@@ -283,6 +329,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_value_index_ui(self, index: int, value: int | float):
         """sets a specific value by index"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
 
         value = gremlin.util.clamp(value, self._minimum, self._maximum)
         try:
@@ -297,6 +345,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_value_ui(self, value: int | float | list | tuple):
         """input values expected to be -1 to +1 floating point"""
+        if not self._is_active():
+            return
         try:
             gremlin.util.assert_ui_thread()
             if self._value_lock:
@@ -342,6 +392,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_marker_visible_ui(self, value: bool):
         """toggle marker visibility"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._marker_visible = value
         self.update()
 
@@ -357,6 +409,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_marker_size_ui(self, value):
         """sets the relative size of the marker"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._marker_size = value
         self._update_pixmaps()
         self._update_marker_offsets_ui()
@@ -367,6 +421,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_read_only_ui(self, value: bool):
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._readOnly = value
 
     def readOnly(self) -> bool:
@@ -375,6 +431,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _update_offsets_ui(self):
         """recomputes pixel offsets based on gate values"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         size = self.size()
         widget_width = size.width()
         widget_height = size.height()
@@ -470,6 +528,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_marker_value_ui(self, value):
         """sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         # if self._lock:
         #     return
         # try:
@@ -502,6 +562,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_minimum_ui(self, value: float):
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._minimum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
@@ -518,6 +580,8 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_maximum_ui(self, value: float) -> None:
         """sets the slider's maximum value"""
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         self._maximum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
@@ -535,6 +599,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
         """
         gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
         if range_min > range_max:
             # swap
             range_max, range_min = range_min, range_max
@@ -553,6 +619,8 @@ class QSliderWidget(QtWidgets.QWidget):
         :param event: QPaintEvent object
 
         """
+        if not self._is_active():
+            return
         # draw the widget
         # syslog.info("slider paint start")
 
@@ -829,6 +897,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def resizeEvent(self, event):
         """called on resize"""
+        if not self._is_active():
+            return
         super().resizeEvent(event)
         self._update_offsets_ui()
         self.adjustSize()
@@ -889,17 +959,20 @@ class QSliderWidget(QtWidgets.QWidget):
         return False
 
     def _show_tooltip(self, message: str):
+        if not self._is_active():
+            return
         gremlin.util.InvokeUiMethod(self._show_tooltip_ui, message)
 
     def _show_tooltip_ui(self, message: str):
         gremlin.util.assert_ui_thread()
+        if not self._is_active() or not Shiboken.isValid(self._tooltip_timer):
+            return
         self._tooltip_message = message
-        if self._tooltip_timer is not None:
-            self._tooltip_timer.stop()
-            self._tooltip_timer.start(1000)
+        self._tooltip_timer.stop()
+        self._tooltip_timer.start(1000)
 
     def _handle_show_tooltip_ui(self):
-        if Shiboken.isValid(self) and self._tooltip_message:
+        if self._is_active() and self._tooltip_message:
             gremlin.util.assert_ui_thread()
             QToolTip.showText(QCursor.pos(), self._tooltip_message, self)
 
@@ -958,7 +1031,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def mouseDoubleClickEvent(self, event):
         """double click event"""
-        if self._readOnly:
+        if not self._is_active() or self._readOnly:
             # don't fire events in readonly mode
             # print ("readonly - skip mousepress")
             return
@@ -1012,7 +1085,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         """
         # print ("mouse press")
-        if self._readOnly:
+        if not self._is_active() or self._readOnly:
             # don't fire events in readonly mode
             return
 
@@ -1032,6 +1105,8 @@ class QSliderWidget(QtWidgets.QWidget):
                 self._hover_lock = True  # lock the current hover mode
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        if not self._is_active():
+            return
         point: QPoint = event.pos()
 
         # process mouse movement for hover
@@ -1111,7 +1186,7 @@ class QSliderWidget(QtWidgets.QWidget):
         """
 
         # print ("mouse release")
-        if self._readOnly:
+        if not self._is_active() or self._readOnly:
             # don't fire events in readonly mode
             # print ("readonly - skip mouse release")
             return

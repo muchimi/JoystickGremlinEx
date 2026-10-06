@@ -36,7 +36,7 @@ import gremlin.input_item
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, ActionSetView
 from gremlin.input_types import InputType
 from PySide6 import QtCore
-from gremlin.util import safe_format, safe_read, InvokeUiMethod, clear_layout, get_guid
+from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import SyncMode
@@ -100,28 +100,47 @@ class GlobalSequence:
     """holds global sequence stats"""
 
     def __init__(self):
-        self.sequence_count = 0  # number of active sequences
+        self._lock = threading.Lock()
+        self._sequence_count = 0  # number of active sequences
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
 
     def profile_start(self):
         # reset count on profile start
-        self.sequence_count = 0
+        with self._lock:
+            self._sequence_count = 0
+
+    @property
+    def sequence_count(self):
+        with self._lock:
+            return self._sequence_count
 
     def canExecute(self):
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
         if max_concurrent:
             # concurrency is enabled if > 0
-            return self.sequence_count + 1 < max_concurrent
+            with self._lock:
+                return self._sequence_count + 1 < max_concurrent
         # concurrency disabled - always succeeed
         return True
 
+    def tryPushSequence(self):
+        """Atomically checks the concurrency limit and reserves a sequence slot."""
+        max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
+        with self._lock:
+            if max_concurrent and self._sequence_count + 1 >= max_concurrent:
+                return False
+            self._sequence_count += 1
+            return True
+
     def pushSequence(self):
-        self.sequence_count += 1
+        with self._lock:
+            self._sequence_count += 1
 
     def popSequence(self):
-        if self.sequence_count:
-            self.sequence_count -= 1
+        with self._lock:
+            if self._sequence_count:
+                self._sequence_count -= 1
 
 
 # instance
@@ -652,11 +671,18 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
     def _update_action_sets(self):
         """redraws action steps in the sequence - each step is an action set"""
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.assert_ui_thread()
 
         # cleanup current action sets
-        for widget in self._widget_map.values():
-            widget.hide()
-            widget.model.data_changed.disconnect(self.container_modified.emit)
+        for widget in list(self._widget_map.values()):
+            if not Shiboken.isValid(widget):
+                continue
+            try:
+                widget.model.data_changed.disconnect(self.container_modified.emit)
+            except (RuntimeError, TypeError):
+                pass
             gremlin.util.delete_widget(widget)
         self._widget_map.clear()
 
@@ -1034,6 +1060,54 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             syslog.info("SEQUENCE: initialized")
 
         self._current_step = None  # tracks the next step to execute
+        self._runner_lock = threading.RLock()
+
+    def _start_runner(self, runner, thread_name: str):
+        gs = GlobalSequence()
+        with self._runner_lock:
+            thread = self.action_data._thread
+            if self.action_data._is_running or (thread is not None and thread.is_alive()):
+                return
+            if not gs.tryPushSequence():
+                syslog.error("SEQUENCE: exceeded concurrent sequence limit")
+                return
+
+            self.action_data._is_running = True
+            thread = threading.Thread(target=self._run_runner, args=(runner,), name=thread_name)
+            self.action_data._thread = thread
+            try:
+                thread.start()
+            except BaseException:
+                self.action_data._thread = None
+                self.action_data._is_running = False
+                gs.popSequence()
+                raise
+
+            if self._verbose:
+                syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
+
+    def _run_runner(self, runner):
+        try:
+            runner()
+        finally:
+            with self._runner_lock:
+                if self.action_data._thread is threading.current_thread():
+                    self.action_data._thread = None
+                self.action_data._is_running = False
+            GlobalSequence().popSequence()
+
+    def _stop_runner(self):
+        with self._runner_lock:
+            thread = self.action_data._thread
+            self.action_data._is_running = False
+
+        if thread is None or thread is threading.current_thread():
+            return
+
+        gremlin.util.safeJoin(thread)
+        with self._runner_lock:
+            if not thread.is_alive() and self.action_data._thread is thread:
+                self.action_data._thread = None
 
     def profile_start(self):
         if self._verbose:
@@ -1099,9 +1173,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         return True  # allowed
 
     def profile_stop(self):
-        # stop wiggling
-        self.stop_wiggle()
-        self.stop_normal()
+        self._stop_runner()
 
         if self._hook_mode_change:
             eh = gremlin.event_handler.EventHandler()
@@ -1115,102 +1187,43 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         # kill any executing timers on mode change
         if gremlin.config.Configuration().macro_mode_affinity:
-            if self.action_data._is_running:
+            if self.action_data._is_running or self.action_data._thread is not None:
                 if self._verbose:
                     syslog.info("SEQUENCE: affinity: stop sequence runner due to mode change")
-                self.action_data._is_running = False
-                gremlin.util.safeJoin(self.action_data._thread)
-
-                self.action_data._thread = None
+                self._stop_runner()
 
         # reset
         self.action_data.last_step = None
 
     def start_wiggle(self):
         """starts the wiggle process"""
-
-        gs = GlobalSequence()
-        if gs.canExecute():
-            if not self.action_data._is_running:
-                self.action_data._is_running = True
-                self.action_data._thread = threading.Thread(target=self._wiggle_runner)
-                self.action_data._thread.name = "wiggle runner"
-                # increase concurrency count
-                gs.pushSequence()
-                self.action_data._thread.start()
-                if self._verbose:
-                    syslog.info(f"SEQUENCE: start wiggle sequence runner: concurrency: [{gs.sequence_count}]")
-
-        else:
-            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
+        self._start_runner(self._wiggle_runner, "wiggle runner")
 
     def stop_wiggle(self):
         """stops the wiggle process"""
-        if self.action_data._is_running:
-            if self._verbose:
-                syslog.info("SEQUENCE: stop wiggle sequence runner")
-            self.action_data._is_running = False
-            gremlin.util.safeJoin(self.action_data._thread)
-            self.action_data._thread = None
-            # reduce concurrency count
-            gs = GlobalSequence()
-            gs.popSequence()
+        if self.action_data._is_running and self._verbose:
+            syslog.info("SEQUENCE: stop wiggle sequence runner")
+        self._stop_runner()
 
     def start_normal(self):
         """starts the normal process"""
-        gs = GlobalSequence()
-        if gs.canExecute():
-            if not self.action_data._is_running:
-                self.action_data._is_running = True
-                self.action_data._thread = threading.Thread(target=self._normal_runner)
-                self.action_data._thread.name = "sequence runner"
-                # increase concurrency count
-                gs.pushSequence()
-                self.action_data._thread.start()
-                if self._verbose:
-                    syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
-        else:
-            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
+        self._start_runner(self._normal_runner, "sequence runner")
 
     def stop_normal(self):
         """stops the normal process"""
-        if self.action_data._is_running:
-            if self._verbose:
-                syslog.info("SEQUENCE: normal mode: stop sequence runner")
-            self.action_data._is_running = False
-            gremlin.util.safeJoin(self.action_data._thread)
-            # reduce concurrency count
-            gs = GlobalSequence()
-            gs.popSequence()
-            self.action_data._thread = None
+        if self.action_data._is_running and self._verbose:
+            syslog.info("SEQUENCE: normal mode: stop sequence runner")
+        self._stop_runner()
 
     def start_stepped(self):
         """starts the stepped process"""
-        gs = GlobalSequence()
-        if gs.canExecute():
-            if not self.action_data._is_running:
-                self.action_data._is_running = True
-                self.action_data._thread = threading.Thread(target=self._stepped_runner)
-                self.action_data._thread.name = "sequence runner"
-                # increase concurrency count
-                gs.pushSequence()
-                self.action_data._thread.start()
-                if self._verbose:
-                    syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
-        else:
-            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
+        self._start_runner(self._stepped_runner, "sequence runner")
 
     def stop_stepped(self):
         """stops the stepped process"""
-        if self.action_data._is_running:
-            if self._verbose:
-                syslog.info("SEQUENCE: stepped mode: stop sequence runner")
-            self.action_data._is_running = False
-            gremlin.util.safeJoin(self.action_data._thread)
-            # reduce concurrency count
-            gs = GlobalSequence()
-            gs.popSequence()
-            self.action_data._thread = None
+        if self.action_data._is_running and self._verbose:
+            syslog.info("SEQUENCE: stepped mode: stop sequence runner")
+        self._stop_runner()
 
     def process_event(self, event: gremlin.event_handler.Event, value: bool | gremlin.actions.Value, extra_data: dict = None) -> bool:
         if not self.valid:

@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T69)
+- New: Map to state: Other state action modes. When triggering a state, the action can also optionally globally touch other states, such as setting all on, off or us
+
 ### (m77T68)
 - New: Map to State pulse mode: the pulse mode defaults to an option that inverts the value of the state while pulsed, rather than turning it on and off. This was always the intended behavior and should not change behavior provided that the state is set to a known value.  This would only require a profile update if you use the pulse feature to turn a state off using pulse.  This is usually not the case.  This can be turned off via the new option in pulse mode.  Defaults to enabled.
 - Change: Allow optional module core plugins to load even if disabled so profiles loaded that use the disabled modules can recognize the fact the profile uses disabled modules. This is an interim solution for now as the long term goal is to not load modules until referenced by a profile (if disabled) and prompt the end-user to load these modules (change options/preferences automatically) if needed.

@@ -403,6 +403,10 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
     def setValue(self, value: float):
         """called when the axis value is updated"""
+        gremlin.util.InvokeUiMethod(self._set_value_ui, value)
+
+    def _set_value_ui(self, value: float):
+        gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self):
             return
         self.merge_curve_widget.setValue(value)
@@ -2021,6 +2025,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _profile_stop(self):
         """called when the profile stops"""
+        gremlin.util.InvokeUiMethod(self._profile_stop_ui)
+
+    def _profile_stop_ui(self):
+        gremlin.util.assert_ui_thread()
+        if not Shiboken.isValid(self):
+            return
         self._update_axis_widget()
         self._enable_axis_tracking()
 

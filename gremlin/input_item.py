@@ -280,13 +280,15 @@ class AbstractView(QtWidgets.QWidget):
         if self._model_callback_cleaned:
             return
         self._model_callback_cleaned = True
-        if self._model is not None:
-            self._model.removeCallback(self._handle_model_changed)
+        model = self._model
+        if model is not None:
+            model.removeCallback(self._handle_model_changed)
         self._model_change_callbacks.clear()
         widget_map = getattr(self, "_widget_map", None)
         if isinstance(widget_map, dict):
             widget_map.clear()
         gremlin.util.clear_widget_references(self)
+        self._model = None
 
     def addSelectionChangeCallback(self, callback: Callable):
         """adds a callback to be called when the model changes - this is used by the container
@@ -328,6 +330,8 @@ class AbstractView(QtWidgets.QWidget):
 
     def _handle_model_changed(self, data=None, force=False):
         """Handles changes in the model."""
+        if self._model_callback_cleaned:
+            return
 
         if not gremlin.util.is_ui_thread():
             # Model callbacks can be fired from worker threads; always marshal
@@ -339,8 +343,14 @@ class AbstractView(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             # widget was destroyed - self unhook
             self._model_change_callbacks.clear()
-            self._model.removeCallback(self._handle_model_changed)
+            model = self._model
+            if model is not None:
+                model.removeCallback(self._handle_model_changed)
+            self._model_callback_cleaned = True
             self._has_changes = False
+            return
+
+        if self._model is None:
             return
 
         if self._has_changes:
@@ -353,8 +363,12 @@ class AbstractView(QtWidgets.QWidget):
             return
 
         # notify the callbacks if any
-        for callback in self._model_change_callbacks:
+        for callback in tuple(self._model_change_callbacks):
+            if self._model_callback_cleaned or not Shiboken.isValid(self):
+                return
             callback()
+            if self._model_callback_cleaned or not Shiboken.isValid(self):
+                return
 
         if gremlin.shared_state.is_redraw_suspended():
             # no redraw allowed currently
@@ -402,16 +416,19 @@ class AbstractView(QtWidgets.QWidget):
 
         :param model the model to visualize
         """
-        if self._model:
-            # ensure the callback is registered so when the model changes, the list view updates
-            self._model.addCallback(self._handle_model_changed)
-        if self._model != model:
-            if self._model:
-                self._model.removeCallback(self._handle_model_changed)
-            assert isinstance(model, AbstractCallbackModel) if model is not None else True, "invalid model"
-            self._model = model
+        if self._model_callback_cleaned or not Shiboken.isValid(self):
+            return
+        if self._model is model:
+            return
 
-            self._hash_key = None
+        assert isinstance(model, AbstractCallbackModel) if model is not None else True, "invalid model"
+        old_model = self._model
+        if old_model is not None:
+            old_model.removeCallback(self._handle_model_changed)
+        self._model = model
+        self._hash_key = None
+        if model is not None:
+            model.addCallback(self._handle_model_changed)
 
     def modelChanged(self) -> bool:
         """true if the unrerlying model has changed - used in the context of begin/end to detect model changes if a redraw was suspended"""
@@ -7369,10 +7386,25 @@ class ActionSetView(AbstractView):
 
     def _handle_model_changed(self, data, force: bool):
         """called when the model changes"""
+        if self._model_callback_cleaned:
+            return
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._handle_model_changed, data, force)
+            return
+        if not Shiboken.isValid(self) or self._model is None:
+            return
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ActionSetView: model changed: force: [{force}]  items: {len(self.model)}")
         self.redraw()
+
+    def _cleanup_ui(self):
+        if self._model_callback_cleaned:
+            return
+        container_widget = getattr(self, "_container_widget", None)
+        if Shiboken.isValid(container_widget):
+            gremlin.util.clear_layout(container_widget.layout())
+        super()._cleanup_ui()
 
     @property
     def selected(self) -> bool:
@@ -7417,8 +7449,8 @@ class ActionSetView(AbstractView):
                 self._action_widget = None
                 self._widget_map.clear()
                 widget = self._stacked_widget.widget(1)
-                widget.hide()
                 self._stacked_widget.removeWidget(widget)
+                gremlin.util.clear_layout(widget.layout())
                 gremlin.util.delete_widget(widget)
 
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
@@ -7507,6 +7539,12 @@ class ActionSetView(AbstractView):
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
         import gremlin.clipboard
+
+        gremlin.util.assert_ui_thread()
+        if self._model_callback_cleaned or not Shiboken.isValid(self):
+            return
+        if self._model is None or not Shiboken.isValid(getattr(self, "_stacked_widget", None)):
+            return
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -7675,6 +7713,7 @@ class ActionSelector(QtWidgets.QWidget):
 
         assert isinstance(input_item, gremlin.input_item.InputItem), "expected an input item, wrong type passed"
 
+        self._cleaned = False
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         # self._input_type = input_type if input_type else self._input_item.getInputType()
@@ -7738,29 +7777,56 @@ class ActionSelector(QtWidgets.QWidget):
             self._callbacks.remove(callback)
 
     def _fireCallbacks(self, action_name: str, mode: str):
-        for callback in self._callbacks:
+        if self._cleaned or not Shiboken.isValid(self):
+            return
+        for callback in tuple(self._callbacks):
+            if self._cleaned or not Shiboken.isValid(self):
+                return
             callback(action_name, mode, self.data)
 
     def _cleanup_ui(self):
-
+        if self._cleaned:
+            return
+        self._cleaned = True
+        try:
+            self._input_item.lockedChanged.disconnect(self._handle_lock_changed)
+        except (AttributeError, RuntimeError, TypeError):
+            pass
         el = gremlin.event_handler.EventListener()
-        el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
+        try:
+            el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
+        except (RuntimeError, TypeError):
+            pass
 
         eh = gremlin.event_handler.EventHandler()
-        eh.last_action_changed.disconnect(self._last_action_changed)
+        try:
+            eh.last_action_changed.disconnect(self._last_action_changed)
+        except (RuntimeError, TypeError):
+            pass
+        self._callbacks.clear()
+        self._callback_pasted = None
+        self.data = None
+        self._input_item = None
+        gremlin.util.clear_widget_references(self)
 
     def _handle_action_list_refresh(self):
+        if self._cleaned:
+            return
         gremlin.util.InvokeUiMethod(self._handle_action_list_refresh_ui)
 
     def _handle_action_list_refresh_ui(self):
-        if Shiboken.isValid(self):
+        if not self._cleaned and Shiboken.isValid(self):
             self.refresh()
 
     def _handle_lock_changed(self, input_item):
+        if self._cleaned:
+            return
         gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item)  # ensure on UI thread
 
     def _handle_lock_changed_ui(self, input_item):
-        if Shiboken.isValid(self):
+        if self._cleaned or not Shiboken.isValid(self) or input_item is None or not Shiboken.isValid(input_item):
+            return
+        if Shiboken.isValid(self.add_button) and Shiboken.isValid(self.paste_button):
             unlocked = not input_item.locked
             self.add_button.setEnabled(unlocked)
             self.paste_button.setEnabled(unlocked)
@@ -7787,18 +7853,25 @@ class ActionSelector(QtWidgets.QWidget):
 
     @QtCore.Slot(object, str)
     def _last_action_changed(self, widget, name):
-        if not Shiboken.isValid(self):
+        if self._cleaned:
             return
-        if not Shiboken.isValid(widget):
+        gremlin.util.InvokeUiMethod(self._last_action_changed_ui, widget, name)
+
+    def _last_action_changed_ui(self, widget, name):
+        gremlin.util.assert_ui_thread()
+        if self._cleaned or not Shiboken.isValid(self):
             return
-        if widget != self.action_dropdown:
-            with QtCore.QSignalBlocker(self.action_dropdown):
-                self.action_dropdown.setCurrentText(name)
+        action_dropdown = self.action_dropdown
+        if not Shiboken.isValid(action_dropdown) or not Shiboken.isValid(widget):
+            return
+        if widget != action_dropdown:
+            with QtCore.QSignalBlocker(action_dropdown):
+                action_dropdown.setCurrentText(name)
 
     def _action_changed(self):
         """remember the last selection"""
 
-        if not Shiboken.isValid(self):
+        if self._cleaned or not Shiboken.isValid(self) or not Shiboken.isValid(self.action_dropdown):
             return
         name = self.action_dropdown.currentText()
         config = gremlin.config.Configuration()
@@ -7857,6 +7930,8 @@ class ActionSelector(QtWidgets.QWidget):
 
     def _handle_help(self):
         """handles the help box on an action"""
+        if self._cleaned or not Shiboken.isValid(self) or not Shiboken.isValid(self.action_dropdown):
+            return
         action_name = self.action_dropdown.currentText()
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action = plugin_manager.get_class(action_name)(self._input_item)
@@ -7878,12 +7953,16 @@ class ActionSelector(QtWidgets.QWidget):
         :param clicked flag indicating whether or not the action resulted from
             a click
         """
+        if self._cleaned or not Shiboken.isValid(self) or not Shiboken.isValid(self.action_dropdown):
+            return
         action_name = self.action_dropdown.currentText()
         self._fireCallbacks(action_name, "add")
         self.action_added.emit(action_name)
 
     def _handle_paste_action(self):
         """handle paste action"""
+        if self._cleaned or not Shiboken.isValid(self):
+            return
         import gremlin.plugin_manager
 
         container = None
@@ -8341,6 +8420,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._action_widget_map = {}  # cache for action set [input_item] -> widget
         self._use_view = view
         self._container: AbstractContainer = None
+        self._cleanup_started = False
 
         background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
         css = f"background-color:{background_color}"
@@ -8507,12 +8587,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         return widget
 
     def _update_container_id(self):
-        if self._container_id_widget and Shiboken.isValid(self) and Shiboken.isValid(self._container_id_widget):
+        if not self._cleanup_started and self._container_id_widget and Shiboken.isValid(self) and Shiboken.isValid(self._container_id_widget):
             gremlin.util.InvokeUiMethod(self._update_container_id_ui)  # on UI thread
 
     def _update_container_id_ui(self):
         """updates the container ID display for this container"""
-        if not Shiboken.isValid(self):
+        if self._cleanup_started or not Shiboken.isValid(self):
             return
         holder = self._container_id_widget
         if holder is None or not Shiboken.isValid(holder):
@@ -8523,10 +8603,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _fireChangeCallbacks(self):
         """fires the change callbacks for this container widget"""
-        if not Shiboken.isValid(self):
+        if self._cleanup_started or not Shiboken.isValid(self):
             return
         alive = []
-        for callback in self._container_changed_callbacks:
+        for callback in tuple(self._container_changed_callbacks):
+            if self._cleanup_started or not Shiboken.isValid(self):
+                return
             owner = getattr(callback, "__self__", None)
             if owner is not None:
                 try:
@@ -8538,6 +8620,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 callback(self)
             except RuntimeError:
                 continue
+            if self._cleanup_started or not Shiboken.isValid(self):
+                return
             alive.append(callback)
         if len(alive) != len(self._container_changed_callbacks):
             self._container_changed_callbacks = alive
@@ -8555,14 +8639,14 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._container_changed_callbacks.remove(callback)
 
     def _handle_container_changed(self, container):
-        if not Shiboken.isValid(self):
+        if self._cleanup_started or not Shiboken.isValid(self):
             return
         gremlin.util.InvokeUiMethod(self._handle_container_changed_ui, container)
 
     def _handle_container_changed_ui(self, container):
         gremlin.util.assert_ui_thread()
         """handles a change in a container"""
-        if not Shiboken.isValid(self):
+        if self._cleanup_started or not Shiboken.isValid(self):
             return
         self._fireChangeCallbacks()
         self.redrawActionSets()
@@ -8573,20 +8657,30 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @QtCore.Slot()
     def _handle_toggled(self):
+        if self._cleanup_started or not Shiboken.isValid(self):
+            return
         self.container.collapsed = self.collapsible_widget.isCollapsed()
 
     def _handle_collapse(self):
+        if self._cleanup_started:
+            return
         gremlin.util.InvokeUiMethod(self._handle_collapse_ui)
 
     def _handle_collapse_ui(self):
         """collapse the container - ui thread"""
+        if self._cleanup_started or not Shiboken.isValid(self.collapsible_widget):
+            return
         self.collapsible_widget.collapse(False)
 
     def _handle_expand(self):
+        if self._cleanup_started:
+            return
         gremlin.util.InvokeUiMethod(self._handle_expand_ui)
 
     def _handle_expand_ui(self):
         """expand the container - ui thread"""
+        if self._cleanup_started or not Shiboken.isValid(self.collapsible_widget):
+            return
         self.collapsible_widget.expand(False)
 
     def _config_visible(self):
@@ -8598,11 +8692,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _handle_lock_changed(self, input_item):
         """enable/disable based on lock state"""
+        if self._cleanup_started:
+            return
         gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item)  # ensure on UI thread
 
     def _handle_lock_changed_ui(self, input_item):
         """enable/disable based on lock state"""
-        if Shiboken.isValid(self):
+        if self._cleanup_started or not Shiboken.isValid(self) or input_item is None or not Shiboken.isValid(input_item):
+            return
+        if Shiboken.isValid(self.collapsible_widget):
             self.setEnabled(not input_item.locked)
 
     @QtCore.Slot()
@@ -8709,26 +8807,55 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @QtCore.Slot(object)
     def _condition_changed(self, container):
+        if self._cleanup_started:
+            return
         gremlin.util.InvokeUiMethod(self._condition_changed_ui, container)
 
     def _condition_changed_ui(self, container):
         gremlin.util.assert_ui_thread()
         """called when conditions change"""
-        if container.id == self.container.id and self.activation_condition_widget:
+        if self._cleanup_started or not Shiboken.isValid(self) or container is None or self.container is None:
+            return
+        if container.id == self.container.id and Shiboken.isValid(self.activation_condition_widget):
             self.activation_condition_widget._update_conditions_ui()
 
     @QtCore.Slot(object)
     def _condition_redraw(self, data):
+        if self._cleanup_started:
+            return
         gremlin.util.InvokeUiMethod(self._condition_redraw_ui, data)
 
     def _condition_redraw_ui(self, data):
         gremlin.util.assert_ui_thread()
         """occurs when a condition redraws"""
 
-        if self.container == data:
+        if not self._cleanup_started and Shiboken.isValid(self) and self.container == data:
             self._cleanup_ui()
 
     def _cleanup_ui(self):
+        if self._cleanup_started:
+            return
+        self._cleanup_started = True
+
+        el = gremlin.event_handler.EventListener()
+        for signal, callback in (
+            (el.condition_redraw, self._condition_redraw),
+            (el.condition_changed, self._condition_changed),
+        ):
+            try:
+                signal.disconnect(callback)
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+        if not Shiboken.isValid(self):
+            self._widget_map.clear()
+            self._action_widget_map.clear()
+            self._container_changed_callbacks.clear()
+            self._container_id_widget = None
+            self._container = None
+            gremlin.util.clear_widget_references(self)
+            return
+
         for view in self.findChildren(AbstractView):
             try:
                 view._cleanup_ui()
@@ -8754,9 +8881,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             except Exception:
                 pass
         self._widget_map.clear()
+        self._action_widget_map.clear()
         self._container_changed_callbacks.clear()
         self._container_id_widget = None
         gremlin.util.clear_widget_references(self)
+        self._container = None
 
     def _create_action_tab(self):
         """create the widget for the container's action tab"""
@@ -9664,6 +9793,13 @@ class ContainerView(AbstractView):
 
     def _handle_model_changed(self, data, force: bool):
         """called when the model changes"""
+        if getattr(self, "_cleaned", False):
+            return
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._handle_model_changed, data, force)
+            return
+        if not self._is_alive():
+            return
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ContainerView: model changed: force: [{force}]  items: {len(self._model)}")
@@ -11474,6 +11610,13 @@ class ConditionView(AbstractView):
 
     def _handle_model_changed(self, data, force: bool):
         """called when the model changes"""
+        if self._model_callback_cleaned:
+            return
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._handle_model_changed, data, force)
+            return
+        if not Shiboken.isValid(self) or self._model is None:
+            return
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ConditionView: model changed: force: [{force}]  items: {len(self.model)}")
@@ -11485,6 +11628,10 @@ class ConditionView(AbstractView):
         gremlin.util.InvokeUiMethod(self._update_count_ui)
 
     def _update_count_ui(self):
+        if self._model_callback_cleaned or not Shiboken.isValid(self):
+            return
+        if self._model is None or not Shiboken.isValid(self.title_widget):
+            return
         count = len(self.model)
         self.title_widget.setText(f"{self._title} ({count if count > 0 else 'None'})")
 
@@ -11515,7 +11662,9 @@ class ConditionView(AbstractView):
 
     def _create_ui(self, extra_data: dict = None):
         """recreates the UI based on the model"""
-        if not Shiboken.isValid(self):
+        if self._model_callback_cleaned or not Shiboken.isValid(self):
+            return
+        if self._model is None or not Shiboken.isValid(self.conditions_layout):
             return
 
         gremlin.util.clear_layout(self.conditions_layout)
@@ -11543,6 +11692,10 @@ class ConditionView(AbstractView):
 
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
+
+        gremlin.util.assert_ui_thread()
+        if self._model_callback_cleaned or not Shiboken.isValid(self) or self._model is None:
+            return
 
         hash_key = self._model.hashKey()
         changed = hash_key != self._hash_key or self._model.modelChanged

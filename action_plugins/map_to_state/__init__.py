@@ -28,8 +28,23 @@ from shiboken6 import Shiboken
 import threading
 import time
 from gremlin.ui.ui_common import QDataCheckbox, QDataLineEdit, QDataRadioButton, getHContainer, getVContainer, getGridContainer, QDelayWidget
+from enum import Enum
 
 syslog = logging.getLogger("system")
+
+
+class MapToStateActionMode (Enum):
+    """Enumeration for other action modes"""
+    NONE= 0 # do nothing
+    TOGGLE = 1 # flip the other states
+    SET_ON = 2 # set the other states on
+    SET_OFF = 3 # set the other states off
+    SET_XOR = 4 # set the other states to XOR (set if different)
+    SET_AND = 5 # set the other states to AND (set other state is also )
+    SET_OR = 6 # set the other states to OR (set if any are on)
+
+
+
 
 
 class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -186,56 +201,96 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
         self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, label="Pulse Options:", widget_only=True)
 
-        mode = self.action_data.mode
-        widgets = []
-        rb = gremlin.ui.ui_common.QDataRadioButton("Hold", data="actual")
-        rb.setToolTip("The state is set based on the pressed/release input state")
-        if mode == "actual":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
+        # map to state modes
+        mode_options = [
+            ("Hold", "actual", "The state is set based on the pressed/release input state"),
+            ("Press (on)", "press", "Sets the state"),
+            ("Release (off)", "release", "Releases the state"),
+            ("Pulse", "pulse", "Pulses the state delay milliseconds (the state is set and released regardless of current state)"),
+            ("Toggle", "toggle", "Toggles the state"),
+            ("Invert", "invert", "Set the state to the reversed input (off if pressed, on if released)"),
+            ("Latch", "latch", "When the state is set, it starts a timer that will ignore ON re-triggers until the state is set to OFF or the timer lapses."),
+        ]
 
-        rb = gremlin.ui.ui_common.QDataRadioButton("Press (on)", data="press")
-        rb.setToolTip("Sets the state")
-        if mode == "press":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Release (off)", data="release")
-        rb.setToolTip("Releases the state")
-        if mode == "release":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Pulse", data="pulse")
-        rb.setToolTip("Pulses the state delay milliseconds (the state is set and released regardless of current state)")
-        if mode == "pulse":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Toggle", data="toggle")
-        rb.setToolTip("Toggles the state")
-        if mode == "toggle":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton("Invert", data="invert")
-        rb.setToolTip("Set the state to the reversed input (off if pressed, on if released)")
-        if mode == "invert":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
+        widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+            options=mode_options,
+            callback=self._mode_changed,
+            value=self.action_data.mode,
+            label="Mode:"
+        )
 
-        rb = gremlin.ui.ui_common.QDataRadioButton("Latch", data="latch")
-        rb.setToolTip("When the state is set, it starts a timer that will ignore ON re-triggers until the state is set to OFF or the timer lapses.")
-        if mode == "latch":
-            rb.setChecked(True)
-        rb.clicked.connect(self._mode_changed)
-        widgets.append(rb)
+        self.main_layout.addWidget(widget)
+        self.mode_widget = widget
 
-        self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets, "Action:")
 
-        self.main_layout.addWidget(self.mode_widget)
+        # widgets = []
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Hold", data="actual")
+        # rb.setToolTip("The state is set based on the pressed/release input state")
+        # if mode == "actual":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Press (on)", data="press")
+        # rb.setToolTip("Sets the state")
+        # if mode == "press":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Release (off)", data="release")
+        # rb.setToolTip("Releases the state")
+        # if mode == "release":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Pulse", data="pulse")
+        # rb.setToolTip("Pulses the state delay milliseconds (the state is set and released regardless of current state)")
+        # if mode == "pulse":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Toggle", data="toggle")
+        # rb.setToolTip("Toggles the state")
+        # if mode == "toggle":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Invert", data="invert")
+        # rb.setToolTip("Set the state to the reversed input (off if pressed, on if released)")
+        # if mode == "invert":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+
+        # rb = gremlin.ui.ui_common.QDataRadioButton("Latch", data="latch")
+        # rb.setToolTip("When the state is set, it starts a timer that will ignore ON re-triggers until the state is set to OFF or the timer lapses.")
+        # if mode == "latch":
+        #     rb.setChecked(True)
+        # rb.clicked.connect(self._mode_changed)
+        # widgets.append(rb)
+
+        # self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets, "Action:")
+        # self.main_layout.addWidget(self.mode_widget)
+
+
+        # action modes
+        action_modes = [
+            ("None",MapToStateActionMode.NONE, "Do Nothing"),
+            ("Toggle",MapToStateActionMode.TOGGLE, "Toggle the state"),
+            ("Off",MapToStateActionMode.SET_OFF, "Set the state to off"),
+            ("On",MapToStateActionMode.SET_ON, "Set the state to on"),
+            ("XOR",MapToStateActionMode.SET_XOR, "Set other states if different from this one"),
+            ("AND",MapToStateActionMode.SET_AND, "Set other states only if this state is also set"),
+            ("OR",MapToStateActionMode.SET_OR, "Set other states if this state is set"),
+        ]
+        widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+            options=action_modes,
+            callback=self._handle_action_mode_changed,
+            value=self.action_data.action_mode,
+            label="Other State Mode:"
+        )
+
+        self.main_layout.addWidget(widget)
 
         widgets = []
         widget = gremlin.ui.ui_common.QDataCheckbox(
@@ -294,6 +349,8 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(widget)
 
+
+
         self.populate_selector()
 
         self.container_hat_widget = None
@@ -301,6 +358,9 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
         # gremlin.util.singleShot(self._update_ui)
         self._update_ui()
+
+    def _handle_action_mode_changed(self, value):
+        self.action_data.action_mode = value
 
     def _sync_changed(self, mode):
         self.action_data.sync_mode = mode
@@ -776,7 +836,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.verbose = gremlin.config.Configuration().verbose_mode_state
 
-
         # create the state if it doesn't exist
         self.sd = gremlin.ui.state_device.StateData()
         key = self.action_data.key
@@ -1023,9 +1082,14 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         is_pressed = event.is_pressed
         input_type = event.getInputType()
 
-        trigger = (
+        # trigger on press or release
+        sub_trigger =(
             (is_pressed and self.action_data.exec_on_press)
             or (not is_pressed and self.action_data.exec_on_release)
+        )
+
+        trigger = (
+            sub_trigger
             or mode in ("actual", "pulse")
             or (not is_pressed and mode == "invert")
         )
@@ -1186,6 +1250,45 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             case ButtonOutputMode.Release:
                                 return True
 
+        # handle other state action based on the action mode
+        if sub_trigger:
+            match self.action_data.action_mode:
+                case MapToStateActionMode.NONE:
+                    pass
+                case MapToStateActionMode.TOGGLE:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    for state_key in states:
+                        self.sd.toggle(state_key)
+
+                case MapToStateActionMode.SET_ON:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    for state_key in states:
+                        self.sd.setValue(state_key, True, force=True)
+
+                case MapToStateActionMode.SET_OFF:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    for state_key in states:
+                        self.sd.setValue(state_key, False, force=True)
+
+                case MapToStateActionMode.SET_XOR:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    value = self.sd.getValue(key)
+                    for state_key in states:
+                        self.sd.setValue(state_key, self.sd.getStates()[state_key] != value, force=True)
+
+                case MapToStateActionMode.SET_AND:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    value = self.sd.getValue(key)
+                    for state_key in states:
+                        self.sd.setValue(state_key, self.sd.getStates()[state_key] and value, force=True)
+
+                case MapToStateActionMode.SET_OR:
+                    states = [k for k in self.sd.getStates() if k != key]
+                    value = self.sd.getValue(key)
+                    for state_key in states:
+                        self.sd.setValue(state_key, self.sd.getStates()[state_key] or value, force=True)
+
+
         return True
 
 
@@ -1225,6 +1328,8 @@ class MapToState(gremlin.input_item.AbstractAction):
         self.pulse_toggles = True  # true if the pulse toggles the state instead of just activating it
         self.exec_on_press = True  # true if trigger should execute on input press event
         self.exec_on_release = False  # true if trigger should execute on input release event
+        self.action_mode : MapToStateActionMode = MapToStateActionMode.NONE # additional action mode when triggered
+        self.other_state_action = None  # action to perform on the other state
         self.sync_mode = SyncMode.Ignore  # ignore by default
         self.reset_default_on_stop = True  # if set, when a profile stops, the state is reset to the default state value
         self.hat_map = {}  # map of button id keyed by hat position tuple
@@ -1318,6 +1423,8 @@ class MapToState(gremlin.input_item.AbstractAction):
             self.sync_mode = SyncMode(safe_read(node, "sync-mode", int, 0))
         if "pulse-toggles" in node.attrib:
             self.pulse_toggles = safe_read(node, "pulse-toggles", bool, True)
+        if "action-mode" in node.attrib:
+            self.action_mode = MapToStateActionMode(safe_read(node, "action-mode", int, 0))
 
         self.latch_delay = safe_read(node, "latch-delay", int, 1000)
 
@@ -1379,6 +1486,7 @@ class MapToState(gremlin.input_item.AbstractAction):
 
             node.set("randomize-mode", safe_format(self.randomize_mode, bool))
             node.set("randomize-weight", safe_format(self.randomize_weight, float))
+            node.set("action-mode", safe_format(self.action_mode.value, int))
 
             input_type = self.get_input_type()
             if input_type == InputType.JoystickHat:

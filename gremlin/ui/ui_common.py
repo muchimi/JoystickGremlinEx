@@ -5108,12 +5108,13 @@ class QDataRadioButton(QtWidgets.QRadioButton):
 class QDataRadioButtonGroup(QtWidgets.QWidget):
     """a group of QDataRadioButton widgets that allows only one to be selected at a time"""
 
-    def __init__(self, options, value=None, callback=None, callbackEx=None, orientation=QtCore.Qt.Horizontal, parent=None):
+    def __init__(self, options, value=None, callback=None, callbackEx=None, orientation=QtCore.Qt.Horizontal, label: str = None, add_stretch=True, parent=None):
         """constructor
         :param options: list of tuples containing the label and data and tooltip for each radio button (label, value, tooltip)
         :param value: the initially selected value (optional) - the value should match the value in one of the options
         :param callback: callback function to execute when a radio button is selected (optional)
         :param orientation: layout orientation, either QtCore.Qt.Vertical or QtCore.Qt.Horizontal (optional)
+        :param label: label for the radio button group (optional)
         :param parent: parent widget (optional)
 
         """
@@ -5129,23 +5130,35 @@ class QDataRadioButtonGroup(QtWidgets.QWidget):
         layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         # Don't stretch across the form field column (avoids centered On/Off radios).
         self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
+
+        widgets = []
+
+        if label:
+            widgets.append(QtWidgets.QLabel(label))
+
         for item in options:
             count = len(item)
             match count:
                 case 3:
-                    label, data, tooltip = item
+                    lbl, data, tooltip = item
                 case 2:
-                    label, data = item
+                    lbl, data = item
                     tooltip = None
                 case _:
-                    label = item
+                    lbl = item
                     data = item
                     tooltip = None
 
-            widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip, parent=self)
+            widget = QDataRadioButton(lbl, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip, parent=self)
             widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred)
-            layout.addWidget(widget, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             self._widgets.append(widget)
+            widgets.append(widget)
+
+        for widget in widgets:
+            layout.addWidget(widget, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+
+        if add_stretch:
+            layout.addStretch()
 
     def _handle_button_clicked(self, widget, checked):
         if checked:
@@ -10560,6 +10573,7 @@ class QSplitTabWidget(QDataWidget):
         """
         super().__init__(parent)
         self.setObjectName(object_name)
+        self._cleanup_started = False
 
         self.setStyleSheet(gremlin.ui.ui_common.Color.cssTabContent())
         self.setContentsMargins(0, 0, 0, 0)
@@ -10665,7 +10679,7 @@ class QSplitTabWidget(QDataWidget):
             widget = the input mapping widget that was registered
         """
         assert isinstance(callback, Callable), "invalid callback"
-        if callback not in self._registered_callbacks:
+        if not self._cleanup_started and callback not in self._registered_callbacks:
             self._registered_callbacks.append(callback)
 
     def addUnregisteredWidgetCallback(self, callback: Callable):
@@ -10676,7 +10690,7 @@ class QSplitTabWidget(QDataWidget):
             widget = the input mapping widget that was registered
         """
         assert isinstance(callback, Callable), "invalid callback"
-        if callback not in self._registered_callbacks:
+        if not self._cleanup_started and callback not in self._unregistered_callbacks:
             self._unregistered_callbacks.append(callback)
 
     def _handle_used_filter_changed(self, device_id, value):
@@ -10713,13 +10727,41 @@ class QSplitTabWidget(QDataWidget):
 
     @tabData.setter
     def tabData(self, value):
-        if value != self._tab_data:
-            if self._tab_data:
-                self._tab_data.filteredChanged.disconnect(self._handle_used_filter_changed)
-                self._tab_data.lockedChanged.disconnect(self._handle_locked_changed)
+        if self._cleanup_started and value is not None:
+            return
+        if value is not self._tab_data:
+            old_tab_data = self._tab_data
+            if old_tab_data is not None:
+                for signal, callback in (
+                    (old_tab_data.filteredChanged, self._handle_tab_data_filtered_changed),
+                    (old_tab_data.lockedChanged, self._handle_tab_data_locked_changed),
+                ):
+                    try:
+                        signal.disconnect(callback)
+                    except (RuntimeError, TypeError, ValueError):
+                        pass
             self._tab_data = value
-            self._tab_data.filteredChanged.connect(self._handle_used_filter_changed)
-            self._tab_data.lockedChanged.connect(self._handle_locked_changed)
+            if value is not None and not self._cleanup_started:
+                value.filteredChanged.connect(self._handle_tab_data_filtered_changed)
+                value.lockedChanged.connect(self._handle_tab_data_locked_changed)
+
+    def _handle_tab_data_filtered_changed(self, *args):
+        if not self._cleanup_started:
+            gremlin.util.InvokeUiMethod(self._handle_tab_data_filtered_changed_ui, *args)
+
+    def _handle_tab_data_filtered_changed_ui(self, *args):
+        gremlin.util.assert_ui_thread()
+        if not self._cleanup_started and Shiboken.isValid(self):
+            self._handle_used_filter_changed(*args)
+
+    def _handle_tab_data_locked_changed(self, *args):
+        if not self._cleanup_started:
+            gremlin.util.InvokeUiMethod(self._handle_tab_data_locked_changed_ui, *args)
+
+    def _handle_tab_data_locked_changed_ui(self, *args):
+        gremlin.util.assert_ui_thread()
+        if not self._cleanup_started and Shiboken.isValid(self):
+            self._handle_locked_changed(*args)
 
     def _handle_used_filter_changed(self, value: bool):
         assert False, "Abstract member must be implemented in derived class"
@@ -10810,12 +10852,22 @@ class QSplitTabWidget(QDataWidget):
 
     def _cleanup_ui(self):
         """remove"""
+        if self._cleanup_started:
+            return
+        self._cleanup_started = True
+        self.tabData = None
         self.unregisterAllWidgets()
         gremlin.util.clear_layout(self._left_container_layout)
         gremlin.util.clear_layout(self._right_container_layout)
+        self._registered_callbacks.clear()
+        self._unregistered_callbacks.clear()
+        self._registered_widget_map.clear()
+        gremlin.util.clear_widget_references(self)
 
     def registerMappingWidget(self, key, widget) -> int:
         """adds a new config input to the right panel"""
+        if self._cleanup_started or not Shiboken.isValid(self) or not Shiboken.isValid(widget):
+            return -1
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -10855,6 +10907,8 @@ class QSplitTabWidget(QDataWidget):
                 syslog.warning(f"RIGHT PANEL: Mapping widget for input item [{input_item}] not found in stacked widget")
 
     def _handle_expired_widget(self, key, widget):
+        if not Shiboken.isValid(self):
+            return
         gremlin.util.InvokeUiMethod(self._handle_expired_widget_ui, key, widget)
 
     def _handle_expired_widget_ui(self, key, widget):
@@ -10870,8 +10924,11 @@ class QSplitTabWidget(QDataWidget):
                     # one of ours
                     if verbose:
                         syslog.info("\tremoving widget from stacked widget")
-                    widget.expired.disconnect(self._handle_expired_widget)
-                    self.unregisterWidget(key)
+                    try:
+                        widget.expired.disconnect(self._handle_expired_widget)
+                    except (RuntimeError, TypeError):
+                        pass
+                    self.unregisterWidget(key, delete=False)
 
     def unload(self):
         """unloads UI resources used by a particular tab widget"""
@@ -10904,7 +10961,7 @@ class QSplitTabWidget(QDataWidget):
 
         return widget
 
-    def unregisterWidget(self, key):
+    def unregisterWidget(self, key, delete=True):
         """removes a widget from the cleanup list"""
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
@@ -10921,6 +10978,13 @@ class QSplitTabWidget(QDataWidget):
             if key in self._registered_widget_map:
                 widget = self._registered_widget_map[key]
 
+                if not Shiboken.isValid(widget):
+                    self._widget_config_index_map.pop(key, None)
+                    self._registered_widget_map.pop(key, None)
+                    if index in self._widget_config_device_map:
+                        del self._widget_config_device_map[index]
+                    return
+
                 index = -1
                 for i in range(self._right_panel_stacked_widget.count()):
                     w = self._right_panel_stacked_widget.widget(i)
@@ -10930,10 +10994,12 @@ class QSplitTabWidget(QDataWidget):
 
                 if index != -1:
                     # this will trigger the expired event on the widget
-                    input_item = widget.input_item
-                    input_item.setMappingWidget(None)
+                    input_item = getattr(widget, "input_item", None)
+                    if input_item is not None:
+                        input_item.setMappingWidget(None)
 
-                    widget.clearInputItem()
+                    if hasattr(widget, "clearInputItem"):
+                        widget.clearInputItem()
                     self._right_panel_stacked_widget.removeWidget(widget)
 
                     # notify of the deletion
@@ -10941,7 +11007,8 @@ class QSplitTabWidget(QDataWidget):
                         callback(key, index, widget)
 
                     # not in the cache - straight up delete
-                    gremlin.util.delete_widget(widget)
+                    if delete:
+                        gremlin.util.delete_widget(widget)
 
                 if key in self._widget_config_index_map:
                     del self._widget_config_index_map[key]
@@ -17755,7 +17822,6 @@ class QTabHeader(FixedTabBar):
 
         self.setStyleSheet(Color.cssTab())
 
-
     @property
     def moveInProgress(self) -> bool:
         return self._move_in_progress or self._mouse_down
@@ -17771,7 +17837,6 @@ class QTabHeader(FixedTabBar):
         self._move_in_progress = True
         self._from_index = from_index
         self._to_index = to_index
-
 
     @QtCore.Slot(QPoint)
     def _open_context_menu(self, position: QPoint):
@@ -17796,4 +17861,3 @@ class QTabHeader(FixedTabBar):
                 self.tabChanged.emit(index)
 
         return super().eventFilter(widget, event)
-
