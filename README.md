@@ -49,6 +49,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T70)
+- Change: Map to State: Added a no-op option for the primary state so the secondary global functions can be used without changing the primary state.
+- Change: Map to State: Added a category filter for the other state mode to filter the action to states in the same category as the primary state, or all other states regardless of category.
+- Fix: Input Viewer: Keyboard will scroll horizontally if it does not fit because the window is too narrow.  This will prevent keyboard visual layout issues with some resolutions as keys could overlap.
+- Fix: Map To State: UI element callback change in T69 has a missed parameter swap causing an exception.
+
 ### (m77T69)
 - New: Map to state: Other state action modes. When triggering a state, the action can also optionally globally touch all other states, such as setting all on, off or use a boolean comparison to determine the new value.  Default is do nothing.
 - Change: new dependency library: networkx (included in package)

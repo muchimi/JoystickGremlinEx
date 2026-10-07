@@ -155,6 +155,8 @@ else:
 
     def _afcs_set_node_property(self, name, value) -> None:
         model = self.node.model
+        if name not in model.properties:
+            return
         model.set_property(name, value)
         view = self.node.view
         if hasattr(view, "widgets") and name in view.widgets.keys():

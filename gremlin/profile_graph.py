@@ -35,7 +35,6 @@ import logging
 import os
 
 
-
 import gremlin.joystick_handling
 import dinput
 import enum
@@ -63,7 +62,7 @@ from gremlin.ui.keyboard_device import KeyboardInputItem
 import networkx as nx
 
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets, QtGui
 
 # from gremlin.util import *
 from gremlin.types import DeviceType
@@ -136,7 +135,7 @@ class ProfileBaseNode(ABC, NodeMixin):
 
 
 class ProfileRootNode(ProfileBaseNode):
-    """device node"""
+    """profile root node"""
 
     def __init__(self, source_xml: str = None):
         super().__init__(ProfileNodeType.Profile)
@@ -150,7 +149,7 @@ class ProfileRootNode(ProfileBaseNode):
         self._graph_modes = {}  # list of mode definitions in the graph
         self._load_default_devices()
         self._registry = gremlin.base_profile.ProfileRegistry(self)
-        self.profile = None
+        self.profile = gremlin.shared_state.current_profile
 
     @staticmethod
     def fromProfile(profile: gremlin.base_profile.Profile):
@@ -285,8 +284,319 @@ class GraphConnectionPoint:
         self.index = index
         self.multi = multi
 
+# base html table node for nodegraphqt
 
-class GraphBaseNode(BaseNode):
+class GraphTableNode(BaseNode):
+    """A custom table node for the node graph that does not use any GDI handles to render text
+        Text is rendered as an HTML table from a dictionary of key-value pairs.
+        The node sizes automatically to fit the text content.
+    """
+    __identifier__ = 'com.custom'
+    NODE_NAME = 'GEX Table Node'
+    HEADER_HEIGHT = 45
+    BOTTOM_PADDING = 15
+    SIDE_PADDING = 12
+
+    MIN_WIDTH = 220   # Hard minimum width floor
+    MAX_WIDTH = 600   # Maximum width before auto-wrapping occurs
+    MIN_HEIGHT = 80   # Minimum height floor
+
+    def __init__(self):
+        super().__init__()
+
+        # Store key-value data in a dictionary property
+        default_data = {
+            'Status': 'Active',
+            'Handle Info': 'Uses QPainter + QTextDocument for 0 native handle overhead.',
+            'Notes': 'Supports multi-line text with automatic word wrapping across columns.'
+        }
+        self.create_property('table_data', default_data)
+        self._data = default_data
+        self._badge_color = None
+
+        # Cache original paint method
+        self._orig_paint = self.view.paint
+        self.view.paint = self.custom_paint
+
+        self.adjust_size_to_content()
+
+    def setBadgeColor(self, color : tuple[int, int, int]):
+        """ sets the badge color for the node - expects an rgb tuple (r, g, b)"""
+        self.set_property('badge_color', color)
+        self._badge_color = color
+        self.view.update()
+
+    def setFont(self, font_name : str):
+        """ sets the font for the node - expects the name of the font as a string """
+        self.set_property('font', font_name)
+        self.view.update()
+
+    def setFontSize(self, font_size : int):
+        """ sets the font size for the node - expects an integer value """
+        self.set_property('font_size', font_size)
+        self.view.update()
+
+    def clearBadgeColor(self):
+        """ clears the badge color for the node """
+        self.set_property('badge_color', None)
+        self._badge_color = None
+        self.view.update()
+
+    def setIcon(self, icon: QtGui.QIcon):
+        """ sets the icon for the node """
+        self.set_property('icon', icon)
+        self.view.update()
+
+    def setTableData(self, table_data: dict[str, str]):
+        """ sets the text to display in the node - expects a dictionary of string key-value pairs.
+        The key is the label, and the value is the corresponding content.
+        """
+        # self.set_property('table_data', table_data)
+        self._data = table_data
+        self.adjust_size_to_content()
+
+
+    def getTableData(self) -> dict[str, str]:
+        """ retrieves the current table data for the node """
+        return self._data or {}
+
+
+    def adjust_size_to_content(self):
+        """updates the dynamic node width and height based on the table content and updates the connectors"""
+        if not hasattr(self, 'view'):
+            return
+
+        # ideal width without line wrapping
+        doc_unconstrained = self._build_html_document(width=None)
+        ideal_content_width = doc_unconstrained.idealWidth()
+
+        # clamp to min width if needed
+        total_width = ideal_content_width + (self.SIDE_PADDING * 2)
+        target_width = int(max(self.MIN_WIDTH, min(total_width, self.MAX_WIDTH)))
+        content_width = target_width - (self.SIDE_PADDING * 2)
+
+        # given the width, compute the height to include any wrapping
+        doc_constrained = self._build_html_document(width=content_width)
+        text_height = doc_constrained.size().height()
+        calculated_height = int(self.HEADER_HEIGHT + text_height + self.BOTTOM_PADDING)
+
+        # ensure min height
+        target_height = max(calculated_height, self.MIN_HEIGHT)
+
+        # update node size
+        if self.view.width != target_width or self.view.height != target_height:
+            # self.view.prepareGeometryChange()
+            self.view.width = target_width
+            self.view.height = target_height
+            self.view.align_ports(v_offset = target_height/2)
+            # self._update_ports()
+            self.view.update()
+
+    # def _update_ports(self):
+    #     """Manual port realignment accounting for port margins and node header space."""
+    #     inputs = [p.view for p in self.inputs().values()]
+    #     outputs = [p.view for p in self.outputs().values()]
+
+    #     top_offset = self.HEADER_HEIGHT + 10
+    #     available_height = max(10, self.view.height - top_offset - self.BOTTOM_PADDING)
+
+    #     # input port
+    #     if inputs:
+    #         port_width = inputs[0].boundingRect().width()
+    #         x_pos = -(port_width / 2.0)
+
+    #         if len(inputs) == 1:
+    #             spacing = available_height / 2.0
+    #             inputs[0].setPos(x_pos, top_offset + spacing)
+    #         else:
+    #             spacing = available_height / (len(inputs) - 1)
+    #             for i, port_item in enumerate(inputs):
+    #                 port_item.setPos(x_pos, top_offset + (spacing * i))
+
+    #     # output port
+    #     if outputs:
+    #         port_width = outputs[0].boundingRect().width()
+    #         x_pos = self.view.width - (port_width / 2.0)
+
+    #         if len(outputs) == 1:
+    #             spacing = available_height / 2.0
+    #             outputs[0].setPos(x_pos, top_offset + spacing)
+    #         else:
+    #             spacing = available_height / (len(outputs) - 1)
+    #             for i, port_item in enumerate(outputs):
+    #                 port_item.setPos(x_pos, top_offset + (spacing * i))
+
+    #     # pipes
+    #     all_ports = list(self.inputs().values()) + list(self.outputs().values())
+    #     for port in all_ports:
+    #         # Access connected pipes via port.view.connected_pipes
+    #         for pipe in getattr(port.view, 'connected_pipes', []):
+    #             if hasattr(pipe, 'draw_path'):
+    #                 pipe.draw_path(pipe.input_port, pipe.output_port)
+
+    def _build_html_document(self, width) -> QtGui.QTextDocument:
+        """Builds an html table from the data dictionary and get a QTextDocument.   """
+        # table_dict = self.get_property('table_data') or {}
+        table_dict = self._data or {}
+
+        rows_html = []
+        for key, value in table_dict.items():
+            clean_value = f"{value}".replace('\n', '<br>')
+            rows_html.append(
+                f"<tr>"
+                f"  <td class='label'>{key}:</td>"
+                f"  <td class='value'>{clean_value}</td>"
+                f"</tr>"
+            )
+
+
+
+        html_content = f"""
+        <html>
+        <head>
+        <style>
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+            }}
+            td {{
+                padding-bottom: 4px;
+                vertical-align: top;
+            }}
+            td.label {{
+                width: 30%;
+                padding-right: 8px;
+            }}
+            td.value {{
+                width: 70%;
+            }}
+        </style>
+        </head>
+        <body>
+            <table>
+                {''.join(rows_html)}
+            </table>
+        </body>
+        </html>
+        """
+
+        doc = QtGui.QTextDocument()
+        font_name = self.get_property('font') or "Arial"
+        font_size = self.get_property('font_size') or 9
+        doc.setDefaultFont(QtGui.QFont(font_name, font_size))
+        if width is not None:
+            doc.setTextWidth(width)
+        doc.setHtml(html_content)
+        return doc
+
+    def custom_paint(self, painter, option, widget=None):
+        """custom paint to render the html table"""
+        # Step A: Draw standard node geometry first
+        self._orig_paint(painter, option, widget)
+
+        table_dict = self.get_property('table_data') or {}
+        if not table_dict:
+            return
+
+        painter.save()
+        node_rect = self.view.boundingRect()
+
+        # render badge if it has one
+        badge_color = self._badge_color
+        if badge_color is not None:
+            painter.setBrush(QtGui.QColor(*badge_color))
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            # painter.setBrush(QtGui.QColor(76, 175, 80))
+            painter.setPen(QtCore.Qt.NoPen)
+            node_rect = self.view.boundingRect()
+            painter.drawEllipse(QtCore.QPointF(node_rect.right() - 18, 14), 4, 4)
+
+        # render icon if it has one
+        if self.has_property('icon'):
+            icon = self.get_property('icon')
+            if icon:
+                # compute icon rectangle and draw the icon
+                icon_size = 18
+                icon_rect = QtCore.QRect(
+                    int(node_rect.right() - icon_size - 12),
+                    int(node_rect.top() + (self.HEADER_HEIGHT - icon_size) / 2),
+                    icon_size,
+                    icon_size
+                )
+                icon.paint(painter, icon_rect, QtCore.Qt.AlignCenter)
+
+        # render the text
+        table_dict = self.get_property('table_data') or {}
+        if table_dict:
+            content_rect = node_rect.adjusted(
+                self.SIDE_PADDING,
+                self.HEADER_HEIGHT,
+                -self.SIDE_PADDING,
+                -self.BOTTOM_PADDING
+            )
+
+            doc = self._build_html_document(content_rect.width())
+
+            painter.translate(content_rect.topLeft())
+            clip_rect = QtCore.QRectF(0, 0, content_rect.width(), content_rect.height())
+            doc.drawContents(painter, clip_rect)
+
+        painter.restore()
+
+
+
+    def set_property(self, name, value, push_undo=True):
+        """Redraw when dictionary property is modified."""
+        super().set_property(name, value, push_undo)
+        if name == 'table_data' and hasattr(self, 'view'):
+            self.adjust_size_to_content()
+
+
+def getGraphNodeColor(node_type: ProfileNodeType) -> str:
+    """returns the color associated with a given node type as a tuple (r, g, b)"""
+
+    # match node_type:
+    #     case ProfileNodeType.Device:
+    #         color = "#B43232"
+    #     case ProfileNodeType.Input:
+    #         color = "#32B432"
+    #     case ProfileNodeType.InputType:
+    #         color = "#32B4B4"
+    #     case ProfileNodeType.Container:
+    #         color = "#3232B4"
+    #     case ProfileNodeType.ActionSet:
+    #         color = "#B4B432"
+    #     case ProfileNodeType.Action:
+    #         color = "#B432B4"
+    #     case ProfileNodeType.MergedAxis:
+    #         color = "#32B4B4"
+    #     case ProfileNodeType.Mode:
+    #         color = "#B48232"
+    #     case _:
+    #         color = "#808080"
+
+    match node_type:
+        case ProfileNodeType.Device:
+            color = "#FFB3BA"  # Pastel Coral / Soft Red
+        case ProfileNodeType.Input:
+            color = "#BAFFC9"  # Pastel Mint / Soft Green
+        case ProfileNodeType.InputType | ProfileNodeType.MergedAxis:
+            color = "#BAE1FF"  # Pastel Sky / Soft Cyan-Blue
+        case ProfileNodeType.Container:
+            color = "#C9C9FF"  # Pastel Lavender / Soft Blue
+        case ProfileNodeType.ActionSet:
+            color = "#FFFFBA"  # Pastel Butter / Soft Yellow
+        case ProfileNodeType.Action:
+            color = "#E8AEFF"  # Pastel Orchid / Soft Purple
+        case ProfileNodeType.Mode:
+            color = "#FFDFBA"  # Pastel Peach / Soft Orange
+        case _:
+            color = "#D3D3D3"  # Soft Light Grey
+
+    return gremlin.util.hex_to_rgb(color)
+
+
+class GraphBaseNode(GraphTableNode):
     """represents a base node in the profile tree"""
 
     __identifier__ = "gex.nodes"
@@ -309,9 +619,6 @@ class GraphBaseNode(BaseNode):
         self.x = 0  # x coordinate for layout
         self.y = 0  # y coordinate for layout
 
-        # Add a text input field
-        self.add_text_input(name="node_name", placeholder_text="Not Specified")
-
         if isinstance(inputs, GraphConnectionPoint):
             inputs = [inputs]
         if isinstance(outputs, GraphConnectionPoint):
@@ -322,22 +629,26 @@ class GraphBaseNode(BaseNode):
                 self._input_map[input.id] = input
                 if input.index is None:
                     input.index = len(self._input_map)
-                self.add_input(input.name, multi_input=input.multi)
+                port = self.add_input(input.name, multi_input=input.multi)
+                port.view.display_name = False
 
         if outputs:
             for output in outputs:
                 self._output_map[output.id] = output
                 if output.index is None:
                     output.index = len(self._output_map)
-                self.add_output(output.name, multi_output=output.multi)
+                port = self.add_output(output.name, multi_output=output.multi)
+                port.view.display_name = False
 
     def connect(self, target_node: GraphBaseNode, source_output_index: int = 0, target_input_index: int = 0):
         """connects this node's output to the target node's input"""
         # ensure the output/input ports at the requested indices exist, adding any that are missing
         while len(self.output_ports()) <= source_output_index:
-            self.add_output(f"output_{len(self.output_ports())}")
+            port = self.add_output(f"output_{len(self.output_ports())}")
+            port.view.display_name = False
         while len(target_node.input_ports()) <= target_input_index:
-            target_node.add_input(f"input_{len(target_node.input_ports())}")
+            port = target_node.add_input(f"input_{len(target_node.input_ports())}")
+            port.view.display_name = False
         self.set_output(source_output_index, target_node.input(target_input_index))
 
     @property
@@ -360,43 +671,19 @@ class GraphBaseNode(BaseNode):
     def ensure_input(self, input_index: int):
         """Ensures that the input port at the specified index exists, adding any that are missing."""
         while len(self.input_ports()) <= input_index:
-            self.add_input(f"input_{len(self.input_ports())}")
+            port = self.add_input(f"input_{len(self.input_ports())}")
+            port.view.display_name = False
 
     def ensure_output(self, output_index: int):
         """Ensures that the output port at the specified index exists, adding any that are missing."""
         while len(self.output_ports()) <= output_index:
-            self.add_output(f"output_{len(self.output_ports())}")
+            port = self.add_output(f"output_{len(self.output_ports())}")
+            port.view.display_name = False
 
     def setData(self, data: dict):
         """Sets the data for the node."""
         self._data = data
-        self.create_property('data_dict', data)
-
-
-class GridNodeWidget(QtWidgets.QWidget):
-    """grid type node content representing a generic list of labels and values arranged as a grid"""
-
-    def __init__(self, data: dict, parent=None):
-        super().__init__(parent)
-
-        col = 0
-        row = 0
-        layout = QtWidgets.QGridLayout(self)
-        for label, value in data.items():
-            layout.addWidget(QtWidgets.QLabel(label), row, col)
-            layout.addWidget(QtWidgets.QLabel(str(value)), row, col + 1)
-            row += 1
-
-
-# Node widgets for different types of profile graph nodes
-class WrapperNodeBaseWidget(NodeBaseWidget):
-    """represents a generic profile node in the profile tree"""
-
-    def setData(self, data: dict):
-        """Sets the data for the wrapper node."""
-        self._data = data
-        self.create_property('data_dict', data)
-
+        self.setTableData(data)
 
 class GraphProfileNode(GraphBaseNode):
     """represents a device node in the profile tree"""
@@ -404,28 +691,26 @@ class GraphProfileNode(GraphBaseNode):
     def __init__(self):
         super().__init__()
 
-    def load(self, node: gremlin.base_profile.Profile):
+    def load(self, node: ProfileRootNode):
         # widget = ProfileNodeWidget(data, self.view)
         # self.add_custom_widget(widget)
-
+        profile = node.profile
         data = {
-            "Profile Name": os.path.basename(node.source_xml) if node.source_xml else "n/a",
+            "Profile Type": "GEX Profile",
+            "Profile Name": os.path.basename(profile.profile_file) if profile and profile.profile_file else "n/a",
+
         }
         self.setData(data)
-
-        self.set_name(data["Profile Name"])
-
-
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Profile))
+        self.set_name("Profile")
 
 
 class GraphDeviceNode(GraphBaseNode):
     """represents a device node in the profile tree"""
 
     def __init__(self):
+        super().__init__()
 
-        c1 = GraphConnectionPoint(direction=GraphConnectionDirection.INPUT, name="Profile", multi=False)
-        c2 = GraphConnectionPoint(direction=GraphConnectionDirection.OUTPUT, name="Inputs", multi=True)
-        super().__init__(inputs=c1, outputs=c2)
 
     def load(self, node: ProfileDeviceNode):
         """implemented by derived nodes based on what they need to show"""
@@ -443,32 +728,12 @@ class GraphDeviceNode(GraphBaseNode):
             "Hat Count": node.device.hat_count,
         }
         self.setData(data)
-        self.set_name(data["Device Name"])
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Device))
+        self.set_name("Device")
 
 
 
-def getGraphNodeColor(node_type: ProfileNodeType) -> str:
-    """returns the color associated with a given node type as a tuple (r, g, b)"""
 
-    match node_type:
-        case ProfileNodeType.Device:
-            color = "#B43232"
-        case ProfileNodeType.Input:
-            color = "#32B432"
-        case ProfileNodeType.Container:
-            color = "#3232B4"
-        case ProfileNodeType.ActionSet:
-            color = "#B4B432"
-        case ProfileNodeType.Action:
-            color = "#B432B4"
-        case ProfileNodeType.MergedAxis:
-            color = "#32B4B4"
-        case ProfileNodeType.Mode:
-            color = "#B48232"
-        case _:
-            color = "#808080"
-
-    return gremlin.util.hex_to_rgb(color)
 
 
 class GraphInputItemNode(GraphBaseNode):
@@ -508,9 +773,9 @@ class GraphInputItemNode(GraphBaseNode):
                 command_string = "|".join(c.key for c in item.commands)
                 data["Commands:"] = command_string
 
+        self.set_name(InputType.to_display_name(input_item.input_type))
         self.setData(data)
-        self.set_name(input_item.display_name)
-
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Input))
 
 
 class GraphContainerNode(GraphBaseNode):
@@ -531,8 +796,9 @@ class GraphContainerNode(GraphBaseNode):
             "Action Count": node.container.action_count,
             "Condition Count": node.container.condition_count,
         }
+        self.set_name("Container")
         self.setData(data)
-        self.set_name(node.container.name)
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Container))
 
 
 
@@ -555,10 +821,8 @@ class GraphActionSetNode(GraphBaseNode):
             "Description": data.action_set.description,
             "Action Count": f"{len(data.action_set)}",
         })
-
-        self.set_name(f"Action Set [{data.action_set.index}]")
-
-
+        self.set_name("Action Set")
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.ActionSet))
 
 class GraphActionNode(GraphBaseNode):
     """represents an action node in the profile tree"""
@@ -576,8 +840,9 @@ class GraphActionNode(GraphBaseNode):
             "Description": node.action.display_name(),
         }
 
+        self.set_name("Action")
         self.setData(data)
-        self.set_name(data["Description"])
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Action))
 
 class GraphInputTypeNode(GraphBaseNode):
     """represents an input type node in the profile tree"""
@@ -593,7 +858,8 @@ class GraphInputTypeNode(GraphBaseNode):
         self.setData({
             "Input Type": data.input_type.name,
         })
-        self.set_name(InputType.to_display_name(data.input_type))
+        self.set_name("Input Type")
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.InputType))
 
 class GraphModeNode(GraphBaseNode):
     """represents a mode node in the profile tree"""
@@ -610,7 +876,8 @@ class GraphModeNode(GraphBaseNode):
             "Mode": mode,
         }
         self.setData(data)
-        self.set_name(f"Mode [{mode}]")
+        self.set_name("Mode")
+        self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Mode))
 
 
 class ProfileTreeDialogUI(ui_common.BaseDialogUi):
@@ -666,12 +933,13 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
             self._build_tree()
 
-            self.apply_networkx_layout(self._node_map)
+            # self.apply_networkx_layout(self._node_map)
 
             view.setUpdatesEnabled(True)
             self._node_graph.scene().blockSignals(False)
             view.update()
 
+            self._node_graph.auto_layout_nodes()
             self._node_graph.fit_to_selection()
 
             # do the layout of the nodes
@@ -873,13 +1141,7 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
             instance_name = instance.type_
             graph_child = self._node_graph.create_node(instance_name)
-            if node.description:
-                graph_child.nodeName = node.description
-            else:
-                graph_child.nodeName = node.nodeType.name
 
-            # color code the node
-            graph_child.color = getGraphNodeColor(node.nodeType)
 
             if graph_parent is not None:
                 # link the parent graph node to its child
@@ -898,7 +1160,7 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
     def _apply_layout(self, node_map: dict):
 
-        margin_x = 200  # spacing between nodes horizontally
+        margin_x = 100  # spacing between nodes horizontally
         margin_y = 100  # spacing between nodes vertically
 
         self.compute_graph_layout(node_map, margin_x, margin_y)

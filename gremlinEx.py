@@ -6433,9 +6433,9 @@ if __name__ == "__main__":
     # disable dark mode for now while we sort icons in a future version
 
     config = gremlin.config.Configuration()
-    QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings, True)
+    # QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+    # QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+    # QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings, True)
 
     theme = config.theme
     match theme:

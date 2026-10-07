@@ -1532,7 +1532,16 @@ States can be toggled by clicking on the state button.  Expression states will u
             self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget(release_wheel=True)
             # self.keyboard_widget.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
             self.keyboard_widget.setReadonly(True)
-            layout.addWidget(self.keyboard_widget)
+
+            # place it in a scrolling container
+            scroll_area = QtWidgets.QScrollArea()
+            scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setWidget(self.keyboard_widget)
+            layout.addWidget(scroll_area)
+
+            # layout.addWidget(self.keyboard_widget)
 
             self.keyboard_widget.hook()
             self._keyboard_visualizer_widget = widget  # gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
@@ -1727,7 +1736,8 @@ class InputViewerArea(QtWidgets.QWidget):
 
         self.scroll_area = gremlin.ui.ui_common.QScrollAreaResizeCallback(callback)
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) # prevent flicker with nested scroll areas
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.scroll_widget = QtWidgets.QWidget()
@@ -1739,13 +1749,6 @@ class InputViewerArea(QtWidgets.QWidget):
 
         layout.addWidget(self.scroll_area)
 
-    # def resizeEvent(self, event: QResizeEvent):
-    #     super().resizeEvent(event)
-    #     old_size = event.oldSize()
-    #     new_size = event.size()
-
-    #     if self._size_changed_callback:
-    #         self._size_changed_callback(old_size, new_size)
 
     def bar(self):
         """returns the vertical scroll bar"""

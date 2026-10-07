@@ -1677,6 +1677,13 @@ class StateData:
         """gets state map"""
         return self._data
 
+    def getCategory(self, key: str) -> StateCategory:
+        """gets the category of a state"""
+        key = key.casefold().strip()
+        if key in self._data:
+            return self._data[key].category
+        return None
+
     def getStateNames(self):
         """gets the list of states currently defined"""
         return list(self._data.keys())
