@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T71)
+- Fix: State Container : incorrect indexing in module caused a blank entry in XML and exception on load.
+
 ### (m77T70)
 - Change: Map to State: Added a no-op option for the primary state so the secondary global functions can be used without changing the primary state.
 - Change: Map to State: Added a category filter for the other state mode to filter the action to states in the same category as the primary state, or all other states regardless of category.

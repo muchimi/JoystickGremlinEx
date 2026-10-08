@@ -270,7 +270,7 @@ class StateContainerWidget(AbstractContainerWidget):
         """
         title = "State: "
         if len(self.container.action_sets) > 0:
-            stub = ", ".join(a.name for a in self.container.action_sets[0])
+            stub = ", ".join(a.name for a in self.container.action_set)
             title += stub
 
         return title
@@ -324,7 +324,12 @@ class StateContainerFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 class StateContainer(AbstractContainer):
-    """Represents a container which holds exactly one action."""
+    """
+
+    Represents a container that executes its contents based on a current state.
+
+
+    """
 
     name = "State"
     tag = "state"
@@ -347,40 +352,38 @@ class StateContainer(AbstractContainer):
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, extra_data=extra_data)
+
+        # use a custom parser for the action sets to handle the first non-empty action set correctly
+        super().__init__(parent, node, extra_data=extra_data, custom_parse_callback = self._parse_actionset_xml)
+
         self.state = None  # the state
         self.required_value = True  # execute on state set by default
+
 
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
 
         # Make sure if we're dealing with axis with remap and response curve
         # actions that they are arranged sensibly
-        if action.get_input_type() == InputType.JoystickAxis:
-            remap_sets = []
-            curve_sets = []
-            for container in self.parent.containers:
-                for action_set in container.action_sets:
-                    for t_action in action_set:
-                        if gremlin.input_item._is_curve_tag(t_action.tag):
-                            curve_sets.append(action_set)
-                        elif t_action.tag == "remap":
-                            remap_sets.append(action_set)
+        # if action.get_input_type() == InputType.JoystickAxis:
+        #     remap_sets = []
+        #     curve_sets = []
+        #     for container in self.parent.containers:
+        #         for action_set in container.action_sets:
+        #             for t_action in action_set:
+        #                 if gremlin.input_item._is_curve_tag(t_action.tag):
+        #                     curve_sets.append(action_set)
+        #                 elif t_action.tag == "remap":
+        #                     remap_sets.append(action_set)
 
-            if action.tag == "remap" and len(curve_sets) == 1 and len(remap_sets) == 0:
-                curve_sets[0].append(action)
-            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and len(curve_sets) == 0:
-                remap_sets[0].append(action)
-            else:
-                if index == -1:
-                    self.action_sets.append([])
-                    index = len(self.action_sets) - 1
-                self.action_sets[index].append(action)
-        else:
-            if index == -1:
-                self.action_sets.append([])
-                index = len(self.action_sets) - 1
-            self.action_sets[index].append(action)
+        #     if action.tag == "remap" and len(curve_sets) == 1 and len(remap_sets) == 0:
+        #         curve_sets[0].append(action)
+        #     elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and len(curve_sets) == 0:
+        #         remap_sets[0].append(action)
+        #     else:
+        #         self.action_set.append(action)
+        # else:
+        self.action_set.append(action)
 
         # self.refresh_conditions()
 
@@ -397,6 +400,36 @@ class StateContainer(AbstractContainer):
             self.state = node.get("state")
         self.required_value = safe_read(node, "value", bool, True)
 
+        # grab the first non empty action set
+
+
+
+        while len(self.action_sets) > 1:
+            self.action_sets.pop()
+
+    def _parse_actionset_xml(self, node, data=None, extra_data=None):
+        """Populates the container with the XML node's contents.
+
+        :param node the XML node with which to populate the container
+        """
+        self.resetActionSets()
+
+        as_nodes = node.xpath("./action-set")
+        # read the first non empty action set due to a bug in the older versions of the software that could create a blank entry
+        found = False
+        for index, as_node in enumerate(as_nodes):
+            action_set = gremlin.input_item.ActionSet()
+            self._parse_action_xml(as_node, action_set, extra_data=extra_data)
+
+            if action_set.count():
+                self.action_sets[0] = action_set
+                found = True
+                break
+
+        if not found:
+            self.action_sets[0] = gremlin.input_item.ActionSet()
+
+
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
 
@@ -407,6 +440,8 @@ class StateContainer(AbstractContainer):
         if self.state:
             node.set("state", self.state)
         node.set("value", safe_format(self.required_value, bool))
+
+
 
         # as_node = ElementTree.Element("action-set")
         # as_node.set("id", write_guid(self.action_sets[0].id))
