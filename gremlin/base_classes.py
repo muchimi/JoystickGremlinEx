@@ -1408,7 +1408,7 @@ class AbstractCallbackModel(AbstractModel):
         """returns the index of the item (filtered model), -1 if not found"""
         if item in self._filtered_item_map:
             return self._filtered_item_map[item]
-        if __debug__:
+        if gremlin.config.Configuration().verbose_mode_ui_level(2):
             syslog.info(f"MODEL: Item not found in filtered item map: {item}")
             syslog.info(f"\tFiltered item map contents: item count: {len(self._filtered_item_map)}")
             for key in self._filtered_item_map:

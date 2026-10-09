@@ -4901,24 +4901,28 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
     def _ok_button_cb(self):
         import gremlin.reporting
 
-        report = gremlin.reporting.ReportEngine()
-
-        options = gremlin.reporting.ReportOptions()
-        options.export_pdf = self.config.ReportPdfEnabled
-        options.export_svg = self.config.ReportSvgEnabled
-        options.open_files = self.config.ReportOpenFilesEnabled
-        options.show_folder = self.config.ReportShowFolder
-
-        report.generate(options)
-
-
 
         if self.config.ReportShowProfileTree:
+
             profile = gremlin.shared_state.current_profile
             if profile is not None and getattr(profile, "graph", None) is not None:
                 profile.graph.show_tree_dialog(self)
+        else:
+
+            import gremlin.reporting
+            report = gremlin.reporting.ReportEngine()
+
+            options = gremlin.reporting.ReportOptions()
+            options.export_pdf = self.config.ReportPdfEnabled
+            options.export_svg = self.config.ReportSvgEnabled
+            options.open_files = self.config.ReportOpenFilesEnabled
+            options.show_folder = self.config.ReportShowFolder
+
+            report.generate(options)
+
 
         self.close()
+
 
     @QtCore.Slot()
     def _cancel_button_cb(self):

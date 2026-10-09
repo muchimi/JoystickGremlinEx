@@ -445,7 +445,7 @@ def osc_message_handler(address, *args):
 class Osc:
     def thread_loop(self):
         """main threading loop"""
-        log("OSC: server starting")
+        log("OSC: server starting...")
         self._dispatcher = Dispatcher()
         self._dispatcher.set_default_handler(osc_message_handler)
         self._server = BlockingOSCUDPServer((host_ip, in_port), self._dispatcher)

@@ -50,6 +50,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
+from gremlin.reporting import ReportTable
 
 
 from OdenGraphQt import NodeGraph, BaseNode, NodeBaseWidget
@@ -59,7 +60,7 @@ from gremlin.ui.ui_common import getVContainer, getHContainer, getGridContainer,
 from gremlin.ui.state_device import StateInputItem
 from gremlin.ui.voice_device import VoiceInputItem
 from gremlin.ui.keyboard_device import KeyboardInputItem
-import networkx as nx
+# import networkx as nx
 
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -313,6 +314,7 @@ class GraphTableNode(BaseNode):
         self.create_property('table_data', default_data)
         self._data = default_data
         self._badge_color = None
+        self._html = None # html content
 
         # Cache original paint method
         self._orig_paint = self.view.paint
@@ -355,6 +357,19 @@ class GraphTableNode(BaseNode):
         self._data = table_data
         self.adjust_size_to_content()
 
+    def setHtml(self, html: str):
+        """ sets the HTML content for the node """
+        self.set_property('html', html)
+        self._html = html
+        self.adjust_size_to_content()
+
+
+    def clearHtml(self):
+        """ clears the HTML content for the node """
+        self.set_property('html', None)
+        self._html = None
+        self.adjust_size_to_content()
+
 
     def getTableData(self) -> dict[str, str]:
         """ retrieves the current table data for the node """
@@ -391,6 +406,11 @@ class GraphTableNode(BaseNode):
             self.view.align_ports(v_offset = target_height/2)
             # self._update_ports()
             self.view.update()
+
+    def update_ports(self):
+        """ removes the display name from connectors """
+        for port in list(self.inputs().values()) + list(self.outputs().values()):
+            port.view.display_name = False
 
     # def _update_ports(self):
     #     """Manual port realignment accounting for port margins and node header space."""
@@ -437,48 +457,54 @@ class GraphTableNode(BaseNode):
     def _build_html_document(self, width) -> QtGui.QTextDocument:
         """Builds an html table from the data dictionary and get a QTextDocument.   """
         # table_dict = self.get_property('table_data') or {}
-        table_dict = self._data or {}
 
-        rows_html = []
-        for key, value in table_dict.items():
-            clean_value = f"{value}".replace('\n', '<br>')
-            rows_html.append(
-                f"<tr>"
-                f"  <td class='label'>{key}:</td>"
-                f"  <td class='value'>{clean_value}</td>"
-                f"</tr>"
-            )
+        if self._html is not None:
+            # use the html content
+            html_content = self._html
+        else:
+            # use table data
+            table_dict = self._data or {}
+
+            rows_html = []
+            for key, value in table_dict.items():
+                clean_value = f"{value}".replace('\n', '<br>')
+                rows_html.append(
+                    f"<tr>"
+                    f"  <td class='label'>{key}:</td>"
+                    f"  <td class='value'>{clean_value}</td>"
+                    f"</tr>"
+                )
 
 
 
-        html_content = f"""
-        <html>
-        <head>
-        <style>
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-            }}
-            td {{
-                padding-bottom: 4px;
-                vertical-align: top;
-            }}
-            td.label {{
-                width: 30%;
-                padding-right: 8px;
-            }}
-            td.value {{
-                width: 70%;
-            }}
-        </style>
-        </head>
-        <body>
-            <table>
-                {''.join(rows_html)}
-            </table>
-        </body>
-        </html>
-        """
+            html_content = f"""
+            <html>
+            <head>
+            <style>
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                }}
+                td {{
+                    padding-bottom: 4px;
+                    vertical-align: top;
+                }}
+                td.label {{
+                    width: 30%;
+                    padding-right: 8px;
+                }}
+                td.value {{
+                    width: 70%;
+                }}
+            </style>
+            </head>
+            <body>
+                <table>
+                    {''.join(rows_html)}
+                </table>
+            </body>
+            </html>
+            """
 
         doc = QtGui.QTextDocument()
         font_name = self.get_property('font') or "Arial"
@@ -548,8 +574,8 @@ class GraphTableNode(BaseNode):
     def set_property(self, name, value, push_undo=True):
         """Redraw when dictionary property is modified."""
         super().set_property(name, value, push_undo)
-        if name == 'table_data' and hasattr(self, 'view'):
-            self.adjust_size_to_content()
+        # if name == 'table_data' and hasattr(self, 'view'):
+        self.adjust_size_to_content()
 
 
 def getGraphNodeColor(node_type: ProfileNodeType) -> str:
@@ -671,14 +697,14 @@ class GraphBaseNode(GraphTableNode):
     def ensure_input(self, input_index: int):
         """Ensures that the input port at the specified index exists, adding any that are missing."""
         while len(self.input_ports()) <= input_index:
-            port = self.add_input(f"input_{len(self.input_ports())}")
-            port.view.display_name = False
+            self.add_input(f"input_{len(self.input_ports())}", display_name=False)
+
 
     def ensure_output(self, output_index: int):
         """Ensures that the output port at the specified index exists, adding any that are missing."""
         while len(self.output_ports()) <= output_index:
-            port = self.add_output(f"output_{len(self.output_ports())}")
-            port.view.display_name = False
+            self.add_output(f"output_{len(self.output_ports())}", display_name=False)
+
 
     def setData(self, data: dict):
         """Sets the data for the node."""
@@ -692,15 +718,12 @@ class GraphProfileNode(GraphBaseNode):
         super().__init__()
 
     def load(self, node: ProfileRootNode):
-        # widget = ProfileNodeWidget(data, self.view)
-        # self.add_custom_widget(widget)
         profile = node.profile
-        data = {
-            "Profile Type": "GEX Profile",
-            "Profile Name": os.path.basename(profile.profile_file) if profile and profile.profile_file else "n/a",
 
-        }
-        self.setData(data)
+        table = ReportTable(cellpadding=4)
+        table.addField("Profile", os.path.basename(profile.profile_file) if profile and profile.profile_file else "n/a")
+        self.setHtml(table.to_html())
+
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Profile))
         self.set_name("Profile")
 
@@ -717,19 +740,25 @@ class GraphDeviceNode(GraphBaseNode):
 
         # widget = DeviceNodeWidget(data.device, self.view)
         # self.add_custom_widget(widget)
-        data = {
-            "Device Name": node.device.name,
-            "Device GUID": node.device.device_id,
-            "Device Type": DeviceType.to_display_name(node.device.device_type),
-            "Enabled": node.device.enabled,
-            "Virtual": node.device.is_virtual,
-            "Axis Count": node.device.axis_count,
-            "Button Count": node.device.button_count,
-            "Hat Count": node.device.hat_count,
-        }
-        self.setData(data)
+        device = node.device
+
+        if hasattr(device, "to_html"):
+            self.setHtml(device.to_html())
+        else:
+            data = {
+                "Device Name": device.name,
+                "Device GUID": device.device_id,
+                "Device Type": DeviceType.to_display_name(device.device_type),
+                "Enabled": device.enabled,
+                "Virtual": device.is_virtual,
+                "Axis Count": device.axis_count,
+                "Button Count": device.button_count,
+                "Hat Count": device.hat_count,
+            }
+            self.setData(data)
+
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Device))
-        self.set_name("Device")
+        self.set_name(f"Device {device.name}")
 
 
 
@@ -749,32 +778,36 @@ class GraphInputItemNode(GraphBaseNode):
         """implemented by derived nodes based on what they need to show"""
 
         input_item = node.input_item
-        device: DeviceSummary = input_item.device
 
 
-        data = {}
+        if hasattr(input_item, "to_html"):
+            self.setHtml(input_item.to_html())
+        else:
 
-        match input_item.input_type:
-            case InputType.JoystickAxis:
-                data["Axis"] = device.get_axis_name(input_item.input_id)
-            case InputType.JoystickButton:
-                data["Button"] =   input_item.input_id
-            case InputType.JoystickHat:
-                data["Hat"] = input_item.input_id
-            case InputType.Keyboard | InputType.KeyboardLatched:
-                item: KeyboardInputItem = input_item
-                key = item.key
-                data["Key"] = str(key)
-            case InputType.State:
-                item: StateInputItem = input_item
-                data["State"] = item.key
-            case InputType.Voice:
-                item: VoiceInputItem = input_item
-                command_string = "|".join(c.key for c in item.commands)
-                data["Commands:"] = command_string
 
-        self.set_name(InputType.to_display_name(input_item.input_type))
-        self.setData(data)
+            data = {}
+            match input_item.input_type:
+                case InputType.JoystickAxis:
+                    device: DeviceSummary = input_item.device
+                    data["Axis"] = device.get_axis_name(input_item.input_id)
+                case InputType.JoystickButton:
+                    data["Button"] =   input_item.input_id
+                case InputType.JoystickHat:
+                    data["Hat"] = input_item.input_id
+                case InputType.Keyboard | InputType.KeyboardLatched:
+                    item: KeyboardInputItem = input_item
+                    key = item.key
+                    data["Key"] = str(key)
+                case InputType.State:
+                    item: StateInputItem = input_item
+                    data["State"] = item.key
+                case InputType.Voice:
+                    item: VoiceInputItem = input_item
+                    command_string = "|".join(c.key for c in item.commands)
+                    data["Commands:"] = command_string
+            self.setData(data)
+
+        self.set_name(f"Input {InputType.to_display_name(input_item.input_type)}")
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Input))
 
 
@@ -789,15 +822,22 @@ class GraphContainerNode(GraphBaseNode):
     def load(self, node: ProfileContainerNode):
         """implemented by derived nodes based on what they need to show"""
 
-        data = {
-            "Container Name": node.container.name,
-            "Container ID": node.container.id,
-            "Description": node.container.description,
-            "Action Count": node.container.action_count,
-            "Condition Count": node.container.condition_count,
-        }
-        self.set_name("Container")
-        self.setData(data)
+        container = node.container
+        if hasattr(container, "to_html"):
+            self.setHtml(container.to_html())
+        else:
+            data = {
+                "Container Name": container.name,
+                "Container ID": container.id,
+                "Description": container.description,
+                "Action Count": container.action_count,
+                "Condition Count": container.condition_count,
+            }
+            self.setData(data)
+
+
+        self.set_name(f"Container {container.name}")
+
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Container))
 
 
@@ -834,14 +874,19 @@ class GraphActionNode(GraphBaseNode):
     def load(self, node: ProfileActionNode):
         """implemented by derived nodes based on what they need to show"""
 
-        data = {
-            "Action Name": node.action.name,
-            "Action ID": node.action.id,
-            "Description": node.action.display_name(),
-        }
+        action = node.action
+        if hasattr(action, "to_html"):
+            self.setHtml(action.to_html())
+        else:
+            data = {
+                "Action Name": action.name,
+                "Action ID": action.id,
+                "Description": action.display_name(),
+            }
+            self.setData(data)
 
-        self.set_name("Action")
-        self.setData(data)
+        self.set_name(f"Action {action.name}")
+
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Action))
 
 class GraphInputTypeNode(GraphBaseNode):
@@ -872,10 +917,10 @@ class GraphModeNode(GraphBaseNode):
     def load(self, mode: str):
         """implemented by derived nodes based on what they need to show"""
 
-        data = {
-            "Mode": mode,
-        }
-        self.setData(data)
+        table = ReportTable(cellpadding=4)
+        table.addField("Name", mode)
+        self.setHtml(table.to_html())
+
         self.set_name("Mode")
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Mode))
 
@@ -898,7 +943,9 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
         self._fallback_widget.setVisible(False)
         self.main_layout.addWidget(self._fallback_widget)
 
+        wm = gremlin.worker.WorkManager()
         try:
+            wm.pushCursor()
             self._node_graph = NodeGraph()  # the node graph instance
             self._node_graph.set_layout_direction(LayoutDirectionEnum.HORIZONTAL.value)  # horizontal layout
 
@@ -931,19 +978,25 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
             view.setUpdatesEnabled(False)
             self._node_graph.scene().blockSignals(True)
 
-            self._build_tree()
+            try:
+                wm.pushCursor()
+                self._build_tree()
+            finally:
+                syslog.info("pop cursor after building tree")
+                wm.popCursor(True)
 
             # self.apply_networkx_layout(self._node_map)
 
             view.setUpdatesEnabled(True)
             self._node_graph.scene().blockSignals(False)
-            view.update()
+
+            # recompute size of each node
+            for node in self._node_map.values():
+                node.adjust_size_to_content()
 
             self._node_graph.auto_layout_nodes()
             self._node_graph.fit_to_selection()
 
-            # do the layout of the nodes
-            # self._apply_layout(self._node_map)
 
         except Exception as exc:  # pragma: no cover - optional dependency may be missing
             syslog.warning(f"ProfileTreeDialogUI: unable to initialize NodeGraphQt: {exc}")
@@ -952,90 +1005,90 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
             close_button.clicked.connect(self.close)
             self.main_layout.addWidget(close_button)
 
-    def apply_networkx_layout(self, node_map: dict, rankdir="LR", nodesep=0.8, ranksep=1.5, scale=100.0, padding=50, min_x_gap=100.0, min_y_gap=60.0):
-        """
-        Applies a Graphviz 'dot' layout to NodeGraphQt nodes.
+    # def apply_networkx_layout(self, node_map: dict, rankdir="LR", nodesep=0.8, ranksep=1.5, scale=100.0, padding=50, min_x_gap=100.0, min_y_gap=60.0):
+    #     """
+    #     Applies a Graphviz 'dot' layout to NodeGraphQt nodes.
 
-        Parameters:
-            node_map (dict): Mapping of {anytree_node: nodegraphqt_node}.
-            rankdir (str): Layout direction ('LR' for Left-to-Right, 'TB' for Top-to-Bottom).
-            nodesep (float): Minimum space between adjacent nodes in the same rank (in inches).
-            ranksep (float): Minimum space between ranks/levels (in inches).
-            scale (float): Multiplier to scale Graphviz inch units to Qt scene pixels.
+    #     Parameters:
+    #         node_map (dict): Mapping of {anytree_node: nodegraphqt_node}.
+    #         rankdir (str): Layout direction ('LR' for Left-to-Right, 'TB' for Top-to-Bottom).
+    #         nodesep (float): Minimum space between adjacent nodes in the same rank (in inches).
+    #         ranksep (float): Minimum space between ranks/levels (in inches).
+    #         scale (float): Multiplier to scale Graphviz inch units to Qt scene pixels.
 
-        """
-        G = nx.DiGraph()
+    #     """
+    #     G = nx.DiGraph()
 
-        # Force Qt event loop / view update to ensure dimensions are accurate
-        try:
-            QtWidgets.QApplication.processEvents()
-        except Exception:
-            pass
+    #     # Force Qt event loop / view update to ensure dimensions are accurate
+    #     try:
+    #         QtWidgets.QApplication.processEvents()
+    #     except Exception:
+    #         pass
 
-        # Add nodes and edges from parent-child relationships
-        for tree_node, qt_node in node_map.items():
-            G.add_node(tree_node)
-            width_px = qt_node.view.width + padding
-            height_px = qt_node.view.height + padding
+    #     # Add nodes and edges from parent-child relationships
+    #     for tree_node, qt_node in node_map.items():
+    #         G.add_node(tree_node)
+    #         width_px = qt_node.view.width + padding
+    #         height_px = qt_node.view.height + padding
 
-            # Convert pixels to inches for Graphviz (Graphviz uses 72 points/inches)
-            width_in = width_px / 72.0
-            height_in = height_px / 72.0
+    #         # Convert pixels to inches for Graphviz (Graphviz uses 72 points/inches)
+    #         width_in = width_px / 72.0
+    #         height_in = height_px / 72.0
 
-            G.nodes[tree_node]["width"] = width_in
-            G.nodes[tree_node]["height"] = height_in
-            G.nodes[tree_node]["fixedsize"] = "true"  # Force Graphviz to honor width/height
+    #         G.nodes[tree_node]["width"] = width_in
+    #         G.nodes[tree_node]["height"] = height_in
+    #         G.nodes[tree_node]["fixedsize"] = "true"  # Force Graphviz to honor width/height
 
-            if tree_node.parent and tree_node.parent in node_map:
-                G.add_edge(tree_node.parent, tree_node)
+    #         if tree_node.parent and tree_node.parent in node_map:
+    #             G.add_edge(tree_node.parent, tree_node)
 
-        graphviz_args = f"-Grankdir={rankdir} -Gnodesep={nodesep} -Granksep={ranksep} -Goverlap=false"
-        # Generate tree layout positions
-        pos = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot", args=graphviz_args)
+    #     graphviz_args = f"-Grankdir={rankdir} -Gnodesep={nodesep} -Granksep={ranksep} -Goverlap=false"
+    #     # Generate tree layout positions
+    #     pos = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot", args=graphviz_args)
 
-        SCALE_FACTOR = 1.8
-        scaled_positions = {}
+    #     SCALE_FACTOR = 1.8
+    #     scaled_positions = {}
 
-        for tree_node, (x, y) in pos.items():
-            scaled_positions[tree_node] = [x * SCALE_FACTOR, -y * SCALE_FACTOR]
+    #     for tree_node, (x, y) in pos.items():
+    #         scaled_positions[tree_node] = [x * SCALE_FACTOR, -y * SCALE_FACTOR]
 
-        # 5. Iterative Collision Resolution Pass (Post-Graphviz Safety Net)
-        # Adjust Y coordinates for nodes at the same rank level if bounding boxes collide
-        nodes_by_rank = {}
-        for tree_node, (x, y) in scaled_positions.items():
-            # Group nodes by approximate X coordinate (same depth level)
-            rank_key = round(x / 50.0) * 50
-            nodes_by_rank.setdefault(rank_key, []).append(tree_node)
+    #     # 5. Iterative Collision Resolution Pass (Post-Graphviz Safety Net)
+    #     # Adjust Y coordinates for nodes at the same rank level if bounding boxes collide
+    #     nodes_by_rank = {}
+    #     for tree_node, (x, y) in scaled_positions.items():
+    #         # Group nodes by approximate X coordinate (same depth level)
+    #         rank_key = round(x / 50.0) * 50
+    #         nodes_by_rank.setdefault(rank_key, []).append(tree_node)
 
-        for rank_x, rank_nodes in nodes_by_rank.items():
-            # Sort nodes vertically
-            rank_nodes.sort(key=lambda n: scaled_positions[n][1])
+    #     for rank_x, rank_nodes in nodes_by_rank.items():
+    #         # Sort nodes vertically
+    #         rank_nodes.sort(key=lambda n: scaled_positions[n][1])
 
-            for i in range(1, len(rank_nodes)):
-                prev_node = rank_nodes[i - 1]
-                curr_node = rank_nodes[i]
+    #         for i in range(1, len(rank_nodes)):
+    #             prev_node = rank_nodes[i - 1]
+    #             curr_node = rank_nodes[i]
 
-                prev_qt = node_map[prev_node]
-                curr_qt = node_map[curr_node]
+    #             prev_qt = node_map[prev_node]
+    #             curr_qt = node_map[curr_node]
 
-                prev_h = prev_qt.view.boundingRect().height() if hasattr(prev_qt, "view") else 100.0
-                curr_h = curr_qt.view.boundingRect().height() if hasattr(curr_qt, "view") else 100.0
+    #             prev_h = prev_qt.view.boundingRect().height() if hasattr(prev_qt, "view") else 100.0
+    #             curr_h = curr_qt.view.boundingRect().height() if hasattr(curr_qt, "view") else 100.0
 
-                prev_y = scaled_positions[prev_node][1]
-                curr_y = scaled_positions[curr_node][1]
+    #             prev_y = scaled_positions[prev_node][1]
+    #             curr_y = scaled_positions[curr_node][1]
 
-                # Required Y clearance between centers
-                min_required_dist = (prev_h / 2.0) + (curr_h / 2.0) + min_y_gap
+    #             # Required Y clearance between centers
+    #             min_required_dist = (prev_h / 2.0) + (curr_h / 2.0) + min_y_gap
 
-                if (curr_y - prev_y) < min_required_dist:
-                    # Push current node and subsequent nodes down
-                    shift = min_required_dist - (curr_y - prev_y)
-                    scaled_positions[curr_node][1] += shift
+    #             if (curr_y - prev_y) < min_required_dist:
+    #                 # Push current node and subsequent nodes down
+    #                 shift = min_required_dist - (curr_y - prev_y)
+    #                 scaled_positions[curr_node][1] += shift
 
-        # Apply positions to NodeGraphQt nodes
-        for tree_node, (x, y) in scaled_positions.items():
-            qt_node = node_map[tree_node]
-            qt_node.set_pos(x * (scale / 72.0), y * (scale / 72.0))
+    #     # Apply positions to NodeGraphQt nodes
+    #     for tree_node, (x, y) in scaled_positions.items():
+    #         qt_node = node_map[tree_node]
+    #         qt_node.set_pos(x * (scale / 72.0), y * (scale / 72.0))
 
     def _has_target_type_in_branch(self, node, node_type: ProfileNodeType):
         """checks if a node type is in the tree"""
@@ -1081,6 +1134,14 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
         # self._graph.dump()
 
+        device_node = None # current device node
+        mode_node = None # current mode node
+        input_type_node = None # current input type node
+        input_item_node = None # current input item node
+
+        container_node = None # holds the active container node in the current branch
+        container = None # current container
+        action_set_count = 0 # number of action sets in the current container
 
 
         # traverse the tree
@@ -1104,36 +1165,76 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
 
                 case ProfileNodeType.Device:
                     instance = GraphDeviceNode
+                    device_node = node
+                    mode_node = None
+                    input_type_node = None
+                    input_item_node = None
+
 
                 case ProfileNodeType.Input:
                     instance = GraphInputItemNode
+
+                    input_item_node = node
+
+                    # reset tracking data with each new input
+                    container_node = None
+                    container = None
+                    action_set_count = 0
+
                     # attach inputs direct to modes
-                    device_node : ProfileDeviceNode = self._get_first_ancestor_of_type(node, ProfileDeviceNode)
-                    if device_node:
-                        parent_node = self._node_map.get(device_node)
+                    graph_node = self._node_map.get(mode_node)
+                    if graph_node:
+                        graph_parent = graph_node
+
+                    if not graph_parent:
+
+                        parent_node : ProfileModeNode = self._get_first_ancestor_of_type(node, ProfileModeNode)
                         if parent_node:
-                            graph_parent = parent_node
+                            parent_node = self._node_map.get(parent_node)
+                            if parent_node:
+                                graph_parent = parent_node
+
 
 
                 case ProfileNodeType.Container:
+                    container_node = node
+                    container = node.container
+                    action_set_count = len(container.action_sets)
+                    parent_node = self._node_map.get(input_item_node)
+                    if parent_node:
+                        graph_parent = parent_node
                     instance = GraphContainerNode
 
                 case ProfileNodeType.Action:
                     instance = GraphActionNode
                     # attach action directly to container if there is only one action set
-                    container_node : ProfileContainerNode = self._get_first_ancestor_of_type(node, ProfileContainerNode)
-                    if container_node and len(container_node.container.action_sets) == 1:
-                        parent_node = self._node_map.get(container_node)
-                        if parent_node:
-                            graph_parent = parent_node
+                    if action_set_count == 1:
+                        # attach action direct to container if only one action set
+                        graph_node = self._node_map.get(container_node)
+                        if graph_node:
+                            graph_parent = graph_node
 
                 case ProfileNodeType.ActionSet:
+                    if action_set_count == 1:
+                        # skip node creation for single action set nodes
+                        continue
                     instance = GraphActionSetNode
 
                 case ProfileNodeType.Mode:
+                    # only display modes that have containers somewhere in their branch
+                    if not self._has_target_type_in_branch(node, ProfileNodeType.Container):
+                        continue
+                    mode_node = node
+                    input_type_node = None
+                    graph_node = self._node_map.get(device_node)
+                    if graph_node:
+                        graph_parent = graph_node
                     instance = GraphModeNode
 
                 case ProfileNodeType.InputType:
+                    continue # skip creation of input type nodes
+                    input_type_node = node
+                    graph_parent = mode_node
                     instance = GraphInputTypeNode
 
                 case _:

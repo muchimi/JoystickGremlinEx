@@ -3453,6 +3453,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # Create OSC tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
 
                             if config.osc_enabled:
+
+
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
@@ -3470,6 +3472,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                         device_guid,
                                         index,
                                     )
+
+                                # ensure OSC is started
+                                osc = gremlin.ui.osc_device.OscInterface()
+                                osc.ensureStarted()
+
                                 # add tab header for this device
                                 if add_tab_if_missing(device, TabDeviceType.Osc):
                                     index += 1

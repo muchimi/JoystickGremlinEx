@@ -738,8 +738,7 @@ class ReportEngine:
         # os.unlink(raw_file)
 
         # g.write_dot(dot_file)
-        syslog.info("DOT FILE:")
-        syslog.info(dot_file)
+        syslog.info(f"DOT FILE: {gremlin.util.toUrl(dot_file)}")
 
         try:
             # get a report file matching the profile

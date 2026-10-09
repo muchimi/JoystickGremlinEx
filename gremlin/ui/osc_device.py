@@ -1605,16 +1605,16 @@ class OscClient:
             # loopback scenario
             self._loopback = True
             if verbose:
-                syslog.info(f"OSC loopback client: {self._name} starting {self._server_ip} port: {self._output_port}")
+                syslog.info(f"OSC: (loopback client): {self._name} starting {self._server_ip} (send) port: {self._output_port}")
         else:
             # syslog = logging.getLogger("system")
             if self._server_ip is not None and self._output_port is not None:
                 self._client = UDPClient(self._server_ip, self._output_port)
                 self._started = True
                 if verbose:
-                    syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
+                    syslog.info(f"OSC: (client): {self._name} starting {self._server_ip} (send) port: {self._output_port}")
             else:
-                syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
+                syslog.error(f"OSC: (client): {self._name} Invalid OSC configuration, provide server IP and port #")
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.stop)
@@ -1806,7 +1806,7 @@ class OscServer:
             self._running = True
 
             # syslog = logging.getLogger("system")
-            syslog.info(f"OSC: server start {self._host_ip} port {self._input_port}")
+            syslog.info(f"OSC: server start {self._host_ip} (listen) port {self._input_port}")
 
     def stop(self):
         """stops the server"""
@@ -1830,14 +1830,14 @@ class OscServer:
         self._dispatcher.set_default_handler(self._callback)
 
         try:
-            syslog.info("OSC: server starting")
+            syslog.info("OSC: (server): starting...")
             self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
             self._server.serve_forever()  # blocks until shutdown
 
             # resume after exit
-            syslog.info("OSC: server shutdown")
+            syslog.info("OSC: (server): shutdown.")
         except Exception as e:
-            syslog.error(f"OSC: server error: {e}")
+            syslog.error(f"OSC: (server): error: {e}")
 
         self._server = None
 
@@ -1876,6 +1876,14 @@ class OscInterface(QtCore.QObject):
         el.osc_loopback.connect(self._loopback_handler)
 
         self._started = False
+
+    def ensureStarted(self):
+        """ensures the OSC interface is started"""
+        config = gremlin.config.Configuration()
+        if not config.osc_enabled:
+            return
+        if not self._started:
+            self.start()
 
     def start(self):
         """starts OSC"""
@@ -1940,7 +1948,7 @@ class OscInterface(QtCore.QObject):
             "osc_internal_client", self._host_ip, self.output_port, "internal"
         )  # the OSC internal client for loop messages
 
-        syslog.info(f"OSC (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
+        syslog.info(f"OSC: (interface): starting with IP: {self._host_ip} port: {self._input_port} send host: {self._target_ip} port: {self._output_port}")
         self._osc_server.stop()  # stop server if started - this resets the message handler for the server and listen ip/port
         self._osc_server.start(self._host_ip, self._input_port, self._osc_message_handler)
         self.startClients()

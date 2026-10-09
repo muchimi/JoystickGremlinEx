@@ -902,6 +902,28 @@ class DeviceSummary:
         """gets the hash key for virtual devices"""
         return (self.axis_count, self.button_count, self.hat_count)
 
+    def to_html(self) -> str:
+        """ html representation of the device """
+        from gremlin.reporting import ReportTable
+        table = ReportTable(cellpadding=4)
+        table.addField("Name", self.name)
+        table.addField("Type", DeviceType.to_display_name(self.device_type))
+        table.addField("Device ID", self.device_id)
+        table.addField("Vendor ID", f"0x{self.vendor_id:x}" if self.vendor_id else "N/A")
+        table.addField("Product ID", f"0x{self.product_id:x}" if self.product_id else "N/A")
+        if self.axis_count:
+            table.addField("Axis Count", self.axis_count)
+        if self.button_count:
+            table.addField("Button Count", self.button_count)
+        if self.hat_count:
+            table.addField("Hat Count", self.hat_count)
+
+
+        return table.to_html()
+
+
+
+
     def __str__(self):
         vjoy_stub = f"VjoyID: {self.vjoy_id}" if self.vjoy_id != -1 else ""
         vendor_string = f"0x{self.vendor_id:x}" if self.vendor_id else "N/A"
