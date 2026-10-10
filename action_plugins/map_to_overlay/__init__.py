@@ -958,7 +958,11 @@ def _apply_citizen_lookup(action_data: "MapToOverlay", is_pressed: bool, event=N
 def _apply_set_image(action_data: "MapToOverlay", is_pressed: bool, event=None):
     import threading
 
-    from gremlin.ui.obs_overlay.ocr_images import fetch_chart_to_cache, set_named_image_path_runtime
+    try:
+        from gremlin.ui.obs_overlay.ocr_images import fetch_chart_to_cache, set_named_image_path_runtime
+    except Exception:
+        syslog.warning("OBS OVERLAY: SC EFB chart images are not available in this build.")
+        return
 
     extra = getattr(event, "extra_data", None) or {} if event is not None else {}
     if isinstance(extra, dict) and extra.get("ocr_runtime_handled"):

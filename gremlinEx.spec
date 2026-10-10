@@ -142,6 +142,7 @@ a = Analysis(
         "gremlin.ui.obs_overlay.model",
         "gremlin.ui.obs_overlay.ocr_capture",
         "gremlin.ui.obs_overlay.ocr_engine",
+        "gremlin.ui.obs_overlay.ocr_lookup",
         "gremlin.ui.obs_overlay.ocr_packs",
         "gremlin.ui.obs_overlay.ocr_track",
         "gremlin.ui.obs_overlay.overlay_window",

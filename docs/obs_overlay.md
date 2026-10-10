@@ -154,8 +154,7 @@ An **OCR** widget marks a capture region on the chosen monitor. While **armed** 
 - Labels substitute `%name%` from Overlay Variables (saved with the overlay in the profile JSON). Simultaneous contributions join as `Savrilium, Laranite, Agricium`.
 - **Load pack… / Import… / Export…** share rule packs:
   - **SC mineables** — mining signatures → `%rock%` (contribute / detection label).
-  - **SC Intelligence** — region-capture rule and `%SCintell_*%` variables. Live citizen lookup is a later feature.
-  - **SC EFB** — one region-capture rule plus the Stanton location catalog and `%SCefb_location%`. Chart download is a later feature.
+  - **SC Intelligence** — place the OCR region over a player nameplate. The pack rule uses **Match = Any text (region)** — leave **Texts** empty (OCR output *is* the handle). While armed, cleaned OCR text is polled at `robertsspaceindustries.com/en/citizens/{handle}` (cached ~10 minutes). Blank OCR or HUD chrome words (e.g. Idle/Armed) are ignored — no citizen fetch. Results fill `%SCintell_handle%`, `%SCintell_name%`, `%SCintell_org%`, `%SCintell_enlisted%`, `%SCintell_location%`, `%SCintell_fluency%`. Cleared when the match is released.
 - **OCR Appearance** is border-only (no fill, image, or shadow) and is drawn on the live overlay. **Unarmed** and **Armed** each have a Border on/off toggle, color, width, and style (**Solid** / **Dashed** / **Dotted**).
 
 ## Notes
