@@ -1726,6 +1726,190 @@ def normalize_ocr_confidence(value, default: float = 0.70) -> float:
     return round(max(0.10, min(1.0, conf)), 2)
 
 
+def normalize_ocr_arm_mode(value) -> str:
+    """Normalize OCR arm mode.
+
+    ``toggle`` / ``hold`` are continuous scanning (latch vs level).
+    ``pulse`` runs one detection on arm edge; ``multi_pulse`` runs N spaced detections.
+    """
+    raw = str(value or "toggle").casefold().replace(" ", "_").replace("-", "_")
+    if raw in (
+        "hold",
+        "while",
+        "depressed",
+        "while_depressed",
+        "level",
+        "press",
+        "continuous_hold",
+    ):
+        return "hold"
+    if raw in ("pulse", "single", "single_pulse", "once"):
+        return "pulse"
+    if raw in ("multi_pulse", "multiple", "pulses", "multi", "multipulse"):
+        return "multi_pulse"
+    return "toggle"
+
+
+def normalize_ocr_arm_pulses(value, default: int = 5) -> int:
+    """Number of detections for Multiple (pulses) arm mode."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(1, min(100, n))
+
+
+def normalize_ocr_arm_pulse_spacing_ms(value, default: int = 500) -> int:
+    """Milliseconds between Multiple (pulses) detections."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(50, min(10000, n))
+
+
+def normalize_ocr_miss_tolerance(value, default: int = 3) -> int:
+    """Consecutive non-matching scans before a held rule releases."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(1, min(20, n))
+
+
+def normalize_ocr_match(value) -> str:
+    raw = str(value or "contain").casefold()
+    if raw in ("exact", "equals", "==", "full"):
+        return "exact"
+    if raw in ("any", "region", "capture", "handle"):
+        return "any"
+    return "contain"
+
+
+def normalize_ocr_capture(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("region", "handle", "text", "any"):
+        return raw
+    return ""
+
+
+def normalize_ocr_fire(value) -> str:
+    """Legacy Edge/Hold — ignored at runtime (detection is always press-while-matched)."""
+    raw = str(value or "edge").casefold()
+    return "hold" if raw in ("hold", "level", "while", "latched") else "edge"
+
+
+def split_ocr_texts(raw) -> list[str]:
+    """Parse a texts list or comma/newline-separated string into unique needles."""
+    if isinstance(raw, (list, tuple)):
+        parts = [str(p or "").strip() for p in raw]
+    else:
+        text = str(raw or "")
+        parts = []
+        for line in text.replace("\r", "\n").split("\n"):
+            for chunk in line.split(","):
+                parts.append(chunk.strip())
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        if not part:
+            continue
+        key = part.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(part)
+    return out
+
+
+def normalize_ocr_base(raw) -> int | None:
+    """Optional signature base for rock-count (count = signature // base)."""
+    if raw is None or raw == "":
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def default_ocr_rule(index: int = 0) -> dict[str, Any]:
+    return {
+        "id": _new_id(),
+        "texts": [],
+        "match": "contain",
+        "capture": "",
+        "base": None,
+        "display_name": "",
+        "mapping_xml": "",
+        "name": f"Rule {int(index) + 1}",
+    }
+
+
+def normalize_ocr_rule(raw, index: int = 0) -> dict[str, Any]:
+    base_rule = default_ocr_rule(index)
+    if not isinstance(raw, dict):
+        return base_rule
+    rule_id = str(raw.get("id") or "").strip() or base_rule["id"]
+    if "texts" in raw:
+        texts = split_ocr_texts(raw.get("texts"))
+    else:
+        texts = split_ocr_texts(raw.get("text"))
+    display_name = str(raw.get("display_name") or "").strip()
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        name = display_name or (texts[0][:24] if texts else base_rule["name"])
+    if not display_name:
+        display_name = name
+    mapping_xml = str(raw.get("mapping_xml") or "")
+    capture = normalize_ocr_capture(raw.get("capture"))
+    match = normalize_ocr_match(raw.get("match"))
+    if match == "any" and not capture:
+        capture = "region"
+    out = {
+        "id": rule_id,
+        "texts": texts,
+        "match": match,
+        "base": normalize_ocr_base(raw.get("base")),
+        "display_name": display_name,
+        "mapping_xml": mapping_xml,
+        "name": name,
+        "capture": capture,
+        "text": ", ".join(texts),
+        "fire": normalize_ocr_fire(raw.get("fire")),
+        "binding": normalize_toggle_binding(raw.get("binding")) if raw.get("binding") else default_toggle_binding(),
+    }
+    for key in ("_runtime", "chart_url", "page_url", "chart_id", "image_widget", "pack_id"):
+        if key in raw and raw.get(key) is not None:
+            out[key] = raw.get(key)
+    return out
+
+
+def normalize_ocr_rules(raw) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    rules = []
+    for index, entry in enumerate(raw):
+        rules.append(normalize_ocr_rule(entry, index))
+    return rules
+
+
+def ocr_rule_input_id(widget_id: str, rule_id: str) -> str:
+    """OverlayInputItem message_key for an OCR rule-as-button."""
+    return f"{str(widget_id or '').strip()}:{str(rule_id or '').strip()}"
+
+
+def detection_label_for_rule(rule: dict[str, Any], signature: int | None) -> str:
+    """Build Quantainium ×2 style label when base is set; otherwise display_name/name."""
+    display = str(rule.get("display_name") or rule.get("name") or "").strip() or "Match"
+    base = normalize_ocr_base(rule.get("base"))
+    if base and signature and signature % base == 0:
+        count = signature // base
+        if count >= 1:
+            return f"{display} ×{count}"
+    return display
+
+
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
     return bool((canvas or {}).get("interactive"))
 

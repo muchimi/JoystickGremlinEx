@@ -222,6 +222,12 @@ class OverlayManager:
                 OverlayValueBus().refresh()
         except Exception:
             pass
+        try:
+            from .ocr_track import OcrOverlayTracker
+
+            OcrOverlayTracker().stop_runtime()
+        except Exception:
+            pass
         auto = self._auto_shown or any(
             page.get("canvas", {}).get("show_on_profile_start") for page in self.scene.pages
         )
