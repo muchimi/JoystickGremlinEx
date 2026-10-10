@@ -1704,6 +1704,28 @@ def is_websocket_mode(canvas: dict[str, Any] | None) -> bool:
     return normalize_background_mode((canvas or {}).get("background_mode")) == "websocket"
 
 
+def normalize_ocr_region(value) -> str:
+    raw = str(value or "widget").casefold()
+    return "fullscreen" if raw in ("fullscreen", "full", "screen", "monitor") else "widget"
+
+
+def normalize_ocr_engine(value) -> str:
+    raw = str(value or "auto").casefold()
+    if raw in ("rapid", "rapidocr", "onnx"):
+        return "rapid"
+    if raw in ("windows", "winocr", "winrt", "media"):
+        return "windows"
+    return "auto"
+
+
+def normalize_ocr_confidence(value, default: float = 0.70) -> float:
+    try:
+        conf = float(value if value is not None else default)
+    except (TypeError, ValueError):
+        conf = float(default)
+    return round(max(0.10, min(1.0, conf)), 2)
+
+
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
     return bool((canvas or {}).get("interactive"))
 

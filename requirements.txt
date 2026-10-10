@@ -35,6 +35,7 @@ faster_whisper>=0.7.0
 ctranslate2
 huggingface_hub
 onnxruntime
+rapidocr
 filelock>=3.12.0
 objprint>=0.3.0
 frozendict>=2.4.0
