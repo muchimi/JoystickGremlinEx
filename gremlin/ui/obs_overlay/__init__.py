@@ -215,6 +215,13 @@ class OverlayManager:
             pass
         self._sync_mouse_reposition_banner()
         self._stop_runtime_toggle()
+        try:
+            if self.scene.reset_variables_on_deactivate():
+                from .bindings import OverlayValueBus
+
+                OverlayValueBus().refresh()
+        except Exception:
+            pass
         auto = self._auto_shown or any(
             page.get("canvas", {}).get("show_on_profile_start") for page in self.scene.pages
         )

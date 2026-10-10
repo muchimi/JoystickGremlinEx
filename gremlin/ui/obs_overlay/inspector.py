@@ -65,6 +65,8 @@ from .model import (
     normalize_background_mode,
     normalize_graph_series,
     normalize_overlay_keys,
+    overlay_variable_name,
+    overlay_variable_token,
     normalize_paddle_direction,
     normalize_runtime_bindings,
     normalize_series_range_mode,
@@ -72,6 +74,7 @@ from .model import (
     normalize_switch_appearance,
     normalize_toggle_binding,
     normalize_visibility,
+    normalize_visibility_variable_test,
     normalize_ws_device_preset,
     normalize_ws_fit_mode,
     serialize_overlay_key,
@@ -2279,6 +2282,16 @@ class OverlayInspector(QtWidgets.QWidget):
     def _visibility_condition_phrase(self, cond: dict) -> str:
         kind = str(cond.get("kind") or "mode").casefold()
         on = str(cond.get("when") or "on").casefold() != "off"
+        if kind == "variable":
+            name = overlay_variable_name(cond.get("variable_name")) or "(pick a variable)"
+            token = overlay_variable_token(name) if overlay_variable_name(cond.get("variable_name")) else name
+            test = normalize_visibility_variable_test(cond.get("variable_test"))
+            if test == "not_empty":
+                return f"variable {token} is not empty"
+            needle = str(cond.get("variable_value") if cond.get("variable_value") is not None else "")
+            if test == "contain":
+                return f"variable {token} contains {needle!r}"
+            return f"variable {token} equals {needle!r}"
         if kind == "mode":
             _mid, name = resolve_overlay_mode(cond.get("mode_id"), cond.get("mode_name"))
             name = name or str(cond.get("mode_name") or "").strip() or "(pick a mode)"
@@ -2362,12 +2375,13 @@ class OverlayInspector(QtWidgets.QWidget):
         add_kind = QDataComboBox()
         add_kind.addItem("Mode", "mode")
         add_kind.addItem("State", "state")
+        add_kind.addItem("Variable", "variable")
         add_kind.addItem("Physical button", "physical")
         add_kind.addItem("vJoy button", "vjoy")
         add_kind.addItem("Keyboard/mouse", "keyboard")
         add_btn = Buttons.getAddWidget(
             label="Add condition",
-            tooltip="Add a mode, state, or input. It is assigned the next letter (A, B, C…).",
+            tooltip="Add a mode, state, variable, or input. It is assigned the next letter (A, B, C…).",
             callback=lambda _btn=None, wid=item["id"], box=add_kind: self._add_visibility_condition(
                 wid, str(box.currentData() or "mode")
             ),
@@ -2392,6 +2406,7 @@ class OverlayInspector(QtWidgets.QWidget):
         kinds = (
             ("mode", "Mode"),
             ("state", "State"),
+            ("variable", "Variable"),
             ("physical", "Physical button"),
             ("vjoy", "vJoy button"),
             ("keyboard", "Keyboard/mouse"),
@@ -2406,6 +2421,15 @@ class OverlayInspector(QtWidgets.QWidget):
             )
         )
         form.addRow("If", kind_box)
+
+        if kind == "variable":
+            self._fill_visibility_variable(form, item, cond)
+            remove = Buttons.getRemoveWidget(
+                label="Remove",
+                callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._remove_visibility_condition(wid, cid),
+            )
+            form.addRow("", remove)
+            return box
 
         when_opts = (
             [("is current", "on"), ("is not current", "off")]
@@ -2453,6 +2477,88 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("", remove)
         return box
+
+    def _fill_visibility_variable(self, form: QtWidgets.QFormLayout, item: dict, cond: dict):
+        """Variable visibility: not empty, or value exact/contains."""
+        cond_id = str(cond.get("id") or "")
+        test = normalize_visibility_variable_test(cond.get("variable_test"))
+        value_mode = test in ("exact", "contain")
+
+        var_box = QDataComboBox(parent=self._host)
+        var_box.addItem("(none)", "")
+        current_name = overlay_variable_name(cond.get("variable_name"))
+        current_id = str(cond.get("variable_id") or "")
+        selected = 0
+        for row in self.scene.variables or []:
+            name = overlay_variable_name(row.get("name"))
+            if not name:
+                continue
+            var_box.addItem(overlay_variable_token(name), name)
+            idx = var_box.count() - 1
+            var_box.setItemData(idx, str(row.get("id") or ""), QtCore.Qt.UserRole + 1)
+            if (current_name and name.casefold() == current_name.casefold()) or (
+                current_id and str(row.get("id") or "") == current_id
+            ):
+                selected = idx
+        if selected == 0 and current_name:
+            var_box.addItem(f"{overlay_variable_token(current_name)} (missing)", current_name)
+            selected = var_box.count() - 1
+            if current_id:
+                var_box.setItemData(selected, current_id, QtCore.Qt.UserRole + 1)
+        var_box.setCurrentIndex(selected)
+        var_box.setToolTip("Overlay variable from Variables…")
+
+        def _on_var(_i=None, combo=var_box, wid=item["id"], cid=cond_id):
+            name = overlay_variable_name(combo.currentData())
+            vid = str(combo.itemData(combo.currentIndex(), QtCore.Qt.UserRole + 1) or "")
+            self._set_visibility_condition(wid, cid, variable_name=name, variable_id=vid)
+
+        var_box.currentIndexChanged.connect(_on_var)
+        form.addRow("Variable", var_box)
+
+        value_fields: list[QtWidgets.QWidget] = []
+
+        def _on_test(v, wid=item["id"], cid=cond_id):
+            mode = str(v or "not_empty").casefold()
+            if mode == "value":
+                keep = normalize_visibility_variable_test(cond.get("variable_test"))
+                if keep == "not_empty":
+                    keep = "exact"
+                self._set_visibility_condition(wid, cid, rebuild=True, variable_test=keep)
+            else:
+                self._set_visibility_condition(wid, cid, rebuild=True, variable_test="not_empty")
+
+        test_radios = _enum_radios(
+            [("Not empty", "not_empty"), ("Value", "value")],
+            "value" if value_mode else "not_empty",
+            _on_test,
+            tooltip="Not empty shows the widget when the variable has any text. Value compares against Exact or Contains.",
+        )
+        form.addRow("Test", test_radios)
+
+        match_radios = _enum_radios(
+            [("Exact", "exact"), ("Contains", "contain")],
+            "contain" if test == "contain" else "exact",
+            lambda v, wid=item["id"], cid=cond_id: self._set_visibility_condition(
+                wid, cid, rebuild=True, variable_test=normalize_visibility_variable_test(v)
+            ),
+            tooltip="Exact requires the full variable value. Contains matches a substring (case-insensitive).",
+        )
+        form.addRow("Match", match_radios)
+        value_fields.append(match_radios)
+
+        value_edit = QtWidgets.QLineEdit(self._host)
+        value_edit.setText(str(cond.get("variable_value") if cond.get("variable_value") is not None else ""))
+        value_edit.setPlaceholderText("Comparison text")
+        value_edit.setToolTip("Text to compare against the variable value.")
+        value_edit.editingFinished.connect(
+            lambda wid=item["id"], cid=cond_id, box=value_edit: self._set_visibility_condition(
+                wid, cid, variable_value=box.text()
+            )
+        )
+        form.addRow("Value", value_edit)
+        value_fields.append(value_edit)
+        _set_form_rows_visible(form, value_fields, value_mode)
 
     def _fill_visibility_input(self, form: QtWidgets.QFormLayout, item: dict, cond: dict):
         kind = str(cond.get("kind") or "physical").casefold()

@@ -1100,6 +1100,10 @@ def _draw_label(
         return
     else:
         text = item.get("label") or ""
+    if "%" in str(text):
+        from .model import resolve_overlay_text
+
+        text = resolve_overlay_text(text)
     if not text:
         return
     label_rect = rect.adjusted(

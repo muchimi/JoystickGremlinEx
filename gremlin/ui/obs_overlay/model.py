@@ -13,6 +13,7 @@ import copy
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from typing import Any
@@ -309,6 +310,115 @@ def widget_is_locked(item: dict[str, Any] | None) -> bool:
 
 def _new_id() -> str:
     return str(uuid.uuid4())
+
+
+_VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_VARIABLE_TOKEN_RE = re.compile(r"%([A-Za-z_][A-Za-z0-9_]*)%")
+
+
+def overlay_variable_name(raw) -> str:
+    """Strip wrapping % and whitespace from a variable name."""
+    text = str(raw or "").strip()
+    if len(text) >= 2 and text.startswith("%") and text.endswith("%"):
+        text = text[1:-1].strip()
+    return text.strip("%").strip()
+
+
+def overlay_variable_token(name) -> str:
+    cleaned = overlay_variable_name(name)
+    return f"%{cleaned}%" if cleaned else ""
+
+
+def resolve_overlay_text(text, scene=None) -> str:
+    """Replace %name% tokens with current overlay variable values."""
+    raw = str(text or "")
+    if "%" not in raw:
+        return raw
+    if scene is None:
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+
+            scene = OverlayManager().scene
+        except Exception:
+            scene = None
+    values: dict[str, str] = {}
+    if scene is not None:
+        for row in getattr(scene, "variables", None) or []:
+            name = overlay_variable_name((row or {}).get("name"))
+            if name:
+                values[name.casefold()] = str((row or {}).get("value") if (row or {}).get("value") is not None else "")
+
+    def _repl(match: re.Match) -> str:
+        return values.get(match.group(1).casefold(), "")
+
+    resolved = _VARIABLE_TOKEN_RE.sub(_repl, raw)
+    resolved = re.sub(r"\s*,\s*,+", ", ", resolved)
+    resolved = re.sub(r"^\s*,\s*", "", resolved)
+    resolved = re.sub(r"\s*,\s*$", "", resolved)
+    resolved = re.sub(r"\s{2,}", " ", resolved)
+    return resolved.strip()
+
+
+def overlay_variable_name_ok(name) -> bool:
+    return bool(_VARIABLE_NAME_RE.match(overlay_variable_name(name)))
+
+
+def default_overlay_variable(name: str = "") -> dict[str, Any]:
+    cleaned = overlay_variable_name(name)
+    return {
+        "id": _new_id(),
+        "name": cleaned,
+        "default": "",
+        "value": "",
+        "reset_seconds": 5.0,
+        "reset_timer": False,
+        "reset_on_deactivate": False,
+    }
+
+
+def normalize_overlay_variable(raw) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    name = overlay_variable_name(raw.get("name"))
+    if not overlay_variable_name_ok(name):
+        return None
+    try:
+        reset_seconds = float(raw.get("reset_seconds") or 0)
+    except (TypeError, ValueError):
+        reset_seconds = 0.0
+    reset_seconds = max(0.0, reset_seconds)
+    if "reset_timer" in raw:
+        reset_timer = bool(raw.get("reset_timer"))
+    else:
+        reset_timer = reset_seconds > 0.0
+    if reset_timer and reset_seconds <= 0.0:
+        reset_seconds = 5.0
+    ident = str(raw.get("id") or "").strip() or _new_id()
+    return {
+        "id": ident,
+        "name": name,
+        "default": str(raw.get("default") or ""),
+        "value": str(raw.get("value") if raw.get("value") is not None else raw.get("default") or ""),
+        "reset_seconds": reset_seconds,
+        "reset_timer": reset_timer,
+        "reset_on_deactivate": bool(raw.get("reset_on_deactivate")),
+    }
+
+
+def normalize_overlay_variables(raw) -> list[dict[str, Any]]:
+    rows = []
+    seen: set[str] = set()
+    for entry in raw or []:
+        item = normalize_overlay_variable(entry)
+        if not item:
+            continue
+        key = item["name"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(item)
+    rows.sort(key=lambda row: str(row.get("name") or "").casefold())
+    return rows
 
 
 def default_style(widget_type: str) -> dict[str, Any]:
@@ -1359,7 +1469,7 @@ def _clamp_rect_delta(x: float, y: float, w: float, h: float, dx: float, dy: flo
     return int(round(nx - x)), int(round(ny - y))
 
 
-VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard")
+VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard", "variable")
 
 
 def default_visibility() -> dict[str, Any]:
@@ -1372,9 +1482,23 @@ def normalize_visibility_kind(kind) -> str:
         return "physical"
     if value in ("keyboard/mouse", "mouse"):
         return "keyboard"
+    if value in ("variable", "var", "overlay_variable"):
+        return "variable"
     if value in VISIBILITY_KINDS:
         return value
     return "mode"
+
+
+def normalize_visibility_variable_test(value) -> str:
+    """How a Variable visibility condition compares the overlay variable."""
+    raw = str(value or "not_empty").casefold().replace("-", "_").replace(" ", "_")
+    if raw in ("exact", "equals", "==", "match"):
+        return "exact"
+    if raw in ("contain", "contains", "in"):
+        return "contain"
+    if raw in ("value", "based_on_value"):
+        return "exact"
+    return "not_empty"
 
 
 def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
@@ -1392,6 +1516,10 @@ def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
         "vjoy_id": 0,
         "input_id": 0,
         "keys": [],
+        "variable_name": "",
+        "variable_id": "",
+        "variable_test": "not_empty",
+        "variable_value": "",
     }
 
 
@@ -1427,6 +1555,22 @@ def normalize_visibility(raw) -> dict[str, Any]:
         except (TypeError, ValueError):
             item["input_id"] = 0
         item["keys"] = normalize_overlay_keys(item.get("keys"))
+        item["variable_name"] = overlay_variable_name(item.get("variable_name") or cond.get("variable_name"))
+        item["variable_id"] = str(item.get("variable_id") or cond.get("variable_id") or "")
+        test_raw = cond.get("variable_test")
+        if test_raw is None:
+            mode = str(cond.get("variable_mode") or cond.get("var_mode") or "").casefold()
+            match = str(cond.get("variable_match") or cond.get("var_match") or "").casefold()
+            if mode in ("value", "based_on_value") or match in ("exact", "contain", "contains"):
+                test_raw = match if match in ("exact", "contain", "contains") else "exact"
+            else:
+                test_raw = "not_empty"
+        item["variable_test"] = normalize_visibility_variable_test(test_raw)
+        item["variable_value"] = str(
+            item.get("variable_value")
+            if item.get("variable_value") is not None
+            else cond.get("variable_value") or cond.get("var_value") or ""
+        )
         cid = str(item.get("id") or "")
         if not cid or cid in seen:
             item["id"] = _new_id()
@@ -1736,6 +1880,8 @@ class OverlayScene(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.pages: list[dict[str, Any]] = []
+        self.variables: list[dict[str, Any]] = []
+        self._variable_reset_at: dict[str, float] = {}
         self.active_page_id: str | None = None
         self.canvas: dict[str, Any] = {}
         self.widgets: list[dict[str, Any]] = []
@@ -1833,6 +1979,8 @@ class OverlayScene(QtCore.QObject):
     def _reset_default_pages(self, emit: bool = True):
         page = default_page("Overlay")
         self.pages = [page]
+        self.variables = []
+        self._variable_reset_at = {}
         self.active_page_id = page["id"]
         self.groups = {}
         self._sync_active_aliases()
@@ -2167,6 +2315,7 @@ class OverlayScene(QtCore.QObject):
             "groups": copy.deepcopy(self.groups),
             "show_control_panel_on_profile_start": bool(self.show_control_panel_on_profile_start),
             "pages": copy.deepcopy(self.pages),
+            "variables": copy.deepcopy(self.variables),
         }
 
     def from_dict(self, data: dict[str, Any] | None):
@@ -2190,6 +2339,8 @@ class OverlayScene(QtCore.QObject):
             active = self.pages[0]["id"]
         self.active_page_id = active
         self.groups = normalize_group_registry(data.get("groups"))
+        self.variables = normalize_overlay_variables(data.get("variables"))
+        self._variable_reset_at = {}
         self.show_control_panel_on_profile_start = bool(data.get("show_control_panel_on_profile_start"))
         self._sync_active_aliases()
         self._ensure_group_registry_from_widgets()
@@ -2198,6 +2349,165 @@ class OverlayScene(QtCore.QObject):
         self._emit()
         self.selection_changed.emit()
         self.control_target_changed.emit()
+
+    def overlay_variable_by_id(self, variable_id: str | None) -> dict[str, Any] | None:
+        ident = str(variable_id or "")
+        if not ident:
+            return None
+        for row in self.variables:
+            if str(row.get("id") or "") == ident:
+                return row
+        return None
+
+    def overlay_variable_by_name(self, name) -> dict[str, Any] | None:
+        key = overlay_variable_name(name).casefold()
+        if not key:
+            return None
+        for row in self.variables:
+            if str(row.get("name") or "").casefold() == key:
+                return row
+        return None
+
+    def add_overlay_variable(
+        self,
+        name: str,
+        default: str = "",
+        reset_seconds: float = 5.0,
+        reset_timer: bool = False,
+        reset_on_deactivate: bool = False,
+    ) -> dict[str, Any] | None:
+        cleaned = overlay_variable_name(name)
+        if not overlay_variable_name_ok(cleaned):
+            return None
+        if self.overlay_variable_by_name(cleaned):
+            return None
+        row = default_overlay_variable(cleaned)
+        row["default"] = str(default or "")
+        row["value"] = row["default"]
+        try:
+            row["reset_seconds"] = max(0.0, float(reset_seconds if reset_seconds is not None else 5.0))
+        except (TypeError, ValueError):
+            row["reset_seconds"] = 5.0
+        row["reset_timer"] = bool(reset_timer)
+        row["reset_on_deactivate"] = bool(reset_on_deactivate)
+        if row["reset_timer"] and row["reset_seconds"] <= 0.0:
+            row["reset_seconds"] = 5.0
+        self.push_undo()
+        self.variables.append(row)
+        self.variables = normalize_overlay_variables(self.variables)
+        self._dirty = True
+        self._emit()
+        return self.overlay_variable_by_name(cleaned)
+
+    def update_overlay_variable(self, variable_id: str, **fields) -> bool:
+        row = self.overlay_variable_by_id(variable_id)
+        if not row:
+            return False
+        next_row = dict(row)
+        if "name" in fields:
+            cleaned = overlay_variable_name(fields.get("name"))
+            if not overlay_variable_name_ok(cleaned):
+                return False
+            existing = self.overlay_variable_by_name(cleaned)
+            if existing is not None and str(existing.get("id") or "") != str(row.get("id") or ""):
+                return False
+            next_row["name"] = cleaned
+        if "default" in fields:
+            next_row["default"] = str(fields.get("default") or "")
+        if "value" in fields:
+            next_row["value"] = str(fields.get("value") if fields.get("value") is not None else "")
+        if "reset_seconds" in fields:
+            try:
+                next_row["reset_seconds"] = max(0.0, float(fields.get("reset_seconds") or 0))
+            except (TypeError, ValueError):
+                next_row["reset_seconds"] = 0.0
+        if "reset_timer" in fields:
+            next_row["reset_timer"] = bool(fields.get("reset_timer"))
+        if "reset_on_deactivate" in fields:
+            next_row["reset_on_deactivate"] = bool(fields.get("reset_on_deactivate"))
+        self.push_undo()
+        row.update(next_row)
+        self.variables = normalize_overlay_variables(self.variables)
+        self._dirty = True
+        self._emit()
+        return True
+
+    def _arm_variable_reset_timer(self, row: dict[str, Any] | None) -> None:
+        if not row:
+            return
+        ident = str(row.get("id") or "")
+        if not ident:
+            return
+        if not bool(row.get("reset_timer")):
+            self._variable_reset_at.pop(ident, None)
+            return
+        try:
+            seconds = float(row.get("reset_seconds") or 0)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds <= 0.0:
+            self._variable_reset_at.pop(ident, None)
+            return
+        self._variable_reset_at[ident] = time.monotonic() + seconds
+
+    def set_overlay_variable_runtime_value(self, name: str, value: str) -> bool:
+        """Update a variable's live value. Creating a missing name still records undo."""
+        row = self.overlay_variable_by_name(name)
+        if row is None:
+            row = self.add_overlay_variable(name)
+            if row is None:
+                return False
+        new_value = str(value if value is not None else "")
+        old_value = str(row.get("value") if row.get("value") is not None else "")
+        changed = old_value != new_value
+        row["value"] = new_value
+        self._arm_variable_reset_timer(row)
+        return changed
+
+    def tick_variable_resets(self) -> bool:
+        """Restore timed-out variables to their defaults. Returns True if any changed."""
+        if not self._variable_reset_at:
+            return False
+        now = time.monotonic()
+        dirty = False
+        for ident, deadline in list(self._variable_reset_at.items()):
+            if now < float(deadline or 0):
+                continue
+            row = self.overlay_variable_by_id(ident)
+            self._variable_reset_at.pop(ident, None)
+            if row is None:
+                continue
+            default = str(row.get("default") or "")
+            if str(row.get("value") if row.get("value") is not None else "") == default:
+                continue
+            row["value"] = default
+            dirty = True
+        return dirty
+
+    def reset_variables_on_deactivate(self) -> bool:
+        """Restore variables flagged for profile-deactivation reset."""
+        dirty = False
+        self._variable_reset_at.clear()
+        for row in self.variables or []:
+            if not bool(row.get("reset_on_deactivate")):
+                continue
+            default = str(row.get("default") or "")
+            if str(row.get("value") if row.get("value") is not None else "") == default:
+                continue
+            row["value"] = default
+            dirty = True
+        return dirty
+
+    def remove_overlay_variable(self, variable_id: str) -> bool:
+        ident = str(variable_id or "")
+        if not ident or not self.overlay_variable_by_id(ident):
+            return False
+        self.push_undo()
+        self.variables = [row for row in self.variables if str(row.get("id") or "") != ident]
+        self._variable_reset_at.pop(ident, None)
+        self._dirty = True
+        self._emit()
+        return True
 
     def _normalize_widget(self, raw: dict[str, Any]) -> dict[str, Any]:
         from .shapes import default_shape_points, normalize_shape_kind, normalize_shape_points

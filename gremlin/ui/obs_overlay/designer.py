@@ -31,6 +31,7 @@ from .images import (
     save_qimage,
 )
 from .inspector import OverlayInspector
+from .variables_dialog import OverlayVariablesDialog
 from .property_clipboard import (
     PropertyGroupsDialog,
     clipboard_groups,
@@ -338,7 +339,7 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
             "Show overlay and Interactive apply to the selected page.<br>"
             "<b>Palette</b> — Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
             "<b>Inspector</b> — Mode (Windowed / On-screen), Visible, Interactive, Toggle overlay, "
-            "Show at profile start, Guides, and canvas size."
+            "Show at profile start, Guides, and canvas size. Variables defines %name% tokens for labels."
         )
         return title, body
 
@@ -1817,6 +1818,12 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             clicked=self._import_overlay,
         )
         self._import_btn = import_btn
+        vars_btn = QDataPushButton(
+            "Variables",
+            tooltip="Define overlay variables such as %mining_signature%. Right-click a row to copy, edit, or delete.",
+            clicked=self._open_variables,
+        )
+        self._vars_btn = vars_btn
         undo = QDataPushButton("Undo", clicked=self.scene.undo)
         self._undo_btn = undo
         redo = QDataPushButton("Redo", clicked=self.scene.redo)
@@ -1829,6 +1836,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             self._control_button,
             export,
             import_btn,
+            vars_btn,
             undo,
             redo,
         ):
@@ -2499,6 +2507,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             self.scene.load(path)
             self.refresh_profile_title()
 
+    def _open_variables(self):
+        if gremlin.shared_state.is_running:
+            return
+        OverlayVariablesDialog(self.scene, parent=self.window()).exec()
+
     def showEvent(self, event):
         if hasattr(self, "canvas") and Shiboken.isValid(self.canvas):
             if gremlin.shared_state.is_running:
@@ -2548,6 +2561,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             "_interactive_box",
             "_export_btn",
             "_import_btn",
+            "_vars_btn",
             "_undo_btn",
             "_redo_btn",
         ):
