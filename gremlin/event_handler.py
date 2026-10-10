@@ -581,6 +581,9 @@ class EventListener(QtCore.QObject):
     # signal emitted when a Stream Deck plugin bridge input is received
     streamdeck_event = Signal(Event)
 
+    # signal emitted when an overlay HUD button (or OCR rule-as-button) is pressed/released
+    overlay_event = Signal(Event)
+
     # state event
     state_event = Signal(Event)
 
@@ -2648,6 +2651,7 @@ class EventHandler(QtCore.QObject):
         self.midi_callbacks = {}
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
+        self.overlay_callbacks = {}
         self.state_callbacks = {}
         self._event_lookup = {}
         self.latched_functors = {}
@@ -3216,6 +3220,18 @@ class EventHandler(QtCore.QObject):
                 if verbose:
                     syslog.info(f"STREAMDECK: register callback mode={mode} key={key}")
 
+            elif event.event_type == InputType.OverlayButton:
+                # Overlay HUD / OCR rule-as-button — keyed by message_key (widget_id or widget_id:rule_id)
+                ov_input = event.identifier
+                key = ov_input.message_key if hasattr(ov_input, "message_key") else str(ov_input)
+                if device_guid not in self.overlay_callbacks:
+                    self.overlay_callbacks[device_guid] = {}
+                if mode not in self.overlay_callbacks[device_guid]:
+                    self.overlay_callbacks[device_guid][mode] = {}
+                if key not in self.overlay_callbacks[device_guid][mode]:
+                    self.overlay_callbacks[device_guid][mode][key] = []
+                self.overlay_callbacks[device_guid][mode][key].append((self._install_plugins(callback), permanent))
+
             elif event.event_type == InputType.State:
                 verbose = gremlin.config.Configuration().verbose
                 state_input = event.identifier
@@ -3578,6 +3594,11 @@ class EventHandler(QtCore.QObject):
                             mode_exists = True
 
                 if not mode_exists:
+                    for device in self.overlay_callbacks.values():
+                        if new_mode in device:
+                            mode_exists = True
+
+                if not mode_exists:
                     for device in self.midi_callbacks.values():
                         if new_mode in device:
                             mode_exists = True
@@ -3747,6 +3768,7 @@ class EventHandler(QtCore.QObject):
         self.midi_callbacks = {}
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
+        self.overlay_callbacks = {}
         self.state_callbacks = {}
 
     def execute_event(self, event: Event, skip_execute=False):
@@ -4017,6 +4039,12 @@ class EventHandler(QtCore.QObject):
                 elif verbose and (m_list or f_list):
                     key = event.identifier.message_key if hasattr(event.identifier, "message_key") else str(event.identifier)
                     syslog.info(f"EVENT: [StreamDeck] found callbacks for {key} mode: {self.runtime_mode} m: {len(m_list)} f: {len(f_list)}")
+            elif event.event_type == InputType.OverlayButton:
+                m_list = self._matching_overlay_callbacks(event)
+                f_list = self._matching_functors(event)
+                if verbose_detailed and not (m_list or f_list):
+                    key = event.identifier.message_key if hasattr(event.identifier, "message_key") else str(event.identifier)
+                    syslog.info(f"EVENT: [Overlay] no matching inputs for {key} mode: {self.runtime_mode}")
             elif event.event_type == InputType.State:
                 m_list = self._matching_state_callbacks(event)
                 if verbose_detailed and not (m_list or f_list):
@@ -4185,6 +4213,22 @@ class EventHandler(QtCore.QObject):
             verbose = config.verbose_mode_streamdeck and config.verbose_mode_extra
             if verbose and not callback_list:
                 syslog.info(f"EVENT: STREAMDECK: no callbacks for key: [{key}] mode: [{self.runtime_mode}]. Normal if this button has no mappings.")
+
+        if not self.process_callbacks:
+            return [c[0] for c in callback_list if c[1]]
+        return [c[0] for c in callback_list]
+
+    def _matching_overlay_callbacks(self, event):
+        """Returns callbacks for overlay HUD / OCR rule-as-button events (message_key lookup)."""
+        callback_list = []
+        if event.event_type == InputType.OverlayButton:
+            identifier = event.identifier
+            key = identifier.message_key if hasattr(identifier, "message_key") else str(identifier)
+            if event.device_guid in self.overlay_callbacks:
+                import gremlin.execution_graph
+
+                ec = gremlin.execution_graph.ExecutionContext()
+                callback_list = ec.getCallbacks(self.overlay_callbacks[event.device_guid], key, self.runtime_mode)
 
         if not self.process_callbacks:
             return [c[0] for c in callback_list if c[1]]

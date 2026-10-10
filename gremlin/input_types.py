@@ -37,6 +37,7 @@ class InputType(enum.IntEnum):
     OctaviIfr1 = 12  # octavi IFR1
     StreamDeck = 13  # Elgato Stream Deck via plugin bridge
     Voice = 14 # Voice input
+    OverlayButton = 15  # Overlay HUD button (profile XML / events; UI uses JoystickButton)
 
 
     @staticmethod
@@ -98,6 +99,8 @@ class InputType(enum.IntEnum):
                 return "StreamDeck"
             case InputType.Voice:
                 return "Voice"
+            case InputType.OverlayButton:
+                return "Overlay"
             case _:
                 return f"Don't know how to handle {value}"
 
@@ -150,6 +153,7 @@ _InputType_to_string_lookup = {
     InputType.StreamDeck: "streamdeck",
     InputType.Mouse: "mouse",
     InputType.Voice: "voice",
+    InputType.OverlayButton: "overlay",
 }
 
 _InputType_to_display_lookup = {
@@ -167,6 +171,7 @@ _InputType_to_display_lookup = {
     InputType.StreamDeck: "Stream Deck",
     InputType.Mouse: "Mouse",
     InputType.Voice: "Voice",
+    InputType.OverlayButton: "Overlay Button",
 }
 
 
@@ -201,5 +206,8 @@ _InputType_to_enum_lookup = {
     "StreamDeck": InputType.StreamDeck,
     "voice": InputType.Voice,
     "Voice": InputType.Voice,
-    "voice-input": InputType.Voice
+    "voice-input": InputType.Voice,
+    "overlay": InputType.OverlayButton,
+    "overlay-button": InputType.OverlayButton,
+    "OverlayButton": InputType.OverlayButton,
 }
