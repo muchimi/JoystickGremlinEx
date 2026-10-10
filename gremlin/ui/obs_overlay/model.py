@@ -709,6 +709,8 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "show_label": False,
                 "window_title": "",
                 "window_exe": "",
+                "launch_path": "",
+                "launch_args": "",
                 "image_keep_aspect": True,
             }
         )

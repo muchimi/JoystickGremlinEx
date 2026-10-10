@@ -56,6 +56,8 @@ _IDENTITY_STYLE_KEYS = {
     "mouse_graphic",
     "window_title",
     "window_exe",
+    "launch_path",
+    "launch_args",
     "remote_client_id",
     "streamdeck_device_id",
     "streamdeck_follow_page",

@@ -24,9 +24,15 @@ from gremlin.singleton_decorator import SingletonDecorator
 syslog = logging.getLogger("system")
 
 _HWND_CACHE_TTL_S = 1.0
+_LAUNCH_COOLDOWN_S = 12.0
 
 
 def _window_exe(hwnd: int) -> str:
+    path = _window_exe_path(hwnd)
+    return os.path.basename(path) if path else ""
+
+
+def _window_exe_path(hwnd: int) -> str:
     if not hwnd:
         return ""
     try:
@@ -46,7 +52,7 @@ def _window_exe(hwnd: int) -> str:
             buf = ctypes.create_unicode_buffer(size.value)
             if not ctypes.windll.kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
                 return ""
-            return os.path.basename(buf.value or "")
+            return str(buf.value or "")
         finally:
             ctypes.windll.kernel32.CloseHandle(handle)
     except Exception:
@@ -54,7 +60,7 @@ def _window_exe(hwnd: int) -> str:
 
 
 def list_application_windows() -> list[dict[str, Any]]:
-    """Visible top-level windows as {hwnd, title, exe} for the Application picker."""
+    """Visible top-level windows as {hwnd, title, exe, path} for the Application picker."""
     from gremlin.remote_video import list_top_windows
 
     windows: list[dict[str, Any]] = []
@@ -63,12 +69,13 @@ def list_application_windows() -> list[dict[str, Any]]:
         name = str(title or "").strip()
         if not name:
             continue
-        exe = _window_exe(int(hwnd))
+        path = _window_exe_path(int(hwnd))
+        exe = os.path.basename(path) if path else ""
         key = (name.casefold(), exe.casefold())
         if key in seen:
             continue
         seen.add(key)
-        windows.append({"hwnd": int(hwnd), "title": name, "exe": exe})
+        windows.append({"hwnd": int(hwnd), "title": name, "exe": exe, "path": path})
     windows.sort(key=lambda item: (item["title"].casefold(), item["exe"].casefold()))
     return windows
 
@@ -77,6 +84,41 @@ def window_choice_label(title: str, exe: str) -> str:
     name = str(title or "").strip() or "(untitled)"
     proc = str(exe or "").strip()
     return f"{name}  ({proc})" if proc else name
+
+
+def launch_application(path, args="") -> tuple[bool, str]:
+    """Start an executable with optional CLI arguments. Returns (ok, error)."""
+    import shlex
+    import subprocess
+
+    raw = str(path or "").strip().strip('"')
+    if not raw:
+        return False, "Set a Launch path first."
+    if not os.path.isfile(raw):
+        return False, f"Launch path not found:\n{raw}"
+    extra: list[str] = []
+    argv = str(args or "").strip()
+    if argv:
+        try:
+            extra = shlex.split(argv, posix=os.name != "nt")
+        except ValueError as err:
+            return False, f"Could not parse arguments: {err}"
+    cwd = os.path.dirname(raw) or None
+    try:
+        kwargs = {
+            "cwd": cwd,
+            "close_fds": True,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "stdin": subprocess.DEVNULL,
+        }
+        if os.name == "nt":
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        subprocess.Popen([raw, *extra], **kwargs)
+    except Exception as err:
+        syslog.warning(f"OBS OVERLAY: launch failed {raw}: {err}")
+        return False, str(err)
+    return True, ""
 
 
 def _hwnd_alive(hwnd: int) -> bool:
@@ -151,6 +193,8 @@ class ApplicationViewTracker:
         style = item.get("style") or {}
         title = str(style.get("window_title") or "").strip()
         exe = str(style.get("window_exe") or "").strip()
+        launch_path = str(style.get("launch_path") or "").strip()
+        launch_args = str(style.get("launch_args") or "")
         try:
             max_w = max(160, min(1280, int(item.get("w") or 480) * 2))
         except (TypeError, ValueError):
@@ -161,23 +205,32 @@ class ApplicationViewTracker:
                 slot = {
                     "title": title,
                     "exe": exe,
+                    "launch_path": launch_path,
+                    "launch_args": launch_args,
                     "max_w": max_w,
                     "hwnd": 0,
                     "checked_at": 0.0,
+                    "launched_at": 0.0,
                     "generation": 0,
                     "image": None,
                     "pixmap": None,
                     "pixmap_gen": -1,
-                    "status": "Select a running application" if not (title or exe) else "Looking for window…",
+                    "status": (
+                        "Select a running application"
+                        if not (title or exe or launch_path)
+                        else "Looking for window…"
+                    ),
                 }
                 self._slots[widget_id] = slot
             slot["title"] = title
             slot["exe"] = exe
+            slot["launch_path"] = launch_path
+            slot["launch_args"] = launch_args
             slot["max_w"] = max_w
-            if not title and not exe:
+            if not title and not exe and not launch_path:
                 slot["status"] = "Select a running application"
             generation = int(slot.get("generation") or 0)
-        if title or exe:
+        if title or exe or launch_path:
             self._ensure_thread()
         return generation
 
@@ -216,7 +269,7 @@ class ApplicationViewTracker:
             slot = self._slots.get(widget_id)
             if not slot:
                 style = (item.get("style") or {}) if item else {}
-                if not (style.get("window_title") or style.get("window_exe")):
+                if not (style.get("window_title") or style.get("window_exe") or style.get("launch_path")):
                     return "Select a running application"
                 return "Looking for window…"
             return str(slot.get("status") or "")
@@ -263,27 +316,46 @@ class ApplicationViewTracker:
                         widget_id,
                         str(slot.get("title") or ""),
                         str(slot.get("exe") or ""),
+                        str(slot.get("launch_path") or ""),
+                        str(slot.get("launch_args") or ""),
                         int(slot.get("max_w") or 960),
                         int(slot.get("hwnd") or 0),
                         float(slot.get("checked_at") or 0.0),
+                        float(slot.get("launched_at") or 0.0),
                     )
                     for widget_id, slot in self._slots.items()
-                    if slot.get("title") or slot.get("exe")
+                    if slot.get("title") or slot.get("exe") or slot.get("launch_path")
                 ]
             if not jobs:
                 self._wake.wait(0.25)
                 self._wake.clear()
                 with self._lock:
-                    if not any(s.get("title") or s.get("exe") for s in self._slots.values()):
+                    if not any(
+                        s.get("title") or s.get("exe") or s.get("launch_path") for s in self._slots.values()
+                    ):
                         return
                 continue
             now = time.monotonic()
             from gremlin.remote_video import grab_window_image
 
-            for widget_id, title, exe, max_w, cached_hwnd, checked_at in jobs:
+            for widget_id, title, exe, launch_path, launch_args, max_w, cached_hwnd, checked_at, launched_at in jobs:
+                match_exe = exe or (os.path.basename(launch_path) if launch_path else "")
                 hwnd = cached_hwnd if (now - checked_at) < _HWND_CACHE_TTL_S and _hwnd_alive(cached_hwnd) else 0
                 if not hwnd:
-                    hwnd = resolve_application_hwnd(title, exe, cached_hwnd)
+                    hwnd = resolve_application_hwnd(title, match_exe, cached_hwnd)
+                if not hwnd and launch_path and (now - launched_at) >= _LAUNCH_COOLDOWN_S:
+                    running = False
+                    try:
+                        import gremlin.shared_state
+
+                        running = bool(gremlin.shared_state.is_running)
+                    except Exception:
+                        running = False
+                    if running:
+                        ok, _err = launch_application(launch_path, launch_args)
+                        launched_at = now if ok else launched_at
+                        if ok:
+                            hwnd = resolve_application_hwnd(title, match_exe, 0)
                 image = grab_window_image(hwnd, max_w) if hwnd else None
                 with self._lock:
                     slot = self._slots.get(widget_id)
@@ -291,10 +363,14 @@ class ApplicationViewTracker:
                         continue
                     slot["hwnd"] = int(hwnd or 0)
                     slot["checked_at"] = now
+                    slot["launched_at"] = launched_at
                     if image is not None and not image.isNull():
                         slot["image"] = image
                         slot["generation"] = int(slot.get("generation") or 0) + 1
                         slot["status"] = ""
                     elif not slot.get("image"):
-                        slot["status"] = "Window not found" if not hwnd else "Unable to capture"
+                        if not hwnd and launch_path:
+                            slot["status"] = "Launching…" if (now - launched_at) < _LAUNCH_COOLDOWN_S else "Window not found"
+                        else:
+                            slot["status"] = "Window not found" if not hwnd else "Unable to capture"
             self._stop.wait(0.08)
