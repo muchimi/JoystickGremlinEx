@@ -4502,6 +4502,24 @@ class OverlayInspector(QtWidgets.QWidget):
         hint.setWordWrap(True)
         form.addRow(hint)
 
+        pack_row = QtWidgets.QWidget(self._host)
+        pack_layout = QtWidgets.QHBoxLayout(pack_row)
+        pack_layout.setContentsMargins(0, 0, 0, 0)
+        load_pack = QDataPushButton("Load pack…")
+        load_pack.setToolTip("Load a built-in OCR rule pack (e.g. SC mineables).")
+        load_pack.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_load_pack(wid))
+        import_btn = QDataPushButton("Import…")
+        import_btn.setToolTip("Import OCR rules from a .json pack file.")
+        import_btn.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_import_pack(wid))
+        export_btn = QDataPushButton("Export…")
+        export_btn.setToolTip("Export these OCR rules as a shareable .json pack.")
+        export_btn.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_export_pack(wid))
+        pack_layout.addWidget(load_pack)
+        pack_layout.addWidget(import_btn)
+        pack_layout.addWidget(export_btn)
+        pack_layout.addStretch(1)
+        form.addRow(pack_row)
+
         rules = normalize_ocr_rules(item.get("ocr_rules"))
         for index, rule in enumerate(rules):
             form.addRow(self._ocr_rule_box(item, rule, index))
@@ -4681,6 +4699,94 @@ class OverlayInspector(QtWidgets.QWidget):
                 self._set_ocr_rules(widget_id, rules)
             if rebuild:
                 self.rebuild()
+
+    def _ocr_pack_merge_choice(self, title: str, *, default_replace: bool = True) -> bool | None:
+        """Ask Replace / Add / Cancel. Returns True=replace, False=add, None=cancel."""
+        box = QtWidgets.QMessageBox(self.window())
+        box.setWindowTitle(title)
+        box.setIcon(QtWidgets.QMessageBox.Question)
+        box.setText("How should this pack be applied?")
+        box.setInformativeText(
+            "Replace removes existing OCR rules on this widget, then loads the pack.\n"
+            "Add keeps existing rules and appends the pack."
+        )
+        replace_btn = box.addButton("Replace", QtWidgets.QMessageBox.AcceptRole)
+        add_btn = box.addButton("Add", QtWidgets.QMessageBox.ActionRole)
+        box.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
+        box.setDefaultButton(replace_btn if default_replace else add_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is replace_btn:
+            return True
+        if clicked is add_btn:
+            return False
+        return None
+
+    def _ocr_load_pack(self, widget_id: str):
+        from .ocr_packs import apply_pack_to_widget, list_builtin_packs
+
+        packs = list_builtin_packs()
+        if not packs:
+            QtWidgets.QMessageBox.information(self.window(), "OCR packs", "No built-in packs found.")
+            return
+        names = [f"{p.get('name') or p.get('id')}" for p in packs]
+        choice, ok = QtWidgets.QInputDialog.getItem(self.window(), "Load OCR pack", "Pack:", names, 0, False)
+        if not ok or not choice:
+            return
+        pack = next((p for p, n in zip(packs, names) if n == choice), None)
+        if not pack:
+            return
+        replace = self._ocr_pack_merge_choice("Load OCR pack", default_replace=True)
+        if replace is None:
+            return
+        err = apply_pack_to_widget(self.scene, widget_id, pack, replace=replace)
+        if err:
+            QtWidgets.QMessageBox.warning(self.window(), "OCR packs", err)
+        self.rebuild()
+
+    def _ocr_import_pack(self, widget_id: str):
+        from .ocr_packs import apply_pack_to_widget, load_pack_file
+
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self.window(),
+            "Import OCR rule pack",
+            "",
+            "OCR pack (*.json);;All files (*.*)",
+        )
+        if not path:
+            return
+        pack, err = load_pack_file(path)
+        if err or not pack:
+            QtWidgets.QMessageBox.warning(self.window(), "Import OCR pack", err or "Invalid pack.")
+            return
+        replace = self._ocr_pack_merge_choice("Import OCR pack", default_replace=False)
+        if replace is None:
+            return
+        err = apply_pack_to_widget(self.scene, widget_id, pack, replace=replace)
+        if err:
+            QtWidgets.QMessageBox.warning(self.window(), "Import OCR pack", err)
+        self.rebuild()
+
+    def _ocr_export_pack(self, widget_id: str):
+        from .ocr_packs import export_widget_pack, save_pack_file
+
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self.window(),
+            "Export OCR rule pack",
+            "ocr_rules.json",
+            "OCR pack (*.json);;All files (*.*)",
+        )
+        if not path:
+            return
+        pack = export_widget_pack(self.scene, item)
+        err = save_pack_file(path, pack)
+        if err:
+            QtWidgets.QMessageBox.warning(self.window(), "Export OCR pack", err)
+        else:
+            QtWidgets.QMessageBox.information(self.window(), "Export OCR pack", f"Saved:\n{path}")
 
     def _input_display_source(self, form, item: dict):
         from .input_display import MOUSE_GRAPHIC_CHOICES, normalize_mouse_graphic

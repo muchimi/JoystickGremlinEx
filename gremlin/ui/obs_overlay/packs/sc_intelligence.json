@@ -1,0 +1,37 @@
+{
+  "schema": "jgex-ocr-pack/1",
+  "id": "sc-intelligence",
+  "name": "SC Intelligence",
+  "description": "OCR a player handle (widget region), look up the RSI citizen dossier, and fill %SCintell_*% overlay variables for custom labels.",
+  "kind": "citizen_lookup",
+  "variables": [
+    { "name": "SCintell_handle", "default": "" },
+    { "name": "SCintell_name", "default": "" },
+    { "name": "SCintell_org", "default": "" },
+    { "name": "SCintell_enlisted", "default": "" },
+    { "name": "SCintell_location", "default": "" },
+    { "name": "SCintell_fluency", "default": "" }
+  ],
+  "field_map": {
+    "handle": "SCintell_handle",
+    "name": "SCintell_name",
+    "org": "SCintell_org",
+    "enlisted": "SCintell_enlisted",
+    "location": "SCintell_location",
+    "fluency": "SCintell_fluency"
+  },
+  "rules": [
+    {
+      "name": "Citizen handle",
+      "display_name": "Citizen handle",
+      "texts": [],
+      "match": "any",
+      "capture": "region",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "citizen_lookup",
+        "use_detection_label": true
+      }
+    }
+  ]
+}

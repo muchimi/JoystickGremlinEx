@@ -142,6 +142,22 @@ A **Stopwatch** binds **Start / stop** like a button (physical, vJoy, state, mod
 
 A **Keyboard / Mouse** widget has no joystick binding. Pick a **Preset** (WASD + mouse, WASD + extra mouse, full keyboard, full keyboard + mouse, mouse only, or all picker keys) or **Select keys…** to choose keys on the same virtual keyboard as Map to Keyboard/Mouse Ex. **Select all** / **Deselect all** apply to that picker. Off/On fill, border, and font follow the other overlay widgets. **Mouse graphic** is a top-down silhouette or a labeled button map (M1–M5, wheel up/down, tilt, double-click). Only selected keys and mouse buttons light when pressed.
 
+## OCR widgets
+
+An **OCR** widget marks a capture region on the chosen monitor. While **armed** (Arming binding), it scans and treats each **rule** as a virtual overlay button: pressed while the text matches, released when it does not.
+
+- **Arm mode**: **Continuous (Toggle)** latches scanning on each press; **Continuous (Hold)** scans only while the input is held; **Single (pulse)** runs one detection on press then disarms; **Multiple (pulses)** runs **# of pulses** detections spaced by **Spacing** (ms), then disarms.
+- Inspector **OCR**: **Region**, **Min confidence** (default **0.70**; RapidOCR only — Windows OCR has no per-line score), **Engine**, **Scan interval** (continuous modes), and **Miss tolerance** (default **3** consecutive non-matching scans before a held rule releases, so hold-mode labels do not flash on flaky frames).
+- **Texts** may list several needles (comma-separated); the rule matches if any is found (Contain or Exact).
+- Optional **Base** (signature packs): matching `6340` with base `3170` yields detection label `Quantainium ×2`.
+- **Map…** opens the same mapping dialog as overlay buttons. Use **Map to Overlay → Set variable** with **Contribute** and **Use detection label** to write into a single variable such as `%rock%`.
+- Labels substitute `%name%` from Overlay Variables (saved with the overlay in the profile JSON). Simultaneous contributions join as `Savrilium, Laranite, Agricium`.
+- **Load pack… / Import… / Export…** share rule packs:
+  - **SC mineables** — mining signatures → `%rock%` (contribute / detection label).
+  - **SC Intelligence** — region-capture rule and `%SCintell_*%` variables. Live citizen lookup is a later feature.
+  - **SC EFB** — one region-capture rule plus the Stanton location catalog and `%SCefb_location%`. Chart download is a later feature.
+- **OCR Appearance** is border-only (no fill, image, or shadow) and is drawn on the live overlay. **Unarmed** and **Armed** each have a Border on/off toggle, color, width, and style (**Solid** / **Dashed** / **Dotted**).
+
 ## Notes
 
 - For OBS, capture **GEX Overlay — {page name}**, not the Overlay tab. Each page is a separate window.

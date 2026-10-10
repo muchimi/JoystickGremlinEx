@@ -48,6 +48,8 @@ added_files = [
 ]
 if os.path.isdir("gremlin/ui/obs_overlay/assets"):
     added_files.append(("gremlin/ui/obs_overlay/assets", "gremlin/ui/obs_overlay/assets"))
+if os.path.isdir("gremlin/ui/obs_overlay/packs"):
+    added_files.append(("gremlin/ui/obs_overlay/packs", "gremlin/ui/obs_overlay/packs"))
 
 
 added_files.extend(collect_data_files("faster_whisper"))
@@ -138,6 +140,10 @@ a = Analysis(
         "gremlin.ui.obs_overlay.host_window",
         "gremlin.ui.obs_overlay.inspector",
         "gremlin.ui.obs_overlay.model",
+        "gremlin.ui.obs_overlay.ocr_capture",
+        "gremlin.ui.obs_overlay.ocr_engine",
+        "gremlin.ui.obs_overlay.ocr_packs",
+        "gremlin.ui.obs_overlay.ocr_track",
         "gremlin.ui.obs_overlay.overlay_window",
         "gremlin.ui.obs_overlay.palettes",
         "gremlin.ui.obs_overlay.property_clipboard",

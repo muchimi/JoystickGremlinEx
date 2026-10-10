@@ -1,0 +1,575 @@
+{
+  "schema": "jgex-ocr-pack/1",
+  "id": "sc-mineables",
+  "name": "SC mineables",
+  "description": "Star Citizen mining signature → ore × rock count (from sc-overlay mineables table).",
+  "variable": {
+    "name": "rock",
+    "default": ""
+  },
+  "rules": [
+    {
+      "name": "Hand-mined Gem",
+      "display_name": "Hand-mined Gem",
+      "base": 3000,
+      "texts": [
+        "3000"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Quantainium",
+      "display_name": "Quantainium",
+      "base": 3170,
+      "texts": [
+        "3170",
+        "6340",
+        "9510",
+        "12680",
+        "15850",
+        "19020"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Stileron",
+      "display_name": "Stileron",
+      "base": 3185,
+      "texts": [
+        "3185",
+        "6370",
+        "9555",
+        "12740",
+        "15925",
+        "19110"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Savrilium",
+      "display_name": "Savrilium",
+      "base": 3200,
+      "texts": [
+        "3200",
+        "6400",
+        "9600",
+        "12800",
+        "16000",
+        "19200"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Ouratite",
+      "display_name": "Ouratite",
+      "base": 3370,
+      "texts": [
+        "3370",
+        "6740",
+        "10110",
+        "13480",
+        "16850",
+        "20220"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Riccite",
+      "display_name": "Riccite",
+      "base": 3385,
+      "texts": [
+        "3385",
+        "6770",
+        "10155",
+        "13540",
+        "16925",
+        "20310"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Lindinium",
+      "display_name": "Lindinium",
+      "base": 3400,
+      "texts": [
+        "3400",
+        "6800",
+        "10200",
+        "13600",
+        "17000",
+        "20400"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Beryl",
+      "display_name": "Beryl",
+      "base": 3540,
+      "texts": [
+        "3540",
+        "7080",
+        "10620",
+        "14160",
+        "17700",
+        "21240"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Taranite",
+      "display_name": "Taranite",
+      "base": 3555,
+      "texts": [
+        "3555",
+        "7110",
+        "10665",
+        "14220",
+        "17775",
+        "21330"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Borase",
+      "display_name": "Borase",
+      "base": 3570,
+      "texts": [
+        "3570",
+        "7140",
+        "10710",
+        "14280",
+        "17850",
+        "21420"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Gold",
+      "display_name": "Gold",
+      "base": 3585,
+      "texts": [
+        "3585",
+        "7170",
+        "10755",
+        "14340",
+        "17925",
+        "21510"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Bexalite",
+      "display_name": "Bexalite",
+      "base": 3600,
+      "texts": [
+        "3600",
+        "7200",
+        "10800",
+        "14400",
+        "18000",
+        "21600"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Laranite",
+      "display_name": "Laranite",
+      "base": 3825,
+      "texts": [
+        "3825",
+        "7650",
+        "11475",
+        "15300",
+        "19125",
+        "22950"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Aslarite",
+      "display_name": "Aslarite",
+      "base": 3840,
+      "texts": [
+        "3840",
+        "7680",
+        "11520",
+        "15360",
+        "19200",
+        "23040"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Titanium",
+      "display_name": "Titanium",
+      "base": 3855,
+      "texts": [
+        "3855",
+        "7710",
+        "11565",
+        "15420",
+        "19275",
+        "23130"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Tungsten",
+      "display_name": "Tungsten",
+      "base": 3870,
+      "texts": [
+        "3870",
+        "7740",
+        "11610",
+        "15480",
+        "19350",
+        "23220"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Agricium",
+      "display_name": "Agricium",
+      "base": 3885,
+      "texts": [
+        "3885",
+        "7770",
+        "11655",
+        "15540",
+        "19425",
+        "23310"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Torite",
+      "display_name": "Torite",
+      "base": 3900,
+      "texts": [
+        "3900",
+        "7800",
+        "11700",
+        "15600",
+        "19500",
+        "23400"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Hephaestanite",
+      "display_name": "Hephaestanite",
+      "base": 4180,
+      "texts": [
+        "4180",
+        "8360",
+        "12540",
+        "16720",
+        "20900",
+        "25080"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Tin",
+      "display_name": "Tin",
+      "base": 4195,
+      "texts": [
+        "4195",
+        "8390",
+        "12585",
+        "16780",
+        "20975",
+        "25170"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Quartz",
+      "display_name": "Quartz",
+      "base": 4210,
+      "texts": [
+        "4210",
+        "8420",
+        "12630",
+        "16840",
+        "21050",
+        "25260"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Corundum",
+      "display_name": "Corundum",
+      "base": 4225,
+      "texts": [
+        "4225",
+        "8450",
+        "12675",
+        "16900",
+        "21125",
+        "25350"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Copper",
+      "display_name": "Copper",
+      "base": 4240,
+      "texts": [
+        "4240",
+        "8480",
+        "12720",
+        "16960",
+        "21200",
+        "25440"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Silicon",
+      "display_name": "Silicon",
+      "base": 4255,
+      "texts": [
+        "4255",
+        "8510",
+        "12765",
+        "17020",
+        "21275",
+        "25530"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Iron",
+      "display_name": "Iron",
+      "base": 4270,
+      "texts": [
+        "4270",
+        "8540",
+        "12810",
+        "17080",
+        "21350",
+        "25620"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Aluminum",
+      "display_name": "Aluminum",
+      "base": 4285,
+      "texts": [
+        "4285",
+        "8570",
+        "12855",
+        "17140",
+        "21425",
+        "25710"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    },
+    {
+      "name": "Ice",
+      "display_name": "Ice",
+      "base": 4300,
+      "texts": [
+        "4300",
+        "8600",
+        "12900",
+        "17200",
+        "21500",
+        "25800"
+      ],
+      "match": "exact",
+      "mapping": {
+        "action": "map_to_overlay",
+        "mode": "set_variable",
+        "write": "contribute",
+        "variable": "rock",
+        "use_detection_label": true
+      }
+    }
+  ],
+  "source": "4.10.0-LIVE.12519617"
+}
