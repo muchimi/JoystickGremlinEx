@@ -43,7 +43,17 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
-from gremlin.ui.ui_common import QEmptyContainerWidget
+from gremlin.ui.ui_common import (
+    QEmptyContainerWidget,
+    QIconPushButton,
+    Icons,
+    QDataComboBox,
+    QDataPushButton,
+    getVContainer,
+    getHContainer,
+    QDataRadioButtonGroup,
+    QUsedPushButton,
+)
 import gremlin.base_profile
 import gremlin.input_item
 
@@ -279,6 +289,7 @@ class AbstractView(QtWidgets.QWidget):
         """Unregister model callbacks before this view's Qt objects are destroyed."""
         if self._model_callback_cleaned:
             return
+
         self._model_callback_cleaned = True
         model = self._model
         if model is not None:
@@ -375,13 +386,17 @@ class AbstractView(QtWidgets.QWidget):
             self._redraw_pending = True
             return
 
-        hash_key = self._model.hashKey()
+        hash_key = self._get_hash_key()
         self._has_changes = hash_key != self._hash_key
 
         if (force or self._has_changes) and not self._redraw_pending:
             self._has_changes = False
             self._hash_key = hash_key
             self.redraw()  # trigger a redraw pending
+
+    def _get_hash_key(self):
+        """key used to detect when a redraw is needed - override to include view state"""
+        return self._model.hashKey()
 
     def beginModelChange(self):
         """call this before making a change to the model to prevent multiple change events from firing"""
@@ -452,6 +467,322 @@ class AbstractView(QtWidgets.QWidget):
 
     def __hash__(self):
         return hash(self._id)
+
+
+class AbstractPaginatedView(AbstractView):
+    """AbstractView with optional pagination - only the items of the current page should be rendered.
+
+    Subclasses render the slice given by pageRange(). A page size of 0 disables pagination.
+    """
+
+    page_changed = QtCore.Signal(int, int)  # (page index, page count)
+
+    def __init__(
+        self,
+        model: AbstractCallbackModel = None,
+        callback: Callable = None,
+        page_size: int = None,
+        parent=None,
+    ):
+        """
+        :param page_size: number of items per page, 0 disables pagination
+        """
+        super().__init__(model=model, callback=callback, parent=parent)
+        config = gremlin.config.Configuration()
+        if page_size is not None:
+            self._page_size = max(0, page_size)
+            config.device_page_size = self._page_size
+        else:
+            # use configuration page size
+            self._page_size = config.device_page_size
+        self._page_index = 0
+
+    def _item_count(self) -> int:
+        """number of visible (filtered) items in the model"""
+        model = self._model
+        if model is None:
+            return 0
+        return model.rows() if hasattr(model, "rows") else model.count()
+
+    def _get_hash_key(self):
+        self._clamp_page()
+        return (super()._get_hash_key(), self._page_size, self._page_index)
+
+    def _clamp_page(self):
+        self._page_index = max(0, min(self._page_index, self.page_count - 1))
+
+    @property
+    def paginated(self) -> bool:
+        return self._page_size > 0
+
+    @property
+    def page_size(self) -> int:
+        return self._page_size
+
+    @property
+    def page_index(self) -> int:
+        return self._page_index
+
+    @property
+    def page_count(self) -> int:
+        if not self._page_size:
+            return 1
+        return max(1, -(-self._item_count() // self._page_size))
+
+    def setPageSize(self, size: int):
+        """sets the number of items per page, 0 disables pagination"""
+        size = max(0, size)
+        if size == self._page_size:
+            return
+        self._page_size = size
+        self._page_index = 0
+        self._hash_key = None
+        self.redraw(force=True)
+        self.page_changed.emit(self._page_index, self.page_count)
+        config = gremlin.config.Configuration()
+        config.device_page_size = self._page_size
+
+    def setPage(self, index: int):
+        """shows the page at the given 0 based index (clamped to the valid range)"""
+        index = max(0, min(index, self.page_count - 1))
+        if index == self._page_index:
+            return
+        self._page_index = index
+        self._hash_key = None
+        self.redraw(force=True)
+        self.page_changed.emit(index, self.page_count)
+
+    def nextPage(self):
+        self.setPage(self._page_index + 1)
+
+    def previousPage(self):
+        self.setPage(self._page_index - 1)
+
+    def pageOfIndex(self, index: int) -> int:
+        """page containing the given model index"""
+        return index // self._page_size if self._page_size else 0
+
+    def showIndex(self, index: int):
+        """switches to the page containing the given model index"""
+        self.setPage(self.pageOfIndex(index))
+
+    def pageRange(self) -> tuple[int, int]:
+        """(start, end) model indices on the current page, end exclusive"""
+        count = self._item_count()
+        if not self._page_size:
+            return (0, count)
+        self._clamp_page()
+        start = self._page_index * self._page_size
+        return (start, min(start + self._page_size, count))
+
+
+class PaginationWidget(QtWidgets.QWidget):
+    """Previous/next controls with a "Page x / y" label for a PaginatedAbstractView.
+
+    Hidden automatically when the view has a single page or pagination is disabled.
+    """
+
+    def __init__(self, view: AbstractPaginatedView, parent=None):
+        super().__init__(parent)
+        assert isinstance(view, AbstractPaginatedView), "invalid view"
+        self._view = view
+
+        width = 28
+
+        self._first_button = QIconPushButton(icon=Icons.arrowFirst(), callback=lambda: self._view.setPage(0))
+        self._prev_button = QIconPushButton(icon=Icons.arrowPrevious(), callback=self._view.previousPage)
+        self._next_button = QIconPushButton(icon=Icons.arrowNext(), callback=self._view.nextPage)
+        self._last_button = QIconPushButton(icon=Icons.arrowLast(), callback=lambda: self._view.setPage(self._view.page_count - 1))
+
+        page_sizes = [
+            ("Off", 0, "Turns pagination off (this could significantly impact UI performance and memory utilization for high count inputs)"),
+            ("16", 16, "Paginate over 16 items"),
+            ("32", 32, "Paginate over 32 items"),
+            ("64", 64, "Paginate over 64 items"),
+        ]
+
+        self._current_size_widget = QtWidgets.QLabel("")
+
+        self._label = QtWidgets.QLabel()
+        self._label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        for button, tooltip in (
+            (self._first_button, "First page"),
+            (self._prev_button, "Previous page"),
+            (self._next_button, "Next page"),
+            (self._last_button, "Last page"),
+        ):
+            button.setFixedWidth(width)
+            button.setToolTip(tooltip)
+
+        self.page_size_widgets = [
+            QUsedPushButton(text, data=value, callback=self._handle_page_size_changed, tooltip=tooltip, interactive=False, size=32, font_size=8)
+            for text, value, tooltip in page_sizes
+        ]
+
+        self._page_size_widget = getHContainer(self.page_size_widgets, widget_only=True)
+
+        pagination_widgets = [
+            "||",
+            self._first_button,
+            self._prev_button,
+            self._label,
+            self._next_button,
+            self._last_button,
+            "||",
+        ]
+
+        self._paginator_widget = getHContainer(pagination_widgets, widget_only=True)
+
+        widget = getHContainer([self._page_size_widget, "||", self._paginator_widget], widget_only=True)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(widget)
+
+        view.page_changed.connect(self._handle_page_changed)
+        view.model.addCallback(self._handle_model_changed)  # page count changes when items are added or removed
+
+        self.refresh()
+
+    def _update_page_size_widgets(self):
+        for widget in self.page_size_widgets:
+            if isinstance(widget, QUsedPushButton):
+                widget.setUsed(widget.data == self._view.page_size)
+
+    def _handle_page_size_changed(self, widget):
+        if Shiboken.isValid(self._view):
+            self._view.setPageSize(widget.data)
+
+    def _cleanup_ui(self):
+        # unhook signals from the view
+        if Shiboken.isValid(self._view):
+            self._view.page_changed.disconnect(self._handle_page_changed)
+            self._view.model.removeCallback(self._handle_model_changed)
+
+    def _handle_page_changed(self, page_index: int, page_count: int):
+        self.refresh()
+
+    def _handle_model_changed(self, data=None, force=False):
+        if Shiboken.isValid(self):
+            gremlin.util.InvokeUiMethod(self.refresh)
+
+    def refresh(self):
+        """updates the label and button states from the view"""
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self._view):
+            return
+        view = self._view
+        index = view.page_index
+        count = view.page_count
+        self._label.setText(f"{index + 1} / {count}")
+        filtered_count = view.count()
+        unfiltered_count = view.unfilteredCount()
+
+        total_stub = f"Total items {filtered_count}" if filtered_count == unfiltered_count else f"Total items {filtered_count} (unfiltered: {unfiltered_count})"
+        self._label.setToolTip(f"Page {index + 1} of {count}, {total_stub}")
+
+        self._first_button.setEnabled(index > 0)
+        self._prev_button.setEnabled(index > 0)
+        self._next_button.setEnabled(index < count - 1)
+        self._last_button.setEnabled(index < count - 1)
+
+        visible = view.paginated and count > 1
+        size_visible = count > 0
+        self._page_size_widget.setVisible(size_visible)
+        page_size = view.page_size
+        self._current_size_widget.setText(f"({page_size})")
+        self._current_size_widget.setToolTip(f"Current page size ({page_size}) {total_stub}")
+        self._paginator_widget.setVisible(visible)
+
+        # mark selected page size
+        self._update_page_size_widgets()
+
+    def setView(self, view: AbstractPaginatedView):
+        """sets the view to manage"""
+        assert isinstance(view, AbstractPaginatedView), "invalid view"
+        if view != self._view:
+            self._view = view
+            self.refresh()
+
+
+class InputJumpWidget(QtWidgets.QWidget):
+    """Searchable list of every input in the view's model - picking one jumps to its page and selects it."""
+
+    def __init__(self, view: AbstractPaginatedView, parent=None):
+        super().__init__(parent)
+        assert isinstance(view, AbstractPaginatedView), "invalid view"
+        self._view = None
+        self._signature = None
+
+        self._combo = QtWidgets.QComboBox()
+        self._combo.setEditable(True)
+        self._combo.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
+        self._combo.lineEdit().setPlaceholderText("Jump to input...")
+        self._combo.setToolTip("Type to search all inputs, pick one to jump to its page and select it")
+        completer = self._combo.completer()
+        completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
+        completer.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self._combo.activated.connect(self._handle_activated)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.addWidget(self._combo)
+
+        self.setView(view)
+
+    def setView(self, view: AbstractPaginatedView):
+        """sets the view to manage"""
+        assert isinstance(view, AbstractPaginatedView), "invalid view"
+        if view is self._view:
+            return
+        self._unhook()
+        self._view = view
+        view.model.addCallback(self._handle_model_changed)  # inputs can be added or removed
+        self._signature = None
+        self.refresh()
+
+    def _unhook(self):
+        view = self._view
+        if view is not None and Shiboken.isValid(view) and view.model is not None:
+            view.model.removeCallback(self._handle_model_changed)
+
+    def _cleanup_ui(self):
+        self._unhook()
+        self._view = None
+
+    def _handle_model_changed(self, data=None, force=False):
+        if Shiboken.isValid(self):
+            gremlin.util.InvokeUiMethod(self.refresh)
+
+    def refresh(self):
+        """reloads the list from the model"""
+        view = self._view
+        if not Shiboken.isValid(self) or view is None or not Shiboken.isValid(view) or view.model is None:
+            return
+
+        entries = []
+        for index, input_item in view.model.getFilteredMap():
+            name = input_item.short_display_name
+            description = input_item.description
+            entries.append((index, f"{name} - {description}" if description else name))
+
+        if entries == self._signature:
+            return
+        self._signature = entries
+
+        with QtCore.QSignalBlocker(self._combo):
+            self._combo.clear()
+            for index, text in entries:
+                self._combo.addItem(text, index)
+            self._combo.setCurrentIndex(-1)
+            self._combo.clearEditText()
+
+    def _handle_activated(self, position: int):
+        index = self._combo.itemData(position)
+        view = self._view
+        if index is None or view is None or not Shiboken.isValid(view):
+            return
+        view.selectItemAt(index, user_selected=True)  # switches to the page holding the input
+        with QtCore.QSignalBlocker(self._combo):
+            self._combo.setCurrentIndex(-1)
+            self._combo.clearEditText()
 
 
 class InputItem(gremlin.base_classes.AbstractInputItem):
@@ -2894,7 +3225,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if not Shiboken.isValid(self):
             return
         if value != self._selected:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"InputItemWidget: input item id [{self.input_item.id}] item: [{self.input_item.display_name}] set selected: [{value}]")
             self._selected = value
@@ -2911,7 +3242,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _execute_selected(self, value: bool, emit: bool):
         # ensure the widget has the correct visual selection state
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ItemWidget: selected [{value}]")
 
@@ -3626,7 +3957,7 @@ class InputItemListModel(AbstractCallbackModel):
         return self.rows()
 
 
-class InputItemListView(AbstractView):
+class InputItemListView(AbstractPaginatedView):
     """View displaying the contents of an InputItemListModel. Used in the left panel of the main UI to display inputs."""
 
     updated = Signal()  # fires when the data is updated
@@ -3653,6 +3984,7 @@ class InputItemListView(AbstractView):
         blank_message: str = "No data",
         enable_filter: bool = False,
         model: InputItemListModel = None,
+        page_size: int = None,  # number of items per page (automatic based on config)
     ):
         """Creates a new input item view instance
 
@@ -3665,7 +3997,7 @@ class InputItemListView(AbstractView):
         :param mapping_changed_handler: handler for when the mapping of an input item changes
 
         """
-        super().__init__(model=model, parent=parent)
+        super().__init__(model=model, page_size=page_size, parent=parent)
 
         # default visible supported input types
         self.shown_input_types = [
@@ -3771,6 +4103,14 @@ class InputItemListView(AbstractView):
         # load data and update
         self.popSuspended(emit=False)
 
+    def count(self) -> int:
+        """gets the number of filtered input items displayed"""
+        return self.model.count() if self.model is not None else 0
+
+    def unfilteredCount(self) -> int:
+        """gets the number of input items in the model without any filtering"""
+        return self.model.unfilteredCount() if self.model is not None else 0
+
     def setRedrawSelectedIndex(self, index: int):
         """sets the index of the item to select on redraw (ignored if -1)"""
         self._redraw_selected_index = index
@@ -3857,6 +4197,12 @@ class InputItemListView(AbstractView):
         if self.model.hasInputItem(input_item):
             index = self.model.indexOfInputItem(input_item)
 
+            if self.paginated:
+                page_start, page_end = self.pageRange()
+                if not page_start <= index < page_end:
+                    self.showIndex(index)
+            page_start = self.pageRange()[0]
+
             self.scrollToIndex(index)
 
             # shenanigans to have the selected input visible in the scroll area of inputs
@@ -3873,7 +4219,7 @@ class InputItemListView(AbstractView):
                         h = 0
                         for i, widget in enumerate(self._widget_map.values()):
                             h += widget.widget_height
-                            if i == index:
+                            if i == index - page_start:
                                 target_widget = widget
                                 break
                     if self._scroll_area:
@@ -4041,7 +4387,8 @@ class InputItemListView(AbstractView):
                             f"ListView: create widgets for [{self.model.display_name}] - included: [{self.model.filteredCount()}] unincluded: [{self.model.unfilteredCount()}]"
                         )
 
-                    data = list(self.model.getFilteredMap())
+                    page_start, page_end = self.pageRange()
+                    data = list(self.model.getFilteredMap())[page_start:page_end]
                     for model_index, input_item in data:
                         assert isinstance(input_item, InputItem), "invalid input item"
                         assert isinstance(model_index, int), "invalid index"
@@ -4190,7 +4537,7 @@ class InputItemListView(AbstractView):
                 if index == -1:
                     index = self._current_index
                 if index == -1:
-                    index = 0
+                    index = self.pageRange()[0]
                 selected_input_item = self._widget_map.get(index, None)
         finally:
             index = -1
@@ -4198,7 +4545,7 @@ class InputItemListView(AbstractView):
                 # select the old input that was previously selected before the update if it's still there
                 index = selected_input_item.index
             if index is None or index == -1 and self._widget_map:
-                index = 0
+                index = self.pageRange()[0]  # selection is not on this page - pick the first item of the page
             if index != -1:
                 if self._current_index != index:
                     self.selectItemAt(index)
@@ -4213,6 +4560,18 @@ class InputItemListView(AbstractView):
                 self._redraw_force = True  # force a complete redraw on next redraw cycle when drawing is allowed again
         self.redraw()  # update if needed
 
+    def _apply_pending_selection_page(self):
+        """moves to the page holding a pending selection request without redrawing"""
+        if not self.paginated:
+            return
+        target = self._redraw_selected_index if self._redraw_selected_index != -1 else self._requested_selected_index
+        if target < 0 or target >= self._item_count():
+            return
+        page = self.pageOfIndex(target)
+        if page != self._page_index:
+            self._page_index = page
+            self.page_changed.emit(page, self.page_count)
+
     def redraw(self, force: bool = False):
         # assert inspect.stack()[1].function == "_fireChanged", "redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
@@ -4226,7 +4585,12 @@ class InputItemListView(AbstractView):
         if gremlin.shared_state.is_redraw_suspended():
             return  # don't redraw
 
-        hash_key = self.model.hashKey()
+
+
+
+        self._apply_pending_selection_page()
+
+        hash_key = self._get_hash_key()
         changed = force or (hash_key != self._model_hash) or self.modelChanged()
         if not changed:
             return  # no changes detected, skip redraw
@@ -4235,7 +4599,7 @@ class InputItemListView(AbstractView):
         # model has changed - redraw
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_ui
+        verbose = config.verbose_mode_ui_level(1)
         # verbose = True
 
         force = force or self._redraw_force
@@ -4247,8 +4611,11 @@ class InputItemListView(AbstractView):
                 syslog.info("input item list view - redraw already in progress")
             return
 
+        wm = gremlin.worker.WorkManager()
         widget_count = 0  # number of displayed input item widgets
         try:
+            # hourglass cursor to indicate redraw in progress
+            wm.pushCursor()
             self._redraw_lock = True
             if not changed:
                 # compare rows
@@ -4280,7 +4647,7 @@ class InputItemListView(AbstractView):
                 self._redraw_selected_index = -1
             else:
                 if self.current_index == -1 and model_count > 0:
-                    self.setCurrentIndex(0)  # pick the first item if nothing is selected now
+                    self.setCurrentIndex(self.pageRange()[0])  # pick the first item if nothing is selected now
 
             # reselect input and make visible
             widget = self.widget(self.current_index)
@@ -4303,6 +4670,8 @@ class InputItemListView(AbstractView):
 
             el = gremlin.event_handler.EventListener()
             el.device_mapping_changed.emit(self._device.device_id)
+
+            wm.popCursor()
 
     def _deselect_all_ui(self):
         """Deselects all input item widgets."""
@@ -4488,7 +4857,7 @@ class InputItemListView(AbstractView):
         self._last_selected_widget = widget
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_inputs or config.verbose_mode_ui
+        verbose = config.verbose_mode_inputs or config.verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"InputItemListView: trigger selection for index [{index}]")
 
@@ -4506,7 +4875,7 @@ class InputItemListView(AbstractView):
     def selectInputItem(self, input_item: InputItem, emit=True, force=False, user_selected=False):
         """selects the input"""
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_inputs or config.verbose_mode_ui
+        verbose = config.verbose_mode_inputs or config.verbose_mode_ui_level(1)
         index = self.indexOf(input_item)
         if index != -1:  # found
             if verbose:
@@ -4554,6 +4923,14 @@ class InputItemListView(AbstractView):
                 index = self.mode.action_id_to_index(event.action_id)
             else:
                 index = model.event_to_index(event)
+
+        if self.paginated and not self._redraw_lock and index >= 0:
+            page_start, page_end = self.pageRange()
+            if not page_start <= index < page_end:
+                # redrawing the target page selects the requested index
+                self._requested_selected_index = index
+                self.showIndex(index)
+                return
 
         if index == -1:
             # always reset things if the index is the clear value of -1
@@ -10283,7 +10660,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         """creates the UI for this input mapping widget"""
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_ui
+        verbose = config.verbose_mode_ui_level(1)
 
         input_item: InputItem = self._input_item
         device = gremlin.joystick_handling.getDevice(input_item.device_guid)
@@ -11913,8 +12290,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._ui_created = False  # true if UI was created for this widget
 
-        self._input_item_list_view: InputItemListView = None
-        self._input_item_list_model: InputItemListModel = None
+        self.jump_widget : InputJumpWidget = None # holds the jump widget for navigating to mapped inputs
+        self.pagination_widget: PaginationWidget = None  # holds the pagination widget for the list view
+
+        self._input_item_list_view: InputItemListView = None  # holds the input item list view
+        self._input_item_list_model: InputItemListModel = None  # holds the input item model
         self._input_item_mapping_widget = None  # mapping display
         self._input_item_blank_message = blank_input_message
 
@@ -11947,10 +12327,15 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.addLeftPanelWidget(self.left_panel_header_container)
 
         # holds the input list on the left side below the header
-        self.listview_container = QtWidgets.QStackedWidget()
-        self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget())  # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
+        self.listview_stackwidget = QtWidgets.QStackedWidget()
+        self.listview_stackwidget.addWidget(gremlin.ui.ui_common.QEmptyWidget())  # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
 
-        self.addLeftPanelWidget(self.listview_container)
+        self.listview_container = QtWidgets.QWidget()
+        self.listview_container_layout = QtWidgets.QVBoxLayout(self.listview_container)
+        self.listview_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.listview_stackwidget.addWidget(self.listview_container)  # index 1 = actual list view container
+
+        self.addLeftPanelWidget(self.listview_stackwidget)
         self._blank_input()
 
     def notifyInputsChanged(self):
@@ -12117,7 +12502,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             gremlin.util.InvokeUiMethod(self._create_ui)
             return False
         assert not self._ui_created, "_create_ui should only be called once per widget life"
-        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_stackwidget):
             return False
         if self._input_item_list_view is not None and not Shiboken.isValid(self._input_item_list_view):
             return False
@@ -12169,13 +12554,28 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
                 self.setInputItemListView(widget)  # registers handlers
 
-                if Shiboken.isValid(self.listview_container):
-                    self.listview_container.setCurrentIndex(1)  # display the list view in the stack widget
+                # flip display to the active list view
+                if Shiboken.isValid(self.listview_stackwidget):
+                    self.listview_stackwidget.setCurrentIndex(1)
 
                 # update the selection if nothing is selected
                 selected_index = widget.currentIndex()
                 if selected_index is not None and selected_index != -1:
                     self.selectInputItemIndex(selected_index)
+
+            # jump widget for navigating to mapped inputs
+            if not self.jump_widget:
+                self.jump_widget = InputJumpWidget(widget)
+                self.listview_container_layout.addWidget(self.jump_widget)
+            else:
+                self.jump_widget.setView(widget)
+
+            # update/set pagination widget for the list view
+            if not self.pagination_widget:
+                self.pagination_widget = PaginationWidget(widget)
+                self.listview_container_layout.addWidget(self.pagination_widget)
+            else:
+                self.pagination_widget.setView(widget)
 
             # indicate created
             self._ui_created = True
@@ -12334,7 +12734,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _set_input_list_view_ui(self, widget):
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
-        if not Shiboken.isValid(self) or not Shiboken.isValid(widget) or not Shiboken.isValid(self.listview_container):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(widget) or not Shiboken.isValid(self.listview_stackwidget):
             return
         current_widget = self._input_item_list_view
         if current_widget != widget:
@@ -12342,7 +12742,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 current_widget.removeSelectionChangeCallback(self._handle_input_item_selected)  # unhook selected callback
                 self.onInputListViewRemoved()
                 current_widget.hide()
-                self.listview_container.removeWidget(current_widget)
+                self.listview_container_layout.removeWidget(current_widget)
                 gremlin.util.delete_widget(current_widget)
 
         self._input_item_list_view = widget
@@ -12352,7 +12752,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._input_item_list_view.addSelectionChangeCallback(
                 self._handle_input_item_selected
             )  # hook selected callback - called whenever an input is selected
-            self.listview_container.addWidget(widget)
+            self.listview_container_layout.insertWidget(0, widget)  # change the list view at the top of the container
+
             self.onInputListViewCreated()
             self._input_item_list_view.setModel(self.inputItemListModel)
             self._input_item_list_view._redraw_ui(force=True)
@@ -12406,7 +12807,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def showContent(self):
         """shows the mapping widget for the currently selected input"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         input_item = self.getSelectedInputItem()
         if verbose:
             syslog.info(f"BASE DEVICE: Showing content for selected input item: {input_item}")
@@ -12555,7 +12956,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
         if self._input_item_list_view is None or not Shiboken.isValid(self._input_item_list_view):
             return
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if index != -1:
             if verbose:
                 syslog.info(f"DeviceTabWidget: select input index [{index}]")

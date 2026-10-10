@@ -835,6 +835,9 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         line_edit.setMinimumWidth(width)
         self.addLeftPanelHeaderWidget(widget)
 
+        self._device_label_widget = widget
+        self._device_label_widget.setVisible(gremlin.config.Configuration().device_label_visible)
+
         grids.append(widget)
 
         if config.show_container_id:
@@ -1357,6 +1360,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         :param text the new label text
         """
         self.device_profile.setDeviceLabel(self.device.device_guid, text)
+        self._device_label_widget.setVisible(gremlin.config.Configuration().device_label_visible)
 
     @property
     def inputCount(self) -> int:

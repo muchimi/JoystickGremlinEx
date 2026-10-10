@@ -1609,6 +1609,39 @@ class Icons:
     def circleArrowRight(qta_color=None):
         return Icons._icon("mdi.arrow-right-circle", qta_color=qta_color)
 
+    @staticmethod
+    def circleArrowUp(qta_color=None):
+        return Icons._icon("mdi.arrow-up-circle", qta_color=qta_color)
+
+    @staticmethod
+    def circleArrowDown(qta_color=None):
+        return Icons._icon("mdi.arrow-down-circle", qta_color=qta_color)
+
+    @staticmethod
+    def circleArrowLast(qta_color=None):
+        return Icons._icon("mdi.page-last", qta_color=qta_color)
+
+    @staticmethod
+    def circleArrowFirst(qta_color=None):
+        return Icons._icon("mdi.page-first", qta_color=qta_color)
+
+    @staticmethod
+    def arrowNext(qta_color=None):
+        return Icons._icon("fa5s.angle-right", qta_color=qta_color)
+
+    @staticmethod
+    def arrowPrevious(qta_color=None):
+        return Icons._icon("fa5s.angle-left", qta_color=qta_color)
+
+    @staticmethod
+    def arrowFirst(qta_color=None):
+        return Icons._icon("fa5s.angle-double-left", qta_color=qta_color)
+
+    @staticmethod
+    def arrowLast(qta_color=None):
+        return Icons._icon("fa5s.angle-double-right", qta_color=qta_color)
+
+    @staticmethod
     def _icon(value: str, qta_color=None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
@@ -5222,6 +5255,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         width: int = None,
         icon_size: int = None,
         checkable: bool = None,
+        font_size: int = None,
     ):
         """custom push button
 
@@ -5260,6 +5294,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         assert isinstance(height, (type(None), int)), "invalid height"
         assert isinstance(width, (type(None), int)), "invalid width"
         assert isinstance(icon_size, (type(None), int)), "invalid icon_size"
+        assert isinstance(font_size, (type(None), int)), "invalid font_size"
 
         self.setCallback(callback)
 
@@ -5300,6 +5335,11 @@ class QDataPushButton(QtWidgets.QPushButton):
             self.setStyleSheet(css)
         else:
             self.setStyleSheet(Color.cssButton())
+
+        if font_size:
+            font = self.font()
+            font.setPointSize(font_size)
+            self.setFont(font)
 
     def _handle_callback(self):
         if self._callback:
@@ -8621,6 +8661,7 @@ class QUsedPushButton(QDataPushButton):
         checked=None,
         interactive=True,
         size: int = 32,
+        font_size: int = None,
     ):
         """Initializes a QUsedPushButton instance.
 
@@ -8638,7 +8679,7 @@ class QUsedPushButton(QDataPushButton):
         :param checkable: indicates if the button is checkable
         :param checked: initial checked state
         """
-        super().__init__(text, data, parent, tooltip, callback=callback, callbackEx=callbackEx, size=size)
+        super().__init__(text, data, parent, tooltip, callback=callback, callbackEx=callbackEx, size=size, font_size=font_size)
         self._used = used
         self._marker = marker
         self._device_guid = used_device_guid

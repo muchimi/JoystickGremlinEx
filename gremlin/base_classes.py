@@ -1502,7 +1502,7 @@ class AbstractCallbackModel(AbstractModel):
                     self._fireChanged()
             return
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")

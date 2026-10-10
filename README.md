@@ -50,6 +50,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T73)
+- New: UI: Optional pagination for device inputs to help manage UI responsiveness vs user preference/convenience. High input count devices (>40 - depends on the system) can have a very significant performance impact on the user interface.  This directly impacts the refresh time when mapping data must be reloaded to reflect an update, and memory utilization, as loading concurrent inputs can generate thousands of UI elements depending on profile complexity which can become unmanageable even on top tier systems.  To help manage this, T73 adds the ability to paginate inputs to keep performance snappy in line with expectations/system/preference.  The feature works in conjunction with the input filter mechanism.  By default this is set to 32 inputs which covers most devices, but guards against high count devices such as vjoy, OSC and others.
+- New: UI: Jump to input.  The drop down lets you type in or select an input and jump to it directly regardless of page (if pagination is used).  Free type or use the drop down to select from available entries.
+- New: UI: Option to show/hide device label.  Off by default.
+- Change: LOG: reduced verbosity of some UI logging and move to level 1 or 2 to reduce volume of entries in normal UI diagnostics verbose mode.  This is only for troubleshooting/development purposes.
+- Fix: UI: show wait cursor while UI is reloading inputs.
+- Fix: (PRR) Always load optional action plugins (Stream Deck, OSC, SimConnect, AFCS) so profile XML can round-trip even when the Options module toggle is off.
+- Fix: (PRR) Hide those actions from Add Action / default-action pickers when the related module is disabled, instead of skipping plugin discovery.
+- Fix: (PRR) Prevents map-to-streamdeck (and similar) mappings from being treated as unknown nodes on load and permanently blanked on the next save.
+
 ### (m77T72A)
 - Change: UI: Execute widget relabeled to "Execute on release" instead of "Release on press".
 

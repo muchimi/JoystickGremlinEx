@@ -3102,7 +3102,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # Hide the classic input list; Companion grid lives in the designer.
         try:
-            self.listview_container.hide()
+            self.listview_stackwidget.hide()
         except Exception:
             pass
         self.clearLeftPanelHeaderWidget()

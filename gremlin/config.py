@@ -4184,3 +4184,27 @@ class Configuration(QtCore.QObject):
             if device:
                 return device
         return None
+
+
+    @property
+    def device_page_size(self) -> int:
+        """returns the current page size for the last selected joystick device"""
+        value = self._get_data("device_page_size", 64)
+        # validate value is in the range of pagination values in case it was changed
+        if value not in (0, 16, 32, 64):
+            value = 64
+            self._set_data("device_page_size", value)
+        return value
+
+    @device_page_size.setter
+    def device_page_size(self, value: int):
+        self._set_data("device_page_size", value)
+
+    @property
+    def device_label_visible(self) -> bool:
+        """returns whether the device label is visible"""
+        return self._get_data("device_label_visible", False)
+
+    @device_label_visible.setter
+    def device_label_visible(self, value: bool):
+        self._set_data("device_label_visible", value)

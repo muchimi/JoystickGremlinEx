@@ -43,6 +43,8 @@ import json
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
 
+from gremlin.ui.ui_common import QDataCheckbox, QDataPushButton, QDataRadioButton
+
 from gremlin.util import load_icon
 import logging
 from gremlin.input_types import InputType
@@ -800,6 +802,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.filter_axis_threshold_widget.setValue(self.config.filter_axis_threshold)
         self.filter_axis_threshold_widget.valueChanged.connect(self._filter_axis_threshold_update)
 
+
         filter_widget = gremlin.ui.ui_common.getHContainer(
             [
                 self.filter_axis_widget,
@@ -948,6 +951,10 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.show_joystick_input_widget.setChecked(self.config.show_input_axis)
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
+        # device label visibility
+        self.device_label_visible_widget = QDataCheckbox("Show device label", value = self.config.device_label_visible, callback=self._device_label_visible_cb)
+
+
         # disable live repeaters when input viewer visible
         # self.disable_joystick_input_widget = QtWidgets.QCheckBox("Disable joystick repeaters when Input Viewer visible")
         # self.disable_joystick_input_widget.setToolTip("When enabled, axis and button visuals will not update while Input Viewer is visible/enabled.\brThis is to help with performance on some systems.")
@@ -988,12 +995,12 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.show_parent_mode_widget.clicked.connect(self._show_parent_mode_widget_cb)
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title="Repeaters", transparent=True)
-        box.addWidget(self.show_joystick_input_widget)
-        # box.addWidget(self.disable_joystick_input_widget)
+        box.addWidget(self.device_label_visible_widget)
         box.addWidget(self.show_button_grid_widget)
         box.addWidget(self.split_joystick_repeater_widget)
         box.addWidget(self.split_joystick_repeater_tooltip_widget)
         box.addWidget(self.show_parent_mode_widget)
+        box.addWidget(self.show_joystick_input_widget)
         msg = "Note: Repeaters only update on newly received axis movement data."
         infobox = gremlin.ui.ui_common.QInfoBox(msg, hide_key="repeater_option_toggle")
         box.addWidget(infobox)
@@ -2683,6 +2690,10 @@ Enabled modules may not show until the device filter is updated.
     @QtCore.Slot(bool)
     def _show_joystick_input_cb(self, checked: bool):
         self.config.show_input_axis = checked
+
+    @QtCore.Slot(bool)
+    def _device_label_visible_cb(self, checked: bool):
+        self.config.device_label_visible = checked
 
     @QtCore.Slot(bool)
     def _disable_joystick_input_cb(self, checked: bool):
