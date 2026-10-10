@@ -3248,6 +3248,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         changed = False
         index = 0
+        # model.pushFilter()
         for key in keys:
             data = state[key]
             if category:
@@ -3262,6 +3263,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             model.setItemAt(index, input_item)
             index += 1
 
+        # model.popFilter()
         model.applyFilter()  # update model filters and sort
         model.popSuspend()
 

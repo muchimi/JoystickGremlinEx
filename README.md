@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T72A)
+- Change: UI: Execute widget relabeled to "Execute on release" instead of "Release on press".
+
 ### (m77T72)
 - New: UI: Profile visualizer: (experimental) new option to display the profile as a node graph in a window.  Additional features may be added later, it's a bit bare bones at the moment but shows an interactive graphical representation of the profile in the UI where you can zoom in and move the canvas around to explore the profile setup in a graphical form.
 - Change: auto-start OSC server if the OSC device is displayed (OSC module enabled).

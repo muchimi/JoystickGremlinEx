@@ -287,8 +287,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
             press_callback=self._press_changed,
             release_callback=self._release_changed,
         )
-        # QExecuteWidget labels the second box "Release on press" but it means
-        # execute on release — keep at least one path enabled.
+        
         if not self.action_data.execute_on_press and not self.action_data.execute_on_release:
             self.action_data.execute_on_press = True
             self._execute_widget.execute_on_press = True

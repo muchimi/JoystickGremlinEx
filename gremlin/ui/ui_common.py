@@ -13544,7 +13544,7 @@ class QExecuteWidget(QWidget):
         )
 
         self._release_widget = QDataCheckbox(
-            "Release on press",
+            "Execute on release",
             value=execute_on_release,
             callback=self._release_changed,
             tooltip="If checked, commands sends on a release event",
