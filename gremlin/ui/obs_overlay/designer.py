@@ -110,6 +110,7 @@ WIDGET_TITLES = {
     "application": "Application",
     "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
+    "ocr": "OCR",
 }
 
 WIDGET_TOOLTIPS = {
@@ -140,6 +141,7 @@ WIDGET_TOOLTIPS = {
     "application": "Live capture of another application window.",
     "remote_view": "Video return from a remote GEX peer.",
     "streamdeck": "Live Stream Deck key grid on the overlay.",
+    "ocr": "Detect on-screen text in the widget region (or full screen) and fire bindings.",
 }
 
 _BANNER_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
@@ -255,6 +257,12 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
     elif widget_type == "streamdeck":
         lines.append("Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding.")
+    elif widget_type == "ocr":
+        lines.append(
+            "Inspector OCR section: widget region or full screen, min confidence, RapidOCR/Windows engine. "
+            "Arming (Continuous Toggle/Hold, or Single/Multiple pulses) starts scanning. Rules: Exact/Contain and Map… "
+            "for the output. Not shown as a filled widget on the live overlay — the designer box marks the capture region."
+        )
     elif widget_type == "axis_graph":
         lines.append("Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding.")
     elif widget_type == "axis_bars":

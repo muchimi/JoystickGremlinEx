@@ -1280,6 +1280,10 @@ def read_widget_value(item: dict[str, Any]):
         from .stopwatch_track import StopwatchOverlayTracker
 
         return StopwatchOverlayTracker().sample(item)
+    if widget_type == "ocr":
+        from .ocr_track import OcrOverlayTracker
+
+        return OcrOverlayTracker().sample(item)
     if widget_type == "input_display":
         from .input_display import KeyboardMouseTracker
 
@@ -1483,6 +1487,7 @@ class OverlayValueBus(QtCore.QObject):
         mouse_ids = set()
         graph_keys = set()
         stopwatch_ids = set()
+        ocr_ids = set()
         input_display_ids = set()
         manual_ids = set()
         remote_ids = set()
@@ -1499,6 +1504,8 @@ class OverlayValueBus(QtCore.QObject):
                         graph_keys.add((widget_id, sid))
             if widget_type == "stopwatch" and widget_id:
                 stopwatch_ids.add(widget_id)
+            if widget_type == "ocr" and widget_id:
+                ocr_ids.add(widget_id)
             if widget_type == "input_display" and widget_id:
                 input_display_ids.add(widget_id)
             if widget_type == "sys_stats" and widget_id:
@@ -1536,6 +1543,9 @@ class OverlayValueBus(QtCore.QObject):
         MouseOverlayTracker().retain(mouse_ids)
         GraphOverlayTracker().retain(graph_keys)
         StopwatchOverlayTracker().retain(stopwatch_ids)
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().retain(ocr_ids)
         KeyboardMouseTracker().retain(input_display_ids)
         ManualCounterTracker().retain(manual_ids)
         ApplicationViewTracker().retain(application_ids)

@@ -64,6 +64,14 @@ _IDENTITY_STYLE_KEYS = {
     "streamdeck_page",
     "stat",
     "font_scale_base",
+    "ocr_region",
+    "ocr_confidence",
+    "ocr_engine",
+    "ocr_interval_ms",
+    "ocr_miss_tolerance",
+    "ocr_arm_mode",
+    "ocr_arm_pulses",
+    "ocr_arm_pulse_spacing_ms",
 }
 
 # Asset paths — appearance is colors/borders/effects, not the widget's image files.

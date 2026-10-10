@@ -182,6 +182,7 @@ WIDGET_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "ocr",
     "panel",  # legacy alias of shape
     "axis_dial",  # legacy alias of axis_radial
 )
@@ -214,6 +215,7 @@ PALETTE_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "ocr",
 )
 
 PALETTE_GROUPS = (
@@ -221,7 +223,7 @@ PALETTE_GROUPS = (
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
-    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck", "ocr")),
 )
 
 DEFAULT_SIZES = {
@@ -253,6 +255,7 @@ DEFAULT_SIZES = {
     "application": (480, 270),
     "remote_view": (480, 270),
     "streamdeck": (320, 208),
+    "ocr": (280, 120),
     "panel": (280, 160),
 }
 
@@ -285,6 +288,7 @@ DEFAULT_LABELS = {
     "application": "",
     "remote_view": "Remote",
     "streamdeck": "",
+    "ocr": "OCR",
     "panel": "",
 }
 
@@ -824,6 +828,38 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_keep_aspect": True,
             }
         )
+    elif widget_type == "ocr":
+        style.update(
+            {
+                "fill": "#00000000",
+                "border": "#3a6ea5",
+                "border_on": "#6ecf8e",
+                "border_width": 2.0,
+                "border_width_on": 2.0,
+                "border_style": "dashed",
+                "border_style_on": "dashed",
+                "border_dash_size": 8.0,
+                "border_dash_size_on": 8.0,
+                "border_dash_spacing": 4.0,
+                "border_dash_spacing_on": 4.0,
+                "border_dash_amount": 0,
+                "border_dash_amount_on": 0,
+                "border_enabled": True,
+                "border_enabled_on": True,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": True,
+                "font_size": 12,
+                "ocr_region": "widget",
+                "ocr_confidence": 0.70,
+                "ocr_engine": "auto",
+                "ocr_interval_ms": 400,
+                "ocr_miss_tolerance": 3,
+                "ocr_arm_mode": "toggle",
+                "ocr_arm_pulses": 5,
+                "ocr_arm_pulse_spacing_ms": 500,
+            }
+        )
     elif widget_type == "remote_view":
         style.update(
             {
@@ -911,6 +947,7 @@ NO_BINDING_WIDGET_TYPES = (
 )
 NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
     "stopwatch",
+    "ocr",
     "toggle",
     "switch_4way",
     "switch_2way",
@@ -1046,7 +1083,7 @@ def normalize_switch_bindings(widget_type: str | None, raw=None) -> dict[str, An
 def widget_binding_kind(widget_type: str) -> str:
     if widget_type in XY_WIDGET_TYPES:
         return "xy"
-    if widget_type in ("button", "stopwatch"):
+    if widget_type in ("button", "stopwatch", "ocr"):
         return "button"
     if widget_type in SWITCH_WIDGET_TYPES:
         return "switch"
@@ -1726,6 +1763,24 @@ def normalize_ocr_confidence(value, default: float = 0.70) -> float:
     return round(max(0.10, min(1.0, conf)), 2)
 
 
+def normalize_ocr_border_style(value) -> str:
+    raw = str(value or "dashed").casefold()
+    if raw in ("solid", "line", "continuous"):
+        return "solid"
+    if raw in ("dot", "dotted", "dots"):
+        return "dotted"
+    return "dashed"
+
+
+def ocr_border_is_enabled(style: dict | None, *, armed: bool) -> bool:
+    """Per-state border visibility for OCR widgets (defaults on)."""
+    style = style or {}
+    key = "border_enabled_on" if armed else "border_enabled"
+    if key in style:
+        return bool(style.get(key))
+    return True
+
+
 def normalize_ocr_arm_mode(value) -> str:
     """Normalize OCR arm mode.
 
@@ -1910,6 +1965,23 @@ def detection_label_for_rule(rule: dict[str, Any], signature: int | None) -> str
     return display
 
 
+def apply_ocr_style_fields(style: dict[str, Any]) -> None:
+    """Clamp OCR capture settings stored on a widget style."""
+    style["ocr_region"] = normalize_ocr_region(style.get("ocr_region"))
+    style["ocr_engine"] = normalize_ocr_engine(style.get("ocr_engine"))
+    style["ocr_arm_mode"] = normalize_ocr_arm_mode(style.get("ocr_arm_mode"))
+    style["ocr_arm_pulses"] = normalize_ocr_arm_pulses(style.get("ocr_arm_pulses"))
+    style["ocr_arm_pulse_spacing_ms"] = normalize_ocr_arm_pulse_spacing_ms(
+        style.get("ocr_arm_pulse_spacing_ms")
+    )
+    style["ocr_confidence"] = normalize_ocr_confidence(style.get("ocr_confidence"))
+    style["ocr_miss_tolerance"] = normalize_ocr_miss_tolerance(style.get("ocr_miss_tolerance"))
+    try:
+        style["ocr_interval_ms"] = max(100, min(5000, int(style.get("ocr_interval_ms") or 400)))
+    except (TypeError, ValueError):
+        style["ocr_interval_ms"] = 400
+
+
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
     return bool((canvas or {}).get("interactive"))
 
@@ -1987,6 +2059,7 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "series": [],
         "keys": [],
         "stats": [],
+        "ocr_rules": [],
     }
     if widget_uses_series(widget_type):
         item["series"] = [default_graph_series(0)]
@@ -1998,6 +2071,10 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         item["keys"] = default_widget_keys()
         item["style"]["input_preset"] = DEFAULT_PRESET
         item["style"]["mouse_graphic"] = preset_mouse_graphic(DEFAULT_PRESET)
+    if widget_type == "ocr":
+        item["binding"] = default_toggle_binding()
+        item["ocr_rules"] = [default_ocr_rule(0)]
+        apply_ocr_style_fields(item["style"])
     if widget_type == "stopwatch":
         item["binding"] = default_toggle_binding()
         item["binding_y"] = default_toggle_binding()
@@ -2724,7 +2801,20 @@ class OverlayScene(QtCore.QObject):
             {
                 k: raw[k]
                 for k in item.keys()
-                if k in raw and k not in ("style", "binding", "binding_y", "bindings", "points", "visibility", "series", "keys", "stats")
+                if k in raw
+                and k
+                not in (
+                    "style",
+                    "binding",
+                    "binding_y",
+                    "bindings",
+                    "points",
+                    "visibility",
+                    "series",
+                    "keys",
+                    "stats",
+                    "ocr_rules",
+                )
             }
         )
         style = default_style(widget_type)
@@ -2749,10 +2839,19 @@ class OverlayScene(QtCore.QObject):
             style["mouse_graphic"] = normalize_mouse_graphic(style.get("mouse_graphic"))
         else:
             item["keys"] = []
+        if widget_type == "ocr":
+            item["ocr_rules"] = normalize_ocr_rules(raw.get("ocr_rules") if "ocr_rules" in raw else item.get("ocr_rules"))
+            if not item["ocr_rules"]:
+                item["ocr_rules"] = [default_ocr_rule(0)]
+            apply_ocr_style_fields(style)
+        else:
+            item["ocr_rules"] = []
         item["binding"], item["binding_y"] = self._normalize_bindings(widget_type, raw)
         if widget_type == "stopwatch":
             item["binding"] = normalize_toggle_binding(item.get("binding"))
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
+        if widget_type == "ocr":
+            item["binding"] = normalize_toggle_binding(item.get("binding"))
         if widget_type in SWITCH_WIDGET_TYPES:
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
             if widget_type in ("switch_4way", "switch_2way"):
@@ -3072,6 +3171,14 @@ class OverlayScene(QtCore.QObject):
             new_style.setdefault("show_mouse", True)
         if widget_type == "sys_stats":
             item["stats"] = normalize_stat_series(item.get("stats"), new_style.get("stat") or "time")
+        if widget_type == "ocr":
+            item["ocr_rules"] = normalize_ocr_rules(item.get("ocr_rules"))
+            if not item["ocr_rules"]:
+                item["ocr_rules"] = [default_ocr_rule(0)]
+            apply_ocr_style_fields(new_style)
+            item["binding"] = normalize_toggle_binding(item.get("binding"))
+        else:
+            item["ocr_rules"] = []
         old_kind = widget_binding_kind(old_type)
         new_kind = widget_binding_kind(widget_type)
         saved_binding = dict(item.get("binding") or {})
@@ -3108,6 +3215,8 @@ class OverlayScene(QtCore.QObject):
             if widget_type == "stopwatch":
                 item["binding"] = default_toggle_binding()
                 item["binding_y"] = default_toggle_binding()
+            elif widget_type == "ocr":
+                item["binding"] = default_toggle_binding()
         elif new_kind == "hat":
             item["binding"]["input_type"] = "hat"
 
@@ -4094,6 +4203,8 @@ class OverlayScene(QtCore.QObject):
                 item["keys"] = normalize_overlay_keys(value)
             elif key == "stats":
                 item["stats"] = normalize_stat_series(value, (item.get("style") or {}).get("stat") or "time")
+            elif key == "ocr_rules":
+                item["ocr_rules"] = normalize_ocr_rules(value)
             elif key == "rotation":
                 from .widgets import normalize_rotation
 

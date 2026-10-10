@@ -54,6 +54,7 @@ from .model import (
     OverlayScene,
     canonical_widget_type,
     default_graph_series,
+    default_ocr_rule,
     default_stat_entry,
     default_style,
     default_toggle_binding,
@@ -64,6 +65,20 @@ from .model import (
     is_websocket_mode,
     normalize_background_mode,
     normalize_graph_series,
+    normalize_ocr_arm_mode,
+    normalize_ocr_arm_pulse_spacing_ms,
+    normalize_ocr_arm_pulses,
+    normalize_ocr_base,
+    normalize_ocr_border_style,
+    normalize_ocr_capture,
+    normalize_ocr_confidence,
+    normalize_ocr_engine,
+    normalize_ocr_match,
+    normalize_ocr_miss_tolerance,
+    normalize_ocr_region,
+    normalize_ocr_rules,
+    ocr_border_is_enabled,
+    ocr_rule_input_id,
     normalize_overlay_keys,
     overlay_variable_name,
     overlay_variable_token,
@@ -78,6 +93,7 @@ from .model import (
     normalize_ws_device_preset,
     normalize_ws_fit_mode,
     serialize_overlay_key,
+    split_ocr_texts,
     switch_channel,
     widget_display_name,
     widget_is_switch,
@@ -1834,16 +1850,20 @@ class OverlayInspector(QtWidgets.QWidget):
 
         self._rotation_slider(form, item)
         self._lock_position_row(form, item)
-        self._style_bool(
-            form,
-            item,
-            "auto_scale_font",
-            "Scale font with size",
-            tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
-        )
-
         widget_type = canonical_widget_type(item.get("type"))
+        if widget_type != "ocr":
+            self._style_bool(
+                form,
+                item,
+                "auto_scale_font",
+                "Scale font with size",
+                tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
+            )
+
         self._build_widget_core(item, widget_type)
+        if widget_type == "ocr":
+            self._ocr_appearance(self._section("Appearance"), item)
+            return
 
         self._build_visibility(item)
 
@@ -2112,9 +2132,14 @@ class OverlayInspector(QtWidgets.QWidget):
             self._paddle_source(self._section("Paddle"), item)
         elif widget_type == "stopwatch":
             self._stopwatch_source(self._section("Stopwatch"), item)
+        elif widget_type == "ocr":
+            self._ocr_source(self._section("OCR"), item)
+            if not self._multi:
+                self._build_binding(item)
+                self._build_ocr_rules(item)
         elif widget_type == "hat":
             self._hat_source(self._section("Hat"), item)
-        if widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
+        if widget_type != "ocr" and widget_type not in NO_BINDING_WIDGET_TYPES and not self._multi:
             self._build_binding(item)
 
     def _build_mixed(self, items: list[dict]):
@@ -4187,6 +4212,476 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_float(form, item, "needle_second_width", "Width", 0.5, 16, step=0.5)
             self._style_bool(form, item, "needle_second_arrow", "Arrow at tip")
 
+    def _ocr_appearance(self, form, item: dict):
+        """Border-only appearance for unarmed / armed OCR capture frames."""
+        hint = QtWidgets.QLabel(
+            "OCR frames use a border only (no fill, image, or shadow). "
+            "Unarmed and Armed each have their own on/off border. "
+            "The live overlay draws the frame; status text stays in the designer.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+        self._style_float(form, item, "corner_radius", "Corner radius", 0, 200)
+        self._ocr_border_state(form, item, armed=False)
+        self._ocr_border_state(form, item, armed=True)
+
+    def _ocr_border_state(self, form, item: dict, *, armed: bool):
+        style = item.get("style") or {}
+        heading = "Armed border" if armed else "Unarmed border"
+        self._look_heading(form, heading)
+
+        enabled_key = "border_enabled_on" if armed else "border_enabled"
+        enabled = ocr_border_is_enabled(style, armed=armed)
+        dependents: list[QtWidgets.QWidget] = []
+
+        toggle = _enum_radios(
+            [("On", "on"), ("Off", "off")],
+            "on" if enabled else "off",
+            None,
+        )
+        form.addRow("Border", toggle)
+
+        color_key = "border_on" if armed else "border"
+        fallback = "#6ecf8e" if armed else "#3a6ea5"
+        values = [(w.get("style") or {}).get(color_key) for w in self.scene.selected_widgets()] or [
+            style.get(color_key)
+        ]
+        same = all(v == values[0] for v in values)
+        color_btn = ColorButton(values[0] or fallback)
+        if not same:
+            color_btn.setToolTip("Multiple values — pick a color to apply to all")
+        color_btn.color_changed.connect(lambda v, wid=item["id"], k=color_key: self._style(wid, **{k: v}))
+        form.addRow("Color", color_btn)
+        dependents.append(color_btn)
+
+        width_key = "border_width_on" if armed else "border_width"
+        width = QtWidgets.QDoubleSpinBox(self._host)
+        width.setRange(0.5, 20)
+        width.setSingleStep(0.5)
+        try:
+            width.setValue(
+                float(
+                    style.get(width_key)
+                    if style.get(width_key) is not None
+                    else style.get("border_width")
+                    or 2.0
+                )
+            )
+        except (TypeError, ValueError):
+            width.setValue(2.0)
+        width.valueChanged.connect(lambda v, wid=item["id"], k=width_key: self._style(wid, **{k: float(v)}))
+        form.addRow("Width", width)
+        dependents.append(width)
+
+        style_key = "border_style_on" if armed else "border_style"
+        current_style = normalize_ocr_border_style(style.get(style_key) or style.get("border_style"))
+        style_radios = _enum_radios(
+            [("Solid", "solid"), ("Dashed", "dashed"), ("Dotted", "dotted")],
+            current_style,
+            lambda v, wid=item["id"], k=style_key: self._style(
+                wid, **{k: normalize_ocr_border_style(v)}, rebuild=True
+            ),
+        )
+        form.addRow("Style", style_radios)
+        dependents.append(style_radios)
+
+        dash_keys = {
+            "size": "border_dash_size_on" if armed else "border_dash_size",
+            "amount": "border_dash_amount_on" if armed else "border_dash_amount",
+            "spacing": "border_dash_spacing_on" if armed else "border_dash_spacing",
+        }
+        dash_widgets: list[QtWidgets.QWidget] = []
+
+        size = QtWidgets.QDoubleSpinBox(self._host)
+        size.setRange(1.0, 200.0)
+        size.setSingleStep(1.0)
+        size.setToolTip("Length of each dash (or dot diameter when dotted), in pixels.")
+        try:
+            size.setValue(float(style.get(dash_keys["size"]) or 8.0))
+        except (TypeError, ValueError):
+            size.setValue(8.0)
+        size.valueChanged.connect(lambda v, wid=item["id"], k=dash_keys["size"]: self._style(wid, **{k: float(v)}))
+        form.addRow("Dash size", size)
+        dash_widgets.append(size)
+        dependents.append(size)
+
+        amount = QtWidgets.QSpinBox(self._host)
+        amount.setRange(0, 64)
+        amount.setSpecialValueText("Auto")
+        amount.setToolTip(
+            "Preferred number of dashes along the longer edge (0 = use Dash size as given). "
+            "Spacing is still applied between dashes."
+        )
+        try:
+            amount.setValue(int(style.get(dash_keys["amount"]) or 0))
+        except (TypeError, ValueError):
+            amount.setValue(0)
+        amount.valueChanged.connect(lambda v, wid=item["id"], k=dash_keys["amount"]: self._style(wid, **{k: int(v)}))
+        form.addRow("Dash amount", amount)
+        dash_widgets.append(amount)
+        dependents.append(amount)
+
+        spacing = QtWidgets.QDoubleSpinBox(self._host)
+        spacing.setRange(0.0, 200.0)
+        spacing.setSingleStep(1.0)
+        spacing.setToolTip("Gap between dashes or dots, in pixels.")
+        try:
+            spacing.setValue(float(style.get(dash_keys["spacing"]) or 4.0))
+        except (TypeError, ValueError):
+            spacing.setValue(4.0)
+        spacing.valueChanged.connect(
+            lambda v, wid=item["id"], k=dash_keys["spacing"]: self._style(wid, **{k: float(v)})
+        )
+        form.addRow("Dash spacing", spacing)
+        dash_widgets.append(spacing)
+        dependents.append(spacing)
+
+        patterned = current_style in ("dashed", "dotted")
+
+        def _sync_dash(on: bool):
+            _set_form_rows_visible(form, dash_widgets, on and patterned)
+
+        def _sync(on: bool):
+            _set_form_rows_visible(form, dependents, on)
+            if on:
+                _sync_dash(True)
+            else:
+                _set_form_rows_visible(form, dash_widgets, False)
+
+        def _on_toggle(value, wid=item["id"], key=enabled_key, width_box=width, wkey=width_key):
+            on = str(value or "on") == "on"
+            fields: dict = {key: on}
+            if on:
+                try:
+                    current = float(
+                        (self.scene.widget_by_id(wid) or item).get("style", {}).get(wkey)
+                        or (self.scene.widget_by_id(wid) or item).get("style", {}).get("border_width")
+                        or 0
+                    )
+                except (TypeError, ValueError, AttributeError):
+                    current = 0.0
+                if current <= 0:
+                    fields[wkey] = 2.0
+                    width_box.blockSignals(True)
+                    width_box.setValue(2.0)
+                    width_box.blockSignals(False)
+            self._style(wid, **fields)
+            _sync(on)
+
+        toggle._callback = _on_toggle
+        _sync(enabled)
+
+    def _ocr_source(self, form, item: dict):
+        from .ocr_engine import engine_status
+        from .ocr_track import OcrOverlayTracker
+
+        style = item.get("style") or {}
+        region = _enum_radios(
+            [("Widget region", "widget"), ("Full screen", "fullscreen")],
+            normalize_ocr_region(style.get("ocr_region")),
+            lambda v, wid=item["id"]: self._style(wid, ocr_region=normalize_ocr_region(v)),
+            tooltip="Widget region captures the desktop under this widget. Full screen uses the overlay monitor.",
+        )
+        form.addRow("Region", region)
+
+        conf = normalize_ocr_confidence(style.get("ocr_confidence"))
+        conf_spin = QtWidgets.QDoubleSpinBox(self._host)
+        conf_spin.setRange(0.10, 1.00)
+        conf_spin.setSingleStep(0.01)
+        conf_spin.setDecimals(2)
+        conf_spin.setValue(conf)
+        conf_spin.setToolTip(
+            "Minimum OCR confidence (default 0.70). Lines scoring below this are ignored "
+            "when the engine reports confidence (RapidOCR). Windows OCR does not expose "
+            "per-line scores, so this filter has no effect there."
+        )
+        conf_spin.valueChanged.connect(
+            lambda v, wid=item["id"]: self._style(wid, ocr_confidence=normalize_ocr_confidence(v))
+        )
+        form.addRow("Min confidence", conf_spin)
+
+        engine = _enum_radios(
+            [("Auto", "auto"), ("RapidOCR", "rapid"), ("Windows OCR", "windows")],
+            normalize_ocr_engine(style.get("ocr_engine")),
+            lambda v, wid=item["id"]: self._style(wid, ocr_engine=normalize_ocr_engine(v)),
+        )
+        form.addRow("Engine", engine)
+        status = engine_status()
+        status_lbl = QtWidgets.QLabel(str(status.get("summary") or ""), self._host)
+        status_lbl.setWordWrap(True)
+        form.addRow("Status", status_lbl)
+
+        interval = QtWidgets.QSpinBox(self._host)
+        interval.setRange(100, 5000)
+        interval.setSingleStep(50)
+        interval.setSuffix(" ms")
+        try:
+            interval.setValue(int(style.get("ocr_interval_ms") or 400))
+        except (TypeError, ValueError):
+            interval.setValue(400)
+        interval.setToolTip("How often to scan while armed.")
+        interval.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_interval_ms=int(v)))
+        form.addRow("Scan interval", interval)
+
+        miss = QtWidgets.QSpinBox(self._host)
+        miss.setRange(1, 20)
+        miss.setValue(normalize_ocr_miss_tolerance(style.get("ocr_miss_tolerance")))
+        miss.setToolTip(
+            "Consecutive non-matching scans before a held rule releases (default 3). "
+            "Raise this if hold-mode labels flash while the text is still on screen."
+        )
+        miss.valueChanged.connect(
+            lambda v, wid=item["id"]: self._style(wid, ocr_miss_tolerance=normalize_ocr_miss_tolerance(v))
+        )
+        form.addRow("Miss tolerance", miss)
+
+        tracker = OcrOverlayTracker()
+        last = QtWidgets.QLabel(tracker.last_text(item) or tracker.status(item) or "—", self._host)
+        last.setWordWrap(True)
+        last.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        form.addRow("Last text", last)
+
+        btn_row = QtWidgets.QWidget(self._host)
+        btn_layout = QtWidgets.QHBoxLayout(btn_row)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        test = QDataPushButton("Test once")
+        test.setToolTip(
+            "Highlights the OCR region on screen, counts down 5 seconds so you can place text, "
+            "then captures that region and runs OCR."
+        )
+        test.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_test_once(wid))
+        clear = QDataPushButton("Clear results")
+        clear.setToolTip("Clear last OCR text, status, and rule match state for this widget.")
+        clear.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_clear_results(wid))
+        btn_layout.addWidget(test)
+        btn_layout.addWidget(clear)
+        btn_layout.addStretch(1)
+        form.addRow(btn_row)
+        hint = QtWidgets.QLabel(
+            "Arm scanning in Arming (Continuous Toggle/Hold, or Single/Multiple pulses). Each rule below fires its own output binding when text matches. "
+            "Test once outlines the capture region on the chosen monitor for 5 seconds before OCR. "
+            "The live overlay draws the Appearance border for unarmed/armed. "
+            "Designer status text (OCR · region, hits) is editor-only.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+    def _ocr_test_once(self, widget_id: str):
+        if self._building:
+            return
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().test_once(item, on_done=lambda _text: self.rebuild())
+        self.rebuild()
+
+    def _ocr_clear_results(self, widget_id: str):
+        if self._building:
+            return
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().clear_results(item)
+        self.rebuild()
+
+    def _build_ocr_rules(self, item: dict):
+        form = self._section("Rules")
+        hint = QtWidgets.QLabel(
+            "Contain / Exact match against Texts (comma-separated). "
+            "Any text (region) ignores Texts and uses whatever OCR reads in the widget. "
+            "While matched the rule acts as a pressed overlay button; when not matched it is released. "
+            "Use Map… for containers and actions.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+        rules = normalize_ocr_rules(item.get("ocr_rules"))
+        for index, rule in enumerate(rules):
+            form.addRow(self._ocr_rule_box(item, rule, index))
+        add = Buttons.getAddWidget(
+            label="Add rule",
+            callback=lambda _btn=None, wid=item["id"]: self._add_ocr_rule(wid),
+        )
+        form.addRow(add)
+
+    def _ocr_rule_box(self, item: dict, rule: dict, index: int) -> QtWidgets.QGroupBox:
+        from .overlay_input import find_overlay_input, overlay_input_has_mappings, overlay_mapping_summary_lines
+
+        title = str(rule.get("name") or rule.get("display_name") or f"Rule {index + 1}")
+        box = QtWidgets.QGroupBox(title, self._host)
+        form = QtWidgets.QFormLayout(box)
+        form.setLabelAlignment(QtCore.Qt.AlignRight)
+        rule_id = str(rule.get("id") or "")
+        match_mode = normalize_ocr_match(rule.get("match"))
+        if normalize_ocr_capture(rule.get("capture")) in ("region", "handle", "any", "text"):
+            match_mode = "any"
+        region_mode = match_mode == "any"
+
+        texts = QtWidgets.QLineEdit(
+            ", ".join(split_ocr_texts(rule.get("texts") if rule.get("texts") is not None else rule.get("text"))),
+            self._host,
+        )
+        texts.setPlaceholderText("(not used — OCR region is the handle)" if region_mode else "3200, 6400")
+        texts.setToolTip(
+            "Ignored in Any text (region) mode — whatever OCR reads becomes the detection label. "
+            "For Contain/Exact: comma or newline separated; rule matches if any value is found."
+        )
+        texts.setEnabled(not region_mode)
+        texts.editingFinished.connect(
+            lambda wid=item["id"], rid=rule_id, w=texts: self._update_ocr_rule(wid, rid, texts=w.text())
+        )
+        form.addRow("Texts", texts)
+
+        name = QtWidgets.QLineEdit(str(rule.get("name") or rule.get("display_name") or ""), self._host)
+        name.setPlaceholderText("e.g. Quantainium")
+        name.setToolTip("Rule title. For Contain/Exact with Base, also drives the detection label (×count).")
+        name.editingFinished.connect(
+            lambda wid=item["id"], rid=rule_id, w=name: self._update_ocr_rule(wid, rid, name=w.text())
+        )
+        form.addRow("Name", name)
+
+        match = _enum_radios(
+            [("Contain", "contain"), ("Exact", "exact"), ("Any text (region)", "any")],
+            match_mode,
+            lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(
+                wid, rid, match=normalize_ocr_match(v), rebuild=True
+            ),
+            tooltip=(
+                "Contain / Exact: match Texts. Any text (region): fire whenever OCR reads something."
+            ),
+        )
+        form.addRow("Match", match)
+
+        base_spin = QtWidgets.QSpinBox(self._host)
+        base_spin.setRange(0, 100000)
+        base_spin.setSpecialValueText("—")
+        base_val = normalize_ocr_base(rule.get("base"))
+        base_spin.setValue(int(base_val or 0))
+        base_spin.setToolTip("Signature base for rock count (count = signature ÷ base). 0 = unused. Ignored for region capture.")
+        base_spin.setEnabled(not region_mode)
+        base_spin.valueChanged.connect(
+            lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(wid, rid, base=v or None)
+        )
+        form.addRow("Base", base_spin)
+
+        input_id = ocr_rule_input_id(str(item.get("id") or ""), rule_id)
+        mapped = find_overlay_input(input_id)
+        for line in overlay_mapping_summary_lines(mapped):
+            summary = QtWidgets.QLabel(line, self._host)
+            summary.setWordWrap(True)
+            form.addRow(summary)
+        caption = "Edit mappings..." if overlay_input_has_mappings(mapped) else "Map..."
+        map_btn = QDataPushButton(caption)
+        map_btn.setToolTip("Open the standard button mapping dialog for this OCR rule.")
+        map_btn.clicked.connect(lambda _=False, wid=item["id"], rid=rule_id: self._open_ocr_rule_mappings(wid, rid))
+        form.addRow(map_btn)
+
+        remove = Buttons.getDeleteWidget(
+            tooltip="Remove this rule",
+            callback=lambda _btn=None, wid=item["id"], rid=rule_id: self._remove_ocr_rule(wid, rid),
+        )
+        form.addRow(remove)
+        return box
+
+    def _open_ocr_rule_mappings(self, widget_id: str, rule_id: str):
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        rules = normalize_ocr_rules(item.get("ocr_rules"))
+        rule = next((r for r in rules if str(r.get("id") or "") == str(rule_id)), None)
+        if not rule:
+            return
+        from .mapping_dialog import OverlayMappingDialog
+
+        try:
+            dialog = OverlayMappingDialog(item, parent=self.window(), rule=rule)
+        except Exception as err:
+            QtWidgets.QMessageBox.warning(self.window(), "OCR rule mappings", str(err))
+            return
+        dialog.exec()
+        for r in rules:
+            if str(r.get("id") or "") == str(rule_id):
+                r["mapping_xml"] = str(rule.get("mapping_xml") or "")
+                break
+        self.scene.apply_widget_update(widget_id, ocr_rules=normalize_ocr_rules(rules))
+        self.rebuild()
+
+    def _ocr_rules_list(self, widget_id: str) -> list[dict]:
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return []
+        return normalize_ocr_rules(item.get("ocr_rules"))
+
+    def _set_ocr_rules(self, widget_id: str, rules: list[dict]):
+        if self._building:
+            return
+        self.scene.apply_widget_update(widget_id, ocr_rules=normalize_ocr_rules(rules))
+        self.rebuild()
+
+    def _add_ocr_rule(self, widget_id: str):
+        rules = self._ocr_rules_list(widget_id)
+        rules.append(default_ocr_rule(len(rules)))
+        self._set_ocr_rules(widget_id, rules)
+
+    def _remove_ocr_rule(self, widget_id: str, rule_id: str):
+        from .overlay_input import remove_overlay_input
+
+        remove_overlay_input(ocr_rule_input_id(widget_id, rule_id))
+        rules = [r for r in self._ocr_rules_list(widget_id) if str(r.get("id") or "") != str(rule_id)]
+        if not rules:
+            rules = [default_ocr_rule(0)]
+        self._set_ocr_rules(widget_id, rules)
+
+    def _update_ocr_rule(self, widget_id: str, rule_id: str, defer_rebuild: bool = False, **fields):
+        if self._building:
+            return
+        rules = self._ocr_rules_list(widget_id)
+        changed = False
+        for rule in rules:
+            if str(rule.get("id") or "") != str(rule_id):
+                continue
+            if "texts" in fields:
+                rule["texts"] = split_ocr_texts(fields.get("texts"))
+                rule["text"] = ", ".join(rule["texts"])
+            if "name" in fields:
+                cleaned = str(fields.get("name") or "").strip() or rule.get("name") or "Rule"
+                rule["name"] = cleaned
+                rule["display_name"] = cleaned
+            if "match" in fields:
+                rule["match"] = normalize_ocr_match(fields.get("match"))
+                if rule["match"] == "any":
+                    rule["capture"] = "region"
+                    rule["texts"] = []
+                    rule["text"] = ""
+                    rule["base"] = None
+                else:
+                    rule["capture"] = ""
+            if "capture" in fields:
+                rule["capture"] = normalize_ocr_capture(fields.get("capture"))
+                if rule["capture"] in ("region", "handle", "any", "text"):
+                    rule["match"] = "any"
+            if "base" in fields:
+                rule["base"] = normalize_ocr_base(fields.get("base"))
+            if "mapping_xml" in fields:
+                rule["mapping_xml"] = str(fields.get("mapping_xml") or "")
+            changed = True
+            break
+        if changed:
+            rebuild = bool(fields.get("rebuild"))
+            if defer_rebuild:
+                self.scene.apply_widget_update(widget_id, ocr_rules=normalize_ocr_rules(rules))
+            else:
+                self._set_ocr_rules(widget_id, rules)
+            if rebuild:
+                self.rebuild()
+
     def _input_display_source(self, form, item: dict):
         from .input_display import MOUSE_GRAPHIC_CHOICES, normalize_mouse_graphic
 
@@ -5384,12 +5879,12 @@ class OverlayInspector(QtWidgets.QWidget):
             open_overlay_control_panel(self.scene, parent=self.window())
 
     def _build_binding(self, item: dict):
-        form = self._section("Bindings")
-        if widget_needs_xy(item.get("type")):
+        widget_type = item.get("type")
+        form = self._section("Arming" if widget_type == "ocr" else "Bindings")
+        if widget_needs_xy(widget_type):
             self._build_channel(item, "binding", "Axis X", force_type="axis", form=form)
             self._build_channel(item, "binding_y", "Axis Y", force_type="axis", form=form)
             return
-        widget_type = item.get("type")
         if widget_type == "stopwatch":
             self._build_channel(
                 item,
@@ -5405,6 +5900,71 @@ class OverlayInspector(QtWidgets.QWidget):
                 "Reset",
                 force_type="button",
                 extra_hint="Optional. A press sets the counter back to zero.",
+                form=form,
+            )
+            return
+        if widget_type == "ocr":
+            style = item.get("style") or {}
+            arm_mode = normalize_ocr_arm_mode(style.get("ocr_arm_mode"))
+            pulse_fields: list[QtWidgets.QWidget] = []
+
+            arm = QDataComboBox(parent=self._host)
+            for label, value in (
+                ("Continuous (Toggle)", "toggle"),
+                ("Continuous (Hold)", "hold"),
+                ("Single (pulse)", "pulse"),
+                ("Multiple (pulses)", "multi_pulse"),
+            ):
+                arm.addItem(label, value)
+            idx = arm.findData(arm_mode)
+            if idx >= 0:
+                arm.setCurrentIndex(idx)
+            arm.setToolTip(
+                "Continuous (Toggle) latches armed on each press. "
+                "Continuous (Hold) scans only while the input is held. "
+                "Single (pulse) runs one detection on press. "
+                "Multiple (pulses) runs N detections spaced apart, then disarms."
+            )
+
+            def _on_arm_mode(_i=None, box=arm, wid=item["id"]):
+                mode = normalize_ocr_arm_mode(box.currentData())
+                self._style(wid, ocr_arm_mode=mode)
+                _set_form_rows_visible(form, pulse_fields, mode == "multi_pulse")
+
+            arm.currentIndexChanged.connect(_on_arm_mode)
+            form.addRow("Arm mode", arm)
+
+            pulses = QtWidgets.QSpinBox(self._host)
+            pulses.setRange(1, 100)
+            pulses.setValue(normalize_ocr_arm_pulses(style.get("ocr_arm_pulses")))
+            pulses.setToolTip("How many detections to run when Multiple (pulses) is selected.")
+            pulses.valueChanged.connect(
+                lambda v, wid=item["id"]: self._style(wid, ocr_arm_pulses=normalize_ocr_arm_pulses(v))
+            )
+            form.addRow("# of pulses", pulses)
+            pulse_fields.append(pulses)
+
+            spacing = QtWidgets.QSpinBox(self._host)
+            spacing.setRange(50, 10000)
+            spacing.setSingleStep(50)
+            spacing.setSuffix(" ms")
+            spacing.setValue(normalize_ocr_arm_pulse_spacing_ms(style.get("ocr_arm_pulse_spacing_ms")))
+            spacing.setToolTip("Delay between Multiple (pulses) detections (e.g. 5 × 500 ms).")
+            spacing.valueChanged.connect(
+                lambda v, wid=item["id"]: self._style(
+                    wid, ocr_arm_pulse_spacing_ms=normalize_ocr_arm_pulse_spacing_ms(v)
+                )
+            )
+            form.addRow("Spacing", spacing)
+            pulse_fields.append(spacing)
+            _set_form_rows_visible(form, pulse_fields, arm_mode == "multi_pulse")
+
+            self._build_channel(
+                item,
+                "binding",
+                "Arm detection",
+                force_type="button",
+                extra_hint="Physical, vJoy, state, mode, or keyboard. Continuous modes scan while armed; pulse modes fire on press.",
                 form=form,
             )
             return

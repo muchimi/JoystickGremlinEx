@@ -1467,6 +1467,117 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
+def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) -> QtGui.QPen:
+    """Border pen for OCR widgets (solid / dashed / dotted; no fill)."""
+    from .model import normalize_ocr_border_style, ocr_border_is_enabled
+
+    if not ocr_border_is_enabled(style, armed=armed):
+        return QtGui.QPen(QtCore.Qt.NoPen)
+
+    width_key = "border_width_on" if armed else "border_width"
+    try:
+        width = float(style.get(width_key) if style.get(width_key) is not None else style.get("border_width") or 2.0)
+    except (TypeError, ValueError):
+        width = 2.0
+    width = max(0.5, width)
+    color = style.get("border_on" if armed else "border") or ("#6ecf8e" if armed else "#3a6ea5")
+    pen = _pen(color, width)
+    if pen.style() == QtCore.Qt.NoPen:
+        return pen
+
+    kind = normalize_ocr_border_style(
+        style.get("border_style_on" if armed else "border_style") or style.get("border_style")
+    )
+    if kind == "solid":
+        pen.setStyle(QtCore.Qt.SolidLine)
+        return pen
+
+    size_key = "border_dash_size_on" if armed else "border_dash_size"
+    amount_key = "border_dash_amount_on" if armed else "border_dash_amount"
+    spacing_key = "border_dash_spacing_on" if armed else "border_dash_spacing"
+    try:
+        size = float(style.get(size_key) or 8.0)
+    except (TypeError, ValueError):
+        size = 8.0
+    try:
+        spacing = float(style.get(spacing_key) or 4.0)
+    except (TypeError, ValueError):
+        spacing = 4.0
+    try:
+        amount = int(style.get(amount_key) or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    size = max(1.0, size)
+    spacing = max(0.0, spacing)
+    if amount >= 2:
+        long_edge = max(float(rect.width()), float(rect.height()))
+        size = max(1.0, (long_edge - (amount - 1) * spacing) / float(amount))
+
+    pen.setStyle(QtCore.Qt.CustomDashLine)
+    if kind == "dotted":
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setDashPattern([max(0.1, size / max(width, 0.5)), max(0.5, spacing / max(width, 0.5))])
+    else:
+        pen.setCapStyle(QtCore.Qt.FlatCap)
+        pen.setDashPattern([max(0.5, size / max(width, 0.5)), max(0.5, spacing / max(width, 0.5))])
+    return pen
+
+
+def paint_ocr(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """OCR capture frame: border-only on the live overlay; designer adds status text."""
+    from .ocr_track import OcrOverlayTracker
+    from .model import normalize_ocr_region
+
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    tracker = OcrOverlayTracker()
+    armed = tracker.armed(item)
+    if isinstance(value, bool):
+        armed = value
+    painter.setPen(_ocr_border_pen(style, rect, armed=armed))
+    painter.setBrush(QtCore.Qt.NoBrush)
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+
+    if _live_fast_paint:
+        painter.restore()
+        return
+
+    inner = rect.adjusted(4, 4, -4, -4)
+    region = normalize_ocr_region(style.get("ocr_region"))
+    status = tracker.status(item) or ("Armed" if armed else "Idle")
+    last = tracker.last_text(item)
+    matched = tracker.matched_names(item)
+    lines = [f"OCR · {region}", status]
+    if matched:
+        lines.append("Hit: " + ", ".join(matched[:3]))
+    elif last:
+        preview = last if len(last) <= 48 else last[:45] + "…"
+        lines.append(preview)
+    painter.setPen(qcolor(style.get("font_color"), "#d7e3f4"))
+    font = painter.font()
+    try:
+        font.setPointSizeF(max(8.0, float(style.get("font_size") or 12)))
+    except (TypeError, ValueError):
+        font.setPointSize(12)
+    painter.setFont(font)
+    painter.drawText(
+        inner.adjusted(4, 4, -4, -4),
+        int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop | QtCore.Qt.TextWordWrap),
+        "\n".join(lines),
+    )
+    _draw_label(painter, item, rect)
+    painter.restore()
+
+
 _streamdeck_pm_cache: dict[tuple, QtGui.QPixmap] = {}
 
 
@@ -3645,6 +3756,7 @@ _PAINTERS = {
     "application": paint_application,
     "remote_view": paint_remote_view,
     "streamdeck": paint_streamdeck,
+    "ocr": paint_ocr,
 }
 
 
@@ -3690,7 +3802,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
+    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "ocr", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
         return None
     if widget_type == "input_display":
         from .input_display import input_display_key_at_point
