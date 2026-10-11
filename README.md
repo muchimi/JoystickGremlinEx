@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T74)
+- Change: UI: UI activation rework on profile stop
+- Fix: UI: resolved an issue with the delay widget when entering data manually
+- Fix: API: save/recall of last input selection could be incorrect with special devices
 
 ### (m77T73A)
 - Fix: UI: Module enable/disable.

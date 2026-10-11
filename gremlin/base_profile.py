@@ -28,7 +28,7 @@ import json
 import time
 
 
-from typing import Callable
+from typing import Any, Callable
 
 
 import container_plugins
@@ -2450,6 +2450,7 @@ class Profile:
         self._profile_fname = None  # the file name of this profile (xml)
         self.settings = Settings(self)
         self.parent = parent
+        self._configuration_data : dict = None # holds the last input (device_guid, input_type, input_id) for the profile
 
         self._profile_config_fname = None  # the configuration file name of this profile (json)
         self._profile_name = None  # the friendly name of this profile
@@ -2459,7 +2460,7 @@ class Profile:
         self._last_edit_mode = "Default"
         self._restore_last_mode = False  # True if the profile should start with the last active mode (profile specific)
         self._dirty = False  # dirty flag - indicates the profile data was changed but not saved yet
-        self._profile_data: Profile
+
         self._force_numlock_off = True  # if set, forces numlock to be off if it isn't so numpad keys report the correct scan codes
         self._force_numlock_on = False  # if set, forces numlock ON.  If a conflict, _force_numlock_off takes precedence.
         self._simconnect_modes = {}  # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
@@ -2474,7 +2475,7 @@ class Profile:
         self._removed_devices = []  # list of removed devices from the profile, list of device_id (str)
         self._save_config_enabled = False  # true if profile config saving is enabled
         self._config_data_read = False
-        self._config_data = {}
+        self._read_config_data = {}
 
         self.override_start_mode = None  # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
@@ -4074,7 +4075,7 @@ class Profile:
             self._profile_config_fname = None
         # Path changed — never reuse a previous profile's in-memory sidecar cache.
         self._config_data_read = False
-        self._config_data = {}
+        self._read_config_data = {}
 
     def get_default_mode(self):
         """gets the default mode for this profile - this is the mode used if the default startup mode is not specified"""
@@ -4919,8 +4920,14 @@ class Profile:
 
         :param force: when True, ignore the in-memory cache and re-read the sidecar
         """
-        if force:
+
+        if force or self._configuration_data is None:
             self._config_data_read = False
+            self._configuration_data = None
+
+        if self._config_data_read and not self._configuration_data:
+            return self._configuration_data
+
         if gremlin.util.is_ui_thread():
             return self._readConfig_ui()
 
@@ -4934,22 +4941,25 @@ class Profile:
 
         time_max = time.time() + timeout
         gremlin.util.InvokeUiMethod(_do_read)
+
         while not result["done"] and time.time() < time_max:
             time.sleep(0.01)
         if not result["done"]:
             syslog.warning("Profile config read timed out")
             return {}
-        return result["value"] if isinstance(result["value"], dict) else {}
+        self._configuration_data = result["value"] if isinstance(result["value"], dict) else {}
+        return self._configuration_data
 
     def _readConfig_ui(self) -> dict:
         """reads the profile config"""
-        fname = self._profile_config_fname
-        if self._config_data_read:
-            return self._config_data if isinstance(self._config_data, dict) else {}
+
+        if self._config_data_read and self._read_config_data is not None:
+            return self._read_config_data
 
         assert gremlin.util.is_ui_thread(), "Profile config read must be done on the UI thread"
 
         data = {}
+        fname = self._profile_config_fname
         if fname and os.path.isfile(fname):
             try:
                 config = gremlin.config.Configuration()
@@ -4968,15 +4978,25 @@ class Profile:
         if not isinstance(data, dict):
             data = {}
 
-        self._config_data = data
+        self._read_config_data = data
         self._config_data_read = True
 
         return data
 
     def _writeConfig(self, data: dict):
+
+        assert isinstance(data, dict), "Profile config data must be a dictionary"
+        if not data:
+            # nothing to write
+            return
+
+        self._writeConfig_ui(data)
+
+    def _writeConfig_ui(self, data: dict):
+        gremlin.util.assert_ui_thread()
+
         fname = self._profile_config_fname
-        if not isinstance(data, dict):
-            data = {}
+
         if fname:
             try:
                 with open(fname, "w", encoding="utf-8") as hdl:
@@ -4986,7 +5006,7 @@ class Profile:
             except Exception:
                 pass
 
-        self._config_data = data
+        self._read_config_data = data
         self._config_data_read = True
 
     def _setConfig(self, key, value):
@@ -5020,100 +5040,224 @@ class Profile:
     def saveConfigEnabled(self, value: bool):
         self._save_config_enabled = value
 
-    def setLastInput(self, device_guid, input_type, input_id):
+    def setLastInput(self, device_guid : dinput.GUID, input_type : InputType, input_id : Any):
         """sets the last profile input"""
-        if self._save_config_enabled:
+
+
+
+
+        if __debug__:
+            device = gremlin.joystick_handling.getDevice(device_guid)
+
+
+            # validate matches of device GUID to possible input types
+            if input_type:
+                match input_type:
+                    case InputType.State:
+                        assert device.device_guid == gremlin.shared_state.state_tab_guid
+                    case InputType.OctaviIfr1:
+                        assert device.device_guid == gremlin.shared_state.octaviifr1_tab_guid
+                    case InputType.ModeControl:
+                        assert device.device_guid == gremlin.shared_state.mode_tab_guid
+                    case InputType.StreamDeck:
+                        assert device.device_guid == gremlin.shared_state.streamdeck_tab_guid
+                    case InputType.Keyboard | InputType.KeyboardLatched:
+                        assert device.device_guid == gremlin.shared_state.keyboard_tab_guid
+                    case InputType.Voice:
+                        assert device.device_guid == gremlin.shared_state.voice_tab_guid
+                    case InputType.OpenSoundControl:
+                        assert device.device_guid == gremlin.shared_state.osc_tab_guid
+                    case _:
+                        assert device.device_type == DeviceType.Joystick
+
+        device_id = gremlin.util.normalize_guid(device_guid) # to string
+        data = self._configuration_data
+        if not data:
+            # not read yet
             data = self._readConfig(force=True)  # merge against disk, never wipe sibling keys
-            if not isinstance(data, dict):
-                data = {}
-            if device_guid is None:
-                # remove existing device, input and id
-                if "last_device_guid" in data:
-                    del data["last_device_guid"]
+            self._configuration_data = data
+
+        # check the map exists for this device (on top of last device selected)
+        map_missing = False
+        if "selection_map" not in data or device_id not in data["selection_map"]:
+            map_missing = True
+
+        current_device_guid = data.get("last_device_guid", None)
+        current_input_id = data.get("last_input_id", None)
+        current_input_type = InputType.convert(data.get("last_input_type", None))
+
+        if not map_missing and current_device_guid == device_id and current_input_id == input_id and current_input_type == input_type:
+            # already saved
+            return
+        
+        if __debug__:
+            syslog.info(f"set profile last input {device.name} {input_type} {input_id}")
+
+        if device_guid is None:
+            # remove existing device, input and id
+            if "last_device_guid" in data:
+                del data["last_device_guid"]
+            if "last_input_id" in data:
+                del data["last_input_id"]
+            if "last_input_type" in data:
+                del data["last_input_type"]
+
+        else:
+            # save other data
+
+            data["last_device_guid"] = device_id
+            data["last_input_id"] = input_id
+            data["last_input_type"] = InputType.to_string(input_type) if input_type is not None else None
+
+            if "selection_map" not in data:
+                data["selection_map"] = {}
+            if device_id not in data["selection_map"]:
+                data["selection_map"][device_id] = {}
+
+            if input_id is None:
+                # remove any existing input_id and input_type
                 if "last_input_id" in data:
                     del data["last_input_id"]
                 if "last_input_type" in data:
-                    del data["last_input_id"]
-
+                    del data["last_input_type"]
+                if "input_id" in data["selection_map"][device_id]:
+                    del data["selection_map"][device_id]["input_id"]
+                if "input_type" in data["selection_map"][device_id]:
+                    del data["selection_map"][device_id]["input_type"]
             else:
-                selection_key = gremlin.util.normalize_guid(device_guid)
-                data["last_device_guid"] = selection_key
-                if "selection_map" not in data:
-                    data["selection_map"] = {}
-                if selection_key not in data["selection_map"]:
-                    data["selection_map"][selection_key] = {}
-
-                if input_id is None:
-                    # remove any existing input_id and input_type
-                    if "last_input_id" in data:
-                        del data["last_input_id"]
-                    if "last_input_type" in data:
-                        del data["last_input_type"]
-                    if "input_id" in data["selection_map"][selection_key]:
-                        del data["selection_map"][selection_key]["input_id"]
-                    if "input_type" in data["selection_map"][selection_key]:
-                        del data["selection_map"][selection_key]["input_type"]
-                else:
-                    # id provided
-                    if not isinstance(input_id, int) or isinstance(input_id, float):
-                        # complex input id like a key, state, osc command
-                        if hasattr(input_id, "message_key"):
-                            data["last_input_id"] = input_id.message_key
-                        else:
-                            data["last_input_id"] = input_id
+                # id provided
+                if not isinstance(input_id, int) or isinstance(input_id, float):
+                    # complex input id like a key, state, osc command
+                    if hasattr(input_id, "message_key"):
+                        data["last_input_id"] = input_id.message_key
                     else:
                         data["last_input_id"] = input_id
+                else:
+                    data["last_input_id"] = input_id
 
-                    data["selection_map"][selection_key]["input_id"] = data["last_input_id"]
+                data["selection_map"][device_id]["input_id"] = data["last_input_id"]
 
-                    if input_type is None:
-                        if "last_input_type" in data:
-                            del data["last_input_type"]
-                        if "input_type" in data["selection_map"][selection_key]:
-                            del data["selection_map"][selection_key]["input_type"]
+                if input_type is None:
+                    if "last_input_type" in data:
+                        del data["last_input_type"]
+                    if "input_type" in data["selection_map"][device_id]:
+                        del data["selection_map"][device_id]["input_type"]
 
-                    else:
-                        data["last_input_type"] = InputType.to_string(input_type)
-                        data["selection_map"][selection_key]["input_type"] = data["last_input_type"]
+                else:
+                    data["last_input_type"] = InputType.to_string(input_type)
+                    data["selection_map"][device_id]["input_type"] = data["last_input_type"]
 
-            self._writeConfig(data)
+            if self._save_config_enabled:
+                self._writeConfig(data)
 
     def getLastInput(self, device_guid=None) -> tuple:
-        """gets the last input for this profile (device_guid, input_type, input_id)"""
-        data = self._readConfig()  # get the profile config
-        if data is None:
-            return (None, None, None)
+        """gets the last input for this profile (device_guid, input_type, input_id)
+
+        if device_guid is not provided, returns the last user selected device and input.
+        if provided, returns the last input for the specified device.
+
+        """
+
+        # verbose = True
+        verbose = False
+
+        data = self._configuration_data
+        if not data:
+            data = self._readConfig()  # get the profile config
+            self._configuration_data = data
+
+        assert isinstance(data, dict),"unable to get default configuration data"
+
+
+
+        if device_guid is None:
+            # get current last input for the profile (as opposed to a different device)
+
+            read_device_guid = data.get("last_device_guid", None)
+            current_input_id = data.get("last_input_id", None)
+            current_input_type = InputType.convert(data.get("last_input_type", None))
+
+            if current_input_type:
+                # match device GUID to the input type due to an older bug in profile config
+                match current_input_type:
+                    case InputType.State:
+                        current_device_guid = gremlin.shared_state.state_tab_guid
+                        sd = gremlin.ui.state_device.StateData()
+                        state = sd.getState(current_input_id)
+                        if state is None:
+                            # does not exist
+                            current_input_id = None
+                    case InputType.OctaviIfr1:
+                        current_device_guid = gremlin.shared_state.octaviifr1_tab_guid
+                    case InputType.ModeControl:
+                        current_device_guid = gremlin.shared_state.mode_tab_guid
+                    case InputType.StreamDeck:
+                        current_device_guid = gremlin.shared_state.streamdeck_tab_guid
+                    case InputType.Keyboard | InputType.KeyboardLatched:
+                        current_device_guid = gremlin.shared_state.keyboard_tab_guid
+                    case InputType.Voice:
+                        current_device_guid = gremlin.shared_state.voice_tab_guid
+                        vd = gremlin.ui.voice_device.VoiceData()
+                        voice = vd.getVoice(current_input_id)
+                        if voice is None:
+                            # does not exist
+                            current_input_id = None
+                    case InputType.OpenSoundControl:
+                        current_device_guid = gremlin.shared_state.osc_tab_guid
+                        od = gremlin.ui.osc_device.OscData()
+                        osc = od.getOsc(current_input_id)
+                        if osc is None:
+                            # does not exist
+                            current_input_id = None
+                    case _:
+                        # default
+                        current_device_guid = read_device_guid
+
+                if read_device_guid != current_device_guid:
+                    syslog.warning(f"Profile last input device GUID mismatch: read {read_device_guid}, using {current_device_guid}")
+                    if verbose:
+                        device = gremlin.joystick_handling.getDevice(current_device_guid)
+                        syslog.info(f"Updating last input for device [{device.name}] input type [{current_input_type}] input ID [{current_input_id}]")
+                    self.setLastInput(current_device_guid, current_input_type, current_input_id)
+
+
+            if current_device_guid is not None and current_input_id is not None and current_input_type is not None:
+                if verbose:
+                    device = gremlin.joystick_handling.getDevice(current_device_guid)
+                    syslog.info(f"get profile last input {device.name} {current_input_type} {current_input_id}")
+                return (current_device_guid, current_input_type, current_input_id)
+
+
+        # get a specific last input
 
         input_id = None
         input_type = None
-        if device_guid is not None and "selection_map" in data:
-            device_guid = gremlin.util.normalize_guid(device_guid)
+        if "selection_map" in data:
+            device_id = gremlin.util.normalize_guid(device_guid)
             selection_map = data["selection_map"]
-            selection_entry = selection_map.get(device_guid)
+            selection_entry = selection_map.get(device_id)
             if selection_entry is None and "device_guid" in selection_map:
                 # Backward compatibility for legacy buggy keying.
                 selection_entry = selection_map.get("device_guid")
 
             if selection_entry:
+                # found an entry for that device
                 if "input_id" in selection_entry:
                     input_id = selection_entry["input_id"]
                 if "input_type" in selection_entry:
                     input_type = InputType.convert(selection_entry["input_type"])
 
-        if device_guid is None:
-            if "last_device_guid" in data:
-                device_guid = data["last_device_guid"]
-            if "last_input_type" in data:
-                input_type = InputType.convert(data["last_input_type"])
-            if "last_input_id" in data:
-                input_id = data["last_input_id"]
+            if verbose:
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                syslog.info(f"Retrieved last input for device [{device.name}] input type [{input_type}] input ID [{input_id}]")
 
-            if device_guid is None:
-                # not found
-                config = gremlin.config.Configuration()
-                device_guid, input_type, input_id = config.get_last_input()
+            return (device_guid, input_type, input_id)
 
-        return (device_guid, input_type, input_id)
+
+        if verbose:
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            syslog.info(f"No last input found for device [{device.name}]")
+        return (None, None, None) # no entry found
 
     def copy_devices(self, source_guid, target_guid):
         """copies data between two devices"""

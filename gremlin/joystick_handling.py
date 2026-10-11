@@ -134,6 +134,7 @@ class VJoyProxy:
         """
         # device IDs are 1 min to 16 max
         assert vid > 0 and vid < 17, f"Invalid VJOY device ID provided: {vid}"
+        # don't lock on read, only lock on write
         # with VJoyProxy._vjoy_proxy_lock:
         if vid in VJoyProxy.vjoy_devices:
             return VJoyProxy.vjoy_devices[vid]

@@ -739,8 +739,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
-        verbose = True
-        auto_release = False
+        # verbose = True
+        # auto_release = False
 
         # verbose = True
         is_local, is_remote = self.action_data.sendFlags()

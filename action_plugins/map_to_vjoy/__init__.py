@@ -3848,7 +3848,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _refresh_grid_ui(self):
         if self.grid_visible_widget is None or not Shiboken.isValid(self.grid_visible_widget):
             return
-        
+
         with QtCore.QSignalBlocker(self.grid_visible_widget):
             self.grid_visible_widget.setChecked(self.action_data.grid_visible)
 
@@ -7102,8 +7102,8 @@ Supports axis merging, curved output, command, hat and button mappings.
             self._action_mode = VjoyAction.VJoyHat
 
         self.current_state = 0  # toggle value for the input 1 means set, any other value means not set for buttons
-        self.pulse_delay = 250  # pulse delay
-        self.pulse_repeat_delay = 250  # pulse repeat delay (time between pulses)
+        self.pulse_delay = 125  # pulse delay
+        self.pulse_repeat_delay = 125  # pulse repeat delay (time between pulses)
         self.pulse_repeat = False  # true if pulses repeat
 
         self.target_value = 0.0

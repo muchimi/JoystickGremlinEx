@@ -183,6 +183,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         super().__init__("main_window", parent)
 
+        self.ui_enabled = True  # as a default, the UI is enabled
+
         self.ui = Ui_Gremlin()
         # self.addWidget(QtWidgets.QLabel("TOP"))
         self.ui.build(self)  # build the main window
@@ -212,6 +214,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._tabs_rebuild_pending = False  # coalesce overlapping tab rebuilds
         self._tabs_rebuild_refresh = False  # pending rebuild should restore selector/selection
         self._tabs_rebuild_timer = None
+        self._ui_enable_after_refresh = False
 
         self._comparative_file = os.path.join(os.getenv("temp"), "8c71a5a6eae74f989cf903816868028e.xml")
 
@@ -268,6 +271,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.shutdown.connect(self.handle_shutdown)
         el.feature_changed.connect(self._handle_feature_changed)  # handle feature changes
         el.input_selection_changed.connect(self._handle_item_selected)
+        el.profile_activating.connect(self._set_activate_state_on)
+        el.profile_deactivated.connect(self._set_activate_state_off)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
@@ -518,10 +523,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         except Exception:
             pass
 
-    def handle_tab_selected(self, device_guid):
-        """persists the last selected device for the profile"""
-        if self.profile:
-            self.profile.saveLastDevice(device_guid)
 
     def _update_start_tab(self):
         """forces a tab index reload on init"""
@@ -1027,6 +1028,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.popLoading(device_guid)
             return
 
+        # self.handle_tab_selected(device_guid)
+
         if verbose:
             syslog.info(f"TAB CHANGED:  new tab [{index}] {self.ui.devices_tab_header_widget.tabText(index)} - device [{device.name}] id [{device.device_id}]")
         self.last_tab_index = index
@@ -1082,34 +1085,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def add_custom_tools_menu(self, menuTools):
         """adds custom tools to the menu"""
-        # self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered=self._tab_sort_cb)
-        # self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
-
         self._actionTabDisplayDevice = QtGui.QAction("Device List...", self, triggered=self._tab_display_device_cb)
         self._actionTabDisplayDevice.setToolTip("Displays the selected device in the profile")
 
         self._ationTabCopyAssignments = QtGui.QAction("Copy to device...", self, triggered=self._tab_copy_cb)
         self._ationTabCopyAssignments.setToolTip("Copies assignments to specified target device")
 
-        # self._actionTabSubstitute = QtGui.QAction("Device Swap...", self, triggered = self._tab_substitute_cb)
-        # self._actionTabSubstitute.setToolTip("Swap one device ID for another device ID")
+
 
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered=self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
-        # tab remove device moved to display options in m77
-        # self._actionTabRemoveDevice = QtGui.QAction("Change Visible Device...", self, triggered=self._tab_remove_device_cb)
-        # self._actionTabRemoveDevice.setToolTip("Removes the device from the profile")
-        # self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
-        # self._actionTabImport.setToolTip("Import profile data into the current device")
+
 
         menuTools.addSeparator()
-        # menuTools.addAction(self._actionTabSort)
+
         menuTools.addAction(self._actionTabDisplayDevice)
         menuTools.addAction(self._ationTabCopyAssignments)
-        # menuTools.addAction(self._actionTabSubstitute)
 
-        # menuTools.addAction(self._actionTabRemoveDevice)
-        # menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
 
     def _tab_context_menu_cb(self, tab_index):
@@ -1117,21 +1109,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._context_menu_tab_index = tab_index
         data = self.ui.devices_tab_header_widget.tabData(tab_index)
         _tab_type = data.tab_type
-        # device_guid = data.device_guid
-        # substitution is only available if the profile has been saved (a new profile matches the current devices by definition)
-        # is_enabled = tab_type == TabDeviceType.Joystick
-        #     and self.profile is not None\
-        #     and self.profile.profile_file is not None\
-        #     and os.path.isfile(self.profile.profile_file)
-        # self._actionTabSubstitute.setEnabled(is_enabled)
+
         menu = QtWidgets.QMenu(self)
-        # menu.addAction(self._actionTabSort)
+
         menu.addAction(self.ui.actionReorderDevices)
         menu.addAction(self.ui.actionDeviceInformation)
         menu.addAction(self._ationTabCopyAssignments)
-        # menu.addAction(self._actionTabSubstitute)
-        # menu.addAction(self._actionTabImport)
-        # menu.addAction(self._actionTabRemoveDevice)
+
         menu.addAction(self._actionTabClearMap)
 
         advanced_menu = menu.addMenu("Advanced...")
@@ -1566,13 +1550,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if message:
             gremlin.ui.ui_common.MessageBox(prompt=message)
 
-    def setUiMode(self):
+    def setUiMode(self, enabled: bool = True):
         """enables or disables the UI based on the runtime mode and options
 
         this can lock the UI while a profile is running to prevent inadvertent changes
 
         """
-        enabled = True
         if gremlin.shared_state.is_running:
             enabled = self.config.runtime_ui_update
             self.push_highlighting()
@@ -1600,6 +1583,56 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionGenerate.setEnabled(enabled)
         # self.ui.actionImportProfile.setEnabled(enabled)
         self.ui.actionLoadProfile.setEnabled(enabled)
+
+    def setUIState(self, enabled: bool):
+        """enables/disables UI elements for run/edit modes"""
+        if self.ui_enabled == enabled:
+            return
+        ui = self.ui
+        ui.devices_tab_header_widget.setEnabled(enabled)  # tab header
+        ui.tab_content_widget.setEnabled(enabled)  # content widget
+        ui.actionNewProfile.setEnabled(enabled)
+        ui.actionOpen.setEnabled(enabled)
+        ui.actionLoadProfile.setEnabled(enabled)
+        ui.actionRecent.setEnabled(enabled)
+        ui.actionManageModes.setEnabled(enabled)
+        ui.actionOptions.setEnabled(enabled)
+        ui.actionCreate1to1Mapping.setEnabled(enabled)
+        # ui.actionMergeAxis.setEnabled(enabled)
+        # ui.actionSwapDevices.setEnabled(enabled)
+        # ui.actionModifyProfile.setEnabled(enabled)
+        self.setUiMode(enabled)
+        self.ui_enabled = enabled
+        syslog.info(f"UI state changed to {gremlin.util.ansiBool(enabled)}")
+
+    def _set_activate_state_on(self):
+        self._set_activation_state(True)
+
+    def _set_activate_state_off(self):
+        self._set_activation_state(False)
+
+    def _set_activation_state(self, active: bool):
+        gremlin.util.InvokeUiMethod(self._set_activation_state_ui, active)  # ensure on UI thread
+
+    def _set_activation_state_ui(self, active: bool):
+        # sets the activation buttons to on or off depending on the active state
+        if active != gremlin.shared_state.profile_state:
+            gremlin.shared_state.profile_state = active
+
+            with QtCore.QSignalBlocker(self.ui.actionActivate):
+                self.ui.actionActivate.setChecked(active)  # toolbar icon "off" or "on"
+
+            if active:
+                # system tray icon to active
+                self.ui.tray_icon.setIcon(load_icon("gex_active.ico"))
+
+                # disable the UI
+                self.setUIState(False)
+            else:
+                # system tray icon to inactivek
+                self.ui.tray_icon.setIcon(load_icon("gex.ico"))
+
+        # syslog.info(f"Profile activation state changed to {'active' if active else 'inactive'}")
 
     def activate(self, activate: bool):
         gremlin.util.InvokeUiMethod(self._activate_ui, activate)  # ensure on UI thread
@@ -1634,6 +1667,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if activate:
                 # Generate the code for the profile and run it
+                el.profile_activating.emit()  # starting profile
+
                 if verbose:
                     syslog.info("Activate: activate profile")
                 self._profile_auto_activated = False
@@ -1651,10 +1686,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if not result:
                     # profile start failed
-                    gremlin.shared_state.profile_state = False
-                    self.ui.tray_icon.setIcon(load_icon("gex.ico"))
-                    with QtCore.QSignalBlocker(self.ui.actionActivate):
-                        self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
+                    # el.profile_stopped.emit()  # stopped
+                    # self._set_activation_state_ui(False)
+                    # gremlin.shared_state.profile_state = False
+                    # self.ui.tray_icon.setIcon(load_icon("gex.ico"))
+                    # with QtCore.QSignalBlocker(self.ui.actionActivate):
+                    #     self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
 
                     if not gremlin.shared_state.profile_message_issued:
                         # error message not issued = issue it
@@ -1668,10 +1705,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if gremlin.shared_state.profile_state:
                     # print ("set icon ACTIVE")
-                    self.ui.tray_icon.setIcon(load_icon("gex_active.ico"))
+                    # self.ui.tray_icon.setIcon(load_icon("gex_active.ico"))
 
-                    with QtCore.QSignalBlocker(self.ui.actionActivate):
-                        self.ui.actionActivate.setChecked(True)  # toolbar icon "on"
+                    # with QtCore.QSignalBlocker(self.ui.actionActivate):
+                    #     self.ui.actionActivate.setChecked(True)  # toolbar icon "on"
 
                     return
 
@@ -1680,6 +1717,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if not gremlin.shared_state.profile_state or is_running:
                 # Stop running the code
+
+                if not activate:
+                    self._ui_enable_after_refresh = True
 
                 # running - save the last running mode to the executing profile
                 if verbose:
@@ -1696,39 +1736,38 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # terminate faster
                     return
 
+                if not activate:
+                    QTimer.singleShot(0, self._enable_ui_after_refresh_ui)
+
                 self._update_status_bar_active(False)
                 self._profile_auto_activated = False
-                current_index = self.ui.devices_tab_header_widget.currentIndex()
-                device_guid = self.getDeviceGuidForTabIndex(current_index)
-                widget = self.getRegisteredWidget(device_guid)
 
-                if widget:
-                    tab_type = widget.data[0]
-                    if tab_type in (
-                        TabDeviceType.Joystick,
-                        TabDeviceType.Keyboard,
-                        TabDeviceType.Osc,
-                        TabDeviceType.Midi,
-                    ):
-                        widget.refresh()
+                # current_index = self.ui.devices_tab_header_widget.currentIndex()
+                # device_guid = self.getDeviceGuidForTabIndex(current_index)
+                # widget = self.getRegisteredWidget(device_guid)
 
-                # toolbar icon
-                with QtCore.QSignalBlocker(self.ui.actionActivate):
-                    self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
+                # if widget:
+                #     tab_type = widget.data[0]
+                #     if tab_type in (
+                #         TabDeviceType.Joystick,
+                #         TabDeviceType.Keyboard,
+                #         TabDeviceType.Osc,
+                #         TabDeviceType.Midi,
+                #     ):
+                #         widget.refresh()
 
-                try:
-                    if self.ui.tray_icon is not None:
-                        self.ui.tray_icon.setIcon(load_icon("gex.ico"))
-                except Exception as err:
-                    syslog.error(f"Load Icon: error: {err}\n{traceback.format_exc()}")
+                # # toolbar icon
+                # with QtCore.QSignalBlocker(self.ui.actionActivate):
+                #     self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
+
+                el.profile_deactivated.emit()  # stopped
+
         except Exception as err:
             syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 
         finally:
             # syslog.info("Activate: completed")
             self.activate_locked = False
-
-            self.setUiMode()
 
     @QtCore.Slot()
     def input_repeater(self):
@@ -2280,7 +2319,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _profile_start_ui(self):
         gremlin.util.assert_ui_thread()
-        self.setUiMode()
+        # self.setUiMode()
         self._update_status_bar_active(True)
         self._update_status_bar_modules_ui()
         self.ui_statusbar_highlight_state_container_widget.setEnabled(False)
@@ -2291,7 +2330,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _profile_stop_ui(self):
         gremlin.util.assert_ui_thread()
-        self.setUiMode()
+        # self.setUiMode()
         self._update_status_bar_active(False)
         self._update_highlight_toolbar_enabled()
         self.ui_statusbar_highlight_state_container_widget.setEnabled(True)
@@ -2859,6 +2898,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._refresh_ui()
         else:
             self._create_tabs_ui()
+        if self._tabs_rebuild_pending:
+            self._arm_tabs_rebuild_timer()
+        self._enable_ui_after_refresh_ui()
+
+    def _enable_ui_after_refresh_ui(self):
+        if not self._ui_enable_after_refresh:
+            return
+        if self._creating_tabs or self._tabs_rebuild_pending or self._tabs_rebuild_refresh or gremlin.shared_state.profile_loading:
+            return
+        self._ui_enable_after_refresh = False
+        self.setUIState(True)
 
     def _get_vjoy_input_enabled(self, device):
         """gets the vjoy input enabled state"""
@@ -3453,8 +3503,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # Create OSC tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
 
                             if config.osc_enabled:
-
-
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
@@ -3818,6 +3866,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self._creating_tabs = False
                 if self._tabs_rebuild_pending:
                     self._arm_tabs_rebuild_timer()
+
+                # Keep the UI disabled until a pending stop refresh completes.
+                if not self._ui_enable_after_refresh:
+                    self.setUIState(True)
 
     def _schedule_startup_input_restore(self, device_guid, input_type, input_id):
         """Schedules a post-load input restore after Qt has settled widget creation."""
@@ -4538,7 +4590,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.setCurrentTabTracking(device_guid)
 
             if not skip_selection_tracking:
-                self.saveLastSelection(device_guid, input_type, input_id)
+                # validate input matches current tab
+                input_item = self._find_input_item(device_guid, input_type, input_id)
+                if not input_item:
+                     input_item = self._get_input_item(device_guid, 0)
+                if input_item:
+                    self.saveLastSelection(input_item.device_guid, input_item.input_type, input_item.input_id)
 
             if completion_callback:
                 # fire the callback on completion
@@ -4548,11 +4605,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.isProfileLoading():
             # ignore if we're loading
             return
-        if self._last_selected_device_guid == device_guid and self._last_selected_input_type == input_type and self._last_selected_input_id == input_id:
-            return
 
         if not device_guid:
             return
+
+        if gremlin.util.compare_guid(self._last_selected_device_guid, device_guid) and self._last_selected_input_type == input_type and self._last_selected_input_id == input_id:
+            return
+
+
         dev = gremlin.joystick_handling.getDevice(device_guid)
         if not dev:
             return
@@ -4564,6 +4624,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_selected_device_guid = device_guid
         self._last_selected_input_type = input_type
         self._last_selected_input_id = input_id
+
+        self.profile.setLastInput(device_guid, input_type, input_id)
+
         config = gremlin.config.Configuration()
         config.set_last_input(device_guid, input_type, input_id)
 
@@ -4580,15 +4643,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def saveInputSelection(self, device_guid, input_type, input_id):
         """Saves the current input selection to the configuration"""
-        config = gremlin.config.Configuration()
-        config.set_last_input(device_guid, input_type, input_id)
-        self._last_selected_device_guid = device_guid
-        self._last_selected_input_type = input_type
-        self._last_selected_input_id = input_id
-        verbose = config.verbose_mode_select
-        if verbose:
-            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-            syslog.info(f"SELECT INPUT: save selection device_name={device_name}, device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
+        self.saveLastSelection(device_guid, input_type, input_id)
+        # config = gremlin.config.Configuration()
+        # config.set_last_input(device_guid, input_type, input_id)
+        # self._last_selected_device_guid = device_guid
+        # self._last_selected_input_type = input_type
+        # self._last_selected_input_id = input_id
+        # verbose = config.verbose_mode_select
+        # if verbose:
+        #     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+        #     syslog.info(f"SELECT INPUT: save selection device_name={device_name}, device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
+
+
 
     def setCurrentTabTracking(self, device_guid: str):
         """sets the tracking tab to the given device guid"""
@@ -6814,4 +6880,4 @@ if __name__ == "__main__":
         sys.exit(0)
 
     except Exception as e:
-        pass
+        syslog.error(f"{e}\n{traceback.format_exc()}")

@@ -394,7 +394,7 @@ class MapToTrigger(gremlin.input_item.AbstractAction):
         self.input_type = last_input_type
         self.input_id = last_input_id
         self.action = "joystick"  # trigger action "joystick" for now
-        self.pulse_delay = 250  # delay for pulse action in ms
+        self.pulse_delay = 125  # delay for pulse action in ms
         self.mode = "pulse"  # mode of the trigger action
         self.use_actual = False  # true if the actual event value is used
         self.value = 0.0  # value if setting a joystick

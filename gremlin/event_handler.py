@@ -625,11 +625,15 @@ class EventListener(QtCore.QObject):
     profile_reset = Signal()  # profile reset signal (when runtime for a profile needs to reset)
     profile_hook = Signal()  # hook functors - before profile start is emitted
     profile_unhook = Signal()  # unhook functors - when profiles stop
+
+
+    profile_activating = Signal()  # profile is being activated
+    profile_deactivated = Signal()  # profile is being deactivated
+
     profile_before_start = Signal()  # occurs before the profile start signal
     profile_start = Signal()  # profile start signal (when a profile starts)
     profile_started = Signal()  # profile started signal (after a profile starts and all process start functions are completed)
     profile_after_start = Signal()  # occurs after the profile started signal
-
     profile_stop = Signal()  # profile stop signal (when a profile stops)
     profile_stopping = Signal()  # profile is about to stop (before a profile stops)
     profile_stopped = Signal()  # profile stopped (after a profile stopped)
@@ -893,6 +897,7 @@ class EventListener(QtCore.QObject):
 
         self.profile_start.connect(self._handle_profile_start)
         self.profile_stopping.connect(self._handle_profile_stopping)
+
         self.profile_after_start.connect(self._handle_profile_started)
         self.config_option_changed.connect(self._handle_options_changed)
 

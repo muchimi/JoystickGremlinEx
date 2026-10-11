@@ -88,21 +88,6 @@ class CodeRunner:
         """
         return gremlin.shared_state.is_running
 
-    def setUIState(self, enabled: bool):
-        """enables/disables UI elements for run/edit modes"""
-        ui = gremlin.shared_state.ui.ui
-        ui.devices_tab_header_widget.setEnabled(enabled)  # tab header
-        ui.tab_content_widget.setEnabled(enabled)  # content widget
-        ui.actionNewProfile.setEnabled(enabled)
-        ui.actionOpen.setEnabled(enabled)
-        ui.actionLoadProfile.setEnabled(enabled)
-        ui.actionRecent.setEnabled(enabled)
-        ui.actionManageModes.setEnabled(enabled)
-        ui.actionOptions.setEnabled(enabled)
-        ui.actionCreate1to1Mapping.setEnabled(enabled)
-        # ui.actionMergeAxis.setEnabled(enabled)
-        # ui.actionSwapDevices.setEnabled(enabled)
-        # ui.actionModifyProfile.setEnabled(enabled)
 
     def disableUi(self):
         """disables UI"""
@@ -123,6 +108,7 @@ class CodeRunner:
         :param profile the profile to use when generating all the callbacks
         :returns: True on success, False if the profile did not start (various reasons)
         """
+
 
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
@@ -147,7 +133,7 @@ class CodeRunner:
         gremlin.shared_state.profile_state = True  # assume profile start ok
         gremlin.shared_state.profile_message_issued = False  # no message issued
 
-        self.disableUi()
+        # self.disableUi()
 
         # gc.collect()
 
@@ -737,7 +723,8 @@ class CodeRunner:
         except Exception:
             tb_msg = traceback.format_exc()
             # re-enable tabs
-            self.enableUI()
+            el.profile_stopped.emit()
+            # self.enableUI()
             syslog.error("Unable to launch profile:")
 
             syslog.error(f"Traceback: {tb_msg}")
@@ -839,11 +826,6 @@ class CodeRunner:
         # hook profiles - this tells all functors to unhook runtime events
         el.profile_unhook.emit()
 
-        el.profile_stopped.emit()  # stopped
-
-        # re-enable tabs
-        self.enableUI()
-
         # reload UI
         el.request_ui_refresh.emit()
 
@@ -853,6 +835,11 @@ class CodeRunner:
         # clear execution context
         ec = gremlin.execution_graph.ExecutionContext()
         ec.clear()
+
+        # re-enable UI
+        # el.profile_stopped.emit()  # stopped
+        #self.enableUI()
+
 
     def _reset_state(self):
         """Resets all states to their default values."""

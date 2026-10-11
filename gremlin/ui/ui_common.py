@@ -3011,6 +3011,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             self.setToolTip(tooltip)
 
         self._callback = callback
+        # determine number of parameters
 
         self.valueChanged.connect(self._handle_changed)
 
@@ -9582,8 +9583,7 @@ class QDelayWidget(QWidget):
             self.delay_label.setText(text)
 
     @QtCore.Slot()
-    def _value_changed(self):
-        value = self._delay_widget.value()
+    def _value_changed(self, value : int):
         if self._validation_callback:
             if not self._validation_callback(value):
                 self._delay_widget.setSuppressed(True)

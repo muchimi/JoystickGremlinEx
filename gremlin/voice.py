@@ -1965,7 +1965,7 @@ class Voice:
 
             try:
                 # Input buffers are reused after the callback returns.
-                audio_queue.put_nowait(indata[:, 0].copy())
+                audio_queue.put_nowait(indata[:, 0].copy()) # @IgnoreException
             except queue.Full:
                 # Drop audio rather than blocking the real-time callback.
                 syslog.warning("Audio processing queue full; dropping block")
