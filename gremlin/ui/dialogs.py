@@ -2291,7 +2291,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "osc",
                 "OSC",
                 "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
-            ("voice", "Voice", "When set, GremlinEx enables the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
+            ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
 
         ]
 
@@ -2342,8 +2342,8 @@ Enabled modules may not show until the device filter is updated.
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Modules")
 
-    def _handle_module_enabled_changed(self, widget, data):
-        checked = widget.isChecked()
+    def _handle_module_enabled_changed(self, widget, checked):
+        data = widget.data
         match data:
             case "streamdeck":
                 self.config.streamdeck_enabled = checked

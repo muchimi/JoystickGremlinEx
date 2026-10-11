@@ -134,22 +134,22 @@ class VJoyProxy:
         """
         # device IDs are 1 min to 16 max
         assert vid > 0 and vid < 17, f"Invalid VJOY device ID provided: {vid}"
-        with VJoyProxy._vjoy_proxy_lock:
-            if vid in VJoyProxy.vjoy_devices:
-                return VJoyProxy.vjoy_devices[vid]
-            else:
-                if not isinstance(vid, int):
-                    raise error.GremlinError(f"Integer ID for vjoy device ID expected: got {vid}")
+        # with VJoyProxy._vjoy_proxy_lock:
+        if vid in VJoyProxy.vjoy_devices:
+            return VJoyProxy.vjoy_devices[vid]
+        else:
+            if not isinstance(vid, int):
+                raise error.GremlinError(f"Integer ID for vjoy device ID expected: got {vid}")
 
-                try:
-                    # ok for output
-                    device = vjoy.VJoy(vid)
-                    VJoyProxy.vjoy_devices[vid] = device
-                    return device
-                except error.VJoyError as err:
-                    msg = f"Failed accessing vJoy id={vid}\n{err}"
-                    syslog.error(msg)
-                    raise err
+            try:
+                # ok for output
+                device = vjoy.VJoy(vid)
+                VJoyProxy.vjoy_devices[vid] = device
+                return device
+            except error.VJoyError as err:
+                msg = f"Failed accessing vJoy id={vid}\n{err}"
+                syslog.error(msg)
+                raise err
 
     @classmethod
     def reset(self):

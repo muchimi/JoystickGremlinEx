@@ -166,7 +166,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.button_pulse_widget = QDelayWidget()
         self.button_pulse_widget.setToolTip("Delay in milliseconds")
         self.button_pulse_widget.setValue(self.action_data.pulse_delay)
-        self.button_pulse_widget.valueChanged.connect(self._value_changed)
+        self.button_pulse_widget.valueChanged.connect(self._handle_pulse_delay_changed)
 
         self.button_pulse_repeat_widget = QDelayWidget()
         self.button_pulse_repeat_widget.setToolTip("Repeat delay in milliseconds")
@@ -358,8 +358,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_pulse_repeat_value_changed(self, value: int):
         """called when the pulse value changes"""
-        if value >= 0:
-            self.action_data.pulse_repeat_delay = value
+        self.action_data.pulse_repeat_delay = value
 
     def _handle_pulse_toggles_changed(self, checked: bool):
         self.action_data.pulse_toggles = checked
@@ -483,8 +482,8 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.randomize_weight_widget.setEnabled(self.action_data.randomize_mode)
 
     @QtCore.Slot()
-    def _value_changed(self, value):
-        self.action_data.delay = value
+    def _handle_pulse_delay_changed(self, value):
+        self.action_data.pulse_delay = value
 
     def _create_hat_mapping(self):
 

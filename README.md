@@ -50,6 +50,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T73A)
+- Fix: UI: Module enable/disable.
+- Fix: Map to State: pulse delay does not persist for pulsing state (reverts to default).
+- Fix: API: lock when reading VJOY data.
+
+
 ### (m77T73)
 - New: UI: Optional pagination for device inputs to help manage UI responsiveness vs user preference/convenience. High input count devices (>40 - depends on the system) can have a very significant performance impact on the user interface.  This directly impacts the refresh time when mapping data must be reloaded to reflect an update, and memory utilization, as loading concurrent inputs can generate thousands of UI elements depending on profile complexity which can become unmanageable even on top tier systems.  To help manage this, T73 adds the ability to paginate inputs to keep performance snappy in line with expectations/system/preference.  The feature works in conjunction with the input filter mechanism.  By default this is set to 64 inputs which covers most devices, but guards against high count devices such as vjoy, OSC and others.
 - New: UI: Jump to input.  The drop down lets you type in or select an input and jump to it directly regardless of page (if pagination is used).  Free type or use the drop down to select from available entries.
