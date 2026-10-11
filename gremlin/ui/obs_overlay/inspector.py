@@ -3722,16 +3722,24 @@ class OverlayInspector(QtWidgets.QWidget):
             if path:
                 fields["launch_path"] = path
             self._style(wid, **fields)
+            from .app_view import ApplicationViewTracker
+
+            updated = self.scene.widget_by_id(wid)
+            if updated is not None:
+                ApplicationViewTracker().sample(updated)
 
         box.currentIndexChanged.connect(_on_window_chosen)
         form.addRow("Application", box)
 
-        def _on_refresh_windows():
+        def _on_refresh_windows(wid=item["id"]):
+            from .app_view import ApplicationViewTracker
+
+            ApplicationViewTracker().invalidate(wid)
             QtCore.QTimer.singleShot(0, self.rebuild)
 
         refresh = Buttons.getRefreshWidget(
             label="Refresh windows",
-            tooltip="Re-scan visible top-level windows.",
+            tooltip="Re-scan visible top-level windows and capture the selected one again.",
             callback=_on_refresh_windows,
         )
         form.addRow(refresh)

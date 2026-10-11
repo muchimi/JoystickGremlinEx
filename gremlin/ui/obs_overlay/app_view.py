@@ -121,6 +121,35 @@ def launch_application(path, args="") -> tuple[bool, str]:
     return True, ""
 
 
+def _window_text(hwnd: int) -> str:
+    if not hwnd:
+        return ""
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        length = int(user32.GetWindowTextLengthW(int(hwnd)) or 0)
+        if length <= 0:
+            return ""
+        buf = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(int(hwnd), buf, length + 1)
+        return str(buf.value or "").strip()
+    except Exception:
+        return ""
+
+
+def _window_is_minimized(hwnd: int) -> bool:
+    if not hwnd:
+        return False
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        return bool(user32.IsWindow(int(hwnd)) and user32.IsIconic(int(hwnd)))
+    except Exception:
+        return False
+
+
 def _hwnd_alive(hwnd: int) -> bool:
     if not hwnd:
         return False
@@ -133,12 +162,23 @@ def _hwnd_alive(hwnd: int) -> bool:
         return False
 
 
+def _cached_hwnd_matches(hwnd: int, title_key: str, exe_key: str) -> bool:
+    """True when the cached window is still the one the widget asked for."""
+    if not hwnd or not _hwnd_alive(hwnd):
+        return False
+    if exe_key and _window_exe(hwnd).casefold() != exe_key:
+        return False
+    if not title_key:
+        return True
+    return _window_text(hwnd).casefold() == title_key
+
+
 def resolve_application_hwnd(title: str, exe: str, cached_hwnd: int = 0) -> int:
     title_key = str(title or "").strip().casefold()
     exe_key = str(exe or "").strip().casefold()
     if not title_key and not exe_key:
         return 0
-    if cached_hwnd and _hwnd_alive(cached_hwnd):
+    if _cached_hwnd_matches(cached_hwnd, title_key, exe_key):
         return int(cached_hwnd)
     windows = list_application_windows()
 
@@ -184,6 +224,18 @@ class ApplicationViewTracker:
             return
         self._ensure_thread()
 
+    def invalidate(self, widget_id: str):
+        """Drop the cached picture so the next pass captures the current choice."""
+        with self._lock:
+            slot = self._slots.get(str(widget_id or ""))
+            if slot is None:
+                return
+            self._clear_capture(slot)
+            if slot.get("title") or slot.get("exe") or slot.get("launch_path"):
+                slot["status"] = "Looking for window…"
+            slot["generation"] = int(slot.get("generation") or 0) + 1
+        self._wake.set()
+
     def sample(self, item: dict[str, Any] | None) -> int:
         if not item:
             return 0
@@ -222,12 +274,24 @@ class ApplicationViewTracker:
                     ),
                 }
                 self._slots[widget_id] = slot
+            target_changed = (
+                str(slot.get("title") or "") != title
+                or str(slot.get("exe") or "") != exe
+            )
             slot["title"] = title
             slot["exe"] = exe
             slot["launch_path"] = launch_path
             slot["launch_args"] = launch_args
             slot["max_w"] = max_w
-            if not title and not exe and not launch_path:
+            if target_changed:
+                self._clear_capture(slot)
+                slot["status"] = (
+                    "Select a running application"
+                    if not (title or exe or launch_path)
+                    else "Looking for window…"
+                )
+                slot["generation"] = int(slot.get("generation") or 0) + 1
+            elif not title and not exe and not launch_path:
                 slot["status"] = "Select a running application"
             generation = int(slot.get("generation") or 0)
         if title or exe or launch_path:
@@ -340,7 +404,12 @@ class ApplicationViewTracker:
 
             for widget_id, title, exe, launch_path, launch_args, max_w, cached_hwnd, checked_at, launched_at in jobs:
                 match_exe = exe or (os.path.basename(launch_path) if launch_path else "")
-                hwnd = cached_hwnd if (now - checked_at) < _HWND_CACHE_TTL_S and _hwnd_alive(cached_hwnd) else 0
+                hwnd = (
+                    cached_hwnd
+                    if (now - checked_at) < _HWND_CACHE_TTL_S
+                    and _cached_hwnd_matches(cached_hwnd, title.casefold(), match_exe.casefold())
+                    else 0
+                )
                 if not hwnd:
                     hwnd = resolve_application_hwnd(title, match_exe, cached_hwnd)
                 if not hwnd and launch_path and (now - launched_at) >= _LAUNCH_COOLDOWN_S:
@@ -356,10 +425,26 @@ class ApplicationViewTracker:
                         launched_at = now if ok else launched_at
                         if ok:
                             hwnd = resolve_application_hwnd(title, match_exe, 0)
+                if hwnd and _window_is_minimized(hwnd):
+                    with self._lock:
+                        slot = self._slots.get(widget_id)
+                        if slot is None or not self._slot_still_wants(slot, title, exe):
+                            continue
+                        slot["hwnd"] = int(hwnd)
+                        slot["checked_at"] = now
+                        slot["launched_at"] = launched_at
+                        had_picture = slot.get("image") is not None or slot.get("pixmap") is not None
+                        self._clear_capture(slot)
+                        slot["hwnd"] = int(hwnd)
+                        slot["checked_at"] = now
+                        if had_picture or slot.get("status") != "Application minimized":
+                            slot["status"] = "Application minimized"
+                            slot["generation"] = int(slot.get("generation") or 0) + 1
+                    continue
                 image = grab_window_image(hwnd, max_w) if hwnd else None
                 with self._lock:
                     slot = self._slots.get(widget_id)
-                    if slot is None:
+                    if slot is None or not self._slot_still_wants(slot, title, exe):
                         continue
                     slot["hwnd"] = int(hwnd or 0)
                     slot["checked_at"] = now
@@ -370,7 +455,22 @@ class ApplicationViewTracker:
                         slot["status"] = ""
                     elif not slot.get("image"):
                         if not hwnd and launch_path:
-                            slot["status"] = "Launching…" if (now - launched_at) < _LAUNCH_COOLDOWN_S else "Window not found"
+                            status = "Launching…" if (now - launched_at) < _LAUNCH_COOLDOWN_S else "Window not found"
                         else:
-                            slot["status"] = "Window not found" if not hwnd else "Unable to capture"
+                            status = "Window not found" if not hwnd else "Unable to capture"
+                        if slot.get("status") != status:
+                            slot["status"] = status
+                            slot["generation"] = int(slot.get("generation") or 0) + 1
             self._stop.wait(0.08)
+
+    @staticmethod
+    def _clear_capture(slot: dict[str, Any]):
+        slot["hwnd"] = 0
+        slot["checked_at"] = 0.0
+        slot["image"] = None
+        slot["pixmap"] = None
+        slot["pixmap_gen"] = -1
+
+    @staticmethod
+    def _slot_still_wants(slot: dict[str, Any], title: str, exe: str) -> bool:
+        return str(slot.get("title") or "") == title and str(slot.get("exe") or "") == exe
