@@ -155,7 +155,10 @@ else:
 
     def _afcs_set_node_property(self, name, value) -> None:
         model = self.node.model
-        if name not in model.properties:
+        # Built-in fields live on the model. AFCS fields (source_name, device_guid,
+        # axis_id, curve, …) are custom properties. Unknown names still no-op so a
+        # missing live field cannot raise NodePropertyError.
+        if name not in model.properties and name not in model.custom_properties:
             return
         model.set_property(name, value)
         view = self.node.view
@@ -1370,48 +1373,62 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
         self._rebuild_inspector(None)
 
+    def _assign_spec_property(self, graph_node, name, value) -> None:
+        """Write a loaded field onto the node model.
+
+        Profile load must not go through the undo command. That command drops
+        custom fields it does not recognise, and a later graph capture then
+        saves the blanks back over the profile.
+        """
+        model = graph_node.model
+        if name not in model.properties and name not in model.custom_properties:
+            return
+        if graph_node.get_property(name) == value:
+            return
+        model.set_property(name, value)
+
     def _apply_spec(self, graph_node, spec: dict) -> None:
         if graph_node is None:
             return
         props = spec.get("props") or {}
-        graph_node.set_property("afcs_id", spec["id"], push_undo=False)
+        self._assign_spec_property(graph_node, "afcs_id", spec["id"])
         graph_node.set_name(spec.get("name") or graph_node.name())
         kind = spec.get("kind")
         if kind == "input":
-            graph_node.set_property("source_name", props.get("source_name") or "", push_undo=False)
-            graph_node.set_property("device_guid", props.get("device_guid") or "", push_undo=False)
-            graph_node.set_property("device_name", props.get("device_name") or "", push_undo=False)
-            graph_node.set_property("axis_id", int(props.get("axis_id") or 0), push_undo=False)
-            graph_node.set_property("invert", bool(props.get("invert")), push_undo=False)
-            graph_node.set_property("display_range", normalize_input_display_range(props.get("display_range")), push_undo=False)
+            self._assign_spec_property(graph_node, "source_name", props.get("source_name") or "")
+            self._assign_spec_property(graph_node, "device_guid", props.get("device_guid") or "")
+            self._assign_spec_property(graph_node, "device_name", props.get("device_name") or "")
+            self._assign_spec_property(graph_node, "axis_id", int(props.get("axis_id") or 0))
+            self._assign_spec_property(graph_node, "invert", bool(props.get("invert")))
+            self._assign_spec_property(graph_node, "display_range", normalize_input_display_range(props.get("display_range")))
         elif kind == "merge":
-            graph_node.set_property("operation", operation_label(props.get("operation")), push_undo=False)
+            self._assign_spec_property(graph_node, "operation", operation_label(props.get("operation")))
         elif kind == "curve":
-            graph_node.set_property("curve_xml", props.get("curve_xml") or "", push_undo=False)
+            self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
         elif kind == "limiter":
-            graph_node.set_property("curve_xml", props.get("curve_xml") or "", push_undo=False)
-            graph_node.set_property("range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")), push_undo=False)
-            graph_node.set_property("shape", normalize_limiter_shape(props.get("shape")), push_undo=False)
+            self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
+            self._assign_spec_property(graph_node, "range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")))
+            self._assign_spec_property(graph_node, "shape", normalize_limiter_shape(props.get("shape")))
             self._update_limiter_preview(graph_node)
         elif kind == "deadzone":
-            graph_node.set_property("center", float(props.get("center") if props.get("center") is not None else 0.05), push_undo=False)
-            graph_node.set_property("outer", float(props.get("outer") or 0.0), push_undo=False)
+            self._assign_spec_property(graph_node, "center", float(props.get("center") if props.get("center") is not None else 0.05))
+            self._assign_spec_property(graph_node, "outer", float(props.get("outer") or 0.0))
         elif kind == "override":
-            graph_node.set_property("threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.08), push_undo=False)
-            graph_node.set_property("release", float(props.get("release") if props.get("release") is not None else 0.03), push_undo=False)
-            graph_node.set_property("release_ms", float(props.get("release_ms") or 0.0), push_undo=False)
-            graph_node.set_property("hold_until_in", bool(props.get("hold_until_in")), push_undo=False)
+            self._assign_spec_property(graph_node, "threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.08))
+            self._assign_spec_property(graph_node, "release", float(props.get("release") if props.get("release") is not None else 0.03))
+            self._assign_spec_property(graph_node, "release_ms", float(props.get("release_ms") or 0.0))
+            self._assign_spec_property(graph_node, "hold_until_in", bool(props.get("hold_until_in")))
         elif kind == "laglead":
-            graph_node.set_property("lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0), push_undo=False)
-            graph_node.set_property("lead_ms", float(props.get("lead_ms") or 0.0), push_undo=False)
+            self._assign_spec_property(graph_node, "lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0))
+            self._assign_spec_property(graph_node, "lead_ms", float(props.get("lead_ms") or 0.0))
         elif kind == "output":
             vjoy_id = int(props.get("vjoy_id") or 1)
             axis_id = int(props.get("axis_id") or 1)
-            graph_node.set_property("vjoy_id", vjoy_id, push_undo=False)
-            graph_node.set_property("axis_id", axis_id, push_undo=False)
+            self._assign_spec_property(graph_node, "vjoy_id", vjoy_id)
+            self._assign_spec_property(graph_node, "axis_id", axis_id)
             if not spec.get("name") or spec.get("name") == "Output":
                 graph_node.set_name(_output_target_label(vjoy_id, axis_id))
-        graph_node.set_property("when_json", encode_when(props.get("when")), push_undo=False)
+        self._assign_spec_property(graph_node, "when_json", encode_when(props.get("when")))
 
     def _load_graph(self) -> None:
         if self._graph is None:
@@ -1650,7 +1667,20 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 self._rebuild_inspector(None)
         self._apply_segment_visibility()
 
+    def _silence_inspector_widgets(self) -> None:
+        """Stop widgets that are about to be deleted from writing empty values back."""
+        form = self._inspector_form
+        for index in range(form.count()):
+            item = form.itemAt(index)
+            widget = item.widget() if item is not None else None
+            if widget is None:
+                continue
+            widget.blockSignals(True)
+            for child in widget.findChildren(QtCore.QObject):
+                child.blockSignals(True)
+
     def _rebuild_inspector(self, node) -> None:
+        self._silence_inspector_widgets()
         gremlin.util.clear_layout(self._inspector_form)
         if node is None or not hasattr(node, "AFCS_KIND"):
             hint = QtWidgets.QLabel("Select a node to edit it. Click Output to add a vJoy axis destination. Delete removes the selected node.")
@@ -1913,7 +1943,20 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
 
     def _listen_axis(self, node) -> None:
-        dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickAxis], callback=lambda event, n=node: self._listen_axis_done(n, event))
+        previous = getattr(self, "_axis_listen_dialog", None)
+        if previous is not None:
+            try:
+                if Shiboken.isValid(previous):
+                    previous.close()
+            except Exception:
+                pass
+            self._axis_listen_dialog = None
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.JoystickAxis],
+            callback=lambda event, n=node: self._listen_axis_done(n, event),
+            parent=self,
+        )
+        self._axis_listen_dialog = dialog
         dialog.show()
 
     def _listen_axis_done(self, node, event) -> None:
