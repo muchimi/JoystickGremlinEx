@@ -1550,10 +1550,6 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
 
         root = QtWidgets.QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
-        self._title = QtWidgets.QLabel()
-        self._title.setStyleSheet("font-weight: bold;")
-        root.addWidget(self._title)
-        self.refresh_profile_title()
         self._toolbar_bar = self._toolbar()
         root.addWidget(self._toolbar_bar)
         self._page_bar_widget = self._page_bar()
@@ -1838,7 +1834,6 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._redo_btn = redo
         for widget in (
             self._interactive_box,
-            self._hints_box,
             self._pane_box,
             self._overlay_button,
             self._control_button,
@@ -1850,6 +1845,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         ):
             layout.addWidget(widget)
         layout.addStretch()
+        layout.addWidget(self._hints_box)
         zoom_label = QtWidgets.QLabel("Zoom")
         self._zoom_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self._zoom_slider.setRange(25, 400)
@@ -2455,9 +2451,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             on_ui(self, self.refresh_profile_title)
             return
         title = getattr(self, "_title", None)
-        if title is None or not alive(title):
-            return
-        title.setText(f"Overlay — {profile_display_name()}")
+        if title is not None and alive(title):
+            title.setText(f"Overlay — {profile_display_name()}")
         self._refresh_overlay_button()
         # Profile switch replaces scene contents; force panes/canvas to catch up.
         pane = getattr(self, "_selection_pane", None)

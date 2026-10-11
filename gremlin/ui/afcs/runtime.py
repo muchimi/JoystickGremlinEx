@@ -375,7 +375,9 @@ class AfcsRuntime:
                     self._dyn_state.pop(node_id, None)
                 if kind == "limiter":
                     gains[node_id] = 1.0
-                if "in" in ports:
+                if "A" in ports:
+                    value = value_of(ports["A"])
+                elif "in" in ports:
                     value = value_of(ports["in"])
                 elif "in_a" in ports:
                     value = value_of(ports["in_a"])
@@ -423,26 +425,17 @@ class AfcsRuntime:
                     outer = 0.0
                 value = apply_deadzone(src, center, outer)
             elif kind == "override":
-                default = value_of(ports["in"]) if "in" in ports else 0.0
-                stick = value_of(ports["override"]) if "override" in ports else default
+                axis_a = value_of(ports["A"]) if "A" in ports else value_of(ports["in"]) if "in" in ports else 0.0
+                axis_b = value_of(ports["B"]) if "B" in ports else value_of(ports["override"]) if "override" in ports else 0.0
                 try:
-                    threshold = float(props.get("threshold") if props.get("threshold") is not None else 0.08)
+                    touch = float(props.get("threshold") if props.get("threshold") is not None else 0.01)
                 except (TypeError, ValueError):
-                    threshold = 0.08
-                try:
-                    release = float(props.get("release") if props.get("release") is not None else 0.03)
-                except (TypeError, ValueError):
-                    release = 0.03
-                try:
-                    release_ms = float(props.get("release_ms") or 0.0)
-                except (TypeError, ValueError):
-                    release_ms = 0.0
-                hold_until_in = bool(props.get("hold_until_in"))
+                    touch = 0.01
                 state = self._dyn_state.get(node_id)
                 if not isinstance(state, OverrideState):
                     state = OverrideState()
                     self._dyn_state[node_id] = state
-                value = state.process(default, stick, threshold, release, dt, release_ms, hold_until_in)
+                value = state.process(axis_a, axis_b, touch)
             elif kind == "laglead":
                 src = value_of(ports["in"]) if "in" in ports else 0.0
                 try:

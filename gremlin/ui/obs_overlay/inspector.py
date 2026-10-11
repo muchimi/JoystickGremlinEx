@@ -632,6 +632,35 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
             pass
 
 
+def make_section_toolbar(parent, expand, collapse) -> QtWidgets.QWidget:
+    """Pinned Expand all / Collapse all row used by the overlay and AFCS inspectors."""
+    bar = QtWidgets.QWidget(parent)
+    layout = QtWidgets.QHBoxLayout(bar)
+    layout.setContentsMargins(0, 0, 0, 4)
+    layout.setSpacing(4)
+    expand_btn = Buttons.getExpandAllWidget(
+        tooltip="Expand every collapsible section in this panel.",
+        callback=expand,
+    )
+    expand_btn.setParent(bar)
+    expand_lbl = QtWidgets.QLabel("Expand all", bar)
+    expand_lbl.setBuddy(expand_btn)
+    collapse_btn = Buttons.getCollapseAllWidget(
+        tooltip="Collapse every collapsible section in this panel.",
+        callback=collapse,
+    )
+    collapse_btn.setParent(bar)
+    collapse_lbl = QtWidgets.QLabel("Collapse all", bar)
+    collapse_lbl.setBuddy(collapse_btn)
+    layout.addWidget(expand_btn)
+    layout.addWidget(expand_lbl)
+    layout.addSpacing(10)
+    layout.addWidget(collapse_btn)
+    layout.addWidget(collapse_lbl)
+    layout.addStretch()
+    return bar
+
+
 class CollapsibleSection(QtWidgets.QWidget):
     """Inspector group with a title header and up/down arrow to show or hide the body."""
 
@@ -1064,31 +1093,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
     def _make_section_toolbar(self) -> QtWidgets.QWidget:
         """Pinned Expand all / Collapse all row above the scrolling inspector."""
-        bar = QtWidgets.QWidget(self)
-        layout = QtWidgets.QHBoxLayout(bar)
-        layout.setContentsMargins(0, 0, 0, 4)
-        layout.setSpacing(4)
-        expand_btn = Buttons.getExpandAllWidget(
-            tooltip="Expand every collapsible section in this panel.",
-            callback=self._expand_all_sections,
-        )
-        expand_btn.setParent(bar)
-        expand_lbl = QtWidgets.QLabel("Expand all", bar)
-        expand_lbl.setBuddy(expand_btn)
-        collapse_btn = Buttons.getCollapseAllWidget(
-            tooltip="Collapse every collapsible section in this panel.",
-            callback=self._collapse_all_sections,
-        )
-        collapse_btn.setParent(bar)
-        collapse_lbl = QtWidgets.QLabel("Collapse all", bar)
-        collapse_lbl.setBuddy(collapse_btn)
-        layout.addWidget(expand_btn)
-        layout.addWidget(expand_lbl)
-        layout.addSpacing(10)
-        layout.addWidget(collapse_btn)
-        layout.addWidget(collapse_lbl)
-        layout.addStretch()
-        return bar
+        return make_section_toolbar(self, self._expand_all_sections, self._collapse_all_sections)
 
     def _expand_all_sections(self):
         for section in list(self._collapsible_sections):

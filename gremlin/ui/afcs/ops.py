@@ -313,55 +313,46 @@ def apply_deadzone(value: float, center: float = 0.05, outer: float = 0.0) -> fl
 
 
 class OverrideState:
-    """Stick takes over when deflected; hysteresis, optional dwell, optional wait for in to move."""
+    """Last axis that moves drives the output. The other stays latched until it moves.
 
-    _IN_MOVE = 0.02
+    A parked throttle at 50% does not count as a grab. Leaving center is not required.
+    """
 
     def __init__(self):
-        self.engaged = False
-        self._release_s = 0.0
-        self._in_ref = None
+        self.active = "a"
+        self._a = None
+        self._b = None
 
-    def process(
-        self,
-        default: float,
-        stick: float,
-        threshold: float,
-        release: float,
-        dt: float = 0.05,
-        release_ms: float = 0.0,
-        hold_until_in: bool = False,
-    ) -> float:
-        mag = abs(float(stick))
-        current_in = float(default)
-        take = clamp(abs(float(threshold)), 0.0, 1.0)
-        drop = clamp(abs(float(release)), 0.0, take)
-        hold = max(0.0, float(release_ms) / 1000.0)
-        step = max(0.0, float(dt))
-        if self.engaged:
-            if mag <= drop:
-                self._release_s += step
-                if self._release_s + 1e-9 >= hold:
-                    if not hold_until_in:
-                        self.engaged = False
-                        self._release_s = 0.0
-                        self._in_ref = None
-                    else:
-                        if self._in_ref is None:
-                            self._in_ref = current_in
-                        elif abs(current_in - self._in_ref) >= self._IN_MOVE:
-                            self.engaged = False
-                            self._release_s = 0.0
-                            self._in_ref = None
+    def process(self, axis_a: float, axis_b: float, touch: float, *_ignored) -> float:
+        a = float(axis_a)
+        b = float(axis_b)
+        need = max(0.0, abs(float(touch)))
+        if self._a is None or self._b is None:
+            self._a = a
+            self._b = b
+            self.active = "b" if abs(b) > abs(a) else "a"
+            return clamp(a if self.active == "a" else b)
+        floor = need if need > 0 else 1e-4
+        da = abs(a - self._a)
+        db = abs(b - self._b)
+        moved_a = da >= floor
+        moved_b = db >= floor
+        if moved_a or moved_b:
+            if moved_a and moved_b:
+                self.active = "a" if da >= db else "b"
+            elif moved_a:
+                self.active = "a"
             else:
-                self._release_s = 0.0
-                self._in_ref = None
-        else:
-            self._release_s = 0.0
-            self._in_ref = None
-            if mag >= take:
-                self.engaged = True
-        return clamp(float(stick if self.engaged else default))
+                self.active = "b"
+        if self.active == "a":
+            self._a = a
+            if moved_b:
+                self._b = b
+            return clamp(a)
+        self._b = b
+        if moved_a:
+            self._a = a
+        return clamp(b)
 
 
 class LagLeadState:
@@ -394,7 +385,7 @@ NODE_HELP = {
     "curve": "Remaps the axis with the GEX response-curve editor. Double-click the node to edit.",
     "limiter": "Shapes throw from a limiter axis. Linear scales the slope with the live limiter. Bezier keeps full corners and pulls the handles toward a flat center as the limiter drops. Min-max follows 1:1 through the center, then clips at whatever the limiter axis is reading — 100% is full travel, 0% is locked at center, and every value in between is a live ceiling. Wire the signal to in and the controller to limit. 0 to 100% uses a slider or throttle; −100 to 100% inverts when the limiter is negative.",
     "deadzone": "Removes noise around center and optionally at the ends, then rescales the remaining travel to full range.",
-    "override": "Passes in until the override axis moves past the take-over threshold (pilot stick). Hands back after the stick stays inside the release band for the hold time. Hold until in moves keeps the override after that until the in axis actually moves, so a pass through center does not drop it.",
+    "override": "Two axes, one output. The axis you move sends the value. The other keeps its last reading and stays quiet until you move it by the grab amount, even when that axis is not centered. A throttle left at 50% does not block the stick.",
     "laglead": "Lag smooths low-frequency jitter. Lead restores or boosts faster motion. Equal lag and lead is a pass-through; lead above lag anticipates.",
     "output": "Writes the finished axis to a vJoy virtual axis. Only one flight mode is active, so modes may share the same vJoy target. Optional conditions can skip the write.",
 }
