@@ -65,6 +65,8 @@ def _user32():
     user32.ShowWindow.restype = wintypes.BOOL
     user32.ReleaseCapture.argtypes = []
     user32.ReleaseCapture.restype = wintypes.BOOL
+    user32.GetCapture.argtypes = []
+    user32.GetCapture.restype = wintypes.HWND
     user32.ClipCursor.argtypes = [ctypes.c_void_p]
     user32.ClipCursor.restype = wintypes.BOOL
     user32.SetCursor.argtypes = [wintypes.HANDLE]
@@ -290,18 +292,38 @@ def _is_system_cursor(user32, handle: int) -> bool:
     return False
 
 
+def _capture_belongs_to_us(user32) -> bool:
+    """True when this process holds the mouse, as it does while a window is dragged."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        captured = int(user32.GetCapture() or 0)
+        if not captured:
+            return False
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(captured, ctypes.byref(pid))
+        return int(pid.value) == int(ctypes.windll.kernel32.GetCurrentProcessId())
+    except Exception:
+        return False
+
+
 def release_cursor_to_arrow(host_hwnd: int = 0) -> None:
     """Separate a joined game input queue and show the arrow. Does not change focus.
 
     Does not call ShowCursor. Undoing a ShowCursor(TRUE) loop hid the pointer.
     A text caret or resize cursor is left alone.
+    ReleaseCapture is skipped while this process holds the mouse. The follow
+    timer calls this every 250ms, and releasing that capture cancels a title-bar
+    move or a border resize.
     """
     if sys.platform != "win32":
         return
     try:
         user32 = _user32()
         user32.ClipCursor(None)
-        user32.ReleaseCapture()
+        if not _capture_belongs_to_us(user32):
+            user32.ReleaseCapture()
         if host_hwnd:
             separate_host_input(host_hwnd)
         current = _cursor_handle(user32)
