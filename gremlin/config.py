@@ -49,10 +49,10 @@ MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI
 OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in ("1", "true", "yes")
 OVERLAY_ENABLED = True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-AFCS_ENABLED = True # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
+AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
 STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
-PROFILE_GRAPH_ENABLED = True # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
+PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -603,7 +603,7 @@ class Configuration(QtCore.QObject):
             delay = initial_delay
             for attempt in range(max_retries):
                 try:
-                    os.replace(tmp, fname_abs)
+                    os.replace(tmp, fname_abs) # @IgnoreException
                     return True
                 except PermissionError as ex:
                     # Catch WinError 5 (Access Denied) or WinError 32 (Sharing Violation)
@@ -629,6 +629,13 @@ class Configuration(QtCore.QObject):
                     os.unlink(tmp)
                 except OSError:
                     pass
+            # Replace is denied while another process holds the file open; try an in-place write
+            try:
+                with open(fname_abs, "w", encoding="utf-8") as hdl:
+                    json.dump(payload, hdl, sort_keys=True, indent=4)
+                return True
+            except Exception as ex2:
+                syslog.error(f"CONFIG: direct write to {fname_abs} failed: {ex2}")
             return False
 
     def _save_ui(self, fname: str = None, save_profile: bool = False):
@@ -726,20 +733,12 @@ class Configuration(QtCore.QObject):
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
             disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
-            disk_foreign = {
-                key: merged[key]
-                for key in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                if isinstance(merged, dict) and key in merged
-            }
+            disk_foreign = {key: merged[key] for key in self._PROFILE_SIDECAR_FOREIGN_KEYS if isinstance(merged, dict) and key in merged}
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
             # on top of on-disk data before writing — never foreign module payloads.
             if pending_profile_data:
-                pending = {
-                    key: value
-                    for key, value in pending_profile_data.items()
-                    if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                }
+                pending = {key: value for key, value in pending_profile_data.items() if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS}
                 merged.update(pending)
 
             # Restore foreign keys captured from disk before update(). Without this,
@@ -756,10 +755,7 @@ class Configuration(QtCore.QObject):
             mem_custom = self._streamdeck_pages_custom_count(mem_pages)
             if disk_custom > 0 and mem_custom < disk_custom:
                 merged["streamdeck_pages"] = disk_pages
-                syslog.info(
-                    "CONFIG: preserved on-disk streamdeck_pages "
-                    f"(disk_custom={disk_custom}, memory_custom={mem_custom})"
-                )
+                syslog.info(f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})")
 
             # Re-read foreign keys immediately before write so an overlay/Stream Deck
             # save that landed during this merge is not rolled back.
@@ -2592,7 +2588,7 @@ class Configuration(QtCore.QObject):
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
             case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
-                if isinstance(input_id,  str) and input_id.isnumeric():
+                if isinstance(input_id, str) and input_id.isnumeric():
                     input_id = int(input_id)
                 else:
                     input_id = 1
@@ -2663,7 +2659,6 @@ class Configuration(QtCore.QObject):
             case DeviceType.OctaviIFR1:
                 save_input_id = input_id
                 input_type = InputType.OctaviIfr1
-
 
             case DeviceType.NotSet:
                 # settings or other non input type page
@@ -2926,7 +2921,6 @@ class Configuration(QtCore.QObject):
         """True if OSC support is enabled"""
         return OSC_ENABLED and self._get_data("osc_enabled", True)
 
-
     @property
     def overlay_enabled(self) -> bool:
         """True if Overlay support is enabled"""
@@ -2939,7 +2933,7 @@ class Configuration(QtCore.QObject):
     @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False) # defaults to OFF and must be explicitly enabled by the user
+        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -4142,6 +4136,7 @@ class Configuration(QtCore.QObject):
             device_id = self.last_selected_joystick_device_id
             if device_id:
                 import gremlin.joystick_handling
+
                 device = gremlin.joystick_handling.getDevice(device_id)
                 if device:
                     if device.axis_count:
@@ -4176,15 +4171,15 @@ class Configuration(QtCore.QObject):
 
     @property
     def last_selected_joystick_device(self):
-        """ gets the last joystick device object, or None if not available"""
+        """gets the last joystick device object, or None if not available"""
         device_id = self.last_selected_joystick_device_id
         if device_id:
             import gremlin.joystick_handling
+
             device = gremlin.joystick_handling.getDevice(device_id)
             if device:
                 return device
         return None
-
 
     @property
     def device_page_size(self) -> int:

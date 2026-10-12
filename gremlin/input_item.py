@@ -38,6 +38,9 @@ import gremlin.event_handler
 import gremlin.singleton_decorator
 
 
+from gremlin.util import _trace
+
+
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
@@ -73,6 +76,7 @@ from gremlin.util import (
     parse_guid,
 )
 import gremlin.util
+from gremlin.util import debug_only
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *  # noqa: F403
 from gremlin.types import DeviceType, EventSourceType
@@ -100,6 +104,8 @@ from gremlin.worker import WorkManager
 
 
 syslog = logging.getLogger("system")
+
+
 
 
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
@@ -7810,6 +7816,7 @@ class ActionSetView(AbstractView):
             widget = self._widget_map[data.action_id]
         return widget
 
+    @gremlin.util.hold_cyclic_gc
     def create_ui(self):
         """(re)creates the contents - content is displayed on page 2 of the stacked container"""
         import gremlin.config
@@ -8460,10 +8467,6 @@ class ContainerSelector(QtWidgets.QWidget):
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
-
-        # self.main_layout.addWidget(self.container_dropdown)
-        # self.main_layout.addWidget(self.help_widget)
-        # self.main_layout.addWidget(self.add_container_widget)
 
         self.main_layout.addWidget(self.save_template_widget)
         self.main_layout.addWidget(self.load_template_widget)
@@ -9266,6 +9269,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def _create_action_tab(self):
         """create the widget for the container's action tab"""
+        _trace("action tab")
         self._action_tab_container_widget = QtWidgets.QWidget()
         self._action_tab_container_layout = QtWidgets.QVBoxLayout(self._action_tab_container_widget)
 
@@ -10258,6 +10262,7 @@ class ContainerView(AbstractView):
 
         self._drawn_once = False  # draw on demand only on first redraw
 
+    @gremlin.util.hold_cyclic_gc
     def create_ui(self):
         """creates the UI for the container contents"""
         import gremlin.util
@@ -10281,6 +10286,7 @@ class ContainerView(AbstractView):
             self._blank_widget.setText(msg)
 
             self._clear_widgets()  # remove current widgets and recreate
+            _trace("container view clear")
 
             container_count = self.model.count()
             if verbose:
@@ -10295,6 +10301,7 @@ class ContainerView(AbstractView):
                     # create the container widget for that plugin
                     if verbose:
                         syslog.info(f"\tCreate container widget: [{container.name}]")
+                    _trace(f"container view build {container.name}")
                     widget = container.widget(self.input_item, container)
                     widget.closed.connect(self._create_closed_cb(widget))
                     self._scroll_layout.addWidget(widget)
@@ -11013,6 +11020,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         """Add multiple containers with a single UI rebuild (avoids Qt UAF on paste)."""
         if not container_list:
             return
+        _trace(f"paste batch {len(container_list)}")
         if plugin_manager is None:
             plugin_manager = gremlin.plugin_manager.ContainerPlugins()
 
@@ -11033,6 +11041,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         # One redraw of the existing ContainerView — avoid MappingWidget.create_ui
         # tear-down while nested scroll/splitter layouts are still settling.
+        _trace("paste redraw")
         if self._container_view is not None and Shiboken.isValid(self._container_view):
             self._container_view.redraw(force=True)
             self._last_container_hash = self._input_item.containers.hashKey()
@@ -11050,6 +11059,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         _el = gremlin.event_handler.EventListener()
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
+        _trace("paste container")
 
         # tracker = ConditionTracker()
         import_data = gremlin.base_profile.ProfileImportData()
@@ -11197,7 +11207,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         self.container_selector.container_from_template.connect(self._load_container_from_template)
         self.container_selector.container_to_template.connect(self._save_container_to_template)
-        # self.container_selector.container_delete.connect(self._delete_container)
+        self.container_selector.container_delete.connect(self._delete_container)
         self.always_execute = QtWidgets.QCheckBox("Always execute")
         self.always_execute.setToolTip("If enabled, the mapping continues to process triggers even if the profile is paused.")
         self.always_execute.setChecked(self._input_item.always_execute)

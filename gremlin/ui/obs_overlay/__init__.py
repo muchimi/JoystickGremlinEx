@@ -17,6 +17,7 @@ from PySide6 import QtCore
 from psygnal import Signal
 from shiboken6 import Shiboken
 
+import gremlin.diagnostics
 import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.util
@@ -176,6 +177,7 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_started_ui)
 
     def _on_profile_started_ui(self):
+        gremlin.diagnostics.breadcrumb("overlay profile start")
         # Flush renames/edits before runtime so deactivate cannot reload stale names.
         self._flush_dirty_scene()
         # Runtime must honor widget visibility conditions (not designer Show-all).
@@ -207,6 +209,7 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_stop_ui)
 
     def _on_profile_stop_ui(self):
+        gremlin.diagnostics.breadcrumb("overlay profile stop")
         self._flush_dirty_scene()
         self._release_overlay_touch()
         try:
@@ -580,6 +583,7 @@ class OverlayManager:
             self.scene.set_preview_show_all(False)
 
     def _show_overlay_ui(self, auto: bool = False, page_ids: list[str] | None = None):
+        gremlin.diagnostics.breadcrumb("overlay show" if not auto else "overlay show auto")
         try:
             self._ensure_current_profile_scene()
             # Manual Show (designer / control panel) paints every designer-visible
@@ -788,6 +792,7 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._hide_overlay_ui)
 
     def _hide_overlay_ui(self):
+        gremlin.diagnostics.breadcrumb("overlay hide")
         for page_id in list(self._overlays):
             self._hide_page_ui(page_id)
         for page_id in list(self._ws_sessions):

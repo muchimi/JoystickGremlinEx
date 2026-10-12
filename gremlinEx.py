@@ -1020,6 +1020,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         if verbose:
             syslog.info(f"TAB CHANGED: selected : {index}")
+        gremlin.diagnostics.breadcrumb(f"tab {index}")
 
         device_guid = self.getDeviceGuidForTabIndex(index)
         device = gremlin.joystick_handling.getDevice(device_guid)
@@ -1671,6 +1672,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if verbose:
                     syslog.info("Activate: activate profile")
+                gremlin.diagnostics.breadcrumb("profile activate")
                 self._profile_auto_activated = False
                 # ec = gremlin.execution_graph.ExecutionContext()
                 # ec.reset()
@@ -1693,6 +1695,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # with QtCore.QSignalBlocker(self.ui.actionActivate):
                     #     self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
 
+                    gremlin.diagnostics.breadcrumb("profile start failed")
                     if not gremlin.shared_state.profile_message_issued:
                         # error message not issued = issue it
                         gremlin.ui.ui_common.MessageBox(
@@ -1724,6 +1727,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # running - save the last running mode to the executing profile
                 if verbose:
                     syslog.info("Deactivate profile requested")
+                gremlin.diagnostics.breadcrumb("profile deactivate")
                 self.profile.set_last_runtime_mode(gremlin.shared_state.runtime_mode)
 
                 # stop listen
@@ -6495,6 +6499,9 @@ sys.excepthook = handle_unhandled_exception
 WM_INPUT = 0x00FF
 
 if __name__ == "__main__":
+    import gremlin.diagnostics
+
+    gremlin.diagnostics.prepare()
     gremlin.shared_state.ui_ready = False
 
     encodings_path = encodings.__file__  # package reference to ensure module is included
@@ -6610,6 +6617,9 @@ if __name__ == "__main__":
         if not result:
             # another instance running
             os._exit(1)
+
+        gremlin.diagnostics.install(app_path)
+        gremlin.util.install_idle_collector()
 
         # user log
         configure_logger(
@@ -6832,6 +6842,7 @@ if __name__ == "__main__":
         app.processEvents()
 
         gremlin.shared_state.ui_ready = True
+        gremlin.diagnostics.breadcrumb("ui ready")
 
         syslog.info("Init completed...")
         el.ui_ready.emit()
