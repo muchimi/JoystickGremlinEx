@@ -1514,6 +1514,7 @@ class OverlayWindow(QtWidgets.QWidget):
         self._applying_flags = False
         self._host_hwnd = 0
         self._host_attached = False
+        self._share_concealed = False
         self._host_timer = QtCore.QTimer(self)
         self._host_timer.setInterval(250)
         self._host_timer.timeout.connect(self._sync_host_attach)
@@ -1642,6 +1643,11 @@ class OverlayWindow(QtWidgets.QWidget):
             view.detach_from_scene()
 
     def hideEvent(self, event):
+        # Native SW_HIDE while the shared app is in the background. Stay parented
+        # so the follow timer can show the overlay again without stealing focus.
+        if getattr(self, "_share_concealed", False):
+            super().hideEvent(event)
+            return
         view = getattr(self, "view", None)
         if view is not None and Shiboken.isValid(view):
             try:
@@ -1952,7 +1958,15 @@ class OverlayWindow(QtWidgets.QWidget):
         if not live:
             return
         from .app_view import resolve_application_hwnd
-        from .host_window import attach_overlay_hwnd, place_overlay_in_host
+        from .host_window import (
+            attach_overlay_hwnd,
+            foreground_is_this_process,
+            hide_overlay_hwnd,
+            host_is_foreground,
+            place_overlay_in_host,
+            release_cursor_to_arrow,
+            separate_host_input,
+        )
 
         host = resolve_application_hwnd(title, exe, self._host_hwnd)
         if not host:
@@ -1969,7 +1983,20 @@ class OverlayWindow(QtWidgets.QWidget):
             self._host_attached = True
         cw = int(canvas.get("width") or self.width() or 1)
         ch = int(canvas.get("height") or self.height() or 1)
-        place_overlay_in_host(hwnd, host, cw, ch)
+        if host_is_foreground(host, hwnd):
+            self._share_concealed = False
+            place_overlay_in_host(hwnd, host, cw, ch)
+        else:
+            self._share_concealed = True
+            hide_overlay_hwnd(hwnd)
+            # The game is not in front. Drop the SetParent input join so its
+            # cursor cannot sit on Joystick Gremlin Ex. Leave the join alone
+            # while the game itself is foreground. Repeat while JG Ex stays
+            # in front, because a later parent message can join the queues again.
+            if foreground_is_this_process():
+                release_cursor_to_arrow(host)
+            else:
+                separate_host_input(host)
         if live_window_is_layered(canvas):
             _extend_frame_into_client(self)
         self._apply_click_through(
@@ -1983,6 +2010,7 @@ class OverlayWindow(QtWidgets.QWidget):
             self._host_hwnd = 0
             return
         host = int(self._host_hwnd or 0)
+        self._share_concealed = False
         try:
             from .host_window import detach_overlay_hwnd
 
