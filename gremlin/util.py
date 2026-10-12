@@ -3214,6 +3214,19 @@ def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
 
     return
 
+def safeReplace(src, dst, retries=5, delay=0.1):
+    for attempt in range(retries):
+        try:
+            os.replace(src, dst) # IgnoreException
+            break
+        except PermissionError as e:
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                raise e
+
+
+
 
 def phraseSplit(phrase: str) -> list[str]:
     """Splits a phrase into segments based on |, newline, or carriage return + newline or <br> tags."""
@@ -3240,3 +3253,4 @@ def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     """Converts a hexadecimal color string to an RGB tuple."""
     hex_str = hex_str.lstrip('#')
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+

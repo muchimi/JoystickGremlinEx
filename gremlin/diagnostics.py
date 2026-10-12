@@ -279,6 +279,7 @@ def _snapshot() -> list[str]:
 
 
 def _flush() -> None:
+    from gremlin.util import safeReplace
     if not _breadcrumb_path:
         return
     lines = _snapshot()
@@ -286,7 +287,7 @@ def _flush() -> None:
     try:
         with open(tmp, "w", encoding="utf-8") as handle:
             handle.writelines(lines)
-        os.replace(tmp, _breadcrumb_path)
+        safeReplace(tmp, _breadcrumb_path) # @IgnoreException
     except Exception:
         pass
 

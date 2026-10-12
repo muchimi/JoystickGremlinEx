@@ -51,13 +51,19 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m77T74)
 - Change: UI: UI activation rework on profile stop
+- Change: API: optimization: device re-initialization will only occur if a device change is found.
+- Change: Overlay: Add Overlay button inputs, Map to Overlay, %name% variables, and the OCR widget (capture, tracker, designer, Star Citizen mineable and intelligence packs). The EFB pack is not included. (Lolo350).
+- Change: Bring the AFCS designer in line with the overlay canvas: layout, selection pane, undo, exclusive states, and input mappings that survive edit and load. (Lolo350)
+- Change: Overlay: Application window recapture, single-widget crop, app-share focus and cursor, and run time show/hide eyes that do not edit the designer Visible flag. (Lolo350)
+- Change: API: optimization. only rebuild device lists if dinput detected a change when re-init is triggered.
 - Fix: UI: resolved an issue with the delay widget when entering data manually
 - Fix: API: save/recall of last input selection could be incorrect with special devices
 - Fix: API: added additional QT widget tear down wrappers and additional diagnostics instrumentation for QT related crashes. (thanks to Lolo350 for researching this and throwing lots of AI tokens at it).
-- Fix: UI: Delete all containers disconnected.
-- Change: Add Overlay button inputs, Map to Overlay, %name% variables, and the OCR widget (capture, tracker, designer, Star Citizen mineable and intelligence packs). The EFB pack is not included. (Lolo350).
-- Change: Bring the AFCS designer in line with the overlay canvas: layout, selection pane, undo, exclusive states, and input mappings that survive edit and load. (Lolo350)
-- Change: Application window recapture, single-widget crop, app-share focus and cursor, and runtime show/hide eyes that do not edit the designer Visible flag. (Lolo350)
+- Fix: UI: Delete all containers not triggering a container delete.
+- Fix: API: device comparison manually defined to capture differences with vjoy devices accurately.
+- Fix: API: disable vjoy monitoring when updating device lists to avoid possible contention.
+- Fix: API: detected device changes will be held while a profile is loading in case an OS level device change is observed while a profile is loading.
+
 - Fix: Overlay: O18 — Several app-share canvases stay visible at once. Showing one attached canvas no longer detaches and hides the others. Each canvas keeps its own app-share setting. (Lolo350)
 - Fix: Overlay: O19 — While a profile is running, the main window can be moved and resized when Joystick Gremlin Ex is in front. The app-share cursor timer no longer cancels a title-bar drag or a border resize. (Lolo350)
 

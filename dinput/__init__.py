@@ -897,14 +897,34 @@ class DeviceSummary:
     def __hash__(self):
         return hash((self.device_guid, self.axis_count, self.button_count, self.hat_count))
 
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if not isinstance(other, DeviceSummary):
+            return NotImplemented
+        return (self.device_guid,
+                self.vendor_id,
+                self.product_id,
+                self.axis_count,
+                self.button_count,
+                self.hat_count) == (
+            other.device_guid,
+            other.vendor_id,
+            other.product_id,
+            other.axis_count,
+            other.button_count,
+            other.hat_count,
+        )
+
     @property
     def hashkey(self):
         """gets the hash key for virtual devices"""
         return (self.axis_count, self.button_count, self.hat_count)
 
     def to_html(self) -> str:
-        """ html representation of the device """
+        """html representation of the device"""
         from gremlin.reporting import ReportTable
+
         table = ReportTable(cellpadding=4)
         table.addField("Name", self.name)
         table.addField("Type", DeviceType.to_display_name(self.device_type))
@@ -918,11 +938,7 @@ class DeviceSummary:
         if self.hat_count:
             table.addField("Hat Count", self.hat_count)
 
-
         return table.to_html()
-
-
-
 
     def __str__(self):
         vjoy_stub = f"VjoyID: {self.vjoy_id}" if self.vjoy_id != -1 else ""
@@ -1019,7 +1035,7 @@ class DILL:
             if os.path.isfile(debug_path):
                 # blitz it
                 try:
-                    os.unlink(debug_path) # @IgnoreException
+                    os.unlink(debug_path)  # @IgnoreException
                 except Exception:
                     syslog.warning(f"DILL: unable to truncate debug file: {debug_path}")
 

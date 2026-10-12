@@ -1015,6 +1015,14 @@ class VJoyMonitor:
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
 
+    def stop(self):
+        """Stops the vJoy monitor and the keep alive thread"""
+        self._stop_keep_alive()
+
+    def start(self):
+        """Starts the vJoy monitor and the keep alive thread"""
+        self._start_keep_alive()
+
     def used(self):
         """Marks the vJoy device as used, updating the last active timestamp"""
         self._last_active = time.time()
@@ -1034,11 +1042,6 @@ class VJoyMonitor:
     def _handle_shutdown(self):
         """Handles shutdown events by stopping the keep alive thread"""
         self._stop_keep_alive()
-        # try:
-        #     for vjoy_id in self._vjoy_id_list:
-        #         VJoyInterface.RelinquishVJD(vjoy_id)
-        # except Exception as e:
-        #     pass
         syslog.info("VJOY: monitor shutdown complete")
 
     def _start_keep_alive(self) :

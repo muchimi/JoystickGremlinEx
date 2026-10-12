@@ -2283,7 +2283,7 @@ class EventListener(QtCore.QObject):
                     gremlin.shared_state.ui.activate(False)
 
             # reset devices and fire off the device change event
-            gremlin.joystick_handling.reset_devices()
+            gremlin.joystick_handling.reset_devices(force=False)
 
         finally:
             self._process_device_change_lock.release()

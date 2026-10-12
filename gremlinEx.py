@@ -202,6 +202,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._selection_locked = False
         self.joystick_event_lock = Lock()  # lock for joystick events
         self.device_change_locked = False
+        self._device_change_deferred = False  # device change seen while a profile was loading
         self._device_change_queue = 0  # count of device updates while the UI is already updating
         self._runtime_mode_map = {}  # map of runtime processes to their last runtime mode
         self._process_runtime_map = {}  # map of MODE to process associated with a profile - the process executable is the key
@@ -522,7 +523,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             RemoteVideoPublisher().stop()
         except Exception:
             pass
-
 
     def _update_start_tab(self):
         """forces a tab index reload on init"""
@@ -1092,11 +1092,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._ationTabCopyAssignments = QtGui.QAction("Copy to device...", self, triggered=self._tab_copy_cb)
         self._ationTabCopyAssignments.setToolTip("Copies assignments to specified target device")
 
-
-
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered=self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
-
 
         menuTools.addSeparator()
 
@@ -4597,7 +4594,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # validate input matches current tab
                 input_item = self._find_input_item(device_guid, input_type, input_id)
                 if not input_item:
-                     input_item = self._get_input_item(device_guid, 0)
+                    input_item = self._get_input_item(device_guid, 0)
                 if input_item:
                     self.saveLastSelection(input_item.device_guid, input_item.input_type, input_item.input_id)
 
@@ -4613,9 +4610,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not device_guid:
             return
 
-        if gremlin.util.compare_guid(self._last_selected_device_guid, device_guid) and self._last_selected_input_type == input_type and self._last_selected_input_id == input_id:
+        if (
+            gremlin.util.compare_guid(self._last_selected_device_guid, device_guid)
+            and self._last_selected_input_type == input_type
+            and self._last_selected_input_id == input_id
+        ):
             return
-
 
         dev = gremlin.joystick_handling.getDevice(device_guid)
         if not dev:
@@ -4657,8 +4657,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # if verbose:
         #     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
         #     syslog.info(f"SELECT INPUT: save selection device_name={device_name}, device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
-
-
 
     def setCurrentTabTracking(self, device_guid: str):
         """sets the tracking tab to the given device guid"""
@@ -5040,21 +5038,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # not initialized yet
             return
 
+        if self.isProfileLoading() or gremlin.shared_state.profile_loading:
+            # replayed once the profile load completes
+            self._device_change_deferred = True
+            return
+
         self.device_change_locked = True
 
-        # force a re-read of DINPUT data
-        syslog.info("DILL: Device change reported by DINPUT - updating enumeration data:")
+        try:
+            # force a re-read of DINPUT data
+            syslog.info("DILL: Device change reported by DINPUT - updating enumeration data:")
 
-        dinput.DILL.reset()  # force a re-int of DILL
+            dinput.DILL.reset()  # force a re-int of DILL
 
-        # update joysticks
-        gremlin.joystick_handling.refresh_devices()
-
-        # request a profile reload
-        el = gremlin.event_handler.EventListener()
-        el.request_reload.emit()
-
-        self.device_change_locked = False
+            # update joysticks - only reload the profile if the device list actually changed
+            if gremlin.joystick_handling.refresh_devices():
+                el = gremlin.event_handler.EventListener()
+                el.request_reload.emit()
+            else:
+                syslog.info("DILL: Device list unchanged - no reload needed")
+        finally:
+            self.device_change_locked = False
 
     @QtCore.Slot()
     def _device_input_changed_cb(self, device_guid, input_type, input_id):
@@ -5709,6 +5713,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # indicate tabs will need to be reloaded
         self.setTabsDirty()  #
 
+        el.pushDeviceChangeSuppression()  # defer device changes until the load completes
         try:
             gremlin.shared_state.push_redraw()
 
@@ -5942,6 +5947,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # update UI post load
             self.refresh()
+
+            # replay any device change that arrived during the load (handler skips the reload if nothing changed)
+            el.popDeviceChangeSuppression()
+            if self._device_change_deferred:
+                self._device_change_deferred = False
+                self._handle_devices_changed()
 
     def refresh(self):
         self._tabs_rebuild_pending = True

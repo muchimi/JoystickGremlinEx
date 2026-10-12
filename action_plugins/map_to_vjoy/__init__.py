@@ -1514,7 +1514,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not self.cb_hat_list:
             return
         vjoy_id = self.action_data.virtual_id
-        dev : dinput.DeviceSummary = self.action_data.virtual_device
+        dev: dinput.DeviceSummary = self.action_data.virtual_device
         if not dev:
             dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
         if not dev:
@@ -2581,7 +2581,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             virtual_device = self.action_data.virtual_device
 
-            index = self.virtual_device_selector_widget.findData(virtual_device)
+            # DeviceSummary has no __eq__ and is recreated on every device init, so match by GUID rather than findData(object)
+            index = -1
+            if virtual_device is not None:
+                for i in range(self.virtual_device_selector_widget.count()):
+                    item = self.virtual_device_selector_widget.itemData(i)
+                    if item is not None and item.device_guid == virtual_device.device_guid:
+                        index = i
+                        self.action_data.virtual_device = item  # rebind to the current instance
+                        break
             if index != -1:
                 self.virtual_device_selector_widget.setCurrentIndex(index)
             else:
@@ -4825,7 +4833,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.vjoy_id = action_data.virtual_id
         self.vjoy_input_id = action_data.vjoy_input_id
 
-        self._valid = True # assume configuration is valid. if not, events will be discarded
+        self._valid = True  # assume configuration is valid. if not, events will be discarded
         input_item = action_data.input_item
 
         # check vjoy output is found
@@ -4833,9 +4841,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if not dev:
             self._valid = False
             if self.verbose:
-                syslog.warning(f"VJOY: [{self.action_data.id}] failed to get device for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]")
+                syslog.warning(
+                    f"VJOY: [{self.action_data.id}] failed to get device for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
+                )
             return
-
 
         # For hat actions the output hat is stored in vjoy_hat_id.
         # check the hat is found
@@ -4844,22 +4853,27 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             if self.vjoy_input_id < 1 or self.vjoy_input_id > dev.hat_count:
                 self._valid = False
                 if self.verbose:
-                    syslog.warning(f"VJOY: [{self.action_data.id}] invalid hat id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]")
+                    syslog.warning(
+                        f"VJOY: [{self.action_data.id}] invalid hat id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
+                    )
 
         elif VjoyAction.is_axis_action(action_data.action_mode):
             # check the axis is found
             if self.vjoy_input_id < 1 or self.vjoy_input_id > dev.axis_count:
                 self._valid = False
                 if self.verbose:
-                    syslog.warning(f"VJOY: [{self.action_data.id}] invalid axis id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]")
+                    syslog.warning(
+                        f"VJOY: [{self.action_data.id}] invalid axis id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
+                    )
 
         elif VjoyAction.is_button_action(action_data.action_mode):
             # check the button is found
             if self.vjoy_input_id < 1 or self.vjoy_input_id > dev.button_count:
                 self._valid = False
                 if self.verbose:
-                    syslog.warning(f"VJOY: [{self.action_data.id}] invalid button id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]")
-
+                    syslog.warning(
+                        f"VJOY: [{self.action_data.id}] invalid button id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
+                    )
 
         if self.verbose:
             syslog.info(f"Initializing VJoyRemapFunctor for action_data id: [{action_data.id}]")
@@ -5164,8 +5178,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.warning(f"VJOY: unable to set output button [{vjoy_button_id}] for vjoy [{vjoy_id}] (not found)")
                 else:
                     syslog.warning(f"VJOY: failed to get proxy for vjoy [{vjoy_id}] (not found)")
-
-
 
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
@@ -5925,7 +5937,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
-
 
         force_remote = event.force_remote
 
@@ -7012,7 +7023,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._input_type = input_type
         self.device_guid = self.hardware_device_guid
         self.input_id = self.hardware_input_id
-
 
         # default hat map table setup and default mapping for new hats
         self.hat_map = {}  # map of button id keyed by hat position tuple

@@ -33,6 +33,7 @@ import gremlin.shared_state
 from gremlin.types import VerboseMode, DeviceType
 from gremlin.input_types import InputType
 from psygnal import Signal
+from gremlin.util import safeReplace
 
 from collections import deque
 import gremlin.singleton_decorator
@@ -505,7 +506,7 @@ class Configuration(QtCore.QObject):
             # A leftover FILE named "temp" causes WinError 183 on makedirs.
             if os.path.isfile(user_profile):
                 try:
-                    os.replace(user_profile, user_profile + ".bak_file")
+                    safeReplace(user_profile, user_profile + ".bak_file")
                 except OSError:
                     try:
                         os.unlink(user_profile)
@@ -540,7 +541,7 @@ class Configuration(QtCore.QObject):
             counter += 1
 
         try:
-            os.replace(fname, backup)
+            safeReplace(fname, backup)
             syslog.warning(f"CONFIG: archived broken config file {fname} to {backup} ({reason})")
         except OSError:
             try:
@@ -550,26 +551,6 @@ class Configuration(QtCore.QObject):
             except Exception as ex:
                 syslog.error(f"CONFIG: could not archive broken config {fname}: {ex}")
 
-    # def _write_json_atomic(self, fname: str, payload: dict):
-    #     """Write JSON atomically without deleting the current file on a failed replace."""
-    #     tmp = self.getTemporaryFile(".json")
-    #     try:
-    #         with open(tmp, "w", encoding="utf-8") as hdl:
-    #             encoder = json.JSONEncoder(sort_keys=True, indent=4)
-    #             hdl.write(encoder.encode(payload))
-    #             hdl.flush()
-    #             os.fsync(hdl.fileno())
-
-    #         os.replace(tmp, fname)
-    #         return True
-    #     except Exception as ex:
-    #         syslog.error(f"CONFIG: unable to write atomically to {fname}: {ex}")
-    #         if os.path.exists(tmp):
-    #             try:
-    #                 os.unlink(tmp)
-    #             except OSError:
-    #                 pass
-    #         return False
 
     def _write_json_atomic(
         self,
@@ -603,7 +584,7 @@ class Configuration(QtCore.QObject):
             delay = initial_delay
             for attempt in range(max_retries):
                 try:
-                    os.replace(tmp, fname_abs) # @IgnoreException
+                    safeReplace(tmp, fname_abs) # @IgnoreException
                     return True
                 except PermissionError as ex:
                     # Catch WinError 5 (Access Denied) or WinError 32 (Sharing Violation)
@@ -788,7 +769,7 @@ class Configuration(QtCore.QObject):
                         hdl.flush()
                         os.fsync(hdl.fileno())
                     with lock2:
-                        os.replace(tmp, fname)
+                        safeReplace(tmp, fname)
             except (filelock.Timeout, OSError, PermissionError, RuntimeError) as ex:
                 syslog.warning(f"CONFIG: could not save profile config {fname} due to lock/write error: {ex}")
                 if os.path.exists(tmp):
