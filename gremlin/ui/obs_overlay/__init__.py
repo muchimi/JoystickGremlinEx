@@ -17,6 +17,7 @@ from PySide6 import QtCore
 from psygnal import Signal
 from shiboken6 import Shiboken
 
+import gremlin.diagnostics
 import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.util
@@ -176,6 +177,7 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_started_ui)
 
     def _on_profile_started_ui(self):
+        gremlin.diagnostics.breadcrumb("overlay profile start")
         # Flush renames/edits before runtime so deactivate cannot reload stale names.
         self._flush_dirty_scene()
         # Runtime must honor widget visibility conditions (not designer Show-all).
@@ -207,14 +209,32 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_stop_ui)
 
     def _on_profile_stop_ui(self):
+        gremlin.diagnostics.breadcrumb("overlay profile stop")
         self._flush_dirty_scene()
         self._release_overlay_touch()
         try:
             self.scene.set_mouse_reposition(False)
         except Exception:
             pass
+        try:
+            self.scene.clear_visibility_overrides()
+        except Exception:
+            pass
         self._sync_mouse_reposition_banner()
         self._stop_runtime_toggle()
+        try:
+            if self.scene.reset_variables_on_deactivate():
+                from .bindings import OverlayValueBus
+
+                OverlayValueBus().refresh()
+        except Exception:
+            pass
+        try:
+            from .ocr_track import OcrOverlayTracker
+
+            OcrOverlayTracker().stop_runtime()
+        except Exception:
+            pass
         auto = self._auto_shown or any(
             page.get("canvas", {}).get("show_on_profile_start") for page in self.scene.pages
         )
@@ -404,17 +424,14 @@ class OverlayManager:
             self.show_overlay(auto=True, page_ids=[page_id])
 
     def _runtime_toggle_target_visible(self, page_id: str):
+        from .bindings import widget_is_live_visible
+
         target = self.scene.control_target or {}
-        kind = str(target.get("kind") or "page")
         ids = self.scene.control_target_widget_ids(target, page_id=page_id)
-        if kind == "group":
-            currently = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in ids) if ids else True
-            self.scene.set_group_widgets_visible(target.get("id"), not currently, page_id=page_id)
-            return
         if not ids:
             return
-        currently = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in ids)
-        self.scene.set_widgets_visible(ids, not currently)
+        currently = all(widget_is_live_visible(self.scene.widget_by_id(wid)) for wid in ids)
+        self.scene.set_runtime_visibility(ids, not currently)
 
     def _runtime_save_as_ui(self, page_id: str | None):
         from .control_panel import open_overlay_control_panel
@@ -561,19 +578,12 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._hide_overlay_page_ui, page_id)
 
     def _hide_overlay_page_ui(self, page_id: str):
-        window = self._overlays.get(page_id)
-        reclaim = bool(
-            window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False)
-        )
         self._hide_page_ui(page_id)
         if not self._overlays and not self._ws_sessions:
             self.scene.set_preview_show_all(False)
-        if reclaim:
-            self._reclaim_main_window_focus()
-            QtCore.QTimer.singleShot(50, self._reclaim_main_window_focus)
-            QtCore.QTimer.singleShot(200, self._reclaim_main_window_focus)
 
     def _show_overlay_ui(self, auto: bool = False, page_ids: list[str] | None = None):
+        gremlin.diagnostics.breadcrumb("overlay show" if not auto else "overlay show auto")
         try:
             self._ensure_current_profile_scene()
             # Manual Show (designer / control panel) paints every designer-visible
@@ -782,39 +792,13 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._hide_overlay_ui)
 
     def _hide_overlay_ui(self):
-        reclaim = False
+        gremlin.diagnostics.breadcrumb("overlay hide")
         for page_id in list(self._overlays):
-            window = self._overlays.get(page_id)
-            if window is not None and Shiboken.isValid(window) and getattr(window, "_host_attached", False):
-                reclaim = True
             self._hide_page_ui(page_id)
         for page_id in list(self._ws_sessions):
             self._hide_page_ui(page_id)
         self.scene.set_preview_show_all(False)
         self._emit_visibility()
-        if reclaim:
-            self._reclaim_main_window_focus()
-            # Windows often ignores the first SetForegroundWindow after SetParent;
-            # retry so the host cursor does not stay glued over JG Ex.
-            QtCore.QTimer.singleShot(50, self._reclaim_main_window_focus)
-            QtCore.QTimer.singleShot(200, self._reclaim_main_window_focus)
-
-    def _reclaim_main_window_focus(self):
-        """After app-share detach, ensure the game is not left covering JG Ex."""
-        try:
-            from .host_window import release_input_hooks, restore_foreground
-
-            release_input_hooks()
-            ui = gremlin.shared_state.ui
-            if ui is None or not Shiboken.isValid(ui):
-                return
-            hwnd = int(ui.winId()) if hasattr(ui, "winId") else 0
-            if hwnd:
-                restore_foreground(hwnd)
-            ui.raise_()
-            ui.activateWindow()
-        except Exception as err:
-            syslog.debug(f"OBS OVERLAY: reclaim UI focus skipped: {err}")
 
     def _hide_page_ui(self, page_id: str):
         self._stop_ws_session(page_id)

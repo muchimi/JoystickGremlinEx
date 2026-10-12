@@ -79,18 +79,18 @@ def getAllDevicesMap():
 def getAllDevices() -> list:
     """gets a list of all devices"""
     global _all_devices_map
-    with _device_registry_lock:
-        return list(_all_devices_map.values())
+    # with _device_registry_lock:
+    return list(_all_devices_map.values())
 
 def dumpDevices():
     """dumps the list of all devices to the log"""
     global _all_devices_map
-    with _device_registry_lock:
-        device_list = list(_all_devices_map.values())
-        device_list.sort(key = lambda d: d.name.casefold())
-        syslog.info(f"All devices: {len(_all_devices_map)}")
-        for device in device_list:
-            syslog.info(f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}")
+    #with _device_registry_lock:
+    device_list = list(_all_devices_map.values())
+    device_list.sort(key = lambda d: d.name.casefold())
+    syslog.info(f"All devices: {len(_all_devices_map)}")
+    for device in device_list:
+        syslog.info(f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}")
 
 
 def _handle_change(data, key, old_value, value):
@@ -124,7 +124,7 @@ class VJoyProxy:
     """Manages the usage of vJoy and allows shared access all callbacks."""
 
     vjoy_devices = {}
-    _vjoy_proxy_lock = threading.RLock()
+    # _vjoy_proxy_lock = threading.RLock()
 
     def __getitem__(self, vid):
         """Returns the requested vJoy instance.
@@ -155,43 +155,43 @@ class VJoyProxy:
     @classmethod
     def reset(self):
         """Relinquishes control over all held VJoy devices."""
-        with VJoyProxy._vjoy_proxy_lock:
-            devices = list(VJoyProxy.vjoy_devices.values())
-            for device in devices:
-                device.invalidate()
-            VJoyProxy.vjoy_devices = {}
+        #with VJoyProxy._vjoy_proxy_lock:
+        devices = list(VJoyProxy.vjoy_devices.values())
+        for device in devices:
+            device.invalidate()
+        VJoyProxy.vjoy_devices = {}
 
 
 def joystick_devices() -> list[DeviceSummary]:
     """Returns the list of CONNECTED physical joysticks"""
-    with _device_registry_lock:
-        return list(_joystick_devices)
+    # with _device_registry_lock:
+    return list(_joystick_devices)
 
 
 def all_joystick_devices(include_disabled=True):
     """Returns the list of CONNECTED AND DISCONNECTED  devices - iterator"""
     global _all_joystick_devices, _joystick_devices
-    with _device_registry_lock:
-        if include_disabled:
-            # all joystick devices
-            return list(_all_joystick_devices)
-        else:
-            # enabled devices only
-            return list(_joystick_devices)
+    # with _device_registry_lock:
+    if include_disabled:
+        # all joystick devices
+        return list(_all_joystick_devices)
+    else:
+        # enabled devices only
+        return list(_joystick_devices)
 
 
 def all_vjoy_devices() -> list[DeviceSummary]:
     """gets connected vjoy devices"""
     global _vjoy_devices
-    with _device_registry_lock:
-        return list(_vjoy_devices)
+    # with _device_registry_lock:
+    return list(_vjoy_devices)
 
 
 def all_maestro_devices() -> list[DeviceSummary]:
     """gets connected Maestro devices"""
     global _maestro_devices
-    with _device_registry_lock:
-        return list(_maestro_devices)
+    # with _device_registry_lock:
+    return list(_maestro_devices)
 
 
 def vjoy_input_devices() -> list[DeviceSummary]:
@@ -215,8 +215,8 @@ def vjoy_input_devices() -> list[DeviceSummary]:
 def vjoy_id_list(connected = True) -> list[int]:
     """gets the list of vjoy device IDs"""
     global _vjoy_devices
-    with _device_registry_lock:
-        return [dev.vjoy_id for dev in _vjoy_devices if dev.connected == connected]
+    # with _device_registry_lock:
+    return [dev.vjoy_id for dev in _vjoy_devices if dev.connected == connected]
 
 
 def vjoy_output_devices() -> list[DeviceSummary]:
@@ -325,12 +325,12 @@ def vjoy_devices(connected_only=True):  # -> list[DeviceSummary]:
     :return list of [DeviceSummary] holding the device configuration for every vjoy device
     """
     global _vjoy_devices_map, _all_vjoy_devices_map
-    with _device_registry_lock:
-        if connected_only:
-            device_list = [dev for dev in _all_vjoy_devices_map.values() if dev.connected]
-            pass
-        else:
-            device_list = list(_all_vjoy_devices_map.values())
+    #with _device_registry_lock:
+    if connected_only:
+        device_list = [dev for dev in _all_vjoy_devices_map.values() if dev.connected]
+        pass
+    else:
+        device_list = list(_all_vjoy_devices_map.values())
 
     return device_list
 
@@ -342,11 +342,11 @@ def maestro_devices(connected_only=True) -> list:
     :return list of [DeviceSummary] holding the device configuration for every Maestro device
     """
     global _maestro_devices_map, _maestro_devices_map
-    with _device_registry_lock:
-        if connected_only:
-            device_list = list(_maestro_devices_map.values())
-        else:
-            device_list = list(_maestro_devices_map.values())
+    # with _device_registry_lock:
+    if connected_only:
+        device_list = list(_maestro_devices_map.values())
+    else:
+        device_list = list(_maestro_devices_map.values())
 
     return device_list
 
@@ -714,8 +714,8 @@ def physical_devices():
     :return list of physical devices
     """
     global _all_devices_map
-    with _device_registry_lock:
-        return [dev for dev in _all_devices_map.values() if not dev.is_virtual]
+    # with _device_registry_lock:
+    return [dev for dev in _all_devices_map.values() if not dev.is_virtual]
 
 
 def default_device():
@@ -767,20 +767,20 @@ def vjoy_id_from_guid(guid, not_found_id=1):
     int
         vJoy id corresponding to the provided device
     """
-    with _device_registry_lock:
-        if isinstance(guid, int):
-            # already a vjoy id = make sure it's defined
-            for dev in _all_vjoy_devices_map.values():
-                if dev.vjoy_id == guid:
-                    return guid  # valid
-            return not_found_id
-
-        if isinstance(guid, str):
-            guid = util.parse_guid(guid)  # convert to dinput GUID
-
+    # with _device_registry_lock:
+    if isinstance(guid, int):
+        # already a vjoy id = make sure it's defined
         for dev in _all_vjoy_devices_map.values():
-            if gremlin.util.compare_guid(dev.device_guid, guid):
-                return dev.vjoy_id
+            if dev.vjoy_id == guid:
+                return guid  # valid
+        return not_found_id
+
+    if isinstance(guid, str):
+        guid = util.parse_guid(guid)  # convert to dinput GUID
+
+    for dev in _all_vjoy_devices_map.values():
+        if gremlin.util.compare_guid(dev.device_guid, guid):
+            return dev.vjoy_id
 
     syslog.error(f"Could not find vJoy matching guid {str(guid)}")
     return not_found_id
@@ -798,10 +798,10 @@ def registerSpecialDevice(dev):
     """adds a special device to the tracking list"""
     global _special_devices_map, _all_devices_map, _special_devices
     # device_guid = gremlin.util.normalize_guid(dev.device_guid)
-    with _device_registry_lock:
-        _all_devices_map[dev.device_guid] = dev
-        _special_devices_map[dev.device_guid] = dev
-        _special_devices.append(dev)
+    # with _device_registry_lock:
+    _all_devices_map[dev.device_guid] = dev
+    _special_devices_map[dev.device_guid] = dev
+    _special_devices.append(dev)
 
     # syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
@@ -809,14 +809,14 @@ def registerSpecialDevice(dev):
 def upsertSpecialDevice(dev):
     """Register or update a special device by GUID (no duplicate list entries)."""
     global _special_devices_map, _all_devices_map, _special_devices
-    with _device_registry_lock:
-        existing = _special_devices_map.get(dev.device_guid)
-        if existing is not None:
-            existing.name = dev.name
-            existing.device_type = dev.device_type
-            existing.device_category = dev.device_category
-            _all_devices_map[dev.device_guid] = existing
-            return existing
+    # with _device_registry_lock:
+    existing = _special_devices_map.get(dev.device_guid)
+    if existing is not None:
+        existing.name = dev.name
+        existing.device_type = dev.device_type
+        existing.device_category = dev.device_category
+        _all_devices_map[dev.device_guid] = existing
+        return existing
     registerSpecialDevice(dev)
     return dev
 
@@ -826,33 +826,33 @@ def unregisterSpecialDevice(device_guid):
     global _special_devices_map, _all_devices_map, _special_devices
     if device_guid is None:
         return
-    with _device_registry_lock:
-        existing = _special_devices_map.pop(device_guid, None)
-        if existing is None:
-            # Try string / alternate GUID identity
-            for key in list(_special_devices_map.keys()):
-                if gremlin.util.compare_guid(key, device_guid):
-                    existing = _special_devices_map.pop(key, None)
-                    device_guid = key
-                    break
-        if existing is None:
-            return
-        if existing in _special_devices:
-            _special_devices.remove(existing)
-        if device_guid in _all_devices_map:
-            del _all_devices_map[device_guid]
+    # with _device_registry_lock:
+    existing = _special_devices_map.pop(device_guid, None)
+    if existing is None:
+        # Try string / alternate GUID identity
+        for key in list(_special_devices_map.keys()):
+            if gremlin.util.compare_guid(key, device_guid):
+                existing = _special_devices_map.pop(key, None)
+                device_guid = key
+                break
+    if existing is None:
+        return
+    if existing in _special_devices:
+        _special_devices.remove(existing)
+    if device_guid in _all_devices_map:
+        del _all_devices_map[device_guid]
     syslog.info(f"\tunregistered special device: [{getattr(existing, 'name', device_guid)}]")
 
 
 def registerDisconnectedDevice(dev):
     """adds a disconnected device to the tracking list"""
     global _disconnected_devices_map, _all_devices_map, _disconnected_devices, _joystick_devices
-    with _device_registry_lock:
-        _all_devices_map[dev.device_guid] = dev
-        if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-            _joystick_devices.append(dev)
-        _disconnected_devices_map[dev.device_guid] = dev
-        _disconnected_devices.append(dev)
+    # with _device_registry_lock:
+    _all_devices_map[dev.device_guid] = dev
+    if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+        _joystick_devices.append(dev)
+    _disconnected_devices_map[dev.device_guid] = dev
+    _disconnected_devices.append(dev)
 
     syslog.info(f"\t[disconnected device] id: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
@@ -860,15 +860,15 @@ def registerDisconnectedDevice(dev):
 def unregisterDisconnectedDevice(dev):
     global _joystick_devices, _disconnected_devices_map, _all_devices_map, _disconnected_devices
     device_guid = dev.device_guid
-    with _device_registry_lock:
-        if dev in _joystick_devices:
-            _joystick_devices.remove(dev)
-        if device_guid in _all_devices_map:
-            del _all_devices_map[device_guid]
-        if device_guid in _disconnected_devices_map:
-            del _disconnected_devices_map[device_guid]
-        if dev in _disconnected_devices:
-            _disconnected_devices.remove(dev)
+    # with _device_registry_lock:
+    if dev in _joystick_devices:
+        _joystick_devices.remove(dev)
+    if device_guid in _all_devices_map:
+        del _all_devices_map[device_guid]
+    if device_guid in _disconnected_devices_map:
+        del _disconnected_devices_map[device_guid]
+    if dev in _disconnected_devices:
+        _disconnected_devices.remove(dev)
 
 
 
@@ -876,9 +876,9 @@ def unregisterDisconnectedDevice(dev):
 def clearDisconnectedDevices():
     """clears the list of disconnected devices"""
     global _disconnected_devices_map, _disconnected_devices
-    with _device_registry_lock:
-        for dev in list(_disconnected_devices):
-            unregisterDisconnectedDevice(dev)
+    # with _device_registry_lock:
+    for dev in list(_disconnected_devices):
+        unregisterDisconnectedDevice(dev)
 
         _disconnected_devices_map.clear()
         _disconnected_devices.clear()
@@ -888,10 +888,10 @@ def registerConfigDevice(dev):
     """adds a special device to the tracking list"""
     global _config_devices_map, _all_devices_map, _config_devices
     # device_guid = gremlin.util.normalize_guid(dev.device_guid)
-    with _device_registry_lock:
-        _all_devices_map[dev.device_guid] = dev
-        _config_devices_map[dev.device_guid] = dev
-        _config_devices.append(dev)
+    # with _device_registry_lock:
+    _all_devices_map[dev.device_guid] = dev
+    _config_devices_map[dev.device_guid] = dev
+    _config_devices.append(dev)
     syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
 
@@ -900,10 +900,10 @@ def removeDevice(dev: DeviceSummary):
     global _all_joystick_devices, _vjoy_devices_map, _joystick_devices, _all_devices_map
     device_guid = dev.device_guid
     device_guid = gremlin.util.normalize_guid(dev.device_guid)
-    with _device_registry_lock:
-        if device_guid in _all_devices_map:
-            del _all_devices_map[device_guid]
-            _update_joystick_device_maps()
+    # with _device_registry_lock:
+    if device_guid in _all_devices_map:
+        del _all_devices_map[device_guid]
+        _update_joystick_device_maps()
 
 
 def device_name_from_guid(device_guid, refresh=False) -> str:
@@ -923,29 +923,29 @@ def device_name_from_guid(device_guid, refresh=False) -> str:
 def known_devices() -> list:
     """gets the list of device GUID (strings) known to GremlinEx"""
     global _all_devices_map
-    with _device_registry_lock:
-        return list(_all_devices_map.keys())
+    # with _device_registry_lock:
+    return list(_all_devices_map.keys())
 
 
 def getKnownDevicesGuids():
     """gets a list of known device GUIDs (iterator)"""
     global _all_devices_map
-    with _device_registry_lock:
-        return list(_all_devices_map.keys())
+    # with _device_registry_lock:
+    return list(_all_devices_map.keys())
 
 
 def getDevices() -> list[DeviceSummary]:
     """gets a list of known devices, physical and virtual (iterator)"""
     global _all_devices_map
-    with _device_registry_lock:
-        return list(_all_devices_map.values())
+    # with _device_registry_lock:
+    return list(_all_devices_map.values())
 
 
 def getValidJoysticksDevices() -> list[DeviceSummary]:
     """gets a list of enabled joystick type devices"""
     global _all_joystick_devices
-    with _device_registry_lock:
-        return [dev for dev in _all_joystick_devices if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)]
+    # with _device_registry_lock:
+    return [dev for dev in _all_joystick_devices if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)]
 
 
 def getVisibleDevices() -> list[DeviceSummary]:
@@ -955,8 +955,8 @@ def getVisibleDevices() -> list[DeviceSummary]:
 
     config = gremlin.config.Configuration()
     visible_map = config.device_visible_map
-    with _device_registry_lock:
-        return [dev for dev in _all_devices_map.values() if not dev.disabled and visible_map.get(dev.device_guid, True)]
+    # with _device_registry_lock:
+    return [dev for dev in _all_devices_map.values() if not dev.disabled and visible_map.get(dev.device_guid, True)]
 
 
 def getVisibleJoystickDevices() -> list[DeviceSummary]:
@@ -966,40 +966,40 @@ def getVisibleJoystickDevices() -> list[DeviceSummary]:
 
     config = gremlin.config.Configuration()
     visible_map = config.device_visible_map
-    with _device_registry_lock:
-        return [dev for dev in _all_joystick_devices if not dev.disabled and visible_map.get(dev.device_guid, True)]
+    # with _device_registry_lock:
+    return [dev for dev in _all_joystick_devices if not dev.disabled and visible_map.get(dev.device_guid, True)]
 
 
 def getValidJoystickDevicesMap() -> dict[dinput.GUID, DeviceSummary]:
     """gets a map of valid joystick device keyed by device guid"""
     global _joystick_device_guid_map
-    with _device_registry_lock:
-        return {
-            dev.device_guid: dev
-            for dev in _joystick_device_guid_map.values()
-            if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)
-        }
+    # with _device_registry_lock:
+    return {
+        dev.device_guid: dev
+        for dev in _joystick_device_guid_map.values()
+        if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)
+    }
 
 
 def getPhysicalDevices() -> list[DeviceSummary]:
     """gets physical joystick devices"""
     global _joystick_device_guid_map
-    with _device_registry_lock:
-        return [dev for dev in _joystick_device_guid_map.values() if dev.device_type == DeviceType.Joystick and not dev.is_virtual]
+    # with _device_registry_lock:
+    return [dev for dev in _joystick_device_guid_map.values() if dev.device_type == DeviceType.Joystick and not dev.is_virtual]
 
 
 def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceSummary:
     """gets the device for the given ID - issues error message if not found"""
     global _all_devices_map
-    with _device_registry_lock:
-        if device_guid:
-            if not isinstance(device_guid, dinput.GUID):
-                device_guid = gremlin.util.to_guid(device_guid)  # ensure a dinput.GUID
-            if device_guid in _all_devices_map:
-                return _all_devices_map[device_guid]
-            verbose = gremlin.config.Configuration().verbose_mode_joystick
-            if verbose:
-                syslog.warning(f"Device not found for GUID: [{device_guid}]")
+    # with _device_registry_lock:
+    if device_guid:
+        if not isinstance(device_guid, dinput.GUID):
+            device_guid = gremlin.util.to_guid(device_guid)  # ensure a dinput.GUID
+        if device_guid in _all_devices_map:
+            return _all_devices_map[device_guid]
+        verbose = gremlin.config.Configuration().verbose_mode_joystick
+        if verbose:
+            syslog.warning(f"Device not found for GUID: [{device_guid}]")
     return None
 
 
@@ -1114,22 +1114,22 @@ def maestro_info_from_index(mid_id: int, connected_only=True):
 def vjoy_device_map() -> dict[int, DeviceSummary]:
     """returns all vjoy devices indexed by vjoy_id -> device"""
     global _all_vjoy_devices_map
-    with _device_registry_lock:
-        return _all_vjoy_devices_map.copy()
+    # with _device_registry_lock:
+    return _all_vjoy_devices_map.copy()
 
 
 def maestro_device_map() -> dict[int, DeviceSummary]:
     """returns all maestro devices indexed by maestro_id -> device"""
     global _maestro_devices_map
-    with _device_registry_lock:
-        return _maestro_devices_map.copy()
+    # with _device_registry_lock:
+    return _maestro_devices_map.copy()
 
 
 def virtual_device_map() -> dict[DeviceType, dict[int, DeviceSummary]]:
     """returns all virtual input devices indexed by device_type:DeviceType, contains [virtual_id:int] -> device: DeviceSummary"""
     global _all_virtual_devices_map
-    with _device_registry_lock:
-        return _all_virtual_devices_map.copy()
+    # with _device_registry_lock:
+    return _all_virtual_devices_map.copy()
 
 
 def is_device_connected(device_guid) -> bool:
@@ -1196,12 +1196,11 @@ def registerSpecialDevices():
     # import gremlin.ui.osc_device
     # import gremlin.ui.midi_device
     global _special_devices_map, _special_devices
-    with _device_registry_lock:
-        _special_devices_map.clear()
-        _special_devices.clear()
-
-        _config_devices_map.clear()
-        _config_devices.clear()
+    # with _device_registry_lock:
+    _special_devices_map.clear()
+    _special_devices.clear()
+    _config_devices_map.clear()
+    _config_devices.clear()
 
     syslog.info("Special devices:")
 
@@ -1332,15 +1331,15 @@ def registerSpecialDevices():
 def getSpecialDevices() -> list:
     """gets all special devices"""
     global _special_devices
-    with _device_registry_lock:
-        return list(_special_devices)
+    # with _device_registry_lock:
+    return list(_special_devices)
 
 
 def getConfigDevices() -> list:
     """gets all configuration devices"""
     global _config_devices
-    with _device_registry_lock:
-        return list(_config_devices)
+    # with _device_registry_lock:
+    return list(_config_devices)
 
 
 def scanDinput():

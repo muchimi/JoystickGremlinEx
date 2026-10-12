@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import ctypes
+import gc
 import importlib
 import logging
 import math
@@ -459,9 +460,105 @@ def hat_direction_to_tuple(value):
         return lookup[value]
     return None
 
+"""
+workaround to QT's deferred delete mechanism for QWidget objects to keep python references in sync with QT's C++ references
+most of the problems with QT's memory management arise from its deferred delete mechanism for QWidget objects and teardown
+planning is required to avoid dangling references and ensure proper cleanup of QWidget objects.
+
+"""
 
 _logtabs = ""
 _cleaned_widgets = []
+_gc_holds = 0
+_pinned_deletes = []
+_pinned_stuck = []
+_pin_release_scheduled = False
+_PIN_TURNS = 8
+
+
+@debug_only
+def _trace(label: str) -> None:
+    """Append one crash-trail breadcrumb. Never raises."""
+    try:
+        from gremlin.diagnostics import breadcrumb
+        breadcrumb(label)
+    except Exception:
+        pass
+
+
+def install_idle_collector():
+    """Leave cyclic collection off for the life of the process.
+
+    Collecting a Python-owned QWidget runs ~QWidget. That destructor calls
+    Qt6Widgets through a QObjectData vtable and faults, whether the collection
+    starts inside json.load, inside a layout query, or from a timer between
+    events. Refcount frees still run. Cycles are kept until exit.
+    """
+    gc.disable()
+
+
+def hold_cyclic_gc(fn):
+    """Keep cyclic collection off across this rebuild.
+
+    install_idle_collector already disables it for the process. This hold
+    disables it again so a later gc.enable() cannot arm a collection while
+    the rebuild is still on the stack.
+    """
+
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        _hold_cyclic_gc()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _release_cyclic_gc()
+
+    return wrapped
+
+
+def _hold_cyclic_gc():
+    global _gc_holds
+    _gc_holds += 1
+    gc.disable()
+
+
+def _release_cyclic_gc():
+    global _gc_holds
+    _gc_holds -= 1
+    if _gc_holds < 0:
+        _gc_holds = 0
+
+
+def _pin_deleted_widget(widget):
+    """Keep a wrapper alive until Qt has processed its deferred delete."""
+    global _pin_release_scheduled
+    _pinned_deletes.append([widget, 0])
+    if _pin_release_scheduled:
+        return
+    _pin_release_scheduled = True
+    QtCore.QTimer.singleShot(0, _release_pinned_deletes)
+
+
+def _release_pinned_deletes():
+    global _pin_release_scheduled, _pinned_deletes
+    batch = _pinned_deletes
+    _pinned_deletes = []
+    kept = []
+    finished = []
+    for widget, turns in batch:
+        turns += 1
+        if widget is None or not Shiboken.isValid(widget):
+            finished.append(widget)
+        elif turns >= _PIN_TURNS:
+            _pinned_stuck.append(widget)
+        else:
+            kept.append([widget, turns])
+    finished.clear()
+    _pinned_deletes.extend(kept)
+    if _pinned_deletes:
+        QtCore.QTimer.singleShot(0, _release_pinned_deletes)
+        return
+    _pin_release_scheduled = False
 
 
 def clear_layout(layout):
@@ -486,6 +583,9 @@ def _clear_layout(layout):
 def delete_widget(widget: QtWidgets.QWidget):
     """removes a widget from memory - calls teardown methods if available on the object to avoid a desync between python and QT memory management"""
     if widget and Shiboken.isValid(widget):
+        # Pin before teardown. Dropping the last Python reference here lets the
+        # cyclic collector run ~QWidget inside the rebuild that is still on the stack.
+        _pin_deleted_widget(widget)
         widget.hide()  # hide the widget from the UI
         # clear any widget layout to release contents as well
         if hasattr(widget, "unhook"):

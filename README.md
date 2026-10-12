@@ -53,6 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: UI: UI activation rework on profile stop
 - Fix: UI: resolved an issue with the delay widget when entering data manually
 - Fix: API: save/recall of last input selection could be incorrect with special devices
+- Fix: API: added additional QT widget teardown wrappers and additional diagnostics instrumentation for QT related crashes.
 
 ### (m77T73A)
 - Fix: UI: Module enable/disable.
