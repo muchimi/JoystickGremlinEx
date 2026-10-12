@@ -57,10 +57,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: UI: Delete all containers disconnected.
 - Change: Add Overlay button inputs, Map to Overlay, %name% variables, and the OCR widget (capture, tracker, designer, Star Citizen mineable and intelligence packs). The EFB pack is not included. (Lolo350).
 - Change: Bring the AFCS designer in line with the overlay canvas: layout, selection pane, undo, exclusive states, and input mappings that survive edit and load. (Lolo350)
-- Change: Application window recapture, single-widget crop, app-share focus and cursor, and runtime show/hide eyes that do not edit the designer Visible flag. (Lolo350)  
+- Change: Application window recapture, single-widget crop, app-share focus and cursor, and runtime show/hide eyes that do not edit the designer Visible flag. (Lolo350)
+- Fix: Overlay: O18 — Several app-share canvases stay visible at once. Showing one attached canvas no longer detaches and hides the others. Each canvas keeps its own app-share setting. (Lolo350)
+- Fix: Overlay: O19 — While a profile is running, the main window can be moved and resized when Joystick Gremlin Ex is in front. The app-share cursor timer no longer cancels a title-bar drag or a border resize. (Lolo350)
 
-Additional notes:  
-Some modules and functionality like voice and OCR can increase CPU and memory utilization significantly.
+
+#### Additional notes:
+
+Some GEX optional modules and functionality such as voice recognition and OCR, can increase CPU/GPU and memory utilization significantly not only when they are used / triggered, but also in terms of residual in memory footprint.  A significant amount of work went in to minimize this impact as everything in GEX is about low latency and low footprint using tools like profiling and even AI tools, the fact remains that these modules, and their dependencies, use new system resources. This is unavoidable. As such, GEX makes these modules optional.  You can control if GEX loads these modules in the options (restart required).
 
 
 ### (m77T73A)
