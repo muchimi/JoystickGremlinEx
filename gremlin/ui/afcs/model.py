@@ -49,7 +49,7 @@ def default_node_props(kind: str) -> dict[str, Any]:
     if kind == "deadzone":
         return {"center": 0.05, "outer": 0.0}
     if kind == "override":
-        return {"threshold": 0.08, "release": 0.03, "release_ms": 0.0, "hold_until_in": False}
+        return {"threshold": 0.01, "release": 0.03, "release_ms": 0.0, "hold_until_in": False}
     if kind == "laglead":
         return {"lag_ms": 80.0, "lead_ms": 0.0}
     if kind == "output":
@@ -193,9 +193,9 @@ def _normalize_node(raw) -> dict[str, Any] | None:
             props["outer"] = 0.0
     if kind == "override":
         try:
-            props["threshold"] = max(0.0, min(1.0, float(props.get("threshold") if props.get("threshold") is not None else 0.08)))
+            props["threshold"] = max(0.0, min(1.0, float(props.get("threshold") if props.get("threshold") is not None else 0.01)))
         except (TypeError, ValueError):
-            props["threshold"] = 0.08
+            props["threshold"] = 0.01
         try:
             props["release"] = max(0.0, min(1.0, float(props.get("release") if props.get("release") is not None else 0.03)))
         except (TypeError, ValueError):
@@ -426,6 +426,19 @@ class AfcsDocument(QtCore.QObject):
         self._dirty = True
         self._emit()
         return cloned
+
+    def reorder_modes(self, order: list[str]) -> None:
+        by_id = {mode["id"]: mode for mode in self.modes()}
+        reordered = [by_id[mode_id] for mode_id in order if mode_id in by_id]
+        seen = {mode["id"] for mode in reordered}
+        for mode in self.modes():
+            if mode["id"] not in seen:
+                reordered.append(mode)
+        if [mode["id"] for mode in reordered] == [mode["id"] for mode in self.modes()]:
+            return
+        self.data["modes"] = reordered
+        self._dirty = True
+        self._emit()
 
     def remove_mode(self, mode_id: str) -> None:
         modes = self.modes()

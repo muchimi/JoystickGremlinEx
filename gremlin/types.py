@@ -1636,6 +1636,7 @@ class EventSourceType(enum.Enum):
     OSC = 4
     StreamDeck = 5
     Any = 6  # any source
+    Overlay = 7
 
 
 

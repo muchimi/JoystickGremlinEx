@@ -352,6 +352,18 @@ class StateCategories(QtCore.QObject):
                     widget.setCurrentIndex(selected_index)
 
 
+def _normalize_exclusive_keys(keys, self_key: str | None = None) -> list[str]:
+    """Normalize exclusive peer keys: casefold, unique, drop blanks/self."""
+    out: list[str] = []
+    self_key = (self_key or "").casefold().strip()
+    for raw in keys or []:
+        key = str(raw or "").casefold().strip()
+        if not key or key == self_key or key in out:
+            continue
+        out.append(key)
+    return out
+
+
 # class StateInputItem(AbstractInputItem):
 class StateInputItem(InputItem):
     """holds a single state"""
@@ -376,6 +388,7 @@ class StateInputItem(InputItem):
         autorelease_mode="toggle",
         autorelease_trigger_mode="on",
         data=None,
+        exclusive_keys=None,
     ):
         master_mode = gremlin.shared_state.master_mode
 
@@ -415,6 +428,9 @@ class StateInputItem(InputItem):
         self._autorelease_mode = autorelease_mode  # autorelease behavior when the timer lapses
         self._autorelease_timer = None  # timer when triggered for autorelease
         self._autorelease_trigger_mode = autorelease_trigger_mode  # trigger mode required to enable the autorelease timer
+        self._exclusive_keys = _normalize_exclusive_keys(exclusive_keys, self._key)
+        self._applying_exclusive = False  # re-entrancy guard for mutual exclusion
+        self._suppress_exclusive = False
 
         self._title_name = "State"
         self.setOverrideInputType(InputType.JoystickButton)
@@ -451,6 +467,7 @@ class StateInputItem(InputItem):
             self.autorelease_delay,
             self.autorelease_mode,
             self.autorelease_trigger_mode,
+            exclusive_keys=list(self._exclusive_keys),
         )
 
     def getOverrideInputType(self):
@@ -603,6 +620,15 @@ class StateInputItem(InputItem):
             self._fire_changed(data)
             self.changed.emit(self)
 
+            if (
+                data
+                and not self._applying_exclusive
+                and not self._expression
+                and self._exclusive_keys
+                and not self._suppress_exclusive
+            ):
+                self._apply_exclusive_off()
+
             if is_auto:
                 trigger_mode = self._autorelease_trigger_mode
                 trigger = False
@@ -620,6 +646,22 @@ class StateInputItem(InputItem):
                         syslog.info(f"STATE: [{self.key}] start release timer")
                     self._autorelease_timer = threading.Timer(self._autorelease_delay, self._handle_autorelease)
                     self._autorelease_timer.start()
+
+    def _apply_exclusive_off(self):
+        """Force mutually exclusive peers Off when this state turns On."""
+        if self._applying_exclusive or self._expression or not self._exclusive_keys:
+            return
+        self._applying_exclusive = True
+        try:
+            sd = StateData()
+            for key in list(self._exclusive_keys):
+                peer = sd.getState(key)
+                if peer is None or peer is self or peer.isExpression:
+                    continue
+                if peer.value:
+                    peer.setValue(False)
+        finally:
+            self._applying_exclusive = False
 
     def _handle_autorelease(self):
         """called when the auto release timer lapses"""
@@ -679,12 +721,23 @@ class StateInputItem(InputItem):
     def toggle(self):
         """toggles the state"""
         if not self._expression:
-            # only toggle non-expression states
-            self._value = not self._value
-            if self._emit:
-                self._fire_changed(self._value)
+            # only toggle non-expression states (via setValue so exclusive rules apply)
+            self.setValue(not bool(self._value))
             return self._value
         return None
+
+    @property
+    def exclusive_keys(self) -> list[str]:
+        """Keys of states mutually exclusive with this one (never includes self)."""
+        return list(self._exclusive_keys)
+
+    @exclusive_keys.setter
+    def exclusive_keys(self, keys):
+        self._exclusive_keys = _normalize_exclusive_keys(keys, self._key)
+
+    @property
+    def is_mutually_exclusive(self) -> bool:
+        return bool(self._exclusive_keys)
 
     @property
     def default_value(self):
@@ -833,6 +886,8 @@ class StateInputItem(InputItem):
         node.set("autorelease-delay", safe_format(self._autorelease_delay, float))
         node.set("autorelease-mode", safe_format(self._autorelease_mode, str))
         node.set("autorelease-trigger", safe_format(self._autorelease_trigger_mode, str))
+        if self._exclusive_keys:
+            node.set("exclusive", ",".join(self._exclusive_keys))
 
         # write container data
         super().to_xml(node)
@@ -884,6 +939,11 @@ class StateInputItem(InputItem):
         self.autorelease_delay = safe_read(node, "autorelease-delay", float, 1.0)
         self.autorelease_mode = safe_read(node, "autorelease-mode", str, "toggle")
         self.autorelease_trigger_mode = safe_read(node, "autorelease-trigger", str, "on")
+        exclusive_raw = node.get("exclusive") if "exclusive" in node.attrib else ""
+        self._exclusive_keys = _normalize_exclusive_keys(
+            [part.strip() for part in str(exclusive_raw or "").split(",") if part.strip()],
+            self._key,
+        )
 
         super().from_xml(node, data, extra_data)
 
@@ -1547,7 +1607,11 @@ class StateData:
                 # initial evaluation
                 to_evaluate.append(state)
             else:
-                state.value = state.default_value
+                state._suppress_exclusive = True
+                try:
+                    state.value = state.default_value
+                finally:
+                    state._suppress_exclusive = False
                 if verbose:
                     syslog.info(f"STATE: profile start [{state.key}] set initial value to: [{'ON/PRESSED' if state.value else 'OFF/RELEASED'}]")
 
@@ -1614,12 +1678,88 @@ class StateData:
             self._hooked_states.add(state)
             state.changed.connect(self._handle_state_changed)
         self._data[new_name] = state
+        old_key = (old_name or "").casefold().strip()
+        new_key = (new_name or "").casefold().strip()
+        if old_key and new_key and old_key != new_key:
+            for other in self._data.values():
+                if other is state or not other.exclusive_keys:
+                    continue
+                keys = other.exclusive_keys
+                if old_key in keys:
+                    other.exclusive_keys = [new_key if k == old_key else k for k in keys]
+            state.exclusive_keys = [k for k in state.exclusive_keys if k != new_key]
         self.key_changed.emit(state, old_name, new_name)
         # remove the old state AFTER updates or things referencing the old state won't find it
         if old_name in self._data:
             del self._data[old_name]
         if not gremlin.shared_state.profile_loading:
             self.crud.emit()
+
+    def set_exclusive_group(self, anchor: StateInputItem, peer_keys: list[str] | None):
+        """Rebuild one mutually exclusive clique from *anchor* + *peer_keys*.
+
+        Every member gets the same exclusive set (minus itself). Former peers
+        that drop out of the group are cleared. Expression states are ignored.
+        """
+        if anchor is None:
+            return
+        previous_keys = set(anchor.exclusive_keys or [])
+        if anchor.key:
+            previous_keys.add(anchor.key.casefold().strip())
+        for key in list(previous_keys):
+            peer = self.getState(key)
+            if peer is None:
+                continue
+            previous_keys.update(peer.exclusive_keys or [])
+            if peer.key:
+                previous_keys.add(peer.key.casefold().strip())
+
+        members: list[StateInputItem] = []
+        if not anchor.isExpression:
+            members.append(anchor)
+        for key in _normalize_exclusive_keys(peer_keys, anchor.key):
+            peer = self.getState(key)
+            if peer is None or peer is anchor or peer.isExpression:
+                continue
+            if peer not in members:
+                members.append(peer)
+        member_keys = {(m.key or "").casefold().strip() for m in members if m.key}
+
+        if len(members) < 2:
+            for key in previous_keys:
+                other = self.getState(key)
+                if other is not None:
+                    other.exclusive_keys = [k for k in other.exclusive_keys if k not in previous_keys]
+            return
+
+        for member in members:
+            member.exclusive_keys = sorted(k for k in member_keys if k != member.key)
+        for key in previous_keys:
+            if key in member_keys:
+                continue
+            other = self.getState(key)
+            if other is None:
+                continue
+            other.exclusive_keys = [
+                k for k in other.exclusive_keys if k not in previous_keys and k not in member_keys
+            ]
+
+    def clear_exclusive_group(self, state: StateInputItem | str | None):
+        """Remove *state* from every peer exclusive list and clear its own."""
+        if state is None:
+            return
+        if isinstance(state, str):
+            state = self.getState(state)
+        if state is None:
+            return
+        peers = list(state.exclusive_keys or [])
+        self_key = (state.key or "").casefold().strip()
+        state.exclusive_keys = []
+        for key in peers:
+            peer = self.getState(key)
+            if peer is None:
+                continue
+            peer.exclusive_keys = [k for k in peer.exclusive_keys if k != self_key]
 
     def _expression_changed(self, state):
         self.expression_changed.emit(state)
@@ -1636,6 +1776,7 @@ class StateData:
         key = key.casefold().strip()
         if key in self._data:
             state = self._data[key]
+            self.clear_exclusive_group(state)
 
             state.unhook()
             state.changed.disconnect(self._handle_state_changed)
@@ -1883,6 +2024,7 @@ class StateData:
             key = state.key
         if key in self._data:
             data = self._data[key]
+            self.clear_exclusive_group(data)
             data.unhook()
             del self._data[key]
             del self._id_map[data.id]
@@ -1892,6 +2034,7 @@ class StateData:
     def removeId(self, id: str):
         if id in self._id_map:
             data = self._id_map[id]
+            self.clear_exclusive_group(data)
             data.unhook()
             key = data.key
             del self._data[key]
@@ -2387,6 +2530,110 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         return self._last_selected_category
 
 
+class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+    """Multi-select popup to choose mutually exclusive peer states."""
+
+    def __init__(self, current_key: str, selected_keys: list[str] | None = None, parent=None):
+        super().__init__(self.__class__.__name__, parent=parent)
+        self.setWindowTitle("Mutually Exclusive States")
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.setMinimumSize(420, 480)
+        self._current_key = (current_key or "").casefold().strip()
+        self._selected = set(_normalize_exclusive_keys(selected_keys, self._current_key))
+        self._search = ""
+        self._category = None
+
+        layout = QtWidgets.QVBoxLayout(self)
+        hint = QtWidgets.QLabel(
+            "Select states that cannot be On at the same time as "
+            f"<b>{html.escape(current_key or '(this state)')}</b>. "
+            "Expression states are not listed.",
+            self,
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self._search_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._search_widget.setPlaceholderText("Search…")
+        layout.addWidget(gremlin.ui.ui_common.getHContainer(["Search:", self._search_widget], widget_only=True))
+
+        self._list = QtWidgets.QListWidget(self)
+        self._list.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self._count_widget = QtWidgets.QLabel("", self)
+
+        cm = StateCategories()
+        self._category_widget = cm.getSelector(None, cm.default())
+        with QtCore.QSignalBlocker(self._category_widget):
+            self._category_widget.insertItem(0, "(all categories)", None)
+            self._category_widget.setCurrentIndex(0)
+        layout.addWidget(gremlin.ui.ui_common.getHContainer(["Category:", self._category_widget], widget_only=True))
+        layout.addWidget(self._list, 1)
+        layout.addWidget(self._count_widget)
+
+        ok = QtWidgets.QPushButton("Ok")
+        ok.clicked.connect(self.accept)
+        cancel = QtWidgets.QPushButton("Cancel")
+        cancel.clicked.connect(self.reject)
+        layout.addWidget(gremlin.ui.ui_common.getHContainer([ok, cancel], left_stretch=True, widget_only=True))
+
+        self._list.itemChanged.connect(self._item_changed)
+        self._search_widget.textChanged.connect(self._search_changed)
+        self._category_widget.currentIndexChanged.connect(self._category_changed)
+        self._rebuild_list()
+
+    def selected_keys(self) -> list[str]:
+        return sorted(self._selected)
+
+    def _search_changed(self, text: str):
+        self._search = text or ""
+        self._rebuild_list()
+
+    def _category_changed(self, *_args):
+        self._category = self._category_widget.currentData()
+        self._rebuild_list()
+
+    def _rebuild_list(self):
+        if not hasattr(self, "_list") or self._list is None:
+            return
+        with QtCore.QSignalBlocker(self._list):
+            self._list.clear()
+            sd = StateData()
+            decorated = gremlin.util.decorate_filter(self._search) if self._search else None
+            shown = 0
+            for _key, state in sd.getStates().items():
+                if not state or state.isExpression:
+                    continue
+                state_key = (state.key or "").casefold().strip()
+                if not state_key or state_key == self._current_key:
+                    continue
+                if self._category is not None and state.category != self._category:
+                    continue
+                if decorated:
+                    if not (fnmatch.fnmatch(state_key, decorated) or self._search.casefold() in state_key):
+                        continue
+                item = QtWidgets.QListWidgetItem(state.key)
+                item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+                item.setCheckState(QtCore.Qt.Checked if state_key in self._selected else QtCore.Qt.Unchecked)
+                item.setData(QtCore.Qt.UserRole, state_key)
+                desc = (state.description or "").strip()
+                if desc:
+                    item.setToolTip(desc)
+                self._list.addItem(item)
+                shown += 1
+        if hasattr(self, "_count_widget") and self._count_widget is not None:
+            self._count_widget.setText(f"{shown} state(s) · {len(self._selected)} selected")
+
+    def _item_changed(self, item: QtWidgets.QListWidgetItem):
+        key = item.data(QtCore.Qt.UserRole)
+        if not key:
+            return
+        if item.checkState() == QtCore.Qt.Checked:
+            self._selected.add(key)
+        else:
+            self._selected.discard(key)
+        self._count_widget.setText(f"{self._list.count()} state(s) · {len(self._selected)} selected")
+
+
 class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     """dialog showing the state input configuration options"""
 
@@ -2420,6 +2667,8 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_widget, self._config_layout = gremlin.ui.ui_common.getGridContainer()
         self.data = state
         self.ref_data = ref_state  # reference state
+        self._exclusive_keys = list(state.exclusive_keys or [])
+        self._exclusive_enabled = bool(self._exclusive_keys)
 
         self._name_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._name_widget.setText(state.key)
@@ -2512,6 +2761,30 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self._autorelease_container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
+        self._exclusive_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Mutually exclusive",
+            value=self._exclusive_enabled,
+            callback=self._handle_exclusive_changed,
+        )
+        self._exclusive_widget.setToolTip(
+            "When this state turns On, selected peer states are forced Off. "
+            "The same exclusive group is written to every selected peer."
+        )
+        self._exclusive_summary_widget = QtWidgets.QLabel("")
+        self._exclusive_summary_widget.setWordWrap(True)
+        self._exclusive_select_widget = QtWidgets.QPushButton("Select…")
+        self._exclusive_select_widget.setToolTip("Choose which states are mutually exclusive with this one.")
+        self._exclusive_select_widget.clicked.connect(self._open_exclusive_picker)
+        self._exclusive_options_widget = gremlin.ui.ui_common.getHContainer(
+            [self._exclusive_summary_widget, self._exclusive_select_widget],
+            widget_only=True,
+        )
+        self._exclusive_container_widget = gremlin.ui.ui_common.getVContainer(
+            [self._exclusive_widget, self._exclusive_options_widget],
+            widget_only=True,
+        )
+        self._refresh_exclusive_summary()
+
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
         self._cm = StateCategories()
@@ -2570,6 +2843,9 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_layout.addWidget(self._autorelease_container_widget, row, col, 1, -1)
 
         row += 1
+        self._config_layout.addWidget(self._exclusive_container_widget, row, col, 1, -1)
+
+        row += 1
 
         self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
         self._default_on_widget.setToolTip("If checked, the state will default to Active/On/Pressed")
@@ -2624,6 +2900,34 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _handle_autorelease_delay_changed(self, value):
         self.data.autorelease_delay = value
+
+    @QtCore.Slot(bool)
+    def _handle_exclusive_changed(self, checked: bool):
+        self._exclusive_enabled = bool(checked)
+        if not self._exclusive_enabled:
+            self._exclusive_keys = []
+        self._refresh_exclusive_summary()
+        self._update_ui()
+
+    def _refresh_exclusive_summary(self):
+        if not self._exclusive_enabled:
+            self._exclusive_summary_widget.setText("")
+            return
+        if self._exclusive_keys:
+            self._exclusive_summary_widget.setText(", ".join(self._exclusive_keys))
+        else:
+            self._exclusive_summary_widget.setText("None selected")
+
+    def _open_exclusive_picker(self):
+        dialog = StateExclusivePickerDialog(self.data.key, self._exclusive_keys, parent=self)
+        if dialog.exec() == QtWidgets.QDialog.Accepted:
+            self._exclusive_keys = dialog.selected_keys()
+            self._exclusive_enabled = True
+            with QtCore.QSignalBlocker(self._exclusive_widget):
+                self._exclusive_widget.setChecked(True)
+            self._refresh_exclusive_summary()
+            self._update_ui()
+        gremlin.util.delete_widget(dialog)
 
     def _set_status(self, text: str):
         """sets the status text"""
@@ -2773,6 +3077,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                             )
                             return
 
+                if self.data.isExpression or not self._exclusive_enabled:
+                    self.data.exclusive_keys = []
+                else:
+                    self.data.exclusive_keys = list(self._exclusive_keys)
+
                 gremlin.shared_state.pop_suspend_highlighting()
                 self.accept()
         else:
@@ -2792,11 +3101,15 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         if expression_visible:
             self._autorelease_container_widget.setVisible(False)
+            self._exclusive_container_widget.setVisible(False)
 
         else:
             self._autorelease_container_widget.setVisible(True)
             visible = self.data.autorelease
             self._autorelease_options_container_widget.setVisible(visible)
+            self._exclusive_container_widget.setVisible(True)
+            self._exclusive_options_widget.setVisible(self._exclusive_enabled)
+            self._exclusive_select_widget.setEnabled(self._exclusive_enabled)
 
 
 class StateFilterWidget(QtWidgets.QWidget):
@@ -3433,6 +3746,10 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
                 # change the state
                 sd.add(edited_input_item)
+                if edited_input_item.isExpression or not edited_input_item.exclusive_keys:
+                    sd.clear_exclusive_group(edited_input_item)
+                else:
+                    sd.set_exclusive_group(edited_input_item, edited_input_item.exclusive_keys)
                 self._filter_widget.updateCounts()
 
             else:
@@ -3457,6 +3774,11 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_item.autorelease_delay = edited_input_item.autorelease_delay
                 input_item.autorelease_mode = edited_input_item.autorelease_mode
                 input_item.autorelease_trigger_mode = edited_input_item.autorelease_trigger_mode
+
+                if input_item.isExpression or not edited_input_item.exclusive_keys:
+                    sd.clear_exclusive_group(input_item)
+                else:
+                    sd.set_exclusive_group(input_item, edited_input_item.exclusive_keys)
 
                 # List view reuses the existing card when the model identity is
                 # unchanged, so name/description/category must be applied in place.

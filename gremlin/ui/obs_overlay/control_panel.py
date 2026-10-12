@@ -106,6 +106,45 @@ class MouseRepositionBanner(QtWidgets.QWidget):
 _reposition_banner: MouseRepositionBanner | None = None
 
 
+class _OverlayTargetList(QtWidgets.QListWidget):
+    """Target list with a selection-pane eye in the item icon slot."""
+
+    eyeClicked = QtCore.Signal(object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setIconSize(QtCore.QSize(16, 16))
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+            item = self.itemAt(pos)
+            if item is not None and self._eye_contains(item, pos):
+                self.eyeClicked.emit(item)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def _eye_contains(self, item: QtWidgets.QListWidgetItem, pos: QtCore.QPoint) -> bool:
+        index = self.indexFromItem(item)
+        option = QtWidgets.QStyleOptionViewItem()
+        option.initFrom(self)
+        option.rect = self.visualRect(index)
+        option.features = QtWidgets.QStyleOptionViewItem.ViewItemFeature.HasDecoration
+        option.icon = item.icon()
+        option.decorationSize = self.iconSize()
+        icon_rect = self.style().subElementRect(
+            QtWidgets.QStyle.SubElement.SE_ItemViewItemDecoration,
+            option,
+            self,
+        )
+        if not icon_rect.isValid() or icon_rect.width() < 4:
+            icon_rect = QtCore.QRect(option.rect.left(), option.rect.top(), 20, option.rect.height())
+        else:
+            icon_rect = icon_rect.adjusted(-2, 0, 4, 0)
+        return icon_rect.contains(pos)
+
+
 def sync_mouse_reposition_banner(enabled: bool):
     """Show or hide the top-of-screen mouse-reposition advisory."""
     global _reposition_banner
@@ -184,9 +223,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
         filter_row.addWidget(self._search_edit, 1)
         target_form.addRow("Show", filter_row)
 
-        self._target_list = QtWidgets.QListWidget(self)
+        self._target_list = _OverlayTargetList(self)
         self._target_list.setMinimumHeight(140)
         self._target_list.currentItemChanged.connect(self._on_target_item)
+        self._target_list.eyeClicked.connect(self._on_eye_clicked)
         target_form.addRow(self._target_list)
         root.addWidget(target_box)
 
@@ -347,6 +387,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._rebuild_timer.setSingleShot(True)
         self._rebuild_timer.setInterval(50)
         self._rebuild_timer.timeout.connect(self._rebuild)
+        self._eye_timer = QtCore.QTimer(self)
+        self._eye_timer.setInterval(250)
+        self._eye_timer.timeout.connect(self._refresh_eye_icons)
+        self._eye_timer.start()
         self.destroyed.connect(self._detach)
         self._bind_runtime_hooks()
         self._install_activity_filters()
@@ -442,6 +486,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
 
     def _detach(self, *_args):
         self._stop_nudge()
+        try:
+            self._eye_timer.stop()
+        except Exception:
+            pass
         self._hide_control_highlight()
         try:
             self._highlight_idle.stop()
@@ -691,6 +739,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
                 item = QtWidgets.QListWidgetItem(label)
                 item.setData(QtCore.Qt.UserRole, ("widget", widget["id"]))
                 self._target_list.addItem(item)
+        self._refresh_eye_icons()
 
         # Select matching target
         kind = str(current.get("kind") or "page")
@@ -720,15 +769,98 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._list_query = str(text or "")
         self._rebuild_targets(self._current_page_id())
 
+    def _target_ids(self, kind: str, tid) -> list[str]:
+        return self.scene.control_target_widget_ids(
+            {"kind": kind, "id": tid},
+            page_id=self._current_page_id(),
+        )
+
+    def _widget_is_shown(self, widget_id: str) -> bool:
+        from .bindings import widget_is_live_visible
+
+        return widget_is_live_visible(self.scene.widget_by_id(widget_id))
+
+    def _target_is_shown(self, data) -> bool:
+        if not data:
+            return True
+        kind, tid = data
+        if kind == "page":
+            page = self.scene.page_by_id(tid)
+            return bool((page or {}).get("visible", True))
+        ids = self._target_ids(kind, tid)
+        if not ids:
+            return True
+        return all(self._widget_is_shown(wid) for wid in ids)
+
+    def _eye_tooltip(self, data, shown: bool) -> str:
+        kind = str(data[0] if data else "")
+        if kind == "page":
+            return "Hide the live page" if shown else "Show the live page"
+        ids = self._target_ids(kind, data[1]) if data else []
+        override = False
+        for wid in ids:
+            item = self.scene.widget_by_id(wid)
+            if item is not None and self.scene.active_visibility_override(item) is not None:
+                override = True
+                break
+        if kind == "group":
+            text = "Hide all widgets on the live overlay" if shown else "Show all widgets on the live overlay"
+        else:
+            text = "Hide on the live overlay" if shown else "Show on the live overlay"
+        if override:
+            text += ". Runtime only — the editor visibility stays as designed"
+        return text
+
+    def _refresh_eye_icons(self):
+        if not _alive(self):
+            return
+        from .selection_pane import _icon_eye
+
+        for row in range(self._target_list.count()):
+            item = self._target_list.item(row)
+            if item is None:
+                continue
+            data = item.data(QtCore.Qt.UserRole)
+            shown = self._target_is_shown(data)
+            tip = self._eye_tooltip(data, shown)
+            if item.data(QtCore.Qt.UserRole + 1) == shown and item.toolTip() == tip:
+                continue
+            item.setIcon(_icon_eye(shown))
+            item.setData(QtCore.Qt.UserRole + 1, shown)
+            item.setToolTip(tip)
+        self._sync_target_visible_checkbox()
+
+    def _on_eye_clicked(self, item: QtWidgets.QListWidgetItem):
+        if self._building or item is None:
+            return
+        data = item.data(QtCore.Qt.UserRole)
+        if not data:
+            return
+        kind, tid = data
+        shown = self._target_is_shown(data)
+        self._target_list.setCurrentItem(item)
+        if kind == "page":
+            self._page_visible.setChecked(not shown)
+            self._refresh_eye_icons()
+            return
+        ids = self._target_ids(kind, tid)
+        if ids:
+            self.scene.set_runtime_visibility(ids, not shown)
+        self._refresh_eye_icons()
+
     def _sync_target_visible_checkbox(self):
         ids = self.scene.control_target_widget_ids()
+        try:
+            running = bool(gremlin.shared_state.is_running)
+        except Exception:
+            running = False
         self._target_visible.blockSignals(True)
         if not ids:
             self._target_visible.setEnabled(False)
             self._target_visible.setChecked(True)
         else:
-            self._target_visible.setEnabled(True)
-            visible = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in ids)
+            self._target_visible.setEnabled(running)
+            visible = all(self._widget_is_shown(wid) for wid in ids)
             self._target_visible.setChecked(visible)
         kind = str((self.scene.control_target or {}).get("kind") or "page")
         if kind == "page" and not is_onscreen_mode(self.scene.canvas_for(self._current_page_id())):
@@ -831,13 +963,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
     def _on_target_visible(self, on: bool):
         if self._building:
             return
-        target = self.scene.control_target or {}
-        kind = str(target.get("kind") or "page")
-        if kind == "group":
-            self.scene.set_group_widgets_visible(target.get("id"), bool(on), page_id=self._current_page_id())
-        else:
-            ids = self.scene.control_target_widget_ids()
-            self.scene.set_widgets_visible(ids, bool(on))
+        ids = self.scene.control_target_widget_ids(page_id=self._current_page_id())
+        if ids:
+            self.scene.set_runtime_visibility(ids, bool(on))
+        self._refresh_eye_icons()
 
     def _reset_layout(self):
         page_id = self._current_page_id()

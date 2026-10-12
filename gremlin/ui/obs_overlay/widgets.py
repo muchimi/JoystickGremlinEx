@@ -539,7 +539,7 @@ def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
         try:
             shaped = shape_path(item)
             if shaped is not None and not shaped.isEmpty():
-                return shaped
+                return _clip_path_to_crop(item, shaped)
         except Exception:
             pass
     if circular or (wtype == "button" and normalize_shape_kind(style.get("shape")) in ("circle", "ellipse")):
@@ -548,7 +548,7 @@ def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
         path.addRoundedRect(rect, radius, radius)
     else:
         path.addRect(rect)
-    return path
+    return _clip_path_to_crop(item, path)
 
 
 def _widget_shadow_image_path(item: dict[str, Any]) -> str:
@@ -735,7 +735,7 @@ def paint_widget_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any]):
     # Drag/rotate of large groups must not pay for soft-shadow stamps on the UI thread.
     if _interaction_paint:
         return
-    image_path = _widget_shadow_image_path(item)
+    image_path = "" if crop_is_active(item) else _widget_shadow_image_path(item)
     if image_path:
         from .images import is_svg_path, svg_renderer
 
@@ -849,6 +849,86 @@ def widget_rect(item: dict[str, Any]) -> QtCore.QRectF:
     return QtCore.QRectF(item["x"], item["y"], item["w"], item["h"])
 
 
+_CROP_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
+_CROP_EDIT_KEY = "crop_edit"
+_CROP_MIN_VISIBLE = 8
+
+
+def clamp_crop(width, height, left, top, right, bottom, minimum: int = _CROP_MIN_VISIBLE):
+    """Keep a crop inset inside the widget and leave at least *minimum* pixels visible."""
+
+    def _n(value) -> int:
+        try:
+            return max(0, int(round(float(value or 0))))
+        except (TypeError, ValueError):
+            return 0
+
+    left, top, right, bottom = _n(left), _n(top), _n(right), _n(bottom)
+    try:
+        width = max(minimum, int(round(float(width or minimum))))
+    except (TypeError, ValueError):
+        width = minimum
+    try:
+        height = max(minimum, int(round(float(height or minimum))))
+    except (TypeError, ValueError):
+        height = minimum
+    if left + right > width - minimum:
+        extra = left + right - (width - minimum)
+        take = min(right, extra)
+        right -= take
+        left = max(0, left - (extra - take))
+    if top + bottom > height - minimum:
+        extra = top + bottom - (height - minimum)
+        take = min(bottom, extra)
+        bottom -= take
+        top = max(0, top - (extra - take))
+    return left, top, right, bottom
+
+
+def crop_insets(item: dict[str, Any] | None) -> tuple[int, int, int, int]:
+    raw = (item or {}).get("crop") if isinstance(item, dict) else None
+    if not isinstance(raw, dict):
+        raw = {}
+    return clamp_crop(
+        (item or {}).get("w") if isinstance(item, dict) else _CROP_MIN_VISIBLE,
+        (item or {}).get("h") if isinstance(item, dict) else _CROP_MIN_VISIBLE,
+        raw.get("l"),
+        raw.get("t"),
+        raw.get("r"),
+        raw.get("b"),
+    )
+
+
+def crop_is_active(item: dict[str, Any] | None) -> bool:
+    return any(crop_insets(item))
+
+
+def cropped_rect(item: dict[str, Any]) -> QtCore.QRectF:
+    rect = widget_rect(item)
+    left, top, right, bottom = crop_insets(item)
+    return rect.adjusted(float(left), float(top), float(-right), float(-bottom))
+
+
+def crop_edit_uses_handles() -> bool:
+    raw = str(QtCore.QSettings(*_CROP_SETTINGS).value(_CROP_EDIT_KEY, "sliders") or "sliders").casefold()
+    return raw == "handles"
+
+
+def set_crop_edit_mode(mode: str):
+    QtCore.QSettings(*_CROP_SETTINGS).setValue(
+        _CROP_EDIT_KEY,
+        "handles" if str(mode or "").casefold() == "handles" else "sliders",
+    )
+
+
+def _clip_path_to_crop(item: dict[str, Any], path: QtGui.QPainterPath) -> QtGui.QPainterPath:
+    if path.isEmpty() or not crop_is_active(item):
+        return path
+    clip = QtGui.QPainterPath()
+    clip.addRect(cropped_rect(item))
+    return path.intersected(clip)
+
+
 def normalize_rotation(value) -> float:
     try:
         angle = float(value or 0.0)
@@ -934,21 +1014,77 @@ def widget_local_to_scene(item: dict[str, Any], x: float, y: float) -> QtCore.QP
     return widget_transform(item).map(QtCore.QPointF(x, y))
 
 
-def widget_contains_point(item: dict[str, Any], x: float, y: float) -> bool:
+def widget_contains_point(item: dict[str, Any], x: float, y: float, *, cropped: bool = True) -> bool:
     point = scene_to_widget_local(item, x, y)
+    use_crop = cropped and crop_is_active(item)
     if uses_shape_geometry(item):
         path = shape_path(item)
+        if use_crop:
+            path = _clip_path_to_crop(item, path)
         if path.contains(point):
             return True
         stroker = QtGui.QPainterPathStroker()
         border = _border_w(item.get("style"))
         stroker.setWidth(max(8.0, border + 6.0))
         return stroker.createStroke(path).contains(point)
-    return widget_rect(item).contains(point)
+    rect = cropped_rect(item) if use_crop else widget_rect(item)
+    return rect.contains(point)
+
+
+def _paint_cropped_body(painter: QtGui.QPainter, item: dict[str, Any], value, fn):
+    """Draw *fn* at full size, then copy only the cropped rectangle onto *painter*."""
+    full = widget_rect(item)
+    crop = cropped_rect(item)
+    if crop.width() < 1.0 or crop.height() < 1.0:
+        return
+    width = max(1, int(math.ceil(full.width())))
+    height = max(1, int(math.ceil(full.height())))
+    buffer = QtGui.QPixmap(width, height)
+    buffer.fill(QtCore.Qt.transparent)
+    buffer_painter = QtGui.QPainter(buffer)
+    try:
+        buffer_painter.setRenderHints(painter.renderHints())
+        buffer_painter.translate(-full.left(), -full.top())
+        fn(buffer_painter, item, value)
+    finally:
+        if buffer_painter.isActive():
+            buffer_painter.end()
+    source = QtCore.QRectF(
+        crop.left() - full.left(),
+        crop.top() - full.top(),
+        crop.width(),
+        crop.height(),
+    )
+    painter.drawPixmap(crop, buffer, source)
+
+
+def _paint_crop_border(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCore.QRectF):
+    """Stroke the visible crop. The widget's own border sits on the full box and is clipped away."""
+    style = item.get("style") or {}
+    width = _border_w(style)
+    if width <= 0:
+        return
+    radius = min(_corner_radius(style), rect.width() * 0.5, rect.height() * 0.5)
+    painter.save()
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(_pen(style.get("border"), width))
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+    painter.restore()
 
 
 def widget_rotated_bounds(item: dict[str, Any]) -> QtCore.QRectF:
     rect = widget_rect(item)
+    if abs(widget_rotation_deg(item)) < 0.001:
+        return rect
+    return widget_transform(item).mapRect(rect)
+
+
+def widget_alignment_bounds(item: dict[str, Any]) -> QtCore.QRectF:
+    """Axis-aligned bounds of the visible crop, used by snap lines."""
+    rect = cropped_rect(item)
     if abs(widget_rotation_deg(item)) < 0.001:
         return rect
     return widget_transform(item).mapRect(rect)
@@ -1100,6 +1236,10 @@ def _draw_label(
         return
     else:
         text = item.get("label") or ""
+    if "%" in str(text):
+        from .model import resolve_overlay_text
+
+        text = resolve_overlay_text(text)
     if not text:
         return
     label_rect = rect.adjusted(
@@ -1460,6 +1600,117 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawText(rect, int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap), msg)
         if not (style.get("window_title") or style.get("window_exe") or style.get("launch_path")):
             _draw_label(painter, item, rect)
+    painter.restore()
+
+
+def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) -> QtGui.QPen:
+    """Border pen for OCR widgets (solid / dashed / dotted; no fill)."""
+    from .model import normalize_ocr_border_style, ocr_border_is_enabled
+
+    if not ocr_border_is_enabled(style, armed=armed):
+        return QtGui.QPen(QtCore.Qt.NoPen)
+
+    width_key = "border_width_on" if armed else "border_width"
+    try:
+        width = float(style.get(width_key) if style.get(width_key) is not None else style.get("border_width") or 2.0)
+    except (TypeError, ValueError):
+        width = 2.0
+    width = max(0.5, width)
+    color = style.get("border_on" if armed else "border") or ("#6ecf8e" if armed else "#3a6ea5")
+    pen = _pen(color, width)
+    if pen.style() == QtCore.Qt.NoPen:
+        return pen
+
+    kind = normalize_ocr_border_style(
+        style.get("border_style_on" if armed else "border_style") or style.get("border_style")
+    )
+    if kind == "solid":
+        pen.setStyle(QtCore.Qt.SolidLine)
+        return pen
+
+    size_key = "border_dash_size_on" if armed else "border_dash_size"
+    amount_key = "border_dash_amount_on" if armed else "border_dash_amount"
+    spacing_key = "border_dash_spacing_on" if armed else "border_dash_spacing"
+    try:
+        size = float(style.get(size_key) or 8.0)
+    except (TypeError, ValueError):
+        size = 8.0
+    try:
+        spacing = float(style.get(spacing_key) or 4.0)
+    except (TypeError, ValueError):
+        spacing = 4.0
+    try:
+        amount = int(style.get(amount_key) or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    size = max(1.0, size)
+    spacing = max(0.0, spacing)
+    if amount >= 2:
+        long_edge = max(float(rect.width()), float(rect.height()))
+        size = max(1.0, (long_edge - (amount - 1) * spacing) / float(amount))
+
+    pen.setStyle(QtCore.Qt.CustomDashLine)
+    if kind == "dotted":
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        pen.setDashPattern([max(0.1, size / max(width, 0.5)), max(0.5, spacing / max(width, 0.5))])
+    else:
+        pen.setCapStyle(QtCore.Qt.FlatCap)
+        pen.setDashPattern([max(0.5, size / max(width, 0.5)), max(0.5, spacing / max(width, 0.5))])
+    return pen
+
+
+def paint_ocr(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """OCR capture frame: border-only on the live overlay; designer adds status text."""
+    from .ocr_track import OcrOverlayTracker
+    from .model import normalize_ocr_region
+
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    tracker = OcrOverlayTracker()
+    armed = tracker.armed(item)
+    if isinstance(value, bool):
+        armed = value
+    painter.setPen(_ocr_border_pen(style, rect, armed=armed))
+    painter.setBrush(QtCore.Qt.NoBrush)
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+
+    if _live_fast_paint:
+        painter.restore()
+        return
+
+    inner = rect.adjusted(4, 4, -4, -4)
+    region = normalize_ocr_region(style.get("ocr_region"))
+    status = tracker.status(item) or ("Armed" if armed else "Idle")
+    last = tracker.last_text(item)
+    matched = tracker.matched_names(item)
+    lines = [f"OCR · {region}", status]
+    if matched:
+        lines.append("Hit: " + ", ".join(matched[:3]))
+    elif last:
+        preview = last if len(last) <= 48 else last[:45] + "…"
+        lines.append(preview)
+    painter.setPen(qcolor(style.get("font_color"), "#d7e3f4"))
+    font = painter.font()
+    try:
+        font.setPointSizeF(max(8.0, float(style.get("font_size") or 12)))
+    except (TypeError, ValueError):
+        font.setPointSize(12)
+    painter.setFont(font)
+    painter.drawText(
+        inner.adjusted(4, 4, -4, -4),
+        int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop | QtCore.Qt.TextWordWrap),
+        "\n".join(lines),
+    )
+    _draw_label(painter, item, rect)
     painter.restore()
 
 
@@ -3641,12 +3892,25 @@ _PAINTERS = {
     "application": paint_application,
     "remote_view": paint_remote_view,
     "streamdeck": paint_streamdeck,
+    "ocr": paint_ocr,
 }
 
 
-def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value, *, draw_shadow: bool = True):
+def paint_widget(
+    painter: QtGui.QPainter,
+    item: dict[str, Any],
+    value,
+    *,
+    draw_shadow: bool = True,
+    crop_ghost: bool = False,
+):
     if not item.get("visible", True):
-        return
+        # Editor-hidden widgets stay off the canvas. A runtime show can still paint
+        # them on the live overlay without changing the saved flag.
+        from .bindings import widget_is_live_visible
+
+        if not widget_is_live_visible(item):
+            return
     from .blink import blink_paint_item
 
     item = blink_paint_item(item, value) or item
@@ -3657,9 +3921,21 @@ def paint_widget(painter: QtGui.QPainter, item: dict[str, Any], value, *, draw_s
     try:
         if abs(widget_rotation_deg(item)) >= 0.001:
             apply_widget_rotation(painter, item)
+        active = crop_is_active(item)
+        if active and crop_ghost:
+            painter.save()
+            painter.setOpacity(painter.opacity() * 0.5)
+            fn(painter, item, value)
+            painter.restore()
         if draw_shadow:
             paint_widget_drop_shadow(painter, item)
-        fn(painter, item, value)
+        if active:
+            # Several painters (application capture included) replace or disable
+            # the painter clip. Render the full widget offscreen, then copy the crop.
+            _paint_cropped_body(painter, item, value, fn)
+            _paint_crop_border(painter, item, cropped_rect(item))
+        else:
+            fn(painter, item, value)
     except Exception:
         syslog.exception(
             f"OBS OVERLAY: paint failed for {item.get('type')} id={item.get('id')}"
@@ -3686,7 +3962,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
+    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "ocr", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
         return None
     if widget_type == "input_display":
         from .input_display import input_display_key_at_point

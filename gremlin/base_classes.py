@@ -389,6 +389,8 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
                     input_type = InputType.State
                 case DeviceType.Keyboard:
                     input_type = InputType.KeyboardLatched
+                case DeviceType.Overlay:
+                    input_type = InputType.OverlayButton
                 case _:
                     raise ValueError(f"Unsupported source type: {value}")
         else:

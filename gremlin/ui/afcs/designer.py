@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-"""AFCS designer: flight-mode list, OdenGraphQt canvas, inspector, live meters."""
+"""AFCS designer: flight-mode tabs, OdenGraphQt canvas, inspector, live meters."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.util
 from gremlin.input_types import InputType
-from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup
+from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup, QTabHeader
 from gremlin.ui.obs_overlay.bindings import (
     find_overlay_state,
     overlay_mode_combo_fields,
@@ -29,7 +29,8 @@ from gremlin.ui.obs_overlay.bindings import (
     populate_overlay_state_combo,
     resolve_overlay_mode,
 )
-from gremlin.ui.obs_overlay.inspector import OverlayKeyCombinationWidget
+from gremlin.ui.obs_overlay.designer import ActionBanner, _palette_view_mode, _set_palette_view_mode
+from gremlin.ui.obs_overlay.inspector import CollapsibleSection, OverlayKeyCombinationWidget, make_section_toolbar
 from gremlin.ui.obs_overlay.model import (
     default_toggle_binding,
     default_visibility_condition,
@@ -73,6 +74,27 @@ from .runtime import curve_from_xml, curve_to_xml
 syslog = logging.getLogger("system")
 
 _NODE_CLIPBOARD: dict | None = None
+_AFCS_UI_SETTINGS = ("Joystick Gremlin Ex", "AFCS")
+_AFCS_HINTS_KEY = "show_action_banner"
+_AFCS_PANE_KEY = "show_selection_pane"
+_AFCS_INTRO_KEY = "afcs_intro"
+
+
+def _afcs_hints_visible() -> bool:
+    return bool(QtCore.QSettings(*_AFCS_UI_SETTINGS).value(_AFCS_HINTS_KEY, True, type=bool))
+
+
+def _set_afcs_hints_visible(visible: bool) -> None:
+    QtCore.QSettings(*_AFCS_UI_SETTINGS).setValue(_AFCS_HINTS_KEY, bool(visible))
+
+
+def _afcs_pane_visible() -> bool:
+    return bool(QtCore.QSettings(*_AFCS_UI_SETTINGS).value(_AFCS_PANE_KEY, True, type=bool))
+
+
+def _set_afcs_pane_visible(visible: bool) -> None:
+    QtCore.QSettings(*_AFCS_UI_SETTINGS).setValue(_AFCS_PANE_KEY, bool(visible))
+
 
 # Match OdenGraphQt ViewerEnum.GRID_SIZE so snap lines up with the drawn grid.
 _AFCS_GRID_SIZE = 50
@@ -85,6 +107,18 @@ def _snap_coord(value: float, size: float = _AFCS_GRID_SIZE) -> float:
 
 def _snap_xy(x: float, y: float) -> tuple[float, float]:
     return _snap_coord(x), _snap_coord(y)
+
+
+def _input_port(node, name: str | None):
+    """Resolve a saved input port. Override used to call the ports in and override."""
+    requested = str(name or "in")
+    port = node.get_input(requested)
+    if port is not None:
+        return port
+    alias = {"in": "A", "override": "B", "a": "A", "b": "B"}.get(requested.casefold())
+    if alias:
+        return node.get_input(alias)
+    return None
 
 
 try:
@@ -105,23 +139,27 @@ else:
         a typed Qt signal native-crashes in Shiboken.
         """
 
-        def __init__(self, graph, hook_attr: str | None = None):
+        def __init__(self, graph=None, hook_attr: str | None = None, *, quiet: bool = True):
             self._graph = graph
             self._hook_attr = hook_attr
+            self._quiet = quiet
             self._slots = []
+
+        def _call(self, func, args) -> None:
+            if self._quiet:
+                try:
+                    func(*args)
+                except Exception:
+                    pass
+            else:
+                func(*args)
 
         def emit(self, *args):
             hook = getattr(self._graph, self._hook_attr, None) if self._hook_attr else None
             if callable(hook):
-                try:
-                    hook(*args)
-                except Exception:
-                    pass
+                self._call(hook, args)
             for slot in list(self._slots):
-                try:
-                    slot(*args)
-                except Exception:
-                    pass
+                self._call(slot, args)
 
         def connect(self, slot):
             if callable(slot) and slot not in self._slots:
@@ -155,7 +193,10 @@ else:
 
     def _afcs_set_node_property(self, name, value) -> None:
         model = self.node.model
-        if name not in model.properties:
+        # Built-in fields live on the model. AFCS fields (source_name, device_guid,
+        # axis_id, curve, …) are custom properties. Unknown names still no-op so a
+        # missing live field cannot raise NodePropertyError.
+        if name not in model.properties and name not in model.custom_properties:
             return
         model.set_property(name, value)
         view = self.node.view
@@ -196,6 +237,26 @@ else:
             self.node_double_clicked = _AfcsHook(self)
             self.node_selection_changed = _AfcsHook(self)
             self._afcs_install_drag_snap()
+            self._afcs_install_pan_cursor()
+            self._afcs_bypass_dict_signals()
+
+        def _afcs_bypass_dict_signals(self) -> None:
+            """Deliver node moves without Qt's Signal(dict) copy.
+
+            OdenGraphQt keys moved_nodes by the node item. PySide6 cannot copy
+            that dict into C++, prints the warning, and the slot receives {}.
+            The move then never reaches the undo stack.
+            """
+            viewer = self.viewer()
+            if viewer is None or getattr(viewer, "_afcs_dict_signals_bypassed", False):
+                return
+            moved = _AfcsHook(quiet=False)
+            moved.connect(self._on_nodes_moved)
+            viewer.moved_nodes = moved
+            inserted = _AfcsHook(quiet=False)
+            inserted.connect(self._on_insert_node)
+            viewer.insert_node = inserted
+            viewer._afcs_dict_signals_bypassed = True
 
         def _afcs_install_drag_snap(self) -> None:
             """Snap selected nodes to the grid while the left mouse button drags them."""
@@ -210,6 +271,59 @@ else:
 
             viewer.mouseMoveEvent = _mouse_move
             viewer._afcs_drag_snap_installed = True
+
+        def _afcs_install_pan_cursor(self) -> None:
+            """Closed hand while the middle button pans, same as the overlay canvas."""
+            viewer = self.viewer()
+            if viewer is None or getattr(viewer, "_afcs_pan_cursor", False):
+                return
+            original_press = viewer.mousePressEvent
+            original_release = viewer.mouseReleaseEvent
+            original_move = viewer.mouseMoveEvent
+
+            def _show_hand(_viewer=viewer):
+                _viewer.setCursor(QtCore.Qt.ClosedHandCursor)
+                _viewer._afcs_pan_hand = True
+
+            def _hide_hand(_viewer=viewer):
+                if not getattr(_viewer, "_afcs_pan_hand", False):
+                    return
+                _viewer.unsetCursor()
+                _viewer._afcs_pan_hand = False
+
+            def _press(event, _original=original_press, _viewer=viewer):
+                _original(event)
+                if event.button() == QtCore.Qt.MouseButton.MiddleButton and not _viewer.ALT_state:
+                    _show_hand()
+
+            def _release(event, _original=original_release):
+                middle = event.button() == QtCore.Qt.MouseButton.MiddleButton
+                _original(event)
+                if middle:
+                    _hide_hand()
+
+            def _move(event, _original=original_move, _viewer=viewer, _graph=self):
+                _original(event)
+                if _viewer.MMB_state and not _viewer.ALT_state:
+                    _show_hand()
+                else:
+                    _hide_hand()
+                if _viewer.ALT_state and (_viewer.MMB_state or _viewer.LMB_state):
+                    hook = getattr(_graph, "_afcs_zoom_changed", None)
+                    if callable(hook):
+                        hook()
+
+            def _wheel(event, _original=viewer.wheelEvent, _graph=self):
+                _original(event)
+                hook = getattr(_graph, "_afcs_zoom_changed", None)
+                if callable(hook):
+                    hook()
+
+            viewer.mousePressEvent = _press
+            viewer.mouseReleaseEvent = _release
+            viewer.mouseMoveEvent = _move
+            viewer.wheelEvent = _wheel
+            viewer._afcs_pan_cursor = True
 
         def _afcs_snap_enabled_now(self) -> bool:
             enabled = self._afcs_snap_enabled
@@ -272,6 +386,8 @@ class ActivationBindingWidget(QtWidgets.QWidget):
         self._binding = default_toggle_binding()
         self._layout = QtWidgets.QFormLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self._layout.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self._source = QDataComboBox()
         for value, label in (
             ("none", "Always (fallback)"),
@@ -507,6 +623,8 @@ class NodeConditionWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         box = QtWidgets.QGroupBox("Conditions")
         self._form = QtWidgets.QFormLayout(box)
+        self._form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self._form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         layout.addWidget(box)
 
     def set_value(self, raw) -> None:
@@ -638,6 +756,8 @@ class NodeConditionWidget(QtWidgets.QWidget):
         phrase = _condition_phrase(cond)
         box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
+        form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         cond_id = str(cond.get("id") or "")
         kind = str(cond.get("kind") or "mode").casefold()
         kind_box = QDataComboBox()
@@ -847,6 +967,124 @@ def _output_target_label(vjoy_id: int, axis_id: int) -> str:
     return f"VJoy {int(vjoy_id)} {axis}"
 
 
+_NODE_SECTION = {
+    "input": "Input",
+    "merge": "Merge",
+    "curve": "Curve",
+    "limiter": "Limiter",
+    "deadzone": "Deadzone",
+    "override": "Override",
+    "laglead": "Lag-lead",
+    "output": "Output",
+}
+
+
+class AfcsSelectionPane(QtWidgets.QWidget):
+    """Name and type list for the nodes on the current flight mode, same layout as the overlay pane."""
+
+    def __init__(self, designer, parent=None):
+        super().__init__(parent)
+        self._designer = designer
+        self._syncing = False
+        self._sort = "name"
+        self.setMinimumWidth(200)
+        self.setMaximumWidth(280)
+
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(4, 4, 4, 4)
+        root.setSpacing(6)
+        title = QtWidgets.QLabel("Selection pane")
+        title.setStyleSheet("font-weight: bold;")
+        root.addWidget(title)
+
+        sort_row = QtWidgets.QHBoxLayout()
+        sort_row.addWidget(QtWidgets.QLabel("Sort"))
+        self._sort_box = QDataRadioButtonGroup(
+            [("Name", "name"), ("Type", "type")],
+            value="name",
+            callback=self._on_sort,
+        )
+        if self._sort_box.layout() is not None:
+            self._sort_box.layout().setContentsMargins(0, 0, 0, 0)
+        sort_row.addWidget(self._sort_box, 1)
+        root.addLayout(sort_row)
+
+        self._tree = QtWidgets.QTreeWidget()
+        self._tree.setHeaderLabels(["Name", "Type"])
+        self._tree.setRootIsDecorated(False)
+        self._tree.setUniformRowHeights(True)
+        self._tree.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self._tree.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        header = self._tree.header()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+        self._tree.itemSelectionChanged.connect(self._on_tree_selection)
+        self._tree.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._tree.customContextMenuRequested.connect(self._on_context_menu)
+        self._tree.setToolTip("Click a node to select it on the canvas. Shift or Ctrl click to select several.")
+        root.addWidget(self._tree, 1)
+
+    def refresh(self) -> None:
+        designer = self._designer
+        if designer is None or self._syncing:
+            return
+        nodes = designer._graph_nodes()
+        def sort_key(node):
+            name = str(node.name() or "").casefold()
+            kind = _NODE_SECTION.get(kind_for_node(node), kind_for_node(node)).casefold()
+            if self._sort == "type":
+                return (kind, name)
+            return (name, kind)
+        ordered = sorted(nodes, key=sort_key)
+        selected_ids = {node.id for node in designer._canvas_selected_nodes()}
+        self._syncing = True
+        try:
+            self._tree.clear()
+            for node in ordered:
+                kind = kind_for_node(node)
+                row = QtWidgets.QTreeWidgetItem([node.name(), _NODE_SECTION.get(kind, kind)])
+                row.setData(0, QtCore.Qt.ItemDataRole.UserRole, node.id)
+                self._tree.addTopLevelItem(row)
+                if node.id in selected_ids:
+                    row.setSelected(True)
+        finally:
+            self._syncing = False
+
+    def _on_sort(self, value=None) -> None:
+        if value is None:
+            value = getattr(self._sort_box, "_value", None) or "name"
+        self._sort = str(value or "name")
+        self.refresh()
+
+    def _on_tree_selection(self) -> None:
+        if self._syncing:
+            return
+        designer = self._designer
+        if designer is None or designer._graph is None:
+            return
+        ids = []
+        for row in self._tree.selectedItems():
+            node_id = row.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            if node_id:
+                ids.append(node_id)
+        nodes = []
+        for node_id in ids:
+            node = designer._graph.get_node_by_id(node_id)
+            if node is not None and hasattr(node, "AFCS_KIND"):
+                nodes.append(node)
+        designer._apply_pane_selection(nodes)
+
+    def _on_context_menu(self, pos: QtCore.QPoint) -> None:
+        designer = self._designer
+        if designer is None:
+            return
+        menu = QtWidgets.QMenu(self)
+        menu.addAction("Copy", designer._copy_selected_nodes)
+        menu.addAction("Delete", designer._delete_selected_nodes)
+        menu.exec(self._tree.viewport().mapToGlobal(pos))
+
+
 class AfcsDesignerWidget(QtWidgets.QWidget):
     def __init__(self, manager, parent=None):
         super().__init__(parent)
@@ -861,93 +1099,22 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._segment_suspend = False
 
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(4, 4, 4, 4)
-        hint = QtWidgets.QLabel(
-            "AFCS — visual axis flow. Click Output to add a vJoy axis destination, then pick the device and axis in the inspector. "
-            "Select nodes and right-click Copy / Paste (or Ctrl+C / Ctrl+V); paste works in this flight mode or another. "
-            "Limiter scales travel from a 0–100% controller. Delete removes the selected node. Outputs are virtual axes only."
-        )
-        hint.setWordWrap(True)
-        root.addWidget(hint)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.addWidget(self._toolbar())
+        root.addWidget(self._mode_bar())
 
         top = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         root.addWidget(top, 1)
-
-        left = QtWidgets.QWidget()
-        left_layout = QtWidgets.QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        self._show_live_box = QtWidgets.QCheckBox("Show live values while profile is active")
-        self._show_live_box.setChecked(bool(gremlin.config.Configuration().afcs_show_live_while_running))
-        self._show_live_box.setToolTip("When a profile is running, live meters stay off unless this is checked. They always show while the profile is stopped.")
-        self._show_live_box.toggled.connect(self._on_show_live_toggled)
-        left_layout.addWidget(self._show_live_box)
-        self._snap_box = QtWidgets.QCheckBox("Snap to grid")
-        self._snap_box.setChecked(bool(gremlin.config.Configuration().afcs_snap_to_grid))
-        self._snap_box.setToolTip(
-            "When checked, dragging a node snaps its top-left corner to the nearest canvas grid point."
-        )
-        self._snap_box.toggled.connect(self._on_snap_toggled)
-        left_layout.addWidget(self._snap_box)
-        self._segment_box = QtWidgets.QCheckBox("Show selected segment only")
-        self._segment_box.setChecked(bool(gremlin.config.Configuration().afcs_show_selected_segment_only))
-        self._segment_box.setToolTip(
-            "When checked, selecting a node keeps its signal path visible "
-            "(upstream feeders and downstream consumers). Shift-click other nodes to add their paths too."
-        )
-        self._segment_box.toggled.connect(self._on_segment_toggled)
-        left_layout.addWidget(self._segment_box)
-        left_layout.addWidget(QtWidgets.QLabel("Flight modes"))
-        self._mode_list = QtWidgets.QListWidget()
-        self._mode_list.currentRowChanged.connect(self._on_mode_row)
-        self._mode_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self._mode_list.customContextMenuRequested.connect(self._mode_context_menu)
-        left_layout.addWidget(self._mode_list, 1)
-        mode_buttons = QtWidgets.QHBoxLayout()
-        add_mode = Buttons.getAddWidget(label="Add")
-        duplicate_mode = QDataPushButton("Duplicate")
-        rename_mode = QDataPushButton("Rename")
-        delete_mode = QDataPushButton("Delete")
-        add_mode.clicked.connect(self._add_mode)
-        duplicate_mode.clicked.connect(self._duplicate_mode)
-        rename_mode.clicked.connect(self._rename_mode)
-        delete_mode.clicked.connect(self._delete_mode)
-        duplicate_mode.setToolTip("Copy the selected flight mode, including its graph and activation.")
-        mode_buttons.addWidget(add_mode)
-        mode_buttons.addWidget(duplicate_mode)
-        mode_buttons.addWidget(rename_mode)
-        mode_buttons.addWidget(delete_mode)
-        left_layout.addLayout(mode_buttons)
-        left_layout.addWidget(QtWidgets.QLabel("Activation"))
-        self._activation = ActivationBindingWidget()
-        self._activation.changed.connect(self._on_activation)
-        left_layout.addWidget(self._activation)
-        top.addWidget(left)
+        top.addWidget(self._node_palette())
 
         center = QtWidgets.QWidget()
         center_layout = QtWidgets.QVBoxLayout(center)
         center_layout.setContentsMargins(0, 0, 0, 0)
-        tools = QtWidgets.QHBoxLayout()
-        for kind, label in (
-            ("input", "Input"),
-            ("merge", "Merge"),
-            ("curve", "Curve"),
-            ("limiter", "Limiter"),
-            ("deadzone", "Deadzone"),
-            ("override", "Override"),
-            ("laglead", "Lag-lead"),
-            ("output", "Output"),
-        ):
-            button = QDataPushButton(label)
-            button.clicked.connect(lambda _=False, k=kind: self._add_node(k))
-            tools.addWidget(button)
-        delete_btn = Buttons.getDeleteWidget(
-            label="Delete",
-            tooltip="Delete the selected node(s). The Delete key also works.",
-            callback=self._delete_selected_nodes,
-        )
-        tools.addWidget(delete_btn)
-        tools.addStretch()
-        center_layout.addLayout(tools)
+        center_layout.setSpacing(6)
+        self._action_banner = ActionBanner(center)
+        self._action_banner.hide_requested.connect(lambda: self._set_hints_visible(False))
+        center_layout.addWidget(self._action_banner)
+        self._set_hints_visible(_afcs_hints_visible(), persist=False)
         if NodeGraph is None:
             missing = QtWidgets.QLabel("OdenGraphQt is not available. Install OdenGraphQt>=0.7.4 into the GEX venv.")
             missing.setWordWrap(True)
@@ -959,6 +1126,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._graph._afcs_property_changed = self._on_property_changed
             self._graph._afcs_snap_enabled = self._snap_enabled
             self._graph._afcs_nodes_moved = self._capture_graph
+            self._graph._afcs_zoom_changed = self._sync_zoom_label
             self._graph.nodes_deleted.connect(self._on_graph_changed)
             self._graph.port_connected.connect(self._on_graph_changed)
             self._graph.port_disconnected.connect(self._on_graph_changed)
@@ -966,22 +1134,23 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._graph.node_selected.connect(self._on_node_selected)
             self._graph.node_selection_changed.connect(self._on_selection_changed)
             self._bind_edit_actions()
+            self._bind_undo_buttons()
             center_layout.addWidget(self._graph.widget, 1)
         top.addWidget(center)
 
-        right = QtWidgets.QWidget()
-        right.setMinimumWidth(280)
-        self._inspector_layout = QtWidgets.QVBoxLayout(right)
-        self._inspector_layout.setContentsMargins(0, 0, 0, 0)
-        self._inspector_layout.addWidget(QtWidgets.QLabel("Inspector"))
-        self._inspector_body = QtWidgets.QWidget()
-        self._inspector_form = QtWidgets.QFormLayout(self._inspector_body)
-        self._inspector_layout.addWidget(self._inspector_body, 1)
-        top.addWidget(right)
+        self._splitter = top
+        self._selection_pane = AfcsSelectionPane(self)
+        top.addWidget(self._selection_pane)
+        top.addWidget(self._inspector_panel())
         top.setStretchFactor(0, 0)
         top.setStretchFactor(1, 1)
         top.setStretchFactor(2, 0)
-        top.setSizes([220, 700, 280])
+        top.setStretchFactor(3, 0)
+        top.setCollapsible(0, False)
+        top.setCollapsible(1, False)
+        top.setCollapsible(2, False)
+        top.setCollapsible(3, False)
+        self._set_pane_visible(_afcs_pane_visible(), persist=False)
 
         self._meter_timer = QtCore.QTimer(self)
         self._meter_timer.setInterval(50)
@@ -989,9 +1158,11 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
 
         self._reload_modes()
         self._load_graph()
+        self._refresh_action_banner()
 
     def showEvent(self, event):
         super().showEvent(event)
+        QtCore.QTimer.singleShot(0, self._maybe_show_intro)
         if gremlin.shared_state.is_running:
             timer = getattr(self.manager.runtime, "_timer", None)
             if timer is not None and timer.isActive():
@@ -1022,6 +1193,138 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._refresh_meters()
         except Exception:
             pass
+
+    def _set_hints_visible(self, visible: bool, persist: bool = True) -> None:
+        banner = getattr(self, "_action_banner", None)
+        if banner is not None and Shiboken.isValid(banner):
+            banner.setVisible(bool(visible))
+        box = getattr(self, "_hints_box", None)
+        if box is not None and Shiboken.isValid(box) and box.isChecked() != bool(visible):
+            with QtCore.QSignalBlocker(box):
+                box.setChecked(bool(visible))
+        if persist:
+            _set_afcs_hints_visible(bool(visible))
+
+    def _canvas_selected_nodes(self) -> list:
+        if self._graph is None:
+            return []
+        try:
+            return [
+                node for node in (self._graph.selected_nodes() or [])
+                if node is not None and hasattr(node, "AFCS_KIND")
+            ]
+        except Exception:
+            return []
+
+    def _refresh_selection_pane(self) -> None:
+        pane = getattr(self, "_selection_pane", None)
+        if pane is None or not Shiboken.isValid(pane):
+            return
+        pane.refresh()
+
+    def _set_pane_visible(self, visible: bool, persist: bool = True) -> None:
+        pane = getattr(self, "_selection_pane", None)
+        splitter = getattr(self, "_splitter", None)
+        if pane is not None and Shiboken.isValid(pane):
+            if visible:
+                pane.setMinimumWidth(200)
+                pane.setMaximumWidth(280)
+                pane.setVisible(True)
+            else:
+                pane.setMinimumWidth(0)
+                pane.setMaximumWidth(0)
+                pane.setVisible(False)
+        if splitter is not None and Shiboken.isValid(splitter) and splitter.count() >= 4:
+            splitter.setCollapsible(2, not bool(visible))
+            sizes = splitter.sizes()
+            pane_w = 220 if visible else 0
+            if len(sizes) < 4 or sum(sizes) < 400:
+                splitter.setSizes([240, 700, pane_w, 320])
+            else:
+                canvas = max(200, sizes[1] + sizes[2] - pane_w)
+                splitter.setSizes([sizes[0], canvas, pane_w, sizes[3]])
+        box = getattr(self, "_pane_box", None)
+        if box is not None and Shiboken.isValid(box) and box.isChecked() != bool(visible):
+            with QtCore.QSignalBlocker(box):
+                box.setChecked(bool(visible))
+        if persist:
+            _set_afcs_pane_visible(bool(visible))
+
+    def _apply_pane_selection(self, nodes: list) -> None:
+        if self._graph is None:
+            return
+        chosen = {node.id for node in nodes}
+        self._pane_sync = True
+        try:
+            for node in self._graph_nodes():
+                node.set_selected(node.id in chosen)
+        finally:
+            self._pane_sync = False
+        focus = nodes[0] if nodes else None
+        self._segment_focus = focus
+        self._rebuild_inspector(focus)
+        self._apply_segment_visibility()
+        self._refresh_action_banner()
+
+    def _refresh_action_banner(self) -> None:
+        banner = getattr(self, "_action_banner", None)
+        if banner is None or not Shiboken.isValid(banner):
+            return
+        banner.set_content(*self._banner_content())
+
+    def _banner_content(self) -> tuple[str, str]:
+        selected = self._selected_afcs_nodes()
+        if not selected:
+            return "Canvas", (
+                "<b>Mouse</b> — Click empty space to deselect. Hold the middle mouse button to pan. "
+                "Ctrl+wheel zooms at the cursor. Drag a node to move it. "
+                "Right-click empty space for Center, or Center and fit. Right-click a node to copy, paste, or delete.<br>"
+                "<b>Keys</b> — Delete removes the selected node. Ctrl+C / Ctrl+V copy and paste. "
+                "Ctrl+Z / Ctrl+Y undo and redo. The toolbar Undo, Redo, Zoom, and Fit do the same.<br>"
+                "<b>Modes</b> — Each tab is a flight mode. Double-click a tab to rename. "
+                "Right-click to add, duplicate, or delete. Drag a tab to reorder.<br>"
+                "<b>Nodes</b> — Click a type to add it at the center of the view. "
+                "List shows one button per row. Wrap flows them across the panel."
+            )
+        node = selected[0]
+        kind = kind_for_node(node)
+        label = _NODE_SECTION.get(kind, kind)
+        title = node.name() if len(selected) == 1 else f"{len(selected)} nodes selected"
+        if len(selected) == 1:
+            title = f"{title} — {label}"
+        help_text = inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
+        help_text = (
+            help_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+        return title, (
+            f"<b>This module</b> — {help_text}<br>"
+            "<b>Mouse</b> — Drag to move. Middle button pans. Ctrl+wheel zooms. "
+            "Double-click a curve or limiter node to edit its response.<br>"
+            "<b>Keys</b> — Delete removes it. Ctrl+C / Ctrl+V copy and paste. Ctrl+Z / Ctrl+Y undo and redo."
+        )
+
+    def _maybe_show_intro(self) -> None:
+        if not self.isVisible() or getattr(self, "_intro_open", False):
+            return
+        if gremlin.config.Configuration().visualHidden(_AFCS_INTRO_KEY):
+            return
+        self._intro_open = True
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle("AFCS")
+        box.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        box.setText("AFCS is experimental.")
+        box.setInformativeText(
+            "AFCS is a graphical way to map axes.\n\n"
+            "Map each axis with Map to AFCS before it can be used on an Input node.\n\n"
+            "This is for axes only. Button integration will follow later."
+        )
+        again = QtWidgets.QCheckBox("Don't show this again", box)
+        box.setCheckBox(again)
+        box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        box.exec()
+        if again.isChecked():
+            gremlin.config.Configuration().setVisualHidden(_AFCS_INTRO_KEY, True)
+        self._intro_open = False
 
     @property
     def inputCount(self) -> int:
@@ -1060,6 +1363,285 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self.manager.designer = None
         self._graph = None
 
+    def _toolbar(self) -> QtWidgets.QWidget:
+        bar = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(bar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._show_live_box = QtWidgets.QCheckBox("Show live values while profile is active")
+        self._show_live_box.setChecked(bool(gremlin.config.Configuration().afcs_show_live_while_running))
+        self._show_live_box.setToolTip("When a profile is running, live meters stay off unless this is checked. They always show while the profile is stopped.")
+        self._show_live_box.toggled.connect(self._on_show_live_toggled)
+        self._snap_box = QtWidgets.QCheckBox("Snap to grid")
+        self._snap_box.setChecked(bool(gremlin.config.Configuration().afcs_snap_to_grid))
+        self._snap_box.setToolTip("When checked, dragging a node snaps its top-left corner to the nearest canvas grid point.")
+        self._snap_box.toggled.connect(self._on_snap_toggled)
+        self._segment_box = QtWidgets.QCheckBox("Show selected segment only")
+        self._segment_box.setChecked(bool(gremlin.config.Configuration().afcs_show_selected_segment_only))
+        self._segment_box.setToolTip(
+            "When checked, selecting a node keeps its signal path visible "
+            "(upstream feeders and downstream consumers). Shift-click other nodes to add their paths too."
+        )
+        self._segment_box.toggled.connect(self._on_segment_toggled)
+        self._hints_box = QtWidgets.QCheckBox("Hints")
+        self._hints_box.setToolTip("Show or hide the hint banner above the canvas.")
+        self._hints_box.setChecked(_afcs_hints_visible())
+        self._hints_box.toggled.connect(self._set_hints_visible)
+        self._pane_box = QtWidgets.QCheckBox("Selection pane")
+        self._pane_box.setToolTip("Show a list of nodes on this flight mode: name and type. Click a row to select it on the canvas.")
+        self._pane_box.setChecked(_afcs_pane_visible())
+        self._pane_box.toggled.connect(self._set_pane_visible)
+        for box in (self._show_live_box, self._snap_box, self._segment_box, self._pane_box):
+            layout.addWidget(box)
+        self._undo_btn = QDataPushButton("Undo", clicked=self._undo_graph)
+        self._redo_btn = QDataPushButton("Redo", clicked=self._redo_graph)
+        self._undo_btn.setEnabled(False)
+        self._redo_btn.setEnabled(False)
+        layout.addWidget(self._undo_btn)
+        layout.addWidget(self._redo_btn)
+        layout.addStretch()
+        layout.addWidget(self._hints_box)
+        layout.addWidget(QtWidgets.QLabel("Zoom"))
+        self._zoom_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self._zoom_slider.setRange(25, 300)
+        self._zoom_slider.setValue(100)
+        self._zoom_slider.setFixedWidth(140)
+        self._zoom_slider.setToolTip("Scale the canvas. Ctrl+wheel zooms at the cursor. Fit frames every node.")
+        self._zoom_slider.valueChanged.connect(self._on_zoom_slider)
+        self._zoom_value = QtWidgets.QLabel("100%")
+        self._zoom_value.setMinimumWidth(44)
+        fit = QDataPushButton(
+            "Fit",
+            tooltip="Zoom and center so every node is in view",
+            clicked=self._on_zoom_fit,
+            width=48,
+        )
+        layout.addWidget(self._zoom_slider)
+        layout.addWidget(self._zoom_value)
+        layout.addWidget(fit)
+        self._zoom_guard = False
+        return bar
+
+    def _mode_bar(self) -> QtWidgets.QWidget:
+        self._mode_tabs = QTabHeader()
+        self._mode_tabs.setContentsMargins(0, 0, 0, 0)
+        self._mode_tabs.setMovable(True)
+        self._mode_tabs.setUsesScrollButtons(True)
+        self._mode_tabs.setObjectName("afcs_modes")
+        self._mode_tabs.setStyleSheet(Color.cssTab())
+        self._mode_tabs.setToolTip("Each tab is a flight mode. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder.")
+        self._mode_tabs.currentChanged.connect(self._on_mode_tab)
+        self._mode_tabs.tabBarDoubleClicked.connect(self._rename_mode_tab)
+        self._mode_tabs.tabContextMenu.connect(self._mode_context_menu)
+        self._mode_tabs.tabMoveCompleted.connect(self._on_mode_tab_moved)
+        add = Buttons.getAddWidget(
+            label=None,
+            tooltip="Add flight mode",
+            callback=lambda _data=None: self._add_mode(),
+        )
+        add.setFixedSize(24, 24)
+        row = gremlin.ui.ui_common.getHContainer([add, self._mode_tabs], widget_only=True)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setMaximumHeight(30)
+        return row
+
+    def _node_palette(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+        view_row = QtWidgets.QWidget()
+        view_layout = QtWidgets.QHBoxLayout(view_row)
+        view_layout.setContentsMargins(0, 0, 0, 0)
+        view_layout.setSpacing(8)
+        view_layout.addWidget(QtWidgets.QLabel("Nodes"))
+        self._node_palette_view = _palette_view_mode()
+        view_toggle = QDataRadioButtonGroup(
+            [
+                ("List", "list", "One button per row."),
+                ("Wrap", "wrap", "Wrap buttons to the panel width."),
+            ],
+            value=self._node_palette_view,
+            callback=self._on_node_palette_view,
+        )
+        view_layout.addWidget(view_toggle)
+        view_layout.addStretch(1)
+        layout.addWidget(view_row)
+        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self._node_palette_host = QtWidgets.QWidget()
+        self._node_palette_layout = QtWidgets.QVBoxLayout(self._node_palette_host)
+        self._node_palette_layout.setContentsMargins(0, 0, 0, 0)
+        self._node_palette_layout.setSpacing(6)
+        layout.addWidget(self._node_palette_host)
+        self._rebuild_node_palette()
+        layout.addStretch()
+        panel.setStyleSheet(f"QWidget {{ background: {Color.actionBackgroundColor()}; }}")
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(panel)
+        scroll.setMinimumWidth(220)
+        scroll.setMaximumWidth(320)
+        return scroll
+
+    def _node_kind_button(self, kind: str, label: str) -> QDataPushButton:
+        button = QDataPushButton(label, tooltip=f"Add a {label} node at the center of the view.")
+        button.clicked.connect(lambda _=False, k=kind: self._add_node(k))
+        return button
+
+    def _on_node_palette_view(self, mode: str) -> None:
+        self._node_palette_view = "list" if mode == "list" else "wrap"
+        _set_palette_view_mode(self._node_palette_view)
+        self._rebuild_node_palette()
+
+    def _rebuild_node_palette(self) -> None:
+        layout = getattr(self, "_node_palette_layout", None)
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                gremlin.util.delete_widget(widget)
+            child = item.layout()
+            if child is not None:
+                gremlin.util.clear_layout(child)
+        kinds = (
+            ("input", "Input"),
+            ("merge", "Merge"),
+            ("curve", "Curve"),
+            ("limiter", "Limiter"),
+            ("deadzone", "Deadzone"),
+            ("override", "Override"),
+            ("laglead", "Lag-lead"),
+            ("output", "Output"),
+        )
+        wrap = getattr(self, "_node_palette_view", _palette_view_mode()) != "list"
+        if wrap:
+            host, flow = gremlin.ui.ui_common.getFlowContainer()
+            for kind, label in kinds:
+                flow.addWidget(self._node_kind_button(kind, label))
+            layout.addWidget(host)
+        else:
+            for kind, label in kinds:
+                layout.addWidget(self._node_kind_button(kind, label))
+
+    def _inspector_panel(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QWidget()
+        panel.setMinimumWidth(280)
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        self._collapsible_sections = []
+        self._section_collapsed = {}
+        layout.addWidget(make_section_toolbar(panel, self._expand_all_sections, self._collapse_all_sections))
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        host = QtWidgets.QWidget()
+        host_layout = QtWidgets.QVBoxLayout(host)
+        host_layout.setContentsMargins(0, 0, 0, 0)
+        host_layout.setSpacing(0)
+        self._activation = ActivationBindingWidget()
+        self._activation.changed.connect(self._on_activation)
+        activation = CollapsibleSection("Activation", expanded=True, parent=host)
+        activation.form().setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        activation.form().setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        activation.form().addRow(self._activation)
+        activation.toggled.connect(lambda on: self._section_collapsed.__setitem__("Activation", not bool(on)))
+        self._activation_section = activation
+        self._collapsible_sections.append(activation)
+        host_layout.addWidget(activation)
+        self._inspector_sections_host = QtWidgets.QWidget(host)
+        self._inspector_sections = QtWidgets.QVBoxLayout(self._inspector_sections_host)
+        self._inspector_sections.setContentsMargins(0, 0, 0, 0)
+        self._inspector_sections.setSpacing(0)
+        host_layout.addWidget(self._inspector_sections_host)
+        host_layout.addStretch()
+        scroll.setWidget(host)
+        layout.addWidget(scroll, 1)
+        self._inspector_form = None
+        return panel
+
+    def _section(self, title: str) -> QtWidgets.QFormLayout:
+        expanded = not bool(self._section_collapsed.get(title, False))
+        section = CollapsibleSection(title, expanded=expanded, parent=self._inspector_sections_host)
+        section.toggled.connect(lambda on, name=title: self._section_collapsed.__setitem__(name, not bool(on)))
+        self._collapsible_sections.append(section)
+        self._inspector_sections.addWidget(section)
+        form = section.form()
+        form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        return form
+
+    def _expand_all_sections(self) -> None:
+        for section in list(self._collapsible_sections):
+            try:
+                section.set_expanded(True)
+                self._section_collapsed[section.title()] = False
+            except RuntimeError:
+                continue
+
+    def _collapse_all_sections(self) -> None:
+        for section in list(self._collapsible_sections):
+            try:
+                section.set_expanded(False)
+                self._section_collapsed[section.title()] = True
+            except RuntimeError:
+                continue
+
+    def _on_zoom_slider(self, value: int) -> None:
+        if getattr(self, "_zoom_guard", False) or self._graph is None:
+            return
+        self._graph.set_zoom(value / 100.0 - 1.0)
+        self._zoom_value.setText(f"{int(value)}%")
+
+    def _on_zoom_fit(self) -> None:
+        self._fit_view_to_nodes()
+        self._sync_zoom_label()
+
+    def _bind_undo_buttons(self) -> None:
+        stack = self._graph.undo_stack()
+        stack.canUndoChanged.connect(self._undo_btn.setEnabled)
+        stack.canRedoChanged.connect(self._redo_btn.setEnabled)
+        self._undo_btn.setEnabled(stack.canUndo())
+        self._redo_btn.setEnabled(stack.canRedo())
+
+    def _undo_graph(self) -> None:
+        self._step_graph_history(undo=True)
+
+    def _redo_graph(self) -> None:
+        self._step_graph_history(undo=False)
+
+    def _step_graph_history(self, undo: bool) -> None:
+        if self._graph is None:
+            return
+        stack = self._graph.undo_stack()
+        if undo:
+            stack.undo()
+        else:
+            stack.redo()
+        self._capture_graph()
+        self.document.save_later()
+        selected = self._selected_afcs_nodes()
+        self._rebuild_inspector(selected[0] if selected else None)
+
+    def _sync_zoom_label(self) -> None:
+        slider = getattr(self, "_zoom_slider", None)
+        label = getattr(self, "_zoom_value", None)
+        if self._graph is None or slider is None or label is None:
+            return
+        viewer = self._graph.viewer()
+        if viewer is None:
+            return
+        percent = int(round((float(viewer.get_zoom()) + 1.0) * 100))
+        percent = max(slider.minimum(), min(slider.maximum(), percent))
+        self._zoom_guard = True
+        try:
+            if slider.value() != percent:
+                slider.setValue(percent)
+            label.setText(f"{percent}%")
+        finally:
+            self._zoom_guard = False
+
     def reload(self) -> None:
         if gremlin.shared_state.is_running:
             return
@@ -1067,36 +1649,45 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._load_graph()
 
     def _current_mode_id(self) -> str | None:
-        item = self._mode_list.currentItem()
-        if item is None:
+        tabs = getattr(self, "_mode_tabs", None)
+        if tabs is None:
             mode = self.document.active_mode()
             return mode["id"] if mode else None
-        return item.data(QtCore.Qt.UserRole)
+        mode_id = tabs.tabData(tabs.currentIndex())
+        if mode_id:
+            return str(mode_id)
+        mode = self.document.active_mode()
+        return mode["id"] if mode else None
 
     def _reload_modes(self) -> None:
+        tabs = self._mode_tabs
+        if getattr(tabs, "moveInProgress", False):
+            return
         active = self.document.data.get("active_mode_id")
-        with QtCore.QSignalBlocker(self._mode_list):
-            self._mode_list.clear()
+        with QtCore.QSignalBlocker(tabs):
+            while tabs.count():
+                tabs.removeTab(0)
             selected = 0
             for index, mode in enumerate(self.document.modes()):
-                item = QtWidgets.QListWidgetItem(mode["name"])
-                item.setData(QtCore.Qt.UserRole, mode["id"])
-                self._mode_list.addItem(item)
+                tabs.addTab(str(mode["name"]))
+                tabs.setTabData(index, mode["id"])
                 if mode["id"] == active:
                     selected = index
-            if self._mode_list.count():
-                self._mode_list.setCurrentRow(selected)
+            if tabs.count():
+                tabs.setCurrentIndex(selected)
         mode = self.document.active_mode()
         if mode:
             self._activation.set_binding(mode.get("activation"))
 
-    def _on_mode_row(self, row: int) -> None:
-        if row < 0:
+    def _on_mode_tab(self, index: int) -> None:
+        # moveInProgress is also true for a plain click, because the mouse is still down
+        # when currentChanged fires. Only a real tab drag should skip the reload.
+        if index < 0 or getattr(self._mode_tabs, "_move_in_progress", False):
             return
-        item = self._mode_list.item(row)
-        if item is None:
+        mode_id = self._mode_tabs.tabData(index)
+        if not mode_id:
             return
-        mode_id = item.data(QtCore.Qt.UserRole)
+        mode_id = str(mode_id)
         previous = self.document.data.get("active_mode_id")
         self._segment_suspend = True
         self._segment_gen = getattr(self, "_segment_gen", 0) + 1
@@ -1138,16 +1729,36 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._rebuild_inspector(None)
         self.document.save_later()
 
-    def _mode_context_menu(self, pos) -> None:
-        item = self._mode_list.itemAt(pos)
-        if item is not None:
-            self._mode_list.setCurrentItem(item)
+    def _on_mode_tab_moved(self, _from_index: int, _to_index: int) -> None:
+        order = []
+        for index in range(self._mode_tabs.count()):
+            mode_id = self._mode_tabs.tabData(index)
+            if mode_id:
+                order.append(str(mode_id))
+        if order:
+            self.document.reorder_modes(order)
+            self.document.save_later()
+        current = self._mode_tabs.tabData(self._mode_tabs.currentIndex())
+        if current and str(current) != str(self.document.data.get("active_mode_id") or ""):
+            self._on_mode_tab(self._mode_tabs.currentIndex())
+
+    def _mode_context_menu(self, index: int) -> None:
+        if index < 0:
+            return
+        self._mode_tabs.setCurrentIndex(index)
         menu = QtWidgets.QMenu(self)
+        menu.addAction("Add flight mode", self._add_mode)
+        menu.addAction("Rename", lambda i=index: self._rename_mode_tab(i))
         menu.addAction("Duplicate", self._duplicate_mode)
-        menu.addAction("Rename", self._rename_mode)
         delete_action = menu.addAction("Delete", self._delete_mode)
         delete_action.setEnabled(len(self.document.modes()) > 1)
-        menu.exec(self._mode_list.mapToGlobal(pos))
+        menu.exec(QtGui.QCursor.pos())
+
+    def _rename_mode_tab(self, index: int) -> None:
+        if index < 0:
+            return
+        self._mode_tabs.setCurrentIndex(index)
+        self._rename_mode()
 
     def _rename_mode(self) -> None:
         mode_id = self._current_mode_id()
@@ -1180,10 +1791,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         mode = self.document.mode_by_id(mode_id) if mode_id else None
         if mode is None:
             return
-        count = len(mode.get("nodes") or [])
-        x, y = 80 + count * 40, 80 + count * 60
-        if self._snap_enabled():
-            x, y = _snap_xy(float(x), float(y))
+        x, y = self._view_center_xy()
         spec = default_node(kind, x=x, y=y)
         if kind == "output":
             vjoy_id, axis_id = self._next_output_target(mode)
@@ -1193,6 +1801,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         node_type = KIND_TO_TYPE[kind]
         graph_node = self._graph.create_node(node_type, name=spec["name"], pos=[spec["x"], spec["y"]], selected=True)
         self._apply_spec(graph_node, spec)
+        self._move_node_to_view_center(graph_node)
         self._capture_graph()
         self.document.save_later()
         self._rebuild_inspector(graph_node)
@@ -1203,6 +1812,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         try:
             graph_menu = self._graph.get_context_menu("graph")
             if graph_menu is not None:
+                graph_menu.add_command("Center", self._on_menu_center_view)
+                graph_menu.add_command("Center and fit", self._on_menu_center_fit)
+                graph_menu.add_separator()
                 graph_menu.add_command("Copy", self._on_menu_copy)
                 graph_menu.add_command("Paste", self._on_menu_paste)
                 graph_menu.add_command("Delete selected", self._on_menu_delete)
@@ -1225,6 +1837,80 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             shortcut = QtGui.QShortcut(key, self._graph.widget)
             shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
             shortcut.activated.connect(callback)
+
+    def _view_center_xy(self) -> tuple[float, float]:
+        viewer = self._graph.viewer() if self._graph is not None else None
+        if viewer is None:
+            return 80.0, 80.0
+        center = viewer.scene_center()
+        return float(center[0]), float(center[1])
+
+    def _move_node_to_view_center(self, graph_node) -> None:
+        """Put the node's body on the middle of the visible canvas."""
+        cx, cy = self._view_center_xy()
+        view = getattr(graph_node, "view", None)
+        width = float(getattr(view, "width", 0) or 0)
+        height = float(getattr(view, "height", 0) or 0)
+        x = cx - width / 2.0
+        y = cy - height / 2.0
+        if self._snap_enabled():
+            x, y = _snap_xy(x, y)
+        graph_node.set_property("pos", [x, y], push_undo=False)
+        self._stamp_added_node_pos(x, y)
+
+    def _stamp_added_node_pos(self, x: float, y: float) -> None:
+        """Keep undo/redo of the new node at the centered position."""
+        stack = self._graph.undo_stack() if self._graph is not None else None
+        if stack is None:
+            return
+        for command_index in range(stack.count() - 1, max(-1, stack.count() - 8), -1):
+            if self._stamp_added_command(stack.command(command_index), x, y):
+                return
+
+    def _stamp_added_command(self, command, x: float, y: float) -> bool:
+        if command is None:
+            return False
+        if command.__class__.__name__ == "NodeAddedCmd":
+            command.pos = [x, y]
+            return True
+        for index in range(command.childCount()):
+            if self._stamp_added_command(command.child(index), x, y):
+                return True
+        return False
+
+    def _center_view_on_cursor(self) -> None:
+        """Pan so the right-click point is the middle of the view. Zoom stays."""
+        viewer = self._graph.viewer() if self._graph is not None else None
+        if viewer is None:
+            return
+        point = viewer.scene_cursor_pos()
+        rect = QtCore.QRectF(viewer._scene_range)
+        rect.translate(point - rect.center())
+        viewer._scene_range = rect
+        viewer._update_scene()
+
+    def _fit_view_to_nodes(self) -> None:
+        """Zoom and pan so every node is inside the view."""
+        viewer = self._graph.viewer() if self._graph is not None else None
+        if viewer is None:
+            return
+        nodes = viewer.all_nodes() or []
+        if not nodes:
+            return
+        rect = viewer._combined_rect(nodes)
+        if rect.isNull():
+            return
+        pad_x = max(48.0, rect.width() * 0.08)
+        pad_y = max(48.0, rect.height() * 0.08)
+        rect = rect.adjusted(-pad_x, -pad_y, pad_x, pad_y)
+        viewer._scene_range = rect
+        viewer._update_scene()
+
+    def _on_menu_center_view(self, _graph=None) -> None:
+        self._center_view_on_cursor()
+
+    def _on_menu_center_fit(self, _graph=None) -> None:
+        self._fit_view_to_nodes()
 
     def _on_menu_delete(self, _graph=None) -> None:
         self._delete_selected_nodes()
@@ -1330,7 +2016,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 if src is None or dst is None:
                     continue
                 out_port = src.get_output(conn.get("from_port") or "out")
-                in_port = dst.get_input(conn.get("to_port") or "in")
+                in_port = _input_port(dst, conn.get("to_port") or "in")
                 if out_port is None or in_port is None:
                     continue
                 try:
@@ -1370,48 +2056,88 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
         self._rebuild_inspector(None)
 
+    def _assign_spec_property(self, graph_node, name, value) -> None:
+        """Write a loaded field onto the node model.
+
+        Profile load must not go through the undo command. That command drops
+        custom fields it does not recognise, and a later graph capture then
+        saves the blanks back over the profile.
+        """
+        model = graph_node.model
+        if name not in model.properties and name not in model.custom_properties:
+            return
+        if graph_node.get_property(name) != value:
+            model.set_property(name, value)
+        self._sync_node_widget(graph_node, name, value)
+
+    def _sync_node_widget(self, graph_node, name, value) -> None:
+        """Show a loaded value on the node itself.
+
+        The merge Op menu is its own combo. Writing the model leaves that
+        combo on its default, Add, while the inspector reads the real mode.
+        """
+        view = getattr(graph_node, "view", None)
+        widgets = getattr(view, "widgets", None)
+        if not widgets or name not in widgets.keys():
+            return
+        widget = widgets[name]
+        try:
+            if widget.get_value() == value:
+                return
+        except Exception:
+            return
+        custom = widget.get_custom_widget() if hasattr(widget, "get_custom_widget") else None
+        try:
+            if custom is not None:
+                with QtCore.QSignalBlocker(custom):
+                    widget.set_value(value)
+            else:
+                widget.set_value(value)
+        except Exception:
+            return
+
     def _apply_spec(self, graph_node, spec: dict) -> None:
         if graph_node is None:
             return
         props = spec.get("props") or {}
-        graph_node.set_property("afcs_id", spec["id"], push_undo=False)
+        self._assign_spec_property(graph_node, "afcs_id", spec["id"])
         graph_node.set_name(spec.get("name") or graph_node.name())
         kind = spec.get("kind")
         if kind == "input":
-            graph_node.set_property("source_name", props.get("source_name") or "", push_undo=False)
-            graph_node.set_property("device_guid", props.get("device_guid") or "", push_undo=False)
-            graph_node.set_property("device_name", props.get("device_name") or "", push_undo=False)
-            graph_node.set_property("axis_id", int(props.get("axis_id") or 0), push_undo=False)
-            graph_node.set_property("invert", bool(props.get("invert")), push_undo=False)
-            graph_node.set_property("display_range", normalize_input_display_range(props.get("display_range")), push_undo=False)
+            self._assign_spec_property(graph_node, "source_name", props.get("source_name") or "")
+            self._assign_spec_property(graph_node, "device_guid", props.get("device_guid") or "")
+            self._assign_spec_property(graph_node, "device_name", props.get("device_name") or "")
+            self._assign_spec_property(graph_node, "axis_id", int(props.get("axis_id") or 0))
+            self._assign_spec_property(graph_node, "invert", bool(props.get("invert")))
+            self._assign_spec_property(graph_node, "display_range", normalize_input_display_range(props.get("display_range")))
         elif kind == "merge":
-            graph_node.set_property("operation", operation_label(props.get("operation")), push_undo=False)
+            self._assign_spec_property(graph_node, "operation", operation_label(props.get("operation")))
         elif kind == "curve":
-            graph_node.set_property("curve_xml", props.get("curve_xml") or "", push_undo=False)
+            self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
         elif kind == "limiter":
-            graph_node.set_property("curve_xml", props.get("curve_xml") or "", push_undo=False)
-            graph_node.set_property("range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")), push_undo=False)
-            graph_node.set_property("shape", normalize_limiter_shape(props.get("shape")), push_undo=False)
+            self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
+            self._assign_spec_property(graph_node, "range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")))
+            self._assign_spec_property(graph_node, "shape", normalize_limiter_shape(props.get("shape")))
             self._update_limiter_preview(graph_node)
         elif kind == "deadzone":
-            graph_node.set_property("center", float(props.get("center") if props.get("center") is not None else 0.05), push_undo=False)
-            graph_node.set_property("outer", float(props.get("outer") or 0.0), push_undo=False)
+            self._assign_spec_property(graph_node, "center", float(props.get("center") if props.get("center") is not None else 0.05))
+            self._assign_spec_property(graph_node, "outer", float(props.get("outer") or 0.0))
         elif kind == "override":
-            graph_node.set_property("threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.08), push_undo=False)
-            graph_node.set_property("release", float(props.get("release") if props.get("release") is not None else 0.03), push_undo=False)
-            graph_node.set_property("release_ms", float(props.get("release_ms") or 0.0), push_undo=False)
-            graph_node.set_property("hold_until_in", bool(props.get("hold_until_in")), push_undo=False)
+            self._assign_spec_property(graph_node, "threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.01))
+            self._assign_spec_property(graph_node, "release", float(props.get("release") if props.get("release") is not None else 0.03))
+            self._assign_spec_property(graph_node, "release_ms", float(props.get("release_ms") or 0.0))
+            self._assign_spec_property(graph_node, "hold_until_in", bool(props.get("hold_until_in")))
         elif kind == "laglead":
-            graph_node.set_property("lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0), push_undo=False)
-            graph_node.set_property("lead_ms", float(props.get("lead_ms") or 0.0), push_undo=False)
+            self._assign_spec_property(graph_node, "lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0))
+            self._assign_spec_property(graph_node, "lead_ms", float(props.get("lead_ms") or 0.0))
         elif kind == "output":
             vjoy_id = int(props.get("vjoy_id") or 1)
             axis_id = int(props.get("axis_id") or 1)
-            graph_node.set_property("vjoy_id", vjoy_id, push_undo=False)
-            graph_node.set_property("axis_id", axis_id, push_undo=False)
+            self._assign_spec_property(graph_node, "vjoy_id", vjoy_id)
+            self._assign_spec_property(graph_node, "axis_id", axis_id)
             if not spec.get("name") or spec.get("name") == "Output":
                 graph_node.set_name(_output_target_label(vjoy_id, axis_id))
-        graph_node.set_property("when_json", encode_when(props.get("when")), push_undo=False)
+        self._assign_spec_property(graph_node, "when_json", encode_when(props.get("when")))
 
     def _load_graph(self) -> None:
         if self._graph is None:
@@ -1453,7 +2179,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 if src is None or dst is None:
                     continue
                 out_port = src.get_output(conn.get("from_port") or "out")
-                in_port = dst.get_input(conn.get("to_port") or "in")
+                in_port = _input_port(dst, conn.get("to_port") or "in")
                 if out_port is None or in_port is None:
                     continue
                 try:
@@ -1475,6 +2201,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 self._segment_suspend = False
                 self._apply_segment_visibility()
             self._refresh_meters()
+            self._refresh_selection_pane()
 
     def _graph_nodes(self) -> list:
         if self._graph is None:
@@ -1577,11 +2304,14 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             return
         self._capture_graph()
         self._apply_segment_visibility()
+        self._refresh_selection_pane()
 
     def _on_property_changed(self, node, name, value) -> None:
         if self._loading or name in ("live_meter", "live_curve", "visible"):
             return
         self._capture_graph()
+        if name == "name":
+            self._refresh_selection_pane()
 
     def _on_double_click(self, node) -> None:
         kind = kind_for_node(node)
@@ -1596,6 +2326,8 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._capture_graph()
 
     def _on_node_selected(self, node) -> None:
+        if getattr(self, "_pane_sync", False):
+            return
         if getattr(self, "_segment_suspend", False) or self._loading:
             self._rebuild_inspector(node)
             return
@@ -1614,8 +2346,12 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._segment_focus = None
         self._rebuild_inspector(node)
         self._apply_segment_visibility()
+        self._refresh_action_banner()
+        self._refresh_selection_pane()
 
     def _on_selection_changed(self, selected=None, _deselected=None) -> None:
+        if getattr(self, "_pane_sync", False):
+            return
         if getattr(self, "_segment_suspend", False) or self._loading:
             return
         self._segment_gen = getattr(self, "_segment_gen", 0) + 1
@@ -1638,6 +2374,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if selected:
             self._segment_focus = selected[0]
         else:
+            self._rebuild_inspector(None)
             focus = getattr(self, "_segment_focus", None)
             alive = False
             if focus is not None:
@@ -1647,17 +2384,32 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                     alive = False
             if not alive:
                 self._segment_focus = None
-                self._rebuild_inspector(None)
         self._apply_segment_visibility()
+        self._refresh_action_banner()
+        self._refresh_selection_pane()
+
+    def _silence_inspector_widgets(self) -> None:
+        """Stop widgets that are about to be deleted from writing empty values back."""
+        host = getattr(self, "_inspector_sections_host", None)
+        if host is None:
+            return
+        for child in host.findChildren(QtCore.QObject):
+            try:
+                child.blockSignals(True)
+            except Exception:
+                continue
 
     def _rebuild_inspector(self, node) -> None:
-        gremlin.util.clear_layout(self._inspector_form)
-        if node is None or not hasattr(node, "AFCS_KIND"):
-            hint = QtWidgets.QLabel("Select a node to edit it. Click Output to add a vJoy axis destination. Delete removes the selected node.")
-            hint.setWordWrap(True)
-            self._inspector_form.addRow(hint)
+        self._silence_inspector_widgets()
+        gremlin.util.clear_layout(self._inspector_sections)
+        showing_node = node is not None and hasattr(node, "AFCS_KIND")
+        self._activation_section.setVisible(not showing_node)
+        if not showing_node:
+            self._collapsible_sections = [self._activation_section]
             return
+        self._collapsible_sections = []
         kind = kind_for_node(node)
+        self._inspector_form = self._section("Node")
         name = QtWidgets.QLineEdit(node.name())
         name.editingFinished.connect(lambda n=node, box=name: self._rename_node(n, box.text()))
         self._inspector_form.addRow("Name", name)
@@ -1665,6 +2417,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._help_label.setWordWrap(True)
         self._inspector_form.addRow(self._help_label)
         self._set_inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
+        self._inspector_form = self._section(_NODE_SECTION.get(kind, "Settings"))
         if kind == "input":
             source = QDataComboBox()
             source.setEditable(True)
@@ -1713,6 +2466,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             index = combo.findData(current)
             combo.setCurrentIndex(index if index >= 0 else 0)
             combo.currentIndexChanged.connect(lambda _i, n=node, box=combo: self._set_merge_op(n, box.currentData()))
+            self._sync_node_widget(node, "operation", operation_label(current))
             self._inspector_form.addRow("Operation", combo)
         elif kind == "curve":
             edit = QDataPushButton("Edit curve...", clicked=lambda n=node: self._on_double_click(n))
@@ -1744,18 +2498,12 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._inspector_form.addRow("Center deadzone", center)
             self._inspector_form.addRow("End deadzone", outer)
         elif kind == "override":
-            take = self._percent_spin(self._prop_float(node, "threshold", 0.08), lambda value, n=node: self._set_node_prop(n, "threshold", value / 100.0))
-            drop = self._percent_spin(self._prop_float(node, "release", 0.03), lambda value, n=node: self._set_node_prop(n, "release", value / 100.0))
-            hold = self._ms_spin(self._prop_float(node, "release_ms", 0.0), lambda value, n=node: self._set_node_prop(n, "release_ms", value))
-            hold.setToolTip("Stay inside the release band this long before handing back. 0 ms releases immediately. Use this so a quick pass through center does not drop the override.")
-            until_in = QtWidgets.QCheckBox("Hold until in moves")
-            until_in.setChecked(bool(node.get_property("hold_until_in")))
-            until_in.setToolTip("After the stick is in the release band, keep the override until the in axis moves. Crossing center on the override stick does not hand back by itself.")
-            until_in.toggled.connect(lambda checked, n=node: self._set_node_prop(n, "hold_until_in", checked))
-            self._inspector_form.addRow("Take over", take)
-            self._inspector_form.addRow("Release", drop)
-            self._inspector_form.addRow("Release hold", hold)
-            self._inspector_form.addRow(until_in)
+            grab = self._percent_spin(self._prop_float(node, "threshold", 0.01), lambda value, n=node: self._set_node_prop(n, "threshold", value / 100.0))
+            grab.setToolTip(
+                "How far an axis must move to become the one sending. "
+                "The other axis stays at its last value until you move it by this amount, even if it is sitting away from center."
+            )
+            self._inspector_form.addRow("Grab when moved", grab)
         elif kind == "laglead":
             lag = self._ms_spin(self._prop_float(node, "lag_ms", 80.0), lambda value, n=node: self._set_node_prop(n, "lag_ms", value))
             lead = self._ms_spin(self._prop_float(node, "lead_ms", 0.0), lambda value, n=node: self._set_node_prop(n, "lead_ms", value))
@@ -1763,16 +2511,11 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._inspector_form.addRow("Lead", lead)
         elif kind == "output":
             self._build_output_pickers(node)
+        self._inspector_form = self._section("When")
         when_widget = NodeConditionWidget()
         when_widget.set_value(node.get_property("when_json"))
         when_widget.changed.connect(lambda vis, n=node: self._set_node_prop(n, "when_json", encode_when(vis)))
         self._inspector_form.addRow(when_widget)
-        remove = Buttons.getDeleteWidget(
-            label="Delete node",
-            tooltip="Remove this node from the graph",
-            callback=lambda n=node: self._delete_nodes([n]),
-        )
-        self._inspector_form.addRow(remove)
 
     def _set_inspector_help(self, kind: str, operation: str | None = None) -> None:
         label = getattr(self, "_help_label", None)
@@ -1910,10 +2653,24 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
     def _set_merge_op(self, node, op: str) -> None:
         node.set_property("operation", operation_label(op))
         self._set_inspector_help("merge", op)
+        self._refresh_action_banner()
         self._capture_graph()
 
     def _listen_axis(self, node) -> None:
-        dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickAxis], callback=lambda event, n=node: self._listen_axis_done(n, event))
+        previous = getattr(self, "_axis_listen_dialog", None)
+        if previous is not None:
+            try:
+                if Shiboken.isValid(previous):
+                    previous.close()
+            except Exception:
+                pass
+            self._axis_listen_dialog = None
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
+            [InputType.JoystickAxis],
+            callback=lambda event, n=node: self._listen_axis_done(n, event),
+            parent=self,
+        )
+        self._axis_listen_dialog = dialog
         dialog.show()
 
     def _listen_axis_done(self, node, event) -> None:

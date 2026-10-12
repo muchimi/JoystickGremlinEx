@@ -46,6 +46,7 @@ _TYPE_TITLES = {
     "application": "Application",
     "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
+    "ocr": "OCR",
 }
 
 _ROLE_ID = QtCore.Qt.ItemDataRole.UserRole

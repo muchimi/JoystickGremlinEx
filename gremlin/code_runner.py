@@ -571,6 +571,9 @@ class CodeRunner:
             if config.streamdeck_enabled:
                 evt_listener.streamdeck_event.connect(self.event_handler.execute_event)
 
+            # overlay HUD / OCR rule-as-button events (always available with overlay)
+            evt_listener.overlay_event.connect(self.event_handler.execute_event)
+
             # # hook state events
             # evt_listener.state_event.connect(self.event_handler.execute_event)
 
@@ -782,6 +785,10 @@ class CodeRunner:
         el.osc_event.disconnect(self.event_handler.execute_event)
         try:
             el.streamdeck_event.disconnect(self.event_handler.execute_event)
+        except Exception:
+            pass
+        try:
+            el.overlay_event.disconnect(self.event_handler.execute_event)
         except Exception:
             pass
         # el.state_event.disconnect(self.event_handler.execute_event)

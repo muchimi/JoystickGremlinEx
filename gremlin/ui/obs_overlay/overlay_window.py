@@ -28,6 +28,10 @@ from .widgets import (
     chroma_fill_color,
     live_window_is_layered,
     paint_background,
+    crop_edit_uses_handles,
+    crop_insets,
+    crop_is_active,
+    cropped_rect,
     paint_widget,
     paint_widget_drop_shadow,
     qcolor,
@@ -43,6 +47,7 @@ from .widgets import (
 )
 
 ROTATE_HANDLE = 8
+CROP_HANDLE_BASE = 20
 
 syslog = logging.getLogger("system")
 
@@ -62,7 +67,7 @@ def _transparent_palette(widget: QtWidgets.QWidget):
 def touchable_item_at(scene: OverlayScene, x: float, y: float, page_id: str | None = None):
     """Topmost overlay widget that may receive touch, or None for pass-through."""
     for item in reversed(scene.sorted_widgets(page_id)):
-        if not item.get("visible", True):
+        if not widget_is_live_visible(item):
             continue
         try:
             ix, iy = float(item["x"]), float(item["y"])
@@ -684,9 +689,7 @@ class OverlayView(QtWidgets.QWidget):
         ]
         for item in self.scene.sorted_widgets(self._page_id):
             wid = str(item.get("id") or "")
-            visible = bool(item.get("visible", True))
-            conditions_ok = widget_is_live_visible(item)
-            if not visible or not conditions_ok:
+            if not widget_is_live_visible(item):
                 parts.append((wid, False))
                 continue
             shadow = resolve_widget_shadow(item.get("style"))
@@ -699,6 +702,7 @@ class OverlayView(QtWidgets.QWidget):
                     round(float(item.get("y") or 0), 2),
                     round(float(item.get("w") or 0), 2),
                     round(float(item.get("h") or 0), 2),
+                    *crop_insets(item),
                     round(float(widget_rotation_deg(item)), 2),
                     bool(shadow.get("on")),
                     round(float(shadow.get("dx") or 0), 2),
@@ -736,8 +740,6 @@ class OverlayView(QtWidgets.QWidget):
             set_live_fast_paint(True)
             try:
                 for item in self.scene.sorted_widgets(self._page_id):
-                    if not item.get("visible", True):
-                        continue
                     if not widget_is_live_visible(item):
                         continue
                     if abs(widget_rotation_deg(item)) < 0.001:
@@ -761,6 +763,15 @@ class OverlayView(QtWidgets.QWidget):
         self._dirty_body_ids = None
         return pm
 
+    def _runtime_hit_target(self, item: dict) -> bool:
+        """Live hit pad. Editor Visible stays put; a runtime eye can force it."""
+        forced = self.scene.active_visibility_override(item)
+        if forced is False:
+            return False
+        if forced is True:
+            return True
+        return bool(item.get("visible", True))
+
     def _paint_hit_pads(
         self,
         painter: QtGui.QPainter,
@@ -781,7 +792,7 @@ class OverlayView(QtWidgets.QWidget):
         if not interactive and not reposition:
             return
         for item in items if items is not None else self.scene.sorted_widgets(self._page_id):
-            if not item.get("visible", True):
+            if not self._runtime_hit_target(item):
                 continue
             if interactive and not reposition and not widget_accepts_touch(item):
                 continue
@@ -814,8 +825,6 @@ class OverlayView(QtWidgets.QWidget):
         set_live_fast_paint(True)
         try:
             for item in items:
-                if not item.get("visible", True):
-                    continue
                 if not widget_is_live_visible(item):
                     continue
                 value = self.bus.value_for(item)
@@ -875,8 +884,6 @@ class OverlayView(QtWidgets.QWidget):
         # Any widget overlapping the dirty region must be redrawn for z-order.
         overlapping = []
         for item in self.scene.sorted_widgets(self._page_id):
-            if not item.get("visible", True):
-                continue
             if not widget_is_live_visible(item):
                 continue
             if widget_dirty_rect(item).intersects(united):
@@ -896,7 +903,7 @@ class OverlayView(QtWidgets.QWidget):
             # Include condition-hidden visible widgets so reposition pads survive dirty patches.
             pad_items = []
             for item in self.scene.sorted_widgets(self._page_id):
-                if not item.get("visible", True):
+                if not self._runtime_hit_target(item):
                     continue
                 if widget_dirty_rect(item).intersects(united):
                     pad_items.append(item)
@@ -993,15 +1000,20 @@ class OverlayView(QtWidgets.QWidget):
                     value = None
                 else:
                     value = self.bus.value_for(item)
+                crop_ghost = (
+                    len(self.scene.selected_ids) == 1
+                    and item.get("id") in self.scene.selected_ids
+                    and crop_is_active(item)
+                )
                 if self.interactive and not conditions_ok:
                     painter.save()
                     try:
                         painter.setOpacity(0.32)
-                        paint_widget(painter, item, value)
+                        paint_widget(painter, item, value, crop_ghost=crop_ghost)
                     finally:
                         painter.restore()
                 else:
-                    paint_widget(painter, item, value)
+                    paint_widget(painter, item, value, crop_ghost=crop_ghost)
             if self.interactive:
                 self._paint_guides(painter)
                 self._paint_selection(painter)
@@ -1185,6 +1197,20 @@ class OverlayView(QtWidgets.QWidget):
                 painter.setBrush(QtCore.Qt.NoBrush)
                 painter.drawRect(rect.adjusted(-1, -1, 1, 1))
                 painter.restore()
+                if crop_edit_uses_handles():
+                    if crop_is_active(item):
+                        crop = cropped_rect(item)
+                        painter.save()
+                        apply_widget_rotation(painter, item)
+                        pen = QtGui.QPen(QtGui.QColor("#ffb020"), 1.25, QtCore.Qt.DashLine)
+                        painter.setPen(pen)
+                        painter.setBrush(QtCore.Qt.NoBrush)
+                        painter.drawRect(crop)
+                        painter.restore()
+                    painter.setBrush(QtGui.QColor("#ffb020"))
+                    painter.setPen(QtGui.QPen(QtGui.QColor("#1a1206"), 1))
+                    for hx, hy in self.crop_handle_points(item):
+                        painter.drawRect(QtCore.QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
                 if widget_id == (self.scene.selected_ids[-1] if self.scene.selected_ids else None):
                     painter.setBrush(QtGui.QColor("#7ec8ff"))
                     painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1))
@@ -1232,6 +1258,34 @@ class OverlayView(QtWidgets.QWidget):
         ]
         return [(widget_local_to_scene(item, px, py).x(), widget_local_to_scene(item, px, py).y()) for px, py in local]
 
+    def crop_handle_points(self, item: dict):
+        # Four edge handles, pulled inside the resize handles when the crop
+        # edge would sit on the widget border. Corners stay resize-only.
+        crop = cropped_rect(item)
+        full = widget_rect(item)
+        gap = 16.0 / max(self._zoom, 0.25)
+        gap_x = min(gap, max(0.0, (full.width() - 8.0) * 0.5))
+        gap_y = min(gap, max(0.0, (full.height() - 8.0) * 0.5))
+        top = crop.top() if crop.top() >= full.top() + gap_y else full.top() + gap_y
+        bottom = crop.bottom() if crop.bottom() <= full.bottom() - gap_y else full.bottom() - gap_y
+        left = crop.left() if crop.left() >= full.left() + gap_x else full.left() + gap_x
+        right = crop.right() if crop.right() <= full.right() - gap_x else full.right() - gap_x
+        if top > bottom:
+            mid = (full.top() + full.bottom()) * 0.5
+            top, bottom = mid - gap_y * 0.5, mid + gap_y * 0.5
+        if left > right:
+            mid = (full.left() + full.right()) * 0.5
+            left, right = mid - gap_x * 0.5, mid + gap_x * 0.5
+        cx = (crop.left() + crop.right()) * 0.5
+        cy = (crop.top() + crop.bottom()) * 0.5
+        local = [
+            (cx, top),
+            (right, cy),
+            (cx, bottom),
+            (left, cy),
+        ]
+        return [(widget_local_to_scene(item, px, py).x(), widget_local_to_scene(item, px, py).y()) for px, py in local]
+
     def rotation_handle_point(self, item: dict) -> QtCore.QPointF:
         rect = widget_rect(item)
         offset = 18.0 / max(self._zoom, 0.25)
@@ -1255,9 +1309,20 @@ class OverlayView(QtWidgets.QWidget):
         rotate = self.rotation_handle_point(item)
         if abs(pos.x() - rotate.x()) <= tol * 1.35 and abs(pos.y() - rotate.y()) <= tol * 1.35:
             return target_id, ROTATE_HANDLE
-        for index, (hx, hy) in enumerate(self.handle_points(item)):
+        resize_points = self.handle_points(item)
+        for index, (hx, hy) in enumerate(resize_points):
             if abs(pos.x() - hx) <= tol and abs(pos.y() - hy) <= tol:
                 return target_id, index
+        if len(self.scene.selected_ids) == 1 and crop_edit_uses_handles():
+            # Edge resize owns the border. A crop handle only counts once it is clear of that point.
+            edge_resize = (1, 3, 5, 7)
+            for index, (hx, hy) in enumerate(self.crop_handle_points(item)):
+                if abs(pos.x() - hx) > tol or abs(pos.y() - hy) > tol:
+                    continue
+                rx, ry = resize_points[edge_resize[index]]
+                if abs(hx - rx) <= tol * 2 and abs(hy - ry) <= tol * 2:
+                    continue
+                return target_id, CROP_HANDLE_BASE + index
         return None, -1
 
     def release_touch(self):
@@ -1450,6 +1515,7 @@ class OverlayWindow(QtWidgets.QWidget):
         self._applying_flags = False
         self._host_hwnd = 0
         self._host_attached = False
+        self._share_concealed = False
         self._host_timer = QtCore.QTimer(self)
         self._host_timer.setInterval(250)
         self._host_timer.timeout.connect(self._sync_host_attach)
@@ -1578,6 +1644,11 @@ class OverlayWindow(QtWidgets.QWidget):
             view.detach_from_scene()
 
     def hideEvent(self, event):
+        # Native SW_HIDE while the shared app is in the background. Stay parented
+        # so the follow timer can show the overlay again without stealing focus.
+        if getattr(self, "_share_concealed", False):
+            super().hideEvent(event)
+            return
         view = getattr(self, "view", None)
         if view is not None and Shiboken.isValid(view):
             try:
@@ -1888,7 +1959,15 @@ class OverlayWindow(QtWidgets.QWidget):
         if not live:
             return
         from .app_view import resolve_application_hwnd
-        from .host_window import attach_overlay_hwnd, place_overlay_in_host
+        from .host_window import (
+            attach_overlay_hwnd,
+            foreground_is_this_process,
+            hide_overlay_hwnd,
+            host_is_foreground,
+            place_overlay_in_host,
+            release_cursor_to_arrow,
+            separate_host_input,
+        )
 
         host = resolve_application_hwnd(title, exe, self._host_hwnd)
         if not host:
@@ -1905,7 +1984,20 @@ class OverlayWindow(QtWidgets.QWidget):
             self._host_attached = True
         cw = int(canvas.get("width") or self.width() or 1)
         ch = int(canvas.get("height") or self.height() or 1)
-        place_overlay_in_host(hwnd, host, cw, ch)
+        if host_is_foreground(host, hwnd):
+            self._share_concealed = False
+            place_overlay_in_host(hwnd, host, cw, ch)
+        else:
+            self._share_concealed = True
+            hide_overlay_hwnd(hwnd)
+            # The game is not in front. Drop the SetParent input join so its
+            # cursor cannot sit on Joystick Gremlin Ex. Leave the join alone
+            # while the game itself is foreground. Repeat while JG Ex stays
+            # in front, because a later parent message can join the queues again.
+            if foreground_is_this_process():
+                release_cursor_to_arrow(host)
+            else:
+                separate_host_input(host)
         if live_window_is_layered(canvas):
             _extend_frame_into_client(self)
         self._apply_click_through(
@@ -1919,6 +2011,7 @@ class OverlayWindow(QtWidgets.QWidget):
             self._host_hwnd = 0
             return
         host = int(self._host_hwnd or 0)
+        self._share_concealed = False
         try:
             from .host_window import detach_overlay_hwnd
 

@@ -31,6 +31,8 @@ from .visibility_logic import (
 
 from .model import (
     NO_BINDING_WIDGET_TYPES,
+    normalize_visibility_variable_test,
+    overlay_variable_name,
     switch_binding,
     switch_positions,
     switch_rest_position,
@@ -778,14 +780,49 @@ def visibility_binding(condition: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def visibility_condition_configured(condition: dict[str, Any] | None) -> bool:
+    cond = condition or {}
+    kind = str(cond.get("kind") or "mode").casefold()
+    if kind == "variable":
+        return bool(overlay_variable_name(cond.get("variable_name")))
     return binding_is_configured(visibility_binding(condition))
+
+
+def _overlay_variable_current_value(condition: dict[str, Any]) -> str:
+    name = overlay_variable_name(condition.get("variable_name"))
+    if not name:
+        return ""
+    try:
+        from gremlin.ui.obs_overlay import OverlayManager
+
+        scene = OverlayManager().scene
+        row = scene.overlay_variable_by_name(name)
+        if row is None and condition.get("variable_id"):
+            row = scene.overlay_variable_by_id(str(condition.get("variable_id") or ""))
+        if row is None:
+            return ""
+        return str(row.get("value") if row.get("value") is not None else "")
+    except Exception:
+        return ""
 
 
 def evaluate_visibility_condition(condition: dict[str, Any] | None) -> bool:
     if not visibility_condition_configured(condition):
         return False
+    cond = condition or {}
+    kind = str(cond.get("kind") or "mode").casefold()
+    if kind == "variable":
+        current = _overlay_variable_current_value(cond)
+        test = normalize_visibility_variable_test(cond.get("variable_test"))
+        if test == "not_empty":
+            return bool(str(current).strip())
+        needle = str(cond.get("variable_value") if cond.get("variable_value") is not None else "")
+        if test == "contain":
+            if not needle:
+                return False
+            return needle.casefold() in str(current).casefold()
+        return str(current).casefold() == needle.casefold()
     value = read_button(visibility_binding(condition))
-    when = str((condition or {}).get("when") or "on").casefold()
+    when = str(cond.get("when") or "on").casefold()
     return (not value) if when == "off" else bool(value)
 
 
@@ -819,9 +856,59 @@ def widget_conditions_match(item: dict[str, Any] | None) -> bool:
     return eval_visibility_node(node, env)
 
 
+def visibility_rule_configured(item: dict[str, Any] | None) -> bool:
+    """True when the widget has at least one visibility condition."""
+    if not item:
+        return False
+    vis = item.get("visibility") or {}
+    return any(
+        isinstance(cond, dict) and visibility_condition_configured(cond)
+        for cond in (vis.get("conditions") or [])
+    )
+
+
+def visibility_rule_signature(item: dict[str, Any] | None) -> tuple:
+    """Snapshot of the inputs a visibility rule watches.
+
+    A button, state, mode, or variable change produces a different tuple, which
+    drops a manual show/hide override.
+    """
+    if not item:
+        return ()
+    vis = item.get("visibility") or {}
+    parts = []
+    for cond in vis.get("conditions") or []:
+        if not isinstance(cond, dict) or not visibility_condition_configured(cond):
+            continue
+        letter = str(cond.get("letter") or "")
+        kind = str(cond.get("kind") or "mode").casefold()
+        try:
+            if kind == "variable":
+                state = _overlay_variable_current_value(cond)
+            else:
+                state = bool(read_button(visibility_binding(cond)))
+        except Exception:
+            state = None
+        parts.append((letter, kind, state))
+    return tuple(parts)
+
+
 def widget_is_live_visible(item: dict[str, Any] | None, *, ignore_conditions: bool = False) -> bool:
     """True when the widget should appear on the live overlay window."""
-    if not item or not item.get("visible", True):
+    if not item:
+        return False
+    if not ignore_conditions:
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+
+            scene = OverlayManager().scene
+            if not scene.preview_show_all:
+                forced = scene.active_visibility_override(item)
+                if forced is not None:
+                    return bool(forced)
+        except Exception:
+            pass
+    if not item.get("visible", True):
         return False
     if ignore_conditions:
         return True
@@ -1187,6 +1274,21 @@ def _quantize_overlay_value(value):
     return value
 
 
+def _label_variable_fingerprint(item: dict[str, Any] | None):
+    """Resolved label text when it contains %variables%; else None."""
+    if not item:
+        return None
+    label = item.get("label") or ""
+    if "%" not in str(label):
+        return None
+    try:
+        from .model import resolve_overlay_text
+
+        return resolve_overlay_text(label)
+    except Exception:
+        return str(label)
+
+
 def read_widget_value(item: dict[str, Any]):
     """Return the live value used by a widget: float, (x,y), bool, or hat tuple."""
     widget_type = item.get("type")
@@ -1195,7 +1297,7 @@ def read_widget_value(item: dict[str, Any]):
     if widget_type in ("label", "panel", "shape", "image"):
         if widget_type == "label" and (item.get("style") or {}).get("show_current_mode"):
             return current_profile_mode()
-        return None
+        return _label_variable_fingerprint(item)
     if widget_type == "application":
         from .app_view import ApplicationViewTracker
 
@@ -1228,6 +1330,10 @@ def read_widget_value(item: dict[str, Any]):
         from .stopwatch_track import StopwatchOverlayTracker
 
         return StopwatchOverlayTracker().sample(item)
+    if widget_type == "ocr":
+        from .ocr_track import OcrOverlayTracker
+
+        return OcrOverlayTracker().sample(item)
     if widget_type == "input_display":
         from .input_display import KeyboardMouseTracker
 
@@ -1287,6 +1393,7 @@ class OverlayValueBus(QtCore.QObject):
         self._poll.timeout.connect(self.refresh)
         self._cache: dict[str, Any] = {}
         self._visible_cache: dict[str, bool] = {}
+        self._label_cache: dict[str, Any] = {}
         self._locked: set[str] = set()
         self._widget_sources: dict[int, list[dict[str, Any]]] = {}
         self._streamdeck_hooked = False
@@ -1405,6 +1512,13 @@ class OverlayValueBus(QtCore.QObject):
         self._refresh_queued = False
         if not alive(self):
             return
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+
+            if OverlayManager().scene.tick_variable_resets():
+                self._emit_all = True
+        except Exception:
+            pass
         if any(item.get("type") == "sys_stats" for item in self._iter_widgets()):
             from .sys_stats import SysStatsSampler
 
@@ -1423,6 +1537,7 @@ class OverlayValueBus(QtCore.QObject):
         mouse_ids = set()
         graph_keys = set()
         stopwatch_ids = set()
+        ocr_ids = set()
         input_display_ids = set()
         manual_ids = set()
         remote_ids = set()
@@ -1439,6 +1554,8 @@ class OverlayValueBus(QtCore.QObject):
                         graph_keys.add((widget_id, sid))
             if widget_type == "stopwatch" and widget_id:
                 stopwatch_ids.add(widget_id)
+            if widget_type == "ocr" and widget_id:
+                ocr_ids.add(widget_id)
             if widget_type == "input_display" and widget_id:
                 input_display_ids.add(widget_id)
             if widget_type == "sys_stats" and widget_id:
@@ -1458,17 +1575,27 @@ class OverlayValueBus(QtCore.QObject):
             if widget_id in self._locked:
                 continue
             value = _quantize_overlay_value(read_widget_value(item))
+            label_fp = _label_variable_fingerprint(item)
             live = widget_is_live_visible(item)
             blink_dirty = False
             if blink_is_armed(item.get("blink")):
                 blink_dirty = blink_tracker.observe(item, value)
-            if self._cache.get(widget_id) != value or self._visible_cache.get(widget_id) != live or blink_dirty:
+            if (
+                self._cache.get(widget_id) != value
+                or self._label_cache.get(widget_id) != label_fp
+                or self._visible_cache.get(widget_id) != live
+                or blink_dirty
+            ):
                 self._cache[widget_id] = value
+                self._label_cache[widget_id] = label_fp
                 self._visible_cache[widget_id] = live
                 changed_ids.append(widget_id)
         MouseOverlayTracker().retain(mouse_ids)
         GraphOverlayTracker().retain(graph_keys)
         StopwatchOverlayTracker().retain(stopwatch_ids)
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().retain(ocr_ids)
         KeyboardMouseTracker().retain(input_display_ids)
         ManualCounterTracker().retain(manual_ids)
         ApplicationViewTracker().retain(application_ids)

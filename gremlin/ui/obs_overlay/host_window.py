@@ -25,9 +25,14 @@ SWP_NOACTIVATE = 0x0010
 SWP_FRAMECHANGED = 0x0020
 SWP_SHOWWINDOW = 0x0040
 SW_HIDE = 0
-ASFW_ANY = 0xFFFFFFFF
-HWND_TOP = 0
-HWND_NOTOPMOST = -2
+IDC_ARROW = 32512
+GA_ROOT = 2
+# Standard cursors LoadCursorW understands. A game cursor is none of these.
+_SYSTEM_CURSOR_IDS = (
+    32512, 32513, 32514, 32515, 32516,
+    32640, 32641, 32642, 32643, 32644, 32645, 32646,
+    32648, 32649, 32650, 32651,
+)
 
 
 def _user32():
@@ -44,14 +49,8 @@ def _user32():
     user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     user32.GetClientRect.restype = wintypes.BOOL
     user32.GetForegroundWindow.restype = wintypes.HWND
-    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
-    user32.SetForegroundWindow.restype = wintypes.BOOL
-    user32.AllowSetForegroundWindow.argtypes = [wintypes.DWORD]
-    user32.AllowSetForegroundWindow.restype = wintypes.BOOL
     user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user32.GetWindowThreadProcessId.restype = wintypes.DWORD
-    user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
-    user32.AttachThreadInput.restype = wintypes.BOOL
     user32.SetWindowPos.argtypes = [
         wintypes.HWND,
         wintypes.HWND,
@@ -64,12 +63,20 @@ def _user32():
     user32.SetWindowPos.restype = wintypes.BOOL
     user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     user32.ShowWindow.restype = wintypes.BOOL
-    user32.BringWindowToTop.argtypes = [wintypes.HWND]
-    user32.BringWindowToTop.restype = wintypes.BOOL
     user32.ReleaseCapture.argtypes = []
     user32.ReleaseCapture.restype = wintypes.BOOL
     user32.ClipCursor.argtypes = [ctypes.c_void_p]
     user32.ClipCursor.restype = wintypes.BOOL
+    user32.SetCursor.argtypes = [wintypes.HANDLE]
+    user32.SetCursor.restype = wintypes.HANDLE
+    user32.LoadCursorW.argtypes = [wintypes.HINSTANCE, ctypes.c_void_p]
+    user32.LoadCursorW.restype = wintypes.HANDLE
+    user32.GetCursorInfo.argtypes = [ctypes.c_void_p]
+    user32.GetCursorInfo.restype = wintypes.BOOL
+    user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+    user32.AttachThreadInput.restype = wintypes.BOOL
+    user32.GetAncestor.argtypes = [wintypes.HWND, ctypes.c_uint]
+    user32.GetAncestor.restype = wintypes.HWND
     if ctypes.sizeof(ctypes.c_void_p) == 8:
         user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
         user32.GetWindowLongPtrW.restype = ctypes.c_longlong
@@ -141,65 +148,6 @@ def apply_noactivate_exstyle(hwnd: int) -> None:
         pass
 
 
-def restore_foreground(hwnd: int) -> None:
-    """Force *hwnd* to the foreground (use sparingly — steals focus from JG Ex)."""
-    if sys.platform != "win32" or not hwnd:
-        return
-    try:
-        import ctypes
-        from ctypes import wintypes
-
-        user32 = _user32()
-        if not user32.IsWindow(hwnd):
-            return
-        # Clear game cursor clip / capture that can make JG Ex feel dead.
-        try:
-            user32.ClipCursor(None)
-        except Exception:
-            pass
-        try:
-            user32.ReleaseCapture()
-        except Exception:
-            pass
-        if int(user32.GetForegroundWindow() or 0) == int(hwnd):
-            user32.BringWindowToTop(hwnd)
-            return
-        user32.AllowSetForegroundWindow(ASFW_ANY)
-        kernel32 = ctypes.windll.kernel32
-        fg = int(user32.GetForegroundWindow() or 0)
-        pid = wintypes.DWORD()
-        fg_tid = int(user32.GetWindowThreadProcessId(fg, ctypes.byref(pid)) or 0) if fg else 0
-        host_tid = int(user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid)) or 0)
-        cur = int(kernel32.GetCurrentThreadId())
-        attached_fg = False
-        attached_host = False
-        try:
-            if fg_tid and fg_tid != cur:
-                attached_fg = bool(user32.AttachThreadInput(cur, fg_tid, True))
-            if host_tid and host_tid != cur and host_tid != fg_tid:
-                attached_host = bool(user32.AttachThreadInput(cur, host_tid, True))
-            user32.BringWindowToTop(hwnd)
-            user32.SetWindowPos(
-                hwnd,
-                HWND_TOP,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
-            )
-            user32.SetForegroundWindow(hwnd)
-        finally:
-            # Always undo AttachThreadInput — a stuck attach makes the host
-            # cursor/input appear over JG Ex and blocks the UI permanently.
-            if attached_host:
-                user32.AttachThreadInput(cur, host_tid, False)
-            if attached_fg:
-                user32.AttachThreadInput(cur, fg_tid, False)
-    except Exception:
-        pass
-
-
 def release_input_hooks() -> None:
     """Drop cursor clip / mouse capture left behind by a host game."""
     if sys.platform != "win32":
@@ -233,30 +181,138 @@ def foreground_hwnd() -> int:
         return 0
 
 
-def restore_foreground_if_was(hwnd: int, previous_foreground: int) -> None:
-    """Restore *hwnd* only if it previously held focus.
+def host_is_foreground(host_hwnd: int, overlay_hwnd: int = 0) -> bool:
+    """True when the shared app, or the overlay parented into it, is the foreground window."""
+    fg = foreground_hwnd()
+    if not fg or not host_hwnd:
+        return False
+    if int(fg) == int(host_hwnd):
+        return True
+    if overlay_hwnd and int(fg) == int(overlay_hwnd):
+        return True
+    try:
+        root = int(_user32().GetAncestor(fg, GA_ROOT) or 0)
+    except Exception:
+        root = 0
+    return root == int(host_hwnd)
 
-    Unconditional restore after app-share SetParent was putting the game
-    (and its cursor) on top of JG Ex and making the UI feel dead.
+
+def foreground_is_this_process() -> bool:
+    """True when the foreground window belongs to Joystick Gremlin Ex."""
+    if sys.platform != "win32":
+        return False
+    fg = foreground_hwnd()
+    if not fg:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = _user32()
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(fg, ctypes.byref(pid))
+        return int(pid.value) == int(ctypes.windll.kernel32.GetCurrentProcessId())
+    except Exception:
+        return False
+
+
+def _cursor_handle(user32) -> int:
+    import ctypes
+    from ctypes import wintypes
+
+    class CURSORINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("flags", wintypes.DWORD),
+            ("hCursor", wintypes.HANDLE),
+            ("ptScreenPos", wintypes.POINT),
+        ]
+
+    info = CURSORINFO()
+    info.cbSize = ctypes.sizeof(CURSORINFO)
+    if not user32.GetCursorInfo(ctypes.byref(info)):
+        return 0
+    return int(info.hCursor or 0)
+
+
+def separate_host_input(host_hwnd: int) -> None:
+    """Undo the input join SetParent creates across processes.
+
+    Cross-process SetParent attaches the two UI threads, so the game cursor
+    stays on Joystick Gremlin Ex until this process exits. Detach only.
+    AttachThreadInput(TRUE) is what left the pointer stuck before.
     """
-    if not hwnd or not previous_foreground:
+    if sys.platform != "win32" or not host_hwnd:
         return
-    if int(previous_foreground) != int(hwnd):
-        return
-    restore_foreground(hwnd)
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = _user32()
+        if not user32.IsWindow(host_hwnd):
+            return
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+        cur = int(kernel32.GetCurrentThreadId() or 0)
+        pid = wintypes.DWORD()
+        host_tid = int(user32.GetWindowThreadProcessId(int(host_hwnd), ctypes.byref(pid)) or 0)
+        if not cur or not host_tid or cur == host_tid:
+            return
+        user32.AttachThreadInput(cur, host_tid, False)
+        user32.AttachThreadInput(host_tid, cur, False)
+    except Exception:
+        pass
 
 
-def restore_previous_foreground(previous_foreground: int, host_hwnd: int = 0) -> None:
-    """Put focus back where it was before SetParent, without promoting *host_hwnd*.
+def _nudge_arrow_cursor() -> None:
+    """Make Qt apply the arrow. SetCursor is ignored until the next mouse move."""
+    try:
+        from PySide6 import QtCore, QtGui, QtWidgets
 
-    SetParent often activates the host. If JG Ex (or anything else) had focus,
-    give it back. If the host already had focus, leave it alone.
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.setOverrideCursor(QtCore.Qt.CursorShape.ArrowCursor)
+            app.restoreOverrideCursor()
+        pos = QtGui.QCursor.pos()
+        QtGui.QCursor.setPos(pos.x() + 1, pos.y())
+        QtGui.QCursor.setPos(pos)
+    except Exception:
+        pass
+
+
+def _is_system_cursor(user32, handle: int) -> bool:
+    if not handle:
+        return True
+    for ident in _SYSTEM_CURSOR_IDS:
+        loaded = int(user32.LoadCursorW(None, ident) or 0)
+        if loaded and loaded == handle:
+            return True
+    return False
+
+
+def release_cursor_to_arrow(host_hwnd: int = 0) -> None:
+    """Separate a joined game input queue and show the arrow. Does not change focus.
+
+    Does not call ShowCursor. Undoing a ShowCursor(TRUE) loop hid the pointer.
+    A text caret or resize cursor is left alone.
     """
-    if not previous_foreground:
+    if sys.platform != "win32":
         return
-    if host_hwnd and int(previous_foreground) == int(host_hwnd):
-        return
-    restore_foreground(previous_foreground)
+    try:
+        user32 = _user32()
+        user32.ClipCursor(None)
+        user32.ReleaseCapture()
+        if host_hwnd:
+            separate_host_input(host_hwnd)
+        current = _cursor_handle(user32)
+        if _is_system_cursor(user32, current):
+            return
+        arrow = int(user32.LoadCursorW(None, IDC_ARROW) or 0)
+        if arrow:
+            user32.SetCursor(arrow)
+            _nudge_arrow_cursor()
+    except Exception:
+        pass
 
 
 def host_client_size(hwnd: int) -> tuple[int, int]:
@@ -285,12 +341,13 @@ def attach_overlay_hwnd(overlay_hwnd: int, host_hwnd: int) -> bool:
         user32 = _user32()
         if not user32.IsWindow(overlay_hwnd) or not user32.IsWindow(host_hwnd):
             return False
-        prev_fg = foreground_hwnd()
         apply_noactivate_exstyle(overlay_hwnd)
         style = _get_style(user32, overlay_hwnd)
         style = (style | WS_CHILD | WS_CLIPSIBLINGS) & ~WS_POPUP
         _set_style(user32, overlay_hwnd, style)
         user32.SetParent(overlay_hwnd, host_hwnd)
+        # Do not show or activate here. The follow timer shows the overlay
+        # only while the shared app is foreground, and never steals focus.
         user32.SetWindowPos(
             overlay_hwnd,
             0,
@@ -298,29 +355,36 @@ def attach_overlay_hwnd(overlay_hwnd: int, host_hwnd: int) -> bool:
             0,
             0,
             0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
         )
-        # SetParent often activates the host. Put focus back where it was
-        # (typically JG Ex). Only leave the host alone if it already had focus.
-        restore_previous_foreground(prev_fg, host_hwnd)
+        # SetParent joins the game's input queue. Separate before the game
+        # cursor can stick to this process. Never pass TRUE.
+        separate_host_input(host_hwnd)
         return True
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: attach to application window failed: {err}")
         return False
 
 
-def place_overlay_in_host(overlay_hwnd: int, host_hwnd: int, width: int, height: int) -> bool:
-    """Keep the overlay at the host client origin, clipped by the host."""
+def place_overlay_in_host(overlay_hwnd: int, host_hwnd: int, width: int, height: int, *, show: bool = True) -> bool:
+    """Keep the overlay at the host client origin, clipped by the host.
+
+    *show* uses SWP_NOACTIVATE so the shared app keeps focus.
+    """
     if sys.platform != "win32" or not overlay_hwnd or not host_hwnd:
         return False
     try:
         user32 = _user32()
         if not user32.IsWindow(overlay_hwnd) or not user32.IsWindow(host_hwnd):
             return False
+        if not show:
+            user32.ShowWindow(overlay_hwnd, SW_HIDE)
+            return True
         cw, ch = host_client_size(host_hwnd)
         w = max(1, min(int(width or 1), cw or int(width or 1)))
         h = max(1, min(int(height or 1), ch or int(height or 1)))
         # NOZORDER: HWND_TOP here was raising the host over JG Ex every tick.
+        # NOACTIVATE: sizing must not take focus from the shared app.
         user32.SetWindowPos(
             overlay_hwnd,
             0,
@@ -344,10 +408,8 @@ def detach_overlay_hwnd(
 ) -> None:
     """Restore a top-level overlay after attach_overlay_hwnd.
 
-    By default this does **not** raise *restore_hwnd* (the game). Forcing the
-    host to the foreground on detach left its cursor on top of JG Ex after
-    profile stop. Pass activate_host=True only when the host already had focus
-    and must keep it mid-session.
+    This does not call SetForegroundWindow. *activate_host* is ignored so a
+    page change cannot pull the shared app or Joystick Gremlin Ex forward.
 
     *hide_window*: after SetParent(0) the HWND can remain visible while Qt still
     thinks it is hidden — native SW_HIDE is required when tearing down.
@@ -364,7 +426,6 @@ def detach_overlay_hwnd(
                 host = int(user32.GetParent(overlay_hwnd) or 0)
             except Exception:
                 host = 0
-        prev_fg = foreground_hwnd()
         # Hide while still a child so SetParent(0) cannot flash a full-size
         # top-level popup over JG Ex.
         if hide_window:
@@ -386,11 +447,10 @@ def detach_overlay_hwnd(
         if hide_window:
             user32.ShowWindow(overlay_hwnd, SW_HIDE)
         release_input_hooks()
-        if activate_host:
-            restore_foreground_if_was(host, prev_fg)
-        else:
-            # Prefer whoever had focus before detach — never promote the game
-            # over JG Ex when tearing the overlay down.
-            restore_previous_foreground(prev_fg, host)
+        # SetParent(0) does not undo the input join. Detach it explicitly.
+        if host:
+            separate_host_input(host)
+        if foreground_is_this_process():
+            release_cursor_to_arrow(host)
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: detach from application window failed: {err}")

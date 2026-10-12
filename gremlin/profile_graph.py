@@ -2285,6 +2285,18 @@ class ProfileInputItemNode(ProfileBaseNode):
                 sd_input_item.parse_xml(node, sd_input_item)
             self.input_id = sd_input_item
 
+        elif self.input_type == InputType.OverlayButton:
+            from gremlin.ui.obs_overlay.overlay_input import OverlayInputItem
+
+            overlay_item = OverlayInputItem(mode_object)
+            for child in node:
+                if child.tag in ("input", "overlay"):
+                    overlay_item.parse_xml(child, overlay_item)
+            if node.tag in ("input", "overlay"):
+                overlay_item.parse_xml(node, overlay_item)
+            overlay_item.setOverrideInputType(InputType.JoystickButton)
+            self.input_id = overlay_item
+
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False

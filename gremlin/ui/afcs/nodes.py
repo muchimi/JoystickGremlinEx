@@ -318,11 +318,11 @@ class AfcsOverride(BaseNode):
 
     def __init__(self):
         super().__init__()
-        self.add_input("in")
-        self.add_input("override")
+        self.add_input("A")
+        self.add_input("B")
         self.add_output("out")
         self.create_property("afcs_id", "", widget_type=NodePropWidgetEnum.HIDDEN.value)
-        self.create_property("threshold", 0.08, widget_type=NodePropWidgetEnum.HIDDEN.value)
+        self.create_property("threshold", 0.01, widget_type=NodePropWidgetEnum.HIDDEN.value)
         self.create_property("release", 0.03, widget_type=NodePropWidgetEnum.HIDDEN.value)
         self.create_property("release_ms", 0.0, widget_type=NodePropWidgetEnum.HIDDEN.value)
         self.create_property("hold_until_in", False, widget_type=NodePropWidgetEnum.HIDDEN.value)

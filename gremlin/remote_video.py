@@ -732,6 +732,52 @@ def grab_window_image(hwnd: int, max_width: int = 960) -> QtGui.QImage | None:
     return _grab_window_gdi(int(hwnd or 0), int(max_width or 960))
 
 
+def grab_screen_image(monitor_index: int = 0, max_width: int = 1920) -> QtGui.QImage | None:
+    """Public GDI desktop capture of a monitor for OCR / overlays."""
+    return _grab_screen_gdi(int(monitor_index or 0), int(max_width or 1920))
+
+
+def grab_screen_rect(left: int, top: int, width: int, height: int, max_width: int = 1920) -> QtGui.QImage | None:
+    """Public GDI capture of an absolute desktop rectangle (screen coordinates)."""
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+        left = int(left)
+        top = int(top)
+        width = int(width)
+        height = int(height)
+        if width <= 0 or height <= 0:
+            return None
+        target_w, target_h = _even_size(width, height, int(max_width or 1920))
+        if not target_w:
+            return None
+        hdc_screen = user32.GetDC(0)
+        if not hdc_screen:
+            return None
+        hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
+        hbmp = gdi32.CreateCompatibleBitmap(hdc_screen, target_w, target_h)
+        old = gdi32.SelectObject(hdc_mem, hbmp)
+        SRCCOPY = 0x00CC0020
+        gdi32.SetStretchBltMode(hdc_mem, _COLORONCOLOR)
+        if target_w == width and target_h == height:
+            ok = gdi32.BitBlt(hdc_mem, 0, 0, target_w, target_h, hdc_screen, left, top, SRCCOPY)
+        else:
+            ok = gdi32.StretchBlt(
+                hdc_mem, 0, 0, target_w, target_h, hdc_screen, left, top, width, height, SRCCOPY
+            )
+        image = _qimage_from_dibits(gdi32, hdc_mem, hbmp, target_w, target_h) if ok else None
+        gdi32.SelectObject(hdc_mem, old)
+        gdi32.DeleteObject(hbmp)
+        gdi32.DeleteDC(hdc_mem)
+        user32.ReleaseDC(0, hdc_screen)
+        return image
+    except Exception as err:
+        syslog.debug(f"REMOTE VIDEO: GDI rect grab failed: {err}")
+        return None
+
+
 def _grab_frame_image() -> QtGui.QImage | None:
     """Capture on the caller thread via GDI — never blocks the Qt UI loop."""
     settings = _active_video_settings()

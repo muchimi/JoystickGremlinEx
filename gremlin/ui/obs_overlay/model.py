@@ -13,6 +13,7 @@ import copy
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from typing import Any
@@ -181,6 +182,7 @@ WIDGET_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "ocr",
     "panel",  # legacy alias of shape
     "axis_dial",  # legacy alias of axis_radial
 )
@@ -213,6 +215,7 @@ PALETTE_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "ocr",
 )
 
 PALETTE_GROUPS = (
@@ -220,7 +223,7 @@ PALETTE_GROUPS = (
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
-    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck", "ocr")),
 )
 
 DEFAULT_SIZES = {
@@ -252,6 +255,7 @@ DEFAULT_SIZES = {
     "application": (480, 270),
     "remote_view": (480, 270),
     "streamdeck": (320, 208),
+    "ocr": (280, 120),
     "panel": (280, 160),
 }
 
@@ -284,6 +288,7 @@ DEFAULT_LABELS = {
     "application": "",
     "remote_view": "Remote",
     "streamdeck": "",
+    "ocr": "OCR",
     "panel": "",
 }
 
@@ -309,6 +314,115 @@ def widget_is_locked(item: dict[str, Any] | None) -> bool:
 
 def _new_id() -> str:
     return str(uuid.uuid4())
+
+
+_VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_VARIABLE_TOKEN_RE = re.compile(r"%([A-Za-z_][A-Za-z0-9_]*)%")
+
+
+def overlay_variable_name(raw) -> str:
+    """Strip wrapping % and whitespace from a variable name."""
+    text = str(raw or "").strip()
+    if len(text) >= 2 and text.startswith("%") and text.endswith("%"):
+        text = text[1:-1].strip()
+    return text.strip("%").strip()
+
+
+def overlay_variable_token(name) -> str:
+    cleaned = overlay_variable_name(name)
+    return f"%{cleaned}%" if cleaned else ""
+
+
+def resolve_overlay_text(text, scene=None) -> str:
+    """Replace %name% tokens with current overlay variable values."""
+    raw = str(text or "")
+    if "%" not in raw:
+        return raw
+    if scene is None:
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+
+            scene = OverlayManager().scene
+        except Exception:
+            scene = None
+    values: dict[str, str] = {}
+    if scene is not None:
+        for row in getattr(scene, "variables", None) or []:
+            name = overlay_variable_name((row or {}).get("name"))
+            if name:
+                values[name.casefold()] = str((row or {}).get("value") if (row or {}).get("value") is not None else "")
+
+    def _repl(match: re.Match) -> str:
+        return values.get(match.group(1).casefold(), "")
+
+    resolved = _VARIABLE_TOKEN_RE.sub(_repl, raw)
+    resolved = re.sub(r"\s*,\s*,+", ", ", resolved)
+    resolved = re.sub(r"^\s*,\s*", "", resolved)
+    resolved = re.sub(r"\s*,\s*$", "", resolved)
+    resolved = re.sub(r"\s{2,}", " ", resolved)
+    return resolved.strip()
+
+
+def overlay_variable_name_ok(name) -> bool:
+    return bool(_VARIABLE_NAME_RE.match(overlay_variable_name(name)))
+
+
+def default_overlay_variable(name: str = "") -> dict[str, Any]:
+    cleaned = overlay_variable_name(name)
+    return {
+        "id": _new_id(),
+        "name": cleaned,
+        "default": "",
+        "value": "",
+        "reset_seconds": 5.0,
+        "reset_timer": False,
+        "reset_on_deactivate": False,
+    }
+
+
+def normalize_overlay_variable(raw) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    name = overlay_variable_name(raw.get("name"))
+    if not overlay_variable_name_ok(name):
+        return None
+    try:
+        reset_seconds = float(raw.get("reset_seconds") or 0)
+    except (TypeError, ValueError):
+        reset_seconds = 0.0
+    reset_seconds = max(0.0, reset_seconds)
+    if "reset_timer" in raw:
+        reset_timer = bool(raw.get("reset_timer"))
+    else:
+        reset_timer = reset_seconds > 0.0
+    if reset_timer and reset_seconds <= 0.0:
+        reset_seconds = 5.0
+    ident = str(raw.get("id") or "").strip() or _new_id()
+    return {
+        "id": ident,
+        "name": name,
+        "default": str(raw.get("default") or ""),
+        "value": str(raw.get("value") if raw.get("value") is not None else raw.get("default") or ""),
+        "reset_seconds": reset_seconds,
+        "reset_timer": reset_timer,
+        "reset_on_deactivate": bool(raw.get("reset_on_deactivate")),
+    }
+
+
+def normalize_overlay_variables(raw) -> list[dict[str, Any]]:
+    rows = []
+    seen: set[str] = set()
+    for entry in raw or []:
+        item = normalize_overlay_variable(entry)
+        if not item:
+            continue
+        key = item["name"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(item)
+    rows.sort(key=lambda row: str(row.get("name") or "").casefold())
+    return rows
 
 
 def default_style(widget_type: str) -> dict[str, Any]:
@@ -714,6 +828,38 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_keep_aspect": True,
             }
         )
+    elif widget_type == "ocr":
+        style.update(
+            {
+                "fill": "#00000000",
+                "border": "#3a6ea5",
+                "border_on": "#6ecf8e",
+                "border_width": 2.0,
+                "border_width_on": 2.0,
+                "border_style": "dashed",
+                "border_style_on": "dashed",
+                "border_dash_size": 8.0,
+                "border_dash_size_on": 8.0,
+                "border_dash_spacing": 4.0,
+                "border_dash_spacing_on": 4.0,
+                "border_dash_amount": 0,
+                "border_dash_amount_on": 0,
+                "border_enabled": True,
+                "border_enabled_on": True,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": True,
+                "font_size": 12,
+                "ocr_region": "widget",
+                "ocr_confidence": 0.70,
+                "ocr_engine": "auto",
+                "ocr_interval_ms": 400,
+                "ocr_miss_tolerance": 3,
+                "ocr_arm_mode": "toggle",
+                "ocr_arm_pulses": 5,
+                "ocr_arm_pulse_spacing_ms": 500,
+            }
+        )
     elif widget_type == "remote_view":
         style.update(
             {
@@ -801,6 +947,7 @@ NO_BINDING_WIDGET_TYPES = (
 )
 NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
     "stopwatch",
+    "ocr",
     "toggle",
     "switch_4way",
     "switch_2way",
@@ -936,7 +1083,7 @@ def normalize_switch_bindings(widget_type: str | None, raw=None) -> dict[str, An
 def widget_binding_kind(widget_type: str) -> str:
     if widget_type in XY_WIDGET_TYPES:
         return "xy"
-    if widget_type in ("button", "stopwatch"):
+    if widget_type in ("button", "stopwatch", "ocr"):
         return "button"
     if widget_type in SWITCH_WIDGET_TYPES:
         return "switch"
@@ -1359,7 +1506,7 @@ def _clamp_rect_delta(x: float, y: float, w: float, h: float, dx: float, dy: flo
     return int(round(nx - x)), int(round(ny - y))
 
 
-VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard")
+VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard", "variable")
 
 
 def default_visibility() -> dict[str, Any]:
@@ -1372,9 +1519,23 @@ def normalize_visibility_kind(kind) -> str:
         return "physical"
     if value in ("keyboard/mouse", "mouse"):
         return "keyboard"
+    if value in ("variable", "var", "overlay_variable"):
+        return "variable"
     if value in VISIBILITY_KINDS:
         return value
     return "mode"
+
+
+def normalize_visibility_variable_test(value) -> str:
+    """How a Variable visibility condition compares the overlay variable."""
+    raw = str(value or "not_empty").casefold().replace("-", "_").replace(" ", "_")
+    if raw in ("exact", "equals", "==", "match"):
+        return "exact"
+    if raw in ("contain", "contains", "in"):
+        return "contain"
+    if raw in ("value", "based_on_value"):
+        return "exact"
+    return "not_empty"
 
 
 def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
@@ -1392,6 +1553,10 @@ def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
         "vjoy_id": 0,
         "input_id": 0,
         "keys": [],
+        "variable_name": "",
+        "variable_id": "",
+        "variable_test": "not_empty",
+        "variable_value": "",
     }
 
 
@@ -1427,6 +1592,22 @@ def normalize_visibility(raw) -> dict[str, Any]:
         except (TypeError, ValueError):
             item["input_id"] = 0
         item["keys"] = normalize_overlay_keys(item.get("keys"))
+        item["variable_name"] = overlay_variable_name(item.get("variable_name") or cond.get("variable_name"))
+        item["variable_id"] = str(item.get("variable_id") or cond.get("variable_id") or "")
+        test_raw = cond.get("variable_test")
+        if test_raw is None:
+            mode = str(cond.get("variable_mode") or cond.get("var_mode") or "").casefold()
+            match = str(cond.get("variable_match") or cond.get("var_match") or "").casefold()
+            if mode in ("value", "based_on_value") or match in ("exact", "contain", "contains"):
+                test_raw = match if match in ("exact", "contain", "contains") else "exact"
+            else:
+                test_raw = "not_empty"
+        item["variable_test"] = normalize_visibility_variable_test(test_raw)
+        item["variable_value"] = str(
+            item.get("variable_value")
+            if item.get("variable_value") is not None
+            else cond.get("variable_value") or cond.get("var_value") or ""
+        )
         cid = str(item.get("id") or "")
         if not cid or cid in seen:
             item["id"] = _new_id()
@@ -1560,6 +1741,247 @@ def is_websocket_mode(canvas: dict[str, Any] | None) -> bool:
     return normalize_background_mode((canvas or {}).get("background_mode")) == "websocket"
 
 
+def normalize_ocr_region(value) -> str:
+    raw = str(value or "widget").casefold()
+    return "fullscreen" if raw in ("fullscreen", "full", "screen", "monitor") else "widget"
+
+
+def normalize_ocr_engine(value) -> str:
+    raw = str(value or "auto").casefold()
+    if raw in ("rapid", "rapidocr", "onnx"):
+        return "rapid"
+    if raw in ("windows", "winocr", "winrt", "media"):
+        return "windows"
+    return "auto"
+
+
+def normalize_ocr_confidence(value, default: float = 0.70) -> float:
+    try:
+        conf = float(value if value is not None else default)
+    except (TypeError, ValueError):
+        conf = float(default)
+    return round(max(0.10, min(1.0, conf)), 2)
+
+
+def normalize_ocr_border_style(value) -> str:
+    raw = str(value or "dashed").casefold()
+    if raw in ("solid", "line", "continuous"):
+        return "solid"
+    if raw in ("dot", "dotted", "dots"):
+        return "dotted"
+    return "dashed"
+
+
+def ocr_border_is_enabled(style: dict | None, *, armed: bool) -> bool:
+    """Per-state border visibility for OCR widgets (defaults on)."""
+    style = style or {}
+    key = "border_enabled_on" if armed else "border_enabled"
+    if key in style:
+        return bool(style.get(key))
+    return True
+
+
+def normalize_ocr_arm_mode(value) -> str:
+    """Normalize OCR arm mode.
+
+    ``toggle`` / ``hold`` are continuous scanning (latch vs level).
+    ``pulse`` runs one detection on arm edge; ``multi_pulse`` runs N spaced detections.
+    """
+    raw = str(value or "toggle").casefold().replace(" ", "_").replace("-", "_")
+    if raw in (
+        "hold",
+        "while",
+        "depressed",
+        "while_depressed",
+        "level",
+        "press",
+        "continuous_hold",
+    ):
+        return "hold"
+    if raw in ("pulse", "single", "single_pulse", "once"):
+        return "pulse"
+    if raw in ("multi_pulse", "multiple", "pulses", "multi", "multipulse"):
+        return "multi_pulse"
+    return "toggle"
+
+
+def normalize_ocr_arm_pulses(value, default: int = 5) -> int:
+    """Number of detections for Multiple (pulses) arm mode."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(1, min(100, n))
+
+
+def normalize_ocr_arm_pulse_spacing_ms(value, default: int = 500) -> int:
+    """Milliseconds between Multiple (pulses) detections."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(50, min(10000, n))
+
+
+def normalize_ocr_miss_tolerance(value, default: int = 3) -> int:
+    """Consecutive non-matching scans before a held rule releases."""
+    try:
+        n = int(value if value is not None else default)
+    except (TypeError, ValueError):
+        n = int(default)
+    return max(1, min(20, n))
+
+
+def normalize_ocr_match(value) -> str:
+    raw = str(value or "contain").casefold()
+    if raw in ("exact", "equals", "==", "full"):
+        return "exact"
+    if raw in ("any", "region", "capture", "handle"):
+        return "any"
+    return "contain"
+
+
+def normalize_ocr_capture(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("region", "handle", "text", "any"):
+        return raw
+    return ""
+
+
+def normalize_ocr_fire(value) -> str:
+    """Legacy Edge/Hold — ignored at runtime (detection is always press-while-matched)."""
+    raw = str(value or "edge").casefold()
+    return "hold" if raw in ("hold", "level", "while", "latched") else "edge"
+
+
+def split_ocr_texts(raw) -> list[str]:
+    """Parse a texts list or comma/newline-separated string into unique needles."""
+    if isinstance(raw, (list, tuple)):
+        parts = [str(p or "").strip() for p in raw]
+    else:
+        text = str(raw or "")
+        parts = []
+        for line in text.replace("\r", "\n").split("\n"):
+            for chunk in line.split(","):
+                parts.append(chunk.strip())
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        if not part:
+            continue
+        key = part.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(part)
+    return out
+
+
+def normalize_ocr_base(raw) -> int | None:
+    """Optional signature base for rock-count (count = signature // base)."""
+    if raw is None or raw == "":
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def default_ocr_rule(index: int = 0) -> dict[str, Any]:
+    return {
+        "id": _new_id(),
+        "texts": [],
+        "match": "contain",
+        "capture": "",
+        "base": None,
+        "display_name": "",
+        "mapping_xml": "",
+        "name": f"Rule {int(index) + 1}",
+    }
+
+
+def normalize_ocr_rule(raw, index: int = 0) -> dict[str, Any]:
+    base_rule = default_ocr_rule(index)
+    if not isinstance(raw, dict):
+        return base_rule
+    rule_id = str(raw.get("id") or "").strip() or base_rule["id"]
+    if "texts" in raw:
+        texts = split_ocr_texts(raw.get("texts"))
+    else:
+        texts = split_ocr_texts(raw.get("text"))
+    display_name = str(raw.get("display_name") or "").strip()
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        name = display_name or (texts[0][:24] if texts else base_rule["name"])
+    if not display_name:
+        display_name = name
+    mapping_xml = str(raw.get("mapping_xml") or "")
+    capture = normalize_ocr_capture(raw.get("capture"))
+    match = normalize_ocr_match(raw.get("match"))
+    if match == "any" and not capture:
+        capture = "region"
+    out = {
+        "id": rule_id,
+        "texts": texts,
+        "match": match,
+        "base": normalize_ocr_base(raw.get("base")),
+        "display_name": display_name,
+        "mapping_xml": mapping_xml,
+        "name": name,
+        "capture": capture,
+        "text": ", ".join(texts),
+        "fire": normalize_ocr_fire(raw.get("fire")),
+        "binding": normalize_toggle_binding(raw.get("binding")) if raw.get("binding") else default_toggle_binding(),
+    }
+    for key in ("_runtime", "chart_url", "page_url", "chart_id", "image_widget", "pack_id"):
+        if key in raw and raw.get(key) is not None:
+            out[key] = raw.get(key)
+    return out
+
+
+def normalize_ocr_rules(raw) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    rules = []
+    for index, entry in enumerate(raw):
+        rules.append(normalize_ocr_rule(entry, index))
+    return rules
+
+
+def ocr_rule_input_id(widget_id: str, rule_id: str) -> str:
+    """OverlayInputItem message_key for an OCR rule-as-button."""
+    return f"{str(widget_id or '').strip()}:{str(rule_id or '').strip()}"
+
+
+def detection_label_for_rule(rule: dict[str, Any], signature: int | None) -> str:
+    """Build Quantainium ×2 style label when base is set; otherwise display_name/name."""
+    display = str(rule.get("display_name") or rule.get("name") or "").strip() or "Match"
+    base = normalize_ocr_base(rule.get("base"))
+    if base and signature and signature % base == 0:
+        count = signature // base
+        if count >= 1:
+            return f"{display} ×{count}"
+    return display
+
+
+def apply_ocr_style_fields(style: dict[str, Any]) -> None:
+    """Clamp OCR capture settings stored on a widget style."""
+    style["ocr_region"] = normalize_ocr_region(style.get("ocr_region"))
+    style["ocr_engine"] = normalize_ocr_engine(style.get("ocr_engine"))
+    style["ocr_arm_mode"] = normalize_ocr_arm_mode(style.get("ocr_arm_mode"))
+    style["ocr_arm_pulses"] = normalize_ocr_arm_pulses(style.get("ocr_arm_pulses"))
+    style["ocr_arm_pulse_spacing_ms"] = normalize_ocr_arm_pulse_spacing_ms(
+        style.get("ocr_arm_pulse_spacing_ms")
+    )
+    style["ocr_confidence"] = normalize_ocr_confidence(style.get("ocr_confidence"))
+    style["ocr_miss_tolerance"] = normalize_ocr_miss_tolerance(style.get("ocr_miss_tolerance"))
+    try:
+        style["ocr_interval_ms"] = max(100, min(5000, int(style.get("ocr_interval_ms") or 400)))
+    except (TypeError, ValueError):
+        style["ocr_interval_ms"] = 400
+
+
 def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
     return bool((canvas or {}).get("interactive"))
 
@@ -1637,6 +2059,7 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "series": [],
         "keys": [],
         "stats": [],
+        "ocr_rules": [],
     }
     if widget_uses_series(widget_type):
         item["series"] = [default_graph_series(0)]
@@ -1648,6 +2071,10 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         item["keys"] = default_widget_keys()
         item["style"]["input_preset"] = DEFAULT_PRESET
         item["style"]["mouse_graphic"] = preset_mouse_graphic(DEFAULT_PRESET)
+    if widget_type == "ocr":
+        item["binding"] = default_toggle_binding()
+        item["ocr_rules"] = [default_ocr_rule(0)]
+        apply_ocr_style_fields(item["style"])
     if widget_type == "stopwatch":
         item["binding"] = default_toggle_binding()
         item["binding_y"] = default_toggle_binding()
@@ -1736,6 +2163,8 @@ class OverlayScene(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.pages: list[dict[str, Any]] = []
+        self.variables: list[dict[str, Any]] = []
+        self._variable_reset_at: dict[str, float] = {}
         self.active_page_id: str | None = None
         self.canvas: dict[str, Any] = {}
         self.widgets: list[dict[str, Any]] = []
@@ -1751,6 +2180,9 @@ class OverlayScene(QtCore.QObject):
         self._mouse_reposition = False
         # Designer Show overlay: paint every visible widget, ignoring mode/state conditions.
         self._preview_show_all = False
+        # Runtime eye override: widget id -> (forced visible, rule-input signature).
+        # Not saved. Dropped when that rule's button, state, mode, or variable changes.
+        self._visibility_overrides: dict[Any, tuple[bool, tuple]] = {}
         # Persist: open Overlay control panel automatically when the profile starts.
         self.show_control_panel_on_profile_start = False
         self._widget_clipboard: list[dict[str, Any]] = []
@@ -1833,6 +2265,8 @@ class OverlayScene(QtCore.QObject):
     def _reset_default_pages(self, emit: bool = True):
         page = default_page("Overlay")
         self.pages = [page]
+        self.variables = []
+        self._variable_reset_at = {}
         self.active_page_id = page["id"]
         self.groups = {}
         self._sync_active_aliases()
@@ -2167,6 +2601,7 @@ class OverlayScene(QtCore.QObject):
             "groups": copy.deepcopy(self.groups),
             "show_control_panel_on_profile_start": bool(self.show_control_panel_on_profile_start),
             "pages": copy.deepcopy(self.pages),
+            "variables": copy.deepcopy(self.variables),
         }
 
     def from_dict(self, data: dict[str, Any] | None):
@@ -2190,6 +2625,8 @@ class OverlayScene(QtCore.QObject):
             active = self.pages[0]["id"]
         self.active_page_id = active
         self.groups = normalize_group_registry(data.get("groups"))
+        self.variables = normalize_overlay_variables(data.get("variables"))
+        self._variable_reset_at = {}
         self.show_control_panel_on_profile_start = bool(data.get("show_control_panel_on_profile_start"))
         self._sync_active_aliases()
         self._ensure_group_registry_from_widgets()
@@ -2198,6 +2635,165 @@ class OverlayScene(QtCore.QObject):
         self._emit()
         self.selection_changed.emit()
         self.control_target_changed.emit()
+
+    def overlay_variable_by_id(self, variable_id: str | None) -> dict[str, Any] | None:
+        ident = str(variable_id or "")
+        if not ident:
+            return None
+        for row in self.variables:
+            if str(row.get("id") or "") == ident:
+                return row
+        return None
+
+    def overlay_variable_by_name(self, name) -> dict[str, Any] | None:
+        key = overlay_variable_name(name).casefold()
+        if not key:
+            return None
+        for row in self.variables:
+            if str(row.get("name") or "").casefold() == key:
+                return row
+        return None
+
+    def add_overlay_variable(
+        self,
+        name: str,
+        default: str = "",
+        reset_seconds: float = 5.0,
+        reset_timer: bool = False,
+        reset_on_deactivate: bool = False,
+    ) -> dict[str, Any] | None:
+        cleaned = overlay_variable_name(name)
+        if not overlay_variable_name_ok(cleaned):
+            return None
+        if self.overlay_variable_by_name(cleaned):
+            return None
+        row = default_overlay_variable(cleaned)
+        row["default"] = str(default or "")
+        row["value"] = row["default"]
+        try:
+            row["reset_seconds"] = max(0.0, float(reset_seconds if reset_seconds is not None else 5.0))
+        except (TypeError, ValueError):
+            row["reset_seconds"] = 5.0
+        row["reset_timer"] = bool(reset_timer)
+        row["reset_on_deactivate"] = bool(reset_on_deactivate)
+        if row["reset_timer"] and row["reset_seconds"] <= 0.0:
+            row["reset_seconds"] = 5.0
+        self.push_undo()
+        self.variables.append(row)
+        self.variables = normalize_overlay_variables(self.variables)
+        self._dirty = True
+        self._emit()
+        return self.overlay_variable_by_name(cleaned)
+
+    def update_overlay_variable(self, variable_id: str, **fields) -> bool:
+        row = self.overlay_variable_by_id(variable_id)
+        if not row:
+            return False
+        next_row = dict(row)
+        if "name" in fields:
+            cleaned = overlay_variable_name(fields.get("name"))
+            if not overlay_variable_name_ok(cleaned):
+                return False
+            existing = self.overlay_variable_by_name(cleaned)
+            if existing is not None and str(existing.get("id") or "") != str(row.get("id") or ""):
+                return False
+            next_row["name"] = cleaned
+        if "default" in fields:
+            next_row["default"] = str(fields.get("default") or "")
+        if "value" in fields:
+            next_row["value"] = str(fields.get("value") if fields.get("value") is not None else "")
+        if "reset_seconds" in fields:
+            try:
+                next_row["reset_seconds"] = max(0.0, float(fields.get("reset_seconds") or 0))
+            except (TypeError, ValueError):
+                next_row["reset_seconds"] = 0.0
+        if "reset_timer" in fields:
+            next_row["reset_timer"] = bool(fields.get("reset_timer"))
+        if "reset_on_deactivate" in fields:
+            next_row["reset_on_deactivate"] = bool(fields.get("reset_on_deactivate"))
+        self.push_undo()
+        row.update(next_row)
+        self.variables = normalize_overlay_variables(self.variables)
+        self._dirty = True
+        self._emit()
+        return True
+
+    def _arm_variable_reset_timer(self, row: dict[str, Any] | None) -> None:
+        if not row:
+            return
+        ident = str(row.get("id") or "")
+        if not ident:
+            return
+        if not bool(row.get("reset_timer")):
+            self._variable_reset_at.pop(ident, None)
+            return
+        try:
+            seconds = float(row.get("reset_seconds") or 0)
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds <= 0.0:
+            self._variable_reset_at.pop(ident, None)
+            return
+        self._variable_reset_at[ident] = time.monotonic() + seconds
+
+    def set_overlay_variable_runtime_value(self, name: str, value: str) -> bool:
+        """Update a variable's live value. Creating a missing name still records undo."""
+        row = self.overlay_variable_by_name(name)
+        if row is None:
+            row = self.add_overlay_variable(name)
+            if row is None:
+                return False
+        new_value = str(value if value is not None else "")
+        old_value = str(row.get("value") if row.get("value") is not None else "")
+        changed = old_value != new_value
+        row["value"] = new_value
+        self._arm_variable_reset_timer(row)
+        return changed
+
+    def tick_variable_resets(self) -> bool:
+        """Restore timed-out variables to their defaults. Returns True if any changed."""
+        if not self._variable_reset_at:
+            return False
+        now = time.monotonic()
+        dirty = False
+        for ident, deadline in list(self._variable_reset_at.items()):
+            if now < float(deadline or 0):
+                continue
+            row = self.overlay_variable_by_id(ident)
+            self._variable_reset_at.pop(ident, None)
+            if row is None:
+                continue
+            default = str(row.get("default") or "")
+            if str(row.get("value") if row.get("value") is not None else "") == default:
+                continue
+            row["value"] = default
+            dirty = True
+        return dirty
+
+    def reset_variables_on_deactivate(self) -> bool:
+        """Restore variables flagged for profile-deactivation reset."""
+        dirty = False
+        self._variable_reset_at.clear()
+        for row in self.variables or []:
+            if not bool(row.get("reset_on_deactivate")):
+                continue
+            default = str(row.get("default") or "")
+            if str(row.get("value") if row.get("value") is not None else "") == default:
+                continue
+            row["value"] = default
+            dirty = True
+        return dirty
+
+    def remove_overlay_variable(self, variable_id: str) -> bool:
+        ident = str(variable_id or "")
+        if not ident or not self.overlay_variable_by_id(ident):
+            return False
+        self.push_undo()
+        self.variables = [row for row in self.variables if str(row.get("id") or "") != ident]
+        self._variable_reset_at.pop(ident, None)
+        self._dirty = True
+        self._emit()
+        return True
 
     def _normalize_widget(self, raw: dict[str, Any]) -> dict[str, Any]:
         from .shapes import default_shape_points, normalize_shape_kind, normalize_shape_points
@@ -2208,13 +2804,39 @@ class OverlayScene(QtCore.QObject):
             {
                 k: raw[k]
                 for k in item.keys()
-                if k in raw and k not in ("style", "binding", "binding_y", "bindings", "points", "visibility", "series", "keys", "stats")
+                if k in raw
+                and k
+                not in (
+                    "style",
+                    "binding",
+                    "binding_y",
+                    "bindings",
+                    "points",
+                    "visibility",
+                    "series",
+                    "keys",
+                    "stats",
+                    "ocr_rules",
+                )
             }
         )
         style = default_style(widget_type)
         style.update(raw.get("style") or {})
         item["style"] = style
         item["visibility"] = normalize_visibility(raw.get("visibility"))
+        if isinstance(raw.get("crop"), dict):
+            from .widgets import clamp_crop
+
+            left, top, right, bottom = clamp_crop(
+                item.get("w"),
+                item.get("h"),
+                raw["crop"].get("l"),
+                raw["crop"].get("t"),
+                raw["crop"].get("r"),
+                raw["crop"].get("b"),
+            )
+            if left or top or right or bottom:
+                item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
         item["name"] = str(item.get("name") or raw.get("name") or "")
         item["locked"] = bool(raw.get("locked") if "locked" in raw else item.get("locked"))
         item["blink"] = normalize_blink(raw.get("blink") if "blink" in raw else item.get("blink"))
@@ -2233,10 +2855,19 @@ class OverlayScene(QtCore.QObject):
             style["mouse_graphic"] = normalize_mouse_graphic(style.get("mouse_graphic"))
         else:
             item["keys"] = []
+        if widget_type == "ocr":
+            item["ocr_rules"] = normalize_ocr_rules(raw.get("ocr_rules") if "ocr_rules" in raw else item.get("ocr_rules"))
+            if not item["ocr_rules"]:
+                item["ocr_rules"] = [default_ocr_rule(0)]
+            apply_ocr_style_fields(style)
+        else:
+            item["ocr_rules"] = []
         item["binding"], item["binding_y"] = self._normalize_bindings(widget_type, raw)
         if widget_type == "stopwatch":
             item["binding"] = normalize_toggle_binding(item.get("binding"))
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
+        if widget_type == "ocr":
+            item["binding"] = normalize_toggle_binding(item.get("binding"))
         if widget_type in SWITCH_WIDGET_TYPES:
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
             if widget_type in ("switch_4way", "switch_2way"):
@@ -2556,6 +3187,14 @@ class OverlayScene(QtCore.QObject):
             new_style.setdefault("show_mouse", True)
         if widget_type == "sys_stats":
             item["stats"] = normalize_stat_series(item.get("stats"), new_style.get("stat") or "time")
+        if widget_type == "ocr":
+            item["ocr_rules"] = normalize_ocr_rules(item.get("ocr_rules"))
+            if not item["ocr_rules"]:
+                item["ocr_rules"] = [default_ocr_rule(0)]
+            apply_ocr_style_fields(new_style)
+            item["binding"] = normalize_toggle_binding(item.get("binding"))
+        else:
+            item["ocr_rules"] = []
         old_kind = widget_binding_kind(old_type)
         new_kind = widget_binding_kind(widget_type)
         saved_binding = dict(item.get("binding") or {})
@@ -2592,6 +3231,8 @@ class OverlayScene(QtCore.QObject):
             if widget_type == "stopwatch":
                 item["binding"] = default_toggle_binding()
                 item["binding_y"] = default_toggle_binding()
+            elif widget_type == "ocr":
+                item["binding"] = default_toggle_binding()
         elif new_kind == "hat":
             item["binding"]["input_type"] = "hat"
 
@@ -3159,20 +3800,90 @@ class OverlayScene(QtCore.QObject):
         self.anchor_target(nxt, target=target)
         return nxt
 
-    def set_widgets_visible(self, widget_ids: list[str], visible: bool) -> bool:
-        flag = bool(visible)
+    def active_visibility_override(self, item: dict[str, Any] | None) -> bool | None:
+        """Forced show/hide while the visibility rule's inputs are unchanged."""
+        if not item:
+            return None
+        wid = item.get("id")
+        entry = self._visibility_overrides.get(wid)
+        if not entry:
+            return None
+        from .bindings import visibility_rule_signature
+
+        forced, signature = entry
+        if signature != visibility_rule_signature(item):
+            self._visibility_overrides.pop(wid, None)
+            return None
+        return bool(forced)
+
+    def clear_visibility_overrides(self, widget_ids: list | None = None) -> None:
+        if widget_ids is None:
+            self._visibility_overrides.clear()
+            return
+        for wid in widget_ids:
+            item = self.widget_by_id(wid)
+            self._visibility_overrides.pop(item.get("id") if item else wid, None)
+
+    def set_runtime_visibility(self, widget_ids: list[str], visible: bool) -> bool:
+        """Show or hide widgets on the live overlay only.
+
+        Does not change the editor Visible flag and does not mark the profile dirty.
+        When a visibility rule currently disagrees, the choice holds until that
+        rule's button, state, mode, or variable changes. With no rule, it holds
+        until toggled again or the profile stops.
+        """
+        from .bindings import visibility_rule_signature, widget_conditions_match
+
+        desired = bool(visible)
         changed = False
         for wid in widget_ids:
             item = self.widget_by_id(wid)
             if not item:
                 continue
+            key = item.get("id")
+            natural = bool(item.get("visible", True)) and widget_conditions_match(item)
+            if desired == natural:
+                if self._visibility_overrides.pop(key, None) is not None:
+                    changed = True
+                continue
+            entry = (desired, visibility_rule_signature(item))
+            if self._visibility_overrides.get(key) != entry:
+                self._visibility_overrides[key] = entry
+                changed = True
+        if changed:
+            try:
+                from .bindings import OverlayValueBus
+
+                OverlayValueBus().refresh()
+            except Exception:
+                pass
+        return changed
+
+    def set_widgets_visible(self, widget_ids: list[str], visible: bool) -> bool:
+        flag = bool(visible)
+        changed = False
+        cleared = False
+        for wid in widget_ids:
+            item = self.widget_by_id(wid)
+            if not item:
+                continue
+            if self._visibility_overrides.pop(item.get("id"), None) is not None:
+                cleared = True
             if bool(item.get("visible", True)) == flag:
                 continue
             item["visible"] = flag
             changed = True
         if changed:
             self._dirty = True
+        if changed or cleared:
             self._emit()
+            if cleared:
+                try:
+                    from .bindings import OverlayValueBus
+
+                    OverlayValueBus().refresh()
+                except Exception:
+                    pass
         return changed
 
     def set_group_widgets_visible(self, group_id: str, visible: bool, page_id: str | None = None) -> bool:
@@ -3329,7 +4040,7 @@ class OverlayScene(QtCore.QObject):
 
     def _widget_snap_targets(self, exclude_ids: set[str] | None = None) -> tuple[list[float], list[float]]:
         """X and Y snap lines from other widgets (left/center/right and top/middle/bottom)."""
-        from .widgets import widget_rotated_bounds
+        from .widgets import widget_alignment_bounds
 
         exclude = {str(i) for i in (exclude_ids or set())}
         vertical: list[float] = []
@@ -3341,7 +4052,7 @@ class OverlayScene(QtCore.QObject):
             if not item.get("visible", True):
                 continue
             try:
-                bounds = widget_rotated_bounds(item)
+                bounds = widget_alignment_bounds(item)
             except Exception:
                 continue
             if bounds.isNull() or bounds.width() <= 0 or bounds.height() <= 0:
@@ -3361,6 +4072,7 @@ class OverlayScene(QtCore.QObject):
         mode: str = "move",
         previous: tuple[float, float, float, float] | None = None,
         exclude_ids: set[str] | None = None,
+        insets: tuple[float, float, float, float] | None = None,
     ) -> tuple[float, float, float, float]:
         guides = self.canvas.get("guides") or []
         snap_widgets = bool(self.canvas.get("snap_to_widgets", True))
@@ -3415,23 +4127,27 @@ class OverlayScene(QtCore.QObject):
                 return None
             return best
 
+        crop_l, crop_t, crop_r, crop_b = (0.0, 0.0, 0.0, 0.0)
+        if insets:
+            crop_l, crop_t, crop_r, crop_b = (float(v or 0) for v in insets)
+
         x_map = {}
         if "left" in x_edges:
-            x_map["left"] = x
+            x_map["left"] = x + crop_l
         if "center" in x_edges:
-            x_map["center"] = x + w / 2.0
+            x_map["center"] = x + (w + crop_l - crop_r) / 2.0
         if "right" in x_edges:
-            x_map["right"] = x + w
+            x_map["right"] = x + w - crop_r
         prev_x = None
         if previous is not None:
             px, py, pw, ph = previous
             prev_x = {}
             if "left" in x_edges:
-                prev_x["left"] = px
+                prev_x["left"] = px + crop_l
             if "center" in x_edges:
-                prev_x["center"] = px + pw / 2.0
+                prev_x["center"] = px + (pw + crop_l - crop_r) / 2.0
             if "right" in x_edges:
-                prev_x["right"] = px + pw
+                prev_x["right"] = px + pw - crop_r
         hit = _best(x_map, vertical, prev_x) if vertical else None
         if hit:
             edge, target = hit
@@ -3440,37 +4156,37 @@ class OverlayScene(QtCore.QObject):
             if mode == "resize":
                 if edge == "left":
                     right = x + w
-                    x = target
+                    x = target - crop_l
                     w = max(8.0, right - x)
                 elif edge == "right":
-                    w = max(8.0, target - x)
+                    w = max(8.0, target - x + crop_r)
                 elif edge == "center":
-                    x = target - w / 2.0
+                    x = target - (w + crop_l - crop_r) / 2.0
             else:
                 if edge == "left":
-                    x = target
+                    x = target - crop_l
                 elif edge == "right":
-                    x = target - w
+                    x = target - (w - crop_r)
                 else:
-                    x = target - w / 2.0
+                    x = target - (w + crop_l - crop_r) / 2.0
 
         y_map = {}
         if "top" in y_edges:
-            y_map["top"] = y
+            y_map["top"] = y + crop_t
         if "center" in y_edges:
-            y_map["center"] = y + h / 2.0
+            y_map["center"] = y + (h + crop_t - crop_b) / 2.0
         if "bottom" in y_edges:
-            y_map["bottom"] = y + h
+            y_map["bottom"] = y + h - crop_b
         prev_y = None
         if previous is not None:
             px, py, pw, ph = previous
             prev_y = {}
             if "top" in y_edges:
-                prev_y["top"] = py
+                prev_y["top"] = py + crop_t
             if "center" in y_edges:
-                prev_y["center"] = py + ph / 2.0
+                prev_y["center"] = py + (ph + crop_t - crop_b) / 2.0
             if "bottom" in y_edges:
-                prev_y["bottom"] = py + ph
+                prev_y["bottom"] = py + ph - crop_b
         hit = _best(y_map, horizontal, prev_y) if horizontal else None
         if hit:
             edge, target = hit
@@ -3479,35 +4195,45 @@ class OverlayScene(QtCore.QObject):
             if mode == "resize":
                 if edge == "top":
                     bottom = y + h
-                    y = target
+                    y = target - crop_t
                     h = max(8.0, bottom - y)
                 elif edge == "bottom":
-                    h = max(8.0, target - y)
+                    h = max(8.0, target - y + crop_b)
                 elif edge == "center":
-                    y = target - h / 2.0
+                    y = target - (h + crop_t - crop_b) / 2.0
             else:
                 if edge == "top":
-                    y = target
+                    y = target - crop_t
                 elif edge == "bottom":
-                    y = target - h
+                    y = target - (h - crop_b)
                 else:
-                    y = target - h / 2.0
+                    y = target - (h + crop_t - crop_b) / 2.0
         return x, y, w, h
 
     def snap_selection_to_guides(self, previous: tuple[float, float, float, float] | None = None):
         primary = self.primary_selection()
         if not primary or widget_is_locked(primary):
             return
+        from .widgets import widget_alignment_bounds
+
+        bounds = widget_alignment_bounds(primary)
+        prev_box = None
+        if previous is not None:
+            shifted = bounds.translated(
+                float(previous[0]) - float(primary["x"]),
+                float(previous[1]) - float(primary["y"]),
+            )
+            prev_box = (shifted.x(), shifted.y(), shifted.width(), shifted.height())
         nx, ny, nw, nh = self.snap_geom_to_guides(
-            float(primary["x"]),
-            float(primary["y"]),
-            float(primary["w"]),
-            float(primary["h"]),
+            bounds.x(),
+            bounds.y(),
+            bounds.width(),
+            bounds.height(),
             mode="move",
-            previous=previous,
+            previous=prev_box,
         )
-        dx = int(round(nx - float(primary["x"])))
-        dy = int(round(ny - float(primary["y"])))
+        dx = int(round(nx - bounds.x()))
+        dy = int(round(ny - bounds.y()))
         if dx == 0 and dy == 0:
             return
         for widget_id in self.selected_ids:
@@ -3572,16 +4298,37 @@ class OverlayScene(QtCore.QObject):
                 item["name"] = str(value or "")
             elif key == "locked":
                 item["locked"] = bool(value)
+            elif key == "visible":
+                item["visible"] = bool(value)
+                self._visibility_overrides.pop(item.get("id"), None)
             elif key == "series":
                 item["series"] = normalize_graph_series(value)
             elif key == "keys":
                 item["keys"] = normalize_overlay_keys(value)
             elif key == "stats":
                 item["stats"] = normalize_stat_series(value, (item.get("style") or {}).get("stat") or "time")
+            elif key == "ocr_rules":
+                item["ocr_rules"] = normalize_ocr_rules(value)
             elif key == "rotation":
                 from .widgets import normalize_rotation
 
                 item["rotation"] = normalize_rotation(value)
+            elif key == "crop":
+                from .widgets import clamp_crop
+
+                raw = value if isinstance(value, dict) else {}
+                left, top, right, bottom = clamp_crop(
+                    item.get("w"),
+                    item.get("h"),
+                    raw.get("l"),
+                    raw.get("t"),
+                    raw.get("r"),
+                    raw.get("b"),
+                )
+                if left == top == right == bottom == 0:
+                    item.pop("crop", None)
+                else:
+                    item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
             else:
                 item[key] = value
         self._dirty = True

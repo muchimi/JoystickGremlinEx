@@ -31,6 +31,7 @@ from .images import (
     save_qimage,
 )
 from .inspector import OverlayInspector
+from .variables_dialog import OverlayVariablesDialog
 from .property_clipboard import (
     PropertyGroupsDialog,
     clipboard_groups,
@@ -40,13 +41,14 @@ from .property_clipboard import (
 )
 from .selection_pane import OverlaySelectionPane
 from .model import DEFAULT_SIZES, PALETTE_GROUPS, OverlayScene, is_interactive_overlay, overlay_path_for_profile, profile_display_name, profile_xml_path, widget_is_locked
-from .overlay_window import OverlayView, ROTATE_HANDLE
+from .overlay_window import CROP_HANDLE_BASE, OverlayView, ROTATE_HANDLE
 from .qt_guard import alive, on_ui
 from .widgets import (
     apply_group_rotation_delta,
     apply_widget_rotation,
     normalize_rotation,
     scene_to_widget_local,
+    widget_contains_point,
     widget_center,
     widget_local_to_scene,
     widget_rotated_bounds,
@@ -109,6 +111,7 @@ WIDGET_TITLES = {
     "application": "Application",
     "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
+    "ocr": "OCR",
 }
 
 WIDGET_TOOLTIPS = {
@@ -139,6 +142,7 @@ WIDGET_TOOLTIPS = {
     "application": "Live capture of another application window.",
     "remote_view": "Video return from a remote GEX peer.",
     "streamdeck": "Live Stream Deck key grid on the overlay.",
+    "ocr": "Detect on-screen text in the widget region (or full screen) and fire bindings.",
 }
 
 _BANNER_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
@@ -157,6 +161,7 @@ _INSPECTOR_WIDTH = 420
 
 _COMMON_WIDGET_MOUSE = (
     "Drag to move (snaps to grid, guides, and other widgets). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
+    "Crop: Geometry, Sliders or Handles. Amber handles sit inside the border and crop one widget; the hidden part shows at 50% while it is selected. "
     "Drag the round handle above the widget to rotate; hold Shift to snap to 15°. "
     "Hold the middle mouse button to pan the canvas. "
     "Shift+click adds to the selection. Right-click: Copy, Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
@@ -254,6 +259,12 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
     elif widget_type == "streamdeck":
         lines.append("Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding.")
+    elif widget_type == "ocr":
+        lines.append(
+            "Inspector OCR section: widget region or full screen, min confidence, RapidOCR/Windows engine. "
+            "Arming (Continuous Toggle/Hold, or Single/Multiple pulses) starts scanning. Rules: Exact/Contain and Map… "
+            "for the output. Not shown as a filled widget on the live overlay — the designer box marks the capture region."
+        )
     elif widget_type == "axis_graph":
         lines.append("Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding.")
     elif widget_type == "axis_bars":
@@ -338,7 +349,7 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
             "Show overlay and Interactive apply to the selected page.<br>"
             "<b>Palette</b> — Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
             "<b>Inspector</b> — Mode (Windowed / On-screen), Visible, Interactive, Toggle overlay, "
-            "Show at profile start, Guides, and canvas size."
+            "Show at profile start, Guides, and canvas size. Variables defines %name% tokens for labels."
         )
         return title, body
 
@@ -604,6 +615,17 @@ class DesignerCanvas(OverlayView):
             self.update()
             return
         widget_id, handle = self.handle_at(pos)
+        if handle >= CROP_HANDLE_BASE:
+            item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
+            if widget_is_locked(item):
+                self.scene.set_selection(self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids))
+                return
+            self.scene.push_undo()
+            self._mode = "crop"
+            self.scene.begin_geometry_gesture()
+            self._handle = handle
+            self.update()
+            return
         if handle == ROTATE_HANDLE:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             if widget_is_locked(item):
@@ -669,6 +691,10 @@ class DesignerCanvas(OverlayView):
             self._start_geom = dict(item) if item else {}
             return
         hit = self.scene.hit_test(pos.x(), pos.y())
+        if hit is None and len(self.scene.selected_ids) == 1:
+            current = self.scene.widget_by_id(self.scene.selected_ids[-1], self._page_id)
+            if current is not None and widget_contains_point(current, pos.x(), pos.y(), cropped=False):
+                hit = current
         if hit:
             additive = bool(event.modifiers() & QtCore.Qt.ShiftModifier)
             group_ids = self.scene.expand_group_ids([hit["id"]])
@@ -743,6 +769,8 @@ class DesignerCanvas(OverlayView):
             self._rotate_to(pos, bool(event.modifiers() & QtCore.Qt.ShiftModifier))
         elif self._mode == "resize":
             self._resize_to(pos, bool(event.modifiers() & QtCore.Qt.ShiftModifier))
+        elif self._mode == "crop":
+            self._crop_to(pos)
         elif self._mode == "guide":
             self._drag_guide(pos)
         elif self._mode == "rubber":
@@ -752,6 +780,15 @@ class DesignerCanvas(OverlayView):
             _, handle = self.handle_at(pos)
             if handle == ROTATE_HANDLE:
                 self.setCursor(QtCore.Qt.OpenHandCursor)
+                return
+            if handle >= CROP_HANDLE_BASE:
+                cursors = {
+                    0: QtCore.Qt.SizeVerCursor,
+                    1: QtCore.Qt.SizeHorCursor,
+                    2: QtCore.Qt.SizeVerCursor,
+                    3: QtCore.Qt.SizeHorCursor,
+                }
+                self.setCursor(cursors.get(handle - CROP_HANDLE_BASE, QtCore.Qt.ArrowCursor))
                 return
             if handle >= 0:
                 self.setCursor(self._resize_cursor(handle))
@@ -769,7 +806,7 @@ class DesignerCanvas(OverlayView):
                 event.accept()
             return
         if self._runtime_locked():
-            was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
+            was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide", "crop")
             self._mode = None
             if was_geometry:
                 self.scene.end_geometry_gesture()
@@ -784,7 +821,7 @@ class DesignerCanvas(OverlayView):
             if event.modifiers() & QtCore.Qt.ShiftModifier:
                 self.scene.set_selection(self.scene.expand_group_ids(self.scene.selected_ids))
             self._rubber = QtCore.QRectF()
-        was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
+        was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide", "crop")
         self._mode = None
         self._handle = -1
         self._guide_id = None
@@ -1044,6 +1081,39 @@ class DesignerCanvas(OverlayView):
         }
         return mapping.get(handle, QtCore.Qt.ArrowCursor)
 
+    def _crop_to(self, pos: QtCore.QPointF):
+        if len(self.scene.selected_ids) != 1:
+            return
+        item = self.scene.widget_by_id(self.scene.selected_ids[-1], self._page_id)
+        if not item:
+            return
+        from .widgets import clamp_crop, scene_to_widget_local, widget_rect
+
+        local = scene_to_widget_local(item, pos.x(), pos.y())
+        rect = widget_rect(item)
+        raw = item.get("crop") if isinstance(item.get("crop"), dict) else {}
+        left = raw.get("l") or 0
+        top = raw.get("t") or 0
+        right = raw.get("r") or 0
+        bottom = raw.get("b") or 0
+        index = self._handle - CROP_HANDLE_BASE
+        if index == 3:
+            left = local.x() - rect.x()
+        elif index == 1:
+            right = rect.right() - local.x()
+        elif index == 0:
+            top = local.y() - rect.y()
+        elif index == 2:
+            bottom = rect.bottom() - local.y()
+        left, top, right, bottom = clamp_crop(rect.width(), rect.height(), left, top, right, bottom)
+        if left == top == right == bottom == 0:
+            item.pop("crop", None)
+        else:
+            item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
+        self.scene._dirty = True
+        self.scene._emit_geometry()
+        self.update()
+
     def _rotate_to(self, pos: QtCore.QPointF, snap: bool = False):
         if not self._start_rotations:
             return
@@ -1111,6 +1181,8 @@ class DesignerCanvas(OverlayView):
             item["w"] = max(8, self.scene.snap_value(w))
             item["h"] = max(8, self.scene.snap_value(h))
             x_edges, y_edges = self._handle_edges()
+            from .widgets import crop_insets
+
             gx, gy, gw, gh = self.scene.snap_geom_to_guides(
                 float(item["x"]),
                 float(item["y"]),
@@ -1119,6 +1191,7 @@ class DesignerCanvas(OverlayView):
                 x_edges=x_edges,
                 y_edges=y_edges,
                 mode="resize",
+                insets=crop_insets(item),
             )
             item["x"] = int(round(gx))
             item["y"] = int(round(gy))
@@ -1541,10 +1614,6 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
 
         root = QtWidgets.QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
-        self._title = QtWidgets.QLabel()
-        self._title.setStyleSheet("font-weight: bold;")
-        root.addWidget(self._title)
-        self.refresh_profile_title()
         self._toolbar_bar = self._toolbar()
         root.addWidget(self._toolbar_bar)
         self._page_bar_widget = self._page_bar()
@@ -1817,23 +1886,30 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             clicked=self._import_overlay,
         )
         self._import_btn = import_btn
+        vars_btn = QDataPushButton(
+            "Variables",
+            tooltip="Define overlay variables such as %mining_signature%. Right-click a row to copy, edit, or delete.",
+            clicked=self._open_variables,
+        )
+        self._vars_btn = vars_btn
         undo = QDataPushButton("Undo", clicked=self.scene.undo)
         self._undo_btn = undo
         redo = QDataPushButton("Redo", clicked=self.scene.redo)
         self._redo_btn = redo
         for widget in (
             self._interactive_box,
-            self._hints_box,
             self._pane_box,
             self._overlay_button,
             self._control_button,
             export,
             import_btn,
+            vars_btn,
             undo,
             redo,
         ):
             layout.addWidget(widget)
         layout.addStretch()
+        layout.addWidget(self._hints_box)
         zoom_label = QtWidgets.QLabel("Zoom")
         self._zoom_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self._zoom_slider.setRange(25, 400)
@@ -2439,9 +2515,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             on_ui(self, self.refresh_profile_title)
             return
         title = getattr(self, "_title", None)
-        if title is None or not alive(title):
-            return
-        title.setText(f"Overlay — {profile_display_name()}")
+        if title is not None and alive(title):
+            title.setText(f"Overlay — {profile_display_name()}")
         self._refresh_overlay_button()
         # Profile switch replaces scene contents; force panes/canvas to catch up.
         pane = getattr(self, "_selection_pane", None)
@@ -2499,6 +2574,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             self.scene.load(path)
             self.refresh_profile_title()
 
+    def _open_variables(self):
+        if gremlin.shared_state.is_running:
+            return
+        OverlayVariablesDialog(self.scene, parent=self.window()).exec()
+
     def showEvent(self, event):
         if hasattr(self, "canvas") and Shiboken.isValid(self.canvas):
             if gremlin.shared_state.is_running:
@@ -2548,6 +2628,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             "_interactive_box",
             "_export_btn",
             "_import_btn",
+            "_vars_btn",
             "_undo_btn",
             "_redo_btn",
         ):
