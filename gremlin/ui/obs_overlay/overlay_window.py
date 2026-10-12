@@ -67,7 +67,7 @@ def _transparent_palette(widget: QtWidgets.QWidget):
 def touchable_item_at(scene: OverlayScene, x: float, y: float, page_id: str | None = None):
     """Topmost overlay widget that may receive touch, or None for pass-through."""
     for item in reversed(scene.sorted_widgets(page_id)):
-        if not item.get("visible", True):
+        if not widget_is_live_visible(item):
             continue
         try:
             ix, iy = float(item["x"]), float(item["y"])
@@ -689,9 +689,7 @@ class OverlayView(QtWidgets.QWidget):
         ]
         for item in self.scene.sorted_widgets(self._page_id):
             wid = str(item.get("id") or "")
-            visible = bool(item.get("visible", True))
-            conditions_ok = widget_is_live_visible(item)
-            if not visible or not conditions_ok:
+            if not widget_is_live_visible(item):
                 parts.append((wid, False))
                 continue
             shadow = resolve_widget_shadow(item.get("style"))
@@ -742,8 +740,6 @@ class OverlayView(QtWidgets.QWidget):
             set_live_fast_paint(True)
             try:
                 for item in self.scene.sorted_widgets(self._page_id):
-                    if not item.get("visible", True):
-                        continue
                     if not widget_is_live_visible(item):
                         continue
                     if abs(widget_rotation_deg(item)) < 0.001:
@@ -767,6 +763,15 @@ class OverlayView(QtWidgets.QWidget):
         self._dirty_body_ids = None
         return pm
 
+    def _runtime_hit_target(self, item: dict) -> bool:
+        """Live hit pad. Editor Visible stays put; a runtime eye can force it."""
+        forced = self.scene.active_visibility_override(item)
+        if forced is False:
+            return False
+        if forced is True:
+            return True
+        return bool(item.get("visible", True))
+
     def _paint_hit_pads(
         self,
         painter: QtGui.QPainter,
@@ -787,7 +792,7 @@ class OverlayView(QtWidgets.QWidget):
         if not interactive and not reposition:
             return
         for item in items if items is not None else self.scene.sorted_widgets(self._page_id):
-            if not item.get("visible", True):
+            if not self._runtime_hit_target(item):
                 continue
             if interactive and not reposition and not widget_accepts_touch(item):
                 continue
@@ -820,8 +825,6 @@ class OverlayView(QtWidgets.QWidget):
         set_live_fast_paint(True)
         try:
             for item in items:
-                if not item.get("visible", True):
-                    continue
                 if not widget_is_live_visible(item):
                     continue
                 value = self.bus.value_for(item)
@@ -881,8 +884,6 @@ class OverlayView(QtWidgets.QWidget):
         # Any widget overlapping the dirty region must be redrawn for z-order.
         overlapping = []
         for item in self.scene.sorted_widgets(self._page_id):
-            if not item.get("visible", True):
-                continue
             if not widget_is_live_visible(item):
                 continue
             if widget_dirty_rect(item).intersects(united):
@@ -902,7 +903,7 @@ class OverlayView(QtWidgets.QWidget):
             # Include condition-hidden visible widgets so reposition pads survive dirty patches.
             pad_items = []
             for item in self.scene.sorted_widgets(self._page_id):
-                if not item.get("visible", True):
+                if not self._runtime_hit_target(item):
                     continue
                 if widget_dirty_rect(item).intersects(united):
                     pad_items.append(item)

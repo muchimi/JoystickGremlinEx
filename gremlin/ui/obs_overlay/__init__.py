@@ -213,6 +213,10 @@ class OverlayManager:
             self.scene.set_mouse_reposition(False)
         except Exception:
             pass
+        try:
+            self.scene.clear_visibility_overrides()
+        except Exception:
+            pass
         self._sync_mouse_reposition_banner()
         self._stop_runtime_toggle()
         try:
@@ -417,17 +421,14 @@ class OverlayManager:
             self.show_overlay(auto=True, page_ids=[page_id])
 
     def _runtime_toggle_target_visible(self, page_id: str):
+        from .bindings import widget_is_live_visible
+
         target = self.scene.control_target or {}
-        kind = str(target.get("kind") or "page")
         ids = self.scene.control_target_widget_ids(target, page_id=page_id)
-        if kind == "group":
-            currently = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in ids) if ids else True
-            self.scene.set_group_widgets_visible(target.get("id"), not currently, page_id=page_id)
-            return
         if not ids:
             return
-        currently = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in ids)
-        self.scene.set_widgets_visible(ids, not currently)
+        currently = all(widget_is_live_visible(self.scene.widget_by_id(wid)) for wid in ids)
+        self.scene.set_runtime_visibility(ids, not currently)
 
     def _runtime_save_as_ui(self, page_id: str | None):
         from .control_panel import open_overlay_control_panel

@@ -856,9 +856,59 @@ def widget_conditions_match(item: dict[str, Any] | None) -> bool:
     return eval_visibility_node(node, env)
 
 
+def visibility_rule_configured(item: dict[str, Any] | None) -> bool:
+    """True when the widget has at least one visibility condition."""
+    if not item:
+        return False
+    vis = item.get("visibility") or {}
+    return any(
+        isinstance(cond, dict) and visibility_condition_configured(cond)
+        for cond in (vis.get("conditions") or [])
+    )
+
+
+def visibility_rule_signature(item: dict[str, Any] | None) -> tuple:
+    """Snapshot of the inputs a visibility rule watches.
+
+    A button, state, mode, or variable change produces a different tuple, which
+    drops a manual show/hide override.
+    """
+    if not item:
+        return ()
+    vis = item.get("visibility") or {}
+    parts = []
+    for cond in vis.get("conditions") or []:
+        if not isinstance(cond, dict) or not visibility_condition_configured(cond):
+            continue
+        letter = str(cond.get("letter") or "")
+        kind = str(cond.get("kind") or "mode").casefold()
+        try:
+            if kind == "variable":
+                state = _overlay_variable_current_value(cond)
+            else:
+                state = bool(read_button(visibility_binding(cond)))
+        except Exception:
+            state = None
+        parts.append((letter, kind, state))
+    return tuple(parts)
+
+
 def widget_is_live_visible(item: dict[str, Any] | None, *, ignore_conditions: bool = False) -> bool:
     """True when the widget should appear on the live overlay window."""
-    if not item or not item.get("visible", True):
+    if not item:
+        return False
+    if not ignore_conditions:
+        try:
+            from gremlin.ui.obs_overlay import OverlayManager
+
+            scene = OverlayManager().scene
+            if not scene.preview_show_all:
+                forced = scene.active_visibility_override(item)
+                if forced is not None:
+                    return bool(forced)
+        except Exception:
+            pass
+    if not item.get("visible", True):
         return False
     if ignore_conditions:
         return True

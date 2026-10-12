@@ -2180,6 +2180,9 @@ class OverlayScene(QtCore.QObject):
         self._mouse_reposition = False
         # Designer Show overlay: paint every visible widget, ignoring mode/state conditions.
         self._preview_show_all = False
+        # Runtime eye override: widget id -> (forced visible, rule-input signature).
+        # Not saved. Dropped when that rule's button, state, mode, or variable changes.
+        self._visibility_overrides: dict[Any, tuple[bool, tuple]] = {}
         # Persist: open Overlay control panel automatically when the profile starts.
         self.show_control_panel_on_profile_start = False
         self._widget_clipboard: list[dict[str, Any]] = []
@@ -3797,20 +3800,90 @@ class OverlayScene(QtCore.QObject):
         self.anchor_target(nxt, target=target)
         return nxt
 
-    def set_widgets_visible(self, widget_ids: list[str], visible: bool) -> bool:
-        flag = bool(visible)
+    def active_visibility_override(self, item: dict[str, Any] | None) -> bool | None:
+        """Forced show/hide while the visibility rule's inputs are unchanged."""
+        if not item:
+            return None
+        wid = item.get("id")
+        entry = self._visibility_overrides.get(wid)
+        if not entry:
+            return None
+        from .bindings import visibility_rule_signature
+
+        forced, signature = entry
+        if signature != visibility_rule_signature(item):
+            self._visibility_overrides.pop(wid, None)
+            return None
+        return bool(forced)
+
+    def clear_visibility_overrides(self, widget_ids: list | None = None) -> None:
+        if widget_ids is None:
+            self._visibility_overrides.clear()
+            return
+        for wid in widget_ids:
+            item = self.widget_by_id(wid)
+            self._visibility_overrides.pop(item.get("id") if item else wid, None)
+
+    def set_runtime_visibility(self, widget_ids: list[str], visible: bool) -> bool:
+        """Show or hide widgets on the live overlay only.
+
+        Does not change the editor Visible flag and does not mark the profile dirty.
+        When a visibility rule currently disagrees, the choice holds until that
+        rule's button, state, mode, or variable changes. With no rule, it holds
+        until toggled again or the profile stops.
+        """
+        from .bindings import visibility_rule_signature, widget_conditions_match
+
+        desired = bool(visible)
         changed = False
         for wid in widget_ids:
             item = self.widget_by_id(wid)
             if not item:
                 continue
+            key = item.get("id")
+            natural = bool(item.get("visible", True)) and widget_conditions_match(item)
+            if desired == natural:
+                if self._visibility_overrides.pop(key, None) is not None:
+                    changed = True
+                continue
+            entry = (desired, visibility_rule_signature(item))
+            if self._visibility_overrides.get(key) != entry:
+                self._visibility_overrides[key] = entry
+                changed = True
+        if changed:
+            try:
+                from .bindings import OverlayValueBus
+
+                OverlayValueBus().refresh()
+            except Exception:
+                pass
+        return changed
+
+    def set_widgets_visible(self, widget_ids: list[str], visible: bool) -> bool:
+        flag = bool(visible)
+        changed = False
+        cleared = False
+        for wid in widget_ids:
+            item = self.widget_by_id(wid)
+            if not item:
+                continue
+            if self._visibility_overrides.pop(item.get("id"), None) is not None:
+                cleared = True
             if bool(item.get("visible", True)) == flag:
                 continue
             item["visible"] = flag
             changed = True
         if changed:
             self._dirty = True
+        if changed or cleared:
             self._emit()
+            if cleared:
+                try:
+                    from .bindings import OverlayValueBus
+
+                    OverlayValueBus().refresh()
+                except Exception:
+                    pass
         return changed
 
     def set_group_widgets_visible(self, group_id: str, visible: bool, page_id: str | None = None) -> bool:
@@ -4225,6 +4298,9 @@ class OverlayScene(QtCore.QObject):
                 item["name"] = str(value or "")
             elif key == "locked":
                 item["locked"] = bool(value)
+            elif key == "visible":
+                item["visible"] = bool(value)
+                self._visibility_overrides.pop(item.get("id"), None)
             elif key == "series":
                 item["series"] = normalize_graph_series(value)
             elif key == "keys":

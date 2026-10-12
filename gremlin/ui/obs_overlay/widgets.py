@@ -3905,7 +3905,12 @@ def paint_widget(
     crop_ghost: bool = False,
 ):
     if not item.get("visible", True):
-        return
+        # Editor-hidden widgets stay off the canvas. A runtime show can still paint
+        # them on the live overlay without changing the saved flag.
+        from .bindings import widget_is_live_visible
+
+        if not widget_is_live_visible(item):
+            return
     from .blink import blink_paint_item
 
     item = blink_paint_item(item, value) or item
