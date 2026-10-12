@@ -728,14 +728,12 @@ class OverlayManager:
                 return
             window._apply_window_flags()
             window.show_without_activating()
-            self._enforce_exclusive_app_share(page_id)
             return
         window = OverlayWindow(self.scene, page_id=page_id)
         window.destroyed.connect(lambda *_args, pid=page_id: self._overlay_destroyed(pid))
         self._overlays[page_id] = window
         self._page_chrome[page_id] = self._page_chrome_tuple(page_id)
         window.show_without_activating()
-        self._enforce_exclusive_app_share(page_id)
 
     def _sync_stream_to_active_page(self):
         """Track designer selection only — do not auto show/hide live windows.
@@ -746,30 +744,6 @@ class OverlayManager:
         active = self.scene.active_page_id
         if active and self.page_is_visible(active):
             self._stream_page_id = active
-
-    def _enforce_exclusive_app_share(self, page_id: str):
-        """Only one overlay may be parented into a host for app share."""
-        canvas = self.scene.canvas_for(page_id)
-        if not canvas.get("attach_to_window"):
-            return
-        for other_id, window in list(self._overlays.items()):
-            if other_id == page_id or not Shiboken.isValid(window):
-                continue
-            other_canvas = self.scene.canvas_for(other_id)
-            if not other_canvas.get("attach_to_window"):
-                continue
-            if getattr(window, "_host_attached", False) or window.isVisible():
-                try:
-                    window._detach_host()
-                except Exception:
-                    pass
-                if window.isVisible():
-                    window.hide()
-        window = self._overlays.get(page_id)
-        if window is not None and Shiboken.isValid(window) and (
-            window.isVisible() or getattr(window, "_host_attached", False)
-        ):
-            window._sync_host_attach()
 
     def _invalidate_remote_window_cache(self):
         try:
