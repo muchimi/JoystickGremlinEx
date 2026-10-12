@@ -2174,16 +2174,6 @@ class Configuration(QtCore.QObject):
         # return True
         return self.verbose and VerboseMode.Voice in self.verbose_mode
 
-    # @property
-    # def osc_enabled(self):
-    #     """true if osc module is enabled"""
-    #     return OSC_ENABLED and self._get_data("osc_enabled", True)
-
-    # @osc_enabled.setter
-    # def osc_enabled(self, value):
-    #     self._data["osc_enabled"] = value
-    #     self.save()
-
     @property
     def osc_input_port(self):
         """OSC listen port"""
@@ -2916,10 +2906,6 @@ class Configuration(QtCore.QObject):
     def afcs_enabled(self, value: bool):
         self._set_data("afcs_enabled", value)
 
-    @property
-    def osc_enabled(self) -> bool:
-        """True if OSC support is enabled"""
-        return OSC_ENABLED and self._get_data("osc_enabled", True)
 
     @property
     def overlay_enabled(self) -> bool:

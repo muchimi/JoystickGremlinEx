@@ -53,8 +53,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: UI: UI activation rework on profile stop
 - Fix: UI: resolved an issue with the delay widget when entering data manually
 - Fix: API: save/recall of last input selection could be incorrect with special devices
-- Fix: API: added additional QT widget teardown wrappers and additional diagnostics instrumentation for QT related crashes.  
+- Fix: API: added additional QT widget tear down wrappers and additional diagnostics instrumentation for QT related crashes. (thanks to Lolo350 for researching this and throwing lots of AI tokens at it).
 - Fix: UI: Delete all containers disconnected.
+- Change: Add Overlay button inputs, Map to Overlay, %name% variables, and the OCR widget (capture, tracker, designer, Star Citizen mineable and intelligence packs). The EFB pack is not included. (Lolo350).
+- Change: Bring the AFCS designer in line with the overlay canvas: layout, selection pane, undo, exclusive states, and input mappings that survive edit and load. (Lolo350)
+- Change: Application window recapture, single-widget crop, app-share focus and cursor, and runtime show/hide eyes that do not edit the designer Visible flag. (Lolo350)  
+
+Additional notes:  
+Some modules and functionality like voice and OCR can increase CPU and memory utilization significantly.
+
 
 ### (m77T73A)
 - Fix: UI: Module enable/disable.
