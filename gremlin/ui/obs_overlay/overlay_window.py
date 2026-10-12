@@ -28,6 +28,10 @@ from .widgets import (
     chroma_fill_color,
     live_window_is_layered,
     paint_background,
+    crop_edit_uses_handles,
+    crop_insets,
+    crop_is_active,
+    cropped_rect,
     paint_widget,
     paint_widget_drop_shadow,
     qcolor,
@@ -43,6 +47,7 @@ from .widgets import (
 )
 
 ROTATE_HANDLE = 8
+CROP_HANDLE_BASE = 20
 
 syslog = logging.getLogger("system")
 
@@ -699,6 +704,7 @@ class OverlayView(QtWidgets.QWidget):
                     round(float(item.get("y") or 0), 2),
                     round(float(item.get("w") or 0), 2),
                     round(float(item.get("h") or 0), 2),
+                    *crop_insets(item),
                     round(float(widget_rotation_deg(item)), 2),
                     bool(shadow.get("on")),
                     round(float(shadow.get("dx") or 0), 2),
@@ -993,15 +999,20 @@ class OverlayView(QtWidgets.QWidget):
                     value = None
                 else:
                     value = self.bus.value_for(item)
+                crop_ghost = (
+                    len(self.scene.selected_ids) == 1
+                    and item.get("id") in self.scene.selected_ids
+                    and crop_is_active(item)
+                )
                 if self.interactive and not conditions_ok:
                     painter.save()
                     try:
                         painter.setOpacity(0.32)
-                        paint_widget(painter, item, value)
+                        paint_widget(painter, item, value, crop_ghost=crop_ghost)
                     finally:
                         painter.restore()
                 else:
-                    paint_widget(painter, item, value)
+                    paint_widget(painter, item, value, crop_ghost=crop_ghost)
             if self.interactive:
                 self._paint_guides(painter)
                 self._paint_selection(painter)
@@ -1185,6 +1196,20 @@ class OverlayView(QtWidgets.QWidget):
                 painter.setBrush(QtCore.Qt.NoBrush)
                 painter.drawRect(rect.adjusted(-1, -1, 1, 1))
                 painter.restore()
+                if crop_edit_uses_handles():
+                    if crop_is_active(item):
+                        crop = cropped_rect(item)
+                        painter.save()
+                        apply_widget_rotation(painter, item)
+                        pen = QtGui.QPen(QtGui.QColor("#ffb020"), 1.25, QtCore.Qt.DashLine)
+                        painter.setPen(pen)
+                        painter.setBrush(QtCore.Qt.NoBrush)
+                        painter.drawRect(crop)
+                        painter.restore()
+                    painter.setBrush(QtGui.QColor("#ffb020"))
+                    painter.setPen(QtGui.QPen(QtGui.QColor("#1a1206"), 1))
+                    for hx, hy in self.crop_handle_points(item):
+                        painter.drawRect(QtCore.QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
                 if widget_id == (self.scene.selected_ids[-1] if self.scene.selected_ids else None):
                     painter.setBrush(QtGui.QColor("#7ec8ff"))
                     painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1))
@@ -1232,6 +1257,34 @@ class OverlayView(QtWidgets.QWidget):
         ]
         return [(widget_local_to_scene(item, px, py).x(), widget_local_to_scene(item, px, py).y()) for px, py in local]
 
+    def crop_handle_points(self, item: dict):
+        # Four edge handles, pulled inside the resize handles when the crop
+        # edge would sit on the widget border. Corners stay resize-only.
+        crop = cropped_rect(item)
+        full = widget_rect(item)
+        gap = 16.0 / max(self._zoom, 0.25)
+        gap_x = min(gap, max(0.0, (full.width() - 8.0) * 0.5))
+        gap_y = min(gap, max(0.0, (full.height() - 8.0) * 0.5))
+        top = crop.top() if crop.top() >= full.top() + gap_y else full.top() + gap_y
+        bottom = crop.bottom() if crop.bottom() <= full.bottom() - gap_y else full.bottom() - gap_y
+        left = crop.left() if crop.left() >= full.left() + gap_x else full.left() + gap_x
+        right = crop.right() if crop.right() <= full.right() - gap_x else full.right() - gap_x
+        if top > bottom:
+            mid = (full.top() + full.bottom()) * 0.5
+            top, bottom = mid - gap_y * 0.5, mid + gap_y * 0.5
+        if left > right:
+            mid = (full.left() + full.right()) * 0.5
+            left, right = mid - gap_x * 0.5, mid + gap_x * 0.5
+        cx = (crop.left() + crop.right()) * 0.5
+        cy = (crop.top() + crop.bottom()) * 0.5
+        local = [
+            (cx, top),
+            (right, cy),
+            (cx, bottom),
+            (left, cy),
+        ]
+        return [(widget_local_to_scene(item, px, py).x(), widget_local_to_scene(item, px, py).y()) for px, py in local]
+
     def rotation_handle_point(self, item: dict) -> QtCore.QPointF:
         rect = widget_rect(item)
         offset = 18.0 / max(self._zoom, 0.25)
@@ -1255,9 +1308,20 @@ class OverlayView(QtWidgets.QWidget):
         rotate = self.rotation_handle_point(item)
         if abs(pos.x() - rotate.x()) <= tol * 1.35 and abs(pos.y() - rotate.y()) <= tol * 1.35:
             return target_id, ROTATE_HANDLE
-        for index, (hx, hy) in enumerate(self.handle_points(item)):
+        resize_points = self.handle_points(item)
+        for index, (hx, hy) in enumerate(resize_points):
             if abs(pos.x() - hx) <= tol and abs(pos.y() - hy) <= tol:
                 return target_id, index
+        if len(self.scene.selected_ids) == 1 and crop_edit_uses_handles():
+            # Edge resize owns the border. A crop handle only counts once it is clear of that point.
+            edge_resize = (1, 3, 5, 7)
+            for index, (hx, hy) in enumerate(self.crop_handle_points(item)):
+                if abs(pos.x() - hx) > tol or abs(pos.y() - hy) > tol:
+                    continue
+                rx, ry = resize_points[edge_resize[index]]
+                if abs(hx - rx) <= tol * 2 and abs(hy - ry) <= tol * 2:
+                    continue
+                return target_id, CROP_HANDLE_BASE + index
         return None, -1
 
     def release_touch(self):

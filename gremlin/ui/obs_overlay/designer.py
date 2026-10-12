@@ -41,13 +41,14 @@ from .property_clipboard import (
 )
 from .selection_pane import OverlaySelectionPane
 from .model import DEFAULT_SIZES, PALETTE_GROUPS, OverlayScene, is_interactive_overlay, overlay_path_for_profile, profile_display_name, profile_xml_path, widget_is_locked
-from .overlay_window import OverlayView, ROTATE_HANDLE
+from .overlay_window import CROP_HANDLE_BASE, OverlayView, ROTATE_HANDLE
 from .qt_guard import alive, on_ui
 from .widgets import (
     apply_group_rotation_delta,
     apply_widget_rotation,
     normalize_rotation,
     scene_to_widget_local,
+    widget_contains_point,
     widget_center,
     widget_local_to_scene,
     widget_rotated_bounds,
@@ -160,6 +161,7 @@ _INSPECTOR_WIDTH = 420
 
 _COMMON_WIDGET_MOUSE = (
     "Drag to move (snaps to grid, guides, and other widgets). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
+    "Crop: Geometry, Sliders or Handles. Amber handles sit inside the border and crop one widget; the hidden part shows at 50% while it is selected. "
     "Drag the round handle above the widget to rotate; hold Shift to snap to 15°. "
     "Hold the middle mouse button to pan the canvas. "
     "Shift+click adds to the selection. Right-click: Copy, Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
@@ -613,6 +615,17 @@ class DesignerCanvas(OverlayView):
             self.update()
             return
         widget_id, handle = self.handle_at(pos)
+        if handle >= CROP_HANDLE_BASE:
+            item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
+            if widget_is_locked(item):
+                self.scene.set_selection(self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids))
+                return
+            self.scene.push_undo()
+            self._mode = "crop"
+            self.scene.begin_geometry_gesture()
+            self._handle = handle
+            self.update()
+            return
         if handle == ROTATE_HANDLE:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             if widget_is_locked(item):
@@ -678,6 +691,10 @@ class DesignerCanvas(OverlayView):
             self._start_geom = dict(item) if item else {}
             return
         hit = self.scene.hit_test(pos.x(), pos.y())
+        if hit is None and len(self.scene.selected_ids) == 1:
+            current = self.scene.widget_by_id(self.scene.selected_ids[-1], self._page_id)
+            if current is not None and widget_contains_point(current, pos.x(), pos.y(), cropped=False):
+                hit = current
         if hit:
             additive = bool(event.modifiers() & QtCore.Qt.ShiftModifier)
             group_ids = self.scene.expand_group_ids([hit["id"]])
@@ -752,6 +769,8 @@ class DesignerCanvas(OverlayView):
             self._rotate_to(pos, bool(event.modifiers() & QtCore.Qt.ShiftModifier))
         elif self._mode == "resize":
             self._resize_to(pos, bool(event.modifiers() & QtCore.Qt.ShiftModifier))
+        elif self._mode == "crop":
+            self._crop_to(pos)
         elif self._mode == "guide":
             self._drag_guide(pos)
         elif self._mode == "rubber":
@@ -761,6 +780,15 @@ class DesignerCanvas(OverlayView):
             _, handle = self.handle_at(pos)
             if handle == ROTATE_HANDLE:
                 self.setCursor(QtCore.Qt.OpenHandCursor)
+                return
+            if handle >= CROP_HANDLE_BASE:
+                cursors = {
+                    0: QtCore.Qt.SizeVerCursor,
+                    1: QtCore.Qt.SizeHorCursor,
+                    2: QtCore.Qt.SizeVerCursor,
+                    3: QtCore.Qt.SizeHorCursor,
+                }
+                self.setCursor(cursors.get(handle - CROP_HANDLE_BASE, QtCore.Qt.ArrowCursor))
                 return
             if handle >= 0:
                 self.setCursor(self._resize_cursor(handle))
@@ -778,7 +806,7 @@ class DesignerCanvas(OverlayView):
                 event.accept()
             return
         if self._runtime_locked():
-            was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
+            was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide", "crop")
             self._mode = None
             if was_geometry:
                 self.scene.end_geometry_gesture()
@@ -793,7 +821,7 @@ class DesignerCanvas(OverlayView):
             if event.modifiers() & QtCore.Qt.ShiftModifier:
                 self.scene.set_selection(self.scene.expand_group_ids(self.scene.selected_ids))
             self._rubber = QtCore.QRectF()
-        was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide")
+        was_geometry = self._mode in ("move", "resize", "rotate", "shape", "guide", "crop")
         self._mode = None
         self._handle = -1
         self._guide_id = None
@@ -1053,6 +1081,39 @@ class DesignerCanvas(OverlayView):
         }
         return mapping.get(handle, QtCore.Qt.ArrowCursor)
 
+    def _crop_to(self, pos: QtCore.QPointF):
+        if len(self.scene.selected_ids) != 1:
+            return
+        item = self.scene.widget_by_id(self.scene.selected_ids[-1], self._page_id)
+        if not item:
+            return
+        from .widgets import clamp_crop, scene_to_widget_local, widget_rect
+
+        local = scene_to_widget_local(item, pos.x(), pos.y())
+        rect = widget_rect(item)
+        raw = item.get("crop") if isinstance(item.get("crop"), dict) else {}
+        left = raw.get("l") or 0
+        top = raw.get("t") or 0
+        right = raw.get("r") or 0
+        bottom = raw.get("b") or 0
+        index = self._handle - CROP_HANDLE_BASE
+        if index == 3:
+            left = local.x() - rect.x()
+        elif index == 1:
+            right = rect.right() - local.x()
+        elif index == 0:
+            top = local.y() - rect.y()
+        elif index == 2:
+            bottom = rect.bottom() - local.y()
+        left, top, right, bottom = clamp_crop(rect.width(), rect.height(), left, top, right, bottom)
+        if left == top == right == bottom == 0:
+            item.pop("crop", None)
+        else:
+            item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
+        self.scene._dirty = True
+        self.scene._emit_geometry()
+        self.update()
+
     def _rotate_to(self, pos: QtCore.QPointF, snap: bool = False):
         if not self._start_rotations:
             return
@@ -1120,6 +1181,8 @@ class DesignerCanvas(OverlayView):
             item["w"] = max(8, self.scene.snap_value(w))
             item["h"] = max(8, self.scene.snap_value(h))
             x_edges, y_edges = self._handle_edges()
+            from .widgets import crop_insets
+
             gx, gy, gw, gh = self.scene.snap_geom_to_guides(
                 float(item["x"]),
                 float(item["y"]),
@@ -1128,6 +1191,7 @@ class DesignerCanvas(OverlayView):
                 x_edges=x_edges,
                 y_edges=y_edges,
                 mode="resize",
+                insets=crop_insets(item),
             )
             item["x"] = int(round(gx))
             item["y"] = int(round(gy))

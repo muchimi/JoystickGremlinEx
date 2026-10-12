@@ -2821,6 +2821,19 @@ class OverlayScene(QtCore.QObject):
         style.update(raw.get("style") or {})
         item["style"] = style
         item["visibility"] = normalize_visibility(raw.get("visibility"))
+        if isinstance(raw.get("crop"), dict):
+            from .widgets import clamp_crop
+
+            left, top, right, bottom = clamp_crop(
+                item.get("w"),
+                item.get("h"),
+                raw["crop"].get("l"),
+                raw["crop"].get("t"),
+                raw["crop"].get("r"),
+                raw["crop"].get("b"),
+            )
+            if left or top or right or bottom:
+                item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
         item["name"] = str(item.get("name") or raw.get("name") or "")
         item["locked"] = bool(raw.get("locked") if "locked" in raw else item.get("locked"))
         item["blink"] = normalize_blink(raw.get("blink") if "blink" in raw else item.get("blink"))
@@ -3954,7 +3967,7 @@ class OverlayScene(QtCore.QObject):
 
     def _widget_snap_targets(self, exclude_ids: set[str] | None = None) -> tuple[list[float], list[float]]:
         """X and Y snap lines from other widgets (left/center/right and top/middle/bottom)."""
-        from .widgets import widget_rotated_bounds
+        from .widgets import widget_alignment_bounds
 
         exclude = {str(i) for i in (exclude_ids or set())}
         vertical: list[float] = []
@@ -3966,7 +3979,7 @@ class OverlayScene(QtCore.QObject):
             if not item.get("visible", True):
                 continue
             try:
-                bounds = widget_rotated_bounds(item)
+                bounds = widget_alignment_bounds(item)
             except Exception:
                 continue
             if bounds.isNull() or bounds.width() <= 0 or bounds.height() <= 0:
@@ -3986,6 +3999,7 @@ class OverlayScene(QtCore.QObject):
         mode: str = "move",
         previous: tuple[float, float, float, float] | None = None,
         exclude_ids: set[str] | None = None,
+        insets: tuple[float, float, float, float] | None = None,
     ) -> tuple[float, float, float, float]:
         guides = self.canvas.get("guides") or []
         snap_widgets = bool(self.canvas.get("snap_to_widgets", True))
@@ -4040,23 +4054,27 @@ class OverlayScene(QtCore.QObject):
                 return None
             return best
 
+        crop_l, crop_t, crop_r, crop_b = (0.0, 0.0, 0.0, 0.0)
+        if insets:
+            crop_l, crop_t, crop_r, crop_b = (float(v or 0) for v in insets)
+
         x_map = {}
         if "left" in x_edges:
-            x_map["left"] = x
+            x_map["left"] = x + crop_l
         if "center" in x_edges:
-            x_map["center"] = x + w / 2.0
+            x_map["center"] = x + (w + crop_l - crop_r) / 2.0
         if "right" in x_edges:
-            x_map["right"] = x + w
+            x_map["right"] = x + w - crop_r
         prev_x = None
         if previous is not None:
             px, py, pw, ph = previous
             prev_x = {}
             if "left" in x_edges:
-                prev_x["left"] = px
+                prev_x["left"] = px + crop_l
             if "center" in x_edges:
-                prev_x["center"] = px + pw / 2.0
+                prev_x["center"] = px + (pw + crop_l - crop_r) / 2.0
             if "right" in x_edges:
-                prev_x["right"] = px + pw
+                prev_x["right"] = px + pw - crop_r
         hit = _best(x_map, vertical, prev_x) if vertical else None
         if hit:
             edge, target = hit
@@ -4065,37 +4083,37 @@ class OverlayScene(QtCore.QObject):
             if mode == "resize":
                 if edge == "left":
                     right = x + w
-                    x = target
+                    x = target - crop_l
                     w = max(8.0, right - x)
                 elif edge == "right":
-                    w = max(8.0, target - x)
+                    w = max(8.0, target - x + crop_r)
                 elif edge == "center":
-                    x = target - w / 2.0
+                    x = target - (w + crop_l - crop_r) / 2.0
             else:
                 if edge == "left":
-                    x = target
+                    x = target - crop_l
                 elif edge == "right":
-                    x = target - w
+                    x = target - (w - crop_r)
                 else:
-                    x = target - w / 2.0
+                    x = target - (w + crop_l - crop_r) / 2.0
 
         y_map = {}
         if "top" in y_edges:
-            y_map["top"] = y
+            y_map["top"] = y + crop_t
         if "center" in y_edges:
-            y_map["center"] = y + h / 2.0
+            y_map["center"] = y + (h + crop_t - crop_b) / 2.0
         if "bottom" in y_edges:
-            y_map["bottom"] = y + h
+            y_map["bottom"] = y + h - crop_b
         prev_y = None
         if previous is not None:
             px, py, pw, ph = previous
             prev_y = {}
             if "top" in y_edges:
-                prev_y["top"] = py
+                prev_y["top"] = py + crop_t
             if "center" in y_edges:
-                prev_y["center"] = py + ph / 2.0
+                prev_y["center"] = py + (ph + crop_t - crop_b) / 2.0
             if "bottom" in y_edges:
-                prev_y["bottom"] = py + ph
+                prev_y["bottom"] = py + ph - crop_b
         hit = _best(y_map, horizontal, prev_y) if horizontal else None
         if hit:
             edge, target = hit
@@ -4104,35 +4122,45 @@ class OverlayScene(QtCore.QObject):
             if mode == "resize":
                 if edge == "top":
                     bottom = y + h
-                    y = target
+                    y = target - crop_t
                     h = max(8.0, bottom - y)
                 elif edge == "bottom":
-                    h = max(8.0, target - y)
+                    h = max(8.0, target - y + crop_b)
                 elif edge == "center":
-                    y = target - h / 2.0
+                    y = target - (h + crop_t - crop_b) / 2.0
             else:
                 if edge == "top":
-                    y = target
+                    y = target - crop_t
                 elif edge == "bottom":
-                    y = target - h
+                    y = target - (h - crop_b)
                 else:
-                    y = target - h / 2.0
+                    y = target - (h + crop_t - crop_b) / 2.0
         return x, y, w, h
 
     def snap_selection_to_guides(self, previous: tuple[float, float, float, float] | None = None):
         primary = self.primary_selection()
         if not primary or widget_is_locked(primary):
             return
+        from .widgets import widget_alignment_bounds
+
+        bounds = widget_alignment_bounds(primary)
+        prev_box = None
+        if previous is not None:
+            shifted = bounds.translated(
+                float(previous[0]) - float(primary["x"]),
+                float(previous[1]) - float(primary["y"]),
+            )
+            prev_box = (shifted.x(), shifted.y(), shifted.width(), shifted.height())
         nx, ny, nw, nh = self.snap_geom_to_guides(
-            float(primary["x"]),
-            float(primary["y"]),
-            float(primary["w"]),
-            float(primary["h"]),
+            bounds.x(),
+            bounds.y(),
+            bounds.width(),
+            bounds.height(),
             mode="move",
-            previous=previous,
+            previous=prev_box,
         )
-        dx = int(round(nx - float(primary["x"])))
-        dy = int(round(ny - float(primary["y"])))
+        dx = int(round(nx - bounds.x()))
+        dy = int(round(ny - bounds.y()))
         if dx == 0 and dy == 0:
             return
         for widget_id in self.selected_ids:
@@ -4209,6 +4237,22 @@ class OverlayScene(QtCore.QObject):
                 from .widgets import normalize_rotation
 
                 item["rotation"] = normalize_rotation(value)
+            elif key == "crop":
+                from .widgets import clamp_crop
+
+                raw = value if isinstance(value, dict) else {}
+                left, top, right, bottom = clamp_crop(
+                    item.get("w"),
+                    item.get("h"),
+                    raw.get("l"),
+                    raw.get("t"),
+                    raw.get("r"),
+                    raw.get("b"),
+                )
+                if left == top == right == bottom == 0:
+                    item.pop("crop", None)
+                else:
+                    item["crop"] = {"l": left, "t": top, "r": right, "b": bottom}
             else:
                 item[key] = value
         self._dirty = True

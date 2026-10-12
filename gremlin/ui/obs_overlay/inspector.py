@@ -1801,6 +1801,65 @@ class OverlayInspector(QtWidgets.QWidget):
         self.scene.remove_guide(guide_id)
         self.rebuild()
 
+    def _crop_controls(self, form, item: dict):
+        from .widgets import crop_edit_uses_handles, crop_insets, set_crop_edit_mode
+
+        def _on_mode(mode):
+            if self._building:
+                return
+            set_crop_edit_mode(str(mode or "sliders"))
+            self.scene.geometry_changed.emit()
+
+        form.addRow(
+            "Crop",
+            _enum_radios(
+                [("Sliders", "sliders"), ("Handles", "handles")],
+                "handles" if crop_edit_uses_handles() else "sliders",
+                _on_mode,
+                tooltip="Sliders set the crop numerically. Handles drag amber edges on the canvas. One widget only.",
+                parent=self._host,
+            ),
+        )
+        width = max(8, int(item.get("w") or 8))
+        height = max(8, int(item.get("h") or 8))
+        left, top, right, bottom = crop_insets(item)
+        wid = item["id"]
+
+        def _set_edge(value, key, ident=wid):
+            current = self.scene.widget_by_id(ident)
+            if not current:
+                return
+            edges = dict(zip(("l", "t", "r", "b"), crop_insets(current)))
+            edges[key] = int(value)
+            self._update(ident, crop=edges)
+
+        def _live(index, ident=wid):
+            current = self.scene.widget_by_id(ident)
+            if not current:
+                return 0
+            return crop_insets(current)[index]
+
+        for index, key, title, value, limit in (
+            (0, "l", "Crop left", left, max(0, width - 8)),
+            (1, "t", "Crop top", top, max(0, height - 8)),
+            (2, "r", "Crop right", right, max(0, width - 8)),
+            (3, "b", "Crop bottom", bottom, max(0, height - 8)),
+        ):
+            self._slider_int(
+                form,
+                title,
+                value,
+                0,
+                limit,
+                lambda v, k=key, ident=wid: _set_edge(v, k, ident),
+                tooltip="Pixels hidden from this edge. The border and shadow follow the visible part.",
+                live_getter=lambda i=index, ident=wid: _live(i, ident),
+            )
+        reset = QDataPushButton("Reset", parent=self._host)
+        reset.setToolTip("Show the whole widget again.")
+        reset.clicked.connect(lambda _=False, ident=wid: self._update(ident, crop={"l": 0, "t": 0, "r": 0, "b": 0}))
+        form.addRow(reset)
+
     def _build_widget(self, item: dict):
         form = self._section("Geometry")
         if self._multi:
@@ -1854,6 +1913,8 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(key.upper(), spin)
 
         self._rotation_slider(form, item)
+        if not self._multi:
+            self._crop_controls(form, item)
         self._lock_position_row(form, item)
         widget_type = canonical_widget_type(item.get("type"))
         if widget_type != "ocr":
