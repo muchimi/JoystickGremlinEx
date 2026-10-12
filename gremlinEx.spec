@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 
 import os
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 
@@ -53,6 +53,7 @@ if os.path.isdir("gremlin/ui/obs_overlay/packs"):
 
 
 added_files.extend(collect_data_files("faster_whisper"))
+added_files.extend(collect_data_files("rapidocr"))
 
 added_files.extend(action_plugins_files)
 added_files.extend(icon_files)
@@ -78,6 +79,8 @@ for src, dest in _binary_candidates:
         added_binaries.append((src, dest))
     else:
         print(f"WARNING: skipping missing binary {src}")
+added_binaries.extend(collect_dynamic_libs("cv2"))
+added_binaries.extend(collect_dynamic_libs("onnxruntime"))
 
 '''
 excludes=["torch",
@@ -119,6 +122,39 @@ a = Analysis(
         "ctranslate2",
         "tokenizers",
         "onnxruntime",
+        "rapidocr",
+        "rapidocr.main",
+        "rapidocr.cal_rec_boxes",
+        "rapidocr.ch_ppocr_cls",
+        "rapidocr.ch_ppocr_det",
+        "rapidocr.ch_ppocr_rec",
+        "rapidocr.cli",
+        "rapidocr.inference_engine.base",
+        "rapidocr.inference_engine.onnxruntime",
+        "rapidocr.inference_engine.onnxruntime.main",
+        "rapidocr.inference_engine.onnxruntime.provider_config",
+        "rapidocr.utils.download_file",
+        "rapidocr.utils.download_models",
+        "rapidocr.utils.load_image",
+        "rapidocr.utils.log",
+        "rapidocr.utils.model_resolver",
+        "rapidocr.utils.output",
+        "rapidocr.utils.parse_parameters",
+        "rapidocr.utils.process_img",
+        "rapidocr.utils.typings",
+        "rapidocr.utils.utils",
+        "rapidocr.utils.vis_res",
+        "cv2",
+        "pyclipper",
+        "shapely",
+        "yaml",
+        "PIL",
+        "omegaconf",
+        "colorlog",
+        "winrt.windows.media.ocr",
+        "winrt.windows.graphics.imaging",
+        "winrt.windows.storage.streams",
+        "winrt.windows.globalization",
         "pycaw",
         "pycountry",
         "objprint",
