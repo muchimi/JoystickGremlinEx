@@ -30,7 +30,7 @@ from .images import (
     qimage_from_mime,
     save_qimage,
 )
-from .inspector import OverlayInspector
+from .inspector import OverlayInspector, button_callback
 from .variables_dialog import OverlayVariablesDialog
 from .property_clipboard import (
     PropertyGroupsDialog,
@@ -444,7 +444,7 @@ class TemplateButton(QtWidgets.QPushButton):
     def __init__(self, label: str, editable: bool = False, parent=None):
         super().__init__(label, parent)
         self._editable = editable
-        self.clicked.connect(lambda _=False: self.apply_requested.emit())
+        self.clicked.connect(button_callback(self.apply_requested.emit))
         if editable:
             self.setToolTip("Click to apply. Right-click to update with the current widgets or delete.")
             self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
@@ -457,9 +457,9 @@ class TemplateButton(QtWidgets.QPushButton):
             return
         menu = QtWidgets.QMenu(self)
         update_action = menu.addAction("Update with current widgets")
-        update_action.triggered.connect(lambda _=False: self.update_requested.emit())
+        update_action.triggered.connect(button_callback(self.update_requested.emit))
         delete_action = menu.addAction("Delete template")
-        delete_action.triggered.connect(lambda _=False: self.delete_requested.emit())
+        delete_action.triggered.connect(button_callback(self.delete_requested.emit))
         menu.exec(event.globalPos())
 
 
@@ -1853,7 +1853,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
                 "While shown from this button, all designer-visible widgets are drawn "
                 "(visibility conditions are ignored until Hide or profile Activate)."
             ),
-            clicked=lambda: self._toggle_overlay(),
+            clicked=self._toggle_overlay,
         )
         self._overlay_button_base_tip = self._overlay_button.toolTip()
         self._control_button = QDataPushButton(
@@ -1947,7 +1947,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         add = gremlin.ui.ui_common.Buttons.getAddWidget(
             label=None,
             tooltip="Add overlay page",
-            callback=lambda _data=None: self._add_page(),
+            callback=self._add_page,
         )
         add.setFixedSize(24, 24)
         row = gremlin.ui.ui_common.getHContainer([add, self._page_tabs], widget_only=True)
@@ -2243,7 +2243,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         for name, tip, factory in TEMPLATES:
             btn = TemplateButton(name, editable=False)
             btn.setToolTip(tip)
-            btn.apply_requested.connect(lambda fn=factory, title=name: self._apply_template(title, fn))
+            btn.apply_requested.connect(button_callback(self._apply_template, name, factory))
             templates_flow.addWidget(btn)
         layout.addWidget(templates_host)
 
@@ -2255,7 +2255,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         add_template = gremlin.ui.ui_common.Buttons.getAddWidget(
             label=None,
             tooltip="Save the current widgets as a global template (not profile-specific)",
-            callback=lambda _data=None: self._save_template(),
+            callback=self._save_template,
         )
         add_template.setFixedSize(24, 24)
         saved_row.addWidget(add_template)
@@ -2293,7 +2293,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         return QDataPushButton(
             title,
             tooltip=tip,
-            clicked=lambda _checked=False, t=widget_type: self._add_widget(t),
+            clicked=button_callback(self._add_widget, widget_type),
         )
 
     def _rebuild_palette_widgets(self):
@@ -2394,9 +2394,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         for name, tip, factory, filename in entries:
             btn = TemplateButton(name, editable=True)
             btn.setToolTip(f"{tip}. Click to apply. Right-click to update with the current widgets or delete.")
-            btn.apply_requested.connect(lambda fn=factory, title=name: self._apply_template(title, fn))
-            btn.update_requested.connect(lambda fname=filename, title=name: self._update_template(fname, title))
-            btn.delete_requested.connect(lambda fname=filename, title=name: self._delete_template(fname, title))
+            btn.apply_requested.connect(button_callback(self._apply_template, name, factory))
+            btn.update_requested.connect(button_callback(self._update_template, filename, name))
+            btn.delete_requested.connect(button_callback(self._delete_template, filename, name))
             layout.addWidget(btn)
 
     def _update_template(self, filename: str, title: str):
