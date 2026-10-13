@@ -3776,28 +3776,30 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 device = gremlin.joystick_handling.getDevice(last_device_guid) if last_device_guid else None
                 if not device:
-                    # does not exist anymore
+                    syslog.warning(f"TABS: Last selected device with GUID [{last_device_guid}] not found.")
+                    # does not exist anymore - grab the first tab
                     last_input_id = None
                     last_input_type = None
-                    last_device_guid = self.ui.devices_tab_header_widget.tabData(0).device_guid  # pick first
-                    device = gremlin.joystick_handling.getDevice(last_device_guid)
-                    assert device is not None, "unable to derive device"
+                    if self.ui.devices_tab_header_widget.count() > 0:
+                        last_device_guid = self.ui.devices_tab_header_widget.tabData(0).device_guid  # pick first
+                        device = gremlin.joystick_handling.getDevice(last_device_guid)
+                if device:
+                    # device found
+                    input_item = None
+                    if last_input_id is not None:
+                        # ensure the input still exists
+                        input_item = self.profile.find_input(last_device_guid, last_input_id, last_input_type)
 
-                input_item = None
-                if last_input_id is not None:
-                    # ensure the input still exists
-                    input_item = self.profile.find_input(last_device_guid, last_input_id, last_input_type)
+                    if not input_item:
+                        # not found
+                        input_item = self.profile.first_input(last_device_guid)
+                        if input_item:
+                            last_input_id = input_item.input_id
+                            last_input_type = input_item.input_type
 
-                if not input_item:
-                    # not found
-                    input_item = self.profile.first_input(last_device_guid)
-                    if input_item:
-                        last_input_id = input_item.input_id
-                        last_input_type = input_item.input_type
-
-                if verbose:
-                    syslog.info(f"CreateTabs: select tab index: [{index}]  device: [{device.name}]")
-                index = self.getTabIndexForDevice(last_device_guid)
+                    if verbose:
+                        syslog.info(f"CreateTabs: select tab index: [{index}]  device: [{device.name}]")
+                    index = self.getTabIndexForDevice(last_device_guid)
 
                 if index is not None:
                     widget: BaseDeviceTabWidget = self.getRegisteredWidget(last_device_guid)

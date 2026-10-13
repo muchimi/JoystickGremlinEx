@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T75)
+- Fix: API: last input recall exception when a device cannot be located (due to recall logic change in T74).
+
 ### (m77T74)
 - Change: UI: UI activation rework on profile stop
 - Change: API: optimization: device re-initialization will only occur if a device change is found.

@@ -5089,7 +5089,7 @@ class Profile:
         if not map_missing and current_device_guid == device_id and current_input_id == input_id and current_input_type == input_type:
             # already saved
             return
-        
+
         if __debug__:
             syslog.info(f"set profile last input {device.name} {input_type} {input_id}")
 
@@ -5174,6 +5174,7 @@ class Profile:
             # get current last input for the profile (as opposed to a different device)
 
             read_device_guid = data.get("last_device_guid", None)
+            current_device_guid = None
             current_input_id = data.get("last_input_id", None)
             current_input_type = InputType.convert(data.get("last_input_type", None))
 
