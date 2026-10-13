@@ -54,8 +54,10 @@ def _probe_rapid() -> tuple[bool, str]:
 
         return True, ""
     except Exception as err:
-        _rapid_error = str(err)
-        return False, "Install rapidocr + onnxruntime for best results"
+        _rapid_error = str(err).strip() or err.__class__.__name__
+        if len(_rapid_error) > 180:
+            _rapid_error = _rapid_error[:177] + "..."
+        return False, _rapid_error
 
 
 def _probe_windows() -> tuple[bool, str]:
