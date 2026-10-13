@@ -596,7 +596,7 @@ class EventListener(QtCore.QObject):
     device_change_event = Signal()
 
     # fires when vjoy input state changes, parameter is the id of the vjoy and what it's changing to
-    vjoy_as_input_changed = Signal(int, bool)
+    vjoy_as_input_changed = Signal()
 
     # fires when the number of gamepad devices changes
     gamepad_change_event = Signal()
@@ -4572,13 +4572,16 @@ class JoystickState:
             device_name = gremlin.joystick_handling.getDeviceName(device_guid)
             syslog.info(f"VJOY: {device_name} output: {'off' if enabled else 'on'}")
 
-    def _vjoy_as_input_changed(self, vjoy_id: int, enabled: bool):
-        dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-        if dev:
+    def _vjoy_as_input_changed(self):
+        import gremlin.joystick_handling
+        vjoy_devices = gremlin.joystick_handling.all_vjoy_devices()
+        profile = gremlin.shared_state.current_profile
+        vid_list = profile.settings.getVjoyAsInputList()
+        for dev in vjoy_devices:
             # vjoy input is enabled, disable output to it
-            device_guid = gremlin.util.normalize_guid(dev.device_guid)
-            self.setOutputEnabled(device_guid, enabled)  # vjoy used as input cannot be used as output
-            self.setInputEnabled(device_guid, not enabled)
+            device_id = dev.device_id
+            input_enabled = dev.vjoy_id in vid_list
+            self.setInputEnabled(device_id, input_enabled)
 
 
 class AxisValues:

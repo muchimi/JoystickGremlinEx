@@ -324,6 +324,18 @@ class DeviceType(IntEnum):
         )
 
     @staticmethod
+    def hasInputs(value: DeviceType) -> bool:
+        """true if the device has inputs"""
+        return value not in (
+            DeviceType.ModeControl,
+            DeviceType.Settings,
+            DeviceType.Plugins,
+            DeviceType.StreamDeck,
+            DeviceType.Overlay,
+            DeviceType.Afcs,
+        )
+
+    @staticmethod
     def to_string(value):
         if value is None:
             return None

@@ -992,7 +992,7 @@ def getPhysicalDevices() -> list[DeviceSummary]:
     return [dev for dev in _joystick_device_guid_map.values() if dev.device_type == DeviceType.Joystick and not dev.is_virtual]
 
 
-def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceSummary:
+def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceSummary | None:
     """gets the device for the given ID - issues error message if not found"""
     global _all_devices_map
     # with _device_registry_lock:
@@ -1018,7 +1018,7 @@ def getDeviceName(device_guid: int | str | dinput.GUID):
     return f"unknown: {str(device_guid)}"
 
 
-def getDeviceFromVjoyId(vid: int):
+def getDeviceFromVjoyId(vid: int) -> DeviceSummary | None:
     """gets the device for the given vjoy id"""
     assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"
     dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)

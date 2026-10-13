@@ -56,6 +56,8 @@ from gremlin.ui.ui_common import (
     getHContainer,
     QDataRadioButtonGroup,
     QUsedPushButton,
+    QDataCheckbox,
+    QInfoBox,
 )
 import gremlin.base_profile
 import gremlin.input_item
@@ -104,8 +106,6 @@ from gremlin.worker import WorkManager
 
 
 syslog = logging.getLogger("system")
-
-
 
 
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
@@ -4590,9 +4590,6 @@ class InputItemListView(AbstractPaginatedView):
 
         if gremlin.shared_state.is_redraw_suspended():
             return  # don't redraw
-
-
-
 
         self._apply_pending_selection_page()
 
@@ -12240,6 +12237,82 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         )
 
 
+class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
+    """Dialog to pick which vJoy devices are treated as physical inputs."""
+    """Dialog to pick which vJoy devices are treated as physical inputs.
+
+    :param profile_settings: the settings of the profile
+    :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
+    :param parent: parent widget, optional
+    """
+    def __init__(self, profile_settings : gremlin.base_profile.Settings, parent=None):
+        """
+        :param profile_settings: the settings of the profile
+        :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
+        :param parent: parent widget, optional
+        """
+        super().__init__(self.__class__.__name__, parent=parent)
+        import gremlin.joystick_handling
+
+        self.settings = profile_settings
+        self._widgets = []
+        self.vjoy_map = {} # map of vjoy IDs to their selection state
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setWindowTitle("vJoy as Input Configuration")
+        self.setModal(True)
+
+        label = QInfoBox(
+            "Declaring a vJoy device as an input device will allow it to be used like a physical device. "
+            "Take care to avoid endless loops when the input triggers an output that is also used as input.\n"
+            "NOTE: This list only shows connected vJoy devices."
+        )
+        self.main_layout.addWidget(label)
+
+        group = QtWidgets.QGroupBox("Select vJoy devices for input:")
+        group_layout = QtWidgets.QVBoxLayout(group)
+        for dev in sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id):
+            enabled = self.settings.getVjoyAsInput(dev.vjoy_id)
+            widget = QDataCheckbox(
+                dev.name,
+                data=dev.vjoy_id,
+                value=enabled,
+                callback = self._handle_state_changed
+                )
+
+            self.vjoy_map[dev.vjoy_id] = enabled
+            group_layout.addWidget(widget)
+            self._widgets.append(widget)
+        group_layout.addStretch()
+
+        scroll_area = gremlin.ui.ui_common.QScrollableWidget(group)
+        scroll_area.setMinimumHeight(150)
+        self.main_layout.addWidget(scroll_area)
+
+
+        select_all = QDataPushButton("Select all", callback = lambda: self._set_all(True))
+        select_none = QDataPushButton("Select none", callback = lambda: self._set_all(False))
+        ok_widget = QDataPushButton("Ok", callback=self.accept)
+        cancel_widget = QDataPushButton("Cancel", callback=self.reject)
+
+        widgets = [select_all, select_none, "||",ok_widget, cancel_widget]
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, auto_size=True)
+        self.main_layout.addWidget(widget)
+
+
+
+
+
+    def _handle_state_changed(self, widget, checked: bool):
+        vid: int = widget.data
+        self.vjoy_map[vid] = checked
+
+    def _set_all(self, checked: bool):
+        for widget in self._widgets:
+            widget.setChecked(checked)
+
+
+
 class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     """Widget used to display the input joystick device."""
 
@@ -12300,7 +12373,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._ui_created = False  # true if UI was created for this widget
 
-        self.jump_widget : InputJumpWidget = None # holds the jump widget for navigating to mapped inputs
+        self.jump_widget: InputJumpWidget = None  # holds the jump widget for navigating to mapped inputs
         self.pagination_widget: PaginationWidget = None  # holds the pagination widget for the list view
 
         self._input_item_list_view: InputItemListView = None  # holds the input item list view

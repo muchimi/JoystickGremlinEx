@@ -551,7 +551,6 @@ class Configuration(QtCore.QObject):
             except Exception as ex:
                 syslog.error(f"CONFIG: could not archive broken config {fname}: {ex}")
 
-
     def _write_json_atomic(
         self,
         fname: str,
@@ -584,7 +583,7 @@ class Configuration(QtCore.QObject):
             delay = initial_delay
             for attempt in range(max_retries):
                 try:
-                    safeReplace(tmp, fname_abs) # @IgnoreException
+                    safeReplace(tmp, fname_abs)  # @IgnoreException
                     return True
                 except PermissionError as ex:
                     # Catch WinError 5 (Access Denied) or WinError 32 (Sharing Violation)
@@ -652,19 +651,19 @@ class Configuration(QtCore.QObject):
         #     syslog.warning(f"CONFIG: keeping existing config at {fname} because the write failed")
 
         if save_profile:
-            self._save_profile_ui()
+            self._save_profile_settings_ui()
 
-    def save_profile(self):
+    def save_profile_settings(self):
         """Saves the profile specific configuration file."""
         import gremlin.util
 
         if QtWidgets.QApplication.instance():
             if gremlin.util.is_ui_thread():
-                self._save_profile_ui()
+                self._save_profile_settings_ui()
             else:
-                gremlin.util.InvokeUiMethod(self._save_profile_ui)  # ensure on UI thread
+                gremlin.util.InvokeUiMethod(self._save_profile_settings_ui)  # ensure on UI thread
         else:
-            self._save_profile_ui()
+            self._save_profile_settings_ui()
 
     @staticmethod
     def _streamdeck_pages_custom_count(pages) -> int:
@@ -688,7 +687,7 @@ class Configuration(QtCore.QObject):
     # save_profile() must not push those stale blobs back over a newer on-disk value.
     _PROFILE_SIDECAR_FOREIGN_KEYS = ("obs_overlay",)
 
-    def _save_profile_ui(self):
+    def _save_profile_settings_ui(self):
         """saves to the profile specific config file"""
         if not self._lock.acquire(blocking=False):
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
@@ -2299,6 +2298,14 @@ class Configuration(QtCore.QObject):
     def device_visible_map(self, value: dict[str, bool]):
         self._set_data("device-visibility", value)
 
+    def setDeviceVisible(self, device_guid, visible: bool):
+        """change device visibility for the given device GUID"""
+        device_id = gremlin.util.normalize_guid(device_guid)
+        current = self.device_visible_map.get(device_id, True)
+        if current != visible:
+            self.device_visible_map[device_id] = visible
+            self.save()
+
     @property
     def show_output_vjoy(self):
         """determines if VJOY output devices are displayed on the device tabs"""
@@ -2446,7 +2453,7 @@ class Configuration(QtCore.QObject):
         self._data["last_device_guid"] = device_guid  # general config
         self._profile_data["last_device_guid"] = device_guid  # profile specific config
         self.save()
-        self.save_profile()
+        self.save_profile_settings()
 
     def set_last_input(
         self,
@@ -2474,7 +2481,9 @@ class Configuration(QtCore.QObject):
         # (stable profile-facing identifier), fall back to normalized guid.
         device = gremlin.joystick_handling.getDevice(device_guid)
         if device is None:
-            device = gremlin.joystick_handling.getDevice(normalized_device_guid)
+            syslog.warning(f"CONFIG: SetLastInput(): Device not found for GUID [{device_guid}]")
+            return
+
         device_key = device.device_id if device is not None else normalized_device_guid
 
         data: dict = self._profile_data.get("last_input", {})
@@ -2493,47 +2502,45 @@ class Configuration(QtCore.QObject):
             pass
         elif isinstance(input_id, str):
             pass
-            # if input_id.isnumeric():
-            #     input_id = int(input_id)
-            # else:
-            #     guid = gremlin.util.parse_guid(input_id)
-            #     if guid is not None:
-            #         input_id = str(guid)
-            #     else:
-            #         syslog.warning(
-            #             f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
-            #         )
-            #         input_id = None
+
         elif isinstance(input_id, gremlin.keyboard.Key):
             input_id = input_id.key_id
         elif isinstance(input_id, (list, set, tuple)):
             pass
         else:
             syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
-            input_id = None
+            return
+
 
         input_type = InputType.convert(input_type)
-        if input_type is not None:
-            data[device_key] = (input_type, input_id)
 
-            input_type_string = InputType.to_string(input_type)
-            self._profile_data["last_input"] = data
-            self._profile_data["last_input_device_guid"] = normalized_device_guid
-            self._profile_data["last_input_id"] = input_id
-            self._profile_data["last_input_type"] = input_type_string
-            self._profile_data["last_input_mode"] = mode
 
-            self._data["last_device_guid"] = normalized_device_guid
-            self._data["last_input_type"] = input_type_string
-            self._data["last_input_id"] = input_id
-            self._data["last_input_mode"] = mode
 
-            if verbose:
-                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
+        data[device_key] = (input_type, input_id)
 
-            self.save_profile()
-            self.save()
+        input_type_string = InputType.to_string(input_type)
+        self._profile_data["last_input"] = data
+        self._profile_data["last_input_device_guid"] = normalized_device_guid
+        self._profile_data["last_device_guid"] = normalized_device_guid  # read first by last_device_guid; must not go stale
+        self._profile_data["last_input_id"] = input_id
+        self._profile_data["last_input_type"] = input_type_string
+        self._profile_data["last_input_mode"] = mode
+
+        self._data["last_device_guid"] = normalized_device_guid
+        self._data["last_input_type"] = input_type_string
+        self._data["last_input_id"] = input_id
+        self._data["last_input_mode"] = mode
+
+        if verbose:
+            device_name = device.name
+            syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
+
+        if __debug__:
+            syslog.info(f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]")
+
+        # save the config
+        self.save_profile_settings()
+        self.save()
 
     def _get_input_id(self, dinput_device_guid, input_id) -> tuple:
         """converts input ID from the storage data to the actual input ID that isn't stored in the config
@@ -2591,8 +2598,6 @@ class Configuration(QtCore.QObject):
                     input_type = DeviceType.State
 
                 widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
-                # if dinput_device_guid in gremlin.ui._widget_device_index_map: # gremlin.shared_state.device_widget_map:
-                #     widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
                 if widget:
                     if input_id is None:
                         item = widget.itemAt(0)
@@ -2609,27 +2614,20 @@ class Configuration(QtCore.QObject):
                                 input_id = item
                                 save_input_id = input_id.guid
 
-                        # items = list(widget.inputItemListModel)
-                        # for item in items:
-                        #     if item.guid == input_id:
-                        #         input_id = item
-                        #         save_input_id = input_id.guid
-                        #         found = True
-                        #         break
-                        # if not found and count > 0:
-                        #     item = items[0]
-                        #     input_id = item
-                        #     save_input_id = input_id.guid
+
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl
-            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs | DeviceType.Voice:
+            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs:
                 input_type = InputType.NotSet
                 input_id = None
                 save_input_id = None
             case DeviceType.OctaviIFR1:
                 save_input_id = input_id
                 input_type = InputType.OctaviIfr1
+            case DeviceType.Voice:
+                save_input_id = input_id
+                input_type = InputType.Voice
 
             case DeviceType.NotSet:
                 # settings or other non input type page
@@ -2655,6 +2653,11 @@ class Configuration(QtCore.QObject):
 
         # syslog = logging.getLogger("system")
         verbose = self.verbose_mode_details
+
+        device = gremlin.joystick_handling.getDevice(device_guid) if device_guid else None
+        # special handling of settings page with no inputs
+        if device and not DeviceType.hasInputs(device.device_type):
+            return (device.device_guid, None, None)
 
         requested_device_guid = device_guid
 
@@ -2778,7 +2781,7 @@ class Configuration(QtCore.QObject):
                 # save the new defaults
                 data[device_guid] = (input_type, save_input_id)
                 self._profile_data["last_input"] = data
-                self.save_profile()
+                self.save_profile_settings()
                 if verbose:
                     syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
 
@@ -2829,7 +2832,7 @@ class Configuration(QtCore.QObject):
             self._profile_loaded = True
 
         if self._profile_fname and not os.path.isfile(self._profile_fname):
-            self.save_profile()
+            self.save_profile_settings()
 
     @QtCore.Slot()
     def _profile_changed_cb(self):
@@ -2886,7 +2889,6 @@ class Configuration(QtCore.QObject):
     @afcs_enabled.setter
     def afcs_enabled(self, value: bool):
         self._set_data("afcs_enabled", value)
-
 
     @property
     def overlay_enabled(self) -> bool:

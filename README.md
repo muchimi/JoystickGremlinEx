@@ -49,6 +49,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T75A)
+- Change: UI: settings tab rework to bring it to current UI standards.
+- Fix: API: save/restore tab information if the selected device has no inputs. 
+- Fix: API: save/restore device selection could result in the default always selected.
+- Fix: UI: vjoy as input devices may be missing even if not filtered
+- Fix: UI: changing a vjoy as input devices now updates the list of devices without a reload if a change is detected (inputs added or removed).    
+
+
+
 ### (m77T75)
 - Fix: API: last input recall exception when a device cannot be located (due to recall logic change in T74).
 

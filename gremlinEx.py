@@ -227,6 +227,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_selected_device_guid = None
         self._last_selected_input_type = None
         self._last_selected_input_id = None
+        self._restoring_selection = 0  # >0 while restoring the saved selection on load
         self._startup_restore_target = None  # deferred startup restore tuple (device_guid, input_type, input_id)
 
         self._resize_count = 0
@@ -274,6 +275,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.input_selection_changed.connect(self._handle_item_selected)
         el.profile_activating.connect(self._set_activate_state_on)
         el.profile_deactivated.connect(self._set_activate_state_off)
+        el.vjoy_as_input_changed.connect(self.refresh)  # refresh UI on vjoy as input changes
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
@@ -2954,7 +2956,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         physical_devices = [dev for dev in all_joystick_devices if dev.device_category == DeviceCategory.Physical and dev.connected]
 
         # if vjoy devices, only include the disconnected ones referenced as input in the profile
-        vjoy_as_input = self.profile.settings.getVjoyAsInputList()
+        vid_as_input = self.profile.settings.getVjoyAsInputList()
+        vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if dev.vjoy_id in vid_as_input]
 
         sorted_devices = []  # list of devices, sorted in tab appearance
         sorted_device_tuples = []  # list of (device_id, device_name, device) triplets, sorted in tab appearance
@@ -2962,7 +2965,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         disconnected_vjoy_devices = []  # list of disconnected vjoy devices - these are vjoy devices in the profile but not found on the current machine
 
         # add vjoy input devices
-        vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if self._get_vjoy_input_enabled(dev)]
         maestro_devices = [dev for dev in gremlin.joystick_handling.all_maestro_devices() if self._get_maestro_input_enabled(dev)]
 
         # add special devices
@@ -3008,6 +3010,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         syslog.info(f"\t[{index}] [<missing>] [<missing>] visible: {visible}")
 
             for index, device, visible in item_list:
+                if device.device_type == DeviceType.VJoy:
+                    # set visibility of vjoy devices based on profile settings
+                    visible = device.vjoy_id in vid_as_input
+                    device.visible = visible
+                if verbose:
+                    syslog.info(f"Processing index [{index}] [{device.name}] type: [{device.device_type.name}] visible: [{visible}]")
                 if not device or not device.connected:
                     # skip if disconnected
                     continue
@@ -3019,13 +3027,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     continue
                 if not visible:
                     # skip hidden devices
-
                     invisible_list.append(device)
-                if device.is_virtual:
-                    # skip devices if the VJOY device is not setup as input
-                    input_enabled = device.vjoy_id in vjoy_as_input
-                    if not input_enabled:
-                        continue
 
                 device.visible = visible
                 id_list.append(device.device_id)
@@ -3052,8 +3054,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     )
 
             # index of the last item per section
+
             for device in missing_devices:
-                if device.is_virtual and device.vjoy_id not in vjoy_as_input:
+                if device.is_virtual and device.vjoy_id not in vid_as_input:
                     # skip vjoy devices not setup as input
                     disconnected_vjoy_devices.append(device)
                 elif device.device_category == DeviceCategory.Physical:
@@ -3066,7 +3069,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # default is sort by physical, vjoy, special and config and by name within these categories
 
             disconnected_devices = [dev for dev in all_joystick_devices if not dev.connected and dev.device_category == DeviceCategory.Physical]
-            disconnected_vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if not dev.connected and dev.vjoy_id in vjoy_as_input]
+            disconnected_vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if not dev.connected and dev.vjoy_id in vid_as_input]
             disconnected_devices.extend(disconnected_vjoy_devices)
 
             physical_devices.sort(key=lambda x: x.name)
@@ -3131,11 +3134,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if verbose:
             syslog.info("Derived sorted device list:")
             index = 0
-            for key, device_list in data.items():
+            for key, item_list in data.items():
                 syslog.info(f"\t[{key}] -----------------")
-                if isinstance(device_list, list):
-                    for dev in device_list:
-                        syslog.info(f"\t\t{str(dev)}")
+                if isinstance(item_list, list):
+                    for item in item_list:
+                        if isinstance(item, DeviceSummary):
+                            dev = item
+                        elif isinstance(item, tuple) and len(item) == 3:
+                            dev = item[2]
+                        else:
+                            continue
+                        syslog.info(f"\t\t{str(dev)}  visible: [{gremlin.util.ansiBool(dev.visible)}]")
             syslog.info("-" * 40)
             for id, name, dev in sorted_device_tuples:
                 syslog.info(f"\t[{index}] [{dev.device_category.name}] [{name}] [{id}] ")
@@ -3230,8 +3239,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._vjoy_input_device_guids = [dev.device_guid for dev in vjoy_devices]
 
             # get the last device selected to determine which tab should be active
-            active_device_guid = config.last_device_guid
-            active_device: DeviceSummary = gremlin.joystick_handling.getDevice(active_device_guid) if active_device_guid else None
+            # the profile always records the last tab (config skips tabs without inputs)
+            active_device_guid = self.profile.getLastInput()[0] or config.last_device_guid
+            active_device = gremlin.joystick_handling.getDevice(active_device_guid) if active_device_guid else None
             if not active_device:
                 # not found - pick the first one by tab order
 
@@ -3239,8 +3249,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 active_device_guid = active_device.device_guid
                 gremlin.shared_state.setActiveDeviceGuid(active_device_guid)
 
-            if verbose_l1:
-                syslog.info(f"TABS: active device: [{active_device.name}] id: [{active_device.device_id}]")
+            if verbose_l1 or __debug__:
+                syslog.info(f"TABS: last active device: [{active_device.name}] id: [{active_device.device_id}]")
 
             visible_map = self.config.device_visible_map
 
@@ -3273,7 +3283,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 device_id = device.device_id
                 device_name = device.name
 
-                if "voice" in device_name.lower():
+                if device.device_type == DeviceType.VJoy:
                     pass
 
                 if device.disabled:
@@ -3772,7 +3782,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections
-                last_device_guid, last_input_type, last_input_id = config.get_last_input()
+                last_device_guid, last_input_type, last_input_id = config.get_last_input(active_device.device_guid if active_device else None)
+                if last_device_guid is None and active_device is not None and self.getTabIndexForDevice(active_device.device_guid) != -1:
+                    # tab without inputs (plugins, overlay, voice...) has no config entry
+                    last_device_guid = active_device.device_guid
 
                 device = gremlin.joystick_handling.getDevice(last_device_guid) if last_device_guid else None
                 if not device:
@@ -3974,7 +3987,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # print (f"select last tab: {self.config.last_tab_guid}")
         device_guid, input_type, input_id = self.config.get_last_input()
         el = gremlin.event_handler.EventListener()
-        el.select_input.emit(device_guid, input_type, input_id, False, True, False, None)
+        self._restoring_selection += 1
+        try:
+            el.select_input.emit(device_guid, input_type, input_id, False, True, False, None)
+        finally:
+            self._restoring_selection -= 1
 
     @QtCore.Slot()
     def _ui_ready(self):
@@ -4028,7 +4045,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
             syslog.info(f"UI: selecting last input: device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
-            self._select_input(device_guid, input_type, input_id)
+            self._restoring_selection += 1
+            try:
+                self._select_input(device_guid, input_type, input_id)
+            finally:
+                self._restoring_selection -= 1
             # eh = gremlin.event_handler.EventListener()
             # eh.select_input.emit(device_guid, input_type, input_id, False, True, False, extra_data)
 
@@ -4572,9 +4593,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     el.input_selection_changed.emit(device_guid, input_type, input_id)
                     el.update_input_state.emit(device_guid)
 
-                    self._last_selected_device_guid = device_guid
-                    self._last_selected_input_type = input_type
-                    self._last_selected_input_id = input_id
+                    self.saveLastSelection(device_guid, input_type, input_id)
 
                 except Exception as err:
                     # something went south with the selection
@@ -4599,14 +4618,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     input_item = self._get_input_item(device_guid, 0)
                 if input_item:
                     self.saveLastSelection(input_item.device_guid, input_item.input_type, input_item.input_id)
+                elif device_guid is not None:
+                    # save the last tab if it has no input item
+                    self.saveLastSelection(device_guid, input_type, input_id)
 
             if completion_callback:
                 # fire the callback on completion
                 completion_callback(device_guid, input_type, input_id)
 
     def saveLastSelection(self, device_guid, input_type, input_id):
-        if self.isProfileLoading():
-            # ignore if we're loading
+        if self.isProfileLoading() or self._restoring_selection:
+            # ignore if we're loading or restoring the saved selection
             return
 
         if not device_guid:
@@ -4622,10 +4644,26 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         dev = gremlin.joystick_handling.getDevice(device_guid)
         if not dev:
             return
-        if input_type is None:
-            return
-        if input_id is None:
-            return
+
+        # # can save allowed devices that don't have inputs
+        # if dev.device_type != DeviceType.Settings:
+        #     if input_type is None:
+        #         return
+        #     if input_id is None:
+        #         return
+
+        last_selected_device = gremlin.joystick_handling.getDevice(device_guid)
+
+        # special case - settings has no inputs
+        if not DeviceType.hasInputs(last_selected_device.device_type):
+            input_type = None
+            input_id = None
+
+        if __debug__:
+            assert last_selected_device is not None, "invalid last selected device"
+            syslog.info(
+                f"Last selected input: {last_selected_device.name} {input_type.name if input_type else 'n/a'} {input_id if input_id is not None else 'n/a'}"
+            )
 
         self._last_selected_device_guid = device_guid
         self._last_selected_input_type = input_type
@@ -4650,15 +4688,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def saveInputSelection(self, device_guid, input_type, input_id):
         """Saves the current input selection to the configuration"""
         self.saveLastSelection(device_guid, input_type, input_id)
-        # config = gremlin.config.Configuration()
-        # config.set_last_input(device_guid, input_type, input_id)
-        # self._last_selected_device_guid = device_guid
-        # self._last_selected_input_type = input_type
-        # self._last_selected_input_id = input_id
-        # verbose = config.verbose_mode_select
-        # if verbose:
-        #     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-        #     syslog.info(f"SELECT INPUT: save selection device_name={device_name}, device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
 
     def setCurrentTabTracking(self, device_guid: str):
         """sets the tracking tab to the given device guid"""

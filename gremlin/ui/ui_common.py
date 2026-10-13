@@ -4918,8 +4918,10 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         value: bool = None,
         checked: bool = None,  # alt param for value
         tooltip=None,
+        readonly: bool = False,
         parent=None,
     ):
+        self._readonly = readonly
         """
         :param text: the label (optional, recommended)
         :param data: the data tracked by this control (optional)
@@ -4940,6 +4942,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         assert isinstance(value, (bool, type(None))), "value must be a boolean or None"
         is_checked = checked if checked is not None else value if value is not None else False
         self.setChecked(is_checked)
+        self.setReadOnly(readonly)
         if callback and isinstance(callback, Callable):
             sig = inspect.signature(callback)
             self._callback_param_count = len(sig.parameters)
@@ -4965,6 +4968,12 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         if self._callbackEx:
             self._callbackEx(self, checked)
 
+    def setReadOnly(self, readonly: bool):
+        """ makes the checkbox readonly or not """
+        self._readonly = readonly
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, readonly)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus if readonly else Qt.FocusPolicy.StrongFocus)
+
     @property
     def data(self):
         return self._data
@@ -4981,6 +4990,10 @@ class QDataCheckbox(QtWidgets.QCheckBox):
 
     def setIgnoreKeyboard(self, value: bool):
         self._ignore_keyboard = value
+
+    def setValue(self, value: bool):
+        """ sets the checked state of the checkbox """
+        self.setChecked(value)
 
 
 class QActionCheckbox(QWidget):
@@ -5346,7 +5359,15 @@ class QDataPushButton(QtWidgets.QPushButton):
         if self._callback:
             # Determine if the callback expects parameters and call accordingly
             if self._callback_param:
-                self._callback(self)
+                match self._callback_param_count:
+                    case 0:
+                        self._callback()
+                    case 1:
+                        self._callback(self)
+                    case 2:
+                        self._callback(self, self.data)
+                    case _:
+                        raise ValueError(f"Unsupported number of callback parameters (supports 0, 1, 2) - got {self._callback_param_count}")
             else:
                 self._callback()
 
@@ -5359,8 +5380,8 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._callback = callback
         if self._callback:
             sig = inspect.signature(self._callback)
-            takes_parameters = len(sig.parameters) > 0
-            self._callback_param = takes_parameters
+            self._callback_param_count = len(sig.parameters)
+            self._callback_param = self._callback_param_count > 0
         else:
             self._callback_param = False
 
@@ -11788,6 +11809,7 @@ def getHContainer(
     no_stretch: bool = False,
     widget_only: bool = False,
     align_top: bool = False,
+    auto_size : bool = False,
     tooltip: str = None,
 ):
     """gets a qt H container widget
@@ -11803,6 +11825,7 @@ def getHContainer(
     :param min_height: min height in pixels (optional)
     :param alignment: alignment
     :param set_alignment: if set, forces the alignment set with the alignment parameter
+    :param auto_size: if set, the widgets will automatically adjust to the minimum size of the other widgets in the container (use this for button groups)
 
     """
     widget = QWidget(parent=parent)
@@ -11811,6 +11834,7 @@ def getHContainer(
     layout.setContentsMargins(left_margin, top_margin, right_margin, bottom_margin)
 
     stretch = False if no_stretch else left_stretch
+    widgets = []
 
     if min_height is not None:
         widget.setMinimumHeight(min_height)
@@ -11846,6 +11870,8 @@ def getHContainer(
                         item = QtWidgets.QLabel(item)
                         if font:
                             item.setFont(font)
+                else:
+                    widgets.append(item)
 
                 if use_vcontainers:
                     item, _ = getVContainer(item)
@@ -11863,6 +11889,8 @@ def getHContainer(
         else:
             if isinstance(widget_or_list, str):
                 widget_or_list = QtWidgets.QLabel(widget_or_list)
+            else:
+                widgets.append(widget_or_list)
 
             if use_vcontainers:
                 widget_or_list, _ = getVContainer(widget_or_list)
@@ -11881,6 +11909,12 @@ def getHContainer(
 
     if tooltip:
         widget.setToolTip(tooltip)
+
+    if auto_size:
+        widgets = [w for w in widgets if w and Shiboken.isValid(w)]
+        width = max(w.sizeHint().width() for w in widgets)
+        for w in widgets:
+            w.setMinimumWidth(width)
 
     if widget_only:
         return widget

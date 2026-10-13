@@ -17,7 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import re
-import sys
+# import sys
 import collections
 import os
 import shutil
@@ -2497,7 +2497,7 @@ class Profile:
         """handles shutdown events"""
         # ensure the profile config data is persisted
         config = gremlin.config.Configuration()
-        config.save_profile()
+        config.save_profile_settings()
 
     def _handle_device_node_changed(self, data_map, key, old_value: ProfileDeviceNode, new_value: ProfileDeviceNode):
         # def stub(node: ProfileDeviceNode) -> str:
@@ -5051,7 +5051,7 @@ class Profile:
 
 
             # validate matches of device GUID to possible input types
-            if input_type:
+            if input_type is not None:
                 match input_type:
                     case InputType.State:
                         assert device.device_guid == gremlin.shared_state.state_tab_guid
@@ -5067,8 +5067,13 @@ class Profile:
                         assert device.device_guid == gremlin.shared_state.voice_tab_guid
                     case InputType.OpenSoundControl:
                         assert device.device_guid == gremlin.shared_state.osc_tab_guid
+                    case InputType.OverlayButton:
+                        assert device.device_guid == gremlin.shared_state.overlay_tab_guid
+                    case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
+                        assert device.device_type in (DeviceType.Joystick, DeviceType.VJoy)
                     case _:
-                        assert device.device_type == DeviceType.Joystick
+                        syslog.warning(f"Unhandled input type: {input_type} {input_type.name}")
+                        pass
 
         device_id = gremlin.util.normalize_guid(device_guid) # to string
         data = self._configuration_data

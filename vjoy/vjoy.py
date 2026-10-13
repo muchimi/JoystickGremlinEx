@@ -639,7 +639,7 @@ class VJoy:
     """Represents a vJoy device present in the system."""
 
     # Duration of inactivity after which the keep alive routine is run - timeout is in seconds
-    keep_alive_timeout = 10 if __debug__ else 60*3
+    keep_alive_timeout = 30 if __debug__ else 60*3
 
     # Axis name mapping
     axis_equivalence = {
@@ -1087,9 +1087,8 @@ class VJoyMonitor:
         while self._keep_alive_running:
             if next_check < time.time():
                 verbose = gremlin.config.Configuration().verbose_mode_vjoy
-                syslog.info("VJOY: keep alive check triggered")
                 if verbose:
-                    syslog.info("VJOY: keep alive reset initiated")
+                    syslog.info("VJOY: keep alive check triggered")
                 self.keep_awake()
                 next_check = self._last_active + VJoy.keep_alive_timeout
             if self._keep_alive_abort_signal.wait(timeout=VJoy.keep_alive_timeout):
