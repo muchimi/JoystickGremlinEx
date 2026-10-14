@@ -3780,6 +3780,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             #     f"Adjusted devices tab header widget size : tab count: {self.ui.devices_tab_header_widget.count()}  size: {self.ui.devices_tab_header_widget.size()}"
             # )
 
+            last_device_guid = None
+            last_input_type = None
+            last_input_id = None
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections
                 last_device_guid, last_input_type, last_input_id = config.get_last_input(active_device.device_guid if active_device else None)

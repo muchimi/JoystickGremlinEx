@@ -51,10 +51,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m77T75B)
 - Fix: Overlay:  O20 follow-up — A frozen build can import RapidOCR. The ONNX Runtime extension and the Visual C++ DLLs it loads are placed beside onnxruntime.dll, and the frozen process searches that folder. A failed import shows the real error instead of the install sentence (Lolo350).
-
-
 - Fix: Overlay:  O26 — Physical OCR Listen no longer raises because the callback listed four parameters. Overlay and OCR clicks use a no-argument wrapper and the existing listen method. The shared button code is unchanged. (Lolo350)
-
+- Fix: UI: exception on refresh tabs due to missing reference.
 
 ### (m77T75A)
 - Change: UI: settings tab rework to bring it to current UI standards.
