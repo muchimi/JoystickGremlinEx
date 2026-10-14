@@ -2763,7 +2763,7 @@ Enabled modules may not show until the device filter is updated.
 
     @QtCore.Slot(bool)
     def _osc_enabled(self, checked: bool):
-        self.config.osc_enabled = checked
+        self.config.setOscEnabled(checked)
         self.osc_input_port.setEnabled(checked)
         self._reload_needed = True
 

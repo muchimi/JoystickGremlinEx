@@ -12614,7 +12614,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if not isinstance(self._input_item_list_model, InputItemListModel):
             raise ValueError(f"DeviceWidget: CreateUi() - invalid model - got [{type(self._input_item_list_model)}]")
-
         try:
             self._ui_loading = True
 
@@ -12658,6 +12657,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 )
 
                 self.setInputItemListView(widget)  # registers handlers
+                assert self._input_item_list_view is not None,"Input item list view was not created successfully"
 
                 # flip display to the active list view
                 if Shiboken.isValid(self.listview_stackwidget):
@@ -12841,7 +12841,14 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
         if not Shiboken.isValid(self) or not Shiboken.isValid(widget) or not Shiboken.isValid(self.listview_stackwidget):
             return
+
         current_widget = self._input_item_list_view
+        if self.listview_container_layout is None:
+            # cleared by cleanup
+            return
+
+
+
         if current_widget != widget:
             if current_widget:
                 current_widget.removeSelectionChangeCallback(self._handle_input_item_selected)  # unhook selected callback
@@ -12850,10 +12857,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self.listview_container_layout.removeWidget(current_widget)
                 gremlin.util.delete_widget(current_widget)
 
-        self._input_item_list_view = widget
+
         if widget is not None:
             if verbose:
                 syslog.info(f"DeviceTabWidget: set input item view for device: [{widget.name}]")
+            self._input_item_list_view = widget
             self._input_item_list_view.addSelectionChangeCallback(
                 self._handle_input_item_selected
             )  # hook selected callback - called whenever an input is selected

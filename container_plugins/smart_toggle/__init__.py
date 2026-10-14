@@ -180,6 +180,7 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
         self.mode = None
         self.long_press_time = 0.0
         self.is_pressed = False  # assume output is not pressed
+        self.container = container
 
     def profile_start(self):
         container = self.container

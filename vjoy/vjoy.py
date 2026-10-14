@@ -1005,12 +1005,13 @@ class VJoyMonitor:
         self._keep_alive_running = False
         self._keep_alive_started = False
         self._keep_alive_thread = None
-        self._keep_alive_abort_signal = threading.Event()
+        
 
         self._vjoy_id_list = []
 
         # process ID
         self.pid = os.getpid()
+        self._keep_alive_abort_signal = threading.Event()
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
@@ -1070,7 +1071,6 @@ class VJoyMonitor:
                 self._keep_alive_abort_signal.set()
                 gremlin.util.safeJoin(self._keep_alive_thread)
             self._keep_alive_thread = None
-            self._keep_alive_abort_signal = None
         self._keep_alive_started = False
         syslog.info("VJOY: keep alive request stopped")
 

@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m77T76B/C)
+Fix: Smart Toggle Container: refactor missed a reference.
+Fix: UI: fix in missing widget in today's refactor for QT teardown introducting a new  exception.
+
 ### (m77T76A)
 - Fix: UI: Exception when selecting or recalling default device if it does not exist in the device list.
 - Fix: UI: Exception when checking if an input has a mapping.

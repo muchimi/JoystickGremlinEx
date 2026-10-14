@@ -2886,6 +2886,11 @@ class Configuration(QtCore.QObject):
         self._osc_enabled = None  # force a re-read
         self.save()  # save the change
 
+    def setOscEnabled(self, value: bool):
+        self._data["osc_enabled"] = value
+        self._osc_enabled = None  # force a re-read
+        self.save()  # save the change
+
     @property
     def afcs_enabled(self) -> bool:
         """True if AFCS support is enabled"""
