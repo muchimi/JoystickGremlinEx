@@ -261,7 +261,7 @@ a = Analysis(
         "OdenGraphQt",
         "qtpy",
         "av",
-        ] +  collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt'),
+        ] +  collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt') + collect_submodules('rapidocr') + collect_submodules('onnxruntime'),
     hookspath=None,
     runtime_hooks=["pyi_rth_onnxruntime.py"],
     excludes=["torch",
