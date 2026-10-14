@@ -392,6 +392,24 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
+    def _cleanup_ui(self):
+        """called when the MIDI device UI is being cleaned up"""
+        super()._cleanup_ui()
+        self.widget_storage.clear()
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.profile_loaded, self._handle_new_profile),
+            (el.edit_mode_changed, self._handle_profile_mode_changed),
+            (el.mode_name_changed, self._mode_name_changed),
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
+
+
     def _handle_new_profile(self):
         gremlin.util.InvokeUiMethod(self._handle_new_profile_ui)
 

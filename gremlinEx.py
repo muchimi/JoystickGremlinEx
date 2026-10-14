@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Main UI of JoystickGremlin.
+Main entry point and UI of GremlinEx (GEX)
 """
 
 # # ruff: disable[E401]
@@ -106,7 +106,7 @@ import gremlin.maestro
 from gremlin.input_types import InputType
 import gremlin.types
 
-from gremlin.util import load_icon, find_file
+from gremlin.util import PACKAGED, load_icon, find_file
 import gremlin.shared_state
 import gremlin.base_profile
 import gremlin.event_handler
@@ -6663,7 +6663,12 @@ if __name__ == "__main__":
             # another instance running
             os._exit(1)
 
-        gremlin.diagnostics.install(app_path)
+        if not PACKAGED:
+            # dev mode only
+            syslog.info("ENV: fault diagnostics and breadcrumbs enabled")
+            gremlin.diagnostics.install(app_path)
+
+        # manual garbage collection setup for QT widgets to manage life cycles
         gremlin.util.install_idle_collector()
 
         # user log
@@ -6681,6 +6686,8 @@ if __name__ == "__main__":
         # syslog = logging.getLogger("system")
 
         syslog.info(f"Joystick Gremlin Ex version {gremlin.version.Version().version}  (P{gremlin.util.getPythonVersion()})")
+
+        syslog.info(f"ENV: {'production' if PACKAGED else 'dev'}")
 
         # Initialize the vjoy interface
         from vjoy.vjoy_interface import VJoyInterface

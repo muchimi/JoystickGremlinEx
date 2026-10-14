@@ -1167,6 +1167,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._keyboard_dialog = None
         self._update_input_widget(self.getContentWidget(), self.getContentWidget().parent)
 
+
     def _dialog_ok_cb(self):
         """called when the add/edit key dialog completes"""
 
@@ -1407,3 +1408,20 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if not self.inputItemListModel.rows():
             # display blank page if no item left
             self._blank_input()
+
+    def _cleanup_ui(self):
+        """called when the keyboard device UI is being cleaned up"""
+        super()._cleanup_ui()
+
+        
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs),
+            (el.config_changed, self._config_changed_cb),
+            (el.edit_mode_changed, self._handle_edit_mode_changed)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass

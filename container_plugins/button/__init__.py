@@ -364,7 +364,7 @@ and another action on trigger release in a single container."""
             self.autorelease = safe_read(node, "autorelease", bool, True)
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node, "delay", int, 250)
-        syslog.info(f"press action set: [{len(self.press_action_set)}] release action set: [{len(self.release_action_set)}]")
+        # syslog.info(f"press action set: [{len(self.press_action_set)}] release action set: [{len(self.release_action_set)}]")
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

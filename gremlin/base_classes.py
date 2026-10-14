@@ -1041,6 +1041,17 @@ class AbstractCallbackModel(AbstractModel):
 
         self.setContentCallback(content_callback)
 
+    def dispose(self):
+        """disposes of the model and cleans up resources"""
+        self._index_map.clearCallbacks()
+        self._item_changed_callbacks.clear()
+        self._data_changed_callbacks.clear()
+        self._item_map.clear()
+        self._index_map.clear()
+        self._filtered_item_map.clear()
+        self._filtered_index_map.clear()
+        self._content_callback = None
+
     def setContentCallback(self, callback: Callable):
         """sets the content changed callback for this model"""
         if __debug__:

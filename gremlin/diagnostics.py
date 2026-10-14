@@ -60,11 +60,12 @@ def prepare() -> None:
     """Set the Qt message format before QApplication exists."""
     os.environ.setdefault("QT_MESSAGE_PATTERN", _QT_PATTERN)
 
-
+@debug_only
 def install(data_path: str) -> None:
     """Arm the crash trail. Call once, after fault.log is configured."""
     global _installed, _breadcrumb_path
     global _previous_excepthook, _previous_thread_hook, _previous_unraisable_hook
+
     if _installed:
         return
     _installed = True

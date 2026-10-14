@@ -40,6 +40,11 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
+
+GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
+PACKAGED = GEX_DEV_ENABLED or hasattr(sys, '_MEIPASS')
+
+
 # general override flags for builds and execution - these override configuration settings from the config file
 # this is used to simplify diagnostics and help with development of work in progress modules
 # T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules

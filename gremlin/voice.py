@@ -2132,7 +2132,7 @@ class Voice:
             result = set_volume()
 
             # Ensure any cyclic wrapper objects are finalized while COM is active.
-            gc.collect()
+            gc.collect(0)
             return result
 
         except Exception as exc:
@@ -2142,7 +2142,7 @@ class Voice:
         finally:
             if com_initialized:
                 # Ensure any cyclic wrapper objects are finalized while COM is active.
-                gc.collect()
+                gc.collect(0)
                 comtypes.CoUninitialize()
 
     def _set_volume_ui(self, percent: float, target_name: str = None):

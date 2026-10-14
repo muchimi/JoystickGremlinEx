@@ -935,7 +935,7 @@ class MidiInterface(QtCore.QObject):
         self._listeners.clear()  # clear the listeners dictionary
 
         self._stopping = False
-        
+
     @property
     def started(self):
         """returns True if the MIDI interface has been started"""
@@ -1873,6 +1873,18 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)  # edit mode changed or mode added/removed
 
         self._last_selected_index = -1  # index of last input, -1 if none
+
+    def _cleanup_ui(self):
+        """called when the MIDI device UI is being cleaned up"""
+        super()._cleanup_ui()
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.edit_mode_changed, self._handle_edit_mode_changed)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
 
     def _load_handler(self, model: MidiInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""

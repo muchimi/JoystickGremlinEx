@@ -3496,6 +3496,29 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.find_next.connect(self._handle_find_next)
         el.state_added.connect(self._handle_state_added)
 
+    def _cleanup_ui(self):
+        """called when the state device UI is being cleaned up"""
+
+        self._widget_map.clear()
+        self._filter_widget.changed.disconnect(self._filter_changed)
+        self._filter_widget.select.disconnect(self._select_input_item_cb)
+        self._filter_widget = None
+        self._filter = None
+
+        super()._cleanup_ui()
+
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs),
+            (el.find_next, self._handle_find_next),
+            (el.state_added, self._handle_state_added)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
+
     def _handle_state_added(self, state):
         """called when a new state is added"""
         self.inputItemListModel.refresh()

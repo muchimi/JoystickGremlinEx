@@ -64,10 +64,12 @@ g_loaded_modules = {}
 
 syslog = logging.getLogger("system")
 
+GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
+PACKAGED = GEX_DEV_ENABLED or hasattr(sys, '_MEIPASS')
 
 def debug_only(func):
     """decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
-    if not __debug__:
+    if PACKAGED:
         return lambda *args, **kwargs: None
     return func
 
@@ -3217,7 +3219,7 @@ def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
 def safeReplace(src, dst, retries=5, delay=0.1):
     for attempt in range(retries):
         try:
-            os.replace(src, dst) # IgnoreException
+            os.replace(src, dst) #@IgnoreException
             break
         except PermissionError as e:
             if attempt < retries - 1:

@@ -708,6 +708,20 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
+    def _cleanup_ui(self):
+        """called when the Octavi device UI is being cleaned up"""
+        super()._cleanup_ui()
+        self.widget_storage.clear()
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
+
     def onInputListViewCreate(self):
         """called when input list is created"""
         self.ensureInputItems()

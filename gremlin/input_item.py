@@ -12464,23 +12464,52 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         gremlin.util.clear_layout(self.left_panel_header_layout)
 
     def _cleanup_ui(self):
+        """ widget cleanup """
+
+        # unhook event listeners
         el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs),
+            (el.tab_selected, self._handle_tab_changed),
+            (el.input_deleted, self._handle_input_deleted),
+            (el.input_filtered_change, self._handle_input_filter_changed),
+            (el.all_inputs_deleted, self._handle_all_inputs_deleted),
+            (el.jump_to_mapped_input, self._handle_jump_to_mapped_input),
+            (el.device_mapping_changed, self._handle_device_mapping_changed),
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
 
-        el.lock_inputs.disconnect(self._handle_lock_inputs)
-        el.unlock_inputs.disconnect(self._handle_unlock_inputs)
+        if self._input_item_list_view is not None and Shiboken.isValid(self._input_item_list_view):
+            gremlin.util.delete_widget(self._input_item_list_view)
 
-        el.jump_to_mapped_input.disconnect(self._handle_jump_to_mapped_input)
-        if self.filtersEnabled:
-            el.input_filtered_change.disconnect(self._handle_input_filter_changed)
+        gremlin.util.clear_layout(self.main_layout)
 
-        if self._input_item_list_model is not None:
-            self._input_item_list_model.removeOnItemChangedCallback(self.onInputItemChange)
-            model_callback = getattr(self, "_handle_model_changed", None)
-            if model_callback is not None:
-                self._input_item_list_model.removeCallback(model_callback)
+        self._input_item_list_view = None
+        self._input_item_list_model.dispose()
+        self._input_item_list_model = None
 
         self.setInputItemListView(None)
         el.input_deleted.disconnect(self._handle_input_deleted)
+
+        self._custom_widget_handler = None
+        self._last_selected_widget = None
+        self._create_widget_callback = None
+        self.listview_container = None
+        self.listview_container_layout = None
+        self.listview_stackwidget = None
+        self.left_panel_header_container = None
+        self.left_panel_header_layout = None
+        self.pagination_widget = None
+        self.jump_widget = None
+        self._model_empty_callback = None
+
+
+        self._registered_callbacks.clear()
+
 
     def _handle_input_deleted(self, input_item: InputItem):
         """handles the input_deleted event - marshals to UI thread"""

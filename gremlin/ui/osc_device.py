@@ -3856,6 +3856,29 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # re-apply filters after config is loaded
         self.inputItemListModel.applyFilter()
 
+    def _cleanup_ui(self):
+        """called when the OSC device UI is being cleaned up"""
+
+        self._filter = None
+        self._filter_widget.changed.disconnect(self._filter_changed)
+        self._filter_widget.select.disconnect(self._select_input_item_cb)
+        self._filter_widget = None
+
+        super()._cleanup_ui()
+
+        el = gremlin.event_handler.EventListener()
+        for signal, slot in (
+            (el.edit_mode_changed, self._handle_edit_mode_changed),
+            (el.config_changed, self._config_changed_cb),
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs),
+            (el.find_next, self._handle_find_next)
+        ):
+            try:
+                signal.disconnect(slot)
+            except Exception:
+                pass
+
     def getDefaultFilter(self) -> dict:
         """gets the default filter for the given device"""
 

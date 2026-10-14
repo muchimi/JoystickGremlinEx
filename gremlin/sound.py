@@ -875,7 +875,7 @@ class Sound:
                     time.sleep(0.1)
 
                 self._sound_tasks.clear()
-                gc.collect()  # forcibly terminate any dangling streams to avoid deadlocks on sd re-init
+                gc.collect(0)  # forcibly terminate any dangling streams to avoid deadlocks on sd re-init
                 sd._terminate()
                 sd._initialize()
                 self.device_map.clear()
