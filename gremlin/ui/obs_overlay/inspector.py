@@ -28,6 +28,19 @@ import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup
 
+
+def button_callback(func, *args, **kwargs):
+    """No-argument click, same shape as a joystick-condition Listen method.
+
+    Values are stored when the button is created. The callback itself has no
+    parameters, so the shared button handler calls it with none.
+    """
+
+    def _call():
+        return func(*args, **kwargs)
+
+    return _call
+
 from .bindings import (
     find_overlay_state,
     overlay_device_label,
@@ -420,7 +433,7 @@ class PaletteSwatch(QtWidgets.QPushButton):
         else:
             self.setToolTip(f"{label}. Click to apply.")
             self.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
-        self.clicked.connect(lambda _=False: self.apply_requested.emit())
+        self.clicked.connect(button_callback(self.apply_requested.emit))
 
     def paintEvent(self, event):
         from .gradient import is_gradient, paint_gradient_spectrum
@@ -456,9 +469,9 @@ class PaletteSwatch(QtWidgets.QPushButton):
             return
         menu = QtWidgets.QMenu(self)
         update_action = menu.addAction("Update with current colors")
-        update_action.triggered.connect(lambda _=False: self.update_requested.emit())
+        update_action.triggered.connect(button_callback(self.update_requested.emit))
         delete_action = menu.addAction("Delete palette")
-        delete_action.triggered.connect(lambda _=False: self.delete_requested.emit())
+        delete_action.triggered.connect(button_callback(self.delete_requested.emit))
         menu.exec(event.globalPos())
 
 
@@ -480,11 +493,11 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
         self._display.setMinimumHeight(int(sample.desiredHeight) + 4)
         layout.addWidget(self._display)
         layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        listen = gremlin.ui.ui_common.Buttons.getListenWidget(callback=lambda: self._listen(False), no_keyboard=False)
+        listen = gremlin.ui.ui_common.Buttons.getListenWidget(callback=button_callback(self._listen, False), no_keyboard=False)
         listen.setToolTip("Listen for a single keyboard or mouse input.")
         listen_multi = gremlin.ui.ui_common.Buttons.getListenWidget(
             label="Listen (multi)",
-            callback=lambda: self._listen(True),
+            callback=button_callback(self._listen, True),
             no_keyboard=False,
         )
         listen_multi.setToolTip("Listen for multiple inputs. Click OK when done.")
@@ -555,7 +568,7 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
 
     def _key_menu(self, widget):
         action = QtGui.QAction("Delete", self)
-        action.triggered.connect(lambda _=False, w=widget: self._delete_key(w))
+        action.triggered.connect(button_callback(self._delete_key, widget))
         menu = QtWidgets.QMenu(self)
         menu.addAction(action)
         menu.exec(QtGui.QCursor.pos())
@@ -1425,7 +1438,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 refresh = Buttons.getRefreshWidget(
                     label="Refresh windows",
                     tooltip="Re-scan visible top-level windows.",
-                    callback=lambda _=False: QtCore.QTimer.singleShot(0, self.rebuild),
+                    callback=button_callback(QtCore.QTimer.singleShot, 0, self.rebuild),
                 )
                 form.addRow(refresh)
                 hint = QtWidgets.QLabel('Discord application share captures that program only. Pin the overlay inside the game window, then share that game. If the game is not running, the overlay stays a normal window (screen share still works).', self._host)
@@ -1439,7 +1452,7 @@ class OverlayInspector(QtWidgets.QWidget):
         reset = QDataPushButton(
             "Reset position",
             tooltip="Clear the saved window position and center this overlay. Also used if the saved monitor is gone.",
-            clicked=lambda: self._reset_page_position(),
+            clicked=self._reset_page_position,
         )
         if onscreen:
             reset.setToolTip("Use the primary monitor if the saved display is gone.")
@@ -1634,7 +1647,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 chip.setStyleSheet(
                     f"QToolButton {{ border: 1px solid #666; border-radius: 3px; background: {fill.name()}; }}"
                 )
-            chip.clicked.connect(lambda _=False, c=hex_color: _apply_preset(c))
+            chip.clicked.connect(button_callback(_apply_preset, hex_color))
             layout.addWidget(chip)
         layout.addStretch(1)
         return row
@@ -1716,12 +1729,12 @@ class OverlayInspector(QtWidgets.QWidget):
         add_v = Buttons.getAddWidget(
             label="Add vertical",
             tooltip="Add a vertical guide. Widgets snap left, center, or right to it.",
-            callback=lambda _=False: self._add_guide("v"),
+            callback=button_callback(self._add_guide, "v"),
         )
         add_h = Buttons.getAddWidget(
             label="Add horizontal",
             tooltip="Add a horizontal guide. Widgets snap top, center, or bottom to it.",
-            callback=lambda _=False: self._add_guide("h"),
+            callback=button_callback(self._add_guide, "h"),
         )
         row.addWidget(add_v)
         row.addWidget(add_h)
@@ -1773,7 +1786,7 @@ class OverlayInspector(QtWidgets.QWidget):
         slider.valueChanged.connect(_from_slider)
         spin.valueChanged.connect(_from_spin)
         color.color_changed.connect(lambda v, ident=gid: self.scene.update_guide(ident, color=v))
-        delete.clicked.connect(lambda _=False, ident=gid: self._remove_guide(ident))
+        delete.clicked.connect(button_callback(self._remove_guide, gid))
         self._bind_live(spin, lambda ident=gid: self._guide_percent(ident))
         self._bind_live(slider, lambda ident=gid: int(round(self._guide_percent(ident) * 10)))
         layout.addWidget(axis_label)
@@ -1857,7 +1870,7 @@ class OverlayInspector(QtWidgets.QWidget):
             )
         reset = QDataPushButton("Reset", parent=self._host)
         reset.setToolTip("Show the whole widget again.")
-        reset.clicked.connect(lambda _=False, ident=wid: self._update(ident, crop={"l": 0, "t": 0, "r": 0, "b": 0}))
+        reset.clicked.connect(button_callback(lambda ident: self._update(ident, crop={"l": 0, "t": 0, "r": 0, "b": 0}), wid))
         form.addRow(reset)
 
     def _build_widget(self, item: dict):
@@ -2441,7 +2454,7 @@ class OverlayInspector(QtWidgets.QWidget):
         preview = QDataPushButton(
             "Preview",
             tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.",
-            clicked=lambda _=False, it=item, box=expr: self._preview_visibility(it, box.text()),
+            clicked=button_callback(lambda it, box: self._preview_visibility(it, box.text()), item, expr),
         )
         expr_row = QtWidgets.QWidget(self._host)
         expr_layout = QtWidgets.QHBoxLayout(expr_row)
@@ -2450,7 +2463,7 @@ class OverlayInspector(QtWidgets.QWidget):
         expr_layout.addWidget(preview)
         form.addRow("Expression", expr_row)
 
-        ops = QDataPushButton("Boolean operators", tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.", clicked=lambda: self._show_boolean_operators())
+        ops = QDataPushButton("Boolean operators", tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.", clicked=self._show_boolean_operators)
         form.addRow("", ops)
 
         hint = QtWidgets.QLabel(self._visibility_summary(vis), self._host)
@@ -2473,8 +2486,10 @@ class OverlayInspector(QtWidgets.QWidget):
         add_btn = Buttons.getAddWidget(
             label="Add condition",
             tooltip="Add a mode, state, variable, or input. It is assigned the next letter (A, B, C…).",
-            callback=lambda _btn=None, wid=item["id"], box=add_kind: self._add_visibility_condition(
-                wid, str(box.currentData() or "mode")
+            callback=button_callback(
+                lambda wid, box: self._add_visibility_condition(wid, str(box.currentData() or "mode")),
+                item["id"],
+                add_kind,
             ),
         )
         add_row = QtWidgets.QWidget(self._host)
@@ -2517,7 +2532,7 @@ class OverlayInspector(QtWidgets.QWidget):
             self._fill_visibility_variable(form, item, cond)
             remove = Buttons.getRemoveWidget(
                 label="Remove",
-                callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._remove_visibility_condition(wid, cid),
+                callback=button_callback(self._remove_visibility_condition, item["id"], cond_id),
             )
             form.addRow("", remove)
             return box
@@ -2564,7 +2579,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         remove = Buttons.getRemoveWidget(
             label="Remove",
-            callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._remove_visibility_condition(wid, cid),
+            callback=button_callback(self._remove_visibility_condition, item["id"], cond_id),
         )
         form.addRow("", remove)
         return box
@@ -2729,7 +2744,7 @@ class OverlayInspector(QtWidgets.QWidget):
             listen = Buttons.getListenWidget(
                 label="Listen...",
                 tooltip="Assign from the next physical button press",
-                callback=lambda _btn=None, it=item, cid=cond_id: self._listen_visibility(it, cid, virtual_only=False),
+                callback=button_callback(self._listen_visibility, item, cond_id, virtual_only=False),
             )
 
         device = None
@@ -2777,8 +2792,15 @@ class OverlayInspector(QtWidgets.QWidget):
         if listen is not None:
             actions.addWidget(listen)
         clear = Buttons.getClearWidget(
-            callback=lambda _btn=None, wid=item["id"], cid=cond_id: self._set_visibility_condition(
-                wid, cid, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
+            callback=button_callback(
+                self._set_visibility_condition,
+                item["id"],
+                cond_id,
+                rebuild=True,
+                device_guid="",
+                device_name="",
+                vjoy_id=0,
+                input_id=0,
             )
         )
         actions.addWidget(clear)
@@ -3249,16 +3271,16 @@ class OverlayInspector(QtWidgets.QWidget):
         layout.setSpacing(6)
         for pal in palettes:
             swatch = PaletteSwatch(pal.get("colors") or {}, pal.get("label") or "Saved palette", editable=editable)
-            swatch.apply_requested.connect(lambda p=pal: self._apply_palette(p))
+            swatch.apply_requested.connect(button_callback(self._apply_palette, pal))
             if editable:
-                swatch.update_requested.connect(lambda pid=pal.get("id"): self._update_saved_palette(widget_type, pid))
-                swatch.delete_requested.connect(lambda pid=pal.get("id"): self._delete_saved_palette(widget_type, pid))
+                swatch.update_requested.connect(button_callback(self._update_saved_palette, widget_type, pal.get("id")))
+                swatch.delete_requested.connect(button_callback(self._delete_saved_palette, widget_type, pal.get("id")))
             layout.addWidget(swatch)
         if add_new:
             add_btn = Buttons.getAddWidget(
                 label="+",
                 tooltip="Save the current colors as a new user palette for this widget type.",
-                callback=lambda: self._add_saved_palette(widget_type),
+                callback=button_callback(self._add_saved_palette, widget_type),
             )
             add_btn.setFixedSize(28, 28)
             layout.addWidget(add_btn)
@@ -3667,10 +3689,10 @@ class OverlayInspector(QtWidgets.QWidget):
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip("Choose an image or SVG file.")
-        browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_image(wid))
+        browse.clicked.connect(button_callback(self._browse_image, item["id"]))
         paste = Buttons.getPasteWidget(
             tooltip="Paste a screenshot from the clipboard (Windows Snipping Tool / Win+Shift+S).",
-            callback=lambda _btn=None, wid=item["id"]: self._paste_image(wid),
+            callback=button_callback(self._paste_image, item["id"]),
         )
         path_edit.editingFinished.connect(lambda wid=item["id"], w=path_edit: self._style(wid, image_path=w.text()))
         path_layout.addWidget(path_edit)
@@ -3725,11 +3747,11 @@ class OverlayInspector(QtWidgets.QWidget):
             "Choose a custom paddle image. PNG with transparency works best. "
             "Pivot is the center of the image. Clear uses the built-in silhouette from your reference."
         )
-        browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_paddle_image(wid))
+        browse.clicked.connect(button_callback(self._browse_paddle_image, item["id"]))
         clear = Buttons.getClearWidget(
             label="Clear",
             tooltip="Use the built-in vector paddle.",
-            callback=lambda _btn=None, wid=item["id"]: self._style(wid, paddle_image="", rebuild=True),
+            callback=button_callback(self._style, item["id"], paddle_image="", rebuild=True),
         )
         path_edit.editingFinished.connect(
             lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
@@ -3813,10 +3835,10 @@ class OverlayInspector(QtWidgets.QWidget):
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip("Choose the executable to launch.")
-        browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_launch_path(wid))
+        browse.clicked.connect(button_callback(self._browse_launch_path, item["id"]))
         clear = Buttons.getClearWidget(
             label="Clear",
-            callback=lambda _btn=None, wid=item["id"]: self._style(wid, launch_path=""),
+            callback=button_callback(self._style, item["id"], launch_path=""),
         )
         path_edit.editingFinished.connect(
             lambda wid=item["id"], w=path_edit: self._style(wid, launch_path=w.text().strip())
@@ -3836,7 +3858,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         launch_now = QDataPushButton("Launch now")
         launch_now.setToolTip("Start this executable with the arguments above.")
-        launch_now.clicked.connect(lambda _=False, wid=item["id"]: self._launch_application_now(wid))
+        launch_now.clicked.connect(button_callback(self._launch_application_now, item["id"]))
         form.addRow(launch_now)
 
         hint = QtWidgets.QLabel(
@@ -4079,7 +4101,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(self._stat_entry_box(item, entry, index))
         add = Buttons.getAddWidget(
             label="Add stat",
-            callback=lambda _btn=None, wid=item["id"]: self._add_stat_entry(wid),
+            callback=button_callback(self._add_stat_entry, item["id"]),
         )
         form.addRow(add)
 
@@ -4169,7 +4191,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if len(self._stats_for(item)) > 1:
             remove = Buttons.getRemoveWidget(
                 label="Remove",
-                callback=lambda _btn=None, wid=item["id"], ident=sid: self._remove_stat_entry(wid, ident),
+                callback=button_callback(self._remove_stat_entry, item["id"], sid),
             )
             form.addRow("", remove)
         return box
@@ -4524,10 +4546,10 @@ class OverlayInspector(QtWidgets.QWidget):
             "Highlights the OCR region on screen, counts down 5 seconds so you can place text, "
             "then captures that region and runs OCR."
         )
-        test.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_test_once(wid))
+        test.clicked.connect(button_callback(self._ocr_test_once, item["id"]))
         clear = QDataPushButton("Clear results")
         clear.setToolTip("Clear last OCR text, status, and rule match state for this widget.")
-        clear.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_clear_results(wid))
+        clear.clicked.connect(button_callback(self._ocr_clear_results, item["id"]))
         btn_layout.addWidget(test)
         btn_layout.addWidget(clear)
         btn_layout.addStretch(1)
@@ -4581,13 +4603,13 @@ class OverlayInspector(QtWidgets.QWidget):
         pack_layout.setContentsMargins(0, 0, 0, 0)
         load_pack = QDataPushButton("Load pack…")
         load_pack.setToolTip("Load a built-in OCR rule pack (e.g. SC mineables).")
-        load_pack.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_load_pack(wid))
+        load_pack.clicked.connect(button_callback(self._ocr_load_pack, item["id"]))
         import_btn = QDataPushButton("Import…")
         import_btn.setToolTip("Import OCR rules from a .json pack file.")
-        import_btn.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_import_pack(wid))
+        import_btn.clicked.connect(button_callback(self._ocr_import_pack, item["id"]))
         export_btn = QDataPushButton("Export…")
         export_btn.setToolTip("Export these OCR rules as a shareable .json pack.")
-        export_btn.clicked.connect(lambda _=False, wid=item["id"]: self._ocr_export_pack(wid))
+        export_btn.clicked.connect(button_callback(self._ocr_export_pack, item["id"]))
         pack_layout.addWidget(load_pack)
         pack_layout.addWidget(import_btn)
         pack_layout.addWidget(export_btn)
@@ -4599,7 +4621,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(self._ocr_rule_box(item, rule, index))
         add = Buttons.getAddWidget(
             label="Add rule",
-            callback=lambda _btn=None, wid=item["id"]: self._add_ocr_rule(wid),
+            callback=button_callback(self._add_ocr_rule, item["id"]),
         )
         form.addRow(add)
 
@@ -4672,12 +4694,12 @@ class OverlayInspector(QtWidgets.QWidget):
         caption = "Edit mappings..." if overlay_input_has_mappings(mapped) else "Map..."
         map_btn = QDataPushButton(caption)
         map_btn.setToolTip("Open the standard button mapping dialog for this OCR rule.")
-        map_btn.clicked.connect(lambda _=False, wid=item["id"], rid=rule_id: self._open_ocr_rule_mappings(wid, rid))
+        map_btn.clicked.connect(button_callback(self._open_ocr_rule_mappings, item["id"], rule_id))
         form.addRow(map_btn)
 
         remove = Buttons.getDeleteWidget(
             tooltip="Remove this rule",
-            callback=lambda _btn=None, wid=item["id"], rid=rule_id: self._remove_ocr_rule(wid, rid),
+            callback=button_callback(self._remove_ocr_rule, item["id"], rule_id),
         )
         form.addRow(remove)
         return box
@@ -4904,10 +4926,10 @@ class OverlayInspector(QtWidgets.QWidget):
         select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color.listenColor()))
         select.setToolTip("Choose keys and mouse buttons on the virtual keyboard.")
         select.setFixedHeight(24)
-        select.clicked.connect(lambda _=False, wid=item["id"]: self._open_input_display_picker(wid))
+        select.clicked.connect(button_callback(self._open_input_display_picker, item["id"]))
         form.addRow(select)
-        all_btn = QDataPushButton("Select all", clicked=lambda wid=item["id"]: self._select_all_input_display_keys(wid))
-        none_btn = QDataPushButton("Deselect all", clicked=lambda wid=item["id"]: self._clear_input_display_keys(wid))
+        all_btn = QDataPushButton("Select all", clicked=button_callback(self._select_all_input_display_keys, item["id"]))
+        none_btn = QDataPushButton("Deselect all", clicked=button_callback(self._clear_input_display_keys, item["id"]))
         row = gremlin.ui.ui_common.getHContainer([all_btn, none_btn], widget_only=True)
         form.addRow(row)
 
@@ -4999,7 +5021,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(self._graph_series_box(item, entry, index))
         add = Buttons.getAddWidget(
             label="Add dataset",
-            callback=lambda _btn=None, wid=item["id"]: self._add_graph_series(wid),
+            callback=button_callback(self._add_graph_series, item["id"]),
         )
         form.addRow(add)
 
@@ -5095,9 +5117,7 @@ class OverlayInspector(QtWidgets.QWidget):
             listen = Buttons.getListenWidget(
                 label="Listen...",
                 tooltip="Assign from the next matching physical axis",
-                callback=lambda _btn=None, it=item, sid=series_id: self._listen_graph_series(
-                    it, sid, virtual_only=False
-                ),
+                callback=button_callback(self._listen_graph_series, item, series_id, virtual_only=False),
             )
 
         device = None
@@ -5181,12 +5201,13 @@ class OverlayInspector(QtWidgets.QWidget):
 
         remove = Buttons.getRemoveWidget(
             label="Remove",
-            callback=lambda _btn=None, wid=item["id"], sid=series_id: self._remove_graph_series(wid, sid),
+            callback=button_callback(self._remove_graph_series, item["id"], series_id),
         )
         clear = Buttons.getClearWidget(
-            callback=lambda _btn=None, wid=item["id"], sid=series_id: self._set_graph_series(
-                wid,
-                sid,
+            callback=button_callback(
+                self._set_graph_series,
+                item["id"],
+                series_id,
                 rebuild=True,
                 device_guid="",
                 device_name="",
@@ -5355,7 +5376,7 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow("Follow hardware page", follow_box)
         form.addRow("Page", page_combo)
-        fit = QDataPushButton("Fit to device", tooltip="Resize this widget to the key layout of the selected Stream Deck.", clicked=lambda wid=item["id"]: self._fit_streamdeck_item(wid, force=True))
+        fit = QDataPushButton("Fit to device", tooltip="Resize this widget to the key layout of the selected Stream Deck.", clicked=button_callback(self._fit_streamdeck_item, item["id"], force=True))
         form.addRow(fit)
         hint = QtWidgets.QLabel(
             "Mirrors the selected deck’s keys (and Stream Deck + dials) using the current GEX page art.",
@@ -5445,10 +5466,10 @@ class OverlayInspector(QtWidgets.QWidget):
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip("Choose an image or SVG file.")
-        browse.clicked.connect(lambda _=False, wid=item["id"], k=key: self._browse_style_image(wid, k))
+        browse.clicked.connect(button_callback(self._browse_style_image, item["id"], key))
         clear = Buttons.getClearWidget(
             label="Clear",
-            callback=lambda _btn=None, wid=item["id"], k=key: self._style(wid, **{k: ""}),
+            callback=button_callback(lambda wid, k: self._style(wid, **{k: ""}), item["id"], key),
         )
         path_edit.editingFinished.connect(
             lambda wid=item["id"], w=path_edit, k=key: self._style(wid, **{k: w.text().strip()})
@@ -6395,9 +6416,7 @@ class OverlayInspector(QtWidgets.QWidget):
             listen = Buttons.getListenWidget(
                 label="Listen...",
                 tooltip="Assign from the next matching physical input",
-                callback=lambda _btn=None, it=item, ch=channel, kind=input_kind: self._listen(
-                    it, ch, kind, virtual_only=False
-                ),
+                callback=button_callback(self._listen, item, channel, input_kind, virtual_only=False),
             )
 
         device = None
@@ -6473,19 +6492,23 @@ class OverlayInspector(QtWidgets.QWidget):
             actions.addWidget(listen_widget)
         if show_clear:
             clear = Buttons.getClearWidget(
-                callback=lambda _btn=None, wid=item["id"], ch=channel: self._bind(
-                    wid,
-                    ch,
-                    rebuild=True,
-                    device_guid="",
-                    device_name="",
-                    vjoy_id=0,
-                    input_id=0,
-                    state_name="",
-                    state_id="",
-                    mode_name="",
-                    mode_id="",
-                    keys=[],
+                callback=button_callback(
+                    lambda wid, ch: self._bind(
+                        wid,
+                        ch,
+                        rebuild=True,
+                        device_guid="",
+                        device_name="",
+                        vjoy_id=0,
+                        input_id=0,
+                        state_name="",
+                        state_id="",
+                        mode_name="",
+                        mode_id="",
+                        keys=[],
+                    ),
+                    item["id"],
+                    channel,
                 )
             )
             actions.addWidget(clear)

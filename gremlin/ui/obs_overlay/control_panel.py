@@ -19,6 +19,8 @@ from shiboken6 import Shiboken
 import gremlin.shared_state
 from gremlin.ui.ui_common import QDataPushButton
 
+from .inspector import button_callback
+
 from .model import (
     ANCHOR_LABELS,
     OverlayScene,
@@ -264,7 +266,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
             btn.setToolTip(ANCHOR_LABELS.get(key, key))
             btn.setFixedSize(40, 32)
             btn.setAutoRaise(False)
-            btn.clicked.connect(lambda _checked=False, a=key: self._anchor(a))
+            btn.clicked.connect(button_callback(self._anchor, key))
             self._anchor_buttons[key] = btn
             pad.addWidget(btn, row, col)
         anchor_layout.addLayout(pad)
@@ -305,7 +307,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
             btn.setFixedSize(40, 32)
             btn.setAutoRaise(False)
             btn.setAutoRepeat(False)
-            btn.pressed.connect(lambda ddx=dx, ddy=dy: self._start_nudge(ddx, ddy))
+            btn.pressed.connect(button_callback(self._start_nudge, dx, dy))
             btn.released.connect(self._stop_nudge)
             self._nudge_buttons.append(btn)
             return btn

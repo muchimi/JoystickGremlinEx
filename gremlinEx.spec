@@ -1,6 +1,8 @@
 # -*- mode: python -*-
 
 import os
+import sys
+
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
@@ -80,7 +82,60 @@ for src, dest in _binary_candidates:
     else:
         print(f"WARNING: skipping missing binary {src}")
 added_binaries.extend(collect_dynamic_libs("cv2"))
-added_binaries.extend(collect_dynamic_libs("onnxruntime"))
+# CPU build. The CUDA and TensorRT provider DLLs are not used and fail to load
+# on a machine that does not have those runtimes.
+for _src, _dest in collect_dynamic_libs("onnxruntime"):
+    _name = os.path.basename(_src).lower()
+    if "cuda" in _name or "tensorrt" in _name:
+        print(f"WARNING: skipping ONNX provider {_name}")
+        continue
+    added_binaries.append((_src, _dest))
+
+# The extension is not a dependency of onnxruntime.dll. Name it so the frozen
+# import can find it beside that DLL.
+import onnxruntime as _onnxruntime
+
+_ort_capi = os.path.join(os.path.dirname(_onnxruntime.__file__), "capi")
+_ort_pyd = os.path.join(_ort_capi, "onnxruntime_pybind11_state.pyd")
+if os.path.isfile(_ort_pyd):
+    added_binaries.append((_ort_pyd, "onnxruntime/capi"))
+else:
+    print(f"WARNING: missing {_ort_pyd}")
+
+# The extension imports these by name. msvcp140.dll and msvcp140_1.dll live in
+# System32, not next to Python, so a dependency walk can miss them.
+_vc_names = ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "msvcp140_1.dll")
+_vc_dirs = [
+    getattr(sys, "base_prefix", ""),
+    os.path.dirname(sys.executable),
+    os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32"),
+]
+for _vc_name in _vc_names:
+    _vc_path = ""
+    for _folder in _vc_dirs:
+        if not _folder:
+            continue
+        _candidate = os.path.join(_folder, _vc_name)
+        if os.path.isfile(_candidate):
+            _vc_path = _candidate
+            break
+    if not _vc_path:
+        print(f"WARNING: VC runtime DLL not found: {_vc_name}")
+        continue
+    added_binaries.append((_vc_path, "."))
+    added_binaries.append((_vc_path, "onnxruntime/capi"))
+
+# pathlib.PurePath.match patterns. UPX corrupts these if a builder does not
+# already skip Control Flow Guard binaries.
+_OCR_UPX_EXCLUDE = [
+    "onnxruntime.dll",
+    "onnxruntime_*.dll",
+    "onnxruntime_pybind11_state.pyd",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "msvcp140.dll",
+    "msvcp140_1.dll",
+]
 
 '''
 excludes=["torch",
@@ -122,6 +177,11 @@ a = Analysis(
         "ctranslate2",
         "tokenizers",
         "onnxruntime",
+        "onnxruntime.capi",
+        "onnxruntime.capi._pybind_state",
+        "onnxruntime.capi.onnxruntime_pybind11_state",
+        "onnxruntime.capi.onnxruntime_validation",
+        "onnxruntime.capi.onnxruntime_inference_collection",
         "rapidocr",
         "rapidocr.main",
         "rapidocr.cal_rec_boxes",
@@ -203,7 +263,7 @@ a = Analysis(
         "av",
         ] +  collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt'),
     hookspath=None,
-    runtime_hooks=None,
+    runtime_hooks=["pyi_rth_onnxruntime.py"],
     excludes=["torch",
         "torchvision",
         "torchaudio",
@@ -245,6 +305,7 @@ exe = EXE(
     debug=False,
     strip=None,
     upx=True,
+    upx_exclude=_OCR_UPX_EXCLUDE,
     console=False,
     icon="icons\\gex.ico"
 )
@@ -256,6 +317,7 @@ coll = COLLECT(
     a.datas,
     strip=None,
     upx=True,
+    upx_exclude=_OCR_UPX_EXCLUDE,
     name="gremlinEx"
 )
 
