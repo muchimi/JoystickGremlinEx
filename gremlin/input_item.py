@@ -10486,7 +10486,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
     def __init__(
         self,
-        input_item: InputItem,
+        input_item: InputItem = None,
         input_type: InputType = None,
         object_name: str = None,
         spacer_height=32,
@@ -10503,6 +10503,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         """
         super().__init__(parent)
+
+        if input_item is None:
+            return  # empty shell, initialized later by fromParams()
 
         assert isinstance(input_item, InputItem), "invalid input type"
         assert input_item.input_id is not None, "invalid input id on input item"
@@ -10558,8 +10561,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     def fromParams(self, params) -> InputItemMappingWidget:  # noqa: F405
         """recreates the widget from self"""
         input_item, input_type, object_name, spacer_height, parent = params
-        widget = InputItemMappingWidget(input_item, input_type, object_name, spacer_height, parent)
-        input_item.setMappingWidget(widget)  # keep a reference
+        self.__init__(input_item, input_type, object_name, spacer_height, parent)
+        input_item.setMappingWidget(self)  # keep a reference
+        return self
 
     def _mapping_changed(self, input_item: InputItem):
         """occurs when a device mapping changed through user interaction with the UI"""
@@ -12239,13 +12243,15 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
 class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
     """Dialog to pick which vJoy devices are treated as physical inputs."""
+
     """Dialog to pick which vJoy devices are treated as physical inputs.
 
     :param profile_settings: the settings of the profile
     :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
     :param parent: parent widget, optional
     """
-    def __init__(self, profile_settings : gremlin.base_profile.Settings, parent=None):
+
+    def __init__(self, profile_settings: gremlin.base_profile.Settings, parent=None):
         """
         :param profile_settings: the settings of the profile
         :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
@@ -12256,7 +12262,7 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.settings = profile_settings
         self._widgets = []
-        self.vjoy_map = {} # map of vjoy IDs to their selection state
+        self.vjoy_map = {}  # map of vjoy IDs to their selection state
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setWindowTitle("vJoy as Input Configuration")
@@ -12273,12 +12279,7 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
         group_layout = QtWidgets.QVBoxLayout(group)
         for dev in sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id):
             enabled = self.settings.getVjoyAsInput(dev.vjoy_id)
-            widget = QDataCheckbox(
-                dev.name,
-                data=dev.vjoy_id,
-                value=enabled,
-                callback = self._handle_state_changed
-                )
+            widget = QDataCheckbox(dev.name, data=dev.vjoy_id, value=enabled, callback=self._handle_state_changed)
 
             self.vjoy_map[dev.vjoy_id] = enabled
             group_layout.addWidget(widget)
@@ -12289,19 +12290,14 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
         scroll_area.setMinimumHeight(150)
         self.main_layout.addWidget(scroll_area)
 
-
-        select_all = QDataPushButton("Select all", callback = lambda: self._set_all(True))
-        select_none = QDataPushButton("Select none", callback = lambda: self._set_all(False))
+        select_all = QDataPushButton("Select all", callback=lambda: self._set_all(True))
+        select_none = QDataPushButton("Select none", callback=lambda: self._set_all(False))
         ok_widget = QDataPushButton("Ok", callback=self.accept)
         cancel_widget = QDataPushButton("Cancel", callback=self.reject)
 
-        widgets = [select_all, select_none, "||",ok_widget, cancel_widget]
+        widgets = [select_all, select_none, "||", ok_widget, cancel_widget]
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, auto_size=True)
         self.main_layout.addWidget(widget)
-
-
-
-
 
     def _handle_state_changed(self, widget, checked: bool):
         vid: int = widget.data
@@ -12310,7 +12306,6 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
     def _set_all(self, checked: bool):
         for widget in self._widgets:
             widget.setChecked(checked)
-
 
 
 class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -12464,7 +12459,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         gremlin.util.clear_layout(self.left_panel_header_layout)
 
     def _cleanup_ui(self):
-        """ widget cleanup """
+        """widget cleanup"""
 
         # unhook event listeners
         el = gremlin.event_handler.EventListener()
@@ -12507,9 +12502,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.jump_widget = None
         self._model_empty_callback = None
 
-
         self._registered_callbacks.clear()
-
 
     def _handle_input_deleted(self, input_item: InputItem):
         """handles the input_deleted event - marshals to UI thread"""

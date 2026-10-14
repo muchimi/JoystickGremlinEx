@@ -3447,8 +3447,10 @@ class Profile:
                 mode_data = device_data.modes[mode_name]
                 for input_type, input_items in mode_data.config.items():
                     for input_item in input_items.values():
+                        if not input_item:
+                            continue
                         if look_for_containers:
-                            if input_item.containers:
+                            if hasattr(input_item, "containers") and input_item.containers:
                                 return True
                         else:
                             # input count indicates content

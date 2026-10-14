@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m77T76A)
+- Fix: UI: Exception when selecting or recalling default device if it does not exist in the device list.
+- Fix: UI: Exception when checking if an input has a mapping.
+- Fix: API: Exception when using two step initialization of input widgets due to API change.
 
 ### (m77T76)
 - Fix: API:  disable QT diagnostics by default in production mode (can be re-enabled via GEX_DEV_ENABLED environment variable if needed).
