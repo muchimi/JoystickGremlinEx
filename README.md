@@ -50,7 +50,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T76)
-- Fix: API:  disable QT diagnostics by default in production mode (can be re-enabled via GEX_DEV_ENABLE environment variable if needed).
+- Fix: API:  disable QT diagnostics by default in production mode (can be re-enabled via GEX_DEV_ENABLED environment variable if needed).
 - Fix: UI: added manual resource release on device UI teardown due to the manual memory management required for the QT memory manager workarounds.
 - Fix: Package: RapidOCR module excluded by the packager.
 
