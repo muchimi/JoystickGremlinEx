@@ -41,13 +41,20 @@ Again, thank you for your shared passion and for your generosity and support. It
 
 # Test versions
 
-The most current test releases will contain the latest bug fixes, features and optimizations.  Not all test releases are stable which is why they are not in the release channel, and many are.  Please make a backup of your profiles and enable the versioning option to keep files separate by version just in case, but there is about a year's worth of key updates since the last official release all in the test channel including several stable versions.  
+The most current test releases will contain the latest bug fixes, features and optimizations.  Not all test releases are stable which is why they are not in the release channel.  However, many are.  Please make a backup of your profiles and enable the versioning option to keep files separate by version just in case, but there is about a year's worth of key updates since the last official release all in the test channel including several stable versions.
 
 The test versions are available here: https://github.com/muchimi/JoystickGremlinEx/releases/tag/test
 
 
 
 # Change log
+
+### (m77T77)
+- Change: Requirements:  Updated all Python dependencies to current releases, including Pyside6 (QT interface for Python) 6.12.0 and EdgeTTS to 7.3.1 (compatibility with online service). Project requirements.txt updated.
+- Change: UI (optional modules): hide/show optional component devices/toolbar based on module enabled/disabled state as set in options to avoid a restart when possible.
+- Fix: API (Voice): filter function exception when filtering inputs.
+- Fix: API (AI TTS): updated dependent library for compatibility with EdgeTTS online services for text to speech generation via AI.
+- Fix: API: resolve an exception on device display order when a previously displayed device is not available (disconnected or disabled).
 
 ### (m77T76B/C)
 Fix: Smart Toggle Container: refactor missed a reference.

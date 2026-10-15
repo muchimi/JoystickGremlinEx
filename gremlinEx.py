@@ -3010,6 +3010,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         syslog.info(f"\t[{index}] [<missing>] [<missing>] visible: {visible}")
 
             for index, device, visible in item_list:
+                if not device:
+                    # device disabled or missing, skip it
+                    continue
                 if device.device_type == DeviceType.VJoy:
                     # set visibility of vjoy devices based on profile settings
                     visible = device.vjoy_id in vid_as_input
@@ -3043,6 +3046,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             all_devices = gremlin.joystick_handling.getAllDevices()
 
             missing_devices = [dev for dev in all_devices if dev.device_id not in id_list]
+            tab_map_device_ids = {gremlin.util.normalize_guid(value[0] if isinstance(value, (list, tuple)) else value) for value in tab_map.values()}
 
             # dump all devices
             if verbose:
@@ -3056,6 +3060,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # index of the last item per section
 
             for device in missing_devices:
+                if gremlin.util.normalize_guid(device.device_id) not in tab_map_device_ids:
+                    device.visible = self.config.isDeviceVisible(device.device_guid)
+                    if device.disabled or not device.visible:
+                        continue
                 if device.is_virtual and device.vjoy_id not in vid_as_input:
                     # skip vjoy devices not setup as input
                     disconnected_vjoy_devices.append(device)
@@ -3214,7 +3222,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             gremlin.shared_state.is_tab_loading = True
 
-            # device map
+            # device map and groups
             data = self._get_sorted_tab_map()
 
             self._active_devices = gremlin.joystick_handling.all_joystick_devices()
@@ -3654,7 +3662,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         case DeviceType.Overlay:
                             # =======================================================
                             # Add overlay device
-                            if config.overlay_enabled:
+                            overlay_enabled = config.overlay_enabled
+                            if overlay_enabled:
                                 try:
                                     device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
                                     device = gremlin.joystick_handling.getDevice(device_guid)
@@ -3679,6 +3688,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 except Exception as err:
                                     syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
                                     syslog.error(traceback.format_exc())
+
+                            # update the overlay toolbar based on status
+                            self.ui.actionOverlayControl.setVisible(overlay_enabled)
 
                         case DeviceType.Afcs:
                             if config.afcs_enabled:
@@ -3848,7 +3860,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 gremlin.util.singleShot(lambda: widget.ensureSelectedVisible())
                         except Exception as e:
                             pass
-
 
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")

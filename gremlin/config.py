@@ -2311,6 +2311,11 @@ class Configuration(QtCore.QObject):
             self.device_visible_map[device_id] = visible
             self.save()
 
+    def isDeviceVisible(self, device_guid) -> bool:
+        """ true if the device filter allows the device to be visible """
+        device_id = gremlin.util.normalize_guid(device_guid)
+        return self.device_visible_map.get(device_id, True)
+
     @property
     def show_output_vjoy(self):
         """determines if VJOY output devices are displayed on the device tabs"""

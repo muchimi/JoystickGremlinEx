@@ -2280,6 +2280,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_widget = QtWidgets.QWidget()
         page_layout = QtWidgets.QVBoxLayout(page_widget)
 
+        # cache the current visibilty
+
         page_layout.addWidget(QtWidgets.QLabel("Module Configuration Options"))
 
         modules = [
@@ -2294,6 +2296,15 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
 
         ]
+
+        self._module_visible_map = {
+            "streamdeck": self.config.isDeviceVisible(gremlin.shared_state.streamdeck_tab_guid),
+            "overlay": self.config.isDeviceVisible(gremlin.shared_state.overlay_tab_guid),
+            "afcs": self.config.isDeviceVisible(gremlin.shared_state.afcs_tab_guid),
+            "midi": self.config.isDeviceVisible(gremlin.shared_state.midi_tab_guid),
+            "osc": self.config.isDeviceVisible(gremlin.shared_state.osc_tab_guid),
+            "voice": self.config.isDeviceVisible(gremlin.shared_state.voice_tab_guid),
+        }
 
         widgets = []
         for data, name, description, env_var in modules:
@@ -2343,20 +2354,38 @@ Enabled modules may not show until the device filter is updated.
         self.tab_container.addTab(content_widget, "Modules")
 
     def _handle_module_enabled_changed(self, widget, checked):
+        """ handle module activation/deactivation
+
+        if a module is newly activated, the device filter is updated to make sure it is visible
+
+        """
         data = widget.data
+
         match data:
             case "streamdeck":
                 self.config.streamdeck_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.streamdeck_tab_guid, True)
             case "overlay":
                 self.config.overlay_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.overlay_tab_guid, True)
             case "afcs":
                 self.config.afcs_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.afcs_tab_guid, True)
             case "midi":
                 self.config.midi_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.midi_tab_guid, True)
             case "osc":
                 self.config.osc_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.osc_tab_guid, True)
             case "voice":
                 self.config.voice_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.voice_tab_guid, True)
 
     def _handle_verbose_all_off(self, widget):
         for widget in self._verbose_mode_widgets.values():
