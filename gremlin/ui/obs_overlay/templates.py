@@ -28,7 +28,7 @@ def _at(widget_type: str, x: int, y: int, w: int | None = None, h: int | None = 
     for key, value in fields.items():
         if key == "style":
             item["style"].update(value)
-        elif key in ("binding", "binding_y"):
+        elif key in ("binding", "binding_y", "binding_z"):
             item.setdefault(key, {}).update(value)
         elif key == "bindings" and isinstance(value, dict):
             item.setdefault("bindings", {}).update(value)

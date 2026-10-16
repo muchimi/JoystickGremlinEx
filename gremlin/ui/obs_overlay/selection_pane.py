@@ -29,6 +29,10 @@ _TYPE_TITLES = {
     "axis_crosshair": "Radar",
     "axis_stick_circle": "Circular",
     "axis_mouse": "Mouse",
+    "axis_xyz": "3D axes",
+    "axis_polar": "3D polar",
+    "axis_ternary": "Triangle",
+    "axis_radar": "Radar FoV",
     "axis_graph": "Temporal graph",
     "axis_bars": "Bar graph",
     "button": "Button",
@@ -46,6 +50,8 @@ _TYPE_TITLES = {
     "application": "Application",
     "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
+    "browser": "Web browser",
+    "efb": "SC EFB",
     "ocr": "OCR",
 }
 

@@ -52,6 +52,7 @@ from .bindings import (
     populate_overlay_state_combo,
     resolve_overlay_mode,
     widget_needs_xy,
+    widget_needs_xyz,
 )
 from .mouse_track import normalize_mouse_mode
 from .qt_guard import alive, later, on_ui
@@ -2144,6 +2145,18 @@ class OverlayInspector(QtWidgets.QWidget):
                     look.addRow("Rings", rings)
                 self._grid_appearance(look, item)
                 self._crosshair_appearance(look, item)
+        elif widget_type == "axis_xyz":
+            self._style_color(look, item, "fill", "Fill")
+            self._xyz_look(look, item)
+        elif widget_type == "axis_polar":
+            self._style_color(look, item, "fill", "Fill")
+            self._polar_look(look, item)
+        elif widget_type == "axis_ternary":
+            self._style_color(look, item, "fill", "Fill")
+            self._ternary_look(look, item)
+        elif widget_type == "axis_radar":
+            self._style_color(look, item, "fill", "Fill")
+            self._radar_look(look, item)
         elif widget_type == "switch_4way":
             self._switch_cardinal_appearance(look, item, include_orientation=False)
         elif widget_type == "switch_2way":
@@ -2187,6 +2200,10 @@ class OverlayInspector(QtWidgets.QWidget):
             self._remote_view_source(self._section("Remote"), item)
         elif widget_type == "streamdeck":
             self._streamdeck_source(self._section("Stream Deck"), item)
+        elif widget_type == "browser":
+            self._browser_source(self._section("Browser"), item)
+        elif widget_type == "efb":
+            self._efb_source(self._section("EFB Pack"), item)
         elif widget_type == "image":
             self._image_source(self._section("Image"), item)
         elif widget_type == "axis_mouse":
@@ -2325,6 +2342,14 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_bool(look, item, "show_dot_crosshair", "Lines through dot")
             self._grid_appearance(look, item)
             self._crosshair_appearance(look, item)
+        if types <= {"axis_xyz"}:
+            self._xyz_look(look, item)
+        if types <= {"axis_polar"}:
+            self._polar_look(look, item)
+        if types <= {"axis_ternary"}:
+            self._ternary_look(look, item)
+        if types <= {"axis_radar"}:
+            self._radar_look(look, item)
         invert_types = {
             "axis_bar",
             "axis_radio",
@@ -3639,6 +3664,162 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip="Keep the grid full strength in the center and fade it toward the widget border.",
         )
 
+    def _axis_arrow_look(self, form, item: dict):
+        """Shared axis stroke + end-arrow controls for 3 Axis widgets."""
+        self._look_heading(form, "Axes")
+        self._style_color(form, item, "axis", "Axis")
+        self._style_float(form, item, "axis_width", "Axis width", 0.5, 12, step=0.5)
+        self._style_bool(form, item, "show_axis_arrows", "End arrows")
+        self._style_float(form, item, "arrow_size", "Arrow size", 0, 40, step=1.0)
+
+    def _ternary_look(self, form, item: dict):
+        """Appearance for the power triangle: fill/border apply to the triangle; shared dot options."""
+        self._look_heading(form, "Dot")
+        self._style_color(form, item, "indicator", "Dot")
+        self._style_float(form, item, "indicator_size", "Dot size", 2, 80)
+        self._indicator_shape(form, item)
+        self._style_bool(form, item, "show_dot_shadow", "Dot shadow")
+        self._style_bool(form, item, "show_dot_crosshair", "Lines through dot")
+        self._axis_arrow_look(form, item)
+
+    def _xyz_frame_look(self, form, item: dict, *, polar: bool):
+        """Shared 3D frame Look (dot, path, axes, grid, optional vector/sphere, box)."""
+        self._look_heading(form, "Dot")
+        self._style_color(form, item, "indicator", "Dot")
+        self._style_float(form, item, "indicator_size", "Dot size", 2, 80)
+        self._indicator_shape(form, item)
+        self._style_bool(form, item, "show_dot_shadow", "Dot shadow")
+        self._style_bool(form, item, "show_dot_crosshair", "Lines through dot")
+
+        self._look_heading(form, "Projection")
+        self._style_bool(form, item, "show_projection", "Show path")
+        self._style_color(form, item, "projection", "Path")
+        self._style_float(form, item, "projection_width", "Path width", 0.5, 12, step=0.5)
+
+        if polar:
+            self._look_heading(form, "Vector")
+            self._style_bool(
+                form,
+                item,
+                "show_vector",
+                "Show vector",
+                tooltip="Ray from the origin to the tip.",
+            )
+            self._style_color(form, item, "vector", "Vector")
+            self._style_float(form, item, "vector_width", "Vector width", 0.5, 12, step=0.5)
+            self._style_bool(form, item, "show_vector_arrow", "Vector arrow")
+
+        self._axis_arrow_look(form, item)
+        self._style_float(
+            form,
+            item,
+            "axis_length",
+            "Axis length",
+            0.12,
+            0.48,
+            step=0.01,
+        )
+        self._style_bool(form, item, "invert_x", "Invert azimuth" if polar else "Invert X")
+        self._style_bool(form, item, "invert_y", "Invert elevation" if polar else "Invert Y")
+        self._style_bool(form, item, "invert_z", "Invert range" if polar else "Invert Z")
+
+        self._look_heading(form, "Horizontal grid")
+        self._style_bool(
+            form,
+            item,
+            "show_grid",
+            "Show grid",
+            tooltip="Grid on the horizontal plane (Y = 0), from −1 to 1 in X and Z.",
+        )
+        self._style_color(form, item, "grid", "Grid")
+        self._style_float(form, item, "grid_width", "Line width", 0.5, 12)
+        divisions = QtWidgets.QSpinBox(self._host)
+        divisions.setRange(2, 12)
+        divisions.setValue(int(item["style"].get("grid_divisions") or 4))
+        divisions.setToolTip("Number of cells from −1 to 1 on the horizontal plane.")
+        divisions.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, grid_divisions=int(v)))
+        form.addRow("Divisions", divisions)
+
+        if polar:
+            self._look_heading(form, "Sphere")
+            self._style_bool(
+                form,
+                item,
+                "show_sphere",
+                "Show sphere",
+                tooltip="Solid ball through the tip; radius follows tip distance. Color accepts a solid or gradient.",
+            )
+            self._style_color(form, item, "sphere", "Sphere")
+            self._style_color(form, item, "sphere_border", "Rim / equator")
+            self._style_float(form, item, "sphere_width", "Rim width", 0.5, 12, step=0.5)
+            self._style_bool(form, item, "show_sphere_equator", "Equator")
+
+        self._look_heading(form, "Bounds box")
+        self._style_bool(
+            form,
+            item,
+            "show_bounds_box",
+            "Show box",
+            tooltip="Cube covering −1…1 on X, Y, and Z.",
+        )
+        self._style_color(form, item, "box", "Box edge")
+        self._style_color(form, item, "box_fill", "Box fill")
+        self._style_float(form, item, "box_width", "Edge width", 0.5, 12, step=0.5)
+
+    def _xyz_look(self, form, item: dict):
+        """Appearance for the 3D axes widget."""
+        self._xyz_frame_look(form, item, polar=False)
+
+    def _polar_look(self, form, item: dict):
+        """Appearance for the 3D polar widget (vector, sphere, angle arcs)."""
+        self._xyz_frame_look(form, item, polar=True)
+
+    def _radar_look(self, form, item: dict):
+        """Look + geometry for the plan-position radar FoV widget."""
+        self._look_heading(form, "Range")
+        self._style_float(form, item, "range_min", "Range min", -1e6, 1e6, step=1.0)
+        self._style_float(form, item, "range_max", "Range max", -1e6, 1e6, step=1.0)
+        rings = QtWidgets.QSpinBox(self._host)
+        rings.setRange(1, 12)
+        rings.setValue(int(item["style"].get("ring_count") or 5))
+        rings.setToolTip("Concentric range circles between min and max.")
+        rings.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ring_count=int(v)))
+        form.addRow("Range rings", rings)
+        self._style_bool(form, item, "show_grid", "Show rings")
+        self._style_color(form, item, "grid", "Ring")
+        self._style_float(form, item, "grid_width", "Ring width", 0.5, 12, step=0.5)
+
+        self._look_heading(form, "Slew limits")
+        self._style_float(form, item, "slew_left_deg", "Left limit (°)", -180, 180, step=1.0)
+        self._style_float(form, item, "slew_right_deg", "Right limit (°)", -180, 180, step=1.0)
+        self._style_bool(
+            form,
+            item,
+            "show_slew_limits",
+            "Show limit rays",
+            tooltip="0° = nose up; negative = left, positive = right.",
+        )
+
+        self._look_heading(form, "Field of regard")
+        self._style_float(form, item, "for_min_deg", "FoR min (±°)", 10, 180, step=1.0)
+        self._style_float(form, item, "for_max_deg", "FoR max (±°)", 10, 180, step=1.0)
+
+        self._look_heading(form, "FoV wedge")
+        self._style_color(form, item, "fov", "Wedge")
+        self._style_color(form, item, "fov_fill", "Wedge fill")
+        self._style_float(form, item, "fov_width", "Wedge width", 0.5, 12, step=0.5)
+        self._style_bool(form, item, "show_fov_scan", "Scan lines")
+
+        self._look_heading(form, "Crosshair")
+        self._style_bool(form, item, "show_center_line", "Show crosshair")
+        self._style_color(form, item, "crosshair", "Crosshair")
+        self._axis_arrow_look(form, item)
+        self._style_bool(form, item, "invert_x", "Invert angle off")
+        self._style_bool(form, item, "invert_y", "Invert FoR")
+        self._style_bool(form, item, "invert_z", "Invert range")
+        self._style_color(form, item, "projection", "Limit rays")
+        self._style_float(form, item, "projection_width", "Limit width", 0.5, 12, step=0.5)
+
     def _crosshair_appearance(self, form, item: dict, show_toggle: bool = True):
         self._look_heading(form, "Crosshairs")
         if show_toggle:
@@ -4589,7 +4770,7 @@ class OverlayInspector(QtWidgets.QWidget):
     def _build_ocr_rules(self, item: dict):
         form = self._section("Rules")
         hint = QtWidgets.QLabel(
-            "Contain / Exact match against Texts (comma-separated). "
+            "Contain / Exact match against Texts (semicolon-separated). "
             "Any text (region) ignores Texts and uses whatever OCR reads in the widget. "
             "While matched the rule acts as a pressed overlay button; when not matched it is released. "
             "Use Map… for containers and actions.",
@@ -4639,13 +4820,14 @@ class OverlayInspector(QtWidgets.QWidget):
         region_mode = match_mode == "any"
 
         texts = QtWidgets.QLineEdit(
-            ", ".join(split_ocr_texts(rule.get("texts") if rule.get("texts") is not None else rule.get("text"))),
+            "; ".join(split_ocr_texts(rule.get("texts") if rule.get("texts") is not None else rule.get("text"))),
             self._host,
         )
-        texts.setPlaceholderText("(not used — OCR region is the handle)" if region_mode else "3200, 6400")
+        texts.setPlaceholderText("(not used — OCR region is the handle)" if region_mode else "3,200; 6,400")
         texts.setToolTip(
             "Ignored in Any text (region) mode — whatever OCR reads becomes the detection label. "
-            "For Contain/Exact: comma or newline separated; rule matches if any value is found."
+            "For Contain/Exact: semicolon or newline separated, so a thousands comma stays in the value. "
+            "The rule matches if any value is found."
         )
         texts.setEnabled(not region_mode)
         texts.editingFinished.connect(
@@ -4687,6 +4869,17 @@ class OverlayInspector(QtWidgets.QWidget):
 
         input_id = ocr_rule_input_id(str(item.get("id") or ""), rule_id)
         mapped = find_overlay_input(input_id)
+        # Live OverlayInput can be empty after profile load even when rule.mapping_xml
+        # still has the Map… dump — rehydrate so the summary matches the Map dialog.
+        if not overlay_input_has_mappings(mapped):
+            xml = str(rule.get("mapping_xml") or "").strip()
+            if xml:
+                from .overlay_input import apply_overlay_mapping_xml
+
+                mapped = (
+                    apply_overlay_mapping_xml(input_id, f"OCR · {title}", xml)
+                    or find_overlay_input(input_id)
+                )
         for line in overlay_mapping_summary_lines(mapped):
             summary = QtWidgets.QLabel(line, self._host)
             summary.setWordWrap(True)
@@ -4763,7 +4956,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 continue
             if "texts" in fields:
                 rule["texts"] = split_ocr_texts(fields.get("texts"))
-                rule["text"] = ", ".join(rule["texts"])
+                rule["text"] = "; ".join(rule["texts"])
             if "name" in fields:
                 cleaned = str(fields.get("name") or "").strip() or rule.get("name") or "Rule"
                 rule["name"] = cleaned
@@ -5313,6 +5506,161 @@ class OverlayInspector(QtWidgets.QWidget):
 
     def _on_mouse_mode(self, widget_id: str, mode: str):
         self._style(widget_id, mouse_mode=normalize_mouse_mode(mode))
+        self.rebuild()
+
+    def _browser_source(self, form, item: dict):
+        from .browser_host import installed_browsers
+
+        style = item.get("style") or {}
+        url = QtWidgets.QLineEdit(self._host)
+        url.setPlaceholderText("https://")
+        url.setText(str(style.get("url") or ""))
+        url.setToolTip("Shown in this widget. It does not switch to a browser you already have open.")
+        url.editingFinished.connect(lambda wid=item["id"], box=url: self._style(wid, url=box.text().strip()))
+        form.addRow("URL", url)
+
+        current = str(style.get("browser") or "default")
+        combo = QDataComboBox(parent=self._host)
+        choices = installed_browsers()
+        if current not in {browser_id for browser_id, _label in choices}:
+            choices.append((current, current))
+        selected = 0
+        for index, (browser_id, label) in enumerate(choices):
+            combo.addItem(label, browser_id)
+            if browser_id == current:
+                selected = index
+        combo.setCurrentIndex(selected)
+        combo.setToolTip(
+            "Windows default is the browser Windows opens for web links. "
+            "The page stays in this widget. The choice is which browser the site sees."
+        )
+        combo.currentIndexChanged.connect(
+            lambda _index, box=combo, wid=item["id"]: self._style(wid, browser=str(box.currentData() or "default"))
+        )
+        form.addRow("Browser", combo)
+        self._style_bool(
+            form,
+            item,
+            "show_url_bar",
+            "Show URL field",
+            tooltip="When off, only the page is shown (edit the URL here in the inspector).",
+        )
+        self._style_bool(
+            form,
+            item,
+            "show_scrollbars",
+            "Show scrollbars",
+            tooltip="When off, page scrollbars are hidden so the widget shows only the page content.",
+        )
+
+    def _efb_source(self, form, item: dict):
+        from .efb_host import _DEFAULT_DISCORD, default_section_buttons, open_discord, open_download_page
+
+        style = item.get("style") or {}
+        path_row = QtWidgets.QWidget(self._host)
+        path_layout = QtWidgets.QHBoxLayout(path_row)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_edit = QtWidgets.QLineEdit(str(style.get("efb_root") or ""), self._host)
+        path_edit.setPlaceholderText(r"C:\Users\...\Desktop\SC EFB")
+        path_edit.setToolTip("Local Delta Consulting EFB install folder (JPG plates).")
+        path_edit.editingFinished.connect(
+            lambda wid=item["id"], box=path_edit: self._style(wid, efb_root=box.text().strip())
+        )
+        browse = Buttons.getFolderWidget(tooltip="Choose install folder")
+        browse.setFixedWidth(28)
+        browse.clicked.connect(button_callback(self._browse_efb_root, item["id"], path_edit))
+        path_layout.addWidget(path_edit, 1)
+        path_layout.addWidget(browse)
+        form.addRow("Install folder", path_row)
+
+        download = QDataPushButton(
+            "Download latest EFB",
+            parent=self._host,
+            tooltip="Opens the Delta Consulting download page.",
+            clicked=button_callback(open_download_page),
+        )
+        form.addRow(download)
+
+        discord = QtWidgets.QLineEdit(str(style.get("discord_url") or _DEFAULT_DISCORD), self._host)
+        discord.setPlaceholderText(_DEFAULT_DISCORD)
+        discord.setToolTip("Delta Consulting Discord invite.")
+        discord.editingFinished.connect(
+            lambda wid=item["id"], box=discord: self._style(wid, discord_url=box.text().strip() or _DEFAULT_DISCORD)
+        )
+        form.addRow("Discord invite", discord)
+        join = QDataPushButton("Join Discord", parent=self._host)
+        join.setToolTip("Opens the Discord invite above.")
+        join.clicked.connect(lambda: open_discord(discord.text().strip()))
+        form.addRow(join)
+
+        hint = QtWidgets.QLabel(
+            "No OCR and no web lookup. The live widget browses JPG plates under this folder. "
+            "Section buttons below are quick links (relative paths). SFD with an empty path follows the selected star system.",
+            self._host,
+        )
+        hint.setWordWrap(True)
+        form.addRow(hint)
+
+        buttons = style.get("section_buttons") or default_section_buttons()
+        if not isinstance(buttons, list):
+            buttons = default_section_buttons()
+        # Keep a working copy for edits in this rebuild.
+        working = [dict(b) for b in buttons if isinstance(b, dict)]
+        if not working:
+            working = default_section_buttons()
+
+        def _save_buttons():
+            self._style(item["id"], section_buttons=[dict(b) for b in working])
+
+        for index, row in enumerate(working):
+            row_w = QtWidgets.QWidget(self._host)
+            row_l = QtWidgets.QHBoxLayout(row_w)
+            row_l.setContentsMargins(0, 0, 0, 0)
+            label = QtWidgets.QLineEdit(str(row.get("label") or ""), self._host)
+            label.setFixedWidth(56)
+            label.setPlaceholderText("Label")
+            path = QtWidgets.QLineEdit(str(row.get("path") or ""), self._host)
+            path.setPlaceholderText("Relative folder (empty SFD = per system)")
+
+            def _on_label(text, i=index, box_path=path):
+                working[i]["label"] = text.strip()
+                if not str(working[i].get("id") or "").strip():
+                    working[i]["id"] = text.strip().casefold() or f"btn{i}"
+                _save_buttons()
+
+            def _on_path(text, i=index):
+                working[i]["path"] = text.strip()
+                _save_buttons()
+
+            label.editingFinished.connect(lambda i=index, box=label: _on_label(box.text(), i))
+            path.editingFinished.connect(lambda i=index, box=path: _on_path(box.text(), i))
+            row_l.addWidget(label)
+            row_l.addWidget(path, 1)
+            form.addRow(f"Button {index + 1}", row_w)
+
+        add = QDataPushButton(
+            "Add section button",
+            parent=self._host,
+            tooltip="Add another right-rail shortcut.",
+            clicked=button_callback(self._efb_add_section_button, item["id"], working),
+        )
+        form.addRow(add)
+
+    def _browse_efb_root(self, widget_id: str, path_edit: QtWidgets.QLineEdit):
+        start = path_edit.text().strip() or QtCore.QDir.homePath()
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(
+            self._host,
+            "SC EFB install folder",
+            start,
+        )
+        if not chosen:
+            return
+        path_edit.setText(chosen)
+        self._style(widget_id, efb_root=chosen)
+
+    def _efb_add_section_button(self, widget_id: str, working: list):
+        working.append({"id": f"custom{len(working)+1}", "label": "NEW", "path": ""})
+        self._style(widget_id, section_buttons=[dict(b) for b in working])
         self.rebuild()
 
     def _streamdeck_source(self, form, item: dict):
@@ -6082,6 +6430,20 @@ class OverlayInspector(QtWidgets.QWidget):
     def _build_binding(self, item: dict):
         widget_type = item.get("type")
         form = self._section("Arming" if widget_type == "ocr" else "Bindings")
+        if widget_needs_xyz(widget_type):
+            if widget_type == "axis_polar":
+                self._build_channel(item, "binding", "Azimuth", force_type="axis", form=form)
+                self._build_channel(item, "binding_y", "Elevation", force_type="axis", form=form)
+                self._build_channel(item, "binding_z", "Range", force_type="axis", form=form)
+            elif widget_type == "axis_radar":
+                self._build_channel(item, "binding", "Angle off", force_type="axis", form=form)
+                self._build_channel(item, "binding_y", "FoR", force_type="axis", form=form)
+                self._build_channel(item, "binding_z", "Range", force_type="axis", form=form)
+            else:
+                self._build_channel(item, "binding", "Axis X", force_type="axis", form=form)
+                self._build_channel(item, "binding_y", "Axis Y", force_type="axis", form=form)
+                self._build_channel(item, "binding_z", "Axis Z", force_type="axis", form=form)
+            return
         if widget_needs_xy(widget_type):
             self._build_channel(item, "binding", "Axis X", force_type="axis", form=form)
             self._build_channel(item, "binding_y", "Axis Y", force_type="axis", form=form)
@@ -6236,7 +6598,7 @@ class OverlayInspector(QtWidgets.QWidget):
             self._look_heading(form, title)
         binding = self._channel_binding(item, channel)
         sources = ["physical", "vjoy"]
-        if force_type != "axis" or not widget_needs_xy(item.get("type")):
+        if force_type != "axis" or not (widget_needs_xy(item.get("type")) or widget_needs_xyz(item.get("type"))):
             sources.append("state")
         if force_type == "button" or item.get("type") in ("button", "stopwatch") or widget_is_switch(item.get("type")):
             sources.append("mode")

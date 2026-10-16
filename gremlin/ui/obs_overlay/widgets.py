@@ -819,6 +819,117 @@ def _deadzone(value: float, style: dict) -> float:
     return value
 
 
+def _xyz(value) -> tuple[float, float, float]:
+    if isinstance(value, (tuple, list)) and len(value) >= 3:
+        return _clamp(float(value[0])), _clamp(float(value[1])), _clamp(float(value[2]))
+    x, y = _xy(value)
+    return x, y, 0.0
+
+
+def _ternary_contrib(value: float) -> float:
+    """Map a centered axis (-1…1) onto a corner contribution (0…1). -1→0, 0→0.5, +1→1."""
+    try:
+        return max(0.0, min(1.0, (float(value) + 1.0) * 0.5))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _ternary_to_axis(share: float) -> float:
+    """Map a corner contribution (0…1) back onto a centered axis (-1…1)."""
+    try:
+        return _clamp(float(share) * 2.0 - 1.0)
+    except (TypeError, ValueError):
+        return -1.0
+
+
+def _ternary_values(x: float, y: float, z: float) -> tuple[float, float, float]:
+    """Contributions after -1…1→0…1. Keep ≥0 and sum ≤ 1 so the indicator stays inside."""
+    sx, sy, sz = _ternary_contrib(x), _ternary_contrib(y), _ternary_contrib(z)
+    total = sx + sy + sz
+    if total > 1.0:
+        sx, sy, sz = sx / total, sy / total, sz / total
+    return sx, sy, sz
+
+
+def _clamp_barycentric(a: float, b: float, c: float) -> tuple[float, float, float]:
+    a = max(0.0, float(a))
+    b = max(0.0, float(b))
+    c = max(0.0, float(c))
+    total = a + b + c
+    if total <= 1e-9:
+        third = 1.0 / 3.0
+        return third, third, third
+    return a / total, b / total, c / total
+
+
+def _ternary_triangle(item: dict[str, Any]) -> tuple[QtCore.QPointF, QtCore.QPointF, QtCore.QPointF]:
+    """Top / left / right corners of the power triangle inside the widget."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    inner = _inner_rect(rect, style)
+    margin = max(8.0, min(inner.width(), inner.height()) * 0.08)
+    avail_w = max(48.0, inner.width() - margin * 2)
+    avail_h = max(48.0, inner.height() - margin * 2)
+    side = min(avail_w, avail_h * 2.0 / math.sqrt(3.0))
+    height = side * math.sqrt(3.0) / 2.0
+    cx = inner.center().x()
+    mid_y = inner.center().y()
+    top = QtCore.QPointF(cx, mid_y - height * 2.0 / 3.0)
+    left = QtCore.QPointF(cx - side / 2.0, mid_y + height / 3.0)
+    right = QtCore.QPointF(cx + side / 2.0, mid_y + height / 3.0)
+    return top, left, right
+
+
+def _ternary_centroid(top: QtCore.QPointF, left: QtCore.QPointF, right: QtCore.QPointF) -> QtCore.QPointF:
+    return QtCore.QPointF((top.x() + left.x() + right.x()) / 3.0, (top.y() + left.y() + right.y()) / 3.0)
+
+
+def _point_to_barycentric(
+    point: QtCore.QPointF,
+    top: QtCore.QPointF,
+    left: QtCore.QPointF,
+    right: QtCore.QPointF,
+) -> tuple[float, float, float]:
+    """Triangle barycentric weights for top / left / right. Outside points are clamped in."""
+    den = (left.y() - right.y()) * (top.x() - right.x()) + (right.x() - left.x()) * (top.y() - right.y())
+    if abs(den) <= 1e-9:
+        third = 1.0 / 3.0
+        return third, third, third
+    a = ((left.y() - right.y()) * (point.x() - right.x()) + (right.x() - left.x()) * (point.y() - right.y())) / den
+    b = ((right.y() - top.y()) * (point.x() - right.x()) + (top.x() - right.x()) * (point.y() - right.y())) / den
+    c = 1.0 - a - b
+    return _clamp_barycentric(a, b, c)
+
+
+def _point_to_ternary_values(
+    point: QtCore.QPointF,
+    top: QtCore.QPointF,
+    left: QtCore.QPointF,
+    right: QtCore.QPointF,
+) -> tuple[float, float, float]:
+    """Map a point in the triangle to centered axis values (-1…1)."""
+    a, b, c = _point_to_barycentric(point, top, left, right)
+    m = min(a, b, c)
+    return _ternary_to_axis(a - m), _ternary_to_axis(b - m), _ternary_to_axis(c - m)
+
+
+def _ternary_point(
+    top: QtCore.QPointF,
+    left: QtCore.QPointF,
+    right: QtCore.QPointF,
+    x: float,
+    y: float,
+    z: float,
+) -> QtCore.QPointF:
+    """Centered axes (-1…1) map to 0…1 contributions; the indicator stays inside the triangle."""
+    sx, sy, sz = _ternary_values(x, y, z)
+    centroid = _ternary_centroid(top, left, right)
+    return QtCore.QPointF(
+        centroid.x() + sx * (top.x() - centroid.x()) + sy * (left.x() - centroid.x()) + sz * (right.x() - centroid.x()),
+        centroid.y() + sx * (top.y() - centroid.y()) + sy * (left.y() - centroid.y()) + sz * (right.y() - centroid.y()),
+    )
+
+
 def _xy(value) -> tuple[float, float]:
     if isinstance(value, (tuple, list)) and len(value) >= 2:
         return _clamp(float(value[0])), _clamp(float(value[1]))
@@ -1561,6 +1672,58 @@ def paint_remote_view(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
+def paint_browser(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Placeholder under the live page. The page itself is a web view, not this paint."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    painter.setPen(_pen(style.get("border"), _border_w(style)))
+    painter.setBrush(fill_brush(style.get("fill"), "#121418", rect=rect))
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+    url = str(style.get("url") or "").strip()
+    painter.setPen(qcolor(style.get("font_color"), "#9aa4b2"))
+    painter.drawText(
+        rect,
+        int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap),
+        url or "Enter a URL",
+    )
+    painter.restore()
+
+
+def paint_efb(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Placeholder under the live EFB surface."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    painter.setPen(_pen(style.get("border"), _border_w(style)))
+    painter.setBrush(fill_brush(style.get("fill"), "#121418", rect=rect))
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+    root = str(style.get("efb_root") or "").strip()
+    painter.setPen(qcolor(style.get("font_color"), "#9aa4b2"))
+    painter.drawText(
+        rect,
+        int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap),
+        root or "SC EFB — set install folder in the inspector",
+    )
+    painter.restore()
+
+
 def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Live capture of a local running application window."""
     from .app_view import ApplicationViewTracker
@@ -1739,6 +1902,35 @@ def streamdeck_preferred_size(device_type=None) -> tuple[int, int]:
     return (int(width), int(height))
 
 
+def _streamdeck_show_pressed(slot_item, held, kind: str, row, col) -> bool:
+    """Match hardware paint: GEX state, otherwise a physical hold.
+
+    Hold may be stored as r{row}c{col} or as the button id. State appearance
+    ignores the hold, the same way the deck does.
+    """
+    try:
+        from gremlin.ui.streamdeck_surface import appearance_follows_state, appearance_state_is_on
+
+        if slot_item is not None and appearance_follows_state(slot_item):
+            return appearance_state_is_on(slot_item)
+    except Exception:
+        pass
+    if not held:
+        return False
+    from gremlin.ui.streamdeck_device import make_slot_key
+
+    candidates = {make_slot_key(kind, row, col)}
+    if slot_item is not None:
+        for raw in (
+            getattr(slot_item, "slot_key", "") or "",
+            getattr(slot_item, "button_id", "") or "",
+        ):
+            text = str(raw or "").strip()
+            if text:
+                candidates.add(text)
+    return any(key in held for key in candidates)
+
+
 def _streamdeck_slot_pixmap(slot_item, pressed: bool, side: int, lcd: bool = False) -> QtGui.QPixmap:
     if slot_item is None:
         return QtGui.QPixmap()
@@ -1847,7 +2039,6 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
             device_grid_size,
             friendly_streamdeck_name,
             is_streamdeck_designer_supported,
-            make_slot_key,
             normalize_page,
             parse_streamdeck_device_type,
         )
@@ -1913,7 +2104,7 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
             for col in range(cols):
                 cell = _key_rect(row, col)
                 slot_item = slots.get(("button", row, col))
-                pressed = make_slot_key("button", row, col) in held
+                pressed = _streamdeck_show_pressed(slot_item, held, "button", row, col)
                 pixmap = _streamdeck_slot_pixmap(slot_item, pressed, max(24, int(key)))
                 if pixmap.isNull():
                     painter.setPen(empty_pen)
@@ -1940,7 +2131,8 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
                 cx = ox + col * (key + gap) + key / 2.0
                 lcd = QtCore.QRectF(cx - lcd_w / 2.0, lcd_y, lcd_w, lcd_h)
                 slot_item = slots.get(("dial_press", 0, col))
-                pixmap = _streamdeck_slot_pixmap(slot_item, False, max(24, int(key)), lcd=True)
+                pressed = _streamdeck_show_pressed(slot_item, held, "dial_press", 0, col)
+                pixmap = _streamdeck_slot_pixmap(slot_item, pressed, max(24, int(key)), lcd=True)
                 painter.setPen(empty_pen)
                 painter.setBrush(empty_fill)
                 painter.drawRoundedRect(lcd, 3, 3)
@@ -1949,7 +2141,6 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
                     painter.drawPixmap(lcd.toRect(), scaled)
                 dial_r = min(key, dial_h) * 0.42
                 center = QtCore.QPointF(cx, dial_y + dial_h / 2.0)
-                pressed = make_slot_key("dial_press", 0, col) in held
                 painter.setPen(empty_pen)
                 painter.setBrush(qcolor("#2a2f36") if not pressed else qcolor("#4a5560"))
                 painter.drawEllipse(center, dial_r, dial_r)
@@ -3862,6 +4053,911 @@ def paint_input_display(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
+def _draw_axis_arrow(
+    painter: QtGui.QPainter,
+    origin: QtCore.QPointF,
+    tip: QtCore.QPointF,
+    color,
+    width: float,
+    arrow_size: float | None = None,
+    draw_arrow: bool = True,
+):
+    """Draw a shaft from origin to tip, with an optional triangular arrowhead at tip."""
+    dx = tip.x() - origin.x()
+    dy = tip.y() - origin.y()
+    length = math.hypot(dx, dy)
+    painter.setPen(_pen(color, width))
+    painter.setBrush(QtCore.Qt.NoBrush)
+    if length < 1.0:
+        return
+    ux, uy = dx / length, dy / length
+    try:
+        head = float(arrow_size) if arrow_size is not None else 7.0
+    except (TypeError, ValueError):
+        head = 7.0
+    head = max(0.0, head)
+    # Stop the shaft short of the tip so the head does not sit under a thick line.
+    shaft_end = tip
+    if draw_arrow and head > 0.5 and length > head + 2.0:
+        shaft_end = QtCore.QPointF(tip.x() - ux * head * 0.55, tip.y() - uy * head * 0.55)
+    painter.drawLine(origin, shaft_end)
+    if not draw_arrow or head < 0.5 or length < 4.0:
+        return
+    left = QtCore.QPointF(tip.x() - ux * head - uy * head * 0.38, tip.y() - uy * head + ux * head * 0.38)
+    right = QtCore.QPointF(tip.x() - ux * head + uy * head * 0.38, tip.y() - uy * head - ux * head * 0.38)
+    painter.setPen(QtCore.Qt.NoPen)
+    painter.setBrush(qcolor(color, "#e6e8ec"))
+    painter.drawPolygon(QtGui.QPolygonF([tip, left, right]))
+
+
+def _axis_arrow_size(style: dict[str, Any], width: float) -> float:
+    try:
+        if style.get("arrow_size") is not None:
+            return max(0.0, float(style.get("arrow_size")))
+    except (TypeError, ValueError):
+        pass
+    return 7.0
+
+
+def _xyz_axis_sign(style: dict[str, Any], key: str) -> float:
+    return -1.0 if style.get(key) else 1.0
+
+
+def _xyz_axis_span(style: dict[str, Any]) -> float:
+    try:
+        span = float(style.get("axis_length") if style.get("axis_length") is not None else 0.30)
+    except (TypeError, ValueError):
+        span = 0.30
+    return max(0.12, min(0.48, span))
+
+
+def _draw_xyz_bounds_box(painter: QtGui.QPainter, project, style: dict[str, Any]):
+    """Wire cube for axis space −1…1 on each axis (optional translucent faces)."""
+    if not style.get("show_bounds_box"):
+        return
+
+    def corner(sx: float, sy: float, sz: float) -> QtCore.QPointF:
+        return project(sx, sy, sz)
+
+    edges = (
+        ((-1, -1, -1), (1, -1, -1)),
+        ((-1, -1, 1), (1, -1, 1)),
+        ((-1, 1, -1), (1, 1, -1)),
+        ((-1, 1, 1), (1, 1, 1)),
+        ((-1, -1, -1), (-1, 1, -1)),
+        ((1, -1, -1), (1, 1, -1)),
+        ((-1, -1, 1), (-1, 1, 1)),
+        ((1, -1, 1), (1, 1, 1)),
+        ((-1, -1, -1), (-1, -1, 1)),
+        ((1, -1, -1), (1, -1, 1)),
+        ((-1, 1, -1), (-1, 1, 1)),
+        ((1, 1, -1), (1, 1, 1)),
+    )
+    fill = style.get("box_fill")
+    if fill:
+        # Six faces as translucent polygons (painter's projection order is fine for a light guide).
+        faces = (
+            ((-1, -1, -1), (1, -1, -1), (1, -1, 1), (-1, -1, 1)),
+            ((-1, 1, -1), (1, 1, -1), (1, 1, 1), (-1, 1, 1)),
+            ((-1, -1, -1), (-1, 1, -1), (-1, 1, 1), (-1, -1, 1)),
+            ((1, -1, -1), (1, 1, -1), (1, 1, 1), (1, -1, 1)),
+            ((-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1)),
+            ((-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)),
+        )
+        color = qcolor(fill, "#20304040")
+        if color.alpha() > 0:
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(color)
+            for face in faces:
+                painter.drawPolygon(QtGui.QPolygonF([corner(*p) for p in face]))
+    try:
+        width = max(0.5, float(style.get("box_width") or 1.2))
+    except (TypeError, ValueError):
+        width = 1.2
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(_pen(style.get("box") or style.get("grid") or "#5a6a84", width))
+    for a, b in edges:
+        painter.drawLine(corner(*a), corner(*b))
+
+
+def _draw_xyz_plane_grid(
+    painter: QtGui.QPainter,
+    project,
+    style: dict[str, Any],
+    half_extent: float = 1.0,
+):
+    """Grid on the horizontal plane (y = 0). Cartesian uses ±1; polar uses ±sphere R."""
+    if not style.get("show_grid"):
+        return
+    try:
+        half = float(half_extent)
+    except (TypeError, ValueError):
+        half = 1.0
+    half = max(1e-3, half)
+    try:
+        divisions = int(style.get("grid_divisions") or 4)
+    except (TypeError, ValueError):
+        divisions = 4
+    divisions = max(2, min(12, divisions))
+    try:
+        width = max(0.5, float(style.get("grid_width") or 1.0))
+    except (TypeError, ValueError):
+        width = 1.0
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(_pen(style.get("grid") or "#2a3a55", width))
+    step = (2.0 * half) / divisions
+    t = -half
+    for _ in range(divisions + 1):
+        painter.drawLine(project(-half, 0.0, t), project(half, 0.0, t))
+        painter.drawLine(project(t, 0.0, -half), project(t, 0.0, half))
+        t += step
+
+
+def _default_sphere_gradient(seed: str | None = None) -> dict[str, Any]:
+    """Radial shading: light highlight → mid → dark rim (matte ball look)."""
+    from .gradient import GRADIENT_TYPE
+
+    base = qcolor(seed, "#b0b0b0")
+    highlight = QtGui.QColor(base)
+    highlight = highlight.lighter(175)
+    highlight.setAlpha(max(base.alpha(), 220))
+    mid = QtGui.QColor(base)
+    shadow = QtGui.QColor(base)
+    shadow = shadow.darker(170)
+    return {
+        "type": GRADIENT_TYPE,
+        "style": "radial",
+        "angle": 135.0,
+        "scale": 130.0,
+        "smoothness": 100.0,
+        "stops": [
+            {"pos": 0.0, "color": highlight.name(QtGui.QColor.HexArgb)},
+            {"pos": 42.0, "color": mid.name(QtGui.QColor.HexArgb)},
+            {"pos": 100.0, "color": shadow.name(QtGui.QColor.HexArgb)},
+        ],
+        "midpoints": [0.45, 0.55],
+    }
+
+
+def _sphere_fill_brush(style: dict[str, Any], ball: QtCore.QRectF) -> QtGui.QBrush | QtCore.Qt.BrushStyle:
+    """Solid color or gradient for the ball. Solids get an automatic radial shade."""
+    from .gradient import is_gradient, paint_value_brush
+
+    fill = style.get("sphere")
+    if fill in (None, ""):
+        fill = style.get("sphere_fill")
+    if is_gradient(fill):
+        return paint_value_brush(fill, ball, "#b0b0b0")
+    color = qcolor(fill, "#b0b0b0")
+    if color.alpha() <= 0:
+        return QtCore.Qt.NoBrush
+    # Auto-shade so a flat swatch still reads as a sphere.
+    return paint_value_brush(_default_sphere_gradient(color.name(QtGui.QColor.HexArgb)), ball, "#b0b0b0")
+
+
+def _unit(vx: float, vy: float, vz: float) -> tuple[float, float, float]:
+    mag = math.sqrt(vx * vx + vy * vy + vz * vz)
+    if mag < 1e-9:
+        return 0.0, 0.0, 0.0
+    return vx / mag, vy / mag, vz / mag
+
+
+def _polar_oblique_coeffs():
+    """Cabinet oblique: +X screen-horizontal, +Y vertical, +Z toward bottom-left (Bloch-style)."""
+    # True ortho with X horizontal and Y vertical collapses +Z onto the vertical —
+    # that stacked +Y/+Z into one bipolar line. Oblique keeps all three readable.
+    angle = math.radians(35.0)
+    z_scale = 0.5  # cabinet foreshortening (far depth reads shorter)
+    # −cos → +Z goes left; +sin → +Z goes down (toward the viewer in the diagram).
+    return -z_scale * math.cos(angle), z_scale * math.sin(angle)
+
+
+def _slerp_dirs(
+    a: tuple[float, float, float],
+    b: tuple[float, float, float],
+    steps: int,
+) -> list[tuple[float, float, float]]:
+    """Short-arc directions from unit vector a to b."""
+    ax, ay, az = _unit(*a)
+    bx, by, bz = _unit(*b)
+    dot = max(-1.0, min(1.0, ax * bx + ay * by + az * bz))
+    if dot > 0.9995:
+        return [(ax, ay, az), (bx, by, bz)]
+    if dot < -0.9995:
+        # Opposite — pick an arbitrary perpendicular pivot.
+        if abs(ax) < 0.9:
+            px, py, pz = _unit(0.0, -az, ay)
+        else:
+            px, py, pz = _unit(-ay, ax, 0.0)
+        mid = _unit(px, py, pz)
+        return _slerp_dirs(a, mid, max(2, steps // 2)) + _slerp_dirs(mid, b, max(2, steps // 2))[1:]
+    omega = math.acos(dot)
+    out = []
+    for i in range(steps + 1):
+        t = i / float(steps)
+        s0 = math.sin((1.0 - t) * omega) / math.sin(omega)
+        s1 = math.sin(t * omega) / math.sin(omega)
+        out.append(_unit(s0 * ax + s1 * bx, s0 * ay + s1 * by, s0 * az + s1 * bz))
+    return out
+
+
+def _draw_projected_polyline(
+    painter: QtGui.QPainter,
+    project,
+    points: list[tuple[float, float, float]],
+    pen: QtGui.QPen,
+):
+    if len(points) < 2:
+        return
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(pen)
+    path = QtGui.QPainterPath(project(*points[0]))
+    for pt in points[1:]:
+        path.lineTo(project(*pt))
+    painter.drawPath(path)
+
+
+def _convex_hull_2d(points: list[QtCore.QPointF]) -> list[QtCore.QPointF]:
+    """Monotone-chain convex hull of screen points (outline of the projected sphere)."""
+    pts = sorted({(p.x(), p.y()) for p in points})
+    if len(pts) <= 2:
+        return [QtCore.QPointF(x, y) for x, y in pts]
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[tuple[float, float]] = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper: list[tuple[float, float]] = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    hull = lower[:-1] + upper[:-1]
+    return [QtCore.QPointF(x, y) for x, y in hull]
+
+
+def _sample_sphere_surface(radius: float, lat_steps: int = 16, lon_steps: int = 32) -> list[tuple[float, float, float]]:
+    """3D points on the sphere of radius R (includes poles)."""
+    pts: list[tuple[float, float, float]] = []
+    for i in range(lat_steps + 1):
+        el = -math.pi / 2.0 + math.pi * i / lat_steps
+        ce = math.cos(el) * radius
+        se = math.sin(el) * radius
+        if i == 0 or i == lat_steps:
+            pts.append((0.0, se, 0.0))
+            continue
+        for j in range(lon_steps):
+            az = 2.0 * math.pi * j / lon_steps
+            pts.append((ce * math.cos(az), se, ce * math.sin(az)))
+    return pts
+
+
+def _draw_xyz_sphere(
+    painter: QtGui.QPainter,
+    project,
+    style: dict[str, Any],
+    radius: float = 1.0,
+    draw_equator: bool = False,
+    screen_radius: float | None = None,
+    view_cam: tuple[float, float, float] | None = None,
+):
+    """Fill the projected 3D sphere of radius R; equator is the y=0 great circle of that same R."""
+    if not style.get("show_sphere"):
+        return
+    try:
+        radius = float(radius)
+    except (TypeError, ValueError):
+        radius = 1.0
+    if radius < 1e-4:
+        return
+    origin = project(0.0, 0.0, 0.0)
+    # Orthographic polar: silhouette is a circle. Oblique xyz: great-circle hull.
+    if screen_radius is not None and screen_radius > 1e-3:
+        path = QtGui.QPainterPath()
+        path.addEllipse(origin, screen_radius, screen_radius)
+        bounds = path.boundingRect()
+    else:
+        kx, ky, kz = _unit(-0.72, -0.42, -1.0)
+        if abs(kx) < 0.9:
+            ux, uy, uz = _unit(0.0, -kz, ky)
+        else:
+            ux, uy, uz = _unit(-ky, kx, 0.0)
+        vx, vy, vz = _unit(ky * uz - kz * uy, kz * ux - kx * uz, kx * uy - ky * ux)
+        path = QtGui.QPainterPath()
+        steps = 96
+        for i in range(steps):
+            t = 2.0 * math.pi * i / steps
+            c, s = math.cos(t), math.sin(t)
+            p = project(
+                radius * (c * ux + s * vx),
+                radius * (c * uy + s * vy),
+                radius * (c * uz + s * vz),
+            )
+            if i == 0:
+                path.moveTo(p)
+            else:
+                path.lineTo(p)
+        path.closeSubpath()
+        bounds = path.boundingRect()
+    if bounds.width() < 1e-3 or bounds.height() < 1e-3:
+        return
+    from .gradient import is_gradient, paint_value_brush
+
+    fill = style.get("sphere")
+    if fill in (None, ""):
+        fill = style.get("sphere_fill")
+    painter.setPen(QtCore.Qt.NoPen)
+    if is_gradient(fill):
+        brush = paint_value_brush(fill, bounds, "#b0b0b0")
+        if brush == QtCore.Qt.NoBrush:
+            return
+        painter.setBrush(brush)
+        painter.drawPath(path)
+    else:
+        base = qcolor(fill, "#b0b0b0")
+        if base.alpha() <= 0:
+            return
+        screen_r = screen_radius if screen_radius is not None else max(bounds.width(), bounds.height()) * 0.5
+        hx = origin.x() - screen_r * 0.22
+        hy = origin.y() - screen_r * 0.28
+        grad = QtGui.QRadialGradient(QtCore.QPointF(hx, hy), screen_r * 1.2)
+        highlight = QtGui.QColor(base.lighter(180))
+        highlight.setAlpha(max(base.alpha(), 230))
+        shadow = QtGui.QColor(base.darker(175))
+        shadow.setAlpha(base.alpha())
+        grad.setColorAt(0.0, highlight)
+        grad.setColorAt(0.45, base)
+        grad.setColorAt(1.0, shadow)
+        painter.setBrush(QtGui.QBrush(grad))
+        painter.drawPath(path)
+    # Equator on the sphere: y = 0, x² + z² = R² (same R as the silhouette).
+    if draw_equator and style.get("show_sphere_equator", True):
+        try:
+            eq_w = max(0.8, float(style.get("sphere_width") or 1.2))
+        except (TypeError, ValueError):
+            eq_w = 1.2
+        eq_color = style.get("sphere_border") or style.get("axis") or "#2c4a6e"
+        if qcolor(eq_color, "#00000000").alpha() <= 0:
+            eq_color = "#2c4a6e"
+        steps = 64
+        painter.setBrush(QtCore.Qt.NoBrush)
+        for i in range(steps):
+            a0 = 2.0 * math.pi * i / steps
+            a1 = 2.0 * math.pi * (i + 1) / steps
+            x0, z0 = radius * math.cos(a0), radius * math.sin(a0)
+            x1, z1 = radius * math.cos(a1), radius * math.sin(a1)
+            p0 = project(x0, 0.0, z0)
+            p1 = project(x1, 0.0, z1)
+            if screen_radius is not None:
+                p0 = _clamp_to_screen_disk(origin, p0, screen_radius)
+                p1 = _clamp_to_screen_disk(origin, p1, screen_radius)
+            # Front (+Z toward viewer) solid; back dashed.
+            mid_z = (z0 + z1) * 0.5
+            pen = _pen(eq_color, eq_w)
+            pen.setStyle(QtCore.Qt.SolidLine if mid_z >= 0.0 else QtCore.Qt.DashLine)
+            painter.setPen(pen)
+            painter.drawLine(p0, p1)
+    rim = style.get("sphere_border")
+    if rim not in (None, "") and qcolor(rim, "#00000000").alpha() > 0:
+        try:
+            rim_w = max(0.5, float(style.get("sphere_width") or 1.0))
+        except (TypeError, ValueError):
+            rim_w = 1.0
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(_pen(rim, rim_w))
+        painter.drawPath(path)
+
+
+def _clamp_to_screen_disk(
+    origin: QtCore.QPointF,
+    point: QtCore.QPointF,
+    screen_r: float,
+) -> QtCore.QPointF:
+    """Keep a projected surface point on/inside the decorative circular ball."""
+    if screen_r < 1e-3:
+        return point
+    dx = point.x() - origin.x()
+    dy = point.y() - origin.y()
+    mag = math.hypot(dx, dy)
+    if mag <= screen_r or mag < 1e-9:
+        return point
+    return QtCore.QPointF(origin.x() + screen_r * dx / mag, origin.y() + screen_r * dy / mag)
+
+
+def _draw_front_back_polyline(
+    painter: QtGui.QPainter,
+    origin: QtCore.QPointF,
+    points_3d: list[tuple[float, float, float]],
+    project,
+    color,
+    width: float,
+    screen_radius: float | None = None,
+):
+    """Draw a sphere curve solid on the +Z (front) side and dashed on the back."""
+    if len(points_3d) < 2:
+        return
+    screen_pts: list[QtCore.QPointF] = []
+    for p in points_3d:
+        sp = project(*p)
+        if screen_radius is not None:
+            sp = _clamp_to_screen_disk(origin, sp, screen_radius)
+        screen_pts.append(sp)
+    painter.setBrush(QtCore.Qt.NoBrush)
+    for i in range(len(points_3d) - 1):
+        mid_z = (points_3d[i][2] + points_3d[i + 1][2]) * 0.5
+        pen = _pen(color, width)
+        pen.setStyle(QtCore.Qt.SolidLine if mid_z >= 0.0 else QtCore.Qt.DashLine)
+        painter.setPen(pen)
+        painter.drawLine(screen_pts[i], screen_pts[i + 1])
+
+
+def _draw_polar_projections(
+    painter: QtGui.QPainter,
+    project,
+    style: dict[str, Any],
+    x: float,
+    y: float,
+    z: float,
+    tip_radius: float,
+    screen_radius: float | None = None,
+):
+    """Polar only: meridian through the tip + radial on the plane out to the equator."""
+    if tip_radius < 1e-4:
+        return
+    origin = project(0.0, 0.0, 0.0)
+    try:
+        path_w = float(
+            style.get("projection_width")
+            if style.get("projection_width") is not None
+            else (style.get("needle_width") or 2.0)
+        )
+    except (TypeError, ValueError):
+        path_w = 2.0
+    path_w = max(0.8, path_w)
+    color = style.get("projection") or style.get("indicator") or "#ff5a3c"
+    painter.setBrush(QtCore.Qt.NoBrush)
+
+    # Meridian on the sphere through the tip (north → tip → equator).
+    north = (0.0, 1.0, 0.0)
+    tip_dir = _unit(x, y, z)
+    eq_dir = _unit(x, 0.0, z)
+    if eq_dir[0] == 0.0 and eq_dir[2] == 0.0:
+        eq_dir = (1.0, 0.0, 0.0)
+    eq_on = (eq_dir[0] * tip_radius, 0.0, eq_dir[2] * tip_radius)
+    meridian = [
+        (d[0] * tip_radius, d[1] * tip_radius, d[2] * tip_radius)
+        for d in (
+            _slerp_dirs(north, tip_dir, 20)
+            + _slerp_dirs(tip_dir, eq_dir, 14)[1:]
+        )
+    ]
+    _draw_front_back_polyline(
+        painter, origin, meridian, project, color, path_w, screen_radius
+    )
+
+    if style.get("show_projection", True):
+        # Plane radial to the equator (same azimuth) — clamp so it cannot leave the ball.
+        end = project(*eq_on)
+        if screen_radius is not None:
+            end = _clamp_to_screen_disk(origin, end, screen_radius)
+        pen = _pen(color, path_w)
+        pen.setStyle(QtCore.Qt.SolidLine if eq_on[2] >= 0.0 else QtCore.Qt.DashLine)
+        painter.setPen(pen)
+        painter.drawLine(origin, end)
+
+
+def _polar_to_cartesian(azimuth: float, elevation: float, range_v: float) -> tuple[float, float, float]:
+    """Map centered axes to Cartesian. Azimuth ±180°, elevation ±90°, range −1…1 → 0…1."""
+    az = float(azimuth) * math.pi
+    el = float(elevation) * (math.pi / 2.0)
+    r = max(0.0, min(1.0, (float(range_v) + 1.0) * 0.5))
+    ce = math.cos(el)
+    return r * ce * math.cos(az), r * math.sin(el), r * ce * math.sin(az)
+
+
+def _paint_3d_axes_body(
+    painter: QtGui.QPainter,
+    item: dict[str, Any],
+    x: float,
+    y: float,
+    z: float,
+    sx: float,
+    sy: float,
+    sz: float,
+    mode: str = "cartesian",
+):
+    """Shared 3D frame: box, grid, sphere, axes, projection + vector, tip dot."""
+    style = item.get("style") or {}
+    polar = mode == "polar"
+    rect = widget_rect(item)
+    painter.setPen(_pen(style.get("border"), _border_w(style)))
+    painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
+    try:
+        radius = max(0.0, float(style.get("corner_radius")))
+    except (TypeError, ValueError):
+        radius = 6.0
+    painter.drawRoundedRect(rect, radius, radius)
+    inner = _inner_rect(rect, style)
+    center = inner.center()
+    scale = min(inner.width(), inner.height()) * _xyz_axis_span(style)
+    if polar:
+        # Textbook Bloch layout: round ball + oblique axes (X right, Y up, Z out).
+        _zx, _zy = _polar_oblique_coeffs()
+
+        def project(ax: float, ay: float, az: float) -> QtCore.QPointF:
+            return QtCore.QPointF(
+                center.x() + scale * (ax + az * _zx),
+                center.y() + scale * (-ay + az * _zy),
+            )
+
+    else:
+
+        def project(ax: float, ay: float, az: float) -> QtCore.QPointF:
+            return QtCore.QPointF(
+                center.x() + scale * (ax - az * 0.72),
+                center.y() + scale * (-ay + az * 0.42),
+            )
+
+    tip_radius = math.sqrt(x * x + y * y + z * z)
+    origin = project(0.0, 0.0, 0.0)
+    # Polar: axes/grid stay on the unit frame. Sphere + tip/vector scale with range only.
+    frame_r = 1.0
+    if polar and style.get("show_sphere"):
+        sphere_radius = tip_radius if tip_radius >= 1e-4 else 0.2
+    else:
+        sphere_radius = tip_radius
+    polar_screen_r = (scale * sphere_radius) if polar else None
+    tip = project(x, y, z)
+    if polar_screen_r is not None:
+        tip = _clamp_to_screen_disk(origin, tip, polar_screen_r)
+
+    if not polar:
+        _draw_xyz_bounds_box(painter, project, style)
+    # Polar: draw a true circle (projected oblique sphere is an ellipse — looks wrong).
+    _draw_xyz_sphere(
+        painter,
+        project,
+        style,
+        sphere_radius,
+        draw_equator=polar,
+        screen_radius=polar_screen_r,
+        view_cam=(0.0, 0.0, 1.0) if polar else None,
+    )
+    # Polar grid stays on the fixed unit plane (not tied to range).
+    _draw_xyz_plane_grid(painter, project, style, half_extent=frame_r if polar else 1.0)
+
+    try:
+        axis_width = float(style.get("axis_width") if style.get("axis_width") is not None else 0.5)
+    except (TypeError, ValueError):
+        axis_width = 0.5
+    axis_width = max(0.5, axis_width)
+    axis_color = style.get("axis") or style.get("border") or "#e6e8ec"
+    show_arrows = bool(style.get("show_axis_arrows", True))
+    arrow_size = _axis_arrow_size(style, axis_width)
+    for axis, sign in (
+        ((1.0, 0.0, 0.0), sx),
+        ((0.0, 1.0, 0.0), sy),
+        ((0.0, 0.0, 1.0), sz),
+    ):
+        if polar:
+            # Positive rays on the fixed unit frame — not scaled by range.
+            tail = origin
+            head = project(*(frame_r * sign * part for part in axis))
+        else:
+            tail = project(*(-0.85 * sign * part for part in axis))
+            head = project(*(1.08 * sign * part for part in axis))
+        _draw_axis_arrow(
+            painter,
+            tail,
+            head,
+            axis_color,
+            axis_width,
+            arrow_size=arrow_size,
+            draw_arrow=show_arrows,
+        )
+
+    if polar:
+        # Meridian / plane radial follow the tip sphere (range), not the unit frame.
+        _draw_polar_projections(
+            painter,
+            project,
+            style,
+            x,
+            y,
+            z,
+            sphere_radius if tip_radius >= 1e-4 else tip_radius,
+            screen_radius=polar_screen_r,
+        )
+    elif style.get("show_projection", True):
+        foot = project(x, 0.0, z)
+        on_x = project(x, 0.0, 0.0)
+        on_z = project(0.0, 0.0, z)
+        try:
+            path_w = float(
+                style.get("projection_width")
+                if style.get("projection_width") is not None
+                else (style.get("needle_width") or 2.5)
+            )
+        except (TypeError, ValueError):
+            path_w = 2.5
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(
+            _pen(
+                style.get("projection") or style.get("indicator") or "#ff5a3c",
+                max(1.0, path_w),
+            )
+        )
+        painter.drawLine(tip, foot)
+        painter.drawLine(foot, on_x)
+        painter.drawLine(foot, on_z)
+    if style.get("show_vector", False) or polar:
+        try:
+            vec_w = float(
+                style.get("vector_width")
+                if style.get("vector_width") is not None
+                else (style.get("projection_width") or style.get("needle_width") or 2.5)
+            )
+        except (TypeError, ValueError):
+            vec_w = 2.5
+        vec_color = style.get("vector") or style.get("indicator") or "#ff5a3c"
+        _draw_axis_arrow(
+            painter,
+            origin,
+            tip,
+            vec_color,
+            max(1.0, vec_w),
+            arrow_size=_axis_arrow_size(style, vec_w) * 0.85,
+            draw_arrow=bool(style.get("show_vector_arrow", True)),
+        )
+    _draw_dot_crosshair(painter, inner, tip.x(), tip.y(), style)
+    _indicator(painter, tip, style)
+    _draw_label(painter, item, rect)
+
+
+def paint_axis_xyz(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """3D axis frame. X right, Y up, Z down-left. Drop to Y=0, then project to X and Z."""
+    style = item.get("style") or {}
+    x, y, z = _xyz(value)
+    x, y, z = _deadzone(x, style), _deadzone(y, style), _deadzone(z, style)
+    sx = _xyz_axis_sign(style, "invert_x")
+    sy = _xyz_axis_sign(style, "invert_y")
+    sz = _xyz_axis_sign(style, "invert_z")
+    x, y, z = sx * x, sy * y, sz * z
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    _paint_3d_axes_body(painter, item, x, y, z, sx, sy, sz, mode="cartesian")
+    painter.restore()
+
+
+def paint_axis_polar(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """3D polar: azimuth + elevation + range with spherical projection diagram."""
+    style = item.get("style") or {}
+    az, el, rng = _xyz(value)
+    az, el, rng = _deadzone(az, style), _deadzone(el, style), _deadzone(rng, style)
+    sx = _xyz_axis_sign(style, "invert_x")
+    sy = _xyz_axis_sign(style, "invert_y")
+    sz = _xyz_axis_sign(style, "invert_z")
+    az, el, rng = sx * az, sy * el, sz * rng
+    x, y, z = _polar_to_cartesian(az, el, rng)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    _paint_3d_axes_body(painter, item, x, y, z, sx, sy, 1.0, mode="polar")
+    painter.restore()
+
+
+def _radar_style_float(style: dict[str, Any], key: str, default: float) -> float:
+    try:
+        return float(style.get(key) if style.get(key) is not None else default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _radar_map_axis(value: float, lo: float, hi: float) -> float:
+    """Map a centered axis (−1…1) onto [lo, hi]."""
+    t = max(0.0, min(1.0, (_clamp(value) + 1.0) * 0.5))
+    return lo + (hi - lo) * t
+
+
+def _radar_axis_from_mapped(mapped: float, lo: float, hi: float) -> float:
+    """Inverse of `_radar_map_axis`."""
+    span = hi - lo
+    if abs(span) < 1e-9:
+        return 0.0
+    t = max(0.0, min(1.0, (float(mapped) - lo) / span))
+    return _clamp(t * 2.0 - 1.0)
+
+
+def _radar_point(origin: QtCore.QPointF, travel: float, angle_off_deg: float) -> QtCore.QPointF:
+    """0° = up (nose), positive = right (clockwise)."""
+    rad = math.radians(angle_off_deg)
+    return QtCore.QPointF(
+        origin.x() + travel * math.sin(rad),
+        origin.y() - travel * math.cos(rad),
+    )
+
+
+def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Plan-position radar FoV: angle off, field of regard, and range. No tip dot."""
+    style = item.get("style") or {}
+    angle_v, for_v, range_v = _xyz(value)
+    sx = _xyz_axis_sign(style, "invert_x")
+    sy = _xyz_axis_sign(style, "invert_y")
+    sz = _xyz_axis_sign(style, "invert_z")
+    angle_v, for_v, range_v = sx * angle_v, sy * for_v, sz * range_v
+
+    slew_l = _radar_style_float(style, "slew_left_deg", -60.0)
+    slew_r = _radar_style_float(style, "slew_right_deg", 60.0)
+    if slew_l > slew_r:
+        slew_l, slew_r = slew_r, slew_l
+    for_min = max(10.0, min(180.0, _radar_style_float(style, "for_min_deg", 10.0)))
+    for_max = max(for_min, min(180.0, _radar_style_float(style, "for_max_deg", 180.0)))
+    range_min = _radar_style_float(style, "range_min", 0.0)
+    range_max = _radar_style_float(style, "range_max", 100.0)
+    if range_max < range_min:
+        range_min, range_max = range_max, range_min
+
+    angle_off = _radar_map_axis(angle_v, slew_l, slew_r)
+    for_half = _radar_map_axis(for_v, for_min, for_max)
+    range_now = _radar_map_axis(range_v, range_min, range_max)
+
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    side = min(rect.width(), rect.height())
+    circle = QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side)
+    painter.setPen(_pen(style.get("border"), _border_w(style, 1.5)))
+    painter.setBrush(fill_brush(style.get("fill"), "#0a1220", rect=circle))
+    painter.drawEllipse(circle)
+
+    origin = circle.center()
+    travel = max(8.0, min(circle.width(), circle.height()) / 2.0 - 2.0)
+    try:
+        rings = max(1, min(12, int(style.get("ring_count") or 5)))
+    except (TypeError, ValueError):
+        rings = 5
+    _draw_ring_grid(painter, circle, style, rings)
+    _draw_crosshairs(painter, circle, style)
+
+    # Cardinal rays (nose up) with optional end arrows — positive only from center.
+    try:
+        axis_w = max(0.5, float(style.get("axis_width") if style.get("axis_width") is not None else 0.5))
+    except (TypeError, ValueError):
+        axis_w = 0.5
+    axis_color = style.get("axis") or style.get("border") or "#e6e8ec"
+    show_arrows = bool(style.get("show_axis_arrows", True))
+    arrow_size = _axis_arrow_size(style, axis_w)
+    for deg in (0.0, 90.0, -90.0, 180.0):
+        _draw_axis_arrow(
+            painter,
+            origin,
+            _radar_point(origin, travel, deg),
+            axis_color,
+            axis_w,
+            arrow_size=arrow_size,
+            draw_arrow=show_arrows,
+        )
+
+    if style.get("show_slew_limits", True):
+        lim_pen = _pen(style.get("projection") or "#ff5a3c", max(1.0, _radar_style_float(style, "projection_width", 1.5)))
+        lim_pen.setStyle(QtCore.Qt.DotLine)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(lim_pen)
+        painter.drawLine(origin, _radar_point(origin, travel, slew_l))
+        painter.drawLine(origin, _radar_point(origin, travel, slew_r))
+
+    span = max(1e-6, range_max - range_min)
+    range_t = max(0.0, min(1.0, (range_now - range_min) / span))
+    fov_r = max(4.0, travel * range_t)
+    left_deg = angle_off - for_half
+    right_deg = angle_off + for_half
+    # Qt arc: 0° = east, positive = CCW. Our 0° = up → Qt 90°; CW right → negative span.
+    start_qt = 90.0 - left_deg
+    span_qt = -(right_deg - left_deg)
+
+    wedge = QtGui.QPainterPath()
+    wedge.moveTo(origin)
+    if for_half >= 179.9:
+        wedge.addEllipse(origin, fov_r, fov_r)
+    else:
+        arc_rect = QtCore.QRectF(origin.x() - fov_r, origin.y() - fov_r, fov_r * 2.0, fov_r * 2.0)
+        wedge.arcTo(arc_rect, start_qt, span_qt)
+        wedge.closeSubpath()
+
+    fov_fill = style.get("fov_fill")
+    if fov_fill not in (None, "") and qcolor(fov_fill, "#00000000").alpha() > 0:
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(qcolor(fov_fill, "#40ff5a3c"))
+        painter.drawPath(wedge)
+        if style.get("show_fov_scan", True) and for_half < 179.9:
+            # Light scan lines inside the wedge (reference cue).
+            scan = qcolor(style.get("fov") or "#ff5a3c", "#ff5a3c")
+            scan.setAlpha(max(40, min(120, scan.alpha() // 2 if scan.alpha() else 70)))
+            painter.setPen(_pen(scan, 1.0))
+            steps = max(4, min(24, int(for_half / 6.0) + 3))
+            for i in range(1, steps):
+                t = i / float(steps)
+                a = left_deg + (right_deg - left_deg) * t
+                painter.drawLine(origin, _radar_point(origin, fov_r, a))
+
+    try:
+        fov_w = max(1.0, float(style.get("fov_width") if style.get("fov_width") is not None else 2.0))
+    except (TypeError, ValueError):
+        fov_w = 2.0
+    fov_color = style.get("fov") or style.get("indicator") or "#ff5a3c"
+    painter.setBrush(QtCore.Qt.NoBrush)
+    painter.setPen(_pen(fov_color, fov_w))
+    if for_half >= 179.9:
+        painter.drawEllipse(origin, fov_r, fov_r)
+    else:
+        painter.drawLine(origin, _radar_point(origin, fov_r, left_deg))
+        painter.drawLine(origin, _radar_point(origin, fov_r, right_deg))
+        painter.drawArc(
+            QtCore.QRectF(origin.x() - fov_r, origin.y() - fov_r, fov_r * 2.0, fov_r * 2.0),
+            int(start_qt * 16),
+            int(span_qt * 16),
+        )
+    # Bore-sight ray (angle off).
+    painter.setPen(_pen(fov_color, max(1.0, fov_w * 0.85)))
+    painter.drawLine(origin, _radar_point(origin, fov_r, angle_off))
+
+    _draw_label(painter, item, rect)
+    painter.restore()
+
+
+def paint_axis_ternary(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Power triangle. No square chrome — fill/border apply to the triangle. Dot uses shared indicator style."""
+    from .gradient import is_gradient
+
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    x, y, z = _xyz(value)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    top, left, right = _ternary_triangle(item)
+    centroid = _ternary_centroid(top, left, right)
+    tri = QtGui.QPolygonF([top, left, right])
+    fill = style.get("fill")
+    brush = fill_brush(fill, "#00000000", rect=rect)
+    # Transparent fill → no triangle body; border still outlines the edges.
+    if not is_gradient(fill) and qcolor(fill, "#00000000").alpha() <= 0:
+        painter.setBrush(QtCore.Qt.NoBrush)
+    else:
+        painter.setBrush(brush)
+    border_w = max(1.0, _border_w(style, 1.8))
+    if style.get("border_enabled", True):
+        painter.setPen(_pen(style.get("border") or "#e6e8ec", border_w))
+    else:
+        painter.setPen(QtCore.Qt.NoPen)
+    painter.drawPolygon(tri)
+    try:
+        axis_width = float(style.get("axis_width") if style.get("axis_width") is not None else 0.5)
+    except (TypeError, ValueError):
+        axis_width = 0.5
+    axis_width = max(0.5, axis_width)
+    axis_color = style.get("axis") or style.get("crosshair") or style.get("border") or "#e6e8ec"
+    show_arrows = bool(style.get("show_axis_arrows", True))
+    arrow_size = _axis_arrow_size(style, axis_width)
+    for tip in (top, left, right):
+        _draw_axis_arrow(
+            painter,
+            centroid,
+            tip,
+            axis_color,
+            axis_width,
+            arrow_size=arrow_size,
+            draw_arrow=show_arrows,
+        )
+    live = _ternary_point(top, left, right, x, y, z)
+    _draw_dot_crosshair(painter, rect, live.x(), live.y(), style)
+    _indicator(painter, live, style)
+    _draw_label(painter, item, rect)
+    painter.restore()
+
+
 _PAINTERS = {
     "axis_bar": paint_axis_bar,
     "axis_radio": paint_axis_radio,
@@ -3874,6 +4970,10 @@ _PAINTERS = {
     "axis_stick_circle": paint_axis_stick_circle,
     "axis_crosshair": paint_axis_crosshair,
     "axis_mouse": paint_axis_mouse,
+    "axis_xyz": paint_axis_xyz,
+    "axis_polar": paint_axis_polar,
+    "axis_ternary": paint_axis_ternary,
+    "axis_radar": paint_axis_radar,
     "axis_graph": paint_axis_graph,
     "axis_bars": paint_axis_bars,
     "button": paint_button,
@@ -3892,6 +4992,8 @@ _PAINTERS = {
     "application": paint_application,
     "remote_view": paint_remote_view,
     "streamdeck": paint_streamdeck,
+    "browser": paint_browser,
+    "efb": paint_efb,
     "ocr": paint_ocr,
 }
 
@@ -3962,7 +5064,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "ocr", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
+    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "browser", "efb", "ocr", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
         return None
     if widget_type == "input_display":
         from .input_display import input_display_key_at_point
@@ -4051,6 +5153,38 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
                 ax /= mag
                 ay /= mag
         return (_clamp(ax), _clamp(ay))
+    if widget_type == "axis_radar":
+        # Drag sets angle off + range; FoR stays at mid (0) — use the axis binding for FoR width.
+        style = item.get("style") or {}
+        cx, cy = rect.center().x(), rect.center().y()
+        side = min(rect.width(), rect.height())
+        travel = max(8.0, side / 2.0 - 2.0)
+        dx = x - cx
+        dy = cy - y
+        dist = math.hypot(dx, dy)
+        # 0° = up, positive = right (CW)
+        angle_off = math.degrees(math.atan2(dx, -dy)) if dist > 1e-6 else 0.0
+        slew_l = _radar_style_float(style, "slew_left_deg", -60.0)
+        slew_r = _radar_style_float(style, "slew_right_deg", 60.0)
+        if slew_l > slew_r:
+            slew_l, slew_r = slew_r, slew_l
+        angle_off = max(slew_l, min(slew_r, angle_off))
+        range_t = max(0.0, min(1.0, dist / travel))
+        range_min = _radar_style_float(style, "range_min", 0.0)
+        range_max = _radar_style_float(style, "range_max", 100.0)
+        if range_max < range_min:
+            range_min, range_max = range_max, range_min
+        range_now = range_min + (range_max - range_min) * range_t
+        ax = _radar_axis_from_mapped(angle_off, slew_l, slew_r)
+        az = _radar_axis_from_mapped(range_now, range_min, range_max)
+        if style.get("invert_x"):
+            ax = -ax
+        if style.get("invert_z"):
+            az = -az
+        return (_clamp(ax), 0.0, _clamp(az))
+    if widget_type == "axis_ternary":
+        top, left, right = _ternary_triangle(item)
+        return _point_to_ternary_values(QtCore.QPointF(x, y), top, left, right)
     if widget_type == "axis_radio":
         steps = max(2, int(style.get("radio_steps") or 5))
         vertical = (style.get("orientation") or "horizontal").casefold() == "vertical"

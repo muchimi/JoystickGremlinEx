@@ -6575,6 +6575,15 @@ if __name__ == "__main__":
     # QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
     # QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
     # QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_DontCreateNativeWidgetSiblings, True)
+    # The overlay page is drawn in the widget. This has to be set before QApplication exists.
+    try:
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
+    except Exception:
+        pass
+    try:
+        import PySide6.QtWebEngineWidgets  # noqa: F401
+    except Exception:
+        pass
 
     theme = config.theme
     match theme:

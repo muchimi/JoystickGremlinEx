@@ -107,7 +107,7 @@ def _normalize_efb_location(entry: dict[str, Any] | None) -> dict[str, Any] | No
     if isinstance(raw_texts, (list, tuple)):
         texts = [_norm_location_text(t) for t in raw_texts if _norm_location_text(t)]
     elif raw_texts:
-        for part in re.split(r"[\n,]+", str(raw_texts)):
+        for part in re.split(r"[\n;]+", str(raw_texts)):
             part = _norm_location_text(part)
             if part:
                 texts.append(part)
@@ -610,6 +610,17 @@ def apply_pack_to_widget(scene, widget_id: str, pack: dict[str, Any], *, replace
     return None
 
 
+def _mineable_signature_text(value) -> str:
+    """Star Citizen shows thousands with a comma, so 11655 is stored as 11,655."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return str(value or "").strip()
+    if number >= 1000:
+        return f"{number:,}"
+    return str(number)
+
+
 def build_sc_mineables_pack_from_source(source_path: str) -> dict[str, Any] | None:
     """Convert sc-overlay-main data/mineables.json into a jgex-ocr-pack."""
     try:
@@ -633,9 +644,9 @@ def build_sc_mineables_pack_from_source(source_path: str) -> dict[str, Any] | No
         except (TypeError, ValueError):
             base = 0
         sigs = rock.get("sigs") or []
-        texts = [str(int(s)) for s in sigs if s is not None]
+        texts = [_mineable_signature_text(s) for s in sigs if s is not None]
         if not texts and base > 0:
-            texts = [str(base)]
+            texts = [_mineable_signature_text(base)]
         rules.append(
             {
                 "name": name,

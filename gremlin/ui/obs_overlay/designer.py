@@ -94,6 +94,10 @@ WIDGET_TITLES = {
     "axis_crosshair": "Radar",
     "axis_stick_circle": "Circular",
     "axis_mouse": "Mouse",
+    "axis_xyz": "3D axes",
+    "axis_polar": "3D polar",
+    "axis_ternary": "Triangle",
+    "axis_radar": "Radar FoV",
     "axis_graph": "Temporal graph",
     "axis_bars": "Bar graph",
     "button": "Button",
@@ -111,6 +115,8 @@ WIDGET_TITLES = {
     "application": "Application",
     "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
+    "browser": "Web browser",
+    "efb": "SC EFB",
     "ocr": "OCR",
 }
 
@@ -131,6 +137,10 @@ WIDGET_TOOLTIPS = {
     "axis_crosshair": "Two-axis radar / crosshair.",
     "axis_stick_circle": "Two-axis stick in a circular pad.",
     "axis_mouse": "Mouse displacement display (VJoy or standard).",
+    "axis_xyz": "Three-axis frame. X right, Y up, Z down-left. Drop to the horizontal plane, then project to X and Z. Appearance: dot, path, vector, grid, sphere, axis length/direction, bounds box.",
+    "axis_polar": "Spherical tip from azimuth, elevation, and range. Same 3D frame as 3D axes, with a customizable vector and optional unit sphere.",
+    "axis_ternary": "Power triangle. Center is 0,0,0. Top / left / right are full X / Y / Z. Fill and border apply to the triangle (no square). Dot is customizable.",
+    "axis_radar": "Plan-position radar FoV. Angle off (slew), field of regard (±10°…±180°), and range. No tip dot — the wedge is the live value.",
     "axis_graph": "Scrolling temporal graph of one or more axes.",
     "axis_bars": "Bar graph of several axis datasets.",
     "sys_stats": "Counter / stats (time, FPS, temperature, manual).",
@@ -142,6 +152,8 @@ WIDGET_TOOLTIPS = {
     "application": "Live capture of another application window.",
     "remote_view": "Video return from a remote GEX peer.",
     "streamdeck": "Live Stream Deck key grid on the overlay.",
+    "browser": "Web page inside the widget. Windows default browser, or another installed browser.",
+    "efb": "Local Star Citizen Electronic Flight Bag: browse and view JPG plates from a Delta Consulting install folder.",
     "ocr": "Detect on-screen text in the widget region (or full screen) and fire bindings.",
 }
 
@@ -259,6 +271,20 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
     elif widget_type == "streamdeck":
         lines.append("Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding.")
+    elif widget_type == "browser":
+        lines.append(
+            "Inspector Browser section: enter a URL. The page is drawn in the widget, so you can type and click it. "
+            "Windows default is the browser Windows uses for links. You can also pick another installed browser, including DuckDuckGo. "
+            "That choice is which browser the site sees. It does not switch to a browser you already have open. "
+            "Uncheck Show URL field / Show scrollbars to show only the page. "
+            "On the canvas, drag the :: grip to move it. No joystick binding."
+        )
+    elif widget_type == "efb":
+        lines.append(
+            "Inspector EFB Pack options: set the install folder (Desktop SC EFB), open the Delta download page, "
+            "and optional Discord invite. Runtime shows search, system filters, section buttons, zoom, and draw. "
+            "JPG plates only. No OCR and no web lookup. No joystick binding."
+        )
     elif widget_type == "ocr":
         lines.append(
             "Inspector OCR section: widget region or full screen, min confidence, RapidOCR/Windows engine. "
@@ -314,6 +340,23 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append(
             "Inspector: bind Up, Center, and Down. Center is optional when neither end is pressed. "
             "Interactive overlay springs back to center on lift."
+        )
+    elif widget_type == "axis_xyz":
+        lines.append(
+            "Inspector: Axis X, Y, and Z are independent. The tip drops to the horizontal plane, then projects to X and Z. "
+            "Appearance: dot, path, vector, grid, sphere, axis length/invert, bounds box."
+        )
+    elif widget_type == "axis_polar":
+        lines.append(
+            "Inspector: Azimuth (−180°…180°), Elevation (−90°…90°), and Range (0…1 from −1…1). "
+            "Same Look as 3D axes, plus vector and sphere."
+        )
+    elif widget_type == "axis_ternary":
+        lines.append("Inspector: Axis X, Axis Y, and Axis Z are independent (mix devices). The drawing is the live value. 100 is full axis, 0 is center.")
+    elif widget_type == "axis_radar":
+        lines.append(
+            "Inspector: Angle off, FoR, and Range. Set slew L/R limits, FoR ±10°…±180°, and range min/max with ring count. "
+            "The wedge is the live FoV — no tip dot."
         )
     elif widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair"):
         lines.append("Inspector: Axis X and Axis Y are independent (mix devices). Dot, grid, and crosshair options. Drag on an Interactive overlay if bound to vJoy.")

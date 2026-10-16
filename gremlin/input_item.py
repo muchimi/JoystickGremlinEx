@@ -12720,7 +12720,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param: index = the index of the input widget to update with the new text
 
         """
-        widget = self.inputItemListView.widget(index)
+        view = self.inputItemListView
+        if view is None:
+            # Stream Deck has no classic input list. The description is already on the input item.
+            return
+        widget = view.widget(index)
         if widget:
             assert hasattr(widget, "setDescription"), "invalid widget - missing setDescription method"
             widget.setDescription(text)
@@ -12731,7 +12735,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """delete description entry"""
         # with QtCore.QSignalBlocker(widget.description_field):
         #     widget.description_field.setText("")
-        item_widget = self._input_item_list_view.widget(index)
+        view = self.inputItemListView
+        if view is None:
+            return
+        item_widget = view.widget(index)
         if item_widget:
             assert hasattr(item_widget, "setDescription"), "invalid widget - missing setDescription method"
             item_widget.setDescription(None)

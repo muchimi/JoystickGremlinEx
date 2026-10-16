@@ -27,6 +27,7 @@ from .bindings import (
     vjoy_binding_writable,
     widget_accepts_touch,
     widget_needs_xy,
+    widget_needs_xyz,
     write_axis,
     write_button,
     write_hat,
@@ -226,6 +227,16 @@ class OverlayTouchHandler:
             direction = mapped if isinstance(mapped, tuple) else (0, 0)
             write_hat(item.get("binding"), (int(direction[0]), int(direction[1])))
             self._poke(item, (int(direction[0]), int(direction[1])))
+            return
+        if widget_needs_xyz(widget_type):
+            if not isinstance(mapped, tuple) or len(mapped) < 3:
+                return
+            x_val, y_val, z_val = float(mapped[0]), float(mapped[1]), float(mapped[2])
+            for axis_name, axis_val in (("x", x_val), ("y", y_val), ("z", z_val)):
+                axis_bind = binding_for_axis(item, axis_name)
+                if vjoy_binding_writable(axis_bind):
+                    write_axis(axis_bind, axis_val)
+            self._poke(item, (x_val, y_val, z_val))
             return
         if widget_needs_xy(widget_type):
             x_val, y_val = mapped if isinstance(mapped, tuple) else (0.0, 0.0)
