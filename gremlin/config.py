@@ -2605,7 +2605,7 @@ class Configuration(QtCore.QObject):
                 elif device_type == DeviceType.Osc:
                     input_type = InputType.OpenSoundControl
                 elif device_type == DeviceType.State:
-                    input_type = DeviceType.State
+                    input_type = InputType.State
 
                 widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
                 if widget:

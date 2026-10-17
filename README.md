@@ -49,6 +49,30 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+
+### (m77T78)
+- New: States: Ability to define one or more text attributes per state.  These can be pasted from plain text with one attribute per line. Attributes can be used to select map to state Action target states.
+- New: Map to State: Adds the ability to select states based on: 
+	+ Single state
+	+ Multiple states
+	+ States by category
+	+ States by attributes
+- Fix: UI: Include states in default device recall on profile load.
+- Fix: Overlay **O14** — 3 Axis widgets (3D axes, polar, ternary, radar FoV). `model.py`, `widgets.py`, `bindings.py`, `inspector.py`, `designer.py`, `selection_pane.py`, `templates.py`, `touch.py`
+- Fix: Overlay  **O17** — Local SC EFB viewer (JPG plates, no OCR). `efb_host.py` and host wiring in overlay UI files above
+- Fix: Overlay  **O21** — Websocket `stop()` silences clients and skips `clients_changed` after session delete. `websocket_server.py`
+- Fix: Overlay  **O22** — App-share return repaints the overlay. `overlay_window.py`
+- Fix: Overlay  **O23** — Overlay Stream Deck press and state look. `widgets.py`, `bindings.py`
+- Fix: Overlay  **O24** — Web browser widget; OpenGL share + WebEngine import before `QApplication`. `browser_host.py`, `gremlinEx.py`, overlay UI files
+- Fix: Overlay  **O25** — OCR texts use semicolons so thousands commas stay intact. `model.py`, `inspector.py`, `ocr_packs.py`, both `sc_mineables.json`
+- Fix: Overlay **O27** — Overlay axes use calibration and input curve via `get_curved_axis`. `bindings.py`
+- Fix: Overlay **O28** — OCR rule Map sync/restore on profile save/load; inspector rehydrates from `mapping_xml`. `model.py`, `inspector.py`
+- Fix: Streamdeck  **S04** — Description callback returns when the list view is missing. `input_item.py`
+- Fix: Streamdeck  **S05** — Auto-return timer restarts on press that stays on the page. `map_to_streamdeck/__init__.py`, `streamdeck_device.py`
+- Fix: Streamdeck  **S06** — Disconnect bridge slots on tab cleanup; `ensureInputItems` no-ops when the model is gone. `streamdeck_device.py`
+
+
 ### (m77T77)
 - Change: Requirements:  Updated all Python dependencies to current releases, including Pyside6 (QT interface for Python) 6.12.0 and EdgeTTS to 7.3.1 (compatibility with online service). Project requirements.txt updated.
 - Change: UI (optional modules): hide/show optional component devices/toolbar based on module enabled/disabled state as set in options to avoid a restart when possible.

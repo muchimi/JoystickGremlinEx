@@ -2103,6 +2103,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         mapping_changed_callback: Callable = None,
         confirm_delete_callback: Callable = None,
         title_callback: Callable = None,
+        description_callback: Callable = None,
         get_state_callback: Callable = None,
         delete_callback: Callable = None,
         config_external=False,
@@ -2120,6 +2121,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         :param mapping_changed_callback: Optional callback for mapping changes
         :param confirm_delete_callback: Optional callback for confirming deletion
         :param title_callback: Optional callback to get the title of the input item
+        :param description_callback: Optional callback to get the description of the input (text)
         :param get_state_callback: Optional callback to get the current state of the input
         :param delete_callback: Optional callback for delete action
         :param config_external: True if the widget is configured externally
@@ -2179,6 +2181,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._title_icons = []  # title bar icons
 
         self._title_callback = title_callback  # callback to get the title of the input item
+
+        self._description_callback = description_callback  # callback to get the description of the input  (optional)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -2481,7 +2485,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                 pass
             case "description":
                 # handle description change
-                self.setInputDescription(input_item.description)
+                if self._description_callback:
+                    self.setInputDescription(self._description_callback(input_item))
+                else:
+                    self.setInputDescription(input_item.description)
             case "input_id":
                 # handle input id change
                 self._update_input_id()

@@ -44,7 +44,19 @@ import gremlin.input_item
 from gremlin.input_item import AbstractCondition, InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem, AbstractContainer, AbstractAction
 from shiboken6 import Shiboken
 import html
-from typing import Callable
+from typing import Callable, Any
+from gremlin.ui.ui_common import (
+    getHContainer,
+    getVContainer,
+    QDataPushButton,
+    QHorizontalSeparator,
+    QHorizontalLine,
+    QCollapsible,
+    Buttons,
+    Icons,
+    ConfirmBox,
+    Color,
+)
 
 
 syslog = logging.getLogger("system")
@@ -389,6 +401,7 @@ class StateInputItem(InputItem):
         autorelease_trigger_mode="on",
         data=None,
         exclusive_keys=None,
+        attributes=None,
     ):
         master_mode = gremlin.shared_state.master_mode
 
@@ -438,8 +451,60 @@ class StateInputItem(InputItem):
         self._hooked = False
         self.hook()  # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name  # states all belong to the master mode
+        self._attributes = {}  # dictionary to store additional attributes for the state
 
+        if attributes is not None:
+            self.addAttribute(attributes)  # add each attribute with default value of None
 
+    def setAttribute(self, key: str, value: Any = None):
+        """set the value of a specific attribute"""
+        self._attributes[key] = value
+
+    def setAttributes(self, attributes: list[str]):
+        """replaces the attribute keys, keeping the values of keys that remain"""
+        self._attributes = {key: self._attributes.get(key) for key in attributes or []}
+
+    def addAttribute(self, key: str | list[str] | tuple[str]):
+        """adds an attribute with a default value of None"""
+        if not key:
+            return  # nothing to do
+        if isinstance(key, str):
+            self._attributes[key] = None
+        elif isinstance(key, list) or isinstance(key, tuple):
+            for k in key:
+                self._attributes[k] = None
+
+    def getAttribute(self, key: str, default: Any = None):
+        """get the value of a specific attribute, return default if not found"""
+        return self._attributes.get(key, default)
+
+    def getAttributes(self) -> list[str]:
+        """list of attributes defined in the state"""
+        return list(self._attributes.keys())
+
+    def removeAttribute(self, key: str):
+        """removes an attribute if it exists"""
+        self._attributes.pop(key, None)
+
+    def getAttributeKeys(self) -> list[str]:
+        """returns the attribute keys"""
+        return list(self._attributes.keys())
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        """returns the attribute keys"""
+        return self.getAttributeKeys()
+
+    def hasAttribute(self, key: str, case_sensitive: bool = True) -> bool:
+        """check if the state has a specific attribute"""
+        if case_sensitive:
+            return key in self._attributes
+        else:
+            return any(k.lower() == key.lower() for k in self._attributes)
+
+    def hasAttributes(self) -> bool:
+        """check if the state has any attributes"""
+        return bool(self._attributes)
 
     def _handle_input_id_callback(self):
         """input id is self for STATE"""
@@ -468,7 +533,11 @@ class StateInputItem(InputItem):
             self.autorelease_mode,
             self.autorelease_trigger_mode,
             exclusive_keys=list(self._exclusive_keys),
-        )
+        )._with_attributes(self._attributes)
+
+    def _with_attributes(self, attributes: dict):
+        self._attributes = dict(attributes)
+        return self
 
     def getOverrideInputType(self):
         """override type"""
@@ -620,13 +689,7 @@ class StateInputItem(InputItem):
             self._fire_changed(data)
             self.changed.emit(self)
 
-            if (
-                data
-                and not self._applying_exclusive
-                and not self._expression
-                and self._exclusive_keys
-                and not self._suppress_exclusive
-            ):
+            if data and not self._applying_exclusive and not self._expression and self._exclusive_keys and not self._suppress_exclusive:
                 self._apply_exclusive_off()
 
             if is_auto:
@@ -889,6 +952,30 @@ class StateInputItem(InputItem):
         if self._exclusive_keys:
             node.set("exclusive", ",".join(self._exclusive_keys))
 
+        # write additional attributes
+        if self._attributes:
+            node_attributes = ElementTree.SubElement(node, "attributes")
+            for key, value in self._attributes.items():
+                a_node = ElementTree.SubElement(node_attributes, "attribute")
+                a_node.set("key", html.escape(key))
+                if isinstance(value, str):
+                    a_node.set("value", html.escape(value))
+                    a_node.set("type", "str")
+                elif isinstance(value, bool):
+                    a_node.set("value", safe_format(value, bool))
+                    a_node.set("type", "bool")
+                elif isinstance(value, int):
+                    a_node.set("value", safe_format(value, int))
+                    a_node.set("type", "int")
+                elif isinstance(value, float):
+                    a_node.set("value", safe_format(value, float))
+                    a_node.set("type", "float")
+                elif value is None:
+                    # no value
+                    pass
+                else:
+                    syslog.warning(f"XML: state: unsupported attribute type for key: {key} [{value}] - this attribute will not save")
+
         # write container data
         super().to_xml(node)
 
@@ -944,6 +1031,28 @@ class StateInputItem(InputItem):
             [part.strip() for part in str(exclusive_raw or "").split(",") if part.strip()],
             self._key,
         )
+
+        # read attributes if any (written under an <attributes> node)
+        self._attributes = {}
+        for attr_node in node.findall("attributes/attribute"):
+            attr_key = html.unescape(attr_node.get("key") or "")
+            if not attr_key:
+                continue
+            attr_value = attr_node.get("value")
+            attr_type = attr_node.get("type")
+            if attr_value is None or not attr_type:
+                # key only
+                self._attributes[attr_key] = None
+            elif attr_type == "str":
+                self._attributes[attr_key] = html.unescape(attr_value)
+            elif attr_type == "int":
+                self._attributes[attr_key] = safe_read(attr_node, "value", int, 0)
+            elif attr_type == "float":
+                self._attributes[attr_key] = safe_read(attr_node, "value", float, 0.0)
+            elif attr_type == "bool":
+                self._attributes[attr_key] = safe_read(attr_node, "value", bool, False)
+            else:
+                self._attributes[attr_key] = None
 
         super().from_xml(node, data, extra_data)
 
@@ -1362,6 +1471,38 @@ class StateInputItem(InputItem):
         return table.to_html()
 
 
+class StateInputItemWidget(gremlin.input_item.InputItemWidget):
+    """ widget for a state input """
+
+    def __init__(
+            self,
+        input_item: StateInputItem,
+        populate_ui_callback=None,
+        populate_name_callback=None,
+        description_callback=None,
+        selection_changed_callback=None,
+        mapping_changed_callback=None,
+        confirm_delete_callback=None,
+        config_external=False,
+        data=None,
+        parent=None,
+    ):
+        assert isinstance(input_item, StateInputItem), "input_item must be an instance of StateInputItem"
+        super().__init__(
+            input_item=input_item,
+            populate_ui_callback=populate_ui_callback,
+            populate_name_callback=populate_name_callback,
+            description_callback=description_callback,
+            selection_changed_callback=selection_changed_callback,
+            mapping_changed_callback=mapping_changed_callback,
+            confirm_delete_callback=confirm_delete_callback,
+            config_external=config_external,
+
+            data=data,
+            parent=parent,
+        )
+
+
 class BaseStateCondition(BaseAbstractCondition):
     """state condition"""
 
@@ -1558,7 +1699,7 @@ class StateData:
         self._state_change_callbacks = {}
         self._hooked_states = set()
 
-    def registerStateChangeCallback(self, key : str, callback : Callable[[StateInputItem], None]):
+    def registerStateChangeCallback(self, key: str, callback: Callable[[StateInputItem], None]):
         """registers a callback to be invoked when a state changes"""
         key = key.casefold().strip()
         if key not in self._state_change_callbacks:
@@ -1566,14 +1707,14 @@ class StateData:
         if callback not in self._state_change_callbacks[key]:
             self._state_change_callbacks[key].append(callback)
 
-    def unregisterStateChangeCallback(self, key : str, callback):
+    def unregisterStateChangeCallback(self, key: str, callback):
         """unregisters a previously registered state change callback"""
         key = key.casefold().strip()
         if key in self._state_change_callbacks:
             if callback in self._state_change_callbacks[key]:
                 self._state_change_callbacks[key].remove(callback)
 
-    def _fire_callbacks(self, state : StateInputItem):
+    def _fire_callbacks(self, state: StateInputItem):
         """invokes all registered state change callbacks for the given state"""
         key = state.key
         # syslog.info(f"State Fire change callbacks: [{key}] -> {gremlin.util.ansiBool(state.value)}")
@@ -1601,8 +1742,6 @@ class StateData:
         to_evaluate = []
         verbose = gremlin.config.Configuration().verbose_mode_state
         for state in self._data.values():
-
-
             if state.expression:
                 # initial evaluation
                 to_evaluate.append(state)
@@ -1623,7 +1762,6 @@ class StateData:
             if verbose:
                 syslog.info(f"\t[{state.key}] expression: {state.value}")
 
-
         # output profile start values
         syslog.info("Startup state values:")
         sd = gremlin.ui.state_device.StateData()
@@ -1631,7 +1769,6 @@ class StateData:
             sd.dumpStates()
         else:
             syslog.info("\tNo states defined.")
-
 
     def _register(self, key: str, value=None, description=None) -> StateInputItem:
         """registers a new state"""
@@ -1656,19 +1793,19 @@ class StateData:
             self.crud.emit()
 
     def _handle_state_changed(self, state: StateInputItem):
-        """ called when a state change occurs"""
-        self._fire_callbacks(state) # fire registered callbacks to the state manager on state change
+        """called when a state change occurs"""
+        self._fire_callbacks(state)  # fire registered callbacks to the state manager on state change
 
     def getCount(self) -> int:
         """returns the number of registered states"""
         return len(self._data)
 
     def dumpStates(self):
-        """ dumps current states to the log file """
+        """dumps current states to the log file"""
         syslog.info("Current states:")
         state: StateInputItem
         for state in self._data.values():
-            syslog.info(f"\t{state.key}: {gremlin.util.ansiText('on',"green") if state.value else gremlin.util.ansiText('off',"red")}")
+            syslog.info(f"\t{state.key}: {gremlin.util.ansiText('on', 'green') if state.value else gremlin.util.ansiText('off', 'red')}")
 
     def update_key(self, state, old_name, new_name):
         """occurs on a key change"""
@@ -1694,6 +1831,23 @@ class StateData:
             del self._data[old_name]
         if not gremlin.shared_state.profile_loading:
             self.crud.emit()
+
+    def getCategories(self) -> list[str]:
+        """returns a list of all categories"""
+        categories = set()
+        for state in self._data.values():
+            if state.category:
+                categories.add(state.category.name)
+        return sorted(categories)
+
+    def getAttributes(self) -> list[str]:
+        """returns a list of all attributes"""
+        attributes = set()
+        for state in self._data.values():
+            state_attributes = state.attributes or []
+            if state_attributes:
+                attributes.update(state_attributes)
+        return sorted(attributes)
 
     def set_exclusive_group(self, anchor: StateInputItem, peer_keys: list[str] | None):
         """Rebuild one mutually exclusive clique from *anchor* + *peer_keys*.
@@ -1740,9 +1894,7 @@ class StateData:
             other = self.getState(key)
             if other is None:
                 continue
-            other.exclusive_keys = [
-                k for k in other.exclusive_keys if k not in previous_keys and k not in member_keys
-            ]
+            other.exclusive_keys = [k for k in other.exclusive_keys if k not in previous_keys and k not in member_keys]
 
     def clear_exclusive_group(self, state: StateInputItem | str | None):
         """Remove *state* from every peer exclusive list and clear its own."""
@@ -2131,7 +2283,6 @@ class StateData:
         )
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)
-
 
         self._fire_callbacks(input_item.key, input_item.value)
 
@@ -2530,6 +2681,166 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         return self._last_selected_category
 
 
+class StateAttributeEditorWidget(QtWidgets.QWidget):
+    """edits the key-only attributes of a StateInputItem in a sortable list"""
+
+    attributes_changed = QtCore.Signal()
+
+    _KEY_ROLE = QtCore.Qt.ItemDataRole.UserRole
+
+    def __init__(self, state: StateInputItem, parent=None):
+        super().__init__(parent)
+        self._state = state
+        self._loading = False
+
+        self._list = QtWidgets.QListWidget()
+        self._list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._list.itemChanged.connect(self._item_changed)
+        self._list.itemSelectionChanged.connect(self._update_buttons)
+
+        self._add_button = QDataPushButton("Add")
+        self._add_button.clicked.connect(self._add_clicked)
+        self._edit_button = QDataPushButton("Edit")
+        self._edit_button.clicked.connect(self._edit_clicked)
+        self._remove_button = QDataPushButton("Remove")
+        self._remove_button.clicked.connect(self._remove_clicked)
+        self._sort_button = QDataPushButton("Sort A-Z", checkable=True)
+        self._sort_button.toggled.connect(self._sort_toggled)
+        self._clear_button = Buttons.getDeleteWidget(callback=self._handle_clear, tooltip="Clear all attributes", color=Color.blueColor())
+        self._copy_button = Buttons.getCopyWidget(callback=self._handle_copy, color=Color.yellowColor())
+        self._paste_button = Buttons.getPasteWidget(
+            callback=self._handle_paste, tooltip="Paste attributes from clipboard.\nThe pasted content should be text and contain one attribute per line."
+        )
+
+        widgets = [self._add_button, self._edit_button, self._remove_button, self._sort_button, self._clear_button, self._copy_button, self._paste_button]
+        button_widget = getHContainer(widgets, widget_only=True, auto_size=True)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self._list)
+        layout.addWidget(button_widget)
+
+        self._sort_ascending = True
+        self._list.setSortingEnabled(True)
+        self._list.sortItems(QtCore.Qt.SortOrder.AscendingOrder)
+        self.reload()
+
+    def _handle_copy(self):
+        items = self._list.selectedItems()
+        if items:
+            keys = [item.data(self._KEY_ROLE) for item in items]
+            QtWidgets.QApplication.clipboard().setText("\n".join(keys))
+
+    def _handle_paste(self):
+        text = QtWidgets.QApplication.clipboard().text()
+        for key in text.splitlines():
+            key = key.strip()
+            if key and not self._state.hasAttribute(key):
+                self._state.setAttribute(key, None)
+                self._add_list_item(key)
+        self.attributes_changed.emit()
+
+    def _handle_clear(self):
+        result = ConfirmBox(prompt="Clear all attributes?", informative_text="Are you sure you want to clear all attributes?", parent=self)
+        if result:
+            for key in self._state.getAttributeKeys():
+                self._state.removeAttribute(key)
+            self.reload()
+            self.attributes_changed.emit()
+
+    def reload(self):
+        """loads the list from the state"""
+        self._loading = True
+        self._list.clear()
+        for key in self._state.getAttributeKeys():
+            self._add_list_item(key)
+        self._loading = False
+        self._update_buttons()
+
+    def _add_list_item(self, key: str):
+        item = QtWidgets.QListWidgetItem(key)
+        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
+        item.setData(self._KEY_ROLE, key)
+        self._list.addItem(item)
+        return item
+
+    def _clipboard_valid(self):
+        clipboard = QtWidgets.QApplication.clipboard()
+        mime_data = clipboard.mimeData()
+        if not mime_data.hasText():
+            return False
+        for mime_type in mime_data.formats():
+            if "xml" in mime_type.lower():
+                return False
+        text = mime_data.text()
+        stripped_text = text.strip()
+        if stripped_text.startswith("<?xml") or stripped_text.startswith("<"):
+            return False
+        return True
+
+    def _update_buttons(self):
+        selected = len(self._list.selectedItems())
+        has_items = self._list.count() > 0
+
+        self._edit_button.setEnabled(selected == 1)
+        self._remove_button.setEnabled(selected > 0)
+        self._copy_button.setEnabled(has_items)
+        self._paste_button.setEnabled(self._clipboard_valid())
+        self._clear_button.setEnabled(has_items)
+
+    def _add_clicked(self):
+        text, ok = QtWidgets.QInputDialog.getMultiLineText(self, "Add attributes", "Attribute names (one per line):")
+        if not ok:
+            return
+        added = False
+        self._loading = True
+        for key in (line.strip() for line in text.splitlines()):
+            if not key or self._state.hasAttribute(key):
+                continue
+            self._state.setAttribute(key, None)
+            self._add_list_item(key)
+            added = True
+        self._loading = False
+        if added:
+            self.attributes_changed.emit()
+
+    def _edit_clicked(self):
+        items = self._list.selectedItems()
+        if len(items) == 1:
+            self._list.editItem(items[0])
+
+    def _remove_clicked(self):
+        for item in self._list.selectedItems():
+            self._state.removeAttribute(item.data(self._KEY_ROLE))
+            self._list.takeItem(self._list.row(item))
+        self.attributes_changed.emit()
+
+    def _sort_toggled(self, checked: bool):
+        order = QtCore.Qt.SortOrder.DescendingOrder if checked else QtCore.Qt.SortOrder.AscendingOrder
+        self._sort_button.setText("Sort Z-A" if checked else "Sort A-Z")
+        self._list.sortItems(order)
+
+    def _item_changed(self, item: QtWidgets.QListWidgetItem):
+        if self._loading:
+            return
+        old_key = item.data(self._KEY_ROLE)
+        new_key = item.text().strip()
+        self._loading = True
+        try:
+            if new_key == old_key:
+                item.setText(old_key)
+            elif not new_key or self._state.hasAttribute(new_key):
+                item.setText(old_key)  # blank or duplicate - revert
+            else:
+                value = self._state.getAttribute(old_key)
+                self._state.removeAttribute(old_key)
+                self._state.setAttribute(new_key, value)
+                item.setText(new_key)
+                item.setData(self._KEY_ROLE, new_key)
+                self.attributes_changed.emit()
+        finally:
+            self._loading = False
+
+
 class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     """Multi-select popup to choose mutually exclusive peer states."""
 
@@ -2545,9 +2856,7 @@ class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         layout = QtWidgets.QVBoxLayout(self)
         hint = QtWidgets.QLabel(
-            "Select states that cannot be On at the same time as "
-            f"<b>{html.escape(current_key or '(this state)')}</b>. "
-            "Expression states are not listed.",
+            f"Select states that cannot be On at the same time as <b>{html.escape(current_key or '(this state)')}</b>. Expression states are not listed.",
             self,
         )
         hint.setWordWrap(True)
@@ -2767,8 +3076,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             callback=self._handle_exclusive_changed,
         )
         self._exclusive_widget.setToolTip(
-            "When this state turns On, selected peer states are forced Off. "
-            "The same exclusive group is written to every selected peer."
+            "When this state turns On, selected peer states are forced Off. The same exclusive group is written to every selected peer."
         )
         self._exclusive_summary_widget = QtWidgets.QLabel("")
         self._exclusive_summary_widget.setWordWrap(True)
@@ -2869,15 +3177,23 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         main_layout.addWidget(self._status_widget)
 
-        self.ok_widget = QtWidgets.QPushButton("Ok")
+        # state attributes section
+        self._attributes_widget = StateAttributeEditorWidget(self.data)
+        main_layout.addWidget(QtWidgets.QLabel("Attributes:"))
+        main_layout.addWidget(self._attributes_widget)
+
+        # dialog ok/cancel buttons section
+        main_layout.addWidget(QHorizontalLine())
+        self.ok_widget = QDataPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
-        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget = QDataPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
+        button_container = getHContainer(["||", self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
 
-        main_layout.addWidget(widget)
+        main_layout.addWidget(button_container)
+
         self._update_ui()
 
     @property
@@ -3466,7 +3782,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # right align
         button_container_layout.addStretch(1)
 
-
         # sort states
         sort_button = QtWidgets.QPushButton("Sort")
         icon = gremlin.ui.ui_common.Icons.sortIcon()
@@ -3512,7 +3827,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             (el.lock_inputs, self._handle_lock_inputs),
             (el.unlock_inputs, self._handle_unlock_inputs),
             (el.find_next, self._handle_find_next),
-            (el.state_added, self._handle_state_added)
+            (el.state_added, self._handle_state_added),
         ):
             try:
                 signal.disconnect(slot)
@@ -3793,6 +4108,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_item.isExpression = edited_input_item.isExpression
                 input_item.expression = edited_input_item.expression
 
+                attributes = edited_input_item.getAttributes()
+                input_item.setAttributes(attributes)
+
                 input_item.autorelease = edited_input_item.autorelease
                 input_item.autorelease_delay = edited_input_item.autorelease_delay
                 input_item.autorelease_mode = edited_input_item.autorelease_mode
@@ -3883,8 +4201,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
 
-
-
     def display_name(self, input_id):
         """returns the name for the given input ID"""
         return input_id.display_name
@@ -3904,14 +4220,31 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             widget.addWidget(QtWidgets.QLabel(f"{input_item.description}"))
         category_name = input_item.category_name
         if category_name:
-            widget.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
+            widget.addWidget(QtWidgets.QLabel(f"Category:  <b>{category_name}</b>"))
+
+        attributes = input_item.attributes
+        attribute_description = []
+        attribute_text = None
+
+        if attributes:
+            # Use inline styles to zero out default block margins
+            attribute_description = ["<p style='margin: 0;'>Attributes:</p><ul style='margin-top: 0; margin-bottom: 0;'>"]
+            attribute_description.extend([f"<li>{key}</li>" for key in attributes])
+            attribute_description.append("</ul>")
+            attribute_text = "".join(attribute_description)
+
+        if attribute_text:
+            label = QtWidgets.QLabel(attribute_text)
+            label.setTextFormat(QtCore.Qt.RichText)
+            widget.addWidget(label)
+
         if input_item.expression:
             icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
             expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data=input_item)
             widget.addWidget(expression_widget)
             StateData().expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))
         else:
-            widget.addWidget(QtWidgets.QLabel(f"Default: {input_item.display_value}"))
+            widget.addWidget(QtWidgets.QLabel(f"Default: <b>{input_item.display_value}</b>"))
 
     def _index_for_key(self, input_id):
         """returns the index of the selected input id"""
@@ -3956,7 +4289,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         assert isinstance(data, StateInputItem), f"Unexpected type in widget handler - expected StateInputItem and got [{type(data).__name__}]"
 
-        widget = InputItemWidget(
+        widget = StateInputItemWidget(
             input_item=identifier.input_item,
             populate_ui_callback=self._populate_input_widget_ui,
             mapping_changed_callback=self._update_input_widget,
@@ -4003,6 +4336,14 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             return False
         return True
+
+
+
+
+
+
+
+
 
     def _create_expression_update_callback(self, state, widget):
         return lambda: gremlin.util.InvokeUiMethod(self._change_expression_callback_ui, state, widget)

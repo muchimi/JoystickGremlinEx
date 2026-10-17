@@ -200,6 +200,7 @@ virtual_device_guid_type_map = [
     (midi_tab_guid, DeviceType.Midi),
     (osc_tab_guid, DeviceType.Osc),
     (mode_tab_guid, DeviceType.ModeControl),
+    (state_tab_guid, DeviceType.State),
     (streamdeck_tab_guid, DeviceType.StreamDeck),
     (voice_tab_guid, DeviceType.Voice),
 ]

@@ -3847,19 +3847,22 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             assert widget is not None, "invalid widget"
                             widget.refresh()
 
-                            # self.ui.devices.setCurrentIndex(index)
-                            self._select_input(
-                                last_device_guid,
-                                last_input_type,
-                                last_input_id,
-                                force_switch=True,
-                            )
-
-                            if isinstance(widget, BaseDeviceTabWidget):
-                                # ensure the input is visible
-                                gremlin.util.singleShot(lambda: widget.ensureSelectedVisible())
                         except Exception as e:
                             pass
+
+                    if isinstance(widget, BaseDeviceTabWidget):
+                        # ensure the input is visible
+
+                        # self.ui.devices.setCurrentIndex(index)
+                        self._select_input(
+                            last_device_guid,
+                            last_input_type,
+                            last_input_id,
+                            force_switch=True,
+                        )
+
+                        # self.selectTabWidgetByIndex(index)
+                        gremlin.util.singleShot(lambda: widget.ensureSelectedVisible())
 
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")
@@ -4113,6 +4116,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         row_count = widget.inputItemListModel.rows()
         return [widget.inputItemListModel.data(index) for index in range(row_count)]
 
+    @staticmethod
+    def _input_id_matches(item: InputItem, input_id) -> bool:
+        """state items use themselves as input id, so a saved str id is matched by guid or key"""
+        if item.input_id == input_id:
+            return True
+        if isinstance(input_id, str):
+            return input_id == getattr(item, "guid", None) or input_id == getattr(item, "message_key", None)
+        return False
+
     def _find_input_item(self, device_guid: str | dinput.GUID, input_type, input_id) -> InputItem:
         """find the input item matching the input id for a given device"""
         if not device_guid or input_id is None or input_type is None:
@@ -4137,7 +4149,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 items = model.getUnfilteredItems()
                 if items:
                     return next(
-                        (item for item in items if item and item.input_id == input_id and item.input_type == input_type),
+                        (item for item in items if item and self._input_id_matches(item, input_id) and item.input_type == input_type),
                         None,
                     )
 

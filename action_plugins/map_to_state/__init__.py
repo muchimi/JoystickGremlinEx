@@ -27,7 +27,19 @@ import html
 from shiboken6 import Shiboken
 import threading
 import time
-from gremlin.ui.ui_common import QDataCheckbox, QDataLineEdit, QDataRadioButton, getHContainer, getVContainer, getGridContainer, QDelayWidget
+from gremlin.ui.ui_common import (
+    QDataCheckbox,
+    QDataLineEdit,
+    QDataRadioButton,
+    getHContainer,
+    getVContainer,
+    getGridContainer,
+    synchronize_grids,
+    QDelayWidget,
+    Buttons,
+    QDataPushButton,
+    AutoSize,
+)
 from enum import Enum
 
 syslog = logging.getLogger("system")
@@ -130,6 +142,72 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         return self.description_widget.text()
 
 
+class StringPickListWidget(QtWidgets.QWidget):
+    """sorted list of strings the user fills by picking from the available names"""
+
+    changed = QtCore.Signal(list)
+
+    def __init__(self, items: list[str], names_callback, none_text: str, parent=None):
+        super().__init__(parent)
+        self._names_callback = names_callback
+        self._none_text = none_text
+
+        self._list = QtWidgets.QListWidget()
+        self._list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._list.setSortingEnabled(True)
+        self._list.setMaximumHeight(90)
+        self._list.addItems(items)
+        self._list.itemSelectionChanged.connect(self._update_buttons)
+
+        self._pick_button = QtWidgets.QPushButton("Pick...")
+        self._pick_button.clicked.connect(self._pick_clicked)
+        self._remove_button = QtWidgets.QPushButton("Remove")
+        self._remove_button.clicked.connect(self._remove_clicked)
+
+        buttons = QtWidgets.QVBoxLayout()
+        buttons.addWidget(self._pick_button)
+        buttons.addWidget(self._remove_button)
+        buttons.addStretch()
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._list, 1)
+        layout.addLayout(buttons)
+        self._update_buttons()
+
+    def items(self) -> list[str]:
+        return [self._list.item(i).text() for i in range(self._list.count())]
+
+    def _update_buttons(self):
+        self._remove_button.setEnabled(bool(self._list.selectedItems()))
+
+    def _pick_clicked(self):
+        names = self._names_callback()
+        selected = set(self.items())
+        menu = QtWidgets.QMenu(self)
+        if not names:
+            menu.addAction(self._none_text).setEnabled(False)
+        for name in names:
+            action = menu.addAction(name)
+            action.setCheckable(True)
+            action.setChecked(name in selected)
+            action.toggled.connect(lambda checked, n=name: self._toggle(n, checked))
+        menu.exec(self._pick_button.mapToGlobal(QtCore.QPoint(0, self._pick_button.height())))
+
+    def _toggle(self, name: str, checked: bool):
+        matches = self._list.findItems(name, QtCore.Qt.MatchFlag.MatchExactly)
+        if checked and not matches:
+            self._list.addItem(name)
+        elif not checked and matches:
+            self._list.takeItem(self._list.row(matches[0]))
+        self.changed.emit(self.items())
+
+    def _remove_clicked(self):
+        for item in self._list.selectedItems():
+            self._list.takeItem(self._list.row(item))
+        self.changed.emit(self.items())
+
+
 class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
     """UI widget for mapping inputs to modify a state"""
 
@@ -153,14 +231,67 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
 
-        self.add_widget = QtWidgets.QPushButton("Add")
-        self.add_widget.setToolTip("Adds a new state")
-        self.add_widget.clicked.connect(self._add_state)
+        self.add_widget = Buttons.getAddWidget(tooltip="Add a new state", callback=self._add_state)
 
-        self.state_selector_widget, layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector, self.add_widget])
+        target_options = [
+            ("State (single)", "state", "Apply the action to the selected state"),
+            ("States (multi)", "states", "Apply the action to every state in the list"),
+            ("Category", "category", "Apply the action to every state in the selected category"),
+            ("Attributes", "attributes", "Apply the action to every state that has any of the listed attributes"),
+        ]
+        self.target_widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+            options=target_options, callback=self._target_mode_changed, value=self.action_data.target_mode, label="Apply to:"
+        )
+        self.main_layout.addWidget(self.target_widget)
+
+        # attribute selector
+        self.attributes_list_widget = StringPickListWidget(
+            self.action_data.attributes, lambda: gremlin.ui.state_device.StateData().getAttributes(), "No attributes defined"
+        )
+        self.attributes_list_widget.setToolTip("States having any of these attributes are targeted")
+        self.attributes_list_widget.changed.connect(self._attributes_changed)
+        w1 = QtWidgets.QLabel("Attributes")
+        self.attributes_container_widget = getHContainer([w1, self.attributes_list_widget, "||"], widget_only=True, align_top=True)
+        self.main_layout.addWidget(self.attributes_container_widget)
+
+        # category selector
+        self.categories_list_widget = StringPickListWidget(
+            self.action_data.categories, lambda: gremlin.ui.state_device.StateData().getCategories(), "No categories defined"
+        )
+        self.categories_list_widget.setToolTip("States in any of these categories are targeted")
+        self.categories_list_widget.changed.connect(self._categories_changed)
+        w2 = QtWidgets.QLabel("Categories")
+        self.categories_container_widget = getHContainer([w2, self.categories_list_widget, "||"], widget_only=True, align_top=True)
+
+        self.main_layout.addWidget(self.categories_container_widget)
+
+        # multiple state selector
+        self.states_list_widget = StringPickListWidget(
+            self.action_data.states, lambda: gremlin.ui.state_device.StateData().getStateNames(), "No states defined"
+        )
+        self.states_list_widget.setToolTip("All of these states are targeted")
+        self.states_list_widget.changed.connect(self._states_changed)
+        self.states_container_widget = getHContainer(["States:", self.states_list_widget, "||"], widget_only=True, align_top=True)
+        self.main_layout.addWidget(self.states_container_widget)
+
+        # states impacted by the category / attributes selection
+        self.impacted_list_widget = QtWidgets.QListWidget()
+        self.impacted_list_widget.setMaximumHeight(90)
+        self.impacted_list_widget.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        w3 = QtWidgets.QLabel("Impacted states:")
+
+        self.impacted_container_widget = getHContainer([w3, self.impacted_list_widget, "||"], widget_only=True, align_top=True)
+        self.impacted_container_widget.setToolTip("States currently matched by the selection")
+        self.main_layout.addWidget(self.impacted_container_widget)
+
+        # make the labels the same width
+        AutoSize([w1, w2, w3])
+
+        # state selector
+        self.state_selector_widget = getHContainer(["State:", self.state_selector, self.add_widget], widget_only=True)
         self.main_layout.addWidget(self.state_selector_widget)
 
-        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only=True)
+        widget = getHContainer(["Description:", self.state_description_widget], widget_only=True)
         self.main_layout.addWidget(widget)
 
         self.button_pulse_widget = QDelayWidget()
@@ -320,6 +451,30 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_action_mode_changed(self, value):
         self.action_data.action_mode = value
 
+    def _target_mode_changed(self, value):
+        self.action_data.target_mode = value
+        self._update_ui()
+
+    @QtCore.Slot(list)
+    def _attributes_changed(self, items: list):
+        self.action_data.attributes = list(items)
+        self._update_impacted()
+
+    @QtCore.Slot(list)
+    def _categories_changed(self, items: list):
+        self.action_data.categories = list(items)
+        self._update_impacted()
+
+    def _update_impacted(self):
+        """refreshes the list of states matched by the category / attributes selection"""
+        self.impacted_list_widget.clear()
+        if self.action_data.target_mode in ("category", "attributes"):
+            self.impacted_list_widget.addItems(sorted((s.key for s in self.action_data.target_states()), key=str.casefold))
+
+    @QtCore.Slot(list)
+    def _states_changed(self, items: list):
+        self.action_data.states = list(items)
+
     def _handle_other_state_category_only_changed(self, checked: bool):
         self.action_data.other_state_category_only = checked
 
@@ -465,7 +620,13 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
         self.container_latch_widget.setVisible(latch_delay_visible)
 
-        self.state_selector_widget.setVisible(state_visible)
+        self.target_widget.setVisible(True)
+        self.attributes_container_widget.setVisible(self.action_data.target_mode == "attributes")
+        self.state_selector_widget.setVisible(state_visible and self.action_data.target_mode == "state")
+        self.states_container_widget.setVisible(self.action_data.target_mode == "states")
+        self.impacted_container_widget.setVisible(self.action_data.target_mode in ("category", "attributes"))
+        self._update_impacted()
+        self.categories_container_widget.setVisible(self.action_data.target_mode == "category")
         # self.button_pulse_widget.setVisible(state_visible and self.action_data.mode == "pulse")
         self.mode_widget.setVisible(state_visible)
         if self.container_hat_widget:
@@ -807,7 +968,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             for position in positions:  # 9 positions - 8 cardinal and center push
                 state_name = self.action_data.hat_map[position]
                 state: gremlin.ui.state_device.StateInputItem = self.sd.getState(state_name)
-                self.hat_state_map[position] = state if not state.isExpression else None  # don't set expression states
+                self.hat_state_map[position] = state if state and not state.isExpression else None  # don't set expression states
 
         if key and not self.sd.exists(key):
             description = self.action_data.description
@@ -817,6 +978,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         self.pulse_worker_map = {}
 
         self.sd.registerStateChangeCallback(key, self._handle_state_changed)
+
+    def _target_states(self) -> list[gremlin.ui.state_device.StateInputItem]:
+        """states the action applies to"""
+        return self.action_data.target_states()
 
     def _handle_state_changed(self, state: gremlin.ui.state_device.StateInputItem):
         """callback for when the state changes"""
@@ -863,13 +1028,15 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if self.action_data.mode == "invert":
             is_pressed = not is_pressed
 
-        # determine the startup state
+        # determine the target states
+        self.state_targets = self._target_states()
 
         match self.action_data.sync_mode:
             case SyncMode.Default:
-                if self.verbose:
-                    syslog.info(f"\tset default : {self.action_data.state.default_value}")
-                self.action_data.state.value = self.action_data.state.default_value
+                for state in self.state_targets:
+                    if self.verbose:
+                        syslog.info(f"\tset default : {state.default_value}")
+                    state.value = state.default_value
             case SyncMode.Input:
                 if self.verbose:
                     syslog.info(f"\t sync to input : {is_pressed}")
@@ -883,41 +1050,45 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
                 else:
                     # regular mapping
-                    state = self.action_data.state
-                    if state and not state.isExpression:
-                        state.value = is_pressed
-                self.action_data.state.value = is_pressed
+                    for state in self.state_targets:
+                        if not state.isExpression:
+                            state.value = is_pressed
+                for state in self.state_targets:
+                    state.value = is_pressed
 
-                # construct the input event to sync
-                event = gremlin.event_handler.Event(
-                    event_type=InputType.State,
-                    identifier=self.action_data.state.key,
-                    value=is_pressed,
-                    is_pressed=is_pressed,
-                    device_guid=gremlin.shared_state.state_tab_guid,
-                )
-                self.process_event(event, is_pressed)
+                if self.state_targets:
+                    # construct the input event to sync
+                    event = gremlin.event_handler.Event(
+                        event_type=InputType.State,
+                        identifier=self.state_targets[0].key,
+                        value=is_pressed,
+                        is_pressed=is_pressed,
+                        device_guid=gremlin.shared_state.state_tab_guid,
+                    )
+                    self.process_event(event, is_pressed)
 
             case SyncMode.LastOrInput:
-                last = self.action_data.state.lastValue
-                if last is None:
-                    if self.verbose:
-                        syslog.info(f"\tset last: use input value : {is_pressed}")
-                    self.action_data.state.value = is_pressed
-                else:
-                    if self.verbose:
-                        syslog.info(f"\tset last: use last value : {last}")
-                    self.action_data.state.value = last
+                for state in self.state_targets:
+                    last = state.lastValue
+                    if last is None:
+                        if self.verbose:
+                            syslog.info(f"\tset last: use input value : {is_pressed}")
+                        state.value = is_pressed
+                    else:
+                        if self.verbose:
+                            syslog.info(f"\tset last: use last value : {last}")
+                        state.value = last
             case SyncMode.LastOrDefault:
-                last = self.action_data.state.lastValue
-                if last is None:
-                    if self.verbose:
-                        syslog.info(f"\tset last: use default value : {self.action_data.state.default_value}")
-                    self.action_data.state.value = self.action_data.state.default_value
-                else:
-                    if self.verbose:
-                        syslog.info(f"\tset last: use last value : {last}")
-                    self.action_data.state.value = last
+                for state in self.state_targets:
+                    last = state.lastValue
+                    if last is None:
+                        if self.verbose:
+                            syslog.info(f"\tset last: use default value : {state.default_value}")
+                        state.value = state.default_value
+                    else:
+                        if self.verbose:
+                            syslog.info(f"\tset last: use last value : {last}")
+                        state.value = last
             case SyncMode.Ignore:
                 pass
 
@@ -945,11 +1116,11 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             syslog.info(f"\t[{state.key}] -> {state.value}")
             else:
                 # regular mapping
-                state = self.action_data.state
-                if state and not state.isExpression:
-                    state.value = state.default_value
-                    if self.verbose:
-                        syslog.info(f"\t[{state.key}] -> {state.value}")
+                for state in self.state_targets:
+                    if not state.isExpression:
+                        state.value = state.default_value
+                        if self.verbose:
+                            syslog.info(f"\t[{state.key}] -> {state.value}")
 
     def profile_mode_changed(self, mode: str):
         """called when the runtime mode changes"""
@@ -960,9 +1131,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             self.pulse_stop(key)
 
     def _pulse_on(self, data):
-        """called when pulse is off"""
+        """called when pulse is on"""
         state_name = data
-        # invert the value
         if self.action_data.pulse_toggles:
             state = self.sd.getValue(state_name)
             if self.verbose:
@@ -984,10 +1154,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             if self.verbose:
                 syslog.info(f"Pulse toggle OFF [{state_name}] (state: {gremlin.util.ansiBool(state)} -> {gremlin.util.ansiBool(not state)})")
             self.sd.setValue(state_name, not state, force=True)
-            # wait for the state to change
-
-            # while self.sd.getValue(state_name) == state:
-            #     time.sleep(0.001)  # small delay to prevent busy-waiting
             if self.verbose:
                 syslog.info(f"State [{state_name}] changed successfully to {gremlin.util.ansiBool(self.sd.getValue(state_name))}")
 
@@ -1026,6 +1192,50 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             worker.stop()
             del self.pulse_worker_map[key]
 
+    def _apply_button_mode(self, key: str, mode: str, is_pressed: bool, verbose: bool):
+        """applies the button mode to a single state"""
+        match mode:
+            case "actual":
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] ACTUAL {is_pressed}")
+                self.sd.setValue(key, is_pressed)
+
+            case "press":
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] ON")
+                self.sd.setValue(key, True)
+
+            case "release":
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] OFF")
+                self.sd.setValue(key, False)
+
+            case "toggle":
+                # current state
+                state = not self.sd.value(key)
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
+                self.sd.setValue(key, state)
+
+            case "pulse":
+                if is_pressed:
+                    if verbose:
+                        syslog.info(f"STATE: trigger start range pulse state {key}")
+                    repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
+                    self.pulse_start(key, self.action_data.pulse_delay / 1000, repeat_interval)
+
+            case "invert":
+                state = not is_pressed
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] INVERT ->  {'ON' if state else 'OFF'}")
+                self.sd.setValue(key, state)
+
+            case "latch":
+                # latch mode is like autorelease but ignores ON retriggers
+                if verbose:
+                    syslog.info(f"STATE FUNCTOR: set [{key}] LATCH")
+                self.sd.latch(key, self.action_data.latch_delay / 1000)
+
     def process_event(self, event, value, extra_data=None):
         """processes an input event - must return True on success, False to abort the input sequence"""
 
@@ -1036,6 +1246,12 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         mode = self.action_data.mode
         is_pressed = event.is_pressed
         input_type = event.getInputType()
+
+        keys = [s.key for s in self._target_states()]
+        if keys:
+            key = keys[0]
+        elif input_type != InputType.JoystickHat:
+            return True  # no states to act on
 
         # trigger on press or release
         sub_trigger = (is_pressed and self.action_data.exec_on_press) or (not is_pressed and self.action_data.exec_on_release)
@@ -1064,47 +1280,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             match input_type:
                 case InputType.JoystickButton:  # | InputType.Keyboard | InputType.KeyboardLatched:
                     # button
-                    match mode:
-                        case "actual":
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] ACTUAL {is_pressed}")
-                            self.sd.setValue(key, is_pressed)
-
-                        case "press":
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] ON")
-                            self.sd.setValue(key, True)
-
-                        case "release":
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] OFF")
-                            self.sd.setValue(key, False)
-
-                        case "toggle":
-                            # current state
-                            state = not self.sd.value(key)
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
-                            self.sd.setValue(key, state)
-
-                        case "pulse":
-                            if is_pressed:
-                                if verbose:
-                                    syslog.info(f"STATE: trigger start range pulse state {key}")
-                                repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
-                                self.pulse_start(key, self.action_data.pulse_delay / 1000, repeat_interval)
-
-                        case "invert":
-                            state = not is_pressed
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] INVERT ->  {'ON' if state else 'OFF'}")
-                            self.sd.setValue(key, state)
-
-                        case "latch":
-                            # latch mode is like autorelease but ignores ON retriggers
-                            if verbose:
-                                syslog.info(f"STATE FUNCTOR: set [{key}] LATCH")
-                            self.sd.latch(key, self.action_data.latch_delay / 1000)
+                    for target_key in keys:
+                        self._apply_button_mode(target_key, mode, is_pressed, verbose)
 
                 case InputType.JoystickHat:
                     # hat button handling
@@ -1119,58 +1296,61 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                         old_position = None
 
                     # release the old position
-                    if old_position:
-                        if old_position in self.pressed_hat_buttons:
-                            state_name = self.pressed_hat_buttons[old_position]
-                            if state_name:
-                                self.sd.setValue(state_name, False, force=True)
-                            del self.pressed_hat_buttons[old_position]
+                    if old_position and old_position in self.pressed_hat_buttons:
+                        for name in self.pressed_hat_buttons.pop(old_position):
+                            self.sd.setValue(name, False, force=True)
 
                     position = event.raw_value
                     is_pressed = event.is_pressed
                     mode = self.action_data.hat_mode_map[position]
 
-                    state_name = self.action_data.hat_map[position]
+                    # the position's mapped state plus every target state when targeting beyond a single state
+                    mapped_name = self.action_data.hat_map[position]
+                    state_names = [mapped_name] if mapped_name else []
+                    if self.action_data.target_mode != "state":
+                        state_names += [k for k in keys if k not in state_names]
                     self.hat_position = position
 
                     if verbose:
                         syslog.info(f"STATE FUNCTOR: received button hat event hat {position} pressed: {is_pressed}")
 
-                    if state_name:
+                    if state_names:
                         match mode:
                             case ButtonOutputMode.Pulse:
-                                if is_pressed:
-                                    if verbose:
-                                        syslog.info(f"STATE FUNCTOR: trigger start pulse state {state_name} hat {position}")
-                                    repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
-                                    self.pulse_start(state_name, self.action_data.pulse_delay / 1000, repeat_interval)
+                                for name in state_names:
+                                    if is_pressed:
+                                        if verbose:
+                                            syslog.info(f"STATE FUNCTOR: trigger start pulse state {name} hat {position}")
+                                        repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
+                                        self.pulse_start(name, self.action_data.pulse_delay / 1000, repeat_interval)
 
-                                else:
-                                    if verbose:
-                                        syslog.info(f"STATE FUNCTOR: trigger stop pulse state {state_name} hat {position}")
-                                    self.pulse_stop(state_name)
+                                    else:
+                                        if verbose:
+                                            syslog.info(f"STATE FUNCTOR: trigger stop pulse state {name} hat {position}")
+                                        self.pulse_stop(name)
 
                             case ButtonOutputMode.Hold:
                                 pass
 
                             case ButtonOutputMode.Press:
                                 if verbose:
-                                    syslog.info(f"STATE FUNCTOR: state [{state_name}] press/on")
+                                    syslog.info(f"STATE FUNCTOR: states {state_names} press/on")
                                 is_pressed = True
                                 if position in self.pressed_hat_buttons:
                                     del self.pressed_hat_buttons[position]
                             case ButtonOutputMode.Release:
                                 if verbose:
-                                    syslog.info(f"STATE FUNCTOR: state [{state_name}] release/off")
+                                    syslog.info(f"STATE FUNCTOR: states {state_names} release/off")
                                 is_pressed = False  # force a release on trigger
                                 if position in self.pressed_hat_buttons:
                                     del self.pressed_hat_buttons[position]
 
                             case ButtonOutputMode.Latch:
                                 # latch mode is like autorelease but ignores ON retriggers
-                                if verbose:
-                                    syslog.info(f"STATE FUNCTOR: set [{key}] LATCH")
-                                self.sd.latch(self.action_data.latch_delay / 1000)
+                                for name in state_names:
+                                    if verbose:
+                                        syslog.info(f"STATE FUNCTOR: set [{name}] LATCH")
+                                    self.sd.latch(name, self.action_data.latch_delay / 1000)
                                 return True
 
                             case ButtonOutputMode.NoOp:
@@ -1179,9 +1359,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
                         # set the new button
                         if verbose:
-                            syslog.info(f"STATE FUNCTOR: state [{state_name}] set new state: {is_pressed}")
-                        self.pressed_hat_buttons[position] = state_name
-                        self.sd.setValue(state_name, is_pressed, force=True)
+                            syslog.info(f"STATE FUNCTOR: states {state_names} set new state: {is_pressed}")
+                        self.pressed_hat_buttons[position] = state_names
+                        for name in state_names:
+                            self.sd.setValue(name, is_pressed, force=True)
 
                     else:
                         # non trigger mode (release)
@@ -1198,10 +1379,11 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         if sub_trigger:
             # get state list
             if self.action_data.other_state_category_only:
-                # match on category
-                states = [k for k in self.sd.getStates() if k != key and self.sd.getCategory(k) == self.sd.getCategory(key)]
+                # match on the category of any target state
+                categories = {self.sd.getCategory(k) for k in keys}
+                states = [k for k in self.sd.getStates() if k not in keys and self.sd.getCategory(k) in categories]
             else:
-                states = [k for k in self.sd.getStates() if k != key]
+                states = [k for k in self.sd.getStates() if k not in keys]
             match self.action_data.action_mode:
                 case MapToStateActionMode.NONE:
                     pass
@@ -1218,19 +1400,22 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                         self.sd.setValue(state_key, False, force=True)
 
                 case MapToStateActionMode.SET_XOR:
-                    value = self.sd.getValue(key)
-                    for state_key in states:
-                        self.sd.setValue(state_key, self.sd.getStates()[state_key] != value, force=True)
+                    for target_key in keys:
+                        value = self.sd.getValue(target_key)
+                        for state_key in states:
+                            self.sd.setValue(state_key, self.sd.getValue(state_key) != value, force=True)
 
                 case MapToStateActionMode.SET_AND:
-                    value = self.sd.getValue(key)
-                    for state_key in states:
-                        self.sd.setValue(state_key, self.sd.getStates()[state_key] and value, force=True)
+                    for target_key in keys:
+                        value = self.sd.getValue(target_key)
+                        for state_key in states:
+                            self.sd.setValue(state_key, self.sd.getValue(state_key) and value, force=True)
 
                 case MapToStateActionMode.SET_OR:
-                    value = self.sd.getValue(key)
-                    for state_key in states:
-                        self.sd.setValue(state_key, self.sd.getStates()[state_key] or value, force=True)
+                    for target_key in keys:
+                        value = self.sd.getValue(target_key)
+                        for state_key in states:
+                            self.sd.setValue(state_key, self.sd.getValue(state_key) or value, force=True)
 
         return True
 
@@ -1283,6 +1468,10 @@ class MapToState(gremlin.input_item.AbstractAction):
             0.5  # chance of randomizing if in randomize mode.  The value 0 to 1 indicates the chance of randomization with 1 = 100%, 0 = no chance.
         )
         self.latch_delay = 1000  # default latch delay in milliseconds
+        self.target_mode = "state"  # "state" applies to the selected state, "attributes" applies to every state having any of the attributes
+        self.attributes: list[str] = []  # attribute names used when the target mode is "attributes"
+        self.categories: list[str] = []  # category names used when the target mode is "categories"
+        self.states: list[str] = []  # state keys used when the target mode is "states"
 
         for position in self.hat_positions:
             self.hat_map[position] = ""  # not mapped by default
@@ -1297,12 +1486,32 @@ class MapToState(gremlin.input_item.AbstractAction):
             return self.state.key
         return None
 
+    def target_states(self) -> list[gremlin.ui.state_device.StateInputItem]:
+        """states the action applies to based on the target mode"""
+        sd = gremlin.ui.state_device.StateData()
+        items = list(sd.getInputItems().values())
+        match self.target_mode:
+            case "attributes":
+                return [s for s in items if any(s.hasAttribute(a) for a in self.attributes)]
+            case "category":
+                names = {c.casefold().strip() for c in self.categories}
+                return [s for s in items if s.category and s.category.name in names]
+            case "states":
+                return [s for s in (sd.getState(k) for k in self.states) if s]
+        return [self.state] if self.state else []
+
     def display_name(self):
         """returns a display string for the current configuration"""
         stub = ""
         if self.pulse_repeat:
             stub = f" (pulse) delay (ms): [{self.pulse_delay}] repeat (ms): [{self.pulse_repeat_delay}]"
-        return f"State: ({self.mode}]) [{self.key}] EOR: [{self.exec_on_release}]{stub}"
+        if self.target_mode == "attributes":
+            target = f"attributes: {', '.join(self.attributes)}"
+        elif self.target_mode == "states":
+            target = f"states: {', '.join(self.states)}"
+        else:
+            target = self.key
+        return f"State: ({self.mode}]) [{target}] EOR: [{self.exec_on_release}]{stub}"
 
     def icon(self):
         """Returns the icon to use for this action.
@@ -1342,11 +1551,21 @@ class MapToState(gremlin.input_item.AbstractAction):
 
         if state:
             self.state = state
-        else:
+        elif key:
             # state not found - see if we can find the missing datas
             # syslog.warning(f"STATE: (map to state): [{key}] does not exist - creating state")
             state = sd._register(key)
             self.state = state
+
+        target_mode = "state"
+        if "target" in node.attrib:
+            target_mode = node.get("target")
+            if target_mode not in ["state", "states", "attributes", "category"]:
+                target_mode = "state"
+        self.target_mode = target_mode
+        self.attributes = [html.unescape(a.get("name")) for a in node.findall("attribute") if a.get("name")]
+        self.categories = [html.unescape(c.get("name")) for c in node.findall("category") if c.get("name")]
+        self.states = [html.unescape(s.get("name")) for s in node.findall("target-state") if s.get("name")]
 
         if "description" in node.attrib:
             self.description = html.unescape(node.get("description"))
@@ -1410,10 +1629,18 @@ class MapToState(gremlin.input_item.AbstractAction):
         :return XML node containing the information of this  instance
         """
         node = ElementTree.Element(MapToState.tag)
-        if self.key:
-            node.set("key", html.escape(self.key))
-            if self.state:
-                node.set("state-id", gremlin.util.normalize_guid(self.state.id))
+        if self.key or self.target_mode != "state":
+            if self.key:
+                node.set("key", html.escape(self.key))
+                if self.state:
+                    node.set("state-id", gremlin.util.normalize_guid(self.state.id))
+            node.set("target", self.target_mode)
+            for attribute in self.attributes:
+                ElementTree.SubElement(node, "attribute", name=html.escape(attribute))
+            for category in self.categories:
+                ElementTree.SubElement(node, "category", name=html.escape(category))
+            for state_key in self.states:
+                ElementTree.SubElement(node, "target-state", name=html.escape(state_key))
             if self.description:
                 node.set("description", html.escape(self.description))
             node.set("mode", self.mode)
@@ -1461,6 +1688,10 @@ class MapToState(gremlin.input_item.AbstractAction):
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""
 
+        if self.target_mode == "attributes":
+            return html.escape(", ".join(self.attributes)) if self.attributes else "N/A"
+        if self.target_mode == "states":
+            return html.escape(", ".join(self.states)) if self.states else "N/A"
         state = self.state
         if state:
             return state.to_html()

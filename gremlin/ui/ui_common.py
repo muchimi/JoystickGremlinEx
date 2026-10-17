@@ -1691,6 +1691,7 @@ class Buttons:
         width: int = None,
         height: int = None,
         size: int = 16,
+        color = None,
         parent=None,
     ):
 
@@ -1719,7 +1720,7 @@ class Buttons:
 
         if icon_source:
             if isinstance(icon_source, str):
-                icon = gremlin.util.load_icon(icon_source)
+                icon = gremlin.util.load_icon(icon_source, qta_color = color)
             elif isinstance(icon_source, QtGui.QIcon):
                 icon = icon_source
             else:
@@ -1728,6 +1729,8 @@ class Buttons:
                 widget.setIcon(icon)
                 widget.setIconSize(QtCore.QSize(size, size))
         widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+
+
         if tooltip:
             widget.setToolTip(tooltip)
 
@@ -1751,11 +1754,12 @@ class Buttons:
         data: object = None,
         size: int = 24,
         icon_size: int = 16,
+        color = None,
     ):
         if not tooltip:
             tooltip = "Delete"
         button = Buttons._template(
-            label=label, icon_source="mdi6.delete", tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, size=icon_size
+            label=label, icon_source="mdi6.delete", tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, size=icon_size, color=color
         )
         if size is not None:
             button.setFixedSize(size, size)
@@ -1941,28 +1945,28 @@ class Buttons:
         return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data)
 
     @staticmethod
-    def getListSyncWidget(label: str = None, tooltip: str = "Find In List", callback: Callable = None, no_keyboard: bool = True, data: object = None):
+    def getListSyncWidget(label: str = None, tooltip: str = "Find In List", callback: Callable = None, no_keyboard: bool = True, data: object = None, color = None):
         icon = Icons.syncIcon()
-        return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data)
+        return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, color=color)
 
     @staticmethod
-    def getPasteWidget(tooltip: str = "Paste", callback: Callable = None):
+    def getPasteWidget(tooltip: str = "Paste", callback: Callable = None, color = None):
         """creates a paste widget
 
         :param tooltip: the tooltip to show
         :callback : optional the callback on click
         """
-        return Buttons._template(label=None, icon_source=Icons.pasteIcon(), tooltip=tooltip, callback=callback, no_keyboard=True, data=None)
+        return Buttons._template(label=None, icon_source=Icons.pasteIcon(), tooltip=tooltip, callback=callback, no_keyboard=True, data=None, color=color)
 
     @staticmethod
-    def getCopyWidget(tooltip: str = "Copy", callback: Callable = None):
+    def getCopyWidget(tooltip: str = "Copy", callback: Callable = None, color = None):
         """creates a copy widget
 
         :param tooltip: the tooltip to show
         :callback : optional the callback on click
 
         """
-        return Buttons._template(label=None, icon_source=Icons.copyIcon(), tooltip=tooltip, callback=callback, no_keyboard=True, data=None)
+        return Buttons._template(label=None, icon_source=Icons.copyIcon(), tooltip=tooltip, callback=callback, no_keyboard=True, data=None, color=color)
 
     @staticmethod
     def getCollapseAllWidget(tooltip: str = "Collapse All", callback: Callable = None, width: int = 24, height: int = 24):
@@ -4620,6 +4624,8 @@ def ConfirmBox(prompt="Are you sure", informative_text=None, parent=None) -> boo
 
     MessageBoxYesNo(prompt=prompt, informative_text=informative_text, callback=set_result, parent=parent)
     return result
+
+
 
 
 def MessageBoxWarning(title="Warning", prompt="Operation", informative_text=None, parent=None, width=200):
@@ -12054,6 +12060,7 @@ def getGridContainer(
     tooltip=None,
     left_margin=0,
     bottom_margin=0,
+    align_top=False,
 ):
     """gets a qt grid container widget
 
@@ -12103,6 +12110,8 @@ def getGridContainer(
                     item = QHorizontalSeparator()
                 else:
                     item = QtWidgets.QLabel(item)
+            if align_top:
+                item = getVContainer([item], widget_only=True)
             layout.addWidget(item, row, col)
             col += 1
 
@@ -17936,3 +17945,12 @@ class QTabHeader(FixedTabBar):
                 self.tabChanged.emit(index)
 
         return super().eventFilter(widget, event)
+
+
+def AutoSize(widgets):
+    """Automatically set the same width for a list of widgets based on the widest one."""
+    if not isinstance(widgets, (list, tuple)) or not widgets:
+        return
+    max_width = max(widget.sizeHint().width() for widget in widgets)
+    for widget in widgets:
+        widget.setMinimumWidth(max_width)
