@@ -472,17 +472,30 @@ class OverlayWebsocketSession(QtCore.QObject):
         self._running = False
         self._frame_timer.stop()
         for sock in list(self._clients):
-            try:
-                sock.close()
-            except Exception:
-                pass
+            self._silence_socket(sock)
         self._clients.clear()
-        if self._ws_server is not None:
+        server = self._ws_server
+        self._ws_server = None
+        if server is not None:
             try:
-                self._ws_server.close()
+                server.blockSignals(True)
             except Exception:
                 pass
-            self._ws_server = None
+            try:
+                server.newConnection.disconnect(self._on_new_connection)
+            except Exception:
+                pass
+            try:
+                server.close()
+            except Exception:
+                pass
+            # Drop the parent link before this session is deleted. Destroying
+            # the server as a child emits disconnected into a dead session.
+            try:
+                server.setParent(None)
+                server.deleteLater()
+            except Exception:
+                pass
         self._stop_http()
         self._teardown_view()
         self._http_port = 0
@@ -575,7 +588,25 @@ class OverlayWebsocketSession(QtCore.QObject):
             self._last_frame_key = None
             self._on_frame_tick(force=True)
 
+    def _silence_socket(self, sock: QtWebSockets.QWebSocket) -> None:
+        """Close a client without letting it call back into this session."""
+        try:
+            sock.blockSignals(True)
+        except Exception:
+            pass
+        for signal in (sock.disconnected, sock.textMessageReceived):
+            try:
+                signal.disconnect()
+            except Exception:
+                pass
+        try:
+            sock.close()
+        except Exception:
+            pass
+
     def _on_disconnected(self, sock: QtWebSockets.QWebSocket):
+        if not Shiboken.isValid(self):
+            return
         if sock in self._clients:
             self._clients.remove(sock)
         try:
@@ -588,8 +619,11 @@ class OverlayWebsocketSession(QtCore.QObject):
                 self._view.release_touch()
             except Exception:
                 pass
-        self.clients_changed.emit(len(self._clients))
-        self.status_changed.emit()
+        try:
+            self.clients_changed.emit(len(self._clients))
+            self.status_changed.emit()
+        except RuntimeError:
+            return
 
     def _send_json(self, sock: QtWebSockets.QWebSocket, payload: dict):
         try:

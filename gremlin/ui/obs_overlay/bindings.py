@@ -278,7 +278,7 @@ def sync_overlay_state_fields(
 
 
 def _iter_identity_dicts(item: dict[str, Any]):
-    for key in ("binding", "binding_y"):
+    for key in ("binding", "binding_y", "binding_z"):
         value = item.get(key)
         if isinstance(value, dict):
             yield value
@@ -476,7 +476,10 @@ def read_axis(binding: dict[str, Any], axis_id: int | None, invert: bool = False
             guid = binding.get("device_guid")
             if not guid:
                 return 0.0
-            value = gremlin.joystick_handling.get_axis(guid, int(axis_id))
+            # Physical axes: use the same calibrated + curve path as the event handler.
+            value = gremlin.joystick_handling.get_curved_axis(guid, int(axis_id))
+            if value is None:
+                value = gremlin.joystick_handling.get_axis(guid, int(axis_id))
         if value is None:
             return 0.0
         return _invert(float(value), invert)
@@ -609,8 +612,15 @@ def widget_needs_xy(widget_type: str) -> bool:
     return widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair")
 
 
+def widget_needs_xyz(widget_type: str) -> bool:
+    return widget_type in ("axis_xyz", "axis_polar", "axis_ternary", "axis_radar")
+
+
 def binding_for_axis(item: dict[str, Any], axis: str = "x") -> dict[str, Any]:
-    """X uses `binding`; Y uses `binding_y`, with legacy input_id_y fallback."""
+    """X uses `binding`; Y uses `binding_y`; Z uses `binding_z`. Y keeps the legacy input_id_y fallback."""
+    if axis == "z":
+        z_bind = item.get("binding_z")
+        return dict(z_bind) if isinstance(z_bind, dict) else {}
     x_bind = dict(item.get("binding") or {})
     if axis != "y":
         return x_bind
@@ -941,6 +951,8 @@ def widget_accepts_touch(item: dict[str, Any] | None) -> bool:
         return vjoy_binding_writable(item.get("binding"))
     if widget_is_switch(widget_type):
         return any(binding_is_writable(switch_binding(item, position)) for position in switch_positions(widget_type))
+    if widget_needs_xyz(widget_type):
+        return any(vjoy_binding_writable(binding_for_axis(item, axis)) for axis in ("x", "y", "z"))
     if widget_needs_xy(widget_type):
         return vjoy_binding_writable(binding_for_axis(item, "x")) or vjoy_binding_writable(binding_for_axis(item, "y"))
     return vjoy_binding_writable(item.get("binding"))
@@ -1217,6 +1229,27 @@ def read_toggle_active(binding: dict[str, Any] | None) -> bool:
     return (not value) if invert else bool(value)
 
 
+def _streamdeck_state_look(bridge, device_id: str, page: int) -> tuple:
+    """ON/OFF of each state-driven key, so the overlay repaints when a GEX state changes."""
+    try:
+        from gremlin.ui.streamdeck_surface import appearance_follows_state, appearance_state_is_on
+
+        slots = bridge.overlay_slots(device_id, page)
+    except Exception:
+        return ()
+    look = []
+    for slot_key in sorted(slots, key=lambda key: (str(key[0]), int(key[1] or 0), int(key[2] or 0))):
+        slot_item = slots.get(slot_key)
+        if slot_item is None or not appearance_follows_state(slot_item):
+            continue
+        try:
+            on = bool(appearance_state_is_on(slot_item))
+        except Exception:
+            on = False
+        look.append((slot_key, on))
+    return tuple(look)
+
+
 def _streamdeck_overlay_value(item: dict[str, Any]):
     """Fingerprint so overlay views redraw when the mirrored deck changes."""
     try:
@@ -1231,17 +1264,19 @@ def _streamdeck_overlay_value(item: dict[str, Any]):
         else:
             page = normalize_page(style.get("streamdeck_page") or 1)
         held = tuple(sorted(bridge.held_slot_keys(device_id))) if device_id else ()
+        look = _streamdeck_state_look(bridge, device_id, page) if device_id else ()
         connected = bool(device_id and device_id in bridge.devices)
         return (
             device_id,
             page,
             held,
+            look,
             connected,
             bridge.overlay_generation(),
             bool(bridge.plugin_is_connected),
         )
     except Exception:
-        return ("", 0, (), False, 0, False)
+        return ("", 0, (), (), False, 0, False)
 
 
 def _read_axis_bars(item: dict[str, Any]):
@@ -1304,6 +1339,30 @@ def read_widget_value(item: dict[str, Any]):
         return ApplicationViewTracker().sample(item)
     if widget_type == "streamdeck":
         return _streamdeck_overlay_value(item)
+    if widget_type == "browser":
+        style = item.get("style") or {}
+        return (
+            str(style.get("url") or ""),
+            str(style.get("browser") or "default"),
+            bool(style.get("show_url_bar", True)),
+            bool(style.get("show_scrollbars", True)),
+        )
+    if widget_type == "efb":
+        style = item.get("style") or {}
+        buttons = style.get("section_buttons") or ()
+        favorites = style.get("favorites") or ()
+        return (
+            str(style.get("efb_root") or ""),
+            str(style.get("system") or "Stanton"),
+            str(style.get("section_id") or "sfd"),
+            str(style.get("discord_url") or ""),
+            tuple(str(p) for p in favorites),
+            tuple(
+                (str(b.get("id") or ""), str(b.get("label") or ""), str(b.get("path") or ""))
+                for b in buttons
+                if isinstance(b, dict)
+            ),
+        )
     if widget_type == "remote_view":
         from gremlin.remote_video import RemoteVideoHub
 
@@ -1363,6 +1422,12 @@ def read_widget_value(item: dict[str, Any]):
         return (x, y)
     if widget_is_switch(widget_type):
         return read_switch_position(item)
+    if widget_needs_xyz(widget_type):
+        axes = []
+        for axis_name in ("x", "y", "z"):
+            axis_bind = binding_for_axis(item, axis_name)
+            axes.append(read_axis(axis_bind, axis_bind.get("input_id"), bool(axis_bind.get("invert"))))
+        return tuple(axes)
     if widget_needs_xy(widget_type):
         x_bind = binding_for_axis(item, "x")
         y_bind = binding_for_axis(item, "y")

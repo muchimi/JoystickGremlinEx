@@ -167,6 +167,10 @@ WIDGET_TYPES = (
     "axis_crosshair",
     "axis_stick_circle",
     "axis_mouse",
+    "axis_xyz",
+    "axis_polar",
+    "axis_ternary",
+    "axis_radar",
     "button",
     "hat",
     "switch_4way",
@@ -182,6 +186,8 @@ WIDGET_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "browser",
+    "efb",
     "ocr",
     "panel",  # legacy alias of shape
     "axis_dial",  # legacy alias of axis_radial
@@ -204,6 +210,10 @@ PALETTE_TYPES = (
     "axis_crosshair",
     "axis_stick_circle",
     "axis_mouse",
+    "axis_xyz",
+    "axis_polar",
+    "axis_ternary",
+    "axis_radar",
     "sys_stats",
     "stopwatch",
     "axis_graph",
@@ -215,6 +225,8 @@ PALETTE_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "browser",
+    "efb",
     "ocr",
 )
 
@@ -222,8 +234,9 @@ PALETTE_GROUPS = (
     ("Buttons", ("button", "toggle", "hat", "switch_4way", "switch_2way", "switch_3way")),
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
+    ("3 Axis", ("axis_xyz", "axis_polar", "axis_ternary", "axis_radar")),
     ("Meters", ("sys_stats", "stopwatch")),
-    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck", "ocr")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck", "browser", "efb", "ocr")),
 )
 
 DEFAULT_SIZES = {
@@ -240,6 +253,10 @@ DEFAULT_SIZES = {
     "axis_stick_circle": (180, 180),
     "axis_crosshair": (220, 220),
     "axis_mouse": (180, 180),
+    "axis_xyz": (240, 240),
+    "axis_polar": (240, 240),
+    "axis_ternary": (300, 280),
+    "axis_radar": (240, 240),
     "button": (88, 32),
     "toggle": (88, 32),
     "hat": (108, 108),
@@ -255,6 +272,8 @@ DEFAULT_SIZES = {
     "application": (480, 270),
     "remote_view": (480, 270),
     "streamdeck": (320, 208),
+    "browser": (640, 400),
+    "efb": (720, 480),
     "ocr": (280, 120),
     "panel": (280, 160),
 }
@@ -273,6 +292,10 @@ DEFAULT_LABELS = {
     "axis_stick_circle": "",
     "axis_crosshair": "",
     "axis_mouse": "",
+    "axis_xyz": "",
+    "axis_polar": "",
+    "axis_ternary": "",
+    "axis_radar": "",
     "button": "BTN",
     "toggle": "",
     "hat": "",
@@ -288,6 +311,8 @@ DEFAULT_LABELS = {
     "application": "",
     "remote_view": "Remote",
     "streamdeck": "",
+    "browser": "Browser",
+    "efb": "SC EFB",
     "ocr": "OCR",
     "panel": "",
 }
@@ -609,6 +634,149 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "ring_count": 3,
             }
         )
+    elif widget_type == "axis_xyz":
+        style.update(
+            {
+                "show_label": False,
+                "corner_radius": 6.0,
+                "indicator_size": 12.0,
+                "indicator": "#ff5a3c",
+                "indicator_shape": "circle",
+                "show_dot_shadow": True,
+                "show_dot_crosshair": False,
+                "show_projection": True,
+                "projection": "#ff5a3c",
+                "projection_width": 2.5,
+                "needle_width": 2.5,
+                "axis_length": 0.30,
+                "invert_x": False,
+                "invert_y": False,
+                "invert_z": False,
+                "show_grid": True,
+                "grid": "#2a3a55",
+                "grid_width": 1.0,
+                "grid_divisions": 4,
+                "show_bounds_box": False,
+                "box": "#5a6a84",
+                "box_fill": "#20304040",
+                "box_width": 1.2,
+                "axis": "#e6e8ec",
+                "axis_width": 0.5,
+                "show_axis_arrows": True,
+                "arrow_size": 7.0,
+                "show_vector": False,
+                "vector": "#ff5a3c",
+                "vector_width": 2.5,
+                "show_vector_arrow": True,
+                "show_sphere": False,
+                "sphere": {
+                    "type": "gradient",
+                    "style": "radial",
+                    "angle": 135.0,
+                    "scale": 130.0,
+                    "smoothness": 100.0,
+                    "stops": [
+                        {"pos": 0.0, "color": "#fff2ebe0"},
+                        {"pos": 42.0, "color": "#ffb0b0b0"},
+                        {"pos": 100.0, "color": "#ff5a5a5a"},
+                    ],
+                    "midpoints": [0.45, 0.55],
+                },
+                "sphere_border": "#00000000",
+                "sphere_width": 1.0,
+            }
+        )
+    elif widget_type == "axis_polar":
+        style.update(
+            {
+                "show_label": False,
+                "corner_radius": 6.0,
+                "indicator_size": 12.0,
+                "indicator": "#ff5a3c",
+                "indicator_shape": "circle",
+                "show_dot_shadow": True,
+                "show_dot_crosshair": False,
+                "show_projection": True,
+                "projection": "#ff5a3c",
+                "projection_width": 2.0,
+                "needle_width": 2.5,
+                "axis_length": 0.30,
+                "invert_x": False,
+                "invert_y": False,
+                "invert_z": False,
+                "show_grid": True,
+                "grid": "#2a3a55",
+                "grid_width": 1.0,
+                "grid_divisions": 4,
+                "show_bounds_box": False,
+                "box": "#5a6a84",
+                "box_fill": "#20304040",
+                "box_width": 1.2,
+                "axis": "#e6e8ec",
+                "axis_width": 0.5,
+                "show_axis_arrows": True,
+                "arrow_size": 7.0,
+                "show_vector": True,
+                "vector": "#ff5a3c",
+                "vector_width": 2.5,
+                "show_vector_arrow": True,
+                "show_sphere": True,
+                "sphere": "#c8c4bc",
+                "sphere_border": "#2c4a6e",
+                "sphere_width": 1.2,
+                "show_sphere_equator": True,
+            }
+        )
+    elif widget_type == "axis_ternary":
+        style.update(
+            {
+                "show_label": False,
+                "fill": "#00000000",
+                "indicator_size": 12.0,
+                "indicator": "#ff5a3c",
+                "indicator_shape": "circle",
+                "show_dot_shadow": True,
+                "show_dot_crosshair": False,
+                "axis": "#e6e8ec",
+                "axis_width": 0.5,
+                "show_axis_arrows": True,
+                "arrow_size": 7.0,
+            }
+        )
+    elif widget_type == "axis_radar":
+        style.update(
+            {
+                "show_label": False,
+                "fill": "#0a1220",
+                "corner_radius": 0.0,
+                "show_grid": True,
+                "grid": "#2a3a55",
+                "grid_width": 1.0,
+                "ring_count": 5,
+                "show_center_line": True,
+                "crosshair": "#3a4a64",
+                "axis": "#e6e8ec",
+                "axis_width": 0.5,
+                "show_axis_arrows": True,
+                "arrow_size": 7.0,
+                "show_slew_limits": True,
+                "slew_left_deg": -60.0,
+                "slew_right_deg": 60.0,
+                "for_min_deg": 10.0,
+                "for_max_deg": 180.0,
+                "range_min": 0.0,
+                "range_max": 100.0,
+                "invert_x": False,
+                "invert_y": False,
+                "invert_z": False,
+                "fov": "#ff5a3c",
+                "fov_fill": "#40ff5a3c",
+                "fov_width": 2.0,
+                "show_fov_scan": True,
+                "projection": "#ff5a3c",
+                "projection_width": 1.5,
+            }
+        )
     elif widget_type == "axis_mouse":
         style.update(
             {
@@ -888,6 +1056,40 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "show_bezel": True,
             }
         )
+    elif widget_type == "browser":
+        style.update(
+            {
+                "fill": "#121418",
+                "border": "#3a414c",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "url": "",
+                "browser": "default",
+                "show_url_bar": True,
+                "show_scrollbars": True,
+            }
+        )
+    elif widget_type == "efb":
+        from .efb_host import default_section_buttons
+
+        style.update(
+            {
+                "fill": "#121418",
+                "border": "#3a414c",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "efb_root": "",
+                "system": "Stanton",
+                "section_id": "sfd",
+                "discord_url": "https://discord.com/invite/p6PVqSk",
+                "favorites": [],
+                "section_buttons": default_section_buttons(),
+            }
+        )
     return style
 
 
@@ -912,6 +1114,76 @@ def _refresh_font_scale_base(item: dict[str, Any], style_updates: dict[str, Any]
 
 OVERLAY_CONFIG_KEY = "obs_overlay"
 XY_WIDGET_TYPES = ("axis_stick_square", "axis_stick_circle", "axis_crosshair")
+XYZ_WIDGET_TYPES = ("axis_xyz", "axis_polar", "axis_ternary", "axis_radar")
+POLAR_WIDGET_TYPES = ("axis_polar",)
+RADAR_WIDGET_TYPES = ("axis_radar",)
+# On type convert, old style is merged onto the new defaults — these keys must stay
+# the destination widget's identity so e.g. axes→polar does not keep show_sphere=False.
+STYLE_IDENTITY_KEYS = {
+    "axis_xyz": (
+        "show_sphere",
+        "show_vector",
+        "show_vector_arrow",
+        "show_projection",
+        "show_sphere_equator",
+        "show_bounds_box",
+        "show_grid",
+        "grid_divisions",
+        "axis_length",
+        "fill",
+    ),
+    "axis_polar": (
+        "show_sphere",
+        "show_vector",
+        "show_vector_arrow",
+        "show_projection",
+        "show_sphere_equator",
+        "show_bounds_box",
+        "show_grid",
+        "grid_divisions",
+        "axis_length",
+        "sphere",
+        "sphere_border",
+        "sphere_width",
+        "fill",
+    ),
+    "axis_ternary": (
+        "fill",
+        "show_axis_arrows",
+        "axis_width",
+        "arrow_size",
+        "show_sphere",
+        "show_vector",
+        "show_projection",
+    ),
+    "axis_radar": (
+        "fill",
+        "ring_count",
+        "slew_left_deg",
+        "slew_right_deg",
+        "for_min_deg",
+        "for_max_deg",
+        "range_min",
+        "range_max",
+        "fov",
+        "fov_fill",
+        "show_fov_scan",
+        "show_slew_limits",
+        "show_center_line",
+    ),
+}
+
+
+def merge_converted_style(widget_type: str, old_style: dict[str, Any] | None) -> dict[str, Any]:
+    """Merge prior Look onto new defaults without stomping type-defining flags."""
+    fresh = default_style(widget_type)
+    merged = dict(fresh)
+    if isinstance(old_style, dict):
+        merged.update(old_style)
+    for key in STYLE_IDENTITY_KEYS.get(widget_type, ()):
+        if key in fresh:
+            merged[key] = copy.deepcopy(fresh[key])
+    return merged
 NO_CORNER_RADIUS_TYPES = (
     "axis_radio",
     "axis_radial",
@@ -920,6 +1192,8 @@ NO_CORNER_RADIUS_TYPES = (
     "axis_paddle",
     "axis_crosshair",
     "axis_stick_circle",
+    "axis_ternary",
+    "axis_radar",
 )
 SINGLE_AXIS_TYPES = (
     "axis_bar",
@@ -939,6 +1213,8 @@ NO_BINDING_WIDGET_TYPES = (
     "application",
     "remote_view",
     "streamdeck",
+    "browser",
+    "efb",
     "axis_mouse",
     "axis_graph",
     "axis_bars",
@@ -1081,6 +1357,8 @@ def normalize_switch_bindings(widget_type: str | None, raw=None) -> dict[str, An
 
 
 def widget_binding_kind(widget_type: str) -> str:
+    if widget_type in XYZ_WIDGET_TYPES:
+        return "xyz"
     if widget_type in XY_WIDGET_TYPES:
         return "xy"
     if widget_type in ("button", "stopwatch", "ocr"):
@@ -1855,14 +2133,17 @@ def normalize_ocr_fire(value) -> str:
 
 
 def split_ocr_texts(raw) -> list[str]:
-    """Parse a texts list or comma/newline-separated string into unique needles."""
+    """Parse a texts list or semicolon/newline-separated string into unique needles.
+
+    Semicolons separate values so a thousands comma (11,655) stays inside one value.
+    """
     if isinstance(raw, (list, tuple)):
         parts = [str(p or "").strip() for p in raw]
     else:
         text = str(raw or "")
         parts = []
         for line in text.replace("\r", "\n").split("\n"):
-            for chunk in line.split(","):
+            for chunk in line.split(";"):
                 parts.append(chunk.strip())
     out: list[str] = []
     seen: set[str] = set()
@@ -1930,7 +2211,7 @@ def normalize_ocr_rule(raw, index: int = 0) -> dict[str, Any]:
         "mapping_xml": mapping_xml,
         "name": name,
         "capture": capture,
-        "text": ", ".join(texts),
+        "text": "; ".join(texts),
         "fire": normalize_ocr_fire(raw.get("fire")),
         "binding": normalize_toggle_binding(raw.get("binding")) if raw.get("binding") else default_toggle_binding(),
     }
@@ -2054,6 +2335,7 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "blink": default_blink(),
         "binding": default_binding(),
         "binding_y": default_binding(),
+        "binding_z": default_binding(),
         "bindings": {},
         "points": [],
         "series": [],
@@ -2810,6 +3092,7 @@ class OverlayScene(QtCore.QObject):
                     "style",
                     "binding",
                     "binding_y",
+                    "binding_z",
                     "bindings",
                     "points",
                     "visibility",
@@ -2863,6 +3146,10 @@ class OverlayScene(QtCore.QObject):
         else:
             item["ocr_rules"] = []
         item["binding"], item["binding_y"] = self._normalize_bindings(widget_type, raw)
+        item["binding_z"] = default_binding()
+        raw_z = raw.get("binding_z")
+        if isinstance(raw_z, dict) and raw_z:
+            item["binding_z"].update(raw_z)
         if widget_type == "stopwatch":
             item["binding"] = normalize_toggle_binding(item.get("binding"))
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
@@ -3124,8 +3411,7 @@ class OverlayScene(QtCore.QObject):
         if old_type == widget_type:
             return
         old_style = dict(item.get("style") or {})
-        new_style = default_style(widget_type)
-        new_style.update(old_style)
+        new_style = merge_converted_style(widget_type, old_style)
         old_size = DEFAULT_SIZES.get(old_type)
         new_size = DEFAULT_SIZES.get(widget_type)
         keep_size = old_type in ("shape", "panel") and widget_type == "button"
@@ -3215,17 +3501,22 @@ class OverlayScene(QtCore.QObject):
             item["bindings"] = {}
         if new_kind == "none" or old_kind == new_kind:
             return
-        if {old_kind, new_kind} <= {"axis", "xy"}:
+        if {old_kind, new_kind} <= {"axis", "xy", "xyz"}:
             binding = item.get("binding") or default_binding()
             if binding.get("input_type") != "axis":
                 item["binding"] = default_binding()
-            if new_kind == "xy":
+            if new_kind in ("xy", "xyz"):
                 y = item.get("binding_y")
                 if not isinstance(y, dict) or not y:
                     item["binding_y"] = default_binding()
+            if new_kind == "xyz":
+                z = item.get("binding_z")
+                if not isinstance(z, dict) or not z:
+                    item["binding_z"] = default_binding()
             return
         item["binding"] = default_binding()
         item["binding_y"] = default_binding()
+        item["binding_z"] = default_binding()
         if new_kind == "button":
             item["binding"]["input_type"] = "button"
             if widget_type == "stopwatch":
@@ -4279,7 +4570,7 @@ class OverlayScene(QtCore.QObject):
                         item["style"].get("switch_appearance")
                     )
                 _refresh_font_scale_base(item, value)
-            elif key in ("binding", "binding_y"):
+            elif key in ("binding", "binding_y", "binding_z"):
                 item.setdefault(key, default_binding()).update(value)
             elif key == "bindings" and isinstance(value, dict):
                 current = dict(item.get("bindings") or {})
@@ -4443,6 +4734,12 @@ class OverlayScene(QtCore.QObject):
             self._path = json_path
             self.from_dict(data)
             self.sync_identity_refs(emit=False)
+            try:
+                from .overlay_input import restore_overlay_mappings_from_widgets
+
+                restore_overlay_mappings_from_widgets(self)
+            except Exception as err:
+                syslog.warning(f"OBS OVERLAY: restore OCR/button mappings failed: {err}")
             self._dirty = False
             self._undo.clear()
             self._redo.clear()
@@ -4469,6 +4766,12 @@ class OverlayScene(QtCore.QObject):
             with open(path, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
             self.from_dict(data)
+            try:
+                from .overlay_input import restore_overlay_mappings_from_widgets
+
+                restore_overlay_mappings_from_widgets(self)
+            except Exception as err:
+                syslog.warning(f"OBS OVERLAY: restore OCR/button mappings failed: {err}")
             self._dirty = True
             self._undo.clear()
             self._redo.clear()
@@ -4480,6 +4783,12 @@ class OverlayScene(QtCore.QObject):
     def save(self, path: str | None = None) -> bool:
         """Export to an explicit path, or persist with the GEX profile save path."""
         if path:
+            try:
+                from .overlay_input import sync_overlay_mappings_to_widgets
+
+                sync_overlay_mappings_to_widgets(self)
+            except Exception as err:
+                syslog.warning(f"OBS OVERLAY: sync OCR/button mappings failed: {err}")
             return self._write_json_file(path, self.to_dict())
         return self.save_to_profile()
 
@@ -4490,6 +4799,12 @@ class OverlayScene(QtCore.QObject):
         if not path:
             syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
             return False
+        try:
+            from .overlay_input import sync_overlay_mappings_to_widgets
+
+            sync_overlay_mappings_to_widgets(self)
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: sync OCR/button mappings failed: {err}")
         data = self.to_dict()
         current = profile_xml_path(profile)
         # Prefer Profile._setConfig so we merge against the live sidecar and keep

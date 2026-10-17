@@ -286,6 +286,18 @@ def _window_on_a_screen(widget: QtWidgets.QWidget) -> bool:
     return False
 
 
+def _redraw_overlay_hwnd(hwnd: int) -> None:
+    """Ask Windows for a paint. A native show does not always expose the Qt window."""
+    if sys.platform != "win32" or not hwnd:
+        return
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    user32.RedrawWindow.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint]
+    user32.RedrawWindow.restype = ctypes.c_int
+    user32.RedrawWindow(hwnd, None, None, 0x0001 | 0x0004 | 0x0080 | 0x0100)
+
+
 def _center_on_screen(widget: QtWidgets.QWidget):
     app = QtWidgets.QApplication.instance()
     screen = app.primaryScreen() if app is not None else None
@@ -417,6 +429,7 @@ class OverlayView(QtWidgets.QWidget):
         self._apply_size()
         self.update()
         self.zoom_changed.emit(zoom)
+        self._sync_browsers()
 
     def canvas_size(self) -> tuple[int, int]:
         w = max(64, int(self.page_canvas.get("width") or 1280))
@@ -592,6 +605,7 @@ class OverlayView(QtWidgets.QWidget):
         self._sync_paint_mode()
         self._apply_size()
         self.update()
+        self._sync_browsers()
 
     def _on_geometry_changed(self):
         """Move/resize only — full invalidate so layered overlays do not smear."""
@@ -606,6 +620,23 @@ class OverlayView(QtWidgets.QWidget):
         self._pending_rect = QtCore.QRect()
         self.update()
         self._update_queued = False
+        self._sync_browsers()
+
+    def _sync_browsers(self):
+        if not Shiboken.isValid(self):
+            return
+        try:
+            from .browser_host import sync_browser_surfaces
+
+            sync_browser_surfaces(self)
+        except Exception:
+            pass
+        try:
+            from .efb_host import sync_efb_surfaces
+
+            sync_efb_surfaces(self)
+        except Exception:
+            pass
 
     def _sync_paint_mode(self):
         if not alive(self):
@@ -1457,7 +1488,16 @@ class OverlayView(QtWidgets.QWidget):
 
     def hideEvent(self, event: QtGui.QHideEvent):
         self._end_reposition_drag()
+        self._sync_browsers()
         super().hideEvent(event)
+
+    def showEvent(self, event: QtGui.QShowEvent):
+        super().showEvent(event)
+        self._sync_browsers()
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):
+        super().resizeEvent(event)
+        self._sync_browsers()
 
     def changeEvent(self, event: QtCore.QEvent):
         if event.type() in (
@@ -1631,6 +1671,9 @@ class OverlayWindow(QtWidgets.QWidget):
         if live_window_is_layered(self.page_canvas):
             _extend_frame_into_client(self)
         self._start_host_follow()
+        view = getattr(self, "view", None)
+        if view is not None and Shiboken.isValid(view):
+            view._sync_browsers()
 
     def detach_from_scene(self):
         if self._scene_connected:
@@ -1657,6 +1700,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 pass
             view.release_touch()
             view.detach_bus()
+            view._sync_browsers()
         # Stop the follow timer before detach so a tick cannot re-attach / raise
         # the host while the overlay is closing for profile stop.
         self._stop_host_follow()
@@ -1755,6 +1799,54 @@ class OverlayWindow(QtWidgets.QWidget):
         if sig == self._chrome_sig:
             return
         self._apply_window_flags()
+
+    def _restore_qt_visibility(self):
+        """Repaint after the shared app is in front again.
+
+        ``SetWindowPos(SWP_SHOWWINDOW)`` can set Qt's visible flag without an
+        expose, and ``update()`` while the flag was still hidden was discarded.
+        Checking ``isVisible()`` then skipped the restore, so the layered frame
+        stayed on the last picture until the overlay was hidden and shown.
+        """
+        if not Shiboken.isValid(self) or getattr(self, "_restoring_visibility", False):
+            return
+        self._restoring_visibility = True
+        had_no_activate = self.testAttribute(QtCore.Qt.WA_ShowWithoutActivating)
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        # A nested hideEvent during this show must not detach app-share.
+        previous_conceal = bool(getattr(self, "_share_concealed", False))
+        self._share_concealed = True
+        try:
+            view = getattr(self, "view", None)
+            if view is not None and Shiboken.isValid(view):
+                view._invalidate_static_layer()
+                view._pending_full = True
+                view._pending_rect = QtCore.QRect()
+                view._update_queued = False
+            if not self.isVisible():
+                self.setVisible(True)
+            if view is not None and Shiboken.isValid(view):
+                if not view.isVisible():
+                    view.setVisible(True)
+                try:
+                    view.attach_bus()
+                except Exception:
+                    pass
+                view.repaint()
+            if sys.platform == "win32":
+                try:
+                    from .host_window import apply_noactivate_exstyle
+
+                    hwnd = int(self.winId() or 0)
+                    if hwnd:
+                        apply_noactivate_exstyle(hwnd)
+                        _redraw_overlay_hwnd(hwnd)
+                except Exception:
+                    pass
+        finally:
+            self._share_concealed = previous_conceal
+            self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, had_no_activate)
+            self._restoring_visibility = False
 
     def show_without_activating(self):
         """Show the live overlay without pulling focus out of the game or JG Ex."""
@@ -1945,6 +2037,9 @@ class OverlayWindow(QtWidgets.QWidget):
     def _sync_host_attach(self):
         if sys.platform != "win32" or not Shiboken.isValid(self) or self._applying_flags:
             return
+        # setVisible during the return show re-enters this from showEvent.
+        if getattr(self, "_restoring_visibility", False):
+            return
         canvas = self.page_canvas
         want = bool(canvas.get("attach_to_window")) and is_onscreen_mode(canvas)
         title = str(canvas.get("attach_window_title") or "").strip()
@@ -1985,8 +2080,13 @@ class OverlayWindow(QtWidgets.QWidget):
         cw = int(canvas.get("width") or self.width() or 1)
         ch = int(canvas.get("height") or self.height() or 1)
         if host_is_foreground(host, hwnd):
-            self._share_concealed = False
+            was_concealed = bool(self._share_concealed)
+            # Keep the conceal flag until the Qt show has painted. Clearing it
+            # first let a nested hideEvent detach the overlay on the way back.
             place_overlay_in_host(hwnd, host, cw, ch)
+            if was_concealed and not getattr(self, "_restoring_visibility", False):
+                self._restore_qt_visibility()
+            self._share_concealed = False
         else:
             self._share_concealed = True
             hide_overlay_hwnd(hwnd)
@@ -2005,6 +2105,9 @@ class OverlayWindow(QtWidgets.QWidget):
             and not is_interactive_overlay(canvas)
             and not self.scene.mouse_reposition_enabled
         )
+        view = getattr(self, "view", None)
+        if view is not None and Shiboken.isValid(view):
+            view._sync_browsers()
 
     def _detach_host(self, activate_host: bool = False, hide_window: bool = False):
         if not self._host_attached:
@@ -2119,6 +2222,9 @@ class OverlayWindow(QtWidgets.QWidget):
     def moveEvent(self, event):
         super().moveEvent(event)
         self._record_window_position()
+        view = getattr(self, "view", None)
+        if view is not None and Shiboken.isValid(view):
+            view._sync_browsers()
 
     def _context_menu(self, pos):
         if is_onscreen_mode(self.page_canvas):

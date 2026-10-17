@@ -50,7 +50,10 @@ PROFILE_BY_DEVICE_TYPE = {
 DEFAULT_PROFILE = "profiles/jgex-xl"
 
 # Pending auto-return timers keyed by device_id (one pending return per deck).
+# State is the page to restore and the delay, so a later press can restart it.
+_auto_return_lock = threading.Lock()
 _auto_return_timers: dict[str, threading.Timer] = {}
+_auto_return_state: dict[str, tuple[int, float]] = {}
 DEFAULT_AUTO_RETURN_SECONDS = 5.0
 
 
@@ -87,45 +90,75 @@ def adjacent_page_1based(device_id: str, delta: int) -> int:
     return pages[(idx + int(delta)) % len(pages)]
 
 
+def _cancel_auto_return_unlocked(device_id: str) -> None:
+    timer = _auto_return_timers.pop(device_id, None)
+    _auto_return_state.pop(device_id, None)
+    if timer is not None:
+        timer.cancel()
+
+
 def cancel_auto_return(device_id: str = "") -> None:
     """Cancel any pending auto-return for a deck (or all if device_id empty)."""
-    if device_id:
-        timer = _auto_return_timers.pop(device_id, None)
-        if timer is not None:
-            timer.cancel()
-        return
-    for key in list(_auto_return_timers.keys()):
-        timer = _auto_return_timers.pop(key, None)
-        if timer is not None:
-            timer.cancel()
+    with _auto_return_lock:
+        if device_id:
+            _cancel_auto_return_unlocked(device_id)
+            return
+        for key in list(_auto_return_timers.keys()):
+            _cancel_auto_return_unlocked(key)
+        _auto_return_state.clear()
 
 
-def schedule_auto_return(device_id: str, page_0based: int, seconds: float) -> None:
-    """After ``seconds``, switch the deck back to ``page_0based`` (action page index)."""
-    device_id = device_id or ""
-    cancel_auto_return(device_id)
+def _start_auto_return_unlocked(device_id: str, page_0based: int, seconds: float) -> None:
+    """Caller holds ``_auto_return_lock``. Replaces any pending return for this deck."""
+    _cancel_auto_return_unlocked(device_id)
     try:
         delay = float(seconds)
     except (TypeError, ValueError):
         delay = 0.0
     if delay <= 0:
         return
+    page = int(page_0based)
+    slot: dict[str, threading.Timer] = {}
 
     def _fire():
-        _auto_return_timers.pop(device_id, None)
+        with _auto_return_lock:
+            if _auto_return_timers.get(device_id) is not slot.get("timer"):
+                return
+            _auto_return_timers.pop(device_id, None)
+            _auto_return_state.pop(device_id, None)
         try:
             from gremlin.ui.streamdeck_device import StreamDeckBridge
 
             bridge = StreamDeckBridge()
-            syslog.info(f"Map to Stream Deck: Auto-return -> GEX bank {int(page_0based) + 1} device={device_id[:12] if device_id else '?'}")
-            bridge.change_page(device_id, int(page_0based), "")
+            syslog.info(f"Map to Stream Deck: Auto-return -> GEX bank {page + 1} device={device_id[:12] if device_id else '?'}")
+            bridge.change_page(device_id, page, "")
         except Exception as exc:
             syslog.warning(f"Map to Stream Deck: auto-return failed: {exc}")
 
     timer = threading.Timer(delay, _fire)
     timer.daemon = True
+    slot["timer"] = timer
+    _auto_return_state[device_id] = (page, delay)
     _auto_return_timers[device_id] = timer
     timer.start()
+
+
+def schedule_auto_return(device_id: str, page_0based: int, seconds: float) -> None:
+    """After ``seconds``, switch the deck back to ``page_0based`` (action page index)."""
+    device_id = device_id or ""
+    with _auto_return_lock:
+        _start_auto_return_unlocked(device_id, page_0based, seconds)
+
+
+def bump_auto_return(device_id: str) -> None:
+    """Restart the pending delay after an action on the page we are waiting to leave."""
+    device_id = device_id or ""
+    with _auto_return_lock:
+        state = _auto_return_state.get(device_id)
+        if state is None:
+            return
+        page_0based, seconds = state
+        _start_auto_return_unlocked(device_id, page_0based, seconds)
 
 
 def apply_change_page(
@@ -258,7 +291,10 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.page_row)
 
         self.auto_return_widget = QtWidgets.QCheckBox("Auto-return to previous page")
-        self.auto_return_widget.setToolTip("After switching, automatically return to the page that was active before this action.")
+        self.auto_return_widget.setToolTip(
+            "After switching, return to the page that was active before this action. "
+            "The delay restarts each time a button on the new page is pressed."
+        )
         self.auto_return_widget.setChecked(bool(self.action_data.auto_return))
         self.auto_return_widget.toggled.connect(self._auto_return_toggled)
 
@@ -267,7 +303,9 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.auto_return_seconds_widget.setDecimals(1)
         self.auto_return_seconds_widget.setSingleStep(0.5)
         self.auto_return_seconds_widget.setSuffix(" s")
-        self.auto_return_seconds_widget.setToolTip("Seconds to stay on the target page before returning")
+        self.auto_return_seconds_widget.setToolTip(
+            "Seconds with no further action before returning. A button press on that page restarts the delay."
+        )
         try:
             seconds = float(self.action_data.auto_return_seconds)
         except (TypeError, ValueError):

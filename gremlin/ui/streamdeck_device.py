@@ -2930,6 +2930,7 @@ class StreamDeckBridge(QtCore.QObject):
                 else:
                     # Re-assert pressed look after actions (actions may have scheduled an idle paint).
                     self._paint_pressed_appearance(item, device_id, context=live_context)
+                self._restart_auto_return(device_id)
             else:
                 # Change Page / Next / Previous / Return ran under this press.
                 # Do not stamp the old key art back on top of the new bank.
@@ -2944,6 +2945,15 @@ class StreamDeckBridge(QtCore.QObject):
                 self._schedule_paint(device_id)
             except Exception:
                 pass
+
+    def _restart_auto_return(self, device_id: str) -> None:
+        """A press on the current page restarts a pending auto-return delay."""
+        try:
+            from action_plugins.map_to_streamdeck import bump_auto_return
+
+            bump_auto_return(device_id)
+        except Exception:
+            pass
 
     def _handle_dial_rotate(self, data: dict):
         device_id = str(data.get("deviceId") or data.get("device") or "")
@@ -2987,7 +2997,10 @@ class StreamDeckBridge(QtCore.QObject):
             extra_data={"input_item": item},
         )
         event.source = EventSourceType.StreamDeck
+        page_before = self.get_active_page(device_id)
         self._emit_event(event)
+        if self.get_active_page(device_id) == page_before:
+            self._restart_auto_return(device_id)
 
         key = (device_id, input_kind, meta["slot_key"])
         delay = gremlin.config.Configuration().osc_default_autorelease_delay
@@ -3149,6 +3162,21 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
     def _cleanup_ui(self):
+        # Drop bridge slots before the base clears the input model; otherwise a
+        # deferred inputs_changed can call ensureInputItems with model None.
+        try:
+            bridge = StreamDeckBridge()
+            for signal, slot in (
+                (bridge.plugin_connected, self._on_plugin_connected),
+                (bridge.inputs_changed, self._on_inputs_changed),
+                (bridge.status_message, self._on_status_message),
+            ):
+                try:
+                    signal.disconnect(slot)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         if self._designer is not None:
             try:
                 self._designer._cleanup_ui()
@@ -3437,6 +3465,8 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self._status_label.setText(StreamDeckBridge().status_text())
 
     def _on_plugin_connected(self, connected: bool):
+        if not Shiboken.isValid(self) or self.inputItemListModel is None:
+            return
         self._refresh_status_label()
         if not connected:
             return
@@ -3452,16 +3482,23 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         gremlin.util.InvokeUiMethod(self.ensureInputItems, True)
 
     def _on_status_message(self, message: str):
+        if not Shiboken.isValid(self):
+            return
         if Shiboken.isValid(self._status_label):
             # Prefer structured status; fall back to raw message if provided.
             text = StreamDeckBridge().status_text()
             self._status_label.setText(text if text else message)
 
     def _on_inputs_changed(self, device_guid):
+        if not Shiboken.isValid(self) or self.inputItemListModel is None:
+            return
         if compare_guid(device_guid, self.device_guid):
             gremlin.util.InvokeUiMethod(self.ensureInputItems, True)
 
     def ensureInputItems(self, refresh=False):
+        # Tab cleanup nulls the model; bridge signals can still arrive until disconnect.
+        if not Shiboken.isValid(self) or self.inputItemListModel is None:
+            return False
         current_mode = gremlin.shared_state.edit_mode
         mode_object = self.device_node.ensure_mode_exists(current_mode)
         config = mode_object.getConfig(InputType.StreamDeck)
@@ -3490,6 +3527,8 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             syslog.info(f"STREAMDECK: pruned {pruned} duplicate input(s) on refresh")
 
         if changed or refresh:
+            if self.inputItemListModel is None:
+                return False
             self.inputItemListModel.refresh()
             if hasattr(self, "_designer") and self._designer is not None:
                 try:
