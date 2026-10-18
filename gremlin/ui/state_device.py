@@ -421,12 +421,13 @@ class StateInputItem(InputItem):
             input_type=InputType.State,
             custom_input_id_handler=self._handle_input_id_callback,
         )
+        default_value = bool(default_value)
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
         self._value = default_value
         self._data = data
-        self._type_cast = type(default_value) if default_value is not None else None
+        self._type_cast = bool
         self.setDescription(description)  # parent property
         self._expression = expression  # expression to evaluate to derive a state
         self._is_expression = is_expression
@@ -634,7 +635,7 @@ class StateInputItem(InputItem):
             return self.evaluate()
 
         # syslog.info(f"STATE getValue(): get [{self.key}]  -> [{self._value}]")
-        return self._value if self._value is not None else False
+        return self._value
 
     @value.setter
     def value(self, data: bool):
@@ -658,11 +659,7 @@ class StateInputItem(InputItem):
 
         """
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if data is None or not isinstance(data, bool):
-            syslog.warning(
-                f"State setter: state: [{self.key}] id: [{self.id}] attempt to set unrecognized value [{data}] - defaulting state to default value: [{self.default_value}]"
-            )
-            data = self.default_value
+        data = bool(self.default_value) if data is None else bool(data)
 
         is_auto = self._autorelease and self._autorelease_delay > 0
 
@@ -809,6 +806,7 @@ class StateInputItem(InputItem):
 
     @default_value.setter
     def default_value(self, data):
+        data = bool(data)
         if self._default_value != data:
             self._default_value = data
             if data != self._value:
@@ -911,7 +909,7 @@ class StateInputItem(InputItem):
         """write XML state node"""
 
         node = ElementTree.Element("state", id=write_guid(self._id), key=self._key)
-        value = self._default_value
+        value = bool(self._default_value)
         description = self.description
 
         node.set("id", write_guid(self._id))
@@ -919,23 +917,8 @@ class StateInputItem(InputItem):
         if description:
             node.set("description", html.escape(description))
 
-        if value is None:
-            # assume boolean state by default
-            value = False
-
-        if isinstance(value, str):
-            node.set("value", value)
-            node.set("type", "str")
-        elif isinstance(value, float):
-            node.set("value", safe_format(value, float))
-            node.set("type", "float")
-        elif isinstance(value, bool):
-            node.set("value", safe_format(value, bool))
-            node.set("type", "bool")
-        else:
-            # ignore other types
-            syslog.warning(f"XML: state: unsupported value type for state: {self.key} [{value}] - this state will not save")
-            return None
+        node.set("value", safe_format(value, bool))
+        node.set("type", "bool")
 
         if self._category:
             _test = self._category.id
@@ -1002,14 +985,14 @@ class StateInputItem(InputItem):
             if category:
                 self._category = category
 
-        value = None
+        value = False
 
         if node_type == "str":
-            value = safe_read(node, "value", str, "")
+            value = safe_read(node, "value", str, "").strip().casefold() in ("true", "1", "yes", "on")
         elif node_type == "float":
-            value = safe_read(node, "value", float, 0.0)
+            value = bool(safe_read(node, "value", float, 0.0))
         elif node_type == "int":
-            value = safe_read(node, "value", int, 0)
+            value = bool(safe_read(node, "value", int, 0))
         elif node_type == "bool":
             value = safe_read(node, "value", bool, False)
         if "expression" in node.attrib:
@@ -1056,8 +1039,8 @@ class StateInputItem(InputItem):
 
         super().from_xml(node, data, extra_data)
 
-        self._default_value = value
-        self._value = value
+        self._default_value = bool(value)
+        self._value = bool(value)
 
     def evaluate(self, as_tuple=False, force=False) -> bool | tuple:
         """evaluates the state
@@ -1072,7 +1055,7 @@ class StateInputItem(InputItem):
 
         if not self._expression:
             # no expression defined, return the curent state value
-            return (self._value, False, None) if as_tuple else self._value
+            return (bool(self._value), False, None) if as_tuple else bool(self._value)
 
         if not force and not self._dirty and self._last_expression_value is not None:
             # nothing changed since the expression was last evaluated - use the last value
@@ -1093,7 +1076,7 @@ class StateInputItem(InputItem):
         if self._expression_stack:
             # update the data
             data = self._evaluate_stack(self._expression_stack, as_tuple)
-            value = data[0] if as_tuple else data
+            value = bool(data[0] if as_tuple else data)
             is_changed = value != self._last_expression_value
             if is_changed:
                 self._value = value
@@ -1472,10 +1455,10 @@ class StateInputItem(InputItem):
 
 
 class StateInputItemWidget(gremlin.input_item.InputItemWidget):
-    """ widget for a state input """
+    """widget for a state input"""
 
     def __init__(
-            self,
+        self,
         input_item: StateInputItem,
         populate_ui_callback=None,
         populate_name_callback=None,
@@ -1497,7 +1480,6 @@ class StateInputItemWidget(gremlin.input_item.InputItemWidget):
             mapping_changed_callback=mapping_changed_callback,
             confirm_delete_callback=confirm_delete_callback,
             config_external=config_external,
-
             data=data,
             parent=parent,
         )
@@ -4336,14 +4318,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             return False
         return True
-
-
-
-
-
-
-
-
 
     def _create_expression_update_callback(self, state, widget):
         return lambda: gremlin.util.InvokeUiMethod(self._change_expression_callback_ui, state, widget)

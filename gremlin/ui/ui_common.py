@@ -8915,7 +8915,7 @@ class StateRepeaterButton(QDataPushButton):
     def __init__(self, state, callback=None, parent=None):
         super().__init__(state.key, parent=parent, data=state)
 
-        font_size = gremlin.config.Configuration().input_viewer_button_size
+        font_size = int(gremlin.config.Configuration().input_viewer_button_size)
         self.setCheckable(True)
         css = Color.cssStateButton(font_size)
         cssAlternate = Color.cssStateExpressionButton(font_size)
