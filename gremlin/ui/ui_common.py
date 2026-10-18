@@ -8920,6 +8920,10 @@ class StateRepeaterButton(QDataPushButton):
         css = Color.cssStateButton(font_size)
         cssAlternate = Color.cssStateExpressionButton(font_size)
         self.data = state
+        if not state:
+            syslog.warning("StateRepeater: State is not provided, setting checked to False")
+            self.setChecked(False)
+            return
 
         if state.expression:
             self.setEnabled(False)
@@ -8927,7 +8931,11 @@ class StateRepeaterButton(QDataPushButton):
         else:
             self.setStyleSheet(css)
 
-        self.setChecked(state.value)
+        if isinstance(state.value, bool):
+            self.setChecked(state.value)
+        else:
+            syslog.warning(f"StateRepeater: State value is not a boolean, converting to bool: state: [{state.key}] value: [{state.value}]")
+            self.setChecked(bool(state.value))
         self.setCallback(callback)
 
     def toggle(self, emit=False):

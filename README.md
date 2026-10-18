@@ -49,7 +49,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-
+### (m77T78A)
+- Fix: UI: interpret state values if not boolean and issue diagnostics if receiving invalid data.
 
 ### (m77T78)
 - New: States: Ability to define one or more text attributes per state.  These can be pasted from plain text with one attribute per line. Attributes can be used to select map to state Action target states.
