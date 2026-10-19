@@ -994,6 +994,7 @@ class AbstractCallbackModel(AbstractModel):
         self._item_changed_callbacks = [self.onItemChanged]
         self._data_changed_callbacks = []
         self._content_callback = None
+        self._initializing = True
 
 
 
@@ -1011,6 +1012,13 @@ class AbstractCallbackModel(AbstractModel):
         self._sort_callback: Callable = None
         self._filtered_enabled: bool = None
         self._sort_enabled: bool = None
+        self._suspend_stack = 1  # tracks suspension of change events (suspend while initializing)
+        self._show_filtered_only = False
+        self._change_pending = False  # true if a change is pending
+
+        assert model_description, "model description not provided"
+        self._model_description = model_description
+        self._allowed_types = allowed_types
 
         assert isinstance(change_callback, Callable) if change_callback is not None else True, "Invalid change callback"
         assert isinstance(allowed_types, tuple) if allowed_types is not None else True, "allowed types must be a tuple"
@@ -1024,15 +1032,6 @@ class AbstractCallbackModel(AbstractModel):
         self.setSortCallback(sort_callback)
         self.setFilterCallback(filter_callback)
 
-        self._show_filtered_only = False
-
-        assert model_description, "model description not provided"
-        self._model_description = model_description
-
-        self._allowed_types = allowed_types
-        self._suspend_stack = 0  # tracks suspension of change events
-        self._change_pending = False  # true if a change is pending
-
         if change_callback:
             self.addCallback(change_callback)
 
@@ -1040,6 +1039,11 @@ class AbstractCallbackModel(AbstractModel):
             self.addOnItemChangedCallback(item_changed_callback)
 
         self.setContentCallback(content_callback)
+
+        self._suspend_stack = 0 # allow change events to be processed
+        self._initializing = False
+
+
 
     def dispose(self):
         """disposes of the model and cleans up resources"""
@@ -1129,6 +1133,8 @@ class AbstractCallbackModel(AbstractModel):
         self._filtered_callback = callback
         if self._filtered_enabled is None:
             self._filtered_enabled = callback is not None  # filter enabled by default if a filtering callback is provided
+        # update
+        self.applyFilter()
 
     def setFilterEnabled(self, value: bool):
         """enables or disables filtering"""
@@ -1417,6 +1423,10 @@ class AbstractCallbackModel(AbstractModel):
         """returns all items in the unfiltered model"""
         return self._index_map.items()
 
+    def unfilteredItemsList(self):
+        """returns all items in the unfiltered model as a list"""
+        return list(self._index_map.values())
+
     def indexOf(self, item) -> int:
         """returns the index of the item (filtered model), -1 if not found"""
         if item in self._filtered_item_map:
@@ -1493,7 +1503,7 @@ class AbstractCallbackModel(AbstractModel):
         """gets the allowed input types in the model, if any"""
         return self._allowed_types
 
-    def applyFilter(self, sort=True, emit=True):
+    def applyFilter(self, sort=True, force = False, emit=True):
         """Applies the filter to the source data
         :param callback: the evaluation callback that passes each item to determine inclusion, true to include, false to exclude
         :param sort: true to sort the data after filtering (only has effect if a sorting callback was provided)
@@ -1513,7 +1523,13 @@ class AbstractCallbackModel(AbstractModel):
                 self._filtered_item_map = TriggerDict.copyFrom({key: value for key, value in self._item_map.items()})
                 if emit:
                     self._fireChanged()
+                    # fire the filter operation
+                    self._onItemChanged(self, index=-1, old_value=None, new_value=None, operation="filter")
+
+
             return
+
+
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
@@ -1521,7 +1537,7 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
 
         # filtering enabled
-        force = False
+        # force = False
 
         new_index_map = TriggerDict()
         new_item_map = TriggerDict()
@@ -1554,7 +1570,7 @@ class AbstractCallbackModel(AbstractModel):
         self.applySort(emit=False)
         new_hash = self.hashKey()
         if current_hash != new_hash:
-            # sort changed the order
+            # sort changed the order or we should refresh
             self._fireChanged(force)
 
     def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
@@ -1819,7 +1835,15 @@ class AbstractCallbackModel(AbstractModel):
             self._data_changed_callbacks.append(callback)
 
     def addOnItemChangedCallback(self, callback: Callable[[object, int, object, object, str], None]):
-        """adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
+        """adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters
+
+        operations:
+            "add" - when an item is added
+            "remove" - when an item is removed
+            "update" - when an item is updated
+            "clear" - when the model is cleared
+
+        """
 
         if __debug__:
             if callback is not None and not callable(callback):
@@ -1883,7 +1907,8 @@ class AbstractCallbackModel(AbstractModel):
         """fires a data changed signal if the data has changed or if force is true"""
         import gremlin.shared_state
 
-        if self._suspend_stack and self._change_pending and not force:
+        if self._initializing or (self._suspend_stack and self._change_pending and not force):
+            # skip while initializing or if changes are suspended and not forced
             return
         if gremlin.shared_state.is_running:
             # auto-suspend at runtime
@@ -1906,7 +1931,11 @@ class AbstractCallbackModel(AbstractModel):
                 callback(self._extra_data, force=force)
 
             if emit:
-                self.data_changed.emit()  # indicate the model changed
+                try:
+                    self.data_changed.emit()  # @IgnoreException indicate the model changed
+                except RuntimeError:
+                    # underlying Qt object already deleted (e.g. during tab rebuild)
+                    pass
 
         self._change_pending = False
 

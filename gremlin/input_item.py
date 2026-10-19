@@ -21,6 +21,8 @@ from abc import abstractmethod, ABCMeta
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QThread
 
+from pathlib import Path
+import json
 from lxml import etree
 import os
 import uuid
@@ -58,6 +60,8 @@ from gremlin.ui.ui_common import (
     QUsedPushButton,
     QDataCheckbox,
     QInfoBox,
+    Color,
+    QFlowWidget,
 )
 import gremlin.base_profile
 import gremlin.input_item
@@ -103,6 +107,27 @@ import dinput
 from gremlin.ui import virtual_button
 import gremlin.error
 from gremlin.worker import WorkManager
+
+from PySide6 import QtCore
+from PySide6.QtCore import Qt, QSortFilterProxyModel
+from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QComboBox,
+    QPushButton,
+    QLabel,
+    QListView,
+    QMenu,
+    QScrollArea,
+    QFrame,
+    QFileDialog,
+    QMessageBox,
+    QInputDialog,
+)
 
 
 syslog = logging.getLogger("system")
@@ -12664,7 +12689,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 )
 
                 self.setInputItemListView(widget)  # registers handlers
-                assert self._input_item_list_view is not None,"Input item list view was not created successfully"
+                assert self._input_item_list_view is not None, "Input item list view was not created successfully"
 
                 # flip display to the active list view
                 if Shiboken.isValid(self.listview_stackwidget):
@@ -12861,8 +12886,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # cleared by cleanup
             return
 
-
-
         if current_widget != widget:
             if current_widget:
                 current_widget.removeSelectionChangeCallback(self._handle_input_item_selected)  # unhook selected callback
@@ -12870,7 +12893,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 current_widget.hide()
                 self.listview_container_layout.removeWidget(current_widget)
                 gremlin.util.delete_widget(current_widget)
-
 
         if widget is not None:
             if verbose:
@@ -13173,3 +13195,468 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if verbose:
             syslog.info("BaseDeviceWidget: widget selected end")
+
+
+# class AdvancedInputItemListModel(InputItemListModel, QSortFilterProxyModel):
+class AdvancedInputItemListModel(InputItemListModel):
+    """proxy filter for input items with search, optional category, and optional attribute filtering"""
+
+    def __init__(
+        self,
+        profile: gremlin.base_profile.Profile,
+        device_guid,
+        mode: str,
+        allowed_types: list = None,
+        custom_load_handler: Callable[[object], bool] = None,
+        custom_remove_handler: Callable[[object], None] = None,
+        custom_clear_handler: Callable = None,
+        custom_filter_handler: Callable[[object], bool] = None,
+        custom_delete_confirm_handler: Callable = None,
+        custom_change_handler: Callable[[object], None] = None,
+        custom_sort_handler: Callable[[object], tuple] = None,
+        show_master_mode: bool = False,
+        show_filtered_only: bool = False,
+    ):
+
+        self._custom_filter_handler = custom_filter_handler
+
+        InputItemListModel.__init__(
+            self,
+            profile=profile,
+            device_guid=device_guid,
+            mode=mode,
+            allowed_types=allowed_types,
+            custom_load_handler=custom_load_handler,
+            custom_remove_handler=custom_remove_handler,
+            custom_clear_handler=custom_clear_handler,
+            custom_filter_handler=None,
+            custom_delete_confirm_handler=custom_delete_confirm_handler,
+            custom_change_handler=custom_change_handler,
+            custom_sort_handler=custom_sort_handler,
+            show_master_mode=show_master_mode,
+            show_filtered_only=show_filtered_only,
+        )
+
+        self._initializing = True
+
+        self.search_string = ""
+        self.category = None
+        self.active_attributes = set()
+        self.setFilterEnabled(True)
+        self.setFilterCallback(self._handle_custom_filter)
+
+        self._initializing = False
+
+    def _handle_custom_filter(self, item):
+        """apply search filters for category and active attributes, and delegate to custom filter if present"""
+        if self.search_string:
+            if self.search_string not in item.key.casefold():
+                return False
+
+        if self.category is not None and hasattr(item, "category"):
+            item_category = item.category
+            if item_category and item.category.name and item_category.name.casefold() != self.category:
+                return False
+        if self.active_attributes:
+            getter = getattr(item, "getAttributes", None)
+            if not callable(getter):
+                return False
+            values = getter()
+            item_attributes = {attr.casefold() for attr in (values or []) if isinstance(attr, str)}
+            if not self.active_attributes.issubset(item_attributes):
+                return False
+
+        if self._custom_filter_handler:
+            return self._custom_filter_handler(item)
+        return True
+
+    def setSearchString(self, text):
+        self.search_string = text.casefold()
+        self._refilter()
+
+    def setCategory(self, category):
+        self.category = category.casefold() if category else None
+        self._refilter()
+
+    def setActiveAttributes(self, attributes):
+        self.active_attributes = {a.casefold() for a in attributes}
+        self._refilter()
+
+    def _refilter(self):
+        """re-applies the filter and forces attached views to redraw even if the model hash is unchanged"""
+        if getattr(self, "_refiltering", False):
+            return  # view redraw can call back into the model
+        self._refiltering = True
+        try:
+            self.applyFilter(emit=False)
+            self._fireChanged(True)
+        finally:
+            self._refiltering = False
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        index = self.sourceModel().index(source_row, 0, source_parent)
+        item = self.sourceModel().data(index, Qt.ItemDataRole.UserRole)
+        if item is None:
+            return False
+        if self.search_string not in item.key.casefold():
+            return False
+        if self.category is not None and hasattr(item, "category"):
+            item_category = item.category
+            if item_category and item_category.casefold() != self.category:
+                return False
+        if self.active_attributes:
+            getter = getattr(item, "getAttributes", None)
+            if not callable(getter):
+                return False
+            values = getter()
+            item_attributes = {attr.casefold() for attr in (values or []) if isinstance(attr, str)}
+            if not self.active_attributes.issubset(item_attributes):
+                return False
+        return True
+
+
+class FilterChip(QWidget):
+    def __init__(self, key, label, on_remove, foreground=None, background=None, border=None, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # plain QWidget subclasses don't paint QSS background/border otherwise
+        self._foreground_color = foreground or Color.keyForegroundColor()
+        self._background_color = background or Color.keyBackgroundColor()
+        self._border_color = border or Color.keyBorderColor()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 2, 6, 2)
+        layout.setSpacing(4)
+        layout.addWidget(QLabel(label))
+        button = QPushButton("×")
+        button.setFixedSize(22, 22)
+        button.clicked.connect(lambda: on_remove(key))
+        layout.addWidget(button)
+        self.setMaximumHeight(28)
+        self._update_style()
+
+    def setColors(self, foreground, background, border):
+        self._foreground_color = foreground
+        self._background_color = background
+        self._border_color = border
+        self._update_style()
+
+    def setForegroundColor(self, color):
+        self._foreground_color = color
+        self._update_style()
+
+    def setBackgroundColor(self, color):
+        self._background_color = color
+        self._update_style()
+
+    def setBorderColor(self, color):
+        self._border_color = color
+        self._update_style()
+
+    def _update_style(self):
+        background_color = self._background_color
+        foreground_color = self._foreground_color
+        border_color = self._border_color
+        self.setStyleSheet(f"""
+            FilterChip {{background: {background_color}; border: 2px solid {border_color};
+                        border-radius: 12px;}}
+            FilterChip QLabel {{color: {foreground_color}; background: transparent; border: none;}}
+            FilterChip QPushButton {{background: transparent; border: none;
+                                    color: {foreground_color}; font-weight: bold;}}
+        """)
+
+
+class FilterControlWidget(QWidget):
+    searchChanged = QtCore.Signal(str)
+    categoryChanged = QtCore.Signal(object)  # None means all categories
+    attributesChanged = QtCore.Signal(list)
+
+    def __init__(self, input_items=None, parent=None):
+        super().__init__(parent)
+        self.input_items = []
+        self.profile_path = None
+        self.active_chips = {}
+        self.attribute_actions = {}
+        self._build_ui()
+        if input_items is not None:
+            self.setInputItems(input_items)
+
+    def _build_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        controls = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search by name...")
+        self.search_input.setClearButtonEnabled(True)
+        controls.addWidget(self.search_input, 3)
+        self.category_combo = QComboBox()
+        self.category_combo.addItem("All categories", None)
+        controls.addWidget(self.category_combo, 1)
+        self.attr_button = QPushButton("Attributes ▼")
+        self.attr_menu = QMenu(self)
+        self.attr_button.setMenu(self.attr_menu)
+        controls.addWidget(self.attr_button, 1)
+        main_layout.addLayout(controls)
+
+        self.chips_scroll = QScrollArea()
+        self.chips_scroll.setWidgetResizable(True)
+        self.chips_scroll.setFixedHeight(32)
+        self.chips_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.chips_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.chips_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.chips_scroll.setVisible(False)
+        container = QWidget()
+        self.chips_layout = QHBoxLayout(container)
+        self.chips_layout.setContentsMargins(0, 0, 0, 0)
+        self.chips_layout.addStretch()
+        self.chips_scroll.setWidget(container)
+        self.chips_scroll.setStyleSheet("QScrollArea { border: none; }")
+
+        main_layout.addWidget(self.chips_scroll)
+
+        widgets = ["Saved search:"]
+
+        self.preset_combo = QComboBox()
+        self.preset_combo.setMinimumWidth(190)
+        widgets.append(self.preset_combo)
+
+        save = QDataPushButton("Save...")
+        save.clicked.connect(self.saveFilters)
+        load = QDataPushButton("Recall")
+        load.clicked.connect(self.loadFilters)
+        delete = QDataPushButton("Delete")
+        delete.clicked.connect(self.deleteFilters)
+        reset = QDataPushButton("Clear Filters")
+        reset.clicked.connect(self.clearFilters)
+        widgets.extend([save, load, delete, reset])
+
+        presets_row = getHContainer(widgets, widget_only=True)
+        main_layout.addWidget(presets_row)
+
+        self.search_input.textChanged.connect(self._on_search)
+        self.category_combo.currentIndexChanged.connect(self._on_category)
+
+    def addWidget(self, widget):
+        """appends an extra widget below the filter controls"""
+        self.layout().addWidget(widget)
+
+    def setInputItems(self, items):
+        self.input_items = list(items)
+        categories = sorted({value for item in self.input_items if isinstance(value := getattr(item, "category_name", None), str)})
+        attributes = sorted(
+            {
+                attr
+                for item in self.input_items
+                if callable(getattr(item, "getAttributes", None))
+                for attr in (item.getAttributes() or [])
+                if isinstance(attr, str)
+            }
+        )
+        # Hide optional controls unless at least one item supplies the field.
+        self.category_combo.setVisible(bool(categories))
+        self.attr_button.setVisible(bool(attributes))
+        self.category_combo.blockSignals(True)
+        self.category_combo.clear()
+        self.category_combo.addItem("All categories", None)
+        for category in categories:
+            self.category_combo.addItem(category, category)
+        self.category_combo.blockSignals(False)
+        self.attr_menu.clear()
+        self.attribute_actions.clear()
+        for attr in attributes:
+            action = self.attr_menu.addAction(attr)
+            action.setCheckable(True)
+            action.toggled.connect(lambda checked, a=attr: self._on_attribute(a, checked))
+            self.attribute_actions[attr] = action
+        # Remove chips for any options that are no longer available.
+        for key in list(self.active_chips):
+            if key != "search":
+                self._set_chip(key, None)
+        self.clearFilters(emit=False)
+
+    def _on_search(self, text):
+        self._set_chip("search", text if text else None, background_color=Color.nameColor())
+        self.searchChanged.emit(text)
+
+    def _on_category(self, _index):
+        category = self.category_combo.currentData()
+        self._set_chip("category", category if category is not None else None, background_color=Color.categoryColor())
+        self.categoryChanged.emit(category)
+
+    def _on_attribute(self, attr, checked):
+        self._set_chip(f"attr_{attr}", attr if checked else None, background_color=Color.attributeColor())
+        self.attributesChanged.emit([name for name, action in self.attribute_actions.items() if action.isChecked()])
+
+    def _set_chip(self, key, label, foreground_color=None, background_color=None, border_color=None):
+        old = self.active_chips.pop(key, None)
+        if old is not None:
+            self.chips_layout.removeWidget(old)
+            old.deleteLater()
+        if label:
+            chip = FilterChip(key, label, self._remove_chip, foreground=foreground_color, background=background_color, border=border_color)
+            self.chips_layout.insertWidget(self.chips_layout.count() - 1, chip)
+            self.active_chips[key] = chip
+        self.chips_scroll.setVisible(bool(self.active_chips))
+
+    def _remove_chip(self, key):
+        if key == "search":
+            self.search_input.clear()
+        elif key == "category":
+            self.category_combo.setCurrentIndex(0)
+        elif key.startswith("attr_"):
+            attr = key[len("attr_") :]
+            action = self.attribute_actions.get(attr)
+            if action is not None:
+                action.setChecked(False)
+
+    def clearFilters(self, emit=True):
+        self.setFilterOptions({"search": "", "category": None, "attributes": []}, emit=emit)
+
+    def getFilterOptions(self):
+        return {
+            "search": self.search_input.text(),
+            "category": self.category_combo.currentData(),
+            "attributes": sorted([attr for attr, action in self.attribute_actions.items() if action.isChecked()]),
+        }
+
+    def setFilterOptions(self, options, emit=True):
+        """Restore available values; ignore unknown categories/attributes."""
+        search = options.get("search", "")
+        category = options.get("category")
+        attrs = options.get("attributes", [])
+        if not isinstance(search, str) or not (category is None or isinstance(category, str)):
+            raise ValueError("Invalid search or category in saved filter options")
+        if not isinstance(attrs, list) or any(not isinstance(a, str) for a in attrs):
+            raise ValueError("Invalid attributes in saved filter options")
+        self.search_input.setText(search)
+        index = self.category_combo.findData(category)
+        self.category_combo.setCurrentIndex(index if index >= 0 else 0)
+        selected = set(attrs)
+        for attr, action in self.attribute_actions.items():
+            action.setChecked(attr in selected)
+        # Always emit final values, even if a control didn't change.
+        if emit:
+            self.searchChanged.emit(self.search_input.text())
+            self.categoryChanged.emit(self.category_combo.currentData())
+            self.attributesChanged.emit([a for a, action in self.attribute_actions.items() if action.isChecked()])
+
+    @staticmethod
+    def sidecarPath(profile_path):
+        if profile_path:
+            return Path(gremlin.util.swapext(profile_path, ".json", suffix=".filters"))
+        return Path()
+
+    def _read_presets(self):
+        """Read version 2 presets, or migrate a version 1 single filter."""
+        path = self.sidecarPath(self.profile_path)
+        if not path.exists():
+            return {"version": 2, "selected": None, "presets": {}}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid filter sidecar")
+        if payload.get("version") == 1:
+            return {"version": 2, "selected": "Default", "presets": {"Default": {key: payload.get(key) for key in ("search", "category", "attributes")}}}
+        if payload.get("version") != 2 or not isinstance(payload.get("presets"), dict):
+            raise ValueError("Unsupported filter sidecar format/version")
+        for name, options in payload["presets"].items():
+            if not isinstance(name, str) or not isinstance(options, dict):
+                raise ValueError("Invalid saved search entry")
+        return payload
+
+    def _write_presets(self, payload):
+        path = self.sidecarPath(self.profile_path)
+        temp = path.with_name(path.name + ".tmp")
+        try:
+            temp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            temp.replace(path)
+        finally:
+            temp.unlink(missing_ok=True)
+
+    def _refresh_presets(self, payload, selected=None):
+        self.preset_combo.clear()
+        self.preset_combo.addItems(sorted(payload["presets"], key=str.casefold))
+        name = selected if selected is not None else payload.get("selected")
+        index = self.preset_combo.findText(name) if isinstance(name, str) else -1
+        if index >= 0:
+            self.preset_combo.setCurrentIndex(index)
+
+    def setProfile(self, profile_path, auto_load=True):
+        """Set XML profile; restore last recalled search when available."""
+        if profile_path is None or not os.path.isfile(profile_path):
+            # nothing to load
+            return
+        profile = Path(profile_path).expanduser().resolve()
+        self.sidecarPath(profile)
+        if not profile.is_file():
+            raise FileNotFoundError(f"Profile not found: {profile}")
+        self.profile_path = profile
+        self.clearFilters(emit=False)
+        self.preset_combo.clear()
+        try:
+            payload = self._read_presets()
+            self._refresh_presets(payload)
+            if auto_load and payload.get("selected") in payload["presets"]:
+                self.setFilterOptions(payload["presets"][payload["selected"]], emit=False)
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, "Load failed", str(exc))
+
+    def saveFilters(self):
+        if self.profile_path is None:
+            QMessageBox.information(self, "Select profile", "Choose a profile XML first.")
+            return
+        suggested = self.preset_combo.currentText() or "My Search"
+        name, ok = QInputDialog.getText(self, "Save named search", "Search name:", text=suggested)
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            QMessageBox.warning(self, "Invalid name", "Enter a non-empty search name.")
+            return
+        try:
+            payload = self._read_presets()
+            if name in payload["presets"]:
+                answer = QMessageBox.question(self, "Replace search?", f"Overwrite '{name}'?")
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+            payload["presets"][name] = self.getFilterOptions()
+            payload["selected"] = name
+            self._write_presets(payload)
+            self._refresh_presets(payload, name)
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.critical(self, "Save failed", str(exc))
+
+    def loadFilters(self, show_missing=True):
+        if self.profile_path is None:
+            QMessageBox.information(self, "Select profile", "Choose a profile XML first.")
+            return
+        name = self.preset_combo.currentText()
+        if not name:
+            if show_missing:
+                QMessageBox.information(self, "No saved searches", "Save a named search first.")
+            return
+        try:
+            payload = self._read_presets()
+            if name not in payload["presets"]:
+                raise ValueError(f"Saved search not found: {name}")
+            self.setFilterOptions(payload["presets"][name])
+            payload["selected"] = name
+            self._write_presets(payload)
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, "Recall failed", str(exc))
+
+    def deleteFilters(self):
+        if self.profile_path is None:
+            QMessageBox.information(self, "Select profile", "Choose a profile XML first.")
+            return
+        name = self.preset_combo.currentText()
+        if not name:
+            return
+        if QMessageBox.question(self, "Delete search?", f"Delete saved search '{name}'?") != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            payload = self._read_presets()
+            payload["presets"].pop(name, None)
+            if payload.get("selected") == name:
+                payload["selected"] = None
+            self._write_presets(payload)
+            self._refresh_presets(payload)
+        except (OSError, ValueError, TypeError) as exc:
+            QMessageBox.warning(self, "Delete failed", str(exc))

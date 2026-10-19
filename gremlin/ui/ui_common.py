@@ -185,7 +185,7 @@ class Color:
 
     @staticmethod
     def backgroundLighterColor():
-        return "#505050" if gremlin.shared_state.is_dark_theme else "#C4C4C4"
+        return "#0C0B0B" if gremlin.shared_state.is_dark_theme else "#C4C4C4"
 
     @staticmethod
     def watermarkColor():
@@ -593,6 +593,18 @@ class Color:
     @staticmethod
     def headerBackgroundColor():
         return "#353535" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+
+    @staticmethod
+    def categoryColor():
+        return "#09406D" if gremlin.shared_state.is_dark_theme else "#103C68"
+
+    @staticmethod
+    def attributeColor():
+        return "#2D582E" if gremlin.shared_state.is_dark_theme else "#3C5F3E"
+
+    @staticmethod
+    def nameColor():
+        return "#4D4D4D" if gremlin.shared_state.is_dark_theme else "#5F5F5F"
 
     @staticmethod
     def getHoverColor(base_color: QColor, percent: float = 1.15) -> QColor:
@@ -1691,7 +1703,7 @@ class Buttons:
         width: int = None,
         height: int = None,
         size: int = 16,
-        color = None,
+        color=None,
         parent=None,
     ):
 
@@ -1720,7 +1732,7 @@ class Buttons:
 
         if icon_source:
             if isinstance(icon_source, str):
-                icon = gremlin.util.load_icon(icon_source, qta_color = color)
+                icon = gremlin.util.load_icon(icon_source, qta_color=color)
             elif isinstance(icon_source, QtGui.QIcon):
                 icon = icon_source
             else:
@@ -1729,7 +1741,6 @@ class Buttons:
                 widget.setIcon(icon)
                 widget.setIconSize(QtCore.QSize(size, size))
         widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-
 
         if tooltip:
             widget.setToolTip(tooltip)
@@ -1754,7 +1765,7 @@ class Buttons:
         data: object = None,
         size: int = 24,
         icon_size: int = 16,
-        color = None,
+        color=None,
     ):
         if not tooltip:
             tooltip = "Delete"
@@ -1945,12 +1956,14 @@ class Buttons:
         return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data)
 
     @staticmethod
-    def getListSyncWidget(label: str = None, tooltip: str = "Find In List", callback: Callable = None, no_keyboard: bool = True, data: object = None, color = None):
+    def getListSyncWidget(
+        label: str = None, tooltip: str = "Find In List", callback: Callable = None, no_keyboard: bool = True, data: object = None, color=None
+    ):
         icon = Icons.syncIcon()
         return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, color=color)
 
     @staticmethod
-    def getPasteWidget(tooltip: str = "Paste", callback: Callable = None, color = None):
+    def getPasteWidget(tooltip: str = "Paste", callback: Callable = None, color=None):
         """creates a paste widget
 
         :param tooltip: the tooltip to show
@@ -1959,7 +1972,7 @@ class Buttons:
         return Buttons._template(label=None, icon_source=Icons.pasteIcon(), tooltip=tooltip, callback=callback, no_keyboard=True, data=None, color=color)
 
     @staticmethod
-    def getCopyWidget(tooltip: str = "Copy", callback: Callable = None, color = None):
+    def getCopyWidget(tooltip: str = "Copy", callback: Callable = None, color=None):
         """creates a copy widget
 
         :param tooltip: the tooltip to show
@@ -4626,8 +4639,6 @@ def ConfirmBox(prompt="Are you sure", informative_text=None, parent=None) -> boo
     return result
 
 
-
-
 def MessageBoxWarning(title="Warning", prompt="Operation", informative_text=None, parent=None, width=200):
     gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "warning", None, parent)
 
@@ -4975,7 +4986,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
             self._callbackEx(self, checked)
 
     def setReadOnly(self, readonly: bool):
-        """ makes the checkbox readonly or not """
+        """makes the checkbox readonly or not"""
         self._readonly = readonly
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, readonly)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus if readonly else Qt.FocusPolicy.StrongFocus)
@@ -4998,7 +5009,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._ignore_keyboard = value
 
     def setValue(self, value: bool):
-        """ sets the checked state of the checkbox """
+        """sets the checked state of the checkbox"""
         self.setChecked(value)
 
 
@@ -8074,17 +8085,17 @@ class StateVisualizerWidget(QWidget):
         group_layout.addWidget(QtWidgets.QLabel("States"))
         # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
-        self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
-        self._state_filter_widget.apply.connect(self.reloadStates)
-        self._state_filter_widget.changed.connect(self._category_filter_changed)
-        self._state_filter_widget.enabledChanged.connect(self.reloadStates)
+        # self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
+        # self._state_filter_widget.apply.connect(self.reloadStates)
+        # self._state_filter_widget.changed.connect(self._category_filter_changed)
+        # self._state_filter_widget.enabledChanged.connect(self.reloadStates)
 
-        filter_container = getHContainer([self._state_filter_widget], widget_only=True)
+        # filter_container = getHContainer([self._state_filter_widget], widget_only=True)
 
-        widgets = [filter_container, QHorizontalLine()]
-        container = getHContainer(widgets, widget_only=True)
-        self._widget_list.append(container)
-        self.main_layout.addWidget(container)
+        # widgets = [filter_container, QHorizontalLine()]
+        # container = getHContainer(widgets, widget_only=True)
+        # self._widget_list.append(container)
+        # self.main_layout.addWidget(container)
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
@@ -8187,7 +8198,7 @@ class StateVisualizerWidget(QWidget):
 
         sd = gremlin.ui.state_device.StateData()
 
-        is_filter = self._state_filter_widget.isFiltered
+        is_filter = False # self._state_filter_widget.isFiltered
 
         if is_filter:
             category = self._state_filter_widget.category
@@ -9618,7 +9629,7 @@ class QDelayWidget(QWidget):
             self.delay_label.setText(text)
 
     @QtCore.Slot()
-    def _value_changed(self, value : int):
+    def _value_changed(self, value: int):
         if self._validation_callback:
             if not self._validation_callback(value):
                 self._delay_widget.setSuppressed(True)
@@ -10143,6 +10154,15 @@ class QFlowLayout(QtWidgets.QLayout):
     def addItem(self, item):
         self._item_list.append(item)
 
+    def insertWidget(self, index: int, widget):
+        """inserts a widget at the given index (negative or out of range appends)"""
+        self.addChildWidget(widget)
+        item = QtWidgets.QWidgetItem(widget)
+        if index < 0 or index > len(self._item_list):
+            index = len(self._item_list)
+        self._item_list.insert(index, item)
+        self.invalidate()
+
     def count(self):
         return len(self._item_list)
 
@@ -10303,6 +10323,13 @@ class QFlowWidget(QWidget):
         """adds widget to the flow layout"""
         self.main_layout.addWidget(widget)
 
+    def insertWidget(self, index: int, widget):
+        """inserts a widget at the given index in the flow layout"""
+
+    def removeWidget(self, widget):
+        """removes a widget from the flow layout"""
+        self.main_layout.removeWidget(widget)
+
     def clear(self):
         """removes all widgets from the contents"""
         self.main_layout.clear()
@@ -10310,6 +10337,10 @@ class QFlowWidget(QWidget):
     def getWidgets(self) -> list:
         """gets a list of widgets in the flow widget"""
         return gremlin.util.get_layout_widgets(self.main_layout)
+
+    def count(self):
+        """returns the number of widgets in the flow layout"""
+        return len(self.getWidgets())
 
 
 class QBubble(QtWidgets.QLabel):
@@ -11823,7 +11854,7 @@ def getHContainer(
     no_stretch: bool = False,
     widget_only: bool = False,
     align_top: bool = False,
-    auto_size : bool = False,
+    auto_size: bool = False,
     tooltip: str = None,
 ):
     """gets a qt H container widget

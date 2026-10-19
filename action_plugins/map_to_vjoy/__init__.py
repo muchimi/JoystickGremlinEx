@@ -3919,7 +3919,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 if output_index != -1:
                     self.virtual_output_selector_widget.setCurrentIndex(output_index)
 
-            elif input_type in VJoyRemapWidget.input_type_buttons:
+            elif input_type in VJoyRemapWidget.input_type_buttons or action_mode in (VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
                 if action_mode in (
                     VjoyAction.VJoyButton,
                     VjoyAction.VJoyButtonPress,
@@ -4226,6 +4226,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         button_to_axis_visible = action == VjoyAction.VJoySetAxis
 
         grid_visible = grid_visible and self.action_data.grid_visible
+
+        if grid_visible and not self.button_grid_widget:
+            self._create_grid_widgets()
 
         self.grid_visible_widget.setVisible(show_grid_visible)
 

@@ -41,7 +41,18 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
-from gremlin.input_item import AbstractCondition, InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem, AbstractContainer, AbstractAction
+from gremlin.input_item import (
+    AbstractCondition,
+    InputItemWidget,
+    BaseAbstractCondition,
+    AbstractConditionWidget,
+    InputItem,
+    AbstractContainer,
+    AbstractAction,
+    AdvancedInputItemListModel,
+    FilterChip,
+    FilterControlWidget,
+)
 from shiboken6 import Shiboken
 import html
 from typing import Callable, Any
@@ -68,7 +79,7 @@ class StateCategory:
     def __init__(self, name: str, id: str = None):
         assert id is None or isinstance(id, str)
         self._id = gremlin.util.get_guid() if id is None else id
-        self._name = name.casefold().strip() if name else None
+        self._name = name.casefold().strip() if name else "Default"
 
     @property
     def name(self) -> str:
@@ -390,18 +401,18 @@ class StateInputItem(InputItem):
     def __init__(
         self,
         key: str = None,
-        default_value=False,
-        description=None,
+        default_value: bool = False,
+        description: str = None,
         is_expression=False,
         expression=None,
-        category=None,
-        autorelease=False,
-        autorelease_delay=1,
-        autorelease_mode="toggle",
-        autorelease_trigger_mode="on",
+        category: StateCategory = None,
+        autorelease: bool = False,
+        autorelease_delay: int = 1,
+        autorelease_mode: str = "toggle",
+        autorelease_trigger_mode: str = "on",
         data=None,
         exclusive_keys=None,
-        attributes=None,
+        attributes: list[str] = None,
     ):
         master_mode = gremlin.shared_state.master_mode
 
@@ -3410,7 +3421,78 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._exclusive_select_widget.setEnabled(self._exclusive_enabled)
 
 
-class StateFilterWidget(QtWidgets.QWidget):
+class StateFilterCountWidget(QtWidgets.QLabel):
+    """shows filtered vs total state counts for a model"""
+
+    def __init__(self, model=None, parent=None):
+        super().__init__(parent)
+        self._model = None
+        self.setModel(model)
+
+    def setModel(self, model):
+        if self._model is not None:
+            self._model.removeCallback(self._handle_model_changed)
+        self._model = model
+        if model is not None:
+            model.addCallback(self._handle_model_changed)
+        self.updateCounts()
+
+    def _handle_model_changed(self, data=None, force=False):
+        gremlin.util.InvokeUiMethod(self.updateCounts)
+
+    def updateCounts(self):
+        if not Shiboken.isValid(self):
+            return
+        model = self._model
+        if model is None:
+            self.setText("")
+            return
+        total = model.rows()
+        if total == 0:
+            self.setText("")
+            return
+        self.setText(f"<i>(showing {model.count():,} of {total:,})</i>")
+
+
+class StateFilterWidget(FilterControlWidget):
+    def __init__(self, model: StateInputItemModel, profile=None, count_widget: StateFilterCountWidget = None, parent=None):
+        super().__init__(parent)
+        self.model = model
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
+        self.count_widget = count_widget
+        if count_widget is not None:
+            count_widget.setModel(model)
+        if profile:
+            self.setProfile(profile.profile_file)
+        self.setInputItems(self.model.unfilteredItemsList())
+
+        # hook the model filters
+        self.searchChanged.connect(self.model.setSearchString)
+        self.categoryChanged.connect(self.model.setCategory)
+        self.attributesChanged.connect(self.model.setActiveAttributes)
+
+        self.model.addOnItemChangedCallback(self.updateFilter)
+
+    def _apply_filter(self):
+        # Implement the filter application logic here
+        self.model.applyFilter()
+
+    def updateFilter(self, source, index, old_value, new_value, operation):
+        """called when the model changes"""
+        if operation == "filter":
+            # update the list of input items
+            self.setInputItems(self.model.unfilteredItemsList())
+
+    def setCategory(self, category: StateCategory):
+        self.model.setCategory(category.key)
+
+    def updateCounts(self):
+        if self.count_widget is not None:
+            self.count_widget.updateCounts()
+
+
+class StateFilterWidget_old(QtWidgets.QWidget):
     """displays a filter widget that can be enabled, and a state category selected"""
 
     changed = Signal(str)  # fires when the filter is changed
@@ -3428,6 +3510,7 @@ class StateFilterWidget(QtWidgets.QWidget):
         self._is_iv = is_iv  # true if input viewer filter
 
         # filter widget
+
         cm = StateCategories()
         category_id = self._config.iv_state_category_filter if is_iv else self._config.state_category_filter
         category = cm.findById(category_id)
@@ -3638,7 +3721,7 @@ class StateFilterWidget(QtWidgets.QWidget):
                 )
 
 
-class StateInputItemModel(gremlin.input_item.InputItemListModel):
+class StateInputItemModel(gremlin.input_item.AdvancedInputItemListModel):
     """data model for state inputs"""
 
     def __init__(
@@ -3705,7 +3788,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(["State Inputs", "||", lock_widget], widget_only=True)
+        count_widget = StateFilterCountWidget()
+        widget = gremlin.ui.ui_common.getHContainer(["State Inputs", count_widget, "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         if config.show_container_id:
@@ -3742,11 +3826,13 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.setInputItemListModel(model)
 
-        self._filter_widget = StateFilterWidget(model=self.inputItemListModel)
-        self._filter_widget.changed.connect(self._filter_changed)
-        self._filter_widget.categoryChanged.connect(self._category_filter_changed)
-        self._filter_widget.select.connect(self._select_input_item_cb)
-        self._category_f = self._filter_widget.category  # current category
+        profile = gremlin.shared_state.current_profile
+        self._filter_widget = StateFilterWidget(model, profile=profile, count_widget=count_widget)
+
+        # self._filter_widget.changed.connect(self._filter_changed)
+        # self._filter_widget.categoryChanged.connect(self._category_filter_changed)
+        # self._filter_widget.select.connect(self._select_input_item_cb)
+        # self._category_f = self._filter_widget.category  # current category
 
         self.addLeftPanelHeaderWidget(self._filter_widget)
 
@@ -3797,8 +3883,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the state device UI is being cleaned up"""
 
         self._widget_map.clear()
-        self._filter_widget.changed.disconnect(self._filter_changed)
-        self._filter_widget.select.disconnect(self._select_input_item_cb)
+        # self._filter_widget.changed.disconnect(self._filter_changed)
+        # self._filter_widget.select.disconnect(self._select_input_item_cb)
+        
         self._filter_widget = None
         self._filter = None
 

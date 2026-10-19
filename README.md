@@ -49,6 +49,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T79):
+- Change: UI (States): filter widget now allows to filter by category and optional attributes, and to save/restore saved filter settings to a sidecar file (saved profiles only). This feature is a companion feature to the new state features added in T78 to further group/filter states when a profile has a lot of states.  Note: due to this change, the state filter option in input viewer is currently disabled until a suitable replacement that supports the new features is refactored.
+- Fix: Map to Vjoy action: axis to button mode - button selector is blank.
+
 ### (m77T78A)
 - Fix: UI: interpret state values issue diagnostics if receiving invalid data.  Ensure value can only be on/off.
 
