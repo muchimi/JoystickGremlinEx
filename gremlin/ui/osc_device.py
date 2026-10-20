@@ -3766,7 +3766,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             profile=self.profile,
             mode=mode,
             custom_load_handler=self._load_handler,
-            custom_filter_handler=self._handle_filter_data,
+            custom_filter_handler=self._filter_data,
         )
 
         self.setInputItemListModel(model)
@@ -3923,7 +3923,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return True
 
-    def _handle_filter_data(self, input_item) -> bool:
+    def _filter_data(self, input_item, filter) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 

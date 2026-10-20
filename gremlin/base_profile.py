@@ -5098,7 +5098,7 @@ class Profile:
             return
 
         if __debug__:
-            syslog.info(f"set profile last input {device.name} {input_type} {input_id}")
+            syslog.info(f"DEBUG ONLY MESSAGE: set profile last input {device.name} {input_type} {input_id}")
 
         if device_guid is None:
             # remove existing device, input and id
@@ -5221,9 +5221,10 @@ class Profile:
                         # default
                         current_device_guid = read_device_guid
 
-                if read_device_guid != current_device_guid:
-                    syslog.warning(f"Profile last input device GUID mismatch: read {read_device_guid}, using {current_device_guid}")
+                if not gremlin.util.compare_guid(read_device_guid, current_device_guid):
+                    syslog.warning(f"Profile last input device GUID mismatch: read [{read_device_guid}], using [{current_device_guid}]")
                     if verbose:
+
                         device = gremlin.joystick_handling.getDevice(current_device_guid)
                         syslog.info(f"Updating last input for device [{device.name}] input type [{current_input_type}] input ID [{current_input_id}]")
                     self.setLastInput(current_device_guid, current_input_type, current_input_id)

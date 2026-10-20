@@ -2094,12 +2094,12 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """callback for the test input button"""
         pass
 
-    def _filter_data(self, input_item : VoiceInputItem) -> bool:
+    def _filter_data(self, input_item : VoiceInputItem, filter : str) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
 
         if not self._filter:
             return True  # ok
-        
+
         key = input_item.key
         if not key:
             # no key = match

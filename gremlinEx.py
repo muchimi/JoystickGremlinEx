@@ -2323,9 +2323,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _profile_start_ui(self):
         gremlin.util.assert_ui_thread()
         # self.setUiMode()
+        self.ui.tab_content_widget.setEnabled(False)
         self._update_status_bar_active(True)
         self._update_status_bar_modules_ui()
-        self.ui_statusbar_highlight_state_container_widget.setEnabled(False)
+        # highlight toolbar
+        self.ui_statusbar_highlight_container_widget.setEnabled(False)
 
     @QtCore.Slot()
     def _profile_stop(self):
@@ -2334,9 +2336,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _profile_stop_ui(self):
         gremlin.util.assert_ui_thread()
         # self.setUiMode()
+        self.ui.tab_content_widget.setEnabled(True)
         self._update_status_bar_active(False)
         self._update_highlight_toolbar_enabled()
-        self.ui_statusbar_highlight_state_container_widget.setEnabled(True)
+        # highlight toolbar
+        self.ui_statusbar_highlight_container_widget.setEnabled(True)
 
     @QtCore.Slot(str, str, object)
     def registerStatusModule(self, key, label: str, state: object, callback):

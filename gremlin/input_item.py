@@ -425,9 +425,9 @@ class AbstractView(QtWidgets.QWidget):
             self._hash_key = hash_key
             self.redraw()  # trigger a redraw pending
 
-    def _get_hash_key(self):
+    def _get_hash_key(self, filter=AbstractCallbackModel.DEFAULT_FILTER):
         """key used to detect when a redraw is needed - override to include view state"""
-        return self._model.hashKey()
+        return self._model.hashKey(filter)
 
     def beginModelChange(self):
         """call this before making a change to the model to prevent multiple change events from firing"""
@@ -472,9 +472,25 @@ class AbstractView(QtWidgets.QWidget):
         if old_model is not None:
             old_model.removeCallback(self._handle_model_changed)
         self._model = model
-        self._hash_key = None
+        self._hash_key = None # reset last model hash
         if model is not None:
             model.addCallback(self._handle_model_changed)
+
+    def changeModelCallback(self, change_callback: Callable):
+        """Changes the model callback to the provided callable."""
+        if self._model is not None:
+            old_callback = getattr(self, "_handle_model_changed", None)
+            if old_callback is not None:
+                self._model.removeCallback(old_callback)
+            if change_callback is not None:
+                self._model.addCallback(change_callback)
+
+    def clearModelCallback(self):
+        """Clears the model callback."""
+        if self._model is not None:
+            old_callback = getattr(self, "_handle_model_changed", None)
+            if old_callback is not None:
+                self._model.removeCallback(old_callback)
 
     def modelChanged(self) -> bool:
         """true if the unrerlying model has changed - used in the context of begin/end to detect model changes if a redraw was suspended"""
@@ -535,9 +551,9 @@ class AbstractPaginatedView(AbstractView):
             return 0
         return model.rows() if hasattr(model, "rows") else model.count()
 
-    def _get_hash_key(self):
+    def _get_hash_key(self, filter=AbstractCallbackModel.DEFAULT_FILTER):
         self._clamp_page()
-        return (super()._get_hash_key(), self._page_size, self._page_index)
+        return (super()._get_hash_key(filter), self._page_size, self._page_index)
 
     def _clamp_page(self):
         self._page_index = max(0, min(self._page_index, self.page_count - 1))
@@ -3839,13 +3855,15 @@ class InputItemListModel(AbstractCallbackModel):
         import gremlin.config
         # load the items for this mode
 
-        if self._custom_load_handler:
-            # use our custom handler to update the model data
-            self._custom_load_handler(self)
-            return
-
         self.pushSuspend()
         try:
+            if self._custom_load_handler:
+                # use our custom handler to update the model data
+                self._custom_load_handler(self)
+                return
+
+
+
             registry = gremlin.shared_state.current_profile.registry
             device_guid = self._device_guid
             mode = self.mode
@@ -4022,6 +4040,7 @@ class InputItemListView(AbstractPaginatedView):
         blank_message: str = "No data",
         enable_filter: bool = False,
         model: InputItemListModel = None,
+        filter: str = AbstractCallbackModel.DEFAULT_FILTER,
         page_size: int = None,  # number of items per page (automatic based on config)
     ):
         """Creates a new input item view instance
@@ -4053,6 +4072,7 @@ class InputItemListView(AbstractPaginatedView):
         assert isinstance(model, InputItemListModel), "invalid model for list view - must be an InputItemListModel base type"
         assert gremlin.util.is_ui_thread()
 
+        self.filter = filter
         self.pushSuspended()
         self.name = name
         self._device_guid = device_guid
@@ -4426,7 +4446,7 @@ class InputItemListView(AbstractPaginatedView):
                         )
 
                     page_start, page_end = self.pageRange()
-                    data = list(self.model.getFilteredMap())[page_start:page_end]
+                    data = list(self.model.getFilteredMap(filter=self.filter))[page_start:page_end]
                     for model_index, input_item in data:
                         assert isinstance(input_item, InputItem), "invalid input item"
                         assert isinstance(model_index, int), "invalid index"
@@ -4625,13 +4645,22 @@ class InputItemListView(AbstractPaginatedView):
 
         self._apply_pending_selection_page()
 
-        hash_key = self._get_hash_key()
-        changed = force or (hash_key != self._model_hash) or self.modelChanged()
+
+
+        hash_key = self.model.hashKey(self.filter) #  self._get_hash_key(self.filter)
+        changed = force or (hash_key != self._model_hash)
         if not changed:
             return  # no changes detected, skip redraw
+        # model has changed - redraw
+        # if "state" in self.model.display_name.lower():
+        #     syslog.info("States in model:")
+        #     for input_item in self.model.getFilteredItems(self.filter):
+        #         syslog.info(f" - {input_item.display_name}")
+        #     syslog.info(f"Hash value: {hash_key}")
+        #     pass
+
         self._model_hash = hash_key
 
-        # model has changed - redraw
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui_level(1)
@@ -4656,9 +4685,14 @@ class InputItemListView(AbstractPaginatedView):
                 # compare rows
                 model_count = self.model.count()  # widgets that should be displayed
                 widget_count = self.getInputItemWidgetCount()
+                input_items = self.model.getFilteredItems()
+                if verbose:
+                    syslog.info("List view model inputs:")
+                    for input_item in input_items:
+                        syslog.info(f" - {input_item.display_name}")
                 if model_count == widget_count:
                     # check to see if the widgets match the inputs
-                    for input_item in self.model.getFilteredItems():
+                    for input_item in input_items:
                         if input_item.id not in self._widget_map:
                             force = True
                             changed = True
@@ -4666,11 +4700,10 @@ class InputItemListView(AbstractPaginatedView):
                 else:
                     changed = True
 
-            if verbose:
-                syslog.info("InputItemListView: redraw")
-
             if force or changed:
                 # create if the first time or if the model changed
+                if verbose:
+                    syslog.info("InputItemListView: redraw")
                 self.create_ui()
                 self._drawn_once = True
                 widget_count = self.getInputItemWidgetCount()
@@ -12390,6 +12423,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.profile = profile
         self.device_node = profile.getDeviceNode(device.device_guid)
 
+
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"
         )
@@ -12426,6 +12460,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.all_inputs_deleted.connect(self._handle_all_inputs_deleted)
         el.jump_to_mapped_input.connect(self._handle_jump_to_mapped_input)
         el.device_mapping_changed.connect(self._handle_device_mapping_changed)
+        # el.profile_before_start.connect(self._handle_profile_before_start)
+        # el.profile_stopped.connect(self._handle_profile_stopped)
 
         if self.filtersEnabled:
             el.input_filtered_change.connect(self._handle_input_filter_changed)
@@ -12447,6 +12483,21 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.listview_stackwidget)
         self._blank_input()
+
+    # def _handle_profile_before_start(self):
+    #     """called before the profile starts"""
+    #     gremlin.util.InvokeUiMethod(self._enable_ui, False)
+
+    # def _handle_profile_stopped(self):
+    #     """called when the profile has stopped"""
+    #     gremlin.util.InvokeUiMethod(self._enable_ui, True)
+
+    # def _enable_ui(self, enable: bool):
+    #     """enables or disables the UI"""
+    #     if self.left_panel_header_container is not None:
+    #         self.left_panel_header_container.setEnabled(enable)
+    #     if self.listview_container is not None:
+    #         self.listview_container.setEnabled(enable)
 
     def notifyInputsChanged(self):
         """tell the UI the inputs changed"""
@@ -12654,7 +12705,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 if self._input_item_list_model.rows():
                     # device has inputs
                     model = self._input_item_list_model
-                    input_filter = self.getDefaultFilter()
+                    input_filter = model.getFilteredItems()
                     input_items = model.getUnfilteredItems()
                     for device_guid in input_filter:
                         for input_type in input_filter[device_guid]:
@@ -12848,17 +12899,26 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def inputItemListModel(self, model: InputItemListModel):
         self.setInputItemListModel(model)
 
-    def setInputItemListModel(self, model: InputItemListModel):
+    def setInputItemListModel(self, model: InputItemListModel, change_callback : Callable = None):
         """sets the model"""
+
+        model_callback = getattr(self, "_handle_model_changed", None) if change_callback is None else change_callback
+
         if self._input_item_list_model != model:
             if self._input_item_list_model is not None:
                 self._input_item_list_model.removeOnItemChangedCallback(self.onInputItemChange)
+                if model_callback is not None:
+                    self._input_item_list_model.removeCallback(model_callback)
                 model_callback = getattr(self, "_handle_model_changed", None)
                 if model_callback is not None:
                     self._input_item_list_model.removeCallback(model_callback)
             self._input_item_list_model = model
         if self._input_item_list_view is not None:
             self._input_item_list_view.setModel(model)
+            if model_callback is not None:
+                self._input_item_list_model.addCallback(model_callback)
+
+
         # trap input item add/remove events
         if self._input_item_list_model is not None:
             self._input_item_list_model.addOnItemChangedCallback(self.onInputItemChange)
@@ -12902,10 +12962,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self._handle_input_item_selected
             )  # hook selected callback - called whenever an input is selected
             self.listview_container_layout.insertWidget(0, widget)  # change the list view at the top of the container
-
             self.onInputListViewCreated()
             self._input_item_list_view.setModel(self.inputItemListModel)
-            self._input_item_list_view._redraw_ui(force=True)
+            self._input_item_list_view._redraw_ui()
 
     def setLastSelectedIndex(self, value: int):
         self._last_selected_index = value
@@ -13220,6 +13279,15 @@ class AdvancedInputItemListModel(InputItemListModel):
 
         self._custom_filter_handler = custom_filter_handler
 
+        self._search_string_map = {}
+        self._search_string_map[self.DEFAULT_FILTER] = None
+
+        self._category_map = {}  # [filter: category] - map of filters to category
+        self._category_map[self.DEFAULT_FILTER] = None
+
+        self._active_attributes_map = {}  # [filter : set] - map of filters to active attributes
+        self._active_attributes_map[self.DEFAULT_FILTER] = set()
+
         InputItemListModel.__init__(
             self,
             profile=profile,
@@ -13239,80 +13307,81 @@ class AdvancedInputItemListModel(InputItemListModel):
 
         self._initializing = True
 
-        self.search_string = ""
-        self.category = None
-        self.active_attributes = set()
-        self.setFilterEnabled(True)
-        self.setFilterCallback(self._handle_custom_filter)
+        self.registerFilter(InputItemListModel.DEFAULT_FILTER, self._handle_custom_filter)
 
         self._initializing = False
 
-    def _handle_custom_filter(self, item):
-        """apply search filters for category and active attributes, and delegate to custom filter if present"""
-        if self.search_string:
-            if self.search_string not in item.key.casefold():
-                return False
+    def setFilterCallback(self, filter, callback: Callable):
+        """sets a filter for a given callback, registering it if necessary"""
+        self.registerFilter(filter, callback)
 
-        if self.category is not None and hasattr(item, "category"):
-            item_category = item.category
-            if item_category and item.category.name and item_category.name.casefold() != self.category:
+    def registerFilter(self, filter, callback: Callable = None):
+        """registers a filter and an optional associated callback"""
+        if filter not in self._category_map:
+            self._category_map[filter] = None
+        if filter not in self._active_attributes_map:
+            self._active_attributes_map[filter] = set()
+        if filter not in self._search_string_map:
+            self._search_string_map[filter] = None
+
+        super().registerFilter(filter, callback)
+        super().registerFilter(filter, self._handle_custom_filter)
+
+    def unregisterFilter(self, filter, callback: Callable = None):
+        super().unregisterFilter(filter, callback)
+        if filter in self._category_map:
+            del self._category_map[filter]
+        if filter in self._active_attributes_map:
+            del self._active_attributes_map[filter]
+
+    def _handle_custom_filter(self, item, filter=InputItemListModel.DEFAULT_FILTER):
+        """apply search filters for category and active attributes, and delegate to custom filter if present"""
+        if self._search_string_map[filter]:
+            if self._search_string_map[filter] not in item.key.casefold():
                 return False
-        if self.active_attributes:
+        if self._category_map[filter] is not None and hasattr(item, "category"):
+            item_category = item.category
+            if item_category and item.category.name and item_category.name.casefold() != self._category_map[filter]:
+                return False
+        if self._active_attributes_map[filter]:
             getter = getattr(item, "getAttributes", None)
             if not callable(getter):
                 return False
             values = getter()
             item_attributes = {attr.casefold() for attr in (values or []) if isinstance(attr, str)}
-            if not self.active_attributes.issubset(item_attributes):
+            if not self._active_attributes_map[filter].issubset(item_attributes):
                 return False
 
-        if self._custom_filter_handler:
-            return self._custom_filter_handler(item)
         return True
 
-    def setSearchString(self, text):
-        self.search_string = text.casefold()
-        self._refilter()
+    def setSearchString(self, text, filter=InputItemListModel.DEFAULT_FILTER, emit=True):
+        if text:
+            self._search_string_map[filter] = text.casefold()
+        else:
+            self._search_string_map[filter] = None
+        self._refilter(filter=filter, emit=emit)
 
-    def setCategory(self, category):
-        self.category = category.casefold() if category else None
-        self._refilter()
+    def setCategory(self, category: str | None, filter=InputItemListModel.DEFAULT_FILTER, emit=True):
+        assert isinstance(category, str) or category is None, "Category must be a valid string or None"
+        if filter:
+            self._category_map[filter] = category.casefold() if category else None
+            self._refilter(filter=filter, emit=emit)
 
-    def setActiveAttributes(self, attributes):
-        self.active_attributes = {a.casefold() for a in attributes}
-        self._refilter()
+    def setActiveAttributes(self, attributes: list | set | tuple, filter=InputItemListModel.DEFAULT_FILTER, emit=True):
+        assert isinstance(attributes, (list, set, tuple)), "Attributes must be a list, set, or tuple"
+        self._active_attributes_map[filter] = {a.casefold() for a in attributes}
+        self._refilter(filter=filter, emit=emit)
 
-    def _refilter(self):
+    def _refilter(self, filter=InputItemListModel.DEFAULT_FILTER, emit=True):
         """re-applies the filter and forces attached views to redraw even if the model hash is unchanged"""
         if getattr(self, "_refiltering", False):
             return  # view redraw can call back into the model
         self._refiltering = True
         try:
-            self.applyFilter(emit=False)
-            self._fireChanged(True)
+            self.applyFilter(emit=emit, filter=filter)
+            self._fireChanged(emit)
         finally:
             self._refiltering = False
-
-    def filterAcceptsRow(self, source_row, source_parent):
-        index = self.sourceModel().index(source_row, 0, source_parent)
-        item = self.sourceModel().data(index, Qt.ItemDataRole.UserRole)
-        if item is None:
-            return False
-        if self.search_string not in item.key.casefold():
-            return False
-        if self.category is not None and hasattr(item, "category"):
-            item_category = item.category
-            if item_category and item_category.casefold() != self.category:
-                return False
-        if self.active_attributes:
-            getter = getattr(item, "getAttributes", None)
-            if not callable(getter):
-                return False
-            values = getter()
-            item_attributes = {attr.casefold() for attr in (values or []) if isinstance(attr, str)}
-            if not self.active_attributes.issubset(item_attributes):
-                return False
-        return True
 
 
 class FilterChip(QWidget):
@@ -13470,7 +13539,7 @@ class FilterControlWidget(QWidget):
         for key in list(self.active_chips):
             if key != "search":
                 self._set_chip(key, None)
-        self.clearFilters(emit=False)
+        self.clearFilters()
 
     def _on_search(self, text):
         self._set_chip("search", text if text else None, background_color=Color.nameColor())
@@ -13497,6 +13566,7 @@ class FilterControlWidget(QWidget):
         self.chips_scroll.setVisible(bool(self.active_chips))
 
     def _remove_chip(self, key):
+        """called when the user clicks on the chip close button"""
         if key == "search":
             self.search_input.clear()
         elif key == "category":
@@ -13507,8 +13577,8 @@ class FilterControlWidget(QWidget):
             if action is not None:
                 action.setChecked(False)
 
-    def clearFilters(self, emit=True):
-        self.setFilterOptions({"search": "", "category": None, "attributes": []}, emit=emit)
+    def clearFilters(self):
+        self.setFilterOptions({"search": "", "category": None, "attributes": []})
 
     def getFilterOptions(self):
         return {
@@ -13517,7 +13587,7 @@ class FilterControlWidget(QWidget):
             "attributes": sorted([attr for attr, action in self.attribute_actions.items() if action.isChecked()]),
         }
 
-    def setFilterOptions(self, options, emit=True):
+    def setFilterOptions(self, options):
         """Restore available values; ignore unknown categories/attributes."""
         search = options.get("search", "")
         category = options.get("category")
@@ -13533,10 +13603,9 @@ class FilterControlWidget(QWidget):
         for attr, action in self.attribute_actions.items():
             action.setChecked(attr in selected)
         # Always emit final values, even if a control didn't change.
-        if emit:
-            self.searchChanged.emit(self.search_input.text())
-            self.categoryChanged.emit(self.category_combo.currentData())
-            self.attributesChanged.emit([a for a, action in self.attribute_actions.items() if action.isChecked()])
+        self.searchChanged.emit(self.search_input.text())
+        self.categoryChanged.emit(self.category_combo.currentData())
+        self.attributesChanged.emit([a for a, action in self.attribute_actions.items() if action.isChecked()])
 
     @staticmethod
     def sidecarPath(profile_path):
@@ -13588,13 +13657,13 @@ class FilterControlWidget(QWidget):
         if not profile.is_file():
             raise FileNotFoundError(f"Profile not found: {profile}")
         self.profile_path = profile
-        self.clearFilters(emit=False)
+        self.clearFilters()
         self.preset_combo.clear()
         try:
             payload = self._read_presets()
             self._refresh_presets(payload)
             if auto_load and payload.get("selected") in payload["presets"]:
-                self.setFilterOptions(payload["presets"][payload["selected"]], emit=False)
+                self.setFilterOptions(payload["presets"][payload["selected"]])
         except (OSError, ValueError, TypeError) as exc:
             QMessageBox.warning(self, "Load failed", str(exc))
 

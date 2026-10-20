@@ -17,8 +17,8 @@
 
 
 import logging
-import threading
 
+import threading
 
 import dinput
 from dinput import DeviceSummary
@@ -87,21 +87,25 @@ def getAllDevicesMap():
     global _all_devices_map
     return _all_devices_map
 
+
 def getAllDevices() -> list:
     """gets a list of all devices"""
     global _all_devices_map
     # with _device_registry_lock:
     return list(_all_devices_map.values())
 
+
 def dumpDevices():
     """dumps the list of all devices to the log"""
     global _all_devices_map
-    #with _device_registry_lock:
+    # with _device_registry_lock:
     device_list = list(_all_devices_map.values())
-    device_list.sort(key = lambda d: d.name.casefold())
+    device_list.sort(key=lambda d: d.name.casefold())
     syslog.info(f"All devices: {len(_all_devices_map)}")
     for device in device_list:
-        syslog.info(f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}")
+        syslog.info(
+            f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}"
+        )
 
 
 def _handle_change(data, key, old_value, value):
@@ -119,9 +123,6 @@ _joystick_init_lock = threading.Lock()
 
 class AxisNames:
     joystick_linear_axis_names = ["X", "Y", "Z", "S1", "S2", "RX", "RY", "RZ"]
-
-
-
 
 
 class VJoyProxy:
@@ -159,7 +160,7 @@ class VJoyProxy:
     @classmethod
     def reset(self):
         """Relinquishes control over all held VJoy devices."""
-        #with VJoyProxy._vjoy_proxy_lock:
+        # with VJoyProxy._vjoy_proxy_lock:
         devices = list(VJoyProxy.vjoy_devices.values())
         for device in devices:
             device.invalidate()
@@ -216,7 +217,8 @@ def vjoy_input_devices() -> list[DeviceSummary]:
     devices = [dev for dev in _vjoy_devices if settings.getVjoyAsInput(dev.vjoy_id)]
     return devices
 
-def vjoy_id_list(connected = True) -> list[int]:
+
+def vjoy_id_list(connected=True) -> list[int]:
     """gets the list of vjoy device IDs"""
     global _vjoy_devices
     # with _device_registry_lock:
@@ -329,7 +331,7 @@ def vjoy_devices(connected_only=True):  # -> list[DeviceSummary]:
     :return list of [DeviceSummary] holding the device configuration for every vjoy device
     """
     global _vjoy_devices_map, _all_vjoy_devices_map
-    #with _device_registry_lock:
+    # with _device_registry_lock:
     if connected_only:
         device_list = [dev for dev in _all_vjoy_devices_map.values() if dev.connected]
         pass
@@ -632,9 +634,7 @@ def set_button(device_guid: str | dinput.GUID | int, index: int, is_pressed: boo
     # local input
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(
-            f"VJOY SET BUTTON: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping"
-        )
+        syslog.warning(f"VJOY SET BUTTON: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
         return
     if 0 < index <= device.button_count:
         proxy = gremlin.joystick_handling.VJoyProxy()
@@ -664,7 +664,6 @@ def set_axis(device_guid, index: int, value: float, update_remote: bool = False)
 
     sd = gremlin.event_handler.JoystickState()
 
-
     if sd.outputIgnored(device_guid):
         # output ignored
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
@@ -674,9 +673,7 @@ def set_axis(device_guid, index: int, value: float, update_remote: bool = False)
 
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(
-            f"VJOY SET AXIS: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping"
-        )
+        syslog.warning(f"VJOY SET AXIS: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
         return
     if 0 < index <= device.axis_count:
         proxy = gremlin.joystick_handling.VJoyProxy()
@@ -703,9 +700,7 @@ def set_hat(device_guid: str | dinput.GUID | int, index: int, direction: tuple):
         return
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(
-            f"VJOY SET HAT: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping"
-        )
+        syslog.warning(f"VJOY SET HAT: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
         return
     if 0 < index < device.hat_count:
         proxy = gremlin.joystick_handling.VJoyProxy()
@@ -873,8 +868,6 @@ def unregisterDisconnectedDevice(dev):
         del _disconnected_devices_map[device_guid]
     if dev in _disconnected_devices:
         _disconnected_devices.remove(dev)
-
-
 
 
 def clearDisconnectedDevices():
@@ -1205,8 +1198,6 @@ def registerSpecialDevices():
     import gremlin.ui.octavi_device
     import gremlin.config
 
-
-
     # import gremlin.ui.osc_device
     # import gremlin.ui.midi_device
     global _special_devices_map, _special_devices
@@ -1286,7 +1277,6 @@ def registerSpecialDevices():
         except Exception:
             pass
 
-
     # voice
     if config.voice_enabled:
         device = DeviceSummary()
@@ -1295,7 +1285,6 @@ def registerSpecialDevices():
         device.device_type = DeviceType.Voice
         device.device_category = DeviceCategory.Special
         registerSpecialDevice(device)
-
 
     # mode
     device = DeviceSummary()
@@ -1461,8 +1450,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
 
     import gremlin.util
 
-
-
     global \
         _joystick_devices, \
         _joystick_init_lock, \
@@ -1485,7 +1472,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
         except Exception:
             pass  # fall through to a full initialization
 
-
     _joystick_initialized = False
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_inputs or config.verbose_mode_vjoy
@@ -1493,7 +1479,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
 
     # vjoy monitor handls keep alive pings to vjoy so the process maintains a hook into the interface when there is no activity
     vjm = vjoy.VJoyMonitor()
-
 
     try:
         with _joystick_init_lock:
@@ -1694,7 +1679,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                     if device.device_guid not in _all_devices_map:
                         _all_devices_map[device.device_guid] = device
 
-
                 for vjoy_index in range(1, 17):  # list all possible vjoy devices index 1 up to 16
                     is_connected, axis_count, button_count, hat_count = config_map[vjoy_index]
 
@@ -1759,7 +1743,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                         dev.axis_names[i] = axis_name
                         dev.axismap_list.append(axis_name)
 
-
                     vjoy_lookup[hash_value] = dev
                     _all_joystick_devices.append(dev)
                     device_guid = gremlin.util.normalize_guid(dev.device_guid)
@@ -1805,7 +1788,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                 for dev in maestro_devices_list:
                     syslog.info(f"\tDevice: (maestro) {str(dev)}")
 
-
                 # m77 - validate all devices in all tracking structures are in the list
                 for dev in _joystick_devices:
                     if dev.device_guid not in _all_devices_map:
@@ -1828,15 +1810,12 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                         syslog.warning(f"JOYSTICK: Device [{dev}] is in _special_devices but not in _all_devices_map")
                         _all_devices_map[dev.device_guid] = dev
 
-
                 try:
                     _last_device_signature = _device_list_signature()
                 except Exception:
                     _last_device_signature = None
                 _joystick_initialized = True
                 syslog.info("Joystick input initialized")
-
-
 
                 # update calibration on initial joystick device load
                 mgr = gremlin.ui.axis_calibration.CalibrationManager()
@@ -1845,7 +1824,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
     finally:
         # turn on vjoy monitoring
         vjm.start()
-
 
     return True
 
@@ -1949,8 +1927,12 @@ class VirtualDeviceUsageState:
     def __init__(self, profile=None):
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.ensure_profile)
+        el.config_option_changed.connect(self._handle_config_changed)
 
         """ tracks assigned VJOY functions """
+
+        self.verbose = False
+        self._handle_config_changed()  # verbose flag
 
         self._device_list = None
         self._profile = None
@@ -1991,6 +1973,10 @@ class VirtualDeviceUsageState:
         el.shutdown.connect(self._handle_shutdown)
         self.reset()
 
+    def _handle_config_changed(self):
+        config = gremlin.config.Configuration()
+        self.verbose = config.verbose_mode_vjoy and config.verbose_mode_extra
+
     def registerAction(self, key):
         # assert key not in self._action_map, "action already registered"
         if key not in self._action_map:
@@ -2004,7 +1990,8 @@ class VirtualDeviceUsageState:
     def unregisterAction(self, key):
         """unregisters an action - this can be called multiple times for the same action"""
         if key in self._action_map:
-            # syslog.info(f"Button State: unregister action [{key}]")
+            if self.verbose:
+                syslog.info(f"Button State: unregister action [{key}]")
             del self._action_map[key]
             for device_type in self._button_usage_map:
                 for virtual_id in self._button_usage_map[device_type]:
@@ -2030,14 +2017,15 @@ class VirtualDeviceUsageState:
 
     def _profile_changed(self):
         """new profile - clear data"""
-        # syslog.info("Button State: profile change event")
+        if self.verbose:
+            syslog.info("Button State: profile changed")
+
         self.reset()
         self.ensure_device_maps(force_update=True)
 
     def reset(self):
         """resets the usage state"""
-        verbose = gremlin.config.Configuration().verbose_mode_joystick
-        if verbose:
+        if self.verbose:
             syslog.info("Button State: reset usage state")
         # self._button_usage.clear()
         self._button_usage_map.clear()
@@ -2208,8 +2196,7 @@ class VirtualDeviceUsageState:
             if virtual_id in self._axis_invert_map[device_type]:
                 if input_id in self._axis_invert_map[device_type][virtual_id]:
                     self._axis_invert_map[device_type][virtual_id][input_id] = not self._axis_invert_map[device_type][virtual_id][input_id]
-                    verbose = gremlin.config.Configuration().verbose_mode_vjoy
-                    if verbose:
+                    if self.verbose:
                         syslog.info(f"Vjoy [{device.name}] Axis {input_id} inverted state: {self._axis_invert_map[device_type][virtual_id][input_id]}")
                     return
 
@@ -2249,7 +2236,8 @@ class VirtualDeviceUsageState:
     def set_profile(self, profile):
         """loads profile data and free input lists"""
         if profile != self._profile:
-            syslog.info(f"Button State: load new profile: {profile.name}")
+            if self.verbose:
+                syslog.info(f"Button State: load new profile: {profile.name}")
             self._profile = profile
             # self._button_usage.clear()
             # self._button_usage_map.clear()  # blits state data on profile change
@@ -2361,7 +2349,7 @@ class VirtualDeviceUsageState:
             self._action_map[key][device_type][virtual_id] = None
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_vjoy and config.verbose_mode_extra
+
         # verbose = True
 
         usage_map = self._button_usage_map[device_type][virtual_id][button_id]
@@ -2381,7 +2369,7 @@ class VirtualDeviceUsageState:
 
         changed = current_state != is_mapped
 
-        if verbose:
+        if self.verbose:
             syslog.info(
                 f"Button State: Set usage state: [{device_type.name}] id [{virtual_id}] button [{button_id}] used: [{used}] mapped: [{is_mapped}] key: [{key}]"
             )
@@ -2400,11 +2388,7 @@ class VirtualDeviceUsageState:
             if used:
                 assert button_id in used_list, f"button {button_id} should be in used list {used_list}"
             else:
-                action_list = [
-                    k
-                    for k in action_keys
-                    if self._action_map.get(k, {}).get(device_type, {}).get(virtual_id, None) == button_id
-                ]
+                action_list = [k for k in action_keys if self._action_map.get(k, {}).get(device_type, {}).get(virtual_id, None) == button_id]
                 assert key not in action_list, f"action {key} should not be in action list {action_list}"
 
         if changed:
@@ -2429,15 +2413,10 @@ class VirtualDeviceUsageState:
         device = gremlin.joystick_handling.getDevice(device_guid)
         if device is None:
             # Profile reload can race joystick re-init; skip rather than abort the load.
-            syslog.warning(
-                f"VJOY usage: device not found for GUID [{device_guid}] "
-                f"(button {button_id}) — skipping usage update"
-            )
+            syslog.warning(f"VJOY usage: device not found for GUID [{device_guid}] (button {button_id}) — skipping usage update")
             return
         if not device.is_virtual:
-            syslog.warning(
-                f"VJOY usage: device [{device.name}] is not virtual — skipping usage update"
-            )
+            syslog.warning(f"VJOY usage: device [{device.name}] is not virtual — skipping usage update")
             return
         device_type = device.device_type
         virtual_id = device.virtual_id
@@ -2574,13 +2553,13 @@ class VirtualDeviceUsageState:
                                             key = action.key
                                             self.set_usage_state(target_device_guid, button_id, key, True, emit=False)
                                             target_deviceguid_list.add(target_device_guid)
+        if self.verbose:
+            syslog.info("Button usage list for profile:")
+            for device_guid in target_deviceguid_list:
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                used_list = self.used_button_list(device_guid)
+                syslog.info(f"Profile load: Used button list for device {device.name}: {used_list}")
 
-        syslog.info("Button usage list for profile:")
-        for device_guid in target_deviceguid_list:
-            device = gremlin.joystick_handling.getDevice(device_guid)
-            used_list = self.used_button_list(device_guid)
-            syslog.info(f"Profile load: Used button list for device {device.name}: {used_list}")
-        pass
 
     def get_action_map(self, device_guid, input_type, input_id):
         """gets what's mapped to a vjoy device by input type and input id"""

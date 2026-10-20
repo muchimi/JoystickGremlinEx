@@ -21,6 +21,8 @@ import fnmatch
 import random
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QModelIndex
+
+from PySide6.QtWidgets import QLayout, QGroupBox, QWidget
 import threading
 
 
@@ -67,6 +69,11 @@ from gremlin.ui.ui_common import (
     Icons,
     ConfirmBox,
     Color,
+    QFlowLayout,
+    QDataRadioButton,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWarningWidget,
 )
 
 
@@ -692,7 +699,8 @@ class StateInputItem(InputItem):
             self._last_value = self._value
             self._value = data
 
-            syslog.info(f"STATE setValue(): set [{self.key}]  -> [{data}]")
+            if verbose:
+                syslog.info(f"STATE setValue(): set [{self.key}]  -> [{data}]")
 
             self._fire_changed(data)
             self.changed.emit(self)
@@ -1670,6 +1678,33 @@ class StateConditionWidget(AbstractConditionWidget):
                 description = data.description
                 self.setDescription(description)
                 self.condition.description = description
+
+
+class StateInputItemModel(gremlin.input_item.AdvancedInputItemListModel):
+    """data model for state inputs"""
+
+    def __init__(
+        self,
+        profile: gremlin.base_profile.Profile,
+        custom_load_handler: Callable = None,
+        custom_filter_handler: Callable = None,
+        custom_change_handler: Callable = None,
+        item_changed_handler: Callable = None,
+    ):
+
+        super().__init__(
+            profile=profile,
+            device_guid=StateDeviceTabWidget.device_guid,
+            mode=gremlin.shared_state.master_mode,
+            allowed_types=[InputType.State],
+            custom_load_handler=custom_load_handler,
+            custom_change_handler=custom_change_handler,
+            custom_filter_handler=custom_filter_handler,
+            show_master_mode=True,
+        )
+
+        if item_changed_handler:
+            self.addOnItemChangedCallback(item_changed_handler)
 
 
 @SingletonDecorator
@@ -3424,9 +3459,12 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 class StateFilterCountWidget(QtWidgets.QLabel):
     """shows filtered vs total state counts for a model"""
 
-    def __init__(self, model=None, parent=None):
+    def __init__(self, model=None, filter=StateInputItemModel.DEFAULT_FILTER, prefix: str = None, suffix: str = None, parent=None):
         super().__init__(parent)
         self._model = None
+        self._filter = filter
+        self._prefix = prefix
+        self._suffix = suffix
         self.setModel(model)
 
     def setModel(self, model):
@@ -3437,8 +3475,22 @@ class StateFilterCountWidget(QtWidgets.QLabel):
             model.addCallback(self._handle_model_changed)
         self.updateCounts()
 
+    def setFilter(self, filter):
+        self._filter = filter
+        self.updateCounts()
+
     def _handle_model_changed(self, data=None, force=False):
         gremlin.util.InvokeUiMethod(self.updateCounts)
+
+    def setSuffix(self, suffix: str):
+        """sets the suffix (optional) = None to clear"""
+        self._suffix = suffix
+        self.updateCounts()
+
+    def setPrefix(self, prefix: str):
+        """sets the prefix (optional) = None to clear"""
+        self._prefix = prefix
+        self.updateCounts()
 
     def updateCounts(self):
         if not Shiboken.isValid(self):
@@ -3447,305 +3499,403 @@ class StateFilterCountWidget(QtWidgets.QLabel):
         if model is None:
             self.setText("")
             return
-        total = model.rows()
+        count = model.count(filter=self._filter)  # total filtered in the model
+        total = model.rows()  # total items in the model
         if total == 0:
             self.setText("")
             return
-        self.setText(f"<i>(showing {model.count():,} of {total:,})</i>")
+        self.setText(f"<i>({self._prefix + ' ' if self._prefix else ''}showing {count:,} of {total:,}{' ' +self._suffix if self._suffix else ''})</i>")
 
 
 class StateFilterWidget(FilterControlWidget):
-    def __init__(self, model: StateInputItemModel, profile=None, count_widget: StateFilterCountWidget = None, parent=None):
+    changed = QtCore.Signal()  # fires when the filter is changed
+
+    def __init__(
+        self, model: StateInputItemModel, profile=None, count_widget: StateFilterCountWidget = None, filter=StateInputItemModel.DEFAULT_FILTER, parent=None
+    ):
         super().__init__(parent)
         self.model = model
+        self.filter = filter  # filter to use on the model
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
         self.count_widget = count_widget
+        self._last_hash = None # tracks changes in the returned data
+
         if count_widget is not None:
             count_widget.setModel(model)
         if profile:
             self.setProfile(profile.profile_file)
-        self.setInputItems(self.model.unfilteredItemsList())
+
+        if model:
+            self.setModel(model)
 
         # hook the model filters
-        self.searchChanged.connect(self.model.setSearchString)
-        self.categoryChanged.connect(self.model.setCategory)
-        self.attributesChanged.connect(self.model.setActiveAttributes)
+        self.searchChanged.connect(self.setSearchString)
+        self.categoryChanged.connect(self.setCategory)
+        self.attributesChanged.connect(self.setActiveAttributes)
 
-        self.model.addOnItemChangedCallback(self.updateFilter)
+    def setModel(self, model: StateInputItemModel):
+        """ updates the state input model to use for the fitler"""
+        if model != self.model:
+            self._last_hash = None # reset tracker
+            if self.model:
+                self.model.unregisterFilteredDataChangeCallback(self.updateFilter)
+            self.model = model
+            if model:
+                items = self.model.unfilteredItemsList()
+                syslog.info(f"StateFilterWidget: setting input items [{len(items)}] found")
+                self.setInputItems(items)
+                self.model.registerFilteredDataChangeCallback(self.updateFilter)
 
-    def _apply_filter(self):
-        # Implement the filter application logic here
-        self.model.applyFilter()
 
-    def updateFilter(self, source, index, old_value, new_value, operation):
-        """called when the model changes"""
-        if operation == "filter":
-            # update the list of input items
-            self.setInputItems(self.model.unfilteredItemsList())
+    def ensureItems(self):
+        if self.model and len(self.input_items) == 0:
+            items = self.model.unfilteredItemsList()
+            # syslog.info(f"StateFilterWidget: ensuring input items [{len(items)}] found")
+            self.setInputItems(items)
 
-    def setCategory(self, category: StateCategory):
-        self.model.setCategory(category.key)
+    def setSearchString(self, search: str):
+        self.model.setSearchString(search, filter=self.filter, emit=False)
+        self.updateFilter()
+
+    def setCategory(self, category: str | StateCategory):
+        if isinstance(category, StateCategory):
+            category = category.name
+        self.model.setCategory(category, filter=self.filter, emit=False)
+        self.updateFilter()
+
+    def setActiveAttributes(self, attributes: list[str]):
+        self.model.setActiveAttributes(attributes, filter=self.filter, emit=False)
+        self.updateFilter()
+
+    def updateFilter(self, force = False):
+        # look for a change
+        current_hash = self.model.hashKey(filter=self.filter)
+        if not force and current_hash == self._last_hash:
+            return
+        self.ensureItems()
+        self._last_hash = current_hash
+
+        self.updateCounts()
+        self.changed.emit()
+
+
+
 
     def updateCounts(self):
         if self.count_widget is not None:
             self.count_widget.updateCounts()
 
 
-class StateFilterWidget_old(QtWidgets.QWidget):
-    """displays a filter widget that can be enabled, and a state category selected"""
+class StateRepeaterButton(QDataPushButton):
+    """state repeater - hooks the state"""
 
-    changed = Signal(str)  # fires when the filter is changed
-    categoryChanged = Signal(StateCategory)  # fires when the category is changed
-    select = Signal(object)  # request to select an item
-    apply = Signal()  # called when the widget's apply button is called
-    enabledChanged = Signal()  # fires when the filter enable/disable is changed
+    def __init__(self, state, callback=None, parent=None):
+        super().__init__(state.key, parent=parent, data=state)
 
-    def __init__(self, model=None, parent=None, is_iv=False):
+        font_size = int(gremlin.config.Configuration().input_viewer_button_size)
+        self.setCheckable(True)
+        css = Color.cssStateButton(font_size)
+        cssAlternate = Color.cssStateExpressionButton(font_size)
+        self.data = state
+        if not state:
+            syslog.warning("StateRepeater: State is not provided, setting checked to False")
+            self.setChecked(False)
+            return
+
+        if state.expression:
+            self.setEnabled(False)
+            self.setStyleSheet(cssAlternate)
+        else:
+            self.setStyleSheet(css)
+
+        if isinstance(state.value, bool):
+            self.setChecked(state.value)
+        else:
+            syslog.warning(f"StateRepeater: State value is not a boolean, converting to bool: state: [{state.key}] value: [{state.value}]")
+            self.setChecked(bool(state.value))
+        self.setCallback(callback)
+
+    def toggle(self, emit=False):
+        """toggle the repeater state"""
+        self.setState(not self.isChecked(), emit)
+
+    def setState(self, value: bool, emit=False):
+        """sets the state of the repeater"""
+        if emit:
+            # fire the signal when checked
+            self.setChecked(value)
+        else:
+            # block the signal
+            with QtCore.QSignalBlocker(self):
+                self.setChecked(value)
+
+
+class StateVisualizerWidget(QWidget):
+    """state visualization widget - input viewer"""
+
+    VISUALIZER_FILTER = "visualizer"
+
+    def __init__(self, parent=None):
         super().__init__(parent)
 
-        self._config = gremlin.config.Configuration()
+        import gremlin.ui.state_device
+
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
+
+        self.initialized = False
+
+        self.widgets = []
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self._model = model
-        self._is_iv = is_iv  # true if input viewer filter
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # filter widget
+        self.main_layout.addWidget(QtWidgets.QLabel("Profile States:"))
 
-        cm = StateCategories()
-        category_id = self._config.iv_state_category_filter if is_iv else self._config.state_category_filter
-        category = cm.findById(category_id)
-        self._category_filter = category
+        self._widget_list = []  # list of widgets to include in max height computation
 
-        self.filter_enabled_widget = QtWidgets.QCheckBox("Enable Filtering")
-        self.filter_enabled_widget.setToolTip("Enables filtering on the state list by category")
-        is_filter = self._config.iv_state_filter_enabled if is_iv else self._config.state_filter_enabled
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
 
-        self.filter_enabled_widget.setChecked(is_filter)
-        self.filter_enabled_widget.clicked.connect(self._filter_enabled_changed)
+        self._hooked = False
 
-        self._category_filter_widget = cm.getSelector(self._category_filter_changed, category)
-        self._category_filter_widget.setEnabled(is_filter)
-        self._category_filter_widget.setEditable(False)  # don't allow editing of categories for the main filter
+        self._state_buttons = {}  # holds the buttons created for each state
 
-        current_filter = self._config.iv_state_filter if is_iv else self._config.state_filter
-        self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text=current_filter)
+        # self.group_widget = QGroupBox("States")
+        self.group_widget = QWidget()
+        group_layout = QVBoxLayout(self.group_widget)
 
-        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback=self._find_entry, tooltip="Search (F3)")
-        self._apply_widget = QtWidgets.QPushButton("Apply")
-        self._apply_widget.setToolTip("Apply current filter")
-        self._apply_widget.clicked.connect(self._apply_filter)
+        count_widget = StateFilterCountWidget(filter=self.VISUALIZER_FILTER, suffix="states")
 
-        self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear_filter, label=None)
-        self._clear_filter_widget.setMaximumWidth(24)
+        ui = gremlin.shared_state.ui
+        device_widget = ui.getRegisteredWidget(StateDeviceTabWidget.device_guid)
+        self.model = device_widget.model if device_widget else None
+        self.model.registerFilter(self.VISUALIZER_FILTER)  # new filter type for the model
+        self.model.addCallback(self._handle_model_changed)
 
-        self._last_search_index = -1  # last search index for a successful search
-        self._last_search_term = None  # last search term for a succesful search
+        profile = gremlin.shared_state.current_profile
+        self._state_filter_widget = StateFilterWidget(model=self.model, profile=profile, count_widget=count_widget, filter=self.VISUALIZER_FILTER)
+        self._state_filter_widget.changed.connect(self._populateState_ui) # update on filter change
 
-        # text filter
-        widget = gremlin.ui.ui_common.getHContainer(
-            [
-                self._find_widget,
-                "||",
-                # self._filter_enabled_widget,
-                QtWidgets.QLabel(" Filter:"),
-                self._filter_widget,
-                "||",
-                self._apply_widget,
-                self._clear_filter_widget,
-            ],
-            widget_only=True,
-        )
-        self.main_layout.addWidget(widget)
+        filter_container = getHContainer([self._state_filter_widget], widget_only=True)
 
-        # category filter
-        widget = gremlin.ui.ui_common.getHContainer(
-            [
-                self.filter_enabled_widget,
-                "||",
-                QtWidgets.QLabel(" Category:"),
-                self._category_filter_widget,
-            ],
-            widget_only=True,
-        )
-        self.main_layout.addWidget(widget)
+        widgets = [filter_container, QHorizontalLine()]
+        container = getHContainer(widgets, widget_only=True)
+        self._widget_list.append(container)
+        self.main_layout.addWidget(container)
 
-        # count row
-        self._count_widget = QtWidgets.QLabel()
-        widget = gremlin.ui.ui_common.getHContainer(self._count_widget, widget_only=True)
-        self.main_layout.addWidget(widget)
-        self.main_layout.setSpacing(2)
-        self._update_count()
+        config = gremlin.config.Configuration()
+        config.changed.connect(self._config_changed)
+        current_size = config.input_viewer_button_size
+        font_sizes = (("small", 12), ("medium", 16), ("large", 20))
+        widgets = [count_widget, "|", "Button size:"]
+        for label, size in font_sizes:
+            rb = QDataRadioButton(label, size)
+            if current_size == size:
+                rb.setChecked(True)
+                self._row_height = size + 4
+            rb.clicked.connect(self._font_size_cb)
+            widgets.append(rb)
 
-    @property
-    def isFiltered(self) -> bool:
-        return self.filter_enabled_widget.isChecked()
+        widgets.append("||")
 
-    @QtCore.Slot(bool)
-    def _filter_enabled_changed(self, is_filter):
-        if self._is_iv:
-            self._config.iv_state_filter_enabled = is_filter
-        else:
-            self._config.state_filter_enabled = is_filter
+        widget = getHContainer(widgets, widget_only=True)
+        group_layout.addWidget(widget)
 
-        self._category_filter_widget.setEnabled(is_filter)
-        has_categories = self._category_filter_widget.count()
-        category = self._category_filter_widget.currentData() if is_filter and has_categories else None
-        self.categoryChanged.emit(category)
-        self.enabledChanged.emit()
+        self._button_widget = QWidget()
+        self._button_layout = QFlowLayout(self._button_widget)
+
+        group_layout.addWidget(self._button_widget)
+
+        self.main_layout.addWidget(self.group_widget)
+
+        self._populateState_ui()
+
+        self.initialized = True
+
+        # apply the filter to refresh the data
+        self.model.applyFilter(filter=self.VISUALIZER_FILTER, emit=True)
+        self._state_filter_widget.updateFilter()
+
+    def _handle_model_changed(self, data, force):
+        # update the data
+        if self.initialized:
+            self.reloadStates()
+
+    def _cleanup_ui(self):
+        self.unhook()
+        if self.model:
+            self.model.unregisterFilter(self.VISUALIZER_FILTER)  # also clears any callbacks for that filter
+
+        self._state_filter_widget.changed.disconnect(self._populateState_ui) # disconnect filter change signal
+
+        for btn in self._state_buttons.values():
+            gremlin.util.delete_widget(btn)
+        self._state_buttons.clear()
+        sd = gremlin.ui.state_device.StateData()
+        sd.crud.disconnect(self._state_crud)
+        config = gremlin.config.Configuration()
+        config.changed.disconnect(self._config_changed)
 
     @QtCore.Slot()
-    def _category_filter_changed(self):
-        """called when the state category filter is changed"""
-        category = self._category_filter_widget.currentData()
-        self._category_filter = category
-        gremlin.config.Configuration().state_category_filter = category.id if category else ""
-        self.categoryChanged.emit(category)
+    def _font_size_cb(self):
+        widget = self.sender()
+        size = widget.data
+        config = gremlin.config.Configuration()
+        config.input_viewer_button_size = size
+        self._row_height = size + 4
+        self.reloadStates()
 
-    @property
-    def category(self) -> StateCategory:
-        """current category"""
-        return self._category_filter
+    def buttonWidget(self):
+        return self._button_widget
 
-    def _update_count(self):
-        """updates the count of defined inputs"""
-        if not self._model:
-            self._count_widget.setText(None)
+    def _handle_filter_callback(self, item, filter):
+        self.reloadStates()
+
+    def populateState(self):
+        """reloads profile state data in the UI"""
+        self.reloadStates()
+
+    def reloadStates(self):
+        """reloads profile state data in the UI"""
+        gremlin.util.InvokeUiMethod(self._populateState_ui)
+
+    def _filter_data(self, input_item, filter) -> bool:
+        """custom filter handler - true if the data is included in the filter, false otherwise"""
+        import fnmatch
+
+        key_filter = self._state_filter_widget.filter
+        if not key_filter:
+            return True  # ok
+        item: StateInputItem = input_item.input_id
+        key = item.key
+        if not key:
+            # no key = match
+            return True
+
+        key = item.key.casefold().strip()
+        if key_filter in key:
+            return True
+        return fnmatch.fnmatch(key, key_filter)
+
+    def _populateState_ui(self):
+        """loads or reloads states"""
+        if not self.initialized or not self._button_widget or not Shiboken.isValid(self._button_widget):
             return
-        total = self._model.rows()
-        visible = self._model.count()
 
-        plural = "s" if total > 1 else ""
-        if total == 0:
-            msg = "<i>(no states found)</i>"
-        elif visible != total:
-            msg = f"<i>({visible:,} of {total:,} state{plural})</i>"
-        else:
-            msg = f"<i>({total:,} state{plural})</i>"
-        self._count_widget.setText(msg)
+        # syslog.info(f"State Visualizer: populate state UI - width: {self.size().width()}")
 
-    def updateCounts(self):
-        """updates the model counts"""
-        self._update_count()
-
-    def _clear_filter(self):
-        value = self._filter_widget.text()
-        if value:
-            # if there is a filter, clear it
-            with QtCore.QSignalBlocker(self._filter_widget):
-                self._filter_widget.setText(None)
-            self._apply_filter()
-
-    def _apply_filter(self):
-        """applies the filter"""
-        value = self._filter_widget.text()
-        if self._is_iv:
-            self._config.iv_state_filter = value
-        else:
-            self._config.state_filter = value
-        self.changed.emit(value)
-        self.apply.emit()
-
-    def clearFilter(self):
-        """clears the filter"""
-        self._clear_filter()
-
-    @property
-    def filter(self) -> str:
-        return self._filter_widget.text()
-
-    def _find_entry(self):
-        """occurs when the find button is clicked"""
-        gremlin.util.InvokeUiMethod(self._find_entry_ui)
-
-    def _find_entry_ui(self):
-        """displays the find dialog"""
+        layout = self._button_layout  # layout that holds the state buttons
         config = gremlin.config.Configuration()
-        current_term = config.state_last_search_term
-        self._dialog = gremlin.ui.ui_common.QInputDialog("Find OSC message", "Search for:", text=current_term)
-        self._dialog.accepted.connect(self._find_entry_accept)
-        self._dialog.setModal(True)
-        self._dialog.show()
+        verbose = config.verbose_mode_state
+        # verbose = True
 
-    def _find_entry_accept(self):
-        search_term = self._dialog.text()
-        if search_term:
-            self.find_next(search_term)
+        i = 0
 
-    def find_next(self, search_term: str):
-        """finds the first entry matching the specified search term"""
-        config = gremlin.config.Configuration()
-        # current_term = config.state_last_search_term
+        items = self.model.getFilteredItems(self.VISUALIZER_FILTER)
 
-        if search_term:
-            input_item: StateInputItem
-            config.state_last_search_term = search_term
-            data = self._model.dataModel()
-            # matches = [(index, item) for index, item in data.items() if fnmatch.fnmatch(item.input_id.key, search_term)]
-            decorated_search_term = gremlin.util.decorate_filter(search_term)
-            matches = [
-                (index, item)
-                for index, item in data.items()
-                if item.input_id.key and (fnmatch.fnmatch(item.input_id.key, decorated_search_term) or search_term in item.input_id.key)
-            ]
+        gremlin.util.clear_layout(layout)
 
-            if matches:
-                index_list = [i for (i, item) in matches]
-                index_list.sort()
+        state_count = self.model.unfilteredCount()
+        has_states = state_count > 0  # has states
 
-                last_index = -1
-                if self._last_search_term == search_term:
-                    # same index
-                    last_index = self._last_search_index
+        self._state_filter_widget.setVisible(has_states)
+        self._state_buttons.clear()
 
-                    # syslog.info(f"last search index: {last_index}")
+        if verbose:
+            syslog.info(f"viewer state: {len(items)} items to display, total states: {state_count}")
 
-                if last_index < 0 or last_index >= len(index_list):
-                    last_index = 0  # round robin to first index
+        if items:
+            state: StateInputItem
+            for state in items:
+                if state.value is None:
+                    syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
+                    continue
 
-                # syslog.info(f"search index: {last_index}")
-                index = index_list[last_index]
-                input_item = data[index]
+                btn = StateRepeaterButton(state, callback=self._state_toggle)
 
-                self._last_search_term = search_term
-                self._last_search_index = last_index + 1  # next search index
+                if verbose:
+                    syslog.info(f"viewer state: {state.key}  value: {state.value}")
 
-                el = gremlin.event_handler.EventListener()
-                el.select_input.emit(
-                    input_item.device_guid,
-                    input_item.input_type,
-                    input_item.input_id,
-                    False,
-                    True,
-                    False,
-                    None,
-                )
+                layout.addWidget(btn)
 
+                state.changed.connect(self._state_changed)
 
-class StateInputItemModel(gremlin.input_item.AdvancedInputItemListModel):
-    """data model for state inputs"""
+                if state.key in self._state_buttons:
+                    # remove the prior button reference
+                    gremlin.util.delete_widget(self._state_buttons[state.key])
 
-    def __init__(
-        self,
-        profile: gremlin.base_profile.Profile,
-        custom_load_handler: Callable = None,
-        custom_filter_handler: Callable = None,
-        custom_change_handler: Callable = None,
-        item_changed_handler: Callable = None,
-    ):
+                self._state_buttons[state.key] = btn
+                i += 1
 
-        super().__init__(
-            profile=profile,
-            device_guid=StateDeviceTabWidget.device_guid,
-            mode=gremlin.shared_state.master_mode,
-            allowed_types=[InputType.State],
-            custom_load_handler=custom_load_handler,
-            custom_change_handler=custom_change_handler,
-            custom_filter_handler=custom_filter_handler,
-            show_master_mode=True,
-        )
+        else:
+            icon = Icons.warningIcon(gremlin.ui.ui_common.Color.yellowColor())
+            stub = f"Showing {len(items)} out of {state_count}" if has_states else "No states available"
+            widget = QWarningWidget(stub, icon=icon)
+            layout.addWidget(widget)
 
-        if item_changed_handler:
-            self.addOnItemChangedCallback(item_changed_handler)
+        self.updateLayout()
+
+    def updateLayout(self):
+        """coerce QT into correct height information -  update the height for the flow layout - this is tricky because the flow layout adjusts based on width and contents which is dynamic"""
+        self.adjustSize()
+
+    @QtCore.Slot(object)
+    def _category_filter_changed(self, category):
+        """called when the state category filter is changed"""
+        self.reloadStates()
+
+    def _state_changed(self, state):
+        # state changed received - ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._state_changed_ui, state)
+
+    def _state_changed_ui(self, state):
+        """called on state changes"""
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose:
+            syslog.info(f"State Visualizer: state {state.key} changed {state.value}")
+        if state.key in self._state_buttons:
+            widget = self._state_buttons[state.key]
+            if Shiboken.isValid(widget):
+                widget.setState(state.value)
+        else:
+            if verbose:
+                syslog.warning(f"State Visualizer: state {state.key} widget not found")
+
+    @QtCore.Slot(str, object)
+    def _config_changed(self, key, value):
+        if key == "input_viewer_button_size":
+            self.reloadStates()
+
+    @QtCore.Slot()
+    def _state_toggle(self, widget):
+        state = widget.data
+        key = state.key
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose:
+            syslog.info("-" * 50)
+            syslog.info(f"Viewer: state {state.key} toggle")
+        sc = gremlin.ui.state_device.StateData()
+        sc.toggle(key)
+
+    @QtCore.Slot()
+    def _state_crud(self):
+        # called on state create/add/remove/edit
+        self.reloadStates()
+
+    def unhook(self):
+        """unhooks events"""
+        if not self._hooked:
+            return
+        vis_type = self.vis_type
+        el = gremlin.event_handler.EventListener()
+        match vis_type:
+            case gremlin.types.VisualizationType.State:
+                el.joystick_event.disconnect(self._state_update)
+
+        self._hooked = False
+
+    def _cleanup_ui(self):
+        self.unhook()
 
 
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -3817,22 +3967,20 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._category_filter = config.state_category_filter
 
         # data model
-        model = StateInputItemModel(
+        self.model = StateInputItemModel(
             profile,
             custom_load_handler=self._load_handler,
             custom_filter_handler=self._filter_data,
             item_changed_handler=self.onItemChanged,
         )
 
-        self.setInputItemListModel(model)
+        self.model.pushSuspend()
+
+        self.setInputItemListModel(self.model)
 
         profile = gremlin.shared_state.current_profile
-        self._filter_widget = StateFilterWidget(model, profile=profile, count_widget=count_widget)
-
-        # self._filter_widget.changed.connect(self._filter_changed)
-        # self._filter_widget.categoryChanged.connect(self._category_filter_changed)
-        # self._filter_widget.select.connect(self._select_input_item_cb)
-        # self._category_f = self._filter_widget.category  # current category
+        self._filter_widget = StateFilterWidget(self.model, profile=profile, count_widget=count_widget)
+        self._filter_widget.changed.connect(self._handle_filter_changed)
 
         self.addLeftPanelHeaderWidget(self._filter_widget)
 
@@ -3879,13 +4027,34 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.find_next.connect(self._handle_find_next)
         el.state_added.connect(self._handle_state_added)
 
+
+        self.model.popSuspend()
+
+        # tell the UI items that depend on the state model it changed
+        el.state_model_change.emit(self.model)
+
+
+    def _handle_filter_changed(self):
+        if self.inputItemListView:
+            self.inputItemListView.redraw()
+
+    def ensureLoaded(self):
+        super().ensureLoaded()
+        # model_count = self.model.unfilteredCount()
+        filter_count = len(self._filter_widget.input_items)
+        #syslog.info(f"Model count: {model_count}, Filter count: {filter_count}")
+        if filter_count == 0:
+            # sync the data
+            self._filter_widget.updateFilter()
+
+
     def _cleanup_ui(self):
         """called when the state device UI is being cleaned up"""
 
         self._widget_map.clear()
-        # self._filter_widget.changed.disconnect(self._filter_changed)
+        self._filter_widget.changed.disconnect(self._handle_filter_changed)
         # self._filter_widget.select.disconnect(self._select_input_item_cb)
-        
+
         self._filter_widget = None
         self._filter = None
 
@@ -3991,7 +4160,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return changed
 
-    def _filter_data(self, input_item) -> bool:
+    def _filter_data(self, input_item, filter) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 

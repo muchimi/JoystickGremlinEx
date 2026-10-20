@@ -1470,12 +1470,11 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _populateState_ui(self, layout):
         self._reload_states_ui()
 
-    def _filter_data(self, state) -> bool:
+    def _filter_data(self, state, filter : str) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
-
-        filter = self._state_filter_widget.filter
-        if not filter:
+        key_filter = self._state_filter_widget.filter
+        if not key_filter:
             return True  # no filter = match
         key = state.key
         if not key:
@@ -1483,9 +1482,9 @@ States can be toggled by clicking on the state button.  Expression states will u
             return True
 
         key = state.key.casefold().strip()
-        if filter in key:
+        if key_filter in key:
             return True
-        return fnmatch.fnmatch(key, filter)
+        return fnmatch.fnmatch(key, key_filter)
 
     def _reload_states(self):
         gremlin.util.InvokeUiMethod(self._reload_states_ui)  # ensure on UI thread
@@ -1598,7 +1597,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         # widget holding state information
         if not widget:
-            widget = gremlin.ui.ui_common.StateVisualizerWidget()
+            widget = gremlin.ui.state_device.StateVisualizerWidget()
             self._state_visualizer_widget = widget
 
         viewer_widget = self._viewer_widget_map.get(key, None)

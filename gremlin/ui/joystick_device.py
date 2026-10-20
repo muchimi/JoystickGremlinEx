@@ -935,7 +935,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             model._update_filter()
 
-    def _filter_data(self, input_item: InputItem):
+    def _filter_data(self, input_item: InputItem, filter : str):
         """custom filter handled - true if the item is included in the list, false if not"""
         profile = gremlin.shared_state.current_profile
         # filtered = true if the input should not be displayed (filtered), false if it should be visible

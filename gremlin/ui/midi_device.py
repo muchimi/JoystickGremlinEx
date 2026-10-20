@@ -1914,7 +1914,7 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
 
             model._update_filter()
 
-    def _filter_data(self, input_item) -> bool:
+    def _filter_data(self, input_item : MidiInputItem, filter : str) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 

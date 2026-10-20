@@ -1026,13 +1026,13 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.debug_ui.setVisible(self.config.is_debug)
 
         self.config.runtime_ui_update = False  # ensure disabled for performance reasons
-        self.runtime_ui_update = QtWidgets.QCheckBox("Update UI when profile is active")
-        self.runtime_ui_update.setChecked(self.config.runtime_ui_update)
-        self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
-        self.runtime_ui_update.setToolTip(
-            "When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime"
-        )
-        self.runtime_ui_update.setEnabled(False)
+        # self.runtime_ui_update = QtWidgets.QCheckBox("Update UI when profile is active")
+        # self.runtime_ui_update.setChecked(self.config.runtime_ui_update)
+        # self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
+        # self.runtime_ui_update.setToolTip(
+        #     "When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime"
+        # )
+        # self.runtime_ui_update.setEnabled(False)
 
         self.show_id_widget = ui_common.QDataCheckbox("Show container/action IDs")
         self.show_id_widget.setChecked(self.config.show_container_id)
@@ -1046,7 +1046,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         )
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title="Debug", transparent=True)
-        box.addWidget(self.runtime_ui_update)
+        # box.addWidget(self.runtime_ui_update)
         box.addWidget(self.show_id_widget)
         box.addWidget(self.debug_ui)
         box.addWidget(log_description_widget)

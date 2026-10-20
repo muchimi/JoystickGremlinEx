@@ -128,7 +128,10 @@ class CodeRunner:
             self.stop()
             return False
 
+
+
         config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_exec
 
         gremlin.shared_state.profile_state = True  # assume profile start ok
         gremlin.shared_state.profile_message_issued = False  # no message issued
@@ -254,7 +257,7 @@ class CodeRunner:
                 graph_mode_node.parent = ec.graph
                 graph_mode_nodes[mode] = graph_mode_node
 
-            verbose = gremlin.config.Configuration().verbose_mode_exec
+
             device_node: gremlin.base_profile.ProfileDeviceNode
             for device_node in profile.devices.values():
                 device_guid = device_node.device_guid
@@ -408,7 +411,7 @@ class CodeRunner:
                         )
                         continue
                     callbacks.extend(container.generate_callbacks())
-                if callbacks:
+                if verbose and callbacks:
                     syslog.info(f"CALLBACK: State [{key}]: registered {len(callbacks)} container callback(s)")
                 for cb_data in callbacks:
                     event = gremlin.event_handler.Event(
@@ -425,7 +428,8 @@ class CodeRunner:
                 vd.ptt_input_item = input_item
                 if input_item:
                     # voice device is latched to an input to manage recognition on/off and toggle
-                    syslog.info(f"Voice latch input found for input item: {input_item.display_name}")
+                    if verbose:
+                        syslog.info(f"Voice latch input found for input item: {input_item.display_name}")
                     valid = True
                     match input_item.input_type:
                         case InputType.JoystickButton | InputType.JoystickHat:
@@ -495,7 +499,7 @@ class CodeRunner:
                             )
                             continue
                         callbacks.extend(container.generate_callbacks())
-                    if callbacks:
+                    if verbose and callbacks:
                         syslog.info(f"CALLBACK: Voice [{key}]: registered {len(callbacks)} container callback(s)")
                     for cb_data in callbacks:
                         vd.addCallback(input_item, cb_data.callback)

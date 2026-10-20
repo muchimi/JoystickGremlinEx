@@ -281,7 +281,7 @@ class PulseWorker:
         syslog = logging.getLogger("system")
         # verbose = gremlin.config.Configuration().verbose
         verbose = False
-        verbose = True
+        # verbose = True
         if not self._thread.is_alive():
             return
 

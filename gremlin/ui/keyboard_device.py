@@ -1023,7 +1023,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return True
 
-    def _filter_data(self, input_item) -> bool:
+    def _filter_data(self, input_item, filter : str) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 
@@ -1413,7 +1413,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the keyboard device UI is being cleaned up"""
         super()._cleanup_ui()
 
-        
+
         el = gremlin.event_handler.EventListener()
         for signal, slot in (
             (el.lock_inputs, self._handle_lock_inputs),

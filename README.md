@@ -49,6 +49,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T80):
+- New: API: generic data model gains multiple concurrent filters.  Each registered filter type can have its own custom callback to determine if the data in the model is filtered or not.  If no filter is provided, the default filter is used.  This feature enables the data models to support multiple concurrent filters to have different views of the same data while using the same model.
+- Change: Input Viewer: State repeater has filters re-enabled and uses the new state filter used in the state device.  The two share the same saved filter profiles for states can be called up in the input viewer. The filter options for states in Input Viewer is a separate set from the one used in the state device.  However they share the same saved filters (if any).
+- Change: TempoEx Container: automatic disable log message now indicates which input contains the disabled TempoEx.
+- Fix: UI: Device and mapping content disabled while the profile is running. This previously was only disabling some components while still allowing some UI interactions at profile runtime that could impact performance or introduce unexpected out of band changes.
+- Fix: LOG: reduced density of forced verbosity some recently modified GEX components avoid spamming the log file with development related diagnostics information.
+- Fix: States Device: Filter not always aware of profile states.
 
 ### (m77T79):
 - Change: UI (States): filter widget now allows to filter by category and optional attributes, and to save/restore saved filter settings to a sidecar file (saved profiles only). This feature is a companion feature to the new state features added in T78 to further group/filter states when a profile has a lot of states.  Note: due to this change, the state filter option in input viewer is currently disabled until a suitable replacement that supports the new features is refactored.

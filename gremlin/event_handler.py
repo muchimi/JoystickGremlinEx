@@ -591,6 +591,7 @@ class EventListener(QtCore.QObject):
     state_category_add = Signal(object)  # fires when a state category is added (StateCategory)
     state_category_delete = Signal(object)  # fires when a state category is removed (StateCategory)
     state_category_name_change = Signal(object)  # fires when a state category name is changed (StateCategory)
+    state_model_change = Signal(object)  # fires when the state model changes (StateInputItemModel)
 
     # Signal emitted when a joystick is attached or removed
     device_change_event = Signal()

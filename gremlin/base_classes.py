@@ -24,6 +24,8 @@ import inspect
 
 from PySide6 import QtCore
 from typing import Callable, List, Any, Generic, TypeVar, Iterator
+
+from attr import filters
 from gremlin.input_types import InputType
 from gremlin.types import DeviceType
 from psygnal import Signal
@@ -894,7 +896,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
         :return True if all required variables are set, False otherwise
         """
-        return True # assume valid
+        return True  # assume valid
 
     # @abstractmethod
     def _sanitize(self):
@@ -962,7 +964,9 @@ class AbstractCallbackModel(AbstractModel):
 
     """
 
-    sorted = Signal() # fires when the model is sorted
+    sorted = Signal()  # fires when the model is sorted
+
+    DEFAULT_FILTER = "default"  # default filter name
 
     def __init__(
         self,
@@ -974,6 +978,7 @@ class AbstractCallbackModel(AbstractModel):
         content_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
+        filtered_data_change_callback: Callable = None,
         item_changed_callback: Callable = None,
         data=None,
     ):
@@ -985,6 +990,7 @@ class AbstractCallbackModel(AbstractModel):
         :param removed_callback: optional callback when an item is removed from the model (unfiltered)
         :param content_callback: optional callback when the content of the model changes
         :param allowable types: optional list of allowable types in the model
+        :param filter_change_callback: optional callback when the filtered data changes
         :param data_changed_callback: optional callback when the model data changes (onItemChanged (model, index, new_item, old_item, operation))
         :param data: optional initial data for the model
 
@@ -994,27 +1000,28 @@ class AbstractCallbackModel(AbstractModel):
         self._item_changed_callbacks = [self.onItemChanged]
         self._data_changed_callbacks = []
         self._content_callback = None
+        self._filter_data_changed_callbacks = []
+        if filtered_data_change_callback:
+            self._filter_data_changed_callbacks.append(filtered_data_change_callback)
         self._initializing = True
-
-
-
 
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
         self._extra_data = data
 
-        # assume no filters
-        self._filtered_index_map = TriggerDict()  # map of index : int to item : object
-        self._filtered_item_map = TriggerDict()  # map of item : object to index : int
+        self._filtered_index_map = {}  # map of [filter][index : int to item : object] - one per filter
+        self._filtered_item_map = {}  # map of [filter][item : object to index : int] - one per filter
 
-        self._filtered_callback: Callable = None
+        self._filtered_callback_map: dict[str, list[Callable]] = {}
         self._sort_callback: Callable = None
-        self._filtered_enabled: bool = None
-        self._sort_enabled: bool = None
+        self._filtered_enabled: bool = filter_callback is not None
+        self._sort_enabled: bool = sort_callback is not None
         self._suspend_stack = 1  # tracks suspension of change events (suspend while initializing)
         self._show_filtered_only = False
         self._change_pending = False  # true if a change is pending
+
+        self.registerFilter(self.DEFAULT_FILTER)
 
         assert model_description, "model description not provided"
         self._model_description = model_description
@@ -1030,7 +1037,8 @@ class AbstractCallbackModel(AbstractModel):
         self._remove_callback = removed_callback
 
         self.setSortCallback(sort_callback)
-        self.setFilterCallback(filter_callback)
+        if filter_callback:
+            self.setFilterCallback(filter_callback)
 
         if change_callback:
             self.addCallback(change_callback)
@@ -1040,10 +1048,65 @@ class AbstractCallbackModel(AbstractModel):
 
         self.setContentCallback(content_callback)
 
-        self._suspend_stack = 0 # allow change events to be processed
+        self._suspend_stack = 0  # allow change events to be processed
         self._initializing = False
 
+    def registerFilter(self, filter: str, callback: Callable = None):
+        """registers a new filtered data set in the model
+        if the filter exists, the request is ignored
 
+        parameters:
+            filter: The name of the filter to register.
+            callback: A callable to be invoked when filtered data changes (optional)
+
+        """
+        apply = False
+        if filter not in self._filtered_index_map:
+            self._filtered_index_map[filter] = TriggerDict()
+            apply = True
+        if filter not in self._filtered_item_map:
+            self._filtered_item_map[filter] = TriggerDict()
+            apply = True
+        if callback is not None:
+            if filter not in self._filtered_callback_map:
+                self._filtered_callback_map[filter] = []
+            if callback not in self._filtered_callback_map[filter]:
+                self._filtered_callback_map[filter].append(callback)
+            self._filtered_enabled = True  # enable filtering if a callback is provided
+            apply = True
+        if apply:
+            self.applyFilter(filter=filter)
+
+    def unregisterFilter(self, filter: str):
+        """removes a filtered data set from the model, or a specific callback if provided"""
+
+        # remove all callbacks for that filter
+        if filter in self._filtered_callback_map:
+            self._filtered_callback_map[filter].clear()
+
+        if filter in self._filtered_index_map:
+            del self._filtered_index_map[filter]
+        if filter in self._filtered_item_map:
+            del self._filtered_item_map[filter]
+        if filter in self._filtered_callback_map:
+            del self._filtered_callback_map[filter]  # clear any callbacks for that filter
+            self._filtered_enabled = bool(self._filtered_callback_map)  # disable filtering if no callbacks remain
+
+
+    def registerFilteredDataChangeCallback(self, callback: Callable):
+        """registers a callback for when filtered data changes"""
+        if callback and callback not in self._filter_data_changed_callbacks:
+            self._filter_data_changed_callbacks.append(callback)
+
+    def unregisterFilteredDataChangeCallback(self, callback: Callable):
+        """unregisters a callback for when filtered data changes"""
+        if callback and callback in self._filter_data_changed_callbacks:
+            self._filter_data_changed_callbacks.remove(callback)
+
+    def _fire_filtered_data_changed_callbacks(self):
+        """calls all registered filtered data change callbacks"""
+        for callback in self._filter_data_changed_callbacks:
+            callback()
 
     def dispose(self):
         """disposes of the model and cleans up resources"""
@@ -1054,12 +1117,14 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map.clear()
         self._filtered_item_map.clear()
         self._filtered_index_map.clear()
+        self._filtered_callback_map.clear()
+        self._filter_data_changed_callbacks.clear()
+        self._filtered_enabled = False
         self._content_callback = None
 
     def setContentCallback(self, callback: Callable):
         """sets the content changed callback for this model"""
         if __debug__:
-
             if callback:
                 assert isinstance(callback, Callable), "invalid callback"
                 sig = inspect.signature(callback)
@@ -1090,14 +1155,14 @@ class AbstractCallbackModel(AbstractModel):
         if hasattr(item, "setContentCallback"):
             item.setContentCallback(None)
 
-    def _notify_changed(self, data = None, force : bool = False, operation : str = "update"):
+    def _notify_changed(self, data=None, force: bool = False, operation: str = "update"):
         if self._content_callback:
             self._content_callback(data, force, operation)
 
-    def setItemAt(self, index: int, item, emit=True):
-        self._set_item_at(index, item, emit, "setItemAt")
+    def setItemAt(self, index: int, item, emit=True, filter: str = DEFAULT_FILTER):
+        self._set_item_at(index, item, emit, "setItemAt", filter)
 
-    def _set_item_at(self, index: int, item, emit=True, operation : str = "add"):
+    def _set_item_at(self, index: int, item, emit=True, operation: str = "add", filter: str = DEFAULT_FILTER):
         """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
@@ -1108,13 +1173,11 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map[index] = item
         self._item_map[item] = index
         self._register_content(item)
-        self.applyFilter(emit)
+        self.applyFilter(emit=emit, filter=filter)
         self._fireChanged()
         self._notify_changed(data=item, operation=operation)
         self.onItemChanged(self, index, item, old_item, operation)
         self.markDirty()
-
-
 
     def setSortCallback(self, callback):
         """changes or clears the sort callback"""
@@ -1127,14 +1190,35 @@ class AbstractCallbackModel(AbstractModel):
     def setSortEnabled(self, value: bool):
         self._sort_enabled = value
 
-    def setFilterCallback(self, callback):
+    def setFilterCallback(self, callback, filter=DEFAULT_FILTER):
         """changes or clears the filter callback"""
         assert isinstance(callback, Callable) if callback is not None else True, "Invalid filter callback"
-        self._filtered_callback = callback
-        if self._filtered_enabled is None:
-            self._filtered_enabled = callback is not None  # filter enabled by default if a filtering callback is provided
+        self.addFilterCallback(filter, callback)
+        self._filtered_enabled = True  # enable filtering
         # update
-        self.applyFilter()
+        self.applyFilter(filter=filter)
+
+    def addFilterCallback(self, filter, callback):
+        """adds a new filter callback for a specific filter"""
+        assert isinstance(callback, Callable), "Invalid filter callback"
+        assert filter is not None, "Filter must be specified"
+        self.registerFilter(filter)
+        if filter not in self._filtered_callback_map:
+            self._filtered_callback_map[filter] = []
+        if callback not in self._filtered_callback_map[filter]:
+            self._filtered_callback_map[filter].append(callback)
+            self._filtered_enabled = True  # enable filtering if a filter callback is added
+            self.applyFilter(filter=filter)
+
+    def removeFilterCallback(self, filter, callback: Callable):
+        """removes a filter callback for a specific filter"""
+        if filter in self._filtered_callback_map and callback in self._filtered_callback_map[filter]:
+            self._filtered_callback_map[filter].remove(callback)
+
+    def clearFilterCallbacks(self, filter):
+        """removes all filter callback for a specific filter"""
+        if filter in self._filtered_callback_map:
+            self._filtered_callback_map[filter].clear()
 
     def setFilterEnabled(self, value: bool):
         """enables or disables filtering"""
@@ -1147,22 +1231,21 @@ class AbstractCallbackModel(AbstractModel):
         for item in items:
             self.add(item, emit=False)
         if emit:
-            self.applyFilter(emit)
+            self.applyFilter(emit=emit)
             self._fireChanged()
-
 
     def __iter__(self):
         """iterator - gets an iterator to the contents"""
-        return iter(self._filtered_index_map.values())
+        return iter(self._filtered_index_map[self.DEFAULT_FILTER].values())
 
     def __len__(self):
-        """number of items in the model"""
-        return len(self._filtered_item_map)
+        """number of items in the model (default filter)"""
+        return len(self._filtered_item_map[self.DEFAULT_FILTER])
 
     def __getitem__(self, index: int):
         """subscribtable"""
-        if index in self._filtered_index_map:
-            return self._filtered_index_map[index]
+        if index in self._filtered_index_map[self.DEFAULT_FILTER]:
+            return self._filtered_index_map[self.DEFAULT_FILTER][index]
         raise IndexError("index out of range")
 
     def __setitem__(self, index: int, item):
@@ -1181,7 +1264,7 @@ class AbstractCallbackModel(AbstractModel):
         """
         return self.add(item)
 
-    def add(self, item: object, index=-1, emit = True) -> int:
+    def add(self, item: object, index=-1, emit=True) -> int:
         """
         Adds (appends) a new entry to the model, returns the position inserted
         :param item: the item to append to the model
@@ -1226,7 +1309,6 @@ class AbstractCallbackModel(AbstractModel):
                     self.markDirty()
                     self._set_item_at(index, item, emit=emit, operation="move")
 
-
             return index
         return -1  # if the item was not added
 
@@ -1262,7 +1344,7 @@ class AbstractCallbackModel(AbstractModel):
         self._item_map[item] = i
 
         self._register_content(item)
-        self._notify_changed(data = item, operation="insert")
+        self._notify_changed(data=item, operation="insert")
 
         self._onItemChanged(self, i, item, old_item, "insert")
 
@@ -1290,25 +1372,25 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
-            self._notify_changed(data = item, operation="place")
+            self._notify_changed(data=item, operation="place")
 
         self._onItemChanged(self, index, item, old_item, "place")
 
-    def _reindex(self, emit = True):
+    def _reindex(self, emit=True, filter=DEFAULT_FILTER):
         """reorders the indices in the model to be consecutive starting from 0"""
         for new_index, item in enumerate(self._index_map.values()):
             self._item_map[item] = new_index
         self._index_map = TriggerDict.copyFrom({new_index: item for new_index, item in enumerate(self._index_map.values())})
-        self.applyFilter(emit=False)  # update filtered data as well
+        self.applyFilter(emit=False, filter=filter)  # update filtered data as well
         verbose = gremlin.config.Configuration().verbose_mode_execution
         if verbose:
             syslog.info("Reindex results:")
-            for index, item in self._filtered_index_map.items():
+            for index, item in self._filtered_index_map[filter].items():
                 syslog.info(f"Filtered index [{index}] maps to item [{item}]")
 
         if emit:
             self._fireChanged()
-            self._notify_changed(data = self, operation="reindex")
+            self._notify_changed(data=self, operation="reindex")
 
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
@@ -1334,7 +1416,7 @@ class AbstractCallbackModel(AbstractModel):
             # syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
-            self._notify_changed(data = item, operation="remove")
+            self._notify_changed(data=item, operation="remove")
             self._unregister_content(item)
             self._onItemChanged(self, index, None, item, "remove")
         else:
@@ -1347,7 +1429,7 @@ class AbstractCallbackModel(AbstractModel):
                     index += 1
                 pass
 
-    def removeAt(self, index: int, emit=True):
+    def removeAt(self, index: int, emit=True, filter=DEFAULT_FILTER):
         """removes the entry at the given filteredmodel index"""
         if index in self._index_map:
             item = self._index_map[index]
@@ -1356,8 +1438,8 @@ class AbstractCallbackModel(AbstractModel):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self._reindex(False)
-            self._notify_changed(data = item, operation="remove")
+            self._reindex(emit=False, filter=filter)
+            self._notify_changed(data=item, operation="remove")
 
             if emit:
                 self._fireChanged()
@@ -1366,20 +1448,21 @@ class AbstractCallbackModel(AbstractModel):
             if __debug__:
                 syslog.info(f"MODEL: Index not found in removeAt: {index}")
 
-    def removeRow(self, index: int, emit=True):
+    def removeRow(self, index: int, emit=True, filter=DEFAULT_FILTER):
         """removes the entry at the given model index"""
-        self.removeAt(index, emit=emit)
+        self.removeAt(index, emit=emit, filter=filter)
 
     def clear(self, emit=True):
-        """Removes all the given entry from the model."""
+        """Removes all entries from the model."""
         if self._item_map:
             self.pushSuspend()
             for item in self._item_map:
                 self._unregister_content(item)
             self._item_map.clear()
             self._index_map.clear()
-            self._filtered_index_map.clear()
-            self._filtered_item_map.clear()
+            for filter in self._filtered_index_map:
+                self._filtered_index_map[filter].clear()
+                self._filtered_item_map[filter].clear()
             self.popSuspend()
             if emit:
                 self._fireChanged()
@@ -1391,6 +1474,12 @@ class AbstractCallbackModel(AbstractModel):
         """
         if index in self._index_map:
             return self._index_map[index]
+        return None
+
+    def filteredData(self, index: int, filter=DEFAULT_FILTER):
+        """returns the filtered item at the given index, None if not found"""
+        if filter in self._filtered_index_map and index in self._filtered_index_map[filter]:
+            return self._filtered_index_map[filter][index]
         return None
 
     @property
@@ -1407,13 +1496,13 @@ class AbstractCallbackModel(AbstractModel):
         """gets the filtered item at the given index if it exists"""
         return self.unfilteredItemAt(index)
 
-    def items(self):
+    def items(self, filter=DEFAULT_FILTER):
         """returns all items in the filtered model"""
-        return self._filtered_index_map.items()
+        return self._filtered_index_map[filter].items()
 
-    def filteredItemAt(self, index: int):
+    def filteredItemAt(self, index: int, filter=DEFAULT_FILTER):
         """gets the filtered item at the given index if it exists"""
-        return self.data(index)
+        return self.filteredData(index, filter)
 
     def unfilteredItemAt(self, index: int):
         """gets the item at the given index of the unfiltered model, returns None if not found"""
@@ -1427,33 +1516,35 @@ class AbstractCallbackModel(AbstractModel):
         """returns all items in the unfiltered model as a list"""
         return list(self._index_map.values())
 
-    def indexOf(self, item) -> int:
+    def indexOf(self, item, filter=DEFAULT_FILTER) -> int:
         """returns the index of the item (filtered model), -1 if not found"""
-        if item in self._filtered_item_map:
-            return self._filtered_item_map[item]
+        if filter in self._filtered_item_map and item in self._filtered_item_map[filter]:
+            return self._filtered_item_map[filter][item]
         if gremlin.config.Configuration().verbose_mode_ui_level(2):
             syslog.info(f"MODEL: Item not found in filtered item map: {item}")
-            syslog.info(f"\tFiltered item map contents: item count: {len(self._filtered_item_map)}")
-            for key in self._filtered_item_map:
-                syslog.info(f"\t\t[{key}]: {self._filtered_item_map[key]}")
+            syslog.info(f"\tFiltered item map contents: item count: {len(self._filtered_item_map[filter])}")
+            for key in self._filtered_item_map[filter]:
+                syslog.info(f"\t\t[{key}]: {self._filtered_item_map[filter][key]}")
 
         return -1
 
-    def pop(self, index: int):
+    def pop(self, index: int, filter=DEFAULT_FILTER):
         """removes and returns the item at the given index, None if not found"""
         if index in self._index_map:
             item = self._index_map[index]
-            self.removeAt(index)
+            self.removeAt(index, filter=filter)
+
             return item
         return None
 
-    def push(self, item):
+    def push(self, item, filter=DEFAULT_FILTER):
         """adds the item to the model and returns its zero based index"""
         index = len(self._index_map) - 1
         self._index_map[index] = item
         self._item_map[item] = index
-        self._filtered_index_map[index] = item
-        self._filtered_item_map[item] = index
+
+        self._filtered_index_map[filter][index] = item
+        self._filtered_item_map[filter][item] = index
         return index
 
     def unfilteredIndexOf(self, item) -> int:
@@ -1482,59 +1573,76 @@ class AbstractCallbackModel(AbstractModel):
         """returns the size of the unfiltered model"""
         return len(self._index_map)
 
-    def count(self) -> int:
+    def count(self, filter=DEFAULT_FILTER) -> int:
         """returns the size of the filtered model"""
-        return len(self._filtered_index_map)
+        return len(self._filtered_index_map[filter])
 
-    def filteredCount(self) -> int:
+    def filteredCount(self, filter=DEFAULT_FILTER) -> int:
         """returns the size of the filtered model"""
-        return len(self._filtered_index_map)
+        return len(self._filtered_index_map[filter])
 
-    def clearFilter(self):
-        """clears any filters"""
-        if self._filtered_index_map.id != self._index_map.id:
-            self._filtered_index_map.clearCallbacks()
-            self._filtered_item_map.clearCallbacks()
-            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
-            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
+    def clearFilter(self, filter=None):
+        """clears all filters (none) or given filter"""
+        if filter is None:
+            # all filters
+            filters_to_clear = list(self._filtered_index_map.keys())
+        else:
+            filters_to_clear = [filter] if filter in self._filtered_index_map else []
+
+        for filter in filters_to_clear:
+            if self._filtered_index_map[filter].id != self._index_map.id:
+                self._filtered_index_map[filter].clearCallbacks()
+                self._filtered_item_map[filter].clearCallbacks()
+                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
 
     @property
     def allowedInputTypes(self) -> tuple:
         """gets the allowed input types in the model, if any"""
         return self._allowed_types
 
-    def applyFilter(self, sort=True, force = False, emit=True):
+    def applyFilter(self, sort=True, force=False, emit=True, filter=DEFAULT_FILTER):
         """Applies the filter to the source data
-        :param callback: the evaluation callback that passes each item to determine inclusion, true to include, false to exclude
+        :param filter: the filter to apply, None for all filters
         :param sort: true to sort the data after filtering (only has effect if a sorting callback was provided)
         :param emit: true to emit a data changed signal after filtering
         """
 
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
+        # verbose = True
+
+        if filter is None:
+            filters = list(self._filtered_index_map.keys())
+        else:
+            filters = [filter] if filter in self._filtered_index_map else []
+
         if not self._can_filter():
             # model is not filtered
-            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
-            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
+            for filter in filters:
+                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
+
+            self._fire_filtered_data_changed_callbacks() # fire data changed callbacks
             return
 
         if not self._filtered_enabled:
-            if self._filtered_index_map.id != self._index_map.id:
-                # reset filters if previously enabled
-                self._filtered_index_map = TriggerDict.copyFrom({key: value for key, value in self._index_map.items()})
-                self._filtered_item_map = TriggerDict.copyFrom({key: value for key, value in self._item_map.items()})
-                if emit:
-                    self._fireChanged()
-                    # fire the filter operation
-                    self._onItemChanged(self, index=-1, old_value=None, new_value=None, operation="filter")
+            # filters are not enabled - reset the filters
 
+            for filter in filters:
+                if verbose:
+                    syslog.info(f"MODEL INPUT FILTER: resetting filter [{filter}]")
+                if self._filtered_index_map[filter].id != self._index_map.id:
+                    # reset filters if previously enabled
+                    self._filtered_index_map[filter] = TriggerDict.copyFrom({key: value for key, value in self._index_map.items()})
+                    self._filtered_item_map[filter] = TriggerDict.copyFrom({key: value for key, value in self._item_map.items()})
+
+            self._fire_filtered_data_changed_callbacks() # fire data changed callbacks
+            if emit:
+                self._fireChanged()
+                # fire the filter operation
+                self._onItemChanged(self, -1, None, None, "filter")
 
             return
-
-
-
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
-        if verbose:
-            device = gremlin.joystick_handling.getDevice(self._device_guid)
-            syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
 
         # filtering enabled
         # force = False
@@ -1544,7 +1652,14 @@ class AbstractCallbackModel(AbstractModel):
 
         new_index = 0
         for item in self._index_map.values():
-            include = self._filtered_callback(item)
+            # determine if the item should be included by calling the relevant callbacks - the first one that fails excludes the item
+            include = True
+            filter_callbacks = self.getFilterCallbacks(filter)
+            for callback in filter_callbacks:
+                include = callback(item, filter)
+                if not include:
+                    break
+
             if include:
                 if verbose:
                     syslog.info(f"\t{item.display_name} -> ON")
@@ -1552,28 +1667,46 @@ class AbstractCallbackModel(AbstractModel):
                 new_item_map[item] = new_index
                 new_index += 1
                 force = True
+            else:
+                if verbose:
+                    syslog.info(f"\t{item.display_name} -> OFF")
         if verbose and new_index == 0:
             syslog.info("\tall inputs are filtered for this device")
 
-        is_included = self._compare_maps(self._index_map, new_index_map)
-        if is_included:
-            self._filtered_index_map = new_index_map
-            self._filtered_index_map.addCallback(self._handle_data_changed)
-            self._filtered_item_map = new_item_map
-            force = True
+        old_hashes = {f: self.hashKey(filter=f) for f in filters}  # before the maps are replaced
+        maps_changed =  self._maps_different(self._index_map, new_index_map)
+        has_changed = maps_changed or filter != self.DEFAULT_FILTER
+        if has_changed:
+            for filter in filters:
+                self._filtered_index_map[filter] = new_index_map
+                self._filtered_index_map[filter].addCallback(self._handle_data_changed)
+                self._filtered_item_map[filter] = new_item_map
+                force = True
         else:
-            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
-            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
-            force = True
+            for filter in filters:
+                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
+                force = True
 
-        current_hash = self.hashKey()
-        self.applySort(emit=False)
-        new_hash = self.hashKey()
-        if current_hash != new_hash:
-            # sort changed the order or we should refresh
-            self._fireChanged(force)
+        for filter in filters:
+            self.applySort(emit=False, filter=filter)
+            new_hash = self.hashKey(filter=filter)
+            if old_hashes[filter] != new_hash or has_changed:
+                # filter or sort changed the visible items
+                has_changed = True
 
-    def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
+        if has_changed:
+            # fire the data changed callbacks for filtered data
+            self._fire_filtered_data_changed_callbacks()
+
+        if emit or has_changed:
+            if self._suspend_stack == 0:
+                self._fireChanged(force)
+                self._onItemChanged(self, -1, None, None, "filter")
+            else:
+                self._change_pending = True
+
+    def setItemFiltered(self, item: object, value: bool, emit=True, filter=DEFAULT_FILTER) -> int:
         """sets an item filtered or not filtered (no effect if the model is not filtered)
         :param item: the object to change (must be in the model)
         :param value: filtered state
@@ -1591,39 +1724,39 @@ class AbstractCallbackModel(AbstractModel):
                 self.applyFilter(emit=False)
 
             if value:
-                if item in self._filtered_item_map:
-                    return self._filtered_item_map[item]  # already filtered
+                if item in self._filtered_item_map[filter]:
+                    return self._filtered_item_map[filter][item]  # already filtered
 
-                index = len(self._filtered_index_map) - 1  # zero based
+                index = len(self._filtered_index_map[filter]) - 1  # zero based
                 self.pushSuspend()
 
-                self._filtered_index_map[index] = item
-                self._filtered_item_map[item] = index
+                self._filtered_index_map[filter][index] = item
+                self._filtered_item_map[filter][item] = index
                 self.popSuspend()
                 if emit:
                     self._fireChanged()
                 return index
             else:
                 # remove from the filtered list
-                if item in self._filtered_item_map:
+                if item in self._filtered_item_map[filter]:
                     self.pushSuspend()
-                    index = self._filtered_item_map[item]
-                    del self._filtered_index_map[index]
-                    del self._filtered_item_map[item]
+                    index = self._filtered_item_map[filter][item]
+                    del self._filtered_index_map[filter][index]
+                    del self._filtered_item_map[filter][item]
                     self.popSuspend()
                     if emit:
                         self._fireChanged()
 
         return -1
 
-    def applySort(self, emit=True):
+    def applySort(self, emit=True, filter=DEFAULT_FILTER):
         """sorts the model based on the callback"""
         import gremlin.input_item
 
         if not self._can_sort():
             # nothing to do
             return
-        items = list(self._filtered_item_map.keys())
+        items = list(self._filtered_item_map[filter].keys())
         if not items:
             return
         indices = self._sort_callback(items)
@@ -1636,7 +1769,7 @@ class AbstractCallbackModel(AbstractModel):
             return
         if __debug__:
             unique = set(indices)
-            count = len(self._filtered_item_map)
+            count = len(self._filtered_item_map[filter])
 
             if len(unique) != count:
                 # invalid list
@@ -1652,12 +1785,12 @@ class AbstractCallbackModel(AbstractModel):
         for item, index in zip(items, indices):
             assert isinstance(item, gremlin.input_item.InputItem)
             assert isinstance(index, int)
-            self._filtered_index_map[index] = item
-            self._filtered_item_map[item] = index
+            self._filtered_index_map[filter][index] = item
+            self._filtered_item_map[filter][item] = index
         if emit:
             self._fireChanged()
 
-    def sort(self, callback=None, emit=True):
+    def sort(self, callback=None, emit=True, filter=DEFAULT_FILTER):
         """Sort filtered items.
 
         Device tabs call ``model.sort(self._sort_callback)`` where the callback is
@@ -1669,7 +1802,7 @@ class AbstractCallbackModel(AbstractModel):
             self.applySort(emit=emit)
             return
 
-        items = list(self._filtered_index_map.values())
+        items = list(self._filtered_index_map[filter].values())
         if not items:
             items = list(self._index_map.values())
         if not items:
@@ -1684,12 +1817,12 @@ class AbstractCallbackModel(AbstractModel):
 
         self.pushSuspend()
         try:
-            self._filtered_index_map = TriggerDict()
-            self._filtered_item_map = TriggerDict()
-            self._filtered_index_map.addCallback(self._handle_data_changed)
+            self._filtered_index_map[filter] = TriggerDict()
+            self._filtered_item_map[filter] = TriggerDict()
+            self._filtered_index_map[filter].addCallback(self._handle_data_changed)
             for index, item in enumerate(sorted_items):
-                self._filtered_index_map[index] = item
-                self._filtered_item_map[item] = index
+                self._filtered_index_map[filter][index] = item
+                self._filtered_item_map[filter][item] = index
 
             # Keep the unfiltered maps in the same visible order when they match 1:1.
             if len(self._index_map) == len(sorted_items):
@@ -1709,9 +1842,9 @@ class AbstractCallbackModel(AbstractModel):
 
     def setFilteredEnabled(self, value: bool, emit=True):
         """enables or disables the filter - has no effect is no filtering is setup"""
-        if self._filtered_callback and self._filtered_enabled != value:
+        if self._filtered_callback_map and self._filtered_enabled != value:
             self._filtered_enabled = value
-            self.applyFilter(emit)
+            self.applyFilter(emit=emit)
 
     def isFilteredEnabled(self) -> bool:
         """true if filtering is enabled"""
@@ -1719,7 +1852,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def _can_filter(self) -> bool:
         """true if filtering can happen"""
-        return self._filtered_enabled and self._filtered_callback is not None
+        return bool(self._filtered_callback_map) and self._filtered_enabled
 
     def _can_sort(self) -> bool:
         """true if sorting can happen"""
@@ -1727,53 +1860,63 @@ class AbstractCallbackModel(AbstractModel):
 
     def isFiltered(self) -> bool:
         """true if the model is currently filtered"""
-        return self._filtered_enabled and self._filtered_callback is not None and self._compare_maps(self._index_map, self._filtered_index_map)
+        return self._filtered_enabled and bool(self._filtered_callback_map) and self._maps_different(self._index_map, self._filtered_index_map)
 
-    def getFilterCallback(self) -> Callable:
-        """gets the model's filtering callback"""
-        return self._filtered_callback
+    def getFilterCallbacks(self, filter=DEFAULT_FILTER) -> list[Callable]:
+        """gets the model's filtering callbacks"""
+        return self._filtered_callback_map[filter] if filter in self._filtered_callback_map else []
 
-    def _compare_maps(self, m1: TriggerDict, m2: TriggerDict):
-        # look for differences in the stored values
+    def _maps_different(self, m1: TriggerDict, m2: TriggerDict):
+        """ compare two trigger dicts looking for differences in the stored values
+
+            returns False if the two trigger dicts are considered equal, True otherwise
+        """
         if isinstance(m1, TriggerDict) and isinstance(m2, TriggerDict):
             if m1.id == m2.id:
                 # same map = no filter applied
-                return True
+                return False
+
             if len(m1) != len(m2):
                 # fast comparison on counts
-                return True
+                return True # different length
+
             # same count = compare actual contents
-            return hash(m1) != hash(m2)
-        return False
+            diff = set(m1.items()) - set(m2.items())
+            return bool(diff)
+
+        # different by default
+        return True
 
         # removed as it's now handled above
 
-    def getFilteredIndices(self):
+    def getFilteredIndices(self, filter=DEFAULT_FILTER):
         """returns the list of indices currently visible in the model"""
-        return [index for index in self._filtered_index_map]
+        return [index for index in self._filtered_index_map[filter]]
 
     def getUnfilteredIndices(self):
         """returns the list of indices currently visible in the model"""
         return [index for index in self._index_map]
 
-    def getFilteredItems(self):
+    def getFilteredItems(self, filter=DEFAULT_FILTER):
         """returns the list of filtered items"""
-        return self._filtered_index_map.values()
+        if filter not in self._filtered_index_map:
+            return []
+        return self._filtered_index_map[filter].values()
 
     def getUnfilteredItems(self):
         """returns the list of unfiltered items"""
         return self._index_map.values()
 
-    def getSequentialItemIndex(self, index: int):
+    def getSequentialItemIndex(self, index: int, filter=DEFAULT_FILTER):
         """returns the item by sequential index in the filtered list"""
-        items = list(self._filtered_index_map.values())
+        items = list(self._filtered_index_map[filter].values())
         if index >= 0 and index < len(items):
             return items[index]
         return None
 
-    def getFilteredMap(self):
+    def getFilteredMap(self, filter=DEFAULT_FILTER):
         """gets index,input_item tuples for all filtered items in the model"""
-        return self._filtered_index_map.items()
+        return self._filtered_index_map[filter].items()
 
     def getUnfilteredMap(self):
         """gets index,input_item tuples for all unfiltered items in the model"""
@@ -1785,18 +1928,18 @@ class AbstractCallbackModel(AbstractModel):
 
     def trigger(self, force=True, emit=True):
         """trigers a model change manually - use this to force a reload even if the data didn't change"""
-        self._fireChanged(force=force, emit=True)
+        self._fireChanged(force=force, emit=emit)
 
-    def pushSuspend(self):
+    def pushSuspend(self, filter=DEFAULT_FILTER):
         """suspends change notifications"""
         if self._suspend_stack == 0:
             self._item_map.pushSuspend()
             self._index_map.pushSuspend()
-            self._filtered_index_map.pushSuspend()
-            self._filtered_item_map.pushSuspend()
+            self._filtered_index_map[filter].pushSuspend()
+            self._filtered_item_map[filter].pushSuspend()
         self._suspend_stack += 1
 
-    def popSuspend(self, reset=False, emit=True):
+    def popSuspend(self, reset=False, emit=True, filter=DEFAULT_FILTER):
         """restores change notifications"""
         if reset and self._suspend_stack > 0:
             self._suspend_stack = 0
@@ -1805,13 +1948,15 @@ class AbstractCallbackModel(AbstractModel):
         if self._suspend_stack == 0:
             self._item_map.popSuspend(reset)
             self._index_map.popSuspend(reset)
-            self._filtered_index_map.popSuspend(reset)
-            self._filtered_item_map.popSuspend(reset)
+            self._filtered_index_map[filter].popSuspend(reset)
+            self._filtered_item_map[filter].popSuspend(reset)
             self._fireChanged(force=self._change_pending, emit=emit)
 
-    def hashKey(self):
+    def hashKey(self, filter=DEFAULT_FILTER):
         """returns a hash key representing the current state of the model"""
-        return hash(tuple(self._filtered_item_map.keys()))
+        if filter not in self._filtered_item_map:
+            return 0
+        return hash(tuple(self._filtered_item_map[filter].keys()))
 
     def resetChanges(self):
         """resets any changes to the model"""
@@ -1856,7 +2001,6 @@ class AbstractCallbackModel(AbstractModel):
                 if len(sig.parameters) != 5:
                     raise TypeError("Callback must accept exactly five parameters: source, index, old_value, new_value, and operation")
 
-
         if callback and callback not in self._item_changed_callbacks:
             self._item_changed_callbacks.append(callback)
 
@@ -1873,9 +2017,9 @@ class AbstractCallbackModel(AbstractModel):
         """true if data has changed"""
         return self._change_pending or hash(self) != self._old_hash
 
-    def _handle_data_changed(self, source, index, old_value, new_value):
+    def _handle_data_changed(self, source, index, old_value, new_value, filter=DEFAULT_FILTER):
         """called when a storage data is changed"""
-        if source.id == self._filtered_index_map.id:
+        if source.id == self._filtered_index_map[filter].id:
             # notify on filtered items only
             if new_value is None and old_value is not None and self._remove_callback:
                 # delete operation received
@@ -1913,7 +2057,7 @@ class AbstractCallbackModel(AbstractModel):
         if gremlin.shared_state.is_running:
             # auto-suspend at runtime
             return
-        new_hash = hash(self)
+        new_hash = self.hashKey()
         if self._suspend_stack and not force:
             # firing changes currently suspended
             self._change_pending = new_hash != self._old_hash

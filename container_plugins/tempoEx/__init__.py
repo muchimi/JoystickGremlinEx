@@ -620,7 +620,8 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         long_count = len(self.container.long_action_set)
         double_count = len(self.container.double_action_set)
         if short_count + long_count + double_count == 0:
-            syslog.warning("TEMPOEX: Disabled: No actions found for short, long or double - disabling the container.")
+            input_item = self.action_data._input_item
+            syslog.warning(f"TEMPOEX: Disabled: No actions found for short, long or double - disabling the container. Input item: [{input_item.display_name}]")
             self.valid = False
             return
 
@@ -665,9 +666,6 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container, "Logic error: Node is not a container node"
 
-        # if self.verbose:
-        #     syslog.info("TEMPOEX: dumping container node")
-        #     ec.dump(container_node)
 
         group_node = container_node.children[0]  # group node is the only child of the container node
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]

@@ -317,7 +317,7 @@ class MouseController:
         :param max_speed maximum speed in pixels per second
         :param time_to_max_speed time to reach max_speed
         """
-        self._motion_type == MotionType.Accelerated
+        self._motion_type = MotionType.Accelerated
         self._accel_generator = AcceleratedMouseMotion(
             direction,
             min_speed,
@@ -333,7 +333,7 @@ class MouseController:
             self._thread = threading.Thread(target=self._control_loop, daemon=False)
             self._thread.name = "MouseController"
             self._thread.start()
-            syslog.info("MOUSE CONTROL: start")
+            syslog.info("MouseController: start")
 
     @property
     def started(self) -> bool:
@@ -346,7 +346,7 @@ class MouseController:
             self._stop.set()
             gremlin.util.safeJoin(self._thread)
             self._thread = None
-            syslog.info("MOUSE CONTROL: stop")
+            syslog.info("MouseController: stop")
 
     def _control_loop(self):
         """Loop responsible for creating and sending mouse motion events."""
@@ -366,9 +366,6 @@ class MouseController:
 
             if dx or dy:
                 send_mouse_motion(int(dx), int(dy))
-            #     syslog.info(f"controller: send {int(dx)} {int(dy)}")
-            # else:
-            #     syslog.info("Controller: skip")
 
             time.sleep(0)
 
