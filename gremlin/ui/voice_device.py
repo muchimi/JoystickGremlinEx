@@ -112,11 +112,12 @@ class VoiceInputItem(InputItem):
 
         super().__init__(
             mode_node=self._mode_object,
-            device_guid=VoiceDeviceTabWidget.device_guid,
+            device_guid= gremlin.shared_state.voice_tab_guid,
             input_type=InputType.Voice,
             override_input_type=InputType.JoystickButton,
             custom_input_id_handler=self._handle_input_id_callback,
             custom_description_handler=self._custom_description_handler,
+            device_type=DeviceType.Voice,
         )
         assert key is None or isinstance(key, str), "key must be a string"
 
@@ -1678,6 +1679,11 @@ class VoiceData:
 
     def from_xml(self, root, data=None, extra_data=None):
         """reads saved data"""
+
+        # if voice is disabled, skip
+        config = gremlin.config.Configuration()
+        if not config.voice_enabled:
+            return
 
         for node in root:
             if node.tag == "voice-input":

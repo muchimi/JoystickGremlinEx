@@ -56,11 +56,25 @@ _previous_unraisable_hook = None
 _QT_PATTERN = "[%{time hh:mm:ss.zzz} tid=%{threadid} %{type}] %{category}: %{message}"
 
 
+
 def prepare() -> None:
     """Set the Qt message format before QApplication exists."""
     os.environ.setdefault("QT_MESSAGE_PATTERN", _QT_PATTERN)
 
-@debug_only
+
+GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
+PACKAGED = hasattr(sys, '_MEIPASS') and not GEX_DEV_ENABLED
+DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNOSTIC_MODE"].lower() in ("1", "true", "yes")
+
+def diagnostics_only(func):
+    if PACKAGED or not DIAGNOSTIC_MODE:
+        return lambda *args, **kwargs: None
+    return func
+
+if not PACKAGED and DIAGNOSTIC_MODE:
+    syslog.info("DIAG: diagnostic mode enabled.")
+
+@diagnostics_only
 def install(data_path: str) -> None:
     """Arm the crash trail. Call once, after fault.log is configured."""
     global _installed, _breadcrumb_path
@@ -68,6 +82,8 @@ def install(data_path: str) -> None:
 
     if _installed:
         return
+
+
     _installed = True
     os.makedirs(data_path, exist_ok=True)
     fault_path = os.path.join(data_path, "fault.log")
@@ -87,9 +103,10 @@ def install(data_path: str) -> None:
         f"{data_path} when native code faults."
     )
 
-@debug_only
+@diagnostics_only
 def breadcrumb(label: str) -> None:
     """Record one short event. Safe to call from any thread."""
+
     try:
         stamp = time.strftime("%Y-%m-%d %H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}"
         line = f"{stamp} tid={_os_thread_id()} ui={int(_on_ui_thread())} {label}\n"

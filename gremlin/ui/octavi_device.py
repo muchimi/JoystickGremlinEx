@@ -258,6 +258,7 @@ class OctaviInterface:
         self._device = None
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._stop)
+        el.options_changed.connect(self._handle_options_changed)
         self._running = False
         self._buttons = {}  # map of [OctaviButton] to bool
         self._last_buttons = {}  # last buttons
@@ -272,6 +273,15 @@ class OctaviInterface:
 
         self._autorelease_delay = 0.25  # delay for autorelease
         if self.deviceFound():
+            self._start()
+
+    def _handle_options_changed(self):
+        config = gremlin.config.Configuration()
+        if not config.octavi_enabled and self._running:
+            # stop the Octavi device if it was running and is now disabled
+            self._stop()
+        if config.octavi_enabled and not self._running:
+            # start the Octavi device if it was not running and it is enabled
             self._start()
 
     def get_button(self, button: OctaviButton):
@@ -301,11 +311,6 @@ class OctaviInterface:
         config = gremlin.config.Configuration()
         if not config.octavi_enabled:
             return False
-
-        # # verify the profile has mappings for this device
-        # profile = gremlin.shared_state.current_profile
-        # if not profile or not profile.hasInputItems(self._device_guid, has_mappings = True):
-        #     return False
 
         verbose = gremlin.config.Configuration().verbose_mode_octavi
         if verbose:
@@ -443,7 +448,7 @@ class OctaviInterface:
                 for button in self._buttons:
                     self._last_buttons[button] = self._buttons[button]
 
-            time.sleep(0.2)
+            #time.sleep(0.2)
 
         # done running
 

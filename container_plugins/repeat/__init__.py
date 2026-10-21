@@ -29,10 +29,10 @@ import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
 
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, ActionSets, ActionSet
 from gremlin.util import safe_format, safe_read, write_guid
 from shiboken6 import Shiboken
-from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.types import ContainerViewTypes
 
 syslog = logging.getLogger("system")
 
@@ -123,19 +123,19 @@ class RepeatContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
-        if len(self.profile_data.action_sets) > 0:
-            assert len(self.profile_data.action_sets) == 1
+        if len(self.container.action_sets) > 0:
+            assert len(self.container.action_sets) == 1,"Repeat container should have exactly one action set"
 
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Repeat", ContainerViewTypes.Action)
+            widget = self._create_action_set_widget(self.container.action_sets[0], "Repeat", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
             action_selector = ActionSelector(
-                self.profile_data.get_input_type(),
-                self.profile_data,
+                self.container.get_input_type(),
+                self.container,
             )
-            action_selector.inputItem = self.profile_data
+            action_selector.inputItem = self.container
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)
@@ -156,8 +156,8 @@ class RepeatContainerWidget(AbstractContainerWidget):
         self.action_data.hold_delay = value / 1000
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Smart Toggle", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            widget = self._create_action_set_widget(self.container.action_sets[0], "Repeat", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -169,11 +169,11 @@ class RepeatContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        if self.container.action_sets[0] is None:
+            self.container.action_sets[0] = []
+        self.container.action_sets[0].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -184,16 +184,16 @@ class RepeatContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.duplicate(action, self.container)
+        if self.container.action_sets[0] is None:
+            self.container.action_sets[0] = []
+        self.container.action_sets[0].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
     def _delay_changed_cb(self, value):
-        self.profile_data.delay = value / 1000  # in seconds
+        self.container.delay = value / 1000  # in seconds
 
     def _activation_changed_cb(self, value):
         """Updates the activation condition state.
@@ -201,9 +201,9 @@ class RepeatContainerWidget(AbstractContainerWidget):
         :param value whether or not the selection was toggled - ignored
         """
         if self.activate_press.isChecked():
-            self.profile_data.activate_on = "press"
+            self.container.activate_on = "press"
         else:
-            self.profile_data.activate_on = "release"
+            self.container.activate_on = "release"
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -219,8 +219,8 @@ class RepeatContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Repeat: "
-        if len(self.profile_data.action_sets) > 0:
-            title += ", ".join(a.name for a in self.profile_data.action_sets[0])
+        if len(self.container.action_sets) > 0:
+            title += ", ".join(a.name for a in self.container.action_sets[0])
         return title
 
 
@@ -405,7 +405,6 @@ class RepeatContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node, extra_data=extra_data)
-        self.setActionSets([[]])
         self.initial_pulse_delay = 0.75  # in seconds # initial repeat
         self.hold_delay = 0.25  # in seconds, repeat hold duration
         self.pulse_interval_delay = 0.25  # in seconds, interval between repeats
@@ -426,15 +425,6 @@ class RepeatContainer(AbstractContainer):
         self.trigger_on_start = safe_read(node, "trigger-start", bool, True)
         self.repeat_count = safe_read(node, "repeat-count", int, 0)
 
-        self.action_sets.clear()
-        self.action_sets.add(gremlin.input_item.ActionSet())
-
-        actionset_nodes = node.xpath("./action-set")
-        for index, actionset_node in enumerate(actionset_nodes):
-            action_set = gremlin.input_item.ActionSet()
-            self._parse_action_xml(actionset_node, action_set, data, extra_data)
-            self.action_sets.append(action_set)
-            break  # only read the first set
 
     def _parse_action_set(elf, node, data=None, extra_data=None):
         pass  # do nothing
@@ -452,11 +442,6 @@ class RepeatContainer(AbstractContainer):
         node.set("trigger-start", safe_format(self.trigger_on_start, bool))
         node.set("repeat-count", safe_format(self.repeat_count, int))
 
-        as_node = ElementTree.Element("action-set")
-        as_node.set("id", write_guid(self.action_sets[0].id))
-        for action in self.action_sets[0]:
-            as_node.append(action.to_xml())
-        node.append(as_node)
         return node
 
     def _is_container_valid(self):

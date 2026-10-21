@@ -1056,6 +1056,18 @@ class ExecutionContext:
                     return True
         return False
 
+    def hasInputItems(self, device_guid, has_mappings=False):
+        """true if the execution tree contains input items for the given device guid"""
+        device_node = self.findDeviceNode(device_guid)
+        if not device_node:
+            return False
+        for node in anytree.PreOrderIter(device_node):
+            if node.nodeType == ExecutionGraphNodeType.InputItem:
+                if has_mappings and not node.input_item.has_mappings:
+                    continue
+                return True
+        return False
+
     def dump(self, root=None, exclude_empty=True, conditions_only=False, input_tree=False):
         self.dumpModeTree()
         self.dumpExecTree(root, exclude_empty, conditions_only)

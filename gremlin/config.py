@@ -42,7 +42,8 @@ syslog = logging.getLogger("system")
 
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
-PACKAGED = GEX_DEV_ENABLED or hasattr(sys, '_MEIPASS')
+PACKAGED = not GEX_DEV_ENABLED and hasattr(sys, '_MEIPASS')
+DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNOSTIC_MODE"].lower() in ("1", "true", "yes")
 
 
 # general override flags for builds and execution - these override configuration settings from the config file

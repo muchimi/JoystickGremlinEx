@@ -285,14 +285,17 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._id = uuid.uuid4()  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
 
-        self._device_guid = device_guid
-        self._device_type = DeviceType.NotSet
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"Device with GUID [{device_guid}] could not be found")
+
+        self._device_guid = device.device_guid
+        self._device_id = device.device_id
+        self._device_name = device.name
+        self._device_type  = device.device_type
+
         assert isinstance(input_type, InputType), "input_type must be an InputType enum value"
 
-        if device_guid is not None:
-            device = gremlin.joystick_handling.getDevice(device_guid)
-            assert device is not None, "device does not exist"
-            self._device_type = device.device_type
         self._input_id: int | any = None  # input Id on the hardware (can be a int or a class)
         self._input_id_readonly: bool = False  # true if the input id cannot be changed
         self._input_type: InputType = input_type  # input type (InputType)
@@ -1234,27 +1237,7 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
             self._fireChanged()
 
-    def __iter__(self):
-        """iterator - gets an iterator to the contents"""
-        return iter(self._filtered_index_map[self.DEFAULT_FILTER].values())
 
-    def __len__(self):
-        """number of items in the model (default filter)"""
-        return len(self._filtered_item_map[self.DEFAULT_FILTER])
-
-    def __getitem__(self, index: int):
-        """subscribtable"""
-        if index in self._filtered_index_map[self.DEFAULT_FILTER]:
-            return self._filtered_index_map[self.DEFAULT_FILTER][index]
-        raise IndexError("index out of range")
-
-    def __setitem__(self, index: int, item):
-        """sets an item at the specified index"""
-        self._set_item_at(index, item, emit=True, operation="setItemAt")
-
-    def __delitem__(self, index: int):
-        """deletes an item at the specified index"""
-        self.removeAt(index)
 
     def append(self, item) -> int:
         """
@@ -2083,6 +2066,41 @@ class AbstractCallbackModel(AbstractModel):
 
         self._change_pending = False
 
+    # dunder methods
+
+    def __iter__(self):
+        """iterator - gets an iterator to the contents"""
+        return iter(self._filtered_index_map[self.DEFAULT_FILTER].values())
+
+    def __len__(self):
+        """number of items in the model (default filter)"""
+        return len(self._filtered_item_map[self.DEFAULT_FILTER])
+
+    def __getitem__(self, index: int):
+        """subscribtable"""
+        if index in self._filtered_index_map[self.DEFAULT_FILTER]:
+            return self._filtered_index_map[self.DEFAULT_FILTER][index]
+        raise IndexError("index out of range")
+
+    def __setitem__(self, index: int, item):
+        """sets an item at the specified index"""
+        self._set_item_at(index, item, emit=True, operation="setItemAt")
+
+    def __delitem__(self, index: int):
+        """deletes an item at the specified index"""
+        self.removeAt(index)
+
+    def __missing__(self, key):
+        raise KeyError(f"Key {key} not found in model")
+
     def __hash__(self):
         """unique hash value of model contents"""
         return hash((self.id, frozenset(self._index_map.values())))
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        if self.id != other.id:
+            return False
+        return  self._index_map == other._index_map
+

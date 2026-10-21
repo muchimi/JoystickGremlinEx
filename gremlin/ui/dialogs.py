@@ -2294,6 +2294,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "OSC",
                 "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
             ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
+            ("octavi", "Octavi", "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.", 'GEX_OCTAVI_ENABLED'),
 
         ]
 
@@ -2304,6 +2305,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             "midi": self.config.isDeviceVisible(gremlin.shared_state.midi_tab_guid),
             "osc": self.config.isDeviceVisible(gremlin.shared_state.osc_tab_guid),
             "voice": self.config.isDeviceVisible(gremlin.shared_state.voice_tab_guid),
+            "octavi": self.config.isDeviceVisible(gremlin.shared_state.octavi_tab_guid),
         }
 
         widgets = []
@@ -2321,8 +2323,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.osc_enabled
                 case "voice":
                     value = self.config.voice_enabled
-                case "afcs":
-                    value = self.config.afcs_enabled
+                case "octavi":
+                    value = self.config.octavi_enabled
             checkbox = gremlin.ui.ui_common.QDataCheckbox(name,
                                                           value = value,
                                                           data=data,
@@ -2386,6 +2388,12 @@ Enabled modules may not show until the device filter is updated.
                 self.config.voice_enabled = checked
                 if checked and not self._module_visible_map[data]:
                     self.config.setDeviceVisible(gremlin.shared_state.voice_tab_guid, True)
+            case "octavi":
+                self.config.octavi_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.octavi_tab_guid, True)
+            case _:
+                raise ValueError(f"Unknown module: {data}")
 
     def _handle_verbose_all_off(self, widget):
         for widget in self._verbose_mode_widgets.values():

@@ -49,6 +49,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T81):
+- Fix: API: TriggerDict: fix for internal Python copy operation exception depending on  key/value data types and dundar updates for comparison calls.
+- Fix: Repeater container: ported to new container API/data model.
+- Fix: Config: add Octavi IFR1 to list of modules that can be disabled if not used, which avoids running a monitoring loop if the device is connected but not used.
+- Fix: API: low level keyboard/mouse performance pass. Eliminated win32 library, use ctype calls directly.  Mouse wheel move from timers to single scheduler to reduce threads and overhead. 
+- Fix: API: event handling rework and performance pass to reduce timer usage and blocking loops, reduction in lookups.
+- Fix: API: axis input filter rework and performance pass. Move from timers to a single scheduler. EMA code branching streamlining.
+- Fix: API: legacy macro engine scheduler rework and performance pass.
+- Fix: API (voice): if voice device is disabled, the voice module will not attempt to load voice related inputs from the profile.
+
+
 ### (m77T80):
 - New: API: generic data model gains multiple concurrent filters.  Each registered filter type can have its own custom callback to determine if the data in the model is filtered or not.  If no filter is provided, the default filter is used.  This feature enables the data models to support multiple concurrent filters to have different views of the same data while using the same model.
 - Change: Input Viewer: State repeater has filters re-enabled and uses the new state filter used in the state device.  The two share the same saved filter profiles for states can be called up in the input viewer. The filter options for states in Input Viewer is a separate set from the one used in the state device.  However they share the same saved filters (if any).

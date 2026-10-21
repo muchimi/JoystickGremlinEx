@@ -30,7 +30,7 @@ K = TypeVar("K")
 class FastQueue(Generic[T]):
     """A small, thread-safe FIFO queue backed by :class:`collections.deque`"""
 
-    __slots__ = ("name", "maxsize", "_queue", "_condition")
+    __slots__ = ("name", "maxsize", "_queue", "_condition", "_not_full")
 
     class Full(Exception):
         """Raised when an item cannot be added because the queue is full."""
@@ -45,7 +45,11 @@ class FastQueue(Generic[T]):
         self.name = name
         self.maxsize = maxsize
         self._queue: collections.deque[T] = collections.deque()
-        self._condition = threading.Condition()
+        # Keep a shared reentrant lock for callback compatibility, but use
+        # separate wait sets: a put wakes consumers, a get wakes producers.
+        lock = threading.RLock()
+        self._condition = threading.Condition(lock)
+        self._not_full = threading.Condition(lock)
 
     @staticmethod
     def _validate_timeout(timeout: float | None) -> None:
@@ -64,32 +68,35 @@ class FastQueue(Generic[T]):
         if not self._condition.wait_for(lambda: bool(self._queue), timeout):
             raise self.Empty("Queue is empty (timeout)")  # @IgnoreException
 
-    def _wait_for_space(self, block: bool, timeout: float | None) -> None:
-        """Wait for capacity. The condition lock must already be held."""
+    def _wait_for_space(self, block: bool, timeout: float | None) -> bool:
+        """Wait for capacity; return whether the shared lock was released."""
         self._validate_timeout(timeout)
 
         if self.maxsize <= 0 or len(self._queue) < self.maxsize:
-            return
+            return False
         if not block:
             raise self.Full("Queue is full")  # @IgnoreException
 
-        if not self._condition.wait_for(
-            lambda: len(self._queue) < self.maxsize,
+        if not self._not_full.wait_for(
+            lambda: self.maxsize <= 0 or len(self._queue) < self.maxsize,
             timeout,
         ):
             raise self.Full("Queue is full (timeout)")  # @IgnoreException
+        return True
 
     def _notify_producer(self) -> None:
         if self.maxsize > 0:
-            self._condition.notify()
+            self._not_full.notify()
 
-    def _notify_all_producers(self) -> None:
+    def _notify_producers(self, count: int) -> None:
         if self.maxsize > 0:
-            self._condition.notify_all()
+            # Only this many producers can use the newly freed capacity.
+            self._not_full.notify(count)
 
     def put(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
         with self._condition:
-            self._wait_for_space(block, timeout)
+            if self.maxsize > 0 or timeout is not None:
+                self._wait_for_space(block, timeout)
             self._queue.append(item)
             self._condition.notify()
         return True
@@ -99,7 +106,8 @@ class FastQueue(Generic[T]):
 
     def putleft(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
         with self._condition:
-            self._wait_for_space(block, timeout)
+            if self.maxsize > 0 or timeout is not None:
+                self._wait_for_space(block, timeout)
             self._queue.appendleft(item)
             self._condition.notify()
         return True
@@ -128,11 +136,14 @@ class FastQueue(Generic[T]):
                     except Exception:
                         continue
 
-            self._wait_for_space(block, timeout)
+            waited = False
+            if self.maxsize > 0 or timeout is not None:
+                waited = self._wait_for_space(block, timeout)
 
             # Another producer may have inserted this key while this producer
-            # was waiting for capacity, so check once more before appending.
-            if key is not None:
+            # was waiting for capacity. Without a wait the lock stayed held,
+            # so repeating the scan would only repeat the same key_fn calls.
+            if waited and key is not None:
                 for index, existing in enumerate(self._queue):
                     try:
                         if key_fn(existing) == key:  # type: ignore[misc]
@@ -147,7 +158,8 @@ class FastQueue(Generic[T]):
 
     def get(self, block: bool = True, timeout: float | None = None) -> T:
         with self._condition:
-            self._wait_for_item(block, timeout)
+            if timeout is not None or not self._queue:
+                self._wait_for_item(block, timeout)
             item = self._queue.popleft()
             self._notify_producer()
             return item
@@ -157,7 +169,8 @@ class FastQueue(Generic[T]):
 
     def pop(self, block: bool = True, timeout: float | None = None) -> T:
         with self._condition:
-            self._wait_for_item(block, timeout)
+            if timeout is not None or not self._queue:
+                self._wait_for_item(block, timeout)
             item = self._queue.pop()
             self._notify_producer()
             return item
@@ -178,24 +191,27 @@ class FastQueue(Generic[T]):
             return []
 
         with self._condition:
-            self._wait_for_item(block, timeout)
+            if timeout is not None or not self._queue:
+                self._wait_for_item(block, timeout)
             count = min(max_batch_size, len(self._queue))
-            items = [self._queue.popleft() for _ in range(count)]
-            self._notify_all_producers()
+            if count == len(self._queue):
+                # deque's bulk operations avoid a Python loop for full drains.
+                items = list(self._queue)
+                self._queue.clear()
+            else:
+                popleft = self._queue.popleft
+                items = [popleft() for _ in range(count)]
+            self._notify_producers(len(items))
             return items
 
     def getall(self, block: bool = True, timeout: float | None = None) -> list[T]:
         with self._condition:
-            self._wait_for_item(block, timeout)
+            if timeout is not None or not self._queue:
+                self._wait_for_item(block, timeout)
             items = list(self._queue)
             self._queue.clear()
-            self._notify_all_producers()
+            self._notify_producers(len(items))
             return items
-
-    def empty(self) -> bool:
-        """Return True when there are no queued items."""
-        with self._condition:
-            return not bool(self._queue)
 
     def getNowait(self) -> list[T]:
         """Compatibility helper: remove all currently queued items."""
@@ -204,7 +220,7 @@ class FastQueue(Generic[T]):
                 return []
             items = list(self._queue)
             self._queue.clear()
-            self._notify_all_producers()
+            self._notify_producers(len(items))
             return items
 
     def remove(self, item: T, fail_on_missing: bool = False) -> bool:
@@ -231,7 +247,7 @@ class FastQueue(Generic[T]):
                 return False
 
             self._queue = retained
-            self._notify_all_producers()
+            self._notify_producers(original_size - len(retained))
             return True
 
     def removeCallback(self, callback: Callable[[T], bool]) -> bool:
@@ -240,8 +256,9 @@ class FastQueue(Generic[T]):
     def clear(self) -> None:
         with self._condition:
             if self._queue:
+                count = len(self._queue)
                 self._queue.clear()
-                self._notify_all_producers()
+                self._notify_producers(count)
 
     def append(self, item: T) -> bool:
         return self.put(item)

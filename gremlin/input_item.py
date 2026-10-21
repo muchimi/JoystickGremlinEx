@@ -849,6 +849,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         custom_input_id_handler: Callable = None,
         override_input_type=None,
         device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
+        device_type: DeviceType = None,  # noqa: F405,
         description: str = None,
         description_readonly: bool = None,
         custom_description_handler: Callable[["InputItem"], str] = None,
@@ -898,7 +899,15 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             mode_node = profile.getModeNode(device_guid, mode_node)
             assert mode_node is not None, "mode_node could not be resolved from the provided name"
 
+        assert device_guid is not None, "invalid device guid provided"
+        assert input_type is not None, "input type must be provided"
+
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"Device with GUID [{device_guid}] could not be found in system device list")
+
         super().__init__(mode_node, device_guid=device_guid, input_type=input_type)
+
 
         self.parent = mode_node  # mode object
         self.extra_data = extra_data if extra_data else {}
@@ -908,8 +917,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self.setInputId(input_id)
 
-        assert device_guid is not None, "invalid device guid provided"
-        assert input_type is not None, "input type must be provided"
+
 
         if isinstance(mode_node, str):
             # convert to a mode object
@@ -917,14 +925,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert device_guid is not None, "device_guid must be provided if mode provided as a name"
             mode_node = profile.getModeNode(device_guid, mode_node)
 
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            raise ValueError(f"Device with GUID [{device_guid}] could not be found in system device list")
 
-        self._device_guid = device.device_guid
-        self._device_id = device.device_id
-        self._device_name = device.name
-        self._device_type = device.device_type
         self._data = data
 
         self._name = None  # device name
@@ -5217,8 +5218,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self._abstract_container_generating_xml = False  # true if generating
         self._action_sets = ActionSets(
             self, content_callback=content_callback
-        )  # containers contain one or more action sets, each action sets contains a list of action set object
-        # self._action_sets.addOnItemChangedCallback(self._on_action_sets_changed)
+        )
 
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
         self._priority = priority  # container execution priority when multiple containers are defined
@@ -5775,7 +5775,11 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             if __debug__:
                 # ensure old containers no longer create action sets
                 nodes = node.xpath("./action-set")
-                assert len(nodes) == 0, "old container is still generating action set data"
+                if nodes:
+                    syslog.error(f"Old container is still generating action set data: type [{self.tag}]")
+                    raise ValueError(f"Old container is still generating action set data: type [{self.tag}]")
+
+
 
             node.set("container_id", self.id)
 
@@ -6584,6 +6588,8 @@ class ActionSet(AbstractCallbackModel):
                 entry.data = data
 
 
+
+
 class ActionSetModel(AbstractCallbackModel):
     """Model storing a set of actions."""
 
@@ -7335,14 +7341,13 @@ class ActionSets(AbstractCallbackModel):
         self._input_item = self._container.input_item
         self._description = description
         self._data = data
+        self._content_callback = content_callback
 
         # add at least one action set object
         # load from container
 
-        if self.count() == 0:
-            # create at least one action set
-            self.setItemAt(0, ActionSet(content_callback=content_callback))
-        assert self.count()
+        self.add(ActionSet(content_callback=content_callback))
+        assert self.count() == 1, "There should be exactly one action set after initialization"
         assert isinstance(self._input_item, InputItem), "Invalid input item for container"
 
     def append(self, item):
@@ -7370,6 +7375,11 @@ class ActionSets(AbstractCallbackModel):
             for action_set in self:
                 action_set.clear()
         super().clear()
+
+    def reset(self):
+        """resets all action sets to their initial state"""
+        self.clear()
+        self.add(ActionSet(content_callback=self._content_callback))
 
     @property
     def description(self) -> str:

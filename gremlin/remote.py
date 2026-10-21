@@ -48,6 +48,7 @@ from psygnal import Signal
 import gremlin.sendinput
 
 import socketserver
+import queue
 import msgpack
 import enum
 
@@ -96,25 +97,58 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def process_request(self, request, client_address):
-        """Handle a UDP RPC packet without reading current_thread().daemon.
+    # Reuse explicitly daemonized workers: high-rate axis and mouse packets
+    # must not create an OS thread on every datagram (including Qt callers).
+    request_worker_count = 4
 
-        Python 3.14 Thread.__init__ calls current_thread().daemon when daemon=
-        is omitted. Qt / DummyThread parents assert Thread.__init__() not called
-        and take down logging + the Plugins UI (Tune Law ship combo included).
-        """
+    def __init__(self, *args, **kwargs):
+        self._request_queue = queue.SimpleQueue()
+        self._request_workers = []
+        self._request_workers_lock = threading.Lock()
+        self._request_workers_stopping = False
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        """Queue every datagram for a fixed set of reusable daemon workers."""
         try:
-            t = threading.Thread(
-                target=self.process_request_thread,
-                args=(request, client_address),
-                daemon=bool(self.daemon_threads),
-            )
-            t.start()
+            with self._request_workers_lock:
+                if self._request_workers_stopping:
+                    self.shutdown_request(request)
+                    return
+                while len(self._request_workers) < self.request_worker_count:
+                    worker = threading.Thread(
+                        target=self._request_worker,
+                        name="remote-packet-worker",
+                        daemon=bool(self.daemon_threads),
+                    )
+                    worker.start()
+                    self._request_workers.append(worker)
+                self._request_queue.put((request, client_address))
         except Exception:
+            # Preserve the original synchronous fallback if threads cannot start.
+            self.process_request_thread(request, client_address)
+
+    def _request_worker(self):
+        while True:
+            item = self._request_queue.get()
+            if item is None:
+                return
+            request, client_address = item
             try:
-                self.finish_request(request, client_address)
-            finally:
-                self.shutdown_request(request)
+                self.process_request_thread(request, client_address)
+            except Exception:
+                # Even an error-notification callback must not kill the worker.
+                syslog.exception("RPC: packet worker failed")
+
+    def server_close(self):
+        with self._request_workers_lock:
+            if not self._request_workers_stopping:
+                self._request_workers_stopping = True
+                # Accepted requests finish before the workers exit. As before,
+                # daemon request handlers do not block application shutdown.
+                for worker in self._request_workers:
+                    self._request_queue.put(None)
+        super().server_close()
 
     def handle_timeout(self):
         import gremlin.event_handler
@@ -145,12 +179,15 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         # config =  gremlin.config.Configuration()
-        raw_data = self.request[0].strip()
+        # MessagePack is binary: stripping whitespace also strips valid values
+        # such as 9, 10, 13 and 32 when they occur at the end of a packet.
+        raw_data = self.request[0]
         try:
             data = msgpack.unpackb(raw_data)
 
-        except ValueError:
-            # unpack error
+        except (ValueError, TypeError):
+            return
+        if not isinstance(data, dict):
             return
 
         host_ip = ""
@@ -189,25 +226,26 @@ class RPCGremlin:
 
     def _thread_runner(self):
         syslog.info("Starting GEX listener...")
+        server_thread = None
+        server_started = False
         try:
             # 1. Initialize server and socket settings
             self._server = GremlinServer(("", self._port), GremlinSocketHandler)
 
             # Configure multicast subscriptions prior to starting execution loops
             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
-            mreq = struct.pack("4sL", group, socket.INADDR_ANY)
+            mreq = struct.pack("=4sI", group, socket.INADDR_ANY)
             self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
             # 2. Spawn and spin up the server worker thread
             server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
             server_thread.start()
+            server_started = True
 
             syslog.info(f"Starting gremlin server listener: multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
 
-            # 3. Main execution sleep-loop
-            while not self._thread_event.is_set():
-                # Faster response to shutdown signal without spinning the CPU too hard
-                self._thread_event.wait(timeout=0.2)
+            # Sleep until stop; no periodic wakeups are needed here.
+            self._thread_event.wait()
 
         except Exception as e:
             syslog.error(f"Critical error in GEX listener thread execution: {e}")
@@ -215,7 +253,14 @@ class RPCGremlin:
             # 4. Enforce strict cleanup sequence
             if self._server:
                 try:
-                    self._server.shutdown()
+                    if server_started:
+                        self._server.shutdown()
+                        server_thread.join()
+                except Exception as e:
+                    syslog.error(f"Error while stopping server loop: {e}")
+                try:
+                    # shutdown() blocks forever if serve_forever never started.
+                    # Always close a partially initialized multicast socket.
                     self._server.server_close()
                 except Exception as e:
                     syslog.error(f"Error while tearing down server context: {e}")
@@ -473,6 +518,10 @@ class RemoteClient:
         """Initialises a new object."""
 
         self._sock = None
+        config = gremlin.config.Configuration()
+        self._verbose_remote_extra = config.verbose_mode_remote_extra
+        self._verbose_remote = config.verbose_mode_remote
+        self._verbose_outputs = config.verbose_mode_outputs
         # unique ID of this client
         self._id = get_guid()
 
@@ -520,6 +569,11 @@ class RemoteClient:
 
     def _handle_config_options_changed(self):
         """called when configuration options are changed"""
+
+        config = gremlin.config.Configuration()
+        self._verbose_remote_extra = config.verbose_mode_remote_extra
+        self._verbose_remote = config.verbose_mode_remote
+        self._verbose_outputs = config.verbose_mode_outputs
 
         # get remote control options and start/stop as needed
         enabled = self.remote_control.remoteEnabled()
@@ -638,7 +692,7 @@ class RemoteClient:
             client = ClientData()
             data = self.getDatablock("register_client", data=client.toPayload())
             self.send(data)  # send to all
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"Register client [{client.client_name}]/[{client.client_id}]")
 
@@ -648,7 +702,7 @@ class RemoteClient:
             client = ClientData()
             data = self.getDatablock("unregister_client", data=client.toPayload())
             self.send(data)  # send to all
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"Unregister client [{client.client_name}]/[{client.client_id}]")
 
@@ -683,7 +737,7 @@ class RemoteClient:
 
     def send_pause(self, duration, client_list=None):
         if self.enabled:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: send pause: {duration}")
             data = self.getDatablock("pause")
@@ -693,7 +747,7 @@ class RemoteClient:
     def send_button(self, device_id, button_id, is_pressed, client_list=None, force_remote=False):
         """sends joystick buttons to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")
             bd = ButtonData.create(device_id, button_id, is_pressed, action="button")
@@ -703,7 +757,7 @@ class RemoteClient:
     def toggle_button(self, device_id, button_id, client_list=None, force_remote=False):
         """sends toggle button to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")
             bd = ButtonData.create(device_id, button_id, action="toggle")
@@ -713,7 +767,7 @@ class RemoteClient:
     def send_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends axis data to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
@@ -724,7 +778,7 @@ class RemoteClient:
     def send_relative_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends relative axis data to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            verbose = self._verbose_outputs
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
@@ -735,7 +789,7 @@ class RemoteClient:
     def send_hat(self, device_id, hat_id, direction, client_list=None, force_remote=False):
         """sends joystick hats to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
             payload = HatData.create(device_id, hat_id, direction, action="value").toPayload()
@@ -753,7 +807,7 @@ class RemoteClient:
     ):
         """sends keyboard events to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 code = int(scan_code)
                 syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
@@ -772,11 +826,11 @@ class RemoteClient:
     ):
         """sends a mouse button press or release to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
 
-            payload = MouseData().create(button_id, is_pressed, "button", extra_data).toPayload()
+            payload = MouseData.create(button_id, is_pressed, "button", extra_data).toPayload()
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
@@ -790,42 +844,42 @@ class RemoteClient:
     ):
         """sends a mouse button press or release to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
-            payload = MouseData().create(button_id, is_pressed, "button_double", extra_data).toPayload()
+            payload = MouseData.create(button_id, is_pressed, "button_double", extra_data).toPayload()
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
         """sends vertical mousewheel data  to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
-            payload = MouseData().create(MouseButton.Wheel, direction, "wheel", extra_data).toPayload()
+            payload = MouseData.create(MouseButton.Wheel, direction, "wheel", extra_data).toPayload()
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_h_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
         """sends horizontal mousewheel data to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_outputs
+            verbose = self._verbose_outputs
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
 
-            payload = MouseData().create(MouseButton.HWheel, direction, "hwheel", extra_data).toPayload()
+            payload = MouseData.create(MouseButton.HWheel, direction, "hwheel", extra_data).toPayload()
             data = self.getDatablock("mouse", key=MouseData.key, data= payload)
             self._dispatch(data, client_list)
 
     def send_mouse_motion(self, dx, dy, client_list=None, force_remote=False, extra_data: dict = None):
         """sends mouse motion data to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
 
-            payload = MouseData().create(MouseButton.NotSet, (dx, dy), "axis", extra_data).toPayload()
+            payload = MouseData.create(MouseButton.NotSet, (dx, dy), "axis", extra_data).toPayload()
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
@@ -841,7 +895,7 @@ class RemoteClient:
     ):
         """sends mouse acceleration data to clients"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info("REMOTE OUTPUT: mouse motion acceleration")
             payload = (
@@ -860,7 +914,7 @@ class RemoteClient:
     def send_gamepad_axis(self, device_id : int | str, mode, value, client_list=None, force_remote=False):
         """sends a gamepad axis to the remote client"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {device_id} mode: {mode} value: {value:0.3f}")
 
@@ -875,7 +929,7 @@ class RemoteClient:
     def send_gamepad_button(self, device_id : int | str, mode, is_pressed, client_list=None, force_remote=False):
         """sends a gamepad button to the remote client"""
         if self.enabled or force_remote:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
+            verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: gamepad: index: {device_id} mode: {mode} pressed: {is_pressed}")
 
@@ -958,7 +1012,7 @@ class RemoteClient:
         # ensure listener is up when remote is enabled
         remote_server.start()
 
-        verbose = gremlin.config.Configuration().verbose_mode_remote_extra
+        verbose = self._verbose_remote_extra
         if verbose:
             syslog.info(f"RPC:  send data {data}")
 
@@ -1055,7 +1109,7 @@ class RemoteClient:
                 # profile must be running
                 return
 
-        verbose = gremlin.config.Configuration().verbose_mode_remote_extra
+        verbose = self._verbose_remote_extra
         if verbose:
             syslog.info(f"REMOTE: received remote data: {data}")
 
@@ -1069,7 +1123,7 @@ class RemoteClient:
                 import win32gui
                 import win32con
 
-                key_data = KeyData().fromPayload(data["data"])
+                key_data = KeyData.fromPayload(data["data"])
                 virtual_code = key_data.virtual_code
                 scan_code = key_data.scan_code
                 flags = key_data.flags
@@ -1105,7 +1159,7 @@ class RemoteClient:
             case "mouse":
                 # mouse output
                 payload = data["data"]
-                mouse_data = MouseData().fromPayload(payload)
+                mouse_data = MouseData.fromPayload(payload)
                 subtype = mouse_data.action
                 match subtype:
                     case "wheel":
@@ -1329,12 +1383,12 @@ class RemoteClient:
                 payload = data["data"]
                 match action:
                     case "button" | "toggle":
-                        packet = ButtonData().fromPayload(payload)
+                        packet = ButtonData.fromPayload(payload)
                         device = packet.device_id
                         target = packet.button_id
                         value = packet.is_pressed
                     case "axis" | "relative_axis" | "relative_Axis":
-                        packet = AxisData().fromPayload(payload)
+                        packet = AxisData.fromPayload(payload)
                         device = packet.device_id
                         target = packet.axis_id
                         value = packet.value
@@ -1342,12 +1396,12 @@ class RemoteClient:
                     case "hat":
                         # Accept HatData; also tolerate legacy AxisData payloads (wrong key) from older masters
                         try:
-                            packet = HatData().fromPayload(payload)
+                            packet = HatData.fromPayload(payload)
                             device = packet.device_id
                             target = packet.hat_id
                             value = packet.direction
                         except AssertionError:
-                            packet = AxisData().fromPayload(payload)
+                            packet = AxisData.fromPayload(payload)
                             device = packet.device_id
                             target = packet.axis_id
                             value = packet.value

@@ -65,7 +65,7 @@ g_loaded_modules = {}
 syslog = logging.getLogger("system")
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
-PACKAGED = GEX_DEV_ENABLED or hasattr(sys, '_MEIPASS')
+PACKAGED = hasattr(sys, '_MEIPASS') and not GEX_DEV_ENABLED
 
 def debug_only(func):
     """decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
@@ -2982,8 +2982,12 @@ class TriggerDict(collections.UserDict):
 
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
         new_dict = TriggerDict()
-        for key, value in source.items():
-            new_dict[key] = copy.deepcopy(value) if deep else value
+        if deep:
+            for key, value in source.data.items():
+                new_dict[key] = copy.deepcopy(value)
+        else:
+            data = source.data.copy()
+            new_dict.update(data)
         return new_dict
 
     @property
@@ -3009,6 +3013,12 @@ class TriggerDict(collections.UserDict):
         if callback and callback not in self._on_change_callbacks:
             self._on_change_callbacks.append(callback)
 
+    def update(self, *args, **kwargs):
+        """updates the dictionary and triggers callbacks"""
+        for key, value in dict(*args, **kwargs).items():
+            self.__setitem__(key, value)
+
+
     def clearCallbacks(self):
         """clears any change callbacks"""
         self._on_change_callbacks.clear()
@@ -3032,6 +3042,16 @@ class TriggerDict(collections.UserDict):
     def __hash__(self):
         """make this dict hashable"""
         return hash(frozenset(self.values()))
+
+    def __eq__(self, other):
+        if not isinstance(other, (type(self),dict)):
+            return NotImplemented
+        h1 = hash(frozenset(self.data.items()))
+        if isinstance(other, dict):
+            h2 = hash(frozenset(other.items()))
+        else:
+            h2 = hash(frozenset(other.data.items()))
+        return h1 == h2
 
 
 def sortDict(d: dict):

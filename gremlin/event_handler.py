@@ -26,10 +26,8 @@ import time
 import threading
 import collections
 from typing import Optional
-from threading import Thread, Timer
+from threading import  Timer
 from typing import Callable
-import itertools
-import queue
 
 from dinput import DeviceSummary
 from gremlin.filter import EMAFilter
@@ -40,7 +38,7 @@ import gremlin.shared_state
 import gremlin.threading
 
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore
 
 import dinput
 import gremlin.config
@@ -49,7 +47,6 @@ from gremlin.types import DeviceType, EventSourceType
 import gremlin.shared_state
 
 import gremlin.util
-from gremlin.util import TriggerDict
 
 import gremlin.keyboard
 import gremlin.ui
@@ -243,7 +240,7 @@ class Event:
                 setattr(result, var, copy.copy(getattr(self, var)))
             else:
                 # deep copy
-                setattr(result, var, copy.deepcopy(getattr(self, var)))
+                setattr(result, var, copy.deepcopy(getattr(self, var), memo))
         return result
 
     @property
@@ -912,8 +909,15 @@ class EventListener(QtCore.QObject):
         self._vjoy_callbacks = []
         self._debounce_map = {}
         self._button_debounce_seconds = 0.01
+        # One deadline per axis, serviced by one worker instead of one Timer
+        # thread per DirectInput sample. The worker sleeps when no axis is pending.
         self._axis_settle_timers = {}
-        self._axis_settle_lock = threading.Lock()
+        self._axis_settle_lock = threading.RLock()
+        self._axis_settle_condition = threading.Condition(self._axis_settle_lock)
+        self._axis_settle_worker = None
+        self._axis_settle_stopping = False
+        self._axis_settle_next_deadline = None
+        self._axis_settle_generation = 0
 
         self._hat_state = {}  # list of map positions (device_id, input_id), position_tuple, if blank - not set
 
@@ -1108,46 +1112,89 @@ class EventListener(QtCore.QObject):
         self._event_queue.clear()
 
     def _cancel_axis_settle_timers(self):
-        with self._axis_settle_lock:
-            for timer in self._axis_settle_timers.values():
-                timer.cancel()
+        """Invalidate pending checks without creating or destroying worker threads."""
+        with self._axis_settle_condition:
+            self._axis_settle_generation += 1
             self._axis_settle_timers.clear()
+            self._axis_settle_condition.notify()
+
+    def _stop_axis_settle_worker(self):
+        with self._axis_settle_condition:
+            self._axis_settle_stopping = True
+            self._axis_settle_generation += 1
+            self._axis_settle_timers.clear()
+            self._axis_settle_condition.notify_all()
+            worker = self._axis_settle_worker
+        if worker is not None and worker is not threading.current_thread():
+            worker.join()
 
     def _schedule_axis_settle_check(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
-        """Schedules a one-shot settling check after axis input quiets down."""
+        """Move this axis's deadline; continuous movement creates no timer threads."""
         settle_delay = 0.025
         if data is not None and data.filter is not None:
             settle_delay = max(data.filter.settle_interval_ns / 1_000_000_000.0, 0.0)
+        deadline = time.perf_counter() + settle_delay
+        with self._axis_settle_condition:
+            if not self._running or self._axis_settle_stopping:
+                return
+            self._axis_settle_timers[key] = (deadline, data, device_guid, input_id, is_virtual)
+            if self._axis_settle_worker is None:
+                worker = threading.Thread(target=self._axis_settle_loop, name="axis settle", daemon=True)
+                self._axis_settle_worker = worker
+                try:
+                    worker.start()
+                except Exception:
+                    self._axis_settle_worker = None
+                    self._axis_settle_timers.pop(key, None)
+                    raise
+            # Extending an existing deadline need not wake the worker. It will
+            # recheck at its previous deadline; only earlier work needs a wakeup.
+            if self._axis_settle_next_deadline is None or deadline < self._axis_settle_next_deadline:
+                self._axis_settle_condition.notify()
 
-        with self._axis_settle_lock:
-            old_timer = self._axis_settle_timers.pop(key, None)
-            if old_timer is not None:
-                old_timer.cancel()
+    def _axis_settle_loop(self):
+        while True:
+            with self._axis_settle_condition:
+                while not self._axis_settle_stopping:
+                    if not self._axis_settle_timers:
+                        self._axis_settle_next_deadline = None
+                        self._axis_settle_condition.wait()
+                        continue
+                    key = min(self._axis_settle_timers, key=lambda key: self._axis_settle_timers[key][0])
+                    pending = self._axis_settle_timers[key]
+                    self._axis_settle_next_deadline = pending[0]
+                    remaining = pending[0] - time.perf_counter()
+                    if remaining > 0:
+                        self._axis_settle_condition.wait(remaining)
+                        continue
+                    self._axis_settle_timers.pop(key)
+                    generation = self._axis_settle_generation
+                    break
+                else:
+                    self._axis_settle_next_deadline = None
+                    return
+            try:
+                # Do not hold the scheduler lock while emitting Qt/UI signals.
+                self._axis_settle_timer_cb(key, *pending[1:], generation=generation)
+            except Exception:
+                syslog.exception("Error processing axis settling check")
 
-            timer = Timer(settle_delay, lambda: self._axis_settle_timer_cb(key, data, device_guid, input_id, is_virtual))
-            timer.daemon = True
-            self._axis_settle_timers[key] = timer
-            timer.start()
-
-    def _axis_settle_timer_cb(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool):
-        with self._axis_settle_lock:
-            self._axis_settle_timers.pop(key, None)
-
-        if not self._running:
-            return
-
-        if self._debounce_map.get(key) is not data:
-            return
-
-        try:
-            settled_raw = data.check_settling()
-        except Exception:
-            return
-
-        if settled_raw is None:
-            return
-
-        self._queue_settled_axis_event(device_guid, input_id, settled_raw, is_virtual)
+    def _axis_settle_timer_cb(self, key, data: "DInputData", device_guid, input_id, is_virtual: bool, generation=None):
+        with self._axis_settle_condition:
+            if not self._running or self._debounce_map.get(key) is not data:
+                return
+            # Reset or a newer input may have arrived after the worker took
+            # this entry. Never let that stale check consume the new deadline.
+            if generation is not None and (
+                generation != self._axis_settle_generation or key in self._axis_settle_timers
+            ):
+                return
+            try:
+                settled_raw = data.check_settling()
+            except Exception:
+                return
+        if settled_raw is not None:
+            self._queue_settled_axis_event(device_guid, input_id, settled_raw, is_virtual)
 
     def _queue_settled_axis_event(self, device_guid, input_id: int, raw_axis_value: float, is_virtual: bool):
         """Queues a synthesized final axis sample when an axis has settled."""
@@ -1247,7 +1294,7 @@ class EventListener(QtCore.QObject):
         self.stopKeepAlive()
         self.stopRunThread()
         self.stopEventThread()
-        self._cancel_axis_settle_timers()
+        self._stop_axis_settle_worker()
 
         # mark all events processed
         self._event_queue.clear()
@@ -1679,8 +1726,7 @@ class EventListener(QtCore.QObject):
         syslog.info("DILL: start listen")
         dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
         dinput.DILL.set_input_event_callback(self._dinput_event_handler)  # DINPUT event handler
-        while not self._run_event.wait(timeout=0.5):
-            continue
+        self._run_event.wait()
 
         syslog.info("DILL: shutdown")
         dinput.DILL.set_device_change_callback(None)
@@ -1873,15 +1919,18 @@ class EventListener(QtCore.QObject):
             input_id,
         )
 
-        data = self._debounce_map.get(key)
-        if data is None:
-            if event_type == dinput.InputType.Axis:
-                data = DInputData(
-                    device_guid=event.device_guid,
-                    input_id=input_id,
-                )
-                self._debounce_map[key] = data
-                data.process_input(value)
+        if event_type == dinput.InputType.Axis:
+            # Serialize filter updates with the quiet-axis settling check.
+            with self._axis_settle_condition:
+                data = self._debounce_map.get(key)
+                if data is None:
+                    data = DInputData(device_guid=event.device_guid, input_id=input_id)
+                    self._debounce_map[key] = data
+                    data.process_input(value)
+                    filtered = False  # preserve first-sample delivery
+                else:
+                    # An exact center value (0) is a valid sample.
+                    filtered = data.process_input(value) is None
                 self._schedule_axis_settle_check(
                     key=key,
                     data=data,
@@ -1889,23 +1938,12 @@ class EventListener(QtCore.QObject):
                     input_id=input_id,
                     is_virtual=bool(getattr(device, "is_virtual", False)),
                 )
-            else:
-                data = DInputData()
-                self._debounce_map[key] = data
-            return False  # process event
-
-        if event_type == dinput.InputType.Axis:
-            filtered = data.process_input(value) is None
-            self._schedule_axis_settle_check(
-                key=key,
-                data=data,
-                device_guid=event.device_guid,
-                input_id=input_id,
-                is_virtual=bool(getattr(device, "is_virtual", False)),
-            )
-            # EMA filter for axis events. Only None means drop — never use
-            # truthiness, or an exact center sample (0) is discarded.
             return filtered
+
+        data = self._debounce_map.get(key)
+        if data is None:
+            self._debounce_map[key] = DInputData()
+            return False
 
         if event_type in (
             dinput.InputType.Button,
@@ -2074,9 +2112,6 @@ class EventListener(QtCore.QObject):
             syslog.info(f"DINPUT EVENT: device [{device.name}] data: {dinput_event}")
 
         event_list = []
-        astate = AxisState()
-        dstate = DInputState()
-
         is_virtual = device.is_virtual if device is not None else False
         if is_virtual:
             input_type = None
@@ -2125,7 +2160,7 @@ class EventListener(QtCore.QObject):
             value = raw_value
 
             # apply spam filter
-            if not astate.shouldProcess(dinput_event):
+            if not AxisState().shouldProcess(dinput_event):
                 # filtered out
                 return
 
@@ -2166,7 +2201,7 @@ class EventListener(QtCore.QObject):
                 syslog.info(f"DINPUT BUTTON: {dinput_event}")
 
             # apply spam filter
-            if not dstate.shouldProcess(dinput_event):
+            if not DInputState().shouldProcess(dinput_event):
                 # filtered out
                 return
             is_pressed = dinput_event.value == 1
@@ -2233,8 +2268,6 @@ class EventListener(QtCore.QObject):
 
         if event_list:
             self.queueJoystickEventList(event_list)
-
-        time.sleep(0)  # yield to other threads
 
     def _dinput_device_change_handler(self, data, action):
         """Callback for device change events.
@@ -3491,9 +3524,12 @@ class EventHandler(QtCore.QObject):
                     # run the mode change
                     if new_mode != self.current_mode:
                         self._change_mode(new_mode, args)
-
+                else:
+                    # Validators can stay false for an entire macro/sequence.
+                    # Wait rather than consuming a core while the queue is full.
+                    abort_event.wait(0.01)
             else:
-                time.sleep(0.05)
+                abort_event.wait(0.05)
 
     def change_mode(self, new_mode, emit=True, force_update=False, tts=True, validate=True):
         args = (emit, force_update, tts, validate)
@@ -4278,7 +4314,7 @@ class EventHandler(QtCore.QObject):
         with self._mode_lookup_cache_lock:
             cached = self._mode_lookup_cache.get(mode_key)
             if cached is not None:
-                return list(cached)
+                return cached
 
         mode_list = []
         seen = set()
@@ -4295,30 +4331,29 @@ class EventHandler(QtCore.QObject):
         profile = gremlin.shared_state.current_profile
         for mode in list(mode_list):
             parent_mode = profile.get_parent_mode(mode) if profile is not None else None
-            while parent_mode:
+            while parent_mode and parent_mode not in seen:
                 add_mode(parent_mode)
                 parent_mode = profile.get_parent_mode(parent_mode) if profile is not None else None
 
+        mode_chain = tuple(mode_list)
         with self._mode_lookup_cache_lock:
-            self._mode_lookup_cache[mode_key] = tuple(mode_list)
+            self._mode_lookup_cache[mode_key] = mode_chain
 
-        return mode_list
+        return mode_chain
 
     def _matching_functors(self, event) -> list:
         """gets the list of matching functors to call when an event occurs"""
-        functors_list = []
-        device_guid = event.device_guid
-        if device_guid not in self.latched_functors:
-            return functors_list
-
+        device_modes = self.latched_functors.get(event.device_guid)
+        if not device_modes:
+            return []
+        key = event.callbackKey
         for mode in self._mode_lookup_chain(event):
-            if mode in self.latched_functors[device_guid]:
-                key = event.callbackKey
-                if key in self.latched_functors[device_guid][mode]:
-                    functors_list = self.latched_functors[device_guid][mode][key]
-                    if functors_list:
-                        break
-        return functors_list
+            mode_functors = device_modes.get(mode)
+            if mode_functors is not None:
+                functors = mode_functors.get(key)
+                if functors:
+                    return functors
+        return []
 
     def _dump_matching_callbacks(self, event: Event, input_item):
         """Dumps the matching callbacks for the given event and input item."""

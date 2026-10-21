@@ -21,12 +21,12 @@ from ctypes import wintypes
 import logging
 import queue
 import threading
-import win32api
+from time import monotonic
 
 import gremlin.singleton_decorator
 
 
-user32 = ctypes.WinDLL("user32")
+user32 = ctypes.WinDLL("user32", use_last_error=True)
 
 g_keyboard_callbacks = []
 g_mouse_callbacks = []  # holds callbacks specific to non mouse movement
@@ -34,6 +34,7 @@ g_mouse_move_callbacks = []  # holds callbacks specific to mouse movement
 g_mouse_wheel_callbacks = []  # holds callbacks specific to mouse wheel
 g_suppress_mouse = 0  # block stack for mouse (shift + esc to terminate)
 g_suppress_keyboard = 0  # block stack for keyboard (shift + esc to terminate)
+_shift_keys_down = set()
 g_shift_state = False  # true if either shift keys are down
 g_verbose_keyboard: bool = False  # verbose mode for keyboards
 
@@ -51,11 +52,11 @@ def _event_worker_loop():
         if item is None:
             break
         callbacks, args = item
-        for cb in list(callbacks):
+        for cb in callbacks:
             try:
                 cb(*args)
-            except Exception as e:
-                syslog.error(f"Error in hook callback execution: {e}")
+            except Exception:
+                syslog.exception("Error in hook callback execution")
 
 
 def _ensure_event_worker():
@@ -132,7 +133,7 @@ class MouseEvent:
 
 
 def get_last_error():
-    return win32api.GetLastError()
+    return ctypes.get_last_error()
 
 
 HOOKPROC = ctypes.WINFUNCTYPE(
@@ -162,8 +163,21 @@ user32.GetMessageW.argtypes = (
     wintypes.UINT,
 )
 
+user32.GetMessageW.restype = wintypes.BOOL
+user32.PeekMessageW.argtypes = (
+    wintypes.LPMSG, wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT,
+)
+user32.PeekMessageW.restype = wintypes.BOOL
+user32.PostThreadMessageW.argtypes = (
+    wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM,
+)
+user32.PostThreadMessageW.restype = wintypes.BOOL
+user32.UnhookWindowsHookEx.argtypes = (wintypes.HHOOK,)
+user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 user32.TranslateMessage.argtypes = (wintypes.LPMSG,)
+user32.TranslateMessage.restype = wintypes.BOOL
 user32.DispatchMessageW.argtypes = (wintypes.LPMSG,)
+user32.DispatchMessageW.restype = wintypes.LPARAM
 
 HC_ACTION = 0
 WH_KEYBOARD_LL = 13
@@ -212,19 +226,26 @@ LPMSLLHOOKSTRUCT = ctypes.POINTER(MSLLHOOKSTRUCT)
 @HOOKPROC
 def process_keyboard_event(n_code, w_param, l_param):
     global g_suppress_keyboard, g_shift_state, g_suppress_mouse, g_verbose_keyboard
+    # Windows requires negative codes to pass through without dereferencing lParam.
+    if n_code < 0:
+        return user32.CallNextHookEx(None, n_code, w_param, l_param)
     msg = ctypes.cast(l_param, LPKBDLLHOOKSTRUCT)[0]
 
-    if n_code >= 0 and msg.scanCode:
+    if msg.scanCode:
         virtual_code = msg.vkCode
         scan_code = msg.scanCode & 0xFF
-        is_extended = msg.flags is not None and bool(msg.flags & 0x0001)
-        is_pressed = w_param in [0x0100, 0x0104]
-        is_injected = msg.flags is not None and bool(msg.flags & 0x0010)
+        is_extended = bool(msg.flags & 0x0001)
+        is_pressed = w_param in (0x0100, 0x0104)
+        is_injected = bool(msg.flags & 0x0010)
 
-        if scan_code == 0x2A:
-            g_shift_state = is_pressed
+        if scan_code in (0x2A, 0x36):
+            if is_pressed:
+                _shift_keys_down.add(scan_code)
+            else:
+                _shift_keys_down.discard(scan_code)
+            g_shift_state = bool(_shift_keys_down)
 
-        if msg.scanCode != 541:
+        if msg.scanCode != 541 and g_keyboard_callbacks:
             evt = KeyEvent(
                 virtual_code=virtual_code,
                 scan_code=scan_code,
@@ -232,106 +253,67 @@ def process_keyboard_event(n_code, w_param, l_param):
                 is_pressed=is_pressed,
                 is_injected=is_injected,
             )
-            if g_keyboard_callbacks:
-                _event_queue.put((list(g_keyboard_callbacks), (evt,)))
+            _event_queue.put((tuple(g_keyboard_callbacks), (evt,)))
 
         if scan_code == 0x01 and g_shift_state:
             g_suppress_keyboard = 0
             g_suppress_mouse = 0
 
         if g_suppress_keyboard != 0:
-            # if g_verbose_keyboard:
-            #     syslog.info(
-            #         f"KBDHK: suppress: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]"
-            #     )
             return 1
-
-        # if g_verbose_keyboard:
-        #     syslog.info(
-        #         f"KBDHK: nexthook: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]"
-        #     )
 
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 
 _mouse_wheel_state = {}
 _mouse_wheel_delay = 0.5
-_mouse_wheel_timer = {}
+# At most four deadlines; rearming a wheel never creates a timer thread.
+_mouse_wheel_deadlines = {}
 _mouse_x = None
-_mouse_y = None  # Fixed typo: _mouxe_y -> _mouse_y
+_mouse_y = None
 
-_wheel_cmd_queue: queue.SimpleQueue | None = None
 _wheel_worker: threading.Thread | None = None
 _wheel_worker_stop = threading.Event()
 _wheel_lock = threading.RLock()
+_wheel_condition = threading.Condition(_wheel_lock)
 
 
 def _ensure_wheel_worker():
-    global _wheel_cmd_queue, _wheel_worker
-    if _wheel_worker is not None and _wheel_worker.is_alive():
-        return
-    _wheel_worker_stop.clear()
-    _wheel_cmd_queue = queue.SimpleQueue()
-    _wheel_worker = threading.Thread(
-        target=_wheel_worker_loop,
-        name="mouse-wheel-release",
-        daemon=True,
-    )
-    _wheel_worker.start()
+    global _wheel_worker
+    with _wheel_condition:
+        if _wheel_worker is not None and _wheel_worker.is_alive():
+            return
+        _wheel_worker_stop.clear()
+        _wheel_worker = threading.Thread(
+            target=_wheel_worker_loop, name="mouse-wheel-release", daemon=True,
+        )
+        _wheel_worker.start()
 
 
 def _wheel_worker_loop():
-    global _mouse_wheel_timer
-    q = _wheel_cmd_queue
-    while not _wheel_worker_stop.is_set():
-        try:
-            cmd = q.get(timeout=0.5) # @IgnoreException
-        except queue.Empty:
-            continue
-        if cmd is None:
-            break
-        op = cmd[0]
-        if op == "arm":
-            button_id = cmd[1]
-            delay = float(cmd[2]) if len(cmd) > 2 else _mouse_wheel_delay
-            with _wheel_lock:
-                old = _mouse_wheel_timer.get(button_id)
-                if old is not None:
-                    try:
-                        old.cancel()
-                    except RuntimeError:
-                        pass
-                timer = threading.Timer(delay, _queue_wheel_release, args=(button_id,))
-                _mouse_wheel_timer[button_id] = timer
-                try:
-                    timer.start()
-                except RuntimeError:
-                    _mouse_wheel_timer[button_id] = None
-                    _queue_wheel_release(button_id)
-        elif op == "cancel":
-            button_id = cmd[1]
-            with _wheel_lock:
-                old = _mouse_wheel_timer.get(button_id)
-                if old is not None:
-                    try:
-                        old.cancel()
-                    except RuntimeError:
-                        pass
-                    _mouse_wheel_timer[button_id] = None
-        elif op == "stop":
-            break
+    with _wheel_condition:
+        while not _wheel_worker_stop.is_set():
+            if not _mouse_wheel_deadlines:
+                _wheel_condition.wait()
+                continue
+            button_id = min(_mouse_wheel_deadlines, key=_mouse_wheel_deadlines.get)
+            remaining = _mouse_wheel_deadlines[button_id] - monotonic()
+            if remaining > 0:
+                _wheel_condition.wait(remaining)
+                continue
+            _queue_wheel_release(button_id)
 
 
 def _arm_wheel_release(button_id):
-    _ensure_wheel_worker()
-    if _wheel_cmd_queue is not None:
-        _wheel_cmd_queue.put(("arm", button_id, _mouse_wheel_delay))
+    with _wheel_condition:
+        _mouse_wheel_deadlines[button_id] = monotonic() + _mouse_wheel_delay
+        _wheel_condition.notify()
 
 
 def _cancel_wheel_release(button_id):
-    _ensure_wheel_worker()
-    if _wheel_cmd_queue is not None:
-        _wheel_cmd_queue.put(("cancel", button_id))
+    with _wheel_condition:
+        _mouse_wheel_deadlines.pop(button_id, None)
+        _wheel_condition.notify()
 
 
 _is_runtime = False
@@ -342,7 +324,7 @@ def setRunning(value: bool):
     _is_runtime = value
 
 
-def getMousePosition(self):
+def getMousePosition(self=None):
     global _mouse_x, _mouse_y
     return (_mouse_x, _mouse_y)
 
@@ -355,29 +337,30 @@ def process_mouse_event(n_code, w_param, l_param):
     global g_mouse_move_callbacks, g_mouse_wheel_callbacks
     global g_suppress_mouse
 
-    verbose = False
+    if n_code < 0:
+        return user32.CallNextHookEx(None, n_code, w_param, l_param)
     if n_code == HC_ACTION:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
 
         button_id = None
-        release_button_id = None  # Guarded against UnboundLocalError
+        release_button_id = None
         is_pressed = True
         is_wheel = False
         process = False
 
-        if w_param in [WM_LBUTTONDOWN, WM_LBUTTONUP]:
+        if w_param in (WM_LBUTTONDOWN, WM_LBUTTONUP):
             button_id = gremlin.types.MouseButton.Left
             is_pressed = w_param == WM_LBUTTONDOWN
             process = True
-        elif w_param in [WM_RBUTTONDOWN, WM_RBUTTONUP]:
+        elif w_param in (WM_RBUTTONDOWN, WM_RBUTTONUP):
             button_id = gremlin.types.MouseButton.Right
             is_pressed = w_param == WM_RBUTTONDOWN
             process = True
-        elif w_param in [WM_MBUTTONDOWN, WM_MBUTTONUP]:
+        elif w_param in (WM_MBUTTONDOWN, WM_MBUTTONUP):
             button_id = gremlin.types.MouseButton.Middle
             is_pressed = w_param == WM_MBUTTONDOWN
             process = True
-        elif w_param in [WM_XBUTTONDOWN, WM_XBUTTONUP]:
+        elif w_param in (WM_XBUTTONDOWN, WM_XBUTTONUP):
             if msg.mouseData & (0x0001 << 16):
                 button_id = gremlin.types.MouseButton.Back
             elif msg.mouseData & (0x0002 << 16):
@@ -396,20 +379,22 @@ def process_mouse_event(n_code, w_param, l_param):
             is_wheel = True
             if g_mouse_wheel_callbacks:
                 _event_queue.put(
-                    (list(g_mouse_wheel_callbacks), (delta, False))
+                    (tuple(g_mouse_wheel_callbacks), (delta, False))
                 )
         elif w_param == WM_MOUSEHWHEEL:
+            # Preserve the unsigned delta expected by existing subscribers.
             delta = msg.mouseData >> 16
-            if delta == 120:
+            signed_delta = ctypes.c_short(delta).value
+            if signed_delta > 0:
                 button_id = gremlin.types.MouseButton.WheelRight
                 release_button_id = gremlin.types.MouseButton.WheelLeft
-            elif delta == 65416:
+            elif signed_delta < 0:
                 button_id = gremlin.types.MouseButton.WheelLeft
                 release_button_id = gremlin.types.MouseButton.WheelRight
             is_wheel = True
             if g_mouse_wheel_callbacks:
                 _event_queue.put(
-                    (list(g_mouse_wheel_callbacks), (delta, True))
+                    (tuple(g_mouse_wheel_callbacks), (delta, True))
                 )
         elif w_param == WM_MOUSEMOVE:
             # CPU Optimization: Only queue callbacks if position actually shifted
@@ -423,36 +408,28 @@ def process_mouse_event(n_code, w_param, l_param):
 
             if g_mouse_move_callbacks:
                 _event_queue.put(
-                    (list(g_mouse_move_callbacks), (_mouse_x, _mouse_y))
+                    (tuple(g_mouse_move_callbacks), (_mouse_x, _mouse_y))
                 )
 
-        if is_wheel and button_id:
-            global _mouse_wheel_delay, _mouse_wheel_state
-            # if verbose:
-            #     syslog.info(f"wheel press {button_id}")
-
-            process = True
-            if _is_runtime:
-                if _mouse_wheel_state.get(button_id, False):
-                    process = False
-                else:
-                    _mouse_wheel_state[button_id] = True
-
-                _arm_wheel_release(button_id)
-
-                if release_button_id and _mouse_wheel_state.get(
-                    release_button_id, False
-                ):
-                    # if verbose:
-                    #     syslog.info(f"wheel timer reset {release_button_id}")
+        if is_wheel and button_id and _is_runtime:
+            # State, deadlines and queued press/release events must be atomic
+            # with respect to the release worker, including a zero delay.
+            with _wheel_condition:
+                if release_button_id:
                     _queue_wheel_release(release_button_id)
+                if not _mouse_wheel_state.get(button_id, False):
+                    _mouse_wheel_state[button_id] = True
+                    if g_mouse_callbacks:
+                        evt = MouseEvent(button_id, True, False)
+                        _event_queue.put((tuple(g_mouse_callbacks), (evt,)))
+                _arm_wheel_release(button_id)
+            process = False
+        elif is_wheel and button_id:
+            process = True
 
-        if process and button_id:
-            # if verbose:
-            #     syslog.info(f"Mouse event press: {button_id}")
+        if process and button_id and g_mouse_callbacks:
             evt = MouseEvent(button_id, is_pressed, False)
-            if g_mouse_callbacks:
-                _event_queue.put((list(g_mouse_callbacks), (evt,)))
+            _event_queue.put((tuple(g_mouse_callbacks), (evt,)))
 
     if g_suppress_mouse == 0:
         return user32.CallNextHookEx(None, n_code, w_param, l_param)
@@ -461,24 +438,83 @@ def process_mouse_event(n_code, w_param, l_param):
 
 
 def _queue_wheel_release(button_id):
-    global g_mouse_callbacks, _mouse_wheel_timer, _mouse_wheel_state
-    verbose = False
-    if _mouse_wheel_state.get(button_id):
-        if verbose:
-            syslog.info(f"wheel release {button_id}")
-        _mouse_wheel_state[button_id] = False
-        with _wheel_lock:
-            timer = _mouse_wheel_timer.get(button_id)
-            if timer is not None:
-                try:
-                    timer.cancel()
-                except RuntimeError:
-                    pass
-                _mouse_wheel_timer[button_id] = None
+    with _wheel_condition:
+        _mouse_wheel_deadlines.pop(button_id, None)
+        if _mouse_wheel_state.get(button_id, False):
+            _mouse_wheel_state[button_id] = False
+            if g_mouse_callbacks:
+                evt = MouseEvent(button_id, False, False)
+                _event_queue.put((tuple(g_mouse_callbacks), (evt,)))
+        _wheel_condition.notify()
 
-        evt = MouseEvent(button_id, False, False)
-        if g_mouse_callbacks:
-            _event_queue.put((list(g_mouse_callbacks), (evt,)))
+
+def _start_listener(hook, name):
+    with hook._lifecycle_lock:
+        if hook._listen_thread is not None and hook._listen_thread.is_alive():
+            return
+        hook._ready.clear()
+        hook._startup_error = None
+        hook._running = True
+        hook._listen_thread = threading.Thread(target=hook._listen, name=name, daemon=True)
+        try:
+            hook._listen_thread.start()
+        except Exception:
+            hook._running = False
+            hook._listen_thread = None
+            raise
+        # The queue must exist before another thread can post WM_QUIT.
+        hook._ready.wait()
+        if hook._startup_error is not None:
+            hook._listen_thread.join()
+            hook._listen_thread = None
+            raise hook._startup_error
+
+
+def _stop_listener(hook):
+    with hook._lifecycle_lock:
+        thread = hook._listen_thread
+        if thread is None:
+            return
+        if thread.is_alive():
+            if not user32.PostThreadMessageW(hook._native_thread_id, WM_QUIT, 0, 0):
+                if thread.is_alive():
+                    raise ctypes.WinError(get_last_error())
+            if thread is not threading.current_thread():
+                thread.join()
+        hook._listen_thread = None
+        hook._running = False
+
+
+def _listen_for_events(hook, hook_type, callback):
+    hook.hook_id = None
+    try:
+        hook._native_thread_id = threading.get_native_id()
+        msg = wintypes.MSG()
+        user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 0)
+        hook.hook_id = user32.SetWindowsHookExW(hook_type, callback, None, 0)
+        if not hook.hook_id:
+            raise ctypes.WinError(get_last_error())
+        hook._ready.set()
+        while True:
+            result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if result == 0:
+                break
+            if result == -1:
+                raise ctypes.WinError(get_last_error())
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
+    except Exception as error:
+        if not hook._ready.is_set():
+            hook._startup_error = error
+        else:
+            syslog.exception("Windows hook message loop failed")
+    finally:
+        if hook.hook_id:
+            if not user32.UnhookWindowsHookEx(hook.hook_id):
+                syslog.error("Unable to remove Windows hook: %s", get_last_error())
+            hook.hook_id = None
+        hook._running = False
+        hook._ready.set()
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -486,6 +522,11 @@ class KeyboardHook:
     def __init__(self):
         self._running = False
         self._listen_thread = None
+        self._lifecycle_lock = threading.RLock()
+        self._ready = threading.Event()
+        self._startup_error = None
+        self._native_thread_id = None
+        self.hook_id = None
 
     def updateVerbose(self):
         import gremlin.config
@@ -518,7 +559,7 @@ class KeyboardHook:
 
     def register(self, callback):
         global g_keyboard_callbacks
-        if callback not in g_keyboard_callbacks:
+        if callback and callback not in g_keyboard_callbacks:
             g_keyboard_callbacks.append(callback)
         self.start()
 
@@ -528,41 +569,20 @@ class KeyboardHook:
             g_keyboard_callbacks.remove(callback)
 
     def start(self):
-        if self._running:
-            return
-        if self._listen_thread is None:
-            self._listen_thread = threading.Thread(
-                target=self._listen, daemon=True
-            )
-            self._listen_thread.name = "keyboard hook"
-        self._running = True
-        self._listen_thread.start()
+        _start_listener(self, "keyboard hook")
 
     def stop(self):
-        if self._running:
-            self._running = False
-            user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
-            gremlin.util.safeJoin(self._listen_thread)
-            self._listen_thread = None
+        _stop_listener(self)
+        _shift_keys_down.clear()
+        global g_shift_state
+        g_shift_state = False
 
     def shutdown(self):
         self.stop()
         syslog.info("KBD: shutdown")
 
     def _listen(self):
-        self.hook_id = user32.SetWindowsHookExW(
-            WH_KEYBOARD_LL, process_keyboard_event, None, 0
-        )
-
-        msg = wintypes.MSG()
-        while True:
-            result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
-            if not result:
-                break
-            if result == -1:
-                raise ctypes.WinError(get_last_error())
-            user32.TranslateMessage(ctypes.byref(msg))
-            user32.DispatchMessageW(ctypes.byref(msg))
+        _listen_for_events(self, WH_KEYBOARD_LL, process_keyboard_event)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -573,8 +593,13 @@ class MouseHook:
 
         self._running = False
         self._listen_thread = None
+        self._lifecycle_lock = threading.RLock()
+        self._ready = threading.Event()
+        self._startup_error = None
+        self._native_thread_id = None
+        self.hook_id = None
 
-        global _mouse_wheel_state, _mouse_wheel_timer, _mouse_wheel_delay
+        global _mouse_wheel_delay
         wheel_buttons = [
             gremlin.types.MouseButton.WheelDown,
             gremlin.types.MouseButton.WheelUp,
@@ -583,12 +608,10 @@ class MouseHook:
         ]
         for button_id in wheel_buttons:
             _mouse_wheel_state[button_id] = False
-            _mouse_wheel_timer[button_id] = None
 
         _mouse_wheel_delay = (
             gremlin.config.Configuration().mouse_wheel_autorelease_delay
         )
-        _ensure_wheel_worker()
 
         SM_SWAPBUTTON = 23
         self._is_swapped = (
@@ -620,20 +643,23 @@ class MouseHook:
 
     def register(self, callback):
         global g_mouse_callbacks
-        if callback and callback not in g_mouse_callbacks:
-            g_mouse_callbacks.append(callback)
+        if callback:
+            if callback not in g_mouse_callbacks:
+                g_mouse_callbacks.append(callback)
             self.start()
 
     def registerMouseMove(self, callback):
         global g_mouse_move_callbacks
-        if callback and callback not in g_mouse_move_callbacks:
-            g_mouse_move_callbacks.append(callback)
+        if callback:
+            if callback not in g_mouse_move_callbacks:
+                g_mouse_move_callbacks.append(callback)
             self.start()
 
     def registerMouseWheel(self, callback):
         global g_mouse_wheel_callbacks
-        if callback and callback not in g_mouse_wheel_callbacks:
-            g_mouse_wheel_callbacks.append(callback)
+        if callback:
+            if callback not in g_mouse_wheel_callbacks:
+                g_mouse_wheel_callbacks.append(callback)
             self.start()
 
     def unregister(self, callback):
@@ -641,6 +667,9 @@ class MouseHook:
         if callback in g_mouse_callbacks:
             g_mouse_callbacks.remove(callback)
 
+        self._stop_if_unused()
+
+    def _stop_if_unused(self):
         if (
             not g_mouse_callbacks
             and not g_mouse_move_callbacks
@@ -652,77 +681,46 @@ class MouseHook:
         global g_mouse_move_callbacks
         if callback in g_mouse_move_callbacks:
             g_mouse_move_callbacks.remove(callback)
+        self._stop_if_unused()
 
     def unregisterMouseWheel(self, callback):
         global g_mouse_wheel_callbacks
         if callback in g_mouse_wheel_callbacks:
             g_mouse_wheel_callbacks.remove(callback)
+        self._stop_if_unused()
 
     def start(self):
-        if self._running:
-            return
-        if self._listen_thread is None:
-            self._listen_thread = threading.Thread(
-                target=self._listen, daemon=False
-            )
-            self._listen_thread.name = "mouse hook"
-        try:
-            self._listen_thread.start()
-            self._running = True
-        except Exception:
-            syslog.error("MOUSE HOOK: unable to create listen thread")
+        with self._lifecycle_lock:
+            _ensure_wheel_worker()
+            try:
+                _start_listener(self, "mouse hook")
+            except Exception:
+                self._stop_timers()
+                raise
 
     def stop(self):
-        if self._running:
-            self._running = False
-            user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
-            gremlin.util.safeJoin(self._listen_thread)
-            self._listen_thread = None
+        with self._lifecycle_lock:
+            _stop_listener(self)
             self._stop_timers()
 
     def shutdown(self):
         self.stop()
         syslog.info("MOUSE: shutdown")
-        if self._listen_thread:
-            gremlin.util.safeJoin(self._listen_thread)
-            self._listen_thread = None
 
     def _stop_timers(self):
-        global _mouse_wheel_timer, _wheel_cmd_queue, _wheel_worker
-        with _wheel_lock:
-            for id in list(_mouse_wheel_timer.keys()):
-                if _mouse_wheel_timer[id]:
-                    try:
-                        _mouse_wheel_timer[id].cancel()
-                    except RuntimeError:
-                        pass
-                    _mouse_wheel_timer[id] = None
-        _wheel_worker_stop.set()
-        if _wheel_cmd_queue is not None:
-            try:
-                _wheel_cmd_queue.put(None)
-            except Exception:
-                pass
-        if _wheel_worker is not None and _wheel_worker.is_alive():
-            _wheel_worker.join(timeout=1.0)
-        _wheel_worker = None
+        global _wheel_worker
+        with _wheel_condition:
+            _wheel_worker_stop.set()
+            for button_id in tuple(_mouse_wheel_state):
+                _queue_wheel_release(button_id)
+            _mouse_wheel_deadlines.clear()
+            _wheel_condition.notify_all()
+        if _wheel_worker is not None:
+            _wheel_worker.join()
+            _wheel_worker = None
 
     def _listen(self):
-        self.hook_id = user32.SetWindowsHookExW(
-            WH_MOUSE_LL, process_mouse_event, None, 0
-        )
-
-        msg = wintypes.MSG()
-        while True:
-            result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
-            if not result:
-                break
-            if result == -1:
-                raise ctypes.WinError(get_last_error())
-
-            if g_suppress_mouse == 0:
-                user32.TranslateMessage(ctypes.byref(msg))
-                user32.DispatchMessageW(ctypes.byref(msg))
+        _listen_for_events(self, WH_MOUSE_LL, process_mouse_event)
 
     @property
     def is_swapped(self) -> bool:

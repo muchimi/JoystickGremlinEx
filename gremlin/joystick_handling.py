@@ -987,8 +987,13 @@ def getPhysicalDevices() -> list[DeviceSummary]:
 
 def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceSummary | None:
     """gets the device for the given ID - issues error message if not found"""
-    global _all_devices_map
-    # with _device_registry_lock:
+    global _all_devices_map, _joystick_initialized
+
+    if not _joystick_initialized:
+        syslog.warning("Device: devices not initialized in getDevice()")
+        return None
+
+
     if device_guid:
         if not isinstance(device_guid, dinput.GUID):
             device_guid = gremlin.util.to_guid(device_guid)  # ensure a dinput.GUID
@@ -997,6 +1002,13 @@ def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceS
         verbose = gremlin.config.Configuration().verbose_mode_joystick
         if verbose:
             syslog.warning(f"Device not found for GUID: [{device_guid}]")
+            # available devices
+            syslog.warning("Available devices:")
+            dumpDevices()
+
+
+
+
     return None
 
 
@@ -1482,7 +1494,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
 
     try:
         with _joystick_init_lock:
-            syslog = logging.getLogger("system")
+
             syslog.info("INIT: Initializing joystick devices")
 
             # turn off vjoy monitoring
