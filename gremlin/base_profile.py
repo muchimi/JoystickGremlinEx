@@ -513,7 +513,7 @@ class AbstractFunctor(QtCore.QObject):
         import gremlin.execution_graph
 
         if self.node:
-            for node in self.node.ancestors:
+            for node in reversed(self.node.ancestors):
                 if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container:
                     return node
         return None
@@ -548,7 +548,7 @@ class AbstractFunctor(QtCore.QObject):
                     # Remap like actions typically have an always activation
                     # condition associated with them
                     if condition.comparison != "always":
-                        needs_auto_release = False
+                        return False
 
         return needs_auto_release
 

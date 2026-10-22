@@ -651,9 +651,7 @@ class StateInputItem(InputItem):
         """gets the state value"""
         if self._is_expression:
             return self.evaluate()
-
-        # syslog.info(f"STATE getValue(): get [{self.key}]  -> [{self._value}]")
-        return self._value
+        return self._value or False # default to False if value is None
 
     @value.setter
     def value(self, data: bool):
@@ -849,12 +847,18 @@ class StateInputItem(InputItem):
                 sd.update_key(self, old_name, value)
 
     @property
+    def name(self) -> str:
+        """alias to key"""
+        return self._key
+
+    @property
     def type_cast(self):
         return self._type_cast
 
     @property
-    def message_key(self):
-        return self.key
+    def message_key(self) -> str:
+        """alias to key"""
+        return self._key
 
     @property
     def expression(self) -> str:
@@ -1971,8 +1975,9 @@ class StateData:
         """gets the state value"""
         key = key.casefold().strip()
         if key in self._data:
-            return self._data[key].value
-        return None
+            return self._data[key].value or False
+        return False
+
 
     def toggle(self, key: str):
         """toggles a state"""
@@ -3808,7 +3813,7 @@ class StateVisualizerWidget(QWidget):
             state: StateInputItem
             for state in items:
                 if state.value is None:
-                    syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
+                    syslog.warning(f"viewer state: bad state data for state: {state.key} id [{state.id}] - null value - skipping display")
                     continue
 
                 btn = StateRepeaterButton(state, callback=self._state_toggle)

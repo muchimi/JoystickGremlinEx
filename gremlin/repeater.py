@@ -234,9 +234,10 @@ class PulseWorker:
         self._abort_event = threading.Event()
 
 
-        el = gremlin.event_handler.EventListener()
-        el.profile_stop.connect(self.stop)  # stop processing on profile stop
-        el.shutdown.connect(self.stop)  # stop processing on app shutdown
+        self._state_lock = threading.RLock()
+        self._signals_connected = False
+        self._keep_running = False
+        self._is_interval = False
 
     @property
     def data(self):
@@ -247,105 +248,94 @@ class PulseWorker:
         self._data = value
 
     def start(self):
-        """request a start"""
-        if self._thread and self._thread.is_alive():
-            return
-        self._abort_event.clear()  # reset the abort event before starting the thread
-        self._thread = threading.Thread(target=self._run, daemon=False, args = (self._abort_event,))
-        self._thread.name = "PulseRepeater"
-        self._keep_running = True
-        self._thread.start()
+        """Start one worker, connecting lifecycle signals only while active."""
+        with self._state_lock:
+            if self._thread and self._thread.is_alive():
+                return
+            if self._repeat_count is not None and self._repeat_count <= 0:
+                return
+            self._abort_event.clear()
+            self._keep_running = True
+            self.is_running = True
+            el = gremlin.event_handler.EventListener()
+            if not self._signals_connected:
+                el.profile_stop.connect(self.stop)
+                el.shutdown.connect(self.stop)
+                self._signals_connected = True
+            self._thread = threading.Thread(
+                target=self._run, daemon=False, args=(self._abort_event,),
+                name="PulseRepeater",
+            )
+            self._thread.start()
 
     def stop(self):
-        """request a stop"""
+        """Wake the worker immediately; it releases an active pulse once."""
+        with self._state_lock:
+            thread = self._thread
+            self._keep_running = False
+            self._abort_event.set()
+        if thread and thread is not threading.current_thread():
+            gremlin.util.safeJoin(thread)
+        with self._state_lock:
+            if self._thread is thread and thread and not thread.is_alive():
+                self._thread = None
 
-        if self._thread:
-            if self._off_callback:
-                # fire the pulse off callback (or abort)
-                if self.data:
-                    self._off_callback(self.data)
-                else:
-                    self._off_callback()
-
-            self._keep_running = False  # tell the worker to stop whatever it's doing
-            self._abort_event.set()  # signal the thread to abort
-            # wait for the thread to terminate
-            gremlin.util.safeJoin(self._thread)
-            self._thread = None
-            self._is_pulse = False  # true if we're pulsing
-            self._is_interval = False  # true if we're waiting for the next pulse
-            self.is_running = False
+    def _invoke_callback(self, callback):
+        if callback:
+            if self._data is not None:
+                callback(self._data)
+            else:
+                callback()
 
     def _run(self, abort_event: threading.Event):
-        """pulse worker"""
-        syslog = logging.getLogger("system")
-        # verbose = gremlin.config.Configuration().verbose
-        verbose = False
-        # verbose = True
-        if not self._thread.is_alive():
-            return
-
+        """Wait without polling, retaining interruptible pulse/interval phases."""
+        # Off-only workers are delayed releases for a press already sent by
+        # their caller; cancellation before the first iteration must release it.
+        off_pending = self._on_callback is None
         try:
-            while not abort_event.is_set():
-                self._is_pulse = True  # indicate pulsing phase
+            while self._keep_running and not abort_event.is_set():
+                self._is_pulse = True
                 self._is_interval = False
-
-                # if verbose: syslog.info("Fire on callback")
-                if self._on_callback:
-                    if self.data:
-                        # has a callback data param
-                        self._on_callback(self.data)
-                    else:
-                        # does not have a callback param
-                        self._on_callback()
-
-                # start the pulse timer
+                off_pending = True
+                self._invoke_callback(self._on_callback)
                 if self._pulse_duration:
-                    time_lapsed = time.time() + self._pulse_duration
-                    while not abort_event.is_set() and time.time() < time_lapsed:
-                        time.sleep(0)
-
-                if self._iteration_callback:
-                    if self.data:
-                        self._iteration_callback(self.data)
-                    else:
-                        self._iteration_callback()
-
+                    abort_event.wait(max(0, self._pulse_duration))
+                if not abort_event.is_set():
+                    self._invoke_callback(self._iteration_callback)
                 self._is_pulse = False
-
-                # if verbose: syslog.info("Stop pulse")
-                if self._off_callback:
-                    # fire the pulse off callback (or abort)
-                    if verbose:
-                        syslog.info("Fire off callback")
-                    if self.data:
-                        self._off_callback(self.data)
-                    else:
-                        self._off_callback()
-
+                off_pending = False
+                self._invoke_callback(self._off_callback)
                 if self._repeat_count is not None:
                     self._repeat_count -= 1
                     self._keep_running = self._repeat_count > 0
-
-                if not self._keep_running or self._repeat_interval < 0:
-                    abort_event.set()  # signal the thread to abort
-                    return
-
-                # start the repeat timer
+                if not self._keep_running or abort_event.is_set() or self._repeat_interval < 0:
+                    break
+                self._is_interval = True
                 if self._repeat_interval > 0:
-                    if verbose:
-                        syslog.info("Start wait")
-                    time_lapsed = time.time() + self._repeat_interval
-                    while self._keep_running and time.time() < time_lapsed:
-                        time.sleep(0)
-                    if verbose:
-                        syslog.info("Stop wait")
-
-        except Exception as e:
-            syslog.error(f"Pulse worker encountered an error: {e}")
+                    abort_event.wait(self._repeat_interval)
+        except Exception as error:
+            syslog.error(f"Pulse worker encountered an error: {error}")
         finally:
-            if verbose:
-                syslog.info("End pulse worker")
+            try:
+                if off_pending:
+                    self._is_pulse = False
+                    self._invoke_callback(self._off_callback)
+            except Exception as error:
+                syslog.error(f"Pulse worker release encountered an error: {error}")
+            finally:
+                with self._state_lock:
+                    self._is_pulse = False
+                    self._is_interval = False
+                    self._keep_running = False
+                    self.is_running = False
+                    if self._signals_connected:
+                        el = gremlin.event_handler.EventListener()
+                        for signal in (el.profile_stop, el.shutdown):
+                            try:
+                                signal.disconnect(self.stop)
+                            except (RuntimeError, TypeError):
+                                pass
+                        self._signals_connected = False
 
     @property
     def is_pulse(self) -> bool:

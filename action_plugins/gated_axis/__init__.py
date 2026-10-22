@@ -1660,9 +1660,15 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def profile_start(self):
         """register the gated functor"""
+        self._started = False
         # self.action_data.gate_data.setActionId(self.action_data.id)
         self.action_data.gate_data.start()
         self.action_data.gate_data.hook()
+
+    def profile_stop(self):
+        self._started = False
+        self.action_data.gate_data.stop()
+        super().profile_stop()
 
     def profile_started(self):
         """occurs after all stat init completed - update based on current axis position"""

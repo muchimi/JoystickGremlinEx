@@ -2969,12 +2969,12 @@ class TriggerDict(collections.UserDict):
     """hashable dict that fires callbacks when data is changed"""
 
     def __init__(self, name: str = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self._on_change_callbacks = []
         self.id = uuid.uuid4()  # unique ID of this dict
         self._suspend_stack = 0
         self._callback_pending = False
         self._name = name if name else "TriggerDict"
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def copyFrom(source: dict, deep=False):
@@ -2982,12 +2982,9 @@ class TriggerDict(collections.UserDict):
 
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
         new_dict = TriggerDict()
-        if deep:
-            for key, value in source.data.items():
-                new_dict[key] = copy.deepcopy(value)
-        else:
-            data = source.data.copy()
-            new_dict.update(data)
+        data = source.data if isinstance(source, TriggerDict) else source
+        # A new dictionary has no observers; copy its storage directly.
+        new_dict.data = copy.deepcopy(data) if deep else data.copy()
         return new_dict
 
     @property
@@ -3046,12 +3043,8 @@ class TriggerDict(collections.UserDict):
     def __eq__(self, other):
         if not isinstance(other, (type(self),dict)):
             return NotImplemented
-        h1 = hash(frozenset(self.data.items()))
-        if isinstance(other, dict):
-            h2 = hash(frozenset(other.items()))
-        else:
-            h2 = hash(frozenset(other.data.items()))
-        return h1 == h2
+        data = other if isinstance(other, dict) else other.data
+        return self.data == data
 
 
 def sortDict(d: dict):

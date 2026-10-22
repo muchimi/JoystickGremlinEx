@@ -93,6 +93,17 @@ class Value:
         """clones this value"""
         import copy
 
+        if (type(self) is Value and len(self.__dict__) == 3
+                and type(self._raw) in (float, int, bool, type(None))
+                and type(self._current) in (float, int, bool, type(None))
+                and type(self._is_pressed) in (bool, type(None))):
+            clone = Value.__new__(Value)
+            clone._raw = self._raw
+            clone._current = self._current
+            clone._is_pressed = self._is_pressed
+            return clone
+        # Preserve deepcopy behavior for mutable payloads, subclasses, and
+        # plugin-added attributes.
         return copy.deepcopy(self)
 
     def invert(self):
@@ -356,9 +367,11 @@ class JoystickCondition(AbstractCondition):
                 # value = joy.axis(self.input_id).value
             r1 = self.condition.range[0]
             r2 = self.condition.range[1]
+            if value is None:
+                return False
             in_range = gremlin.util.valueInRange(value, r1, r2)
 
-            if self.condition.comparison in ["inside", "outside"]:
+            if self.condition.comparison in ("inside", "outside"):
                 retval = in_range if self.comparison == "inside" else not in_range
             if verbose:
                 syslog.info(
@@ -415,7 +428,7 @@ class JoystickCondition(AbstractCondition):
                 # succeed on release
                 if verbose:
                     syslog.info(
-                        f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {ansiPass()} (ignore release mode enabled)"
+                        f"{logtabs}JoystickCondition: Hat {self.comparison}: device {info.name} input: {self.input_id} direction: {direction} return: {ansiPass()} (ignore release mode enabled)"
                     )
                 return True
 
@@ -426,7 +439,7 @@ class JoystickCondition(AbstractCondition):
                 )
             return retval
         else:
-            syslog.warning(f"{logtabs}JoystickCondition: Invalid input_type {self.input_type} received")
+            syslog.warning(f"JoystickCondition: Invalid input_type {self.input_type} received")
             return False
 
     def condition_name(self) -> str:
@@ -516,7 +529,7 @@ class VJoyCondition(AbstractCondition):
             r2 = self.condition.range[1]
             in_range = gremlin.util.valueInRange(current_value, r1, r2)
 
-            if self.comparison in ["inside", "outside"]:
+            if self.comparison in ("inside", "outside"):
                 retval = in_range if self.comparison == "inside" else not in_range
             if verbose:
                 syslog.info(
@@ -541,7 +554,7 @@ class VJoyCondition(AbstractCondition):
             elif self.comparison == "released":
                 retval = not is_pressed  # true if the vjoy button is not pressed
             else:
-                syslog.error(f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button")
+                syslog.error(f"VjoyCondition: Button {self.comparison} is not a valid condition for a button")
 
             if verbose:
                 syslog.info(
@@ -551,12 +564,12 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickHat:
-            direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
+            direction = gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)
             if not event.is_pressed and direction == (0, 0) and self.ignore_release:
                 # succeed on release
                 if verbose:
                     syslog.info(
-                        f"{logtabs}VjoyCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {ansiPass()} (ignore release mode enabled)"
+                        f"{logtabs}VjoyCondition: Hat {self.comparison}: device {info.name} input: {self.input_id} direction: {direction} return: {ansiPass()} (ignore release mode enabled)"
                     )
                 return True
 
@@ -565,6 +578,7 @@ class VJoyCondition(AbstractCondition):
                 syslog.info(
                     f"{logtabs}VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {ansiResult(retval)}"
                 )
+            return retval
         else:
             syslog.warning(f"VjoyCondition: Invalid input_type {self.input_type} received")
             return False

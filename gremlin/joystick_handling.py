@@ -422,11 +422,12 @@ def get_axis_name(axis_id):
 
 def get_curved_axis(device_guid, axis_id):
     """returns curved/calibrated data same as the event handler"""
-    import gremlin.ui.osc_device
     import gremlin.config
 
     verbose = gremlin.config.Configuration().verbose_mode_curve
 
+    if isinstance(device_guid, int):
+        device_guid = getVjoyDeviceGuid(device_guid)
     device = getDevice(device_guid)
     if not device:
         if verbose:
@@ -443,7 +444,10 @@ def get_curved_axis(device_guid, axis_id):
         return curved
 
     else:
-        if device.device_type == DeviceType.Osc and isinstance(axis_id, gremlin.ui.osc_device.OscInputItem) and axis_id.is_axis:
+        if device.device_type != DeviceType.Osc:
+            return None
+        import gremlin.ui.osc_device
+        if isinstance(axis_id, gremlin.ui.osc_device.OscInputItem) and axis_id.is_axis:
             osc = gremlin.ui.osc_device.InputOscClient()
             osc.start()
             data = osc.getData(axis_id.message)  # gets data arguments or None if no data

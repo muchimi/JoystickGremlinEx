@@ -1587,7 +1587,6 @@ class GateData:
         gates = self.getGates()
         self.updateRanges()  # ensure we have the latest ranges
 
-        self._valid_mode_list.clear()  # rebuild the valid mode list
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         # verbose = True
@@ -1746,12 +1745,6 @@ class GateData:
         if triggers:
             value = gremlin.actions.Value(input_value)
 
-            range_event = event.clone()
-            range_event.event_type = InputType.JoystickAxis  # force linear
-            if not range_event.extra_data:
-                range_event.extra_data = {}
-            range_event.extra_data["triggers"] = triggers
-
             for trigger in triggers:
                 # syslog.info(f"Trigger: {trigger.mode.name}")
                 trigger_event = event.clone()
@@ -1770,13 +1763,13 @@ class GateData:
                             syslog.info(
                                 f"Exec Trigger: fixed value: {trigger.range.range_display() if trigger.range else trigger.gate.slider_index} : value {input_value:0.3f}"
                             )
-                        value.current = trigger.value
+                        trigger_value.current = trigger.value
                         trigger_event.curve_value = trigger.value
 
                     case TriggerMode.ValueInRange:
                         if verbose_extra:
                             syslog.info(f"Exec Trigger: value in range: {trigger.range.range_display()} : value {input_value:0.3f}")
-                        value.current = trigger.value
+                        trigger_value.current = trigger.value
                         trigger_event.curve_value = trigger.value
                         trigger_event.is_pressed = True
                         trigger_value.is_pressed = True
@@ -1869,7 +1862,10 @@ class GateData:
                         # range condition
                         if verbose:
                             syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f} range: [{trigger.range.to_display()}]")
-                        action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
+                        action_value = gremlin.actions.Value(
+                            trigger.value, trigger.raw_value,
+                            is_pressed=trigger_value.is_pressed,
+                        )
                         if verbose:
                             syslog.info(f"trigger node: {self._action_data.id}")
                         self._ec.execute_functor_id(
@@ -1890,40 +1886,44 @@ class GateData:
                             extra_data,
                             True,
                         )
-                        autorelease = False
-                        if trigger.condition in (
-                            GateConditionType.OnCross,
-                            GateConditionType.OnCrossDecrease,
-                            GateConditionType.OnCrossIncrease,
-                        ):
-                            # gate condition
-                            autorelease = trigger.gate.autorelease_map[trigger.condition]
-                        elif trigger.condition in (
-                            GateConditionType.EnterRange,
-                            GateConditionType.ExitRange,
-                        ):
-                            # range condition
-                            autorelease = trigger.range.autorelease_map[trigger.condition]
-                        if autorelease:
-                            # handle autorelease based on trigger delay
-                            if verbose:
-                                syslog.info(f"GATED AXIS AUTORELEASE TRIGGER: {trigger.mode.name}")
-                            button_release_event = trigger_event.clone()
-                            button_release_event.is_pressed = False
-                            button_release_value = gremlin.actions.Value(input_value, False)
-                            delay = trigger.delay / 1000  # delay in seconds
+                    autorelease = False
+                    if trigger.condition in (
+                        GateConditionType.OnCross,
+                        GateConditionType.OnCrossDecrease,
+                        GateConditionType.OnCrossIncrease,
+                    ):
+                        # gate condition
+                        autorelease = trigger.gate.autorelease_map[trigger.condition]
+                    elif trigger.condition in (
+                        GateConditionType.EnterRange,
+                        GateConditionType.ExitRange,
+                    ):
+                        # range condition
+                        autorelease = trigger.range.autorelease_map[trigger.condition]
+                    if autorelease:
+                        # handle autorelease based on trigger delay
+                        if verbose:
+                            syslog.info(f"GATED AXIS AUTORELEASE TRIGGER: {trigger.mode.name}")
+                        button_release_event = trigger_event.clone()
+                        button_release_event.is_pressed = False
+                        source_value = action_value if trigger.range is not None else trigger_value
+                        button_release_value = source_value.clone()
+                        button_release_value.is_pressed = False
+                        delay = trigger.delay / 1000  # delay in seconds
 
-                            def release():
-                                return self._ec.execute_functor_id(
-                                    self._action_data.id,
-                                    button_release_event,
-                                    button_release_value,
-                                    extra_data,
-                                    True,
-                                )
+                        def release(button_release_event=button_release_event,
+                                    button_release_value=button_release_value,
+                                    extra_data=extra_data):
+                            return self._ec.execute_functor_id(
+                                self._action_data.id,
+                                button_release_event,
+                                button_release_value,
+                                extra_data,
+                                True,
+                            )
 
-                            worker = gremlin.repeater.PulseWorker(delay, -1, None, release)
-                            worker.start()
+                        worker = gremlin.repeater.PulseWorker(delay, -1, None, release)
+                        worker.start()
 
     def _short_press(self, functor, event, value, delay=250):
         """triggers a short press of a trigger (gate crossing)"""
@@ -2952,8 +2952,7 @@ class GateData:
 
         if count > 0 and count_max < count:
             trim_count = count - count_max
-            for _ in range(trim_count):
-                data.pop(0)
+            del data[:trim_count]
         return data
 
     def process_triggers(self, current_value: float, update_last=True):
@@ -2969,17 +2968,17 @@ class GateData:
 
         """
 
-        config = gremlin.config.Configuration()
-        _verbose = config.verbose_mode_gate
-        verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
-        gh = GateEventHandler()
-
         if current_value is None:
             return
 
         with self._process_trigger_lock:
             tt = TriggerTracking()  # trigger tracking object
             tt.clear()  # reset any prior triggers
+            last_value = self._last_value
+            if last_value is not None and last_value == current_value:
+                return tt.triggers
+            config = gremlin.config.Configuration()
+            verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
             ranges = self.getUsedRanges()  # list of all ranges
 
             last_value = self._last_value  # last value processed
@@ -3037,12 +3036,6 @@ class GateData:
                         td.condition = condition
 
             value = None
-
-            value_changed = last_value is None or last_value != current_value
-
-            if not value_changed:
-                # nothing changed
-                return tt.triggers
 
             range_info: RangeInfo
             range_info = self._get_range_for_value_from_list(current_value, ranges)
@@ -3102,7 +3095,7 @@ class GateData:
                                 syslog.info(f"IN RANGE TRIGGER: [{td.range.to_display()}]")
 
             # process outside range condition ranges - those trigger if the value is outside the range
-            outside_trigger_ranges = [rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateConditionType.OutsideRange)]
+            outside_trigger_ranges = (rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateConditionType.OutsideRange))
             for outside_range in outside_trigger_ranges:
                 if not tt.getTrigger(outside_range, TriggerMode.ValueOutOfRange):
                     td = TriggerData()
@@ -3114,8 +3107,8 @@ class GateData:
                     td.condition = GateConditionType.OutsideRange
                     td.delay = outside_range.delay
                     tt.triggers.append(td)
-                    tt.registerTrigger(outside_range, TriggerMode.ValueOutOfRange)
-                    tt.clearTrigger(range_info, TriggerMode.ValueInRange)
+                    tt.registerTrigger(outside_range, td)
+                    tt.clearTrigger(outside_range, TriggerMode.ValueInRange)
                     if verbose_extra:
                         syslog.info(f"OUT OF RANGE TRIGGER: [{td.range.to_display()}]")
 
@@ -3125,7 +3118,6 @@ class GateData:
             # process any the gate triggers
             gate: GateInfo
 
-            tt = TriggerTracking()  # tracking data to remember what triggers were already issued so we don't issue them multiple times
             rt = RangeTracking()  # tracking data for range enter/exit
 
             for gate in crossed_gates:
@@ -3248,6 +3240,7 @@ class GateData:
                 self._last_value = current_value
 
             if not gremlin.shared_state.is_running:
+                gh = GateEventHandler()
                 # update trigger lines at edit time
                 for trigger in tt.triggers:
                     mode = trigger.mode
@@ -4205,8 +4198,12 @@ class GatedAxisGateCondition(gremlin.actions.AbstractCondition):
     def process_event(self, event, value, extra_data: dict = None):
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
-        trigger = extra_data["trigger"]
-        condition_type = extra_data["condition_type"]
+        if not extra_data:
+            return False
+        trigger = extra_data.get("trigger")
+        if trigger is None:
+            return False
+        condition_type = extra_data.get("condition_type")
 
         result = False
         if trigger.gate:
@@ -4254,8 +4251,12 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_gate and (config.verbose_mode_condition or config.verbose_mode_extra)
 
-        condition_type = extra_data["condition_type"]
-        trigger = extra_data["trigger"]
+        if not extra_data:
+            return False
+        trigger = extra_data.get("trigger")
+        if trigger is None:
+            return False
+        condition_type = extra_data.get("condition_type")
 
         result = False
         if trigger.range:

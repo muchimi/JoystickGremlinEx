@@ -52,7 +52,7 @@ import gremlin.input_item
 import os
 import enum
 from gremlin.remote import remote_control
-from gremlin.types import ButtonOutputMode, SendType, SyncMode, VjoyAction, DeviceType
+from gremlin.types import ButtonOutputMode, SendType, SyncMode, VjoyAction, DeviceType, ActivationRule
 import vjoy.vjoy
 from functools import partial
 from psygnal import Signal
@@ -4975,6 +4975,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def getCurveActions(self):
         """finds curve action siblings to this remap action"""
+        if gremlin.shared_state.is_running and self.curve_actions is not None:
+            return self.curve_actions
         actions = []
         nodes = []
         for node in self.getSiblings():
@@ -4988,6 +4990,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             for node in nodes:
                 action = node.action
                 actions.append(action)
+        if gremlin.shared_state.is_running:
+            self.curve_actions = actions
         return actions
 
     def getCurveData(self, event, value):
@@ -5028,16 +5032,24 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule)
 
     def shouldExecute(self, event, value, action) -> bool:
-        """determines if the given action should execute or not: returns True if the condition is satisfied"""
-
-        activation_condition: gremlin.input_item.BaseActivationCondition = action.activation_condition
-        if activation_condition is None or not activation_condition.conditions:
-            # no condition
+        """Evaluate live curve conditions without rebuilding activation models."""
+        activation = action.activation_condition
+        if activation is None or not activation.conditions:
             return True
+        return self._evaluate_curve_conditions(activation, event, value)
 
-        functor = self._create_activation_condition(activation_condition, self.action_data)
-
-        return gremlin.input_item.BaseActivationCondition.rule_function[functor._rule]([partial(c, event, value) for c in functor._conditions])
+    def _evaluate_curve_conditions(self, activation, event, value):
+        any_rule = activation.rule == ActivationRule.Any
+        for condition in activation.conditions:
+            if isinstance(condition, gremlin.input_item.BaseActivationCondition):
+                result = self._evaluate_curve_conditions(condition, event, value)
+            else:
+                result = self._convert_condition(condition)(event, value)
+            if any_rule and result:
+                return True
+            if not any_rule and not result:
+                return False
+        return not any_rule
 
     def applyContainerCurves(self, value: float):
         """applies the container curve data to the curve"""
@@ -5137,6 +5149,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         """occurs on profile start"""
+        # Rebuild topology-derived curve metadata for every profile run.
+        self.curve_actions = None
         # setup initial state
 
         is_local, is_remote = self.action_data.sendFlags()
@@ -5314,9 +5328,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case VjoyAction.VJoyButtonInverted:
                             is_pressed = not joystick_handling.get_button(device_guid, input_id)
 
-                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                        case VjoyAction.VJoyButtonPress:
                             is_pressed = True
-                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                        case VjoyAction.VJoyButtonRelease:
                             is_pressed = False
                             trigger = False
                         case VjoyAction.VJoyInvertAxis:
@@ -5342,9 +5356,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
                             is_pressed = gremlin.ui.osc_device.osc_client.getData(message)
-                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                        case VjoyAction.VJoyButtonPress:
                             is_pressed = True
-                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                        case VjoyAction.VJoyButtonRelease:
                             trigger = True
                             is_pressed = False
                 case InputType.Midi:
@@ -5353,9 +5367,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case VjoyAction.VJoyButton:
                             midi_client = gremlin.ui.midi_device.MidiClient()
                             is_pressed = midi_client.getData(message)
-                        case VjoyAction.VJoyButton.VJoyButtonPress:
+                        case VjoyAction.VJoyButtonPress:
                             is_pressed = True
-                        case VjoyAction.VJoyButton.VJoyButtonRelease:
+                        case VjoyAction.VJoyButtonRelease:
                             is_pressed = False
 
             match self.action_data.sync_mode:
@@ -5480,6 +5494,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_stop(self):
         """called when profile stops"""
 
+        self.curve_actions = None
         # clear any pulse workers still active
         worker: PulseWorker
         for worker in self.pulse_worker_map.values():
@@ -5524,8 +5539,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
             elif action_mode in (
                 VjoyAction.VJoyButton,
-                VjoyAction.VJoyButton.VJoyButtonPress,
-                VjoyAction.VJoyButton.VJoyButtonRelease,
+                VjoyAction.VJoyButtonPress,
+                VjoyAction.VJoyButtonRelease,
                 VjoyAction.VJoyButtonInverted,
             ):
                 # button modes
@@ -5740,7 +5755,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # value position is now between 0 and 1
             offset = self.direction * self.action_data.relative_value * self.scale_factor
 
-            syslog.info(f"Tick: {offset:0.3f} scale: {self.scale_factor:0.3f}")
+            if self.verbose_extra:
+                syslog.info(f"Tick: {offset:0.3f} scale: {self.scale_factor:0.3f}")
 
             # read the current output axis value
             value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
@@ -5882,7 +5898,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
             if event.is_repeater:
                 # use the repeater value
-                value = event.value
+                ranged_value = event.value
             else:
                 curves = None
                 if event.curve_value is not None:
@@ -6074,39 +6090,25 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
 
                         self.action_data.axis_last_value = value
-                        self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
-
-                        # remember the last value
-                        self.action_data.axis_last_value = value
+                        self._set_axis(
+                            self.vjoy_id, self.vjoy_input_id, value,
+                            send_flags=(is_local, is_remote), force_remote=force_remote,
+                        )
 
                     elif axis_mode == "relative":
                         # relative mode
 
-                        if self.action_data.use_relative_value:
-                            # input is an axis
-                            scale_factor = event.value
-                            if scale_factor < 0:
-                                scale_factor = -scale_factor
-                                direction = -1
-                            else:
-                                direction = +1
-                            if not self._relative_pulse_worker:
-                                self._relative_pulse_worker = PulseWorker(
-                                    0,
-                                    self.action_data.relative_pulse_delay / 1000,
-                                    on_callback=self._relative_pulse_on,
-                                    data=(
-                                        self.vjoy_id,
-                                        self.vjoy_input_id,
-                                        is_local,
-                                        is_remote,
-                                    ),
-                                )
-
-                            self.scale_factor = scale_factor
-
+                        relative_input = event.value if event.value is not None else value
+                        direction = -1 if relative_input < 0 else 1
+                        self.scale_factor = abs(relative_input) if self.action_data.use_relative_value else 1.0
+                        worker_data = (self.vjoy_id, self.vjoy_input_id, is_local, is_remote)
+                        if self._relative_pulse_worker is None:
+                            self._relative_pulse_worker = PulseWorker(
+                                0, self.action_data.relative_pulse_delay / 1000,
+                                on_callback=self._relative_pulse_on, data=worker_data,
+                            )
                         else:
-                            self.scale_factor = 1.0
+                            self._relative_pulse_worker.data = worker_data
 
                         if self.action_data.reverse:
                             direction = -direction
@@ -6732,28 +6734,26 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.encoder.value = 0.0
         self.encoder.reset_acceleration()
 
-    def _set_axis(self, vid: int, axis_id: int, value: float):
-        """sets the axis value using the inversion factor"""
-
-        # fix: RC20 double inversion
-        # inverted = self.usage_data.is_inverted(vid, axis_id)
-        # if inverted:
-        #     # invert the value
-        #     value = -value
-
-        is_local, is_remote = self.action_data.sendFlags()
+    def _set_axis(self, vid: int, axis_id: int, value: float, send_flags=None, force_remote=False):
+        """Write the selected axis using routing already resolved by the caller."""
+        is_local, is_remote = self.action_data.sendFlags() if send_flags is None else send_flags
+        if force_remote:
+            is_local, is_remote = False, True
         if is_local:
             if self.verbose:
-                syslog.info(f"VJOY: send local axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
-            joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+                syslog.info(f"VJOY: send local axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
+            joystick_handling.VJoyProxy()[vid].axis(axis_id).value = value
         if is_remote:
             if self.verbose:
-                syslog.info(f"VJOY: send remote axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
-            self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value, client_list=self.client_list)
+                syslog.info(f"VJOY: send remote axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
+            self.remote_client.send_axis(
+                vid, axis_id, value, client_list=self.client_list,
+                force_remote=force_remote,
+            )
 
     def _get_axis(self, vid: int, axis_id: int) -> float:
         """gets the axis value using the inversion factor"""
-        value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+        value = joystick_handling.VJoyProxy()[vid].axis(axis_id).value
         inverted = self.usage_data.is_inverted(vid, axis_id)
         if inverted:
             value = -value
@@ -7340,37 +7340,15 @@ Supports axis merging, curved output, command, hat and button mappings.
         return self.hardware_input_id.getAxisValue()
 
     def get_merged_axis_value(self, event):
-        """computes the merged axis value for the current configuration"""
-
-        if self.action_mode == VjoyAction.VJoyMergeAxis:
-            action_value = event.value
-            curves = None
-            if event.curve_value is not None:
-                # curve data already applied, only apply our own curve if present
-                if self.curve_data:
-                    curves = [self.curve_data]
-                value = event.curve_value
-            else:
-                # not using curve data, apply all applicable curves
-                curves = self.getCurveData(event, action_value)
-                value = action_value.current
-
-            # this handles axis merging and applies any curves and axis inversion
-            filtered_value = self.get_filtered_axis_value(value, curves=curves)
-            if filtered_value is None:
-                filtered_value = value
-
-            ranged_value = self.get_ranged_axis_value(filtered_value)
-
-            if ranged_value is None:
-                ranged_value = filtered_value
-
-            action_value = gremlin.actions.Value(value=ranged_value, raw=event.raw_value, is_pressed=event.is_pressed)
-            merged_value = action_value.current
-            for data in self._merge_data:
-                merged_value = data.compute(merged_value)
-            return merged_value
-        return event.value
+        """Apply the merge/filter pipeline once to the current event."""
+        if self.action_mode != VjoyAction.VJoyMergeAxis:
+            return event.value
+        value = event.curve_value if event.curve_value is not None else event.value
+        filtered_value = self.get_filtered_axis_value(value)
+        if filtered_value is None:
+            filtered_value = value
+        ranged_value = self.get_ranged_axis_value(filtered_value)
+        return filtered_value if ranged_value is None else ranged_value
 
     def get_filtered_axis_value(self, value: float = None, curves: list = None, channels=False) -> float:
         """computes the output value for the current configuration - applies curves if curves are provided
@@ -7466,7 +7444,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     v1 = curve_data.curve_value(v1)
 
             # include in merged data the input axis
-            merged_values = [v1]
+            merged_values = [v1] if channels else None
             value = v1
             sd = gremlin.event_handler.AxisState()
             if verbose:
@@ -7500,7 +7478,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                             device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
                             v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
                             syslog.warning(
-                                f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}"
+                                f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2}"
                             )
 
                 elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
@@ -7516,7 +7494,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                             device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
                             v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
                             syslog.warning(
-                                f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}"
+                                f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2}"
                             )
 
                 else:
@@ -7542,7 +7520,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                     # apply any curve to the merged data before applying it
                     v2 = data.curve_data.curve_value(v2)
 
-                merged_values.append(v2)  # add the merge value
+                if channels:
+                    merged_values.append(v2)  # channel diagnostics only
 
                 match data.operation:
                     case MergeOperationType.Add:
@@ -7680,8 +7659,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 return True
 
             key = (device_guid, input_id)
-            keys = [md.key for md in self._merge_data]
-            return key in keys
+            return any(md.key == key for md in self._merge_data)
         return False
 
     @property
