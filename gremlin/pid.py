@@ -8,8 +8,9 @@ https://github.com/ThunderTecke/PID_Py
 
 from __future__ import annotations  # deprecated with python 3.14+
 import time
+import math
 from enum import Flag, auto
-from threading import Thread
+from threading import Thread, Event, current_thread
 import logging
 
 
@@ -124,12 +125,16 @@ class SimplePID(object):
         :param dt: If set, uses this value for timestep instead of real time. This can be used in
             simulations when simulation time is different from real time.
         """
-        if not self.auto_mode:
+        if not self._auto_mode:
             return self._last_output
 
         now = self.time_fn()
         if dt is None:
-            dt = now - self._last_time if (now - self._last_time) else 1e-16
+            dt = now - self._last_time
+            if dt < 0:
+                return self._last_output
+            if dt == 0:
+                dt = 1e-16
         elif dt <= 0:
             raise ValueError("dt has negative value {}, must be positive".format(dt))
 
@@ -140,11 +145,13 @@ class SimplePID(object):
         # Compute error terms
         error = self.setpoint - input_
         d_input = input_ - (self._last_input if (self._last_input is not None) else input_)
-        d_error = error - (self._last_error if (self._last_error is not None) else error)
 
         # Check if must map the error
         if self.error_map is not None:
             error = self.error_map(error)
+
+        if not self.differential_on_measurement:
+            d_error = error - (self._last_error if self._last_error is not None else error)
 
         # Compute the proportional term
         if not self.proportional_on_measurement:
@@ -156,7 +163,11 @@ class SimplePID(object):
 
         # Compute integral and derivative terms
         self._integral += self.Ki * error * dt
-        self._integral = _clamp(self._integral, self.output_limits)  # Avoid integral windup
+        lower, upper = self._min_output, self._max_output
+        if upper is not None and self._integral > upper:
+            self._integral = upper
+        elif lower is not None and self._integral < lower:
+            self._integral = lower  # Avoid integral windup
 
         if self.differential_on_measurement:
             self._derivative = -self.Kd * d_input / dt
@@ -165,7 +176,10 @@ class SimplePID(object):
 
         # Compute final output
         output = self._proportional + self._integral + self._derivative
-        output = _clamp(output, self.output_limits)
+        if upper is not None and output > upper:
+            output = upper
+        elif lower is not None and output < lower:
+            output = lower
 
         # Keep track of state
         self._last_output = output
@@ -628,7 +642,8 @@ class PID:
 
         currentTime: float, default = None
             The current time. For simulation purpose only.
-            Leave it to `None` for a real application.
+            Leave it to `None` to use monotonic time. Explicit timestamps
+            must use a consistent clock origin for the controller's lifetime.
 
         Returns
         -------
@@ -637,6 +652,8 @@ class PID:
         """
         # Process value
         if processValue is None:
+            if self.simulation is None:
+                raise ValueError("processValue is required when no simulation is configured")
             processValue = self.simulation.output
 
         # Logging mode switching
@@ -648,7 +665,7 @@ class PID:
         self.memManualMode = self.manualMode
 
         if currentTime is None:
-            actualTime = time.time()
+            actualTime = time.monotonic()
         else:
             actualTime = currentTime
 
@@ -656,6 +673,8 @@ class PID:
         if self._startTime is not None and self._lastTime is not None:
             # ===== Delta time =====
             deltaTime = actualTime - self._lastTime
+            if deltaTime <= 0:
+                return self.output
 
             # Process value stabilization
             if self.processValueStableLimit is not None:
@@ -789,60 +808,52 @@ class PID:
             # ===== Historian =====
             if self.historian is not None:
                 if HistorianParams.P in self.historianParams:
-                    self.historian["P"].append(self._p)
-
-                    if len(self.historian["P"]) > self.historianLenght:
-                        del self.historian["P"][0]
+                    series = self.historian["P"]
+                    series.append(self._p)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.I in self.historianParams:
-                    self.historian["I"].append(self._i)
-
-                    if len(self.historian["I"]) > self.historianLenght:
-                        del self.historian["I"][0]
+                    series = self.historian["I"]
+                    series.append(self._i)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.D in self.historianParams:
-                    self.historian["D"].append(self._d)
-
-                    if len(self.historian["D"]) > self.historianLenght:
-                        del self.historian["D"][0]
+                    series = self.historian["D"]
+                    series.append(self._d)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.OUTPUT in self.historianParams:
-                    self.historian["OUTPUT"].append(self.output)
-
-                    if len(self.historian["OUTPUT"]) > self.historianLenght:
-                        del self.historian["OUTPUT"][0]
+                    series = self.historian["OUTPUT"]
+                    series.append(self.output)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.SETPOINT in self.historianParams:
-                    self.historian["SETPOINT"].append(self._setpoint)
-
-                    if len(self.historian["SETPOINT"]) > self.historianLenght:
-                        del self.historian["SETPOINT"][0]
+                    series = self.historian["SETPOINT"]
+                    series.append(self._setpoint)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.PROCESS_VALUE in self.historianParams:
-                    self.historian["PROCESS_VALUE"].append(processValue)
-
-                    if len(self.historian["PROCESS_VALUE"]) > self.historianLenght:
-                        del self.historian["PROCESS_VALUE"][0]
+                    series = self.historian["PROCESS_VALUE"]
+                    series.append(processValue)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
                 if HistorianParams.ERROR in self.historianParams:
-                    self.historian["ERROR"].append(error)
+                    series = self.historian["ERROR"]
+                    series.append(error)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
-                    if len(self.historian["ERROR"]) > self.historianLenght:
-                        del self.historian["ERROR"][0]
-
-                if (
-                    (HistorianParams.P in self.historianParams)
-                    or (HistorianParams.I in self.historianParams)
-                    or (HistorianParams.D in self.historianParams)
-                    or (HistorianParams.ERROR in self.historianParams)
-                    or (HistorianParams.OUTPUT in self.historianParams)
-                    or (HistorianParams.PROCESS_VALUE in self.historianParams)
-                    or (HistorianParams.SETPOINT in self.historianParams)
-                ):
-                    self.historian["TIME"].append(actualTime - self._startTime)
-
-                    if len(self.historian["TIME"]) > self.historianLenght:
-                        del self.historian["TIME"][0]
+                if self.historianParams and "TIME" in self.historian:
+                    series = self.historian["TIME"]
+                    series.append(actualTime - self._startTime)
+                    if len(series) > self.historianLenght:
+                        del series[0]
 
             # ===== Saving data for next execution =====
             self._lastError = error
@@ -1050,7 +1061,25 @@ class ThreadedPID(PID, Thread):
         self.processValue = 0.0
         self.cycleTime = cycleTime
 
+        self._quit_event = Event()
         self.quit = False
+
+    @property
+    def quit(self):
+        return self._quit_event.is_set()
+
+    @quit.setter
+    def quit(self, value):
+        if value:
+            self._quit_event.set()
+        else:
+            self._quit_event.clear()
+
+    def stop(self, wait=True, timeout=None):
+        """Interrupt the cycle wait and optionally join the worker."""
+        self.quit = True
+        if wait and self.is_alive() and current_thread() is not self:
+            self.join(timeout)
 
     def start(self) -> None:
         """
@@ -1067,10 +1096,12 @@ class ThreadedPID(PID, Thread):
         Thread execution. Overrided from `threading.Thread`
         See `threading.Thread` documentation for more information
         """
-        while self.quit is False:
-            while time.time() < (self._lastTime + self.cycleTime):
-                time.sleep(self.cycleTime / 100.0)
-
+        while not self._quit_event.is_set():
+            remaining = self._lastTime + self.cycleTime - time.monotonic()
+            if remaining > 0 and self._quit_event.wait(remaining):
+                break
+            if self._quit_event.is_set():
+                break
             self.compute(self.setpoint, self.processValue if self.simulation is None else None)
 
 
@@ -1088,12 +1119,77 @@ class Simulation:
 
     def __call__(self, input: float, t: float = None) -> float:
         if t is None:
-            actualTime = time.time()
+            actualTime = time.monotonic()
         else:
             actualTime = t
 
         if self._lastTime is not None:
             deltaTime = actualTime - self._lastTime
+            if deltaTime <= 0:
+                return self.output
             self.output += (1.0 / self.tau) * ((self.K * input) - self.output) * deltaTime
 
         self._lastTime = actualTime
+        return self.output
+
+
+class PIDAxisTransition:
+    """Curved, bounded axis motion driven by PID position-error feedback.
+
+    Response time scales controller time. With the default proportional gain,
+    about 99% of the distance is covered in that many seconds; velocity tapers
+    continuously with the remaining error. This is not a constant-speed ramp.
+    The caller supplies elapsed seconds and schedules output updates.
+    """
+
+    def __init__(self, value=0.0, response_time=1.0, limits=(-1.0, 1.0), tolerance=1e-5):
+        if not math.isfinite(response_time) or response_time <= 0:
+            raise ValueError("response_time must be positive and finite")
+        lower, upper = limits
+        if not (math.isfinite(lower) and math.isfinite(upper) and lower < upper):
+            raise ValueError("axis limits must be finite and increasing")
+        if not math.isfinite(value) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise ValueError("axis value must be finite and tolerance must be positive")
+        self.response_time = response_time
+        self.limits = limits
+        self.tolerance = tolerance
+        self.value = max(lower, min(upper, value))
+        self.target = self.value
+        # P-only tuning of the PID gives a monotonic exponential response,
+        # without integral windup, derivative kicks, or overshoot.
+        self.controller = SimplePID(4.6, 0.0, 0.0, setpoint=self.target, sample_time=None)
+
+    @property
+    def settled(self):
+        return self.value == self.target
+
+    def set_target(self, target):
+        if not math.isfinite(target):
+            raise ValueError("target must be finite")
+        lower, upper = self.limits
+        self.target = max(lower, min(upper, target))
+        self.controller.setpoint = self.target
+        return self.target
+
+    def advance(self, elapsed):
+        if not math.isfinite(elapsed) or elapsed <= 0:
+            raise ValueError("elapsed must be positive and finite")
+        if self.settled:
+            return self.value
+        # Small normalized steps keep very fast response settings and delayed
+        # frames stable without making the response depend on frame cadence.
+        duration = elapsed / self.response_time
+        steps = min(1000, max(1, math.ceil(duration / 0.01)))
+        dt = duration / steps
+        for _ in range(steps):
+            error = self.target - self.value
+            if abs(error) <= self.tolerance:
+                self.value = self.target
+                break
+            correction = self.controller(self.value, dt=dt) * dt
+            if error > 0:
+                self.value = min(self.target, self.value + max(0.0, correction))
+            else:
+                self.value = max(self.target, self.value + min(0.0, correction))
+        return self.value
+

@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m77T82):
+- New: Map to VJoy action: stepped axis mode gains a PID mode. PID stands for Proportional-Integral-Derivative controller.  This mode uses an adaptive algorithm commonly found in cruise-control or setpoint applications: in this case, it allows a target value (setpoint) to be designated on an axis, and over time GEX will generate axis output values that drive toward that setpoint using a smooth curve.  The more the current axis value deviates from the target setpoint, the steeper the acceleration curve (the faster the rate of change). The target (setpoint) value is set by the increase/decrease inputs mapped to the action.  The curve is computed dynamically and will smooth out automatically as the output value nears the set point which prevents jerky movements.  The PID mode differs from the other modes in that it takes time and deviation from the new setpoint into consideration when setting the target value, resulting is a smooth output.  Example application: setting a target speed, or setting a trim value.  Default parameters can be changed to change how fast or slow PID algorithm responds.
+- New: Map to Vjoy action: ability to set the initial axis value on profile start when using the stepped mode.
+- Fix: API (State): ensure default value a state reports is off/released if the state value is not defined yet.
+- Fix: API (State): add aliases for older API calls to avoid exception with older references in the UI.
+- Fix: API (engine): Refactor execution engine data lookups and shortcut condition logic handling to improve runtime response.
+- Fix: UI (Curve Editor): default dialog size should now fit its contents without having to resize.
+- Fix: Input Viewer: clear button does not clear state visualizer. 
 
 ### (m77T81):
 - Fix: API: TriggerDict: fix for internal Python copy operation exception depending on  key/value data types and dundar updates for comparison calls.

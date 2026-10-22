@@ -1177,6 +1177,9 @@ States can be toggled by clicking on the state button.  Expression states will u
             _, visualization = key
             vc.setValue(key, device, visualization, False)
 
+        self.hideKeyboard()
+        self.hideState()
+
         self.vis_selector._clear_selection()
         self.saveKeyboardState(False)
         self.saveStateState(False)
@@ -1264,7 +1267,6 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._state_filter_widget = None
         self._state_visualizer_widget = None
-        # self._state_buttons.clear()
 
         self._delete_widget(self.keyboard_widget)
         self.keyboard_widget = None

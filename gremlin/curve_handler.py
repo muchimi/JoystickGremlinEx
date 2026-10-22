@@ -922,6 +922,45 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         self.parent.control_point.set_handle(self.index, new_point)
 
 
+class CurveGraphicsView(QtWidgets.QGraphicsView):
+    """Fit the logical curve scene into the viewport without distorting it."""
+
+    def __init__(self, scene, parent=None):
+        super().__init__(scene, parent)
+        self.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        # Keep scrollbars from changing the viewport while fitting it.
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setRenderHint(QtGui.QPainter.Antialiasing)
+        # Include the tracker/point radii and their outlines at the endpoints.
+        padding = 8.0
+        self.setSceneRect(QtCore.QRectF(
+            -g_scene_size - padding, -g_scene_size - padding,
+            2 * (g_scene_size + padding), 2 * (g_scene_size + padding),
+        ))
+
+    def sizeHint(self):
+        return QtCore.QSize(510, 510)
+
+    def minimumSizeHint(self):
+        return QtCore.QSize(0, 0)
+
+    def _fit_curve(self):
+        if self.viewport().width() > 0 and self.viewport().height() > 0:
+            # Scene items, including control handles and the live tracker, share
+            # this transform. Scene coordinates used for editing stay unchanged.
+            self.fitInView(self.sceneRect(), QtCore.Qt.KeepAspectRatio)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_curve()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_curve()
+
+
 class CurveView(QtWidgets.QGraphicsScene):
     """Visualization of the entire curve editor UI element."""
 
@@ -1751,7 +1790,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Create view displaying the curve scene
 
-        self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
         self.container_repeater_widget = QtWidgets.QWidget()
@@ -2021,7 +2059,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Recreate the UI components
         self.curve_scene = CurveView(self.curve_model, self.control_point_editor, self.curve_data.show_input_axis)
-        self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
         self._configure_response_curve_view()
 
         # update the deadzone widget
@@ -2188,15 +2225,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_model.set_handle_symmetry(state == QtCore.Qt.Checked.value)
 
     def _configure_response_curve_view(self):
-        """Initializes the response curve view components."""
-        self.curve_view = QtWidgets.QGraphicsView(self.curve_scene)
-        self.curve_view.setFixedSize(QtCore.QSize(510, 510))
-        self.curve_view.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.curve_view.setSceneRect(QtCore.QRectF(-g_scene_size, -g_scene_size, 2 * g_scene_size, 2 * g_scene_size))
+        """Create a view that scales the graph and its items to the layout bounds."""
         gremlin.ui.ui_common.clear_layout(self.container_curve_layout)
-        self.container_curve_layout.addStretch()
+        self.curve_view = CurveGraphicsView(self.curve_scene, self.container_curve_widget)
         self.container_curve_layout.addWidget(self.curve_view)
-        self.container_curve_layout.addStretch()
 
     def _invert_curve(self):
         self.curve_model.invert()
@@ -2549,8 +2581,33 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(self.scroll_area)
         self.scroll_layout.addWidget(self.widget)
 
-        self.minimumWidth = 400
-        self.minimumHeight = 400
+        self.setMinimumSize(400, 400)
+        self._resize_to_contents()
+
+    def _resize_to_contents(self):
+        """Fit the editor rather than QScrollArea's capped default size hint."""
+        self.ensurePolished()
+        self.widget.ensurePolished()
+        self.scroll_layout.activate()
+        self.main_layout.activate()
+        content_size = self.scroll_layout.sizeHint().expandedTo(self.scroll_widget.minimumSizeHint())
+        margins = self.main_layout.contentsMargins()
+        frame = self.scroll_area.frameWidth() * 2
+        preferred = content_size + QtCore.QSize(
+            margins.left() + margins.right() + frame,
+            margins.top() + margins.bottom() + frame,
+        )
+        preferred = preferred.expandedTo(self.minimumSize())
+        screen = self.screen()
+        if screen is not None:
+            available = screen.availableGeometry().size()
+            # Retain scrolling when the full editor will not fit on screen.
+            if preferred.height() > available.height():
+                preferred.setWidth(preferred.width() + self.scroll_area.verticalScrollBar().sizeHint().width())
+            if preferred.width() > available.width():
+                preferred.setHeight(preferred.height() + self.scroll_area.horizontalScrollBar().sizeHint().height())
+            preferred = preferred.boundedTo(available)
+        self.resize(preferred)
 
     def getCurveData(self):
         return self.widget.curve_data

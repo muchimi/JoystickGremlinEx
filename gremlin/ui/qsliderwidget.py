@@ -1,3 +1,20 @@
+# -*- coding: utf-8; -*-
+
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 # implements a custom multi-gate slider widget
 from __future__ import annotations  # deprecated with python 3.14+
 import logging
@@ -19,6 +36,7 @@ from PySide6.QtGui import (
 from shiboken6 import Shiboken
 
 from itertools import pairwise
+from bisect import bisect_left, bisect_right
 
 syslog = logging.getLogger("system")
 
@@ -128,9 +146,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._value_lock = False
 
-        # self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
-
-        # self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
 
         self._pixmaps = []  # list of pixmap data marker definition objects
 
@@ -185,16 +201,15 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.assert_ui_thread()
         if not self._is_active():
             return
-        self._desired_height = value
-        self.resize(self.minimumSizeHint())
+        # Compatibility hint only: Qt minimum/maximum/fixed sizes remain authoritative.
+        self._desired_height = max(1, int(value))
+        self.updateGeometry()
 
     def minimumSizeHint(self):
-        """
-        Minimum size of the widget in pixels
+        # Contents scale down to the actual size; do not impose hidden limits.
+        return QtCore.QSize(0, 0)
 
-        Returns:
-            Minimum widget size (Qsize)
-        """
+    def sizeHint(self):
         return QtCore.QSize(100, self._desired_height)
 
     @property
@@ -231,7 +246,8 @@ class QSliderWidget(QtWidgets.QWidget):
         if not self._is_active():
             return
         value = gremlin.util.clamp(value, 0, 50)
-        if self._tick_count != value:
+        if self._tick_count != value or self._tick_marks is not None:
+            self._tick_marks = None
             self._tick_count = value
             self.update()
 
@@ -243,11 +259,11 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.assert_ui_thread()
         if not self._is_active():
             return
-        if value:
-            self._tick_marks = value
-            self._tick_count = len(value)
-        else:
-            self._tick_count = 0
+        marks = list(value) if value is not None else []
+        if self._tick_marks == marks and self._tick_count == len(marks):
+            return
+        self._tick_marks = marks or None
+        self._tick_count = len(marks)
         self.update()
 
     def setDrawHandles(self, value: bool):
@@ -260,6 +276,7 @@ class QSliderWidget(QtWidgets.QWidget):
         if not self._is_active():
             return
         self._draw_handles = value
+        self._update_hotspots()
         self.update()
 
     def setHandleIcon(self, index, icon, use_qta=False, color="#a0a0a0"):
@@ -282,6 +299,7 @@ class QSliderWidget(QtWidgets.QWidget):
             # clear the entry
             if index in self._handle_icons:
                 del self._handle_icons[index]
+                self._internal_handle_pixmaps.pop(index, None)
                 self.update()
         else:
             hid = QSliderWidget.HandleIconData(index, icon, use_qta, color)
@@ -334,7 +352,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         value = gremlin.util.clamp(value, self._minimum, self._maximum)
         try:
-            values = self._values
+            values = self._values.copy()
             values[index] = value
             self._set_value_ui(values)
         except Exception:
@@ -347,10 +365,10 @@ class QSliderWidget(QtWidgets.QWidget):
         """input values expected to be -1 to +1 floating point"""
         if not self._is_active():
             return
+        if self._value_lock:
+            return
         try:
             gremlin.util.assert_ui_thread()
-            if self._value_lock:
-                return
             self._value_lock = True
             values = None
             if isinstance(value, float):
@@ -394,8 +412,9 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.assert_ui_thread()
         if not self._is_active():
             return
-        self._marker_visible = value
-        self.update()
+        if self._marker_visible != value:
+            self._marker_visible = value
+            self.update()
 
     @property
     def marker_size(self):
@@ -436,7 +455,7 @@ class QSliderWidget(QtWidgets.QWidget):
         size = self.size()
         widget_width = size.width()
         widget_height = size.height()
-        margin = 4  # pixel margin
+        margin = min(4, widget_width // 2, widget_height // 2)  # fit narrow/short widgets
         usable_width = widget_width - margin
         range_width = usable_width - margin
         usable_margin = int((widget_width - range_width) * 0.5)
@@ -449,9 +468,9 @@ class QSliderWidget(QtWidgets.QWidget):
         handle_count = len(self._values)
 
         # handle sizes
-        max_icon_size = widget_height - 2 * margin
+        max_icon_size = min(widget_height, widget_width) - 2 * margin
         handle_size = 24
-        handle_size = min(handle_size, max_icon_size)
+        handle_size = max(0, min(handle_size, max_icon_size))
         self._handle_radius = int(handle_size * 0.5)
         self._handle_size = self._handle_radius * 2
         self._handle_top = int((widget_height - self._handle_size) * 0.5)
@@ -465,18 +484,22 @@ class QSliderWidget(QtWidgets.QWidget):
         self._usable_width = range_width
         self._usable_margin = int(handle_size * 0.5) + usable_margin  # account for handle diameter
         self._usable_left = self._usable_margin
-        self._usable_right = widget_width - self._usable_margin
+        self._usable_right = max(self._usable_left, widget_width - self._usable_margin)
 
         # print (f"Range width: {self._usable_width} range left: {self._usable_left} range right: {self._usable_right}  range width: {self._usable_width}  widget width: {widget_width}  height {widget_height} handle diameter: {handle_size} radius: {self._handle_radius}")
 
         # handle_offsets = []
         for value in self._values:
-            x = gremlin.util.scale_to_range(
-                value,
-                source_min=self._minimum,
-                source_max=self._maximum,
-                target_min=self._usable_left,
-                target_max=self._usable_right,
+            x = (
+                self._usable_left
+                if self._minimum == self._maximum
+                else gremlin.util.scale_to_range(
+                    value,
+                    source_min=self._minimum,
+                    source_max=self._maximum,
+                    target_min=self._usable_left,
+                    target_max=self._usable_right,
+                )
             )
             gate_positions.append(x - self._handle_radius)
             # handle_offsets.append((value, x))
@@ -502,9 +525,38 @@ class QSliderWidget(QtWidgets.QWidget):
         self._handle_positions = gate_positions
         # print (f"Range left: {self._range_left}  right: {self._range_right}  width: {self._range_width} height: {self._range_height} top margin: {self._range_top}")
         self._update_marker_offsets_ui()
-        # self._update_all_handle_pixmaps()
+        self._update_hotspots()
+        if getattr(self, "_icon_geometry", None) != (self._handle_size, widget_height):
+            self._icon_geometry = (self._handle_size, widget_height)
+            self._update_pixmaps()
+            self._update_all_handle_pixmaps()
+
+    def _update_hotspots(self):
+        """Hit targets depend on geometry, not on paint frequency."""
+        self._handle_hotspots = []
+        self._range_hotspots = []
+        self._range_hotspots_map = {}
+        positions = self._handle_positions
+        if not positions:
+            return
+        pairs = [(0, len(positions) - 1)] if self._single_range else pairwise(range(len(positions)))
+        for a, b in pairs:
+            x1, x2 = positions[a], positions[b]
+            left = x1 + self._handle_radius
+            if self._single_range and not self._draw_handles:
+                left = x1 - self._handle_radius
+                x1 -= self._handle_radius
+                x2 += self._handle_radius
+            rect = QRect(int(left), int(self._range_top), int(x2 - x1), int(self._range_height))
+            self._range_hotspots.append(rect)
+            self._range_hotspots_map[rect] = (a, b)
+        if self._draw_handles:
+            self._handle_hotspots = [QRect(int(x), self._handle_top, self._handle_size, self._handle_size) for x in positions]
 
     def _update_marker_offsets_ui(self):
+        if not self._marker_pos:
+            self._int_marker_pos = []
+            return
         if self._marker_pos:
             # compute marker positions
             source_min = self._minimum
@@ -514,7 +566,8 @@ class QSliderWidget(QtWidgets.QWidget):
                 return
             target_min = self._usable_left  # self._to_qinteger_space(self._range_left)
             target_max = self._usable_right  # self._to_qinteger_space(self._range_right)
-            self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in self._marker_pos]
+            factor = (target_max - target_min) / (source_max - source_min)
+            self._int_marker_pos = [(v - source_min) * factor + target_min for v in self._marker_pos]
             # print (f"marker: {[v for v in self._int_marker_pos]}")
 
     def _update_targets(self):
@@ -530,23 +583,18 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.assert_ui_thread()
         if not self._is_active():
             return
-        # if self._lock:
-        #     return
-        # try:
-        #     self._lock = True
-        if isinstance(value, float) or isinstance(value, int):
-            value = gremlin.util.clamp(value, self._minimum, self._maximum)
-            list_value = [value]
+        if isinstance(value, (float, int)):
+            values = [value]
         else:
-            list_value = value
-        self._marker_pos = list_value
-
-        # update geometry + repaint
-        self._update_offsets_ui()
-        self.update()
-
-        # finally:
-        #     self._lock = False
+            values = list(value) if value is not None else []
+        clamp = gremlin.util.clamp
+        values = [clamp(v, self._minimum, self._maximum) for v in values if v is not None]
+        if values == self._marker_pos:
+            return
+        self._marker_pos = values
+        self._update_marker_offsets_ui()
+        if self._marker_visible:
+            self.update()
 
     def markerValue(self) -> float:
         """gets the marker value"""
@@ -569,6 +617,7 @@ class QSliderWidget(QtWidgets.QWidget):
             self._maximum, self._minimum = self._minimum, self._maximum
         self._update_targets()
         self._update_offsets_ui()
+        self.update()
 
     def maximum(self) -> float:  # type: ignore
         """gets the slider's maximum value"""
@@ -587,6 +636,7 @@ class QSliderWidget(QtWidgets.QWidget):
             self._maximum, self._minimum = self._minimum, self._maximum
         self._update_targets()
         self._update_offsets_ui()
+        self.update()
 
     def setRange(self, range_min: float, range_max: float):
         gremlin.util.InvokeUiMethod(self._set_range_ui, range_min, range_max)
@@ -608,6 +658,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._maximum = range_max
         self._update_targets()
         self._update_offsets_ui()
+        self.update()
 
     def range(self):
         """returns the range of the slider"""
@@ -662,14 +713,11 @@ class QSliderWidget(QtWidgets.QWidget):
         """
         return self.handleColor
 
-    def _draw_widget(self, painter: QPainter):
-        """
-        Draw the progress bar with Circular or Square style.
-
-        :param painter: QPainter object.
-        """
-        handle_count = self._handle_count
-
+    def _get_paint_resources(self):
+        colors = (self.handleBorderColor, self.rangeBorderColor, self.handleColor, self.rangeColor, self.rangeAlternateColor, self.getBackgroundColor())
+        key = tuple(color.rgba() for color in colors) + (self._handle_size, self._range_height, self.UseAlternateColor)
+        if getattr(self, "_paint_resource_key", None) == key:
+            return self._paint_resources
         handle_pen = QPen(QBrush(self.handleBorderColor), self._handle_size * 0.1)
         range_pen = QPen(QBrush(self.rangeBorderColor), self._range_height * 0.1)
         handle_pen_h = QPen(
@@ -698,6 +746,33 @@ class QSliderWidget(QtWidgets.QWidget):
         backgroundBrush = QBrush(self.getBackgroundColor())
         emptyPen = QPen(Qt.NoPen)
 
+        self._paint_resource_key = key
+        self._paint_resources = (
+            handle_pen,
+            range_pen,
+            handle_pen_h,
+            range_pen_h,
+            handle_fill,
+            handle_fill_h,
+            range_colors,
+            range_colors_h,
+            backgroundBrush,
+            emptyPen,
+        )
+        return self._paint_resources
+
+    def _draw_widget(self, painter: QPainter):
+        """
+        Draw the progress bar with Circular or Square style.
+
+        :param painter: QPainter object.
+        """
+        handle_count = self._handle_count
+
+        (handle_pen, range_pen, handle_pen_h, range_pen_h, handle_fill, handle_fill_h, range_colors, range_colors_h, backgroundBrush, emptyPen) = (
+            self._get_paint_resources()
+        )
+
         # slider background
         painter.setPen(emptyPen)
         painter.setBrush(backgroundBrush)
@@ -711,11 +786,6 @@ class QSliderWidget(QtWidgets.QWidget):
         )
 
         # slider range - from the leftmost handle to the rightmost handle
-
-        # reset computed hotspots
-        self._handle_hotspots = []
-        self._range_hotspots = []
-        self._range_hotspots_map = {}  # map of rect to range index pairs (a,b)
 
         # draw ranges of different colors
         color_index = 0
@@ -760,11 +830,6 @@ class QSliderWidget(QtWidgets.QWidget):
                 range_corner,
             )
 
-            range_rect = QRect(range_left, range_top, range_width, range_height)
-            # msg += f"range [{x1} {x2} {range_rect.left()} {range_rect.right()} {range_rect.top()} {range_rect.bottom()} ] "
-            self._range_hotspots.append(range_rect)
-            self._range_hotspots_map[range_rect] = (a, b)
-
         else:
             # individual ranges between handles
             color_index = 0
@@ -800,11 +865,6 @@ class QSliderWidget(QtWidgets.QWidget):
                     range_corner,
                 )
 
-                range_rect = QRect(range_left, range_top, range_width, range_height)
-                # msg += f"range [{x1} {x2} {range_rect.left()} {range_rect.right()} {range_rect.top()} {range_rect.bottom()} ] "
-                self._range_hotspots.append(range_rect)
-                self._range_hotspots_map[range_rect] = (a, b)
-
         self._range_msg = msg
 
         if self._draw_handles:
@@ -823,9 +883,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
                 x = self._handle_positions[index]
                 # clickable areas
-                handle_rect = QRect(x, self._handle_top, self._handle_size, self._handle_size)
-                # print (f"handle [{index}  {handle_rect}]")
-                self._handle_hotspots.append(handle_rect)
+                handle_rect = self._handle_hotspots[index]
                 painter.drawEllipse(handle_rect)
 
                 # handle icons
@@ -841,14 +899,30 @@ class QSliderWidget(QtWidgets.QWidget):
     def _draw_markers(self, painter: QPainter):
         """draws the markers on the widget"""
         positions = self._int_marker_pos
-        center = self.height() * 0.66
+        center = int(self.height() * 0.66)
 
         pixmaps = self._get_pixmaps()
         p_count = len(pixmaps)
         for index, value in enumerate(positions):
             if index < p_count:
                 pd = pixmaps[index]
-                painter.drawPixmap(value + pd.offset_x, center + pd.offset_y, pd.pixmap)
+                ratio = pd.pixmap.devicePixelRatio()
+                width = pd.pixmap.width() / ratio
+                height = pd.pixmap.height() / ratio
+                if width <= 0 or height <= 0 or self.height() <= center:
+                    continue
+                # Also fit caller-supplied marker pixmaps, preserving their aspect
+                # ratio and offsets without resampling them on every paint.
+                factor = min(
+                    1.0,
+                    (self.height() - center) / max(height, pd.offset_y + height),
+                    (2 * self._usable_margin) / max(width, 2 * abs(pd.offset_x), 2 * abs(pd.offset_x + width)),
+                )
+                painter.drawPixmap(
+                    QtCore.QRectF(value + pd.offset_x * factor, center + pd.offset_y * factor, width * factor, height * factor),
+                    pd.pixmap,
+                    QtCore.QRectF(pd.pixmap.rect()),
+                )
 
     def _draw_ticks(self, painter: QPainter):
         """draws the tick markers"""
@@ -859,18 +933,18 @@ class QSliderWidget(QtWidgets.QWidget):
 
         x1 = self._handle_min + self._handle_radius
         x2 = self._handle_max + self._handle_radius
-        center = self.height() * 0.66
+        center = int(self.height() * 0.66)
         width = x2 - x1
 
         if count > 0:
             y1 = center
-            y2 = 10  # int((self.height() - center) * 0.8)
+            y2 = int(self.height() * (10 / 32))
 
             if self._tick_marks:
                 # variable spaced
                 for value in self._tick_marks:
-                    if value >= -1 and value <= 1:
-                        x = gremlin.util.scale_to_range(value, target_min=x1, target_max=x2)
+                    if self._minimum <= value <= self._maximum:
+                        x = gremlin.util.scale_to_range(value, self._minimum, self._maximum, x1, x2)
                         p1 = QPoint(x, y1)
                         p2 = QPoint(x, y2)
                         painter.drawLine(p1, p2)
@@ -884,7 +958,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
                 interval = width / (count - 1)
                 x = x1
-                for _ in range(self._tick_count + 1):
+                for _ in range(self._tick_count):
                     p1 = QPoint(x, y1)
                     p2 = QPoint(x, y2)
                     painter.drawLine(p1, p2)
@@ -901,13 +975,14 @@ class QSliderWidget(QtWidgets.QWidget):
             return
         super().resizeEvent(event)
         self._update_offsets_ui()
-        self.adjustSize()
         self.update()
 
     def _mouse_position_to_value(self, x):
         """converts a mouse position to a slider value"""
         if x >= self._usable_left and x <= self._usable_right:
             # x is in the "value" zone
+            if self._usable_left == self._usable_right:
+                return self._minimum
             value = gremlin.util.scale_to_range(x, self._usable_left, self._usable_right, self._minimum, self._maximum)
             # print (f"click value: {x} -> {value}")
             return value
@@ -916,10 +991,8 @@ class QSliderWidget(QtWidgets.QWidget):
         return None
 
     def _get_min_max_handles(self):
-        """gets the index of the lowest and highest handle by value"""
-        values = [(value, index) for index, value in enumerate(self._values)]
-        values.sort(key=lambda x: x[0])
-        return (values[0][1], values[-1][1])
+        """Values are stored in ascending order."""
+        return (0, len(self._values) - 1)
 
     def _hover_enter_range(self, a, b):
         """enters a range"""
@@ -992,9 +1065,9 @@ class QSliderWidget(QtWidgets.QWidget):
             for index, rect in enumerate(self._handle_hotspots):
                 if rect.contains(point):
                     if self._hover_handle_index != index:
-                        hover_changed = hover_changed or self._hover_exit_handle()
-                        hover_changed = hover_changed or self._hover_exit_range()
-                        hover_changed = hover_changed or self._hover_enter_handle(index)
+                        hover_changed = self._hover_exit_handle() or hover_changed
+                        hover_changed = self._hover_exit_range() or hover_changed
+                        hover_changed = self._hover_enter_handle(index) or hover_changed
                         # tooltip
                         if index in self._tooltip_handle_map:
                             self._show_tooltip(self._tooltip_handle_map[index])
@@ -1010,9 +1083,9 @@ class QSliderWidget(QtWidgets.QWidget):
                     if rect.contains(point):
                         a, b = self._range_hotspots_map[rect]
                         if self._hover_range_handle_pair is None or self._hover_range_handle_pair != (a, b):
-                            hover_changed = hover_changed or self._hover_exit_handle()
-                            hover_changed = hover_changed or self._hover_exit_range()
-                            hover_changed = hover_changed or self._hover_enter_range(a, b)
+                            hover_changed = self._hover_exit_handle() or hover_changed
+                            hover_changed = self._hover_exit_range() or hover_changed
+                            hover_changed = self._hover_enter_range(a, b) or hover_changed
                             key = (a, b)
                             if key in self._tooltip_range_map:
                                 self._show_tooltip(self._tooltip_range_map[key])
@@ -1020,8 +1093,8 @@ class QSliderWidget(QtWidgets.QWidget):
                         break
 
             if not is_hover:
-                hover_changed = hover_changed or self._hover_exit_handle()
-                hover_changed = hover_changed or self._hover_exit_range()
+                hover_changed = self._hover_exit_handle() or hover_changed
+                hover_changed = self._hover_exit_range() or hover_changed
                 self._tooltip_message = None
                 if self._tooltip_timer is not None:
                     self._tooltip_timer.stop()
@@ -1103,9 +1176,11 @@ class QSliderWidget(QtWidgets.QWidget):
                 self._drag_last_point = point
                 self._drag_x = point.x()
                 self._hover_lock = True  # lock the current hover mode
+                self._drag_emit = False
+                break
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        if not self._is_active():
+        if not self._is_active() or self._readOnly:
             return
         point: QPoint = event.pos()
 
@@ -1132,10 +1207,7 @@ class QSliderWidget(QtWidgets.QWidget):
                         self.handleDragStart.emit(self._drag_handle_index)  # fire the drag start event
                         self._drag_emit = True
 
-                    current_x = self._handle_positions[self._drag_handle_index]
-
-                    x_offset = x - self._drag_x
-                    current_x += x_offset
+                    current_x = x + self._drag_x_offset
 
                     # drag bounds check
                     if current_x < self._handle_min:
@@ -1149,24 +1221,15 @@ class QSliderWidget(QtWidgets.QWidget):
                     old_value = self._values[self._drag_handle_index]
                     # print (f"Current x: {old_x} -> {current_x}  offset: {x_offset}  old value: {old_value}  new value: {value}")
                     if old_value != value:
-                        self._values[self._drag_handle_index] = value
-                        values = [(value, index) for index, value in enumerate(self._values)]
-                        pair = values[self._drag_handle_index]
-                        values.sort(key=lambda x: x[0])
-                        self._values.sort()
-                        new_index = values.index(pair)
-
-                        # print (f"new index: {new_index}")
+                        self._values.pop(self._drag_handle_index)
+                        if value > old_value:
+                            new_index = bisect_left(self._values, value)
+                        else:
+                            new_index = bisect_right(self._values, value)
+                        self._values.insert(new_index, value)
                         self._drag_handle_index = new_index
-
-                        self._handle_positions[self._drag_handle_index] = current_x
-                        index_min, index_max = self._get_min_max_handles()
-
-                        self._range_left = self._handle_positions[index_min] + self._handle_radius
-                        self._range_right = self._handle_positions[index_max] + self._handle_radius
-                        self._range_width = self._range_right - self._range_left
                         self._drag_x = x
-                        # print (f"drag offset: {x_offset}  new position: {current_x}  new value: {value}  min index: {index_min}  max index: {index_max}")
+                        self._update_offsets_ui()
 
                         # fire the gate value change
                         self.valueChanged.emit(self._drag_handle_index, value)
@@ -1191,6 +1254,7 @@ class QSliderWidget(QtWidgets.QWidget):
             # print ("readonly - skip mouse release")
             return
 
+        self._mouse_down = False
         if self._double_clicked:
             self._double_clicked = False
             # ignore mouse releases on double click
@@ -1284,13 +1348,30 @@ class QSliderWidget(QtWidgets.QWidget):
             return self._pixmaps
         return self._internal_pixmaps
 
+    @staticmethod
+    def _fit_icon_pixmap(pixmap, width, height):
+        """Fit in logical pixels without stretching or losing high-DPI resolution."""
+        ratio = pixmap.devicePixelRatio()
+        return pixmap.scaled(
+            max(1, int(width * ratio)),
+            max(1, int(height * ratio)),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation,
+        )
+
     def _update_pixmaps(self):
         icon = gremlin.util.load_icon("ei.chevron-up")
-        pixmap = icon.pixmap(self.marker_size)
-        center = self.height() / 2
-        if pixmap.height() > center:
-            pixmap = pixmap.scaledToHeight(center)
-        pd = QSliderWidget.PixmapData(pixmap=pixmap, offset_x=-pixmap.width() / 2, offset_y=0)
+        pixmap = icon.pixmap(max(1, int(self.marker_size)))
+        # Markers start below the groove. Fit the remaining space, including
+        # the horizontal margin at either end of the slider.
+        top = int(self.height() * 0.66)
+        width = max(1, min(self.marker_size, self._handle_size + 8)) if hasattr(self, "_handle_size") else self.marker_size
+        pixmap = self._fit_icon_pixmap(pixmap, width, max(1, self.height() - top))
+        pd = QSliderWidget.PixmapData(
+            pixmap=pixmap,
+            offset_x=-pixmap.width() / pixmap.devicePixelRatio() / 2,
+            offset_y=0,
+        )
         self._internal_pixmaps = [pd]
 
     def _update_handle_pixmaps(self, hid: QSliderWidget.HandleIconData):  # noqa: F821
@@ -1299,18 +1380,29 @@ class QSliderWidget(QtWidgets.QWidget):
         two versions of the icon are loaded, a regular and highlighted version
 
         """
-        icon_size = int(self._handle_size * 0.75)
-        margin = (self._handle_size - icon_size) // 2
+        if self._handle_size <= 0:
+            self._internal_handle_pixmaps.pop(hid.index, None)
+            return
+        icon_size = max(1, int(self._handle_size * 0.75))
         # hex_color = "#323232" # default QTA is rgb 50,50,50
         hex_color = hid.color
         color = QColor(hex_color)
         color_h = gremlin.util.highlight_qcolor(color, factor=1.4)
         icon = gremlin.util.load_icon(hid.icon, qta_color=color)
         icon_h = gremlin.util.load_icon(hid.icon, qta_color=color_h)
-        pixmap = icon.pixmap(icon_size)
-        pixmap_h = icon_h.pixmap(icon_size)
-        pd = QSliderWidget.PixmapData(pixmap=pixmap, offset_x=-pixmap.width() / 2, offset_y=margin)
-        pd_h = QSliderWidget.PixmapData(pixmap=pixmap_h, offset_x=-pixmap.width() / 2, offset_y=margin)
+        pixmap = self._fit_icon_pixmap(icon.pixmap(icon_size), icon_size, icon_size)
+        pixmap_h = self._fit_icon_pixmap(icon_h.pixmap(icon_size), icon_size, icon_size)
+
+        def centered_data(image):
+            ratio = image.devicePixelRatio()
+            return QSliderWidget.PixmapData(
+                pixmap=image,
+                offset_x=-image.width() / ratio / 2,
+                offset_y=(self._handle_size - image.height() / ratio) / 2,
+            )
+
+        pd = centered_data(pixmap)
+        pd_h = centered_data(pixmap_h)
         self._internal_handle_pixmaps[hid.index] = (pd, pd_h)
 
     def _update_all_handle_pixmaps(self):
