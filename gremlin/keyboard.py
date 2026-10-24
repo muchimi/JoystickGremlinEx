@@ -274,7 +274,7 @@ class Key:
     def sequence(self):
         """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
         # include the primary key itself in the sequence
-        sequence = [self] + self._latched_keys
+        sequence = [self.key_tuple] + [key.key_tuple for key in self._latched_keys]
         return sequence
 
     @property
