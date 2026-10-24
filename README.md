@@ -52,7 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T83):
 
 - New: UI (experimental): custom color theme (this may not presently entirely work as intended as more testing is needed).  This is available under theme options in the UI configuration options and brings up a custom dialog.  Presently a number of color usage descriptions may not make a lot of sense at this point, nor indicate where they are used.  The custom theme can be saved.  A GEX restart is required after making changes.
-- New: DOC: New user guides for [Map to Vjoy](https://muchimi.github.io/JoystickGremlinEx/actions/map_to_vjoy_user_guide/)
+- New: DOC: New user guide for [Map to Vjoy](https://muchimi.github.io/JoystickGremlinEx/actions/map_to_vjoy_user_guide/)
 - New: DOC: New user guide for [Gated Axis Action](https://muchimi.github.io/JoystickGremlinEx/actions/gated_axis_user_guide/)
 - New: DOC: New user guide for [Map to Keyboard/Mouse EX Action](https://muchimi.github.io/JoystickGremlinEx/actions/keyboard_ex_user_guide/) 
 - Change: DOC: started updating the documentation for m77.
