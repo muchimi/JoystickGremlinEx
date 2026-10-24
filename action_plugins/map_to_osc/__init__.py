@@ -556,7 +556,7 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
         self._value_container_layout.addWidget(self._v2_widget)
         self._value_container_layout.addStretch()
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         self._warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill", use_qta=True, icon_color=QtGui.QColor(warning_color), text="", use_wrap=False
         )

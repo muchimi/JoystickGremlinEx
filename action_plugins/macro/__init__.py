@@ -195,7 +195,6 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.index = index
         self.config = gremlin.config.Configuration()
 
-
         self.action_types = {
             "Joystick": MacroActionEditor.ActionTypeData("Joystick", self._joystick_ui, gremlin.macro.JoystickAction),
             "Keyboard": MacroActionEditor.ActionTypeData("Keyboard", self._keyboard_ui, gremlin.macro.KeyAction),
@@ -545,9 +544,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             if "vjoy_selector" not in self.ui_elements:
                 # vJoy input selection
                 self.ui_elements["vjoy_selector"] = gremlin.ui.ui_common.VJoySelector(
-                    change_cb = self._modify_vjoy,
-                    valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
-                    show_connected_only = True
+                    change_cb=self._modify_vjoy, valid_types=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], show_connected_only=True
                 )
 
             self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
@@ -752,9 +749,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         page_widget = gremlin.ui.ui_common.QDataComboBox()
         page_widget.setMinimumWidth(220)
-        page_widget.setToolTip(
-            "GEX virtual page (Companion-style bank). Unlimited — not limited by Elgato's profile pages."
-        )
+        page_widget.setToolTip("GEX virtual page (Companion-style bank). Unlimited — not limited by Elgato's profile pages.")
 
         auto_return_widget = QtWidgets.QCheckBox("Auto-return to previous page")
         auto_return_widget.setChecked(bool(action.auto_return))
@@ -784,7 +779,6 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.ui_elements["sd_auto_return_row"] = auto_return_row
 
         self.config = gremlin.config.Configuration()
-
 
         def _connected_devices():
             if self.config.streamdeck_enabled:
@@ -967,9 +961,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 widget_only=True,
             )
         )
-        self.action_layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(function_widget, "Function:", widget_only=True)
-        )
+        self.action_layout.addWidget(gremlin.ui.ui_common.getHContainer(function_widget, "Function:", widget_only=True))
         self.action_layout.addWidget(page_row)
         self.action_layout.addWidget(auto_return_row)
 
@@ -1610,8 +1602,8 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
             # Toolbar
             self.toolbar = QtWidgets.QToolBar()
 
-            background_color = gremlin.ui.ui_common.Color.backgroundColor()
-            border_color = gremlin.ui.ui_common.Color.borderColor()
+            background_color = gremlin.ui.ui_common.Color().backgroundColor()
+            border_color = gremlin.ui.ui_common.Color().borderColor()
             self.toolbar.setStyleSheet(
                 f"QToolBar {{border: 1px solid {border_color}; background-color: {background_color};}} ::separator {{background-color: {border_color};}}"
             )
@@ -1994,7 +1986,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose:
             syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} trigger: [{trigger}] event: [{str(event)}")
 
-        if not trigger: # event.is_pressed:
+        if not trigger:  # event.is_pressed:
             if self.action_data.auto_stop and self.macro.state == gremlin.macro.MacroState.Running:
                 if verbose:
                     syslog.info(f"\t{gremlin.util.ansiText('auto_stop triggered, terminating macro', 'magenta', True)}")
@@ -2035,8 +2027,6 @@ To send complex sequences, please look at the sequence container."""
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
-
-
 
     functor = MacroFunctor
     widget = MacroWidget
@@ -2233,9 +2223,7 @@ To send complex sequences, please look at the sequence container."""
                     sd_action.page = 0
                 sd_action.auto_return = safe_read(child, "auto-return", bool, False)
                 try:
-                    seconds = float(
-                        safe_read(child, "auto-return-seconds", float, DEFAULT_AUTO_RETURN_SECONDS)
-                    )
+                    seconds = float(safe_read(child, "auto-return-seconds", float, DEFAULT_AUTO_RETURN_SECONDS))
                 except (TypeError, ValueError):
                     seconds = DEFAULT_AUTO_RETURN_SECONDS
                 sd_action.auto_return_seconds = max(0.1, seconds)

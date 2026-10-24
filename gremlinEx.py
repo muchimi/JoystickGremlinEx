@@ -280,11 +280,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.activeColor(),
+            qta_color=gremlin.ui.ui_common.Color().activeColor(),
         )
         self._icon_off = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.inactiveColor(),
+            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
         )
         self._button_highlighting_enabled = self.config.highlight_input_buttons  # true if highlighting on buttons
         self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
@@ -2189,8 +2189,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.status_bar_remote_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
             on_icon=remote_icon,
             off_icon=remote_icon,
-            off_color=gremlin.ui.ui_common.Color.orangeOffColor(),
-            on_color=gremlin.ui.ui_common.Color.orangeColor(),
+            off_color=gremlin.ui.ui_common.Color().orangeOffColor(),
+            on_color=gremlin.ui.ui_common.Color().orangeColor(),
             icon_size=20,
             tooltip="Profile remote state",
         )
@@ -2283,21 +2283,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color.recordColor(),
+            qta_color=gremlin.ui.ui_common.Color().recordColor(),
         )
         self._icon_red = icon
         self._status_red = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color.activeColor(),
+            qta_color=gremlin.ui.ui_common.Color().activeColor(),
         )
         self._icon_green = icon
         self._status_green = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color.inactiveColor(),
+            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
         )
         self._icon_gray = icon
         self._status_gray = icon.pixmap(icon_size)
@@ -2828,7 +2828,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # device.update()  # update connection state
             if not device.connected:
                 # indicate device is disconnected
-                color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
+                color = gremlin.ui.ui_common.Color().tabMissingForegroundColor()
                 icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
                 self.ui.devices_tab_header_widget.setTabIcon(position, icon)
                 self.ui.devices_tab_header_widget.setTabTextColor(position, color)
@@ -2839,15 +2839,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 has_active_map = edit_mode in mode_map and mode_map[edit_mode]
                 has_map = False
                 if has_active_map:
-                    color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
+                    color = gremlin.ui.ui_common.Color().tabUsedForegroundColor()
                     icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
                 else:
                     has_map = sum(mode_map.values()) > 0
                     if has_map:
-                        color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()
+                        color = gremlin.ui.ui_common.Color().tabUsedOtherForegroundColor()
                         icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
                     else:
-                        color = gremlin.ui.ui_common.Color.tabForegroundColor()
+                        color = gremlin.ui.ui_common.Color().tabForegroundColor()
                         icon = QtGui.QIcon()
 
                 # self.ui.devices_tab_header_widget.setTabTextColor(position, color)
@@ -4088,12 +4088,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         """
 
-        device_guid, input_type, input_id = gremlin.shared_state.current_profile.getLastInput(device_guid)
+        # device_guid, input_type, input_id = gremlin.shared_state.current_profile.getLastInput(device_guid)
 
-        # _, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
+        _, input_type, input_id = self.config.get_last_input(device_guid=device_guid)
         if not input_type:
             # pick the first input for that tab
-            _widget = self._get_tab_widget_guid(device_guid)
+            _widget = self._get_tab_widget_guid(device_guid)  # creates the tab if needed
             input_item: InputItem = self._get_input_item(device_guid, 0)
             if input_item:
                 return (input_item.input_type, input_item.input_id)
@@ -4952,8 +4952,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not os.path.isdir(gfx_folder):
                 raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
 
-        normal_color = gremlin.ui.ui_common.Color.normalColor()
-        active_color = gremlin.ui.ui_common.Color.activeColor()
+        normal_color = gremlin.ui.ui_common.Color().normalColor()
+        active_color = gremlin.ui.ui_common.Color().activeColor()
         is_dark = gremlin.shared_state.is_dark_theme
 
         profile_icon = "dark_profile_open.svg" if is_dark else "profile_open.svg"
@@ -5382,9 +5382,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         Color = gremlin.ui.ui_common.Color
         try:
             if self._is_active:
-                text_active = f'<font color="{Color.activeColor()}">Active</font>'
+                text_active = f'<font color="{Color().activeColor()}">Active</font>'
             else:
-                text_active = f'<font color="{Color.inactiveColor()}">Paused</font>'
+                text_active = f'<font color="{Color().inactiveColor()}">Paused</font>'
 
             if gremlin.shared_state.is_running:
                 text_running = f"Running and {text_active}"
@@ -5414,13 +5414,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.status_bar_remote_widget.setToolTip(f"Profile remote mode is currently {'active.' if remote_state else 'inactive.'}")
 
             # if event.is_local:
-            #     local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
+            #     local_msg = f"<font color=\"{Color().activeColor()}\">Active</font>"
             # else:
-            #     local_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
+            #     local_msg = f"<font color=\"{Color().inactiveColor()}\">Disabled</font>"
             # if event.is_remote:
-            #     remote_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
+            #     remote_msg = f"<font color=\"{Color().activeColor()}\">Active</font>"
             # else:
-            #     remote_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
+            #     remote_msg = f"<font color=\"{Color().inactiveColor()}\">Disabled</font>"
             # self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
 
             self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running}")
@@ -6603,10 +6603,6 @@ if __name__ == "__main__":
 
     theme = config.theme
     match theme:
-        case "auto":
-            gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
-            app = QtWidgets.QApplication(sys.argv)
-
         case "light":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
             gremlin.shared_state.is_dark_theme = False
@@ -6618,19 +6614,32 @@ if __name__ == "__main__":
             gremlin.shared_state.is_dark_theme = True
             app = QtWidgets.QApplication(sys.argv)
 
+        case "custom":
+            gremlin.shared_state.custom_theme = True
+            gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+            app = QtWidgets.QApplication(sys.argv)
+
+        case _:  # "auto":
+            gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+            app = QtWidgets.QApplication(sys.argv)
+
     # application style and css
     # app.setStyle("Fusion")
 
     app.setQuitOnLastWindowClosed(False)  # don't quit when the main window is hidden (minimize to tray)
 
     app.setStyle(gremlin.ui.ui_common.GexAppStyle())
-    app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
+    app.setStyleSheet(gremlin.ui.ui_common.Color().cssApplication())
     icon = gremlin.util.load_icon("gex.ico")
     if icon:
         app.setWindowIcon(icon)
 
     # config file watcher setup (must be after app is instantiated)
     config.start()
+
+    # color
+    color = gremlin.ui.ui_common.Color()
+    color.setTheme(theme)
 
     # set faster context switch for Python
     sys.setswitchinterval(0.001)

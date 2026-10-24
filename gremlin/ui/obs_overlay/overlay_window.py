@@ -21,7 +21,15 @@ from shiboken6 import Shiboken
 import gremlin.shared_state
 
 from .bindings import OverlayValueBus, widget_accepts_touch, widget_conditions_match, widget_is_live_visible
-from .model import DEFAULT_GUIDE_COLOR, OVERLAY_WINDOW_TITLE, OverlayScene, is_interactive_overlay, is_onscreen_mode, normalize_background_mode, overlay_window_title
+from .model import (
+    DEFAULT_GUIDE_COLOR,
+    OVERLAY_WINDOW_TITLE,
+    OverlayScene,
+    is_interactive_overlay,
+    is_onscreen_mode,
+    normalize_background_mode,
+    overlay_window_title,
+)
 from .qt_guard import alive
 from .touch import OverlayTouchHandler
 from .widgets import (
@@ -158,6 +166,7 @@ def _reposition_target_hit(scene: OverlayScene, x: float, y: float, page_id: str
         return False
     hit = scene.hit_test(x, y, page_id)
     return bool(hit and hit.get("id") in ids)
+
 
 def _handle_nchittest(widget: QtWidgets.QWidget, eventType, message):
     if sys.platform != "win32":
@@ -1031,11 +1040,7 @@ class OverlayView(QtWidgets.QWidget):
                     value = None
                 else:
                     value = self.bus.value_for(item)
-                crop_ghost = (
-                    len(self.scene.selected_ids) == 1
-                    and item.get("id") in self.scene.selected_ids
-                    and crop_is_active(item)
-                )
+                crop_ghost = len(self.scene.selected_ids) == 1 and item.get("id") in self.scene.selected_ids and crop_is_active(item)
                 if self.interactive and not conditions_ok:
                     painter.save()
                     try:
@@ -1403,11 +1408,7 @@ class OverlayView(QtWidgets.QWidget):
 
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         # Live overlay mouse-reposition: handled on the view (fills the window client).
-        if (
-            not self.interactive
-            and self.scene.mouse_reposition_enabled
-            and event.button() == QtCore.Qt.LeftButton
-        ):
+        if not self.interactive and self.scene.mouse_reposition_enabled and event.button() == QtCore.Qt.LeftButton:
             scene = self.map_to_scene(event.position())
             hit = self.scene.hit_test(scene.x(), scene.y(), self.page_id)
             if hit is not None:
@@ -1621,12 +1622,17 @@ class OverlayWindow(QtWidgets.QWidget):
         return super().nativeEvent(eventType, message)
 
     def event(self, event: QtCore.QEvent) -> bool:
-        if event.type() in (
-            QtCore.QEvent.Type.TouchBegin,
-            QtCore.QEvent.Type.TouchUpdate,
-            QtCore.QEvent.Type.TouchEnd,
-            QtCore.QEvent.Type.TouchCancel,
-        ) and is_interactive_overlay(self.page_canvas) and not self.scene.mouse_reposition_enabled:
+        if (
+            event.type()
+            in (
+                QtCore.QEvent.Type.TouchBegin,
+                QtCore.QEvent.Type.TouchUpdate,
+                QtCore.QEvent.Type.TouchEnd,
+                QtCore.QEvent.Type.TouchCancel,
+            )
+            and is_interactive_overlay(self.page_canvas)
+            and not self.scene.mouse_reposition_enabled
+        ):
             if self._forward_window_touch(event):
                 event.accept()
                 return True
@@ -1662,11 +1668,7 @@ class OverlayWindow(QtWidgets.QWidget):
             self.view.attach_bus()
         if not self._applying_flags:
             reposition = self.scene.mouse_reposition_enabled
-            click_through = (
-                is_onscreen_mode(self.page_canvas)
-                and not is_interactive_overlay(self.page_canvas)
-                and not reposition
-            )
+            click_through = is_onscreen_mode(self.page_canvas) and not is_interactive_overlay(self.page_canvas) and not reposition
             self._apply_click_through(click_through)
         if live_window_is_layered(self.page_canvas):
             _extend_frame_into_client(self)
@@ -1885,12 +1887,7 @@ class OverlayWindow(QtWidgets.QWidget):
             # Unconditional detach on every apply was yanking focus from the game.
             flags_preview = None
             if onscreen:
-                flags = (
-                    QtCore.Qt.Window
-                    | QtCore.Qt.FramelessWindowHint
-                    | QtCore.Qt.WindowStaysOnTopHint
-                    | QtCore.Qt.Tool
-                )
+                flags = QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool
                 if attach:
                     flags = QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint
                     if not interactive or reposition:
@@ -1961,7 +1958,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.drag_bar.setVisible(show_bar)
                 chroma = chroma_fill_color(self.page_canvas)
                 bar = chroma if chroma.alpha() > 80 else QtGui.QColor("#8a93a3")
-                fg = gremlin.ui.ui_common.Color.normalColor()
+                fg = gremlin.ui.ui_common.Color().normalColor()
                 self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:{fg};")
                 if Shiboken.isValid(self.view):
                     self.view._sync_paint_mode()
@@ -2100,11 +2097,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 separate_host_input(host)
         if live_window_is_layered(canvas):
             _extend_frame_into_client(self)
-        self._apply_click_through(
-            is_onscreen_mode(canvas)
-            and not is_interactive_overlay(canvas)
-            and not self.scene.mouse_reposition_enabled
-        )
+        self._apply_click_through(is_onscreen_mode(canvas) and not is_interactive_overlay(canvas) and not self.scene.mouse_reposition_enabled)
         view = getattr(self, "view", None)
         if view is not None and Shiboken.isValid(view):
             view._sync_browsers()

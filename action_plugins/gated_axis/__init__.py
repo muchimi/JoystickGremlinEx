@@ -103,7 +103,6 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.id = gremlin.util.get_guid()  # unique ID for this widget
 
-
         self._stack = []  # save stack for saved state
         self.setObjectName(f"{object_name} [{self.id}]" if object_name else f"GateAxisWidget: [{self.id}]")
         config = gremlin.config.Configuration()
@@ -147,9 +146,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(missing)
             return
 
-        self._grab_icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color.recordColor())
-        self._setup_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.inactiveColor())
-        self._setup_container_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.activeContentColor())
+        self._grab_icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor())
+        self._setup_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor())
+        self._setup_container_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().activeContentColor())
 
         # get the curent axis normalized value -1 to +1
         if action_data.input_is_hardware():
@@ -164,11 +163,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.slider_frame_widget = QtWidgets.QFrame()
         self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
-        background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
+        background_color = gremlin.ui.ui_common.Color().sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f".QFrame{{background-color: {background_color}; border-radius: 10px;}}")
         self._slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(parent=self.slider_frame_widget, object_name=f"Slider for {self.objectName()} [{self.id}]")
-
-
 
         # self._slider.setOrientation(QtCore.Qt.Horizontal)
         self._slider_widget.setRange(-1, 1)
@@ -202,8 +199,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_slider_widget.setContentsMargins(0, 0, 0, 0)
 
         # configure trigger button
-        self._configure_trigger_widget = gremlin.ui.ui_common.QDataPushButton("Configure",
-                                                                              callback=self._trigger_cb)
+        self._configure_trigger_widget = gremlin.ui.ui_common.QDataPushButton("Configure", callback=self._trigger_cb)
         self._configure_trigger_widget.setIcon(self._setup_icon)
         self._show_configuration = show_configuration
         # self._configure_trigger_widget.setVisible(show_configuration)
@@ -494,7 +490,6 @@ making changes that impact the order of gates or ranges."""
         self.unhook()
         self._gate_data.unhook()
         gremlin.util.clear_layout(self.main_layout)
-
 
     def _pushState(self):
         """saves the current gate data to the stack"""
@@ -1076,7 +1071,7 @@ making changes that impact the order of gates or ranges."""
         rng = self._gate_data.findRangeByValue(value)
         msg = f"<b>Range {rng.to_display()}</b>"
         line = gremlin.ui.ui_common.QHLine()
-        color = gremlin.ui.ui_common.Color.menuSeparatorColor()
+        color = gremlin.ui.ui_common.Color().menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
         widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
 
@@ -1107,7 +1102,7 @@ making changes that impact the order of gates or ranges."""
         gate = self._gate_data.getGateSliderIndex(handle_index)
         msg = f"<b>Gate [{handle_index + 1}]</b> {gate.value:0.{_decimals}f}"
         line = gremlin.ui.ui_common.QHLine()
-        color = gremlin.ui.ui_common.Color.menuSeparatorColor()
+        color = gremlin.ui.ui_common.Color().menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
         widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
 
@@ -1232,10 +1227,8 @@ making changes that impact the order of gates or ranges."""
 
         row += 1
         col = 0
-        select_all_widget = gremlin.ui.ui_common.QDataPushButton("All",
-                                                                 callback=self._select_all_filters_cb)
-        clear_all_widget = gremlin.ui.ui_common.QDataPushButton("None",
-                                                                callback=self._clear_all_filters_cb)
+        select_all_widget = gremlin.ui.ui_common.QDataPushButton("All", callback=self._select_all_filters_cb)
+        clear_all_widget = gremlin.ui.ui_common.QDataPushButton("None", callback=self._clear_all_filters_cb)
         self.container_filter_layout.addWidget(select_all_widget, row, col)
         col += 1
         self.container_filter_layout.addWidget(clear_all_widget, row, col)
@@ -1521,9 +1514,9 @@ making changes that impact the order of gates or ranges."""
             if gate is None:
                 self._slider_widget.setHandleIcon(index, None)
             elif gate.hasAnyContainers():
-                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color.activeContentColor())
+                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color().activeContentColor())
             else:
-                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color.inactiveColor())
+                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color().inactiveColor())
 
         # find the widgets for the gate
         if gate in self._gwi_map:
@@ -1627,7 +1620,6 @@ class GatedAxisWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-
 
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)

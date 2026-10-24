@@ -75,7 +75,7 @@ def normalize_gradient(raw, seed_color: str | None = None) -> dict[str, Any]:
                 continue
             color = str(entry.get("color") or "#ffffffff")
             col = qcolor(color, "#ffffffff")
-            stops.append({"pos": pos, "color": col.name(QtGui.QColor.HexArgb)})
+            stops.append({"pos": pos, "color": col.name(QtGui.QColor().HexArgb)})
     if len(stops) < 2:
         stops = copy.deepcopy(base["stops"])
     stops.sort(key=lambda s: float(s["pos"]))
@@ -214,7 +214,7 @@ def paint_gradient_spectrum(painter: QtGui.QPainter, rect: QtCore.QRectF, gradie
         return
     grad = normalize_gradient(gradient)
     # Checkerboard for translucent stops
-    painter.fillRect(rect, QtGui.QColor(Color.backgroundColor()))
+    painter.fillRect(rect, QtGui.QColor(Color().backgroundColor()))
     tile = 6
     light = QtGui.QColor("#3a3a3a")
     left = int(math.floor(rect.left()))
@@ -355,7 +355,7 @@ class _GradientBar(QtWidgets.QWidget):
         # Double-ish add: click on bar adds stop if room
         if bar.contains(QtCore.QPointF(x, y)) and len(stops) < MAX_STOPS:
             new_pos = self._x_to_pos(x)
-            color = sample_gradient_color(self._gradient, new_pos / 100.0).name(QtGui.QColor.HexArgb)
+            color = sample_gradient_color(self._gradient, new_pos / 100.0).name(QtGui.QColor().HexArgb)
             stops.append({"pos": new_pos, "color": color})
             stops.sort(key=lambda s: float(s["pos"]))
             stops[0]["pos"] = 0.0
@@ -511,9 +511,7 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
         ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Ok", callback=self.accept)
         cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
-        layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
-        )
+        layout.addWidget(gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True))
 
         self._sync_angle_enabled()
         self._refresh_stop_editors()
@@ -581,9 +579,7 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             return
         idx = max(0, min(idx, len(stops) - 1))
         color = qcolor(stops[idx].get("color"), "#ffffff")
-        self._stop_color.setStyleSheet(
-            f"background:{color.name(QtGui.QColor.HexArgb)}; border:1px solid #555; border-radius:3px;"
-        )
+        self._stop_color.setStyleSheet(f"background:{color.name(QtGui.QColor().HexArgb)}; border:1px solid #555; border-radius:3px;")
         self._stop_pos.blockSignals(True)
         self._stop_pos.setValue(float(stops[idx].get("pos") or 0))
         edge = idx in (0, len(stops) - 1)
@@ -604,7 +600,7 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             QtWidgets.QColorDialog.DontUseNativeDialog | QtWidgets.QColorDialog.ShowAlphaChannel,
         )
         if chosen.isValid():
-            self._gradient["stops"][idx]["color"] = chosen.name(QtGui.QColor.HexArgb)
+            self._gradient["stops"][idx]["color"] = chosen.name(QtGui.QColor().HexArgb)
             self._push()
 
     def _on_stop_pos(self, value):

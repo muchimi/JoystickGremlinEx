@@ -1587,7 +1587,6 @@ class GateData:
         gates = self.getGates()
         self.updateRanges()  # ensure we have the latest ranges
 
-
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         # verbose = True
         if verbose:
@@ -1863,7 +1862,8 @@ class GateData:
                         if verbose:
                             syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f} range: [{trigger.range.to_display()}]")
                         action_value = gremlin.actions.Value(
-                            trigger.value, trigger.raw_value,
+                            trigger.value,
+                            trigger.raw_value,
                             is_pressed=trigger_value.is_pressed,
                         )
                         if verbose:
@@ -1911,9 +1911,7 @@ class GateData:
                         button_release_value.is_pressed = False
                         delay = trigger.delay / 1000  # delay in seconds
 
-                        def release(button_release_event=button_release_event,
-                                    button_release_value=button_release_value,
-                                    extra_data=extra_data):
+                        def release(button_release_event=button_release_event, button_release_value=button_release_value, extra_data=extra_data):
                             return self._ec.execute_functor_id(
                                 self._action_data.id,
                                 button_release_event,
@@ -3882,7 +3880,7 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
             self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor()))
 
         if self.gate.isError:
-            warning_color = gremlin.ui.ui_common.Color.warningColor()
+            warning_color = gremlin.ui.ui_common.Color().warningColor()
             self.setIcon("ph.shield-warning-fill", color=QtGui.QColor(warning_color))
         else:
             self.setIcon(None)
@@ -3974,7 +3972,7 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         self.grab_widget.setIcon(
             load_icon(
                 "mdi.checkbox-blank-circle",
-                qta_color=gremlin.ui.ui_common.Color.recordColor(),
+                qta_color=gremlin.ui.ui_common.Color().recordColor(),
             )
         )
         self.grab_widget.setMaximumWidth(20)
@@ -4119,9 +4117,9 @@ class RangeInfoWidget(QtWidgets.QWidget):
     def update_icon(self):
         has_containers = self._range.hasAnyContainers()
         if has_containers:
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.activeContentColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color.inactiveColor()))
+            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor()))
 
     def set_decimals(self, value):
         self.decimals = value
@@ -4328,15 +4326,15 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_condition_layout.setContentsMargins(0, 0, 0, 0)
         self.container_condition_layout.addWidget(self._condition_tab)
 
-        # self.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
+        # self.setStyleSheet(gremlin.ui.ui_common.Color().cssTab())
 
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.activeColor(),
+            qta_color=gremlin.ui.ui_common.Color().activeColor(),
         )
         self._icon_disabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.inactiveColor(),
+            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
         )
 
         if is_range:

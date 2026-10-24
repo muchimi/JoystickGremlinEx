@@ -2549,7 +2549,8 @@ class TTSNotifyData:
 class LatchedCallbackData:
     """holds callback data for latched data"""
 
-    def __init__(self, input_item, event_type, callback, action_data=None):
+    def __init__(self, input_item, event_type, callback, action_data=None, permanent=False):
+        self.permanent = permanent
         self.event_type = event_type
         self.callback = callback
         self.input_item = input_item
@@ -2950,6 +2951,7 @@ class EventHandler(QtCore.QObject):
             case _:
                 return event.identifier
 
+
     def _matching_input_item(self, mode, event):
         """gets the matching input item from the event"""
 
@@ -2961,6 +2963,7 @@ class EventHandler(QtCore.QObject):
         magic = self.getMagic(event)
 
         key = event.callbackKey
+        latched = key[1] in (InputType.Keyboard, InputType.KeyboardLatched)
         # verbose = True
 
         if verbose:
@@ -2978,6 +2981,15 @@ class EventHandler(QtCore.QObject):
                 while lookup_mode and lookup_mode not in visited:
                     visited.add(lookup_mode)
                     if lookup_mode in self.latched_input_map[device_guid]:
+                        if latched:
+                            for ck in self.latched_input_map[device_guid][lookup_mode]:
+                                if ck[1] in (InputType.Keyboard, InputType.KeyboardLatched):
+                                    if key[:3] == ck[:3]:
+                                        if verbose:
+                                            key_stub = self._callback_key_stub(key)
+                                            syslog.info(f"**** LATCH MATCH INPUT ITEM: magic: [{magic}] key: {key_stub} ")
+                                        return self.latched_input_map[device_guid][lookup_mode][ck]
+
                         if key in self.latched_input_map[device_guid][lookup_mode]:
                             if verbose:
                                 key_stub = self._callback_key_stub(key)
@@ -3060,7 +3072,7 @@ class EventHandler(QtCore.QObject):
         if verbose:
             syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
 
-    def addCallback(self, device_guid: dinput.GUID, mode: str, event: Event, callback: Callable, permanent=False, node=None, extra_data: dict = {}):
+    def addCallback(self, device_guid: dinput.GUID, mode: str, event: Event, callback: Callable, permanent=False, node=None, extra_data: dict = None):
         """Installs the provided callback for the given event.
 
         :param device_guid the GUID of the device the callback is
@@ -3090,125 +3102,57 @@ class EventHandler(QtCore.QObject):
         input_item = None
         latched = event is not None and event.event_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Mouse)
         action_data = None
+        # CodeRunner attaches the KeyboardInputItem to the event and/or the
+        # explicit registration metadata. Explicit arguments take precedence.
+        metadata = dict(event.extra_data or {}) if event is not None else {}
+        metadata.update(extra_data or {})
+        extra_data = metadata
         if extra_data:
             if "input_item" in extra_data:
                 input_item = extra_data["input_item"]
             if "latched" in extra_data:
-                latched = extra_data["latched"]
+                latched = latched or extra_data["latched"]
             if "action_data" in extra_data:
                 action_data = extra_data["action_data"]
 
         if latched:
-            # latched entry only
+            if input_item is None and event is not None and isinstance(event.identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+                input_item = event.identifier
+            if not isinstance(getattr(input_item, "key", None), gremlin.keyboard.Key):
+                raise ValueError("Keyboard/chord callback registration requires an input_item with a configured Key")
 
-            key = event.callbackKey
-            if device_guid not in self.latched_callbacks:
-                self.latched_callbacks[device_guid] = {}
-            if mode not in self.latched_callbacks[device_guid].keys():
-                self.latched_callbacks[device_guid][mode] = {}
-            if key not in self.latched_callbacks[device_guid][mode]:
-                self.latched_callbacks[device_guid][mode][key] = {}
-            if input_item not in self.latched_callbacks[device_guid][mode][key]:
-                self.latched_callbacks[device_guid][mode][key] = []
-            data = self.latched_callbacks[device_guid][mode][key]
-            data.append((self._install_plugins(callback), permanent))
+            installed_callback = self._install_plugins(callback)
+            seen_keys = set()
+            for latched_key in input_item.key.getKeys():
+                key_id = latched_key.index_tuple()
+                if key_id in seen_keys:
+                    continue
+                seen_keys.add(key_id)
+                if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+                    # Use precisely the same key shape as incoming events. A Key's
+                    # callbackKey has different latch flags from Event.callbackKey.
+                    key = Event(
+                        event_type=InputType.KeyboardLatched, device_guid=device_guid,
+                        identifier=key_id, mode=mode,
+                    ).callbackKey
+                else:
+                    key = latched_key.callbackKey
 
-            # setup the latched input list
-            if device_guid not in self.latched_input_map:
-                self.latched_input_map[device_guid] = {}
-            if mode not in self.latched_input_map[device_guid]:
-                self.latched_input_map[device_guid][mode] = {}
-            if key in self.latched_input_map[device_guid][mode]:
-                assert False, f"Input item {input_item.display_name} already latched for device {device_guid}, mode {mode}, key {key}"
-            self.latched_input_map[device_guid][mode][key] = LatchedCallbackData(input_item, event.event_type, callback, action_data=action_data)
+                mode_callbacks = self.latched_callbacks.setdefault(device_guid, {}).setdefault(mode, {})
+                item_callbacks = mode_callbacks.setdefault(key, {}).setdefault(input_item, [])
+                item_callbacks.append((installed_callback, permanent))
 
-            if verbose:
-                device = gremlin.joystick_handling.getDevice(device_guid)
-                syslog.info(f"CALLBACK: latched callback - REGISTERED LATCH - key[{key}] input item: [{input_item.display_name}]")
-            # do not register latched callbacks as regular callbacks
+                mode_inputs = self.latched_input_map.setdefault(device_guid, {}).setdefault(mode, {})
+                mode_inputs.setdefault(key, []).append(LatchedCallbackData(
+                    input_item, event.event_type, installed_callback,
+                    action_data=action_data, permanent=permanent,
+                ))
+                if verbose:
+                    syslog.info(f"CALLBACK: registered chord member {key_id} for {input_item.display_name} in mode {mode}")
             return
 
         if event:
-            if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-                assert input_item is not None, "adding a lacthed input requires passing the input item to addCallback()"
-                verbose = gremlin.config.Configuration().verbose_mode_keyboard
-                # verbose = True
-                # keyboard latched event
-                identifier = event.identifier  # Key()
-                if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
-                    primary_key = identifier.key
-                elif isinstance(identifier, gremlin.keyboard.Key):
-                    primary_key = identifier
-                else:
-                    syslog.error(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
-                    raise ValueError(f"Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
-
-                # if the key can latch with multiple primary keys, build the table of all combinations
-                key_list = [primary_key]
-                if primary_key.is_latched:
-                    # multiple keys - add each key
-                    key_list.extend(primary_key._latched_keys)
-                    # ensure unique
-                    key_list = list(set(key_list))
-
-                for key in key_list:
-                    # the events will arrive as keyboard events - in any order - this makes sure latching is checked regardless of the order of key presses
-                    virtual_code = key.virtual_code
-                    keyid_source = key.index_tuple()  # use the scan code for now
-                    # index = virtual_code if virtual_code > 0 else keyid
-                    keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
-
-                    if device_guid not in self.latched_keyboard_key_map:
-                        self.latched_keyboard_key_map[device_guid] = {}
-                    if mode not in self.latched_keyboard_key_map[device_guid]:
-                        self.latched_keyboard_key_map[device_guid][mode] = {}
-                    if keyid not in self.latched_keyboard_key_map[device_guid][mode]:
-                        self.latched_keyboard_key_map[device_guid][mode][keyid] = []
-                    data = self.latched_keyboard_key_map[device_guid][mode][keyid]
-                    data.append((self._install_plugins(callback), permanent))
-
-                    if device_guid not in self.latched_events.keys():
-                        self.latched_events[device_guid] = {}
-
-                    if mode not in self.latched_events[device_guid].keys():
-                        self.latched_events[device_guid][mode] = {}
-                    if keyid not in self.latched_events[device_guid][mode].keys():
-                        self.latched_events[device_guid][mode][keyid] = {}
-                    if input_item not in self.latched_events[device_guid][mode][keyid]:
-                        self.latched_events[device_guid][mode][keyid][input_item] = []
-
-                    self.latched_events[device_guid][mode][keyid][input_item].append(identifier)
-                    if verbose:
-                        syslog.info(
-                            f"Key latch registered by guid [{device_guid}]  mode: [{mode}] input item: [{input_item.display_name}] vk: [{virtual_code} (0x{virtual_code:X})] source keyid: [{gremlin.keyboard.KeyMap.keyid_tostring(keyid_source)}]-> translated keyId: [{gremlin.keyboard.KeyMap.keyid_tostring(keyid)}] name: {key.name} Primary key: [{primary_key}]"
-                        )
-                    pass
-
-                # prep map of keys to their callback/identifier
-                if latched:
-                    # record latched event
-                    perms = [tuple(primary_key.sequence)]
-
-                    for perm in perms:
-                        if perm not in self.latched_keys:
-                            self.latched_keys[perm] = {}
-                        if input_item not in self.latched_keys[perm]:
-                            self.latched_keys[perm][input_item] = []
-                        if callback not in self.latched_keys[perm][input_item]:
-                            self.latched_keys[perm][input_item].append((primary_key, callback))
-
-                    # latched entry only
-                    if device_guid not in self.latched_callbacks:
-                        self.latched_callbacks[device_guid] = {}
-                    if mode not in self.latched_callbacks[device_guid].keys():
-                        self.latched_callbacks[device_guid][mode] = {}
-                    if primary_key not in self.latched_callbacks[device_guid][mode]:
-                        self.latched_callbacks[device_guid][mode][primary_key] = []
-                    data = self.latched_callbacks[device_guid][mode][primary_key]
-                    data.append((self._install_plugins(callback), permanent))
-                    return
-
-            elif event.event_type == InputType.Midi:
+            if event.event_type == InputType.Midi:
                 # MIDI event
                 verbose = gremlin.config.Configuration().verbose_mode_midi
                 midi_input = event.identifier
@@ -3828,6 +3772,69 @@ class EventHandler(QtCore.QObject):
 
         self.registry.update(event)  # record the event
 
+        input_item: gremlin.input_item.InputItem = None
+        callback: Callable = None
+
+        # if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
+        #     pass
+
+        mode = event.mode if event.mode else self.runtime_mode
+        items = self._matching_input_item(mode, event)
+        if not isinstance(items, list):
+            items = [items] if items else []
+
+        if items:
+            matching_callbacks = []
+            matching_functors = []
+            for data in items:
+                callback = None
+                if isinstance(data, LatchedCallbackData):
+                    if not self.process_callbacks and not data.permanent:
+                        continue
+                    if verbose:
+                        syslog.info(f"Latched callback data found: {data}")
+                    input_item, callback = data.input_item, data.callback
+                    action_data = data.action_data
+                    if action_data:
+                        if event.extra_data is None:
+                            event.extra_data = {}
+                        event.extra_data["action_data"] = action_data
+
+                else:
+                    input_item = data
+
+                m_list, f_list = self._execute_event(
+                    event, input_item, skip_execute=skip_execute, callback=callback
+                )
+                matching_callbacks.extend(m_list or [])
+                matching_functors.extend(f_list or [])
+
+            return matching_callbacks, matching_functors
+        else:
+            return self._execute_event(event, None, skip_execute=skip_execute)
+
+
+
+    def _execute_event(self, event: Event, input_item=None, skip_execute=False, callback: Callable = None):
+        """main execution (runtime) event handler - queues trigger callbacks on event input
+
+        :param event: the event to run callbacks for
+        :param skip_execute: optional, prevents callback execution if they are executed another way
+        :returns: tuple list of callbacks
+
+        """
+
+        import gremlin.config
+        import gremlin.keyboard
+        import gremlin.execution_graph
+
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_inputs or config.verbose_mode_exec
+        verbose_detailed = verbose and config.verbose_mode_extra
+        # verbose = True
+
+        self.registry.update(event)  # record the event
+
 
         try:
             # mode to act on
@@ -3840,24 +3847,6 @@ class EventHandler(QtCore.QObject):
             m_list = []
             f_list = []
             v_list = []
-
-            input_item: gremlin.input_item.InputItem = None
-            callback: Callable = None
-
-            # if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched, InputType.Mouse):
-            #     pass
-
-            data = self._matching_input_item(mode, event)
-            if isinstance(data, LatchedCallbackData):
-                input_item, callback = data.input_item, data.callback
-                action_data = data.action_data
-                if action_data:
-                    if event.extra_data is None:
-                        event.extra_data = {}
-                    event.extra_data["action_data"] = action_data
-
-            else:
-                input_item = data
 
 
             if verbose:
@@ -3903,7 +3892,8 @@ class EventHandler(QtCore.QObject):
                     syslog.info(f"Event: input disabled {str(event)}")
                 return None, None
 
-            # filter latched keyboard or mouse events
+            # filter latched keyboard or mouse events - this section looks for concurrent key/mouse inputs and triggers the registered callbacks
+            # if a match is found - the key order does not matter
             if event.event_type in (
                 InputType.Keyboard,
                 InputType.KeyboardLatched,
@@ -3911,32 +3901,48 @@ class EventHandler(QtCore.QObject):
             ):
                 el = EventListener()
 
+                def key_id(key):
+                    """Normalize event, chord and state identities to physical pairs."""
+                    if isinstance(key, gremlin.keyboard.Key):
+                        return key.index_tuple()
+                    if isinstance(key, gremlin.types.MouseButton):
+                        mouse_key = gremlin.keyboard.Key()
+                        mouse_key.mouse_button = key
+                        return mouse_key.index_tuple()
+                    scan_code, extended = key
+                    return scan_code, extended
+
+                # event.data is authoritative for keyboard state. Also accept an
+                # iterable containing only the currently held physical key pairs.
+                state_data = event.data if event.data is not None else {}
+                if isinstance(state_data, dict):
+                    data = {key_id(key): bool(pressed) for key, pressed in state_data.items()}
+                else:
+                    data = {key_id(key): True for key in state_data}
+                pressed_keys = {key for key, pressed in data.items() if pressed}
+
+                def key_matches(left, right):
+                    """Preserve reverse-translated keyboard identities when matching."""
+                    if left == right:
+                        return True
+                    return (
+                        gremlin.keyboard.KeyMap.reverse_translate(left) == right
+                        or gremlin.keyboard.KeyMap.reverse_translate(right) == left
+                    )
+
                 def keyPressed(key: gremlin.keyboard.Key):
-                    """gets the key pressed state for a given key"""
-                    nonlocal el
-                    index = key.index_tuple()
-
+                    """Check this chord member against the event's held-key snapshot."""
+                    index = key_id(key)
+                    # Explicit False states must not be replaced by live listener
+                    # state. Mouse state falls back only if absent from the event.
+                    if index in data:
+                        return index in pressed_keys
+                    reverse_index = gremlin.keyboard.KeyMap.reverse_translate(index)
+                    if reverse_index in data:
+                        return reverse_index in pressed_keys
                     if key.is_mouse:
-                        # handle mouse
-                        state = el.get_key_state(key)
-                        return state
-
-                    found = index in data.keys()
-                    if not found:
-                        # try the reverse translate
-                        r_index = gremlin.keyboard.KeyMap.reverse_translate(index)
-                        if r_index is not None:
-                            found = r_index in data.keys()
-                            if found:
-                                index = r_index
-
-                    state = data[index] if found else False
-                    if verbose:
-                        syslog.info(
-                            f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} key: [{key.name}] found: {found} state: {state} {'*****' if state else ''}"
-                        )
-
-                    return state
+                        return el.get_key_state(key)
+                    return False
 
                 config = gremlin.config.Configuration()
 
@@ -3946,7 +3952,8 @@ class EventHandler(QtCore.QObject):
                     for index, latched_input in enumerate(latched_inputs):
                         syslog.info(f"\t[{index}]: {latched_input}")
 
-                data = event.data  # holds keyboard state info
+
+
 
                 if not event.extra_data:
                     # ensure additional data passed on in the event exists
@@ -3960,13 +3967,7 @@ class EventHandler(QtCore.QObject):
                         syslog.info(f"\t\t{gremlin.keyboard.KeyMap.keyid_tostring(key)} {data[key]}")
 
                 # match keys
-                event_key = event.identifier  # the key in the event
-                if isinstance(event_key, gremlin.keyboard.Key):
-                    event_key = event_key.message_key
-                elif isinstance(event_key, gremlin.types.MouseButton):
-                    key = gremlin.keyboard.Key()
-                    key.mouse_button = event_key
-                    event_key = key
+                event_key = key_id(event.identifier)  # physical key that changed
 
                 latched_map = {}
 
@@ -3977,6 +3978,10 @@ class EventHandler(QtCore.QObject):
 
                     latch_found = False
                     latched_keys = input_id.getKeys()
+                    # Any member can complete the chord, regardless of press order.
+                    # An unrelated event must not trigger or release a held chord.
+                    if not any(key_matches(event_key, key_id(key)) for key in latched_keys):
+                        continue
                     m_list = []
                     f_list = []
 
@@ -3995,11 +4000,15 @@ class EventHandler(QtCore.QObject):
 
                         # process release events if any
                         if not event.is_pressed:
-                            for key in latched_keys:
-                                if key in self._keyboard_callback_map:
-                                    r_list = self._keyboard_callback_map[key]
-                                    del self._keyboard_callback_map[key]
+                            # Press callbacks are stored under the whole input's
+                            # primary key. Releasing ANY member ends that chord.
+                            latch_key = input_item.key
+                            r_list = self._keyboard_callback_map.pop(latch_key, [])
+                            if r_list:
+                                if not skip_execute:
                                     self._trigger_callbacks(r_list, event)
+                                return r_list, f_list
+                            continue
 
                         is_latched = all(keyPressed(key) for key in latched_keys)
                         if is_latched:
@@ -4010,7 +4019,7 @@ class EventHandler(QtCore.QObject):
                                 m_list = [callback]
                             else:
                                 # get callbacks for that input item
-                                m_list = self._matching_latched_callbacks(event, latch_key)
+                                m_list = self._matching_latched_callbacks(event, latch_key, input_item=input_item)
 
                             # check voice latching if latching on keyboard
                             if config.voice_enabled:
@@ -4019,18 +4028,22 @@ class EventHandler(QtCore.QObject):
                                     m_list.extend(v_list)
 
                             if m_list:
-                                # record the press event for the release when
-                                self._keyboard_callback_map[latch_key] = m_list
+                                # Multiple containers on one chord register separate
+                                # callbacks. Retain all of them for the first release.
+                                release_callbacks = self._keyboard_callback_map.setdefault(latch_key, [])
+                                for registered_callback in m_list:
+                                    if not any(saved is registered_callback for saved in release_callbacks):
+                                        release_callbacks.append(registered_callback)
 
                                 if verbose:
                                     trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
                                     syslog.info(trigger_line)
                                     syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event} ")
                                     syslog.info(trigger_line)
-                                self._trigger_callbacks(m_list, event)
+                                if not skip_execute:
+                                    self._trigger_callbacks(m_list, event)
                                 if verbose:
                                     syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
-                                self._keyboard_callback_map[latch_key] = m_list  # save the matching callbacks for the latched key for release
                                 return m_list, f_list
 
                     if not latch_found:
@@ -4435,37 +4448,34 @@ class EventHandler(QtCore.QObject):
             return [vd.execute_callback]
         return []
 
-    def _matching_latched_callbacks(self, event, key):
-        from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
-        import gremlin.keyboard
 
-        assert isinstance(key, gremlin.keyboard.Key), f"invalid key type, got {type(key)} - expecting [gremlin.keyboard.Key]"
-        callback_list = []
-        if event.event_type in (
-            InputType.KeyboardLatched,
-            InputType.Keyboard,
-            InputType.Mouse,
-        ):
+    def _matching_keys(self, key : gremlin.keyboard.Key) -> bool:
+        """ checks the key and related latched keys are pressed """
+        callback_key = frozenset(key.sequence)
+
+
+
+
+    def _matching_latched_callbacks(self, event, key, input_item=None):
+        """Read the same per-member, per-input callback map addCallback writes."""
+        if event.event_type not in (InputType.KeyboardLatched, InputType.Keyboard, InputType.Mouse):
+            return []
+        device_modes = self.latched_callbacks.get(event.device_guid, {})
+        wanted_chord = frozenset(member.index_tuple() for member in key.getKeys())
+        for mode in self._mode_lookup_chain(event):
+            registered_items = device_modes.get(mode, {}).get(event.callbackKey, {})
             callback_list = []
-            device_guid = KeyboardDeviceTabWidget.device_guid
-            if device_guid in self.latched_keyboard_key_map:
-                import gremlin.execution_graph
-
-                ec = gremlin.execution_graph.ExecutionContext()  # current execution context
-                keyid_source = key.index_tuple()  # use the scan code for now
-                keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
-
-                for lookup_mode in self._mode_lookup_chain(event):
-                    if lookup_mode in self.latched_keyboard_key_map[device_guid] and keyid in self.latched_keyboard_key_map[device_guid][lookup_mode]:
-                        callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, lookup_mode)
-                        break
-
-        if callback_list:
-            # Filter events when the system is paused
-            if not self.process_callbacks:
-                return [c[0] for c in callback_list if c[1]]
-            else:
-                return [c[0] for c in callback_list]
+            for registered_item, callbacks in registered_items.items():
+                if input_item is not None:
+                    if registered_item is not input_item:
+                        continue
+                else:
+                    registered_chord = frozenset(member.index_tuple() for member in registered_item.key.getKeys())
+                    if registered_chord != wanted_chord:
+                        continue
+                callback_list.extend(callbacks)
+            if callback_list:
+                return [callback for callback, permanent in callback_list if self.process_callbacks or permanent]
         return []
 
     def _install_plugins(self, callback):

@@ -131,7 +131,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
         # display a warning that this is a legacy mapper
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,

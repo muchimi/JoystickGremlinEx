@@ -31,6 +31,7 @@ import logging
 import threading
 import time
 from gremlin.util import log_info, load_icon
+
 # from gremlin.base_classes import TraceableList
 import gremlin.input_item
 from shiboken6 import Shiboken
@@ -83,7 +84,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         self.listen_widget.setToolTip("Listen for a single input.")
 
         self.show_keyboard_widget = gremlin.ui.ui_common.QIconPushButton("Select...")
-        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color.listenColor()))
+        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
         self.show_keyboard_widget.setToolTip("Select keys using the virtual keyboard")
         self.show_keyboard_widget.setFixedHeight(24)  # match the other buttons
@@ -397,9 +398,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
     def _record_keys_ui(self, multi_keys):
         """Prompts the user to press the desired key combination. - runs on UI thread"""
         gremlin.shared_state.push_suspend_highlighting()
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Keyboard, InputType.Mouse],
-                                                                        return_kb_event=False,
-                                                                        multi_keys=multi_keys)
+        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Keyboard, InputType.Mouse], return_kb_event=False, multi_keys=multi_keys)
 
         button_press_dialog.item_selected.connect(self._update_keys)
         button_press_dialog.keyInput.connect(self._handle_key_input)

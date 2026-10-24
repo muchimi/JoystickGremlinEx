@@ -14,11 +14,7 @@ from typing import Any
 from PySide6 import QtCore, QtGui, QtWidgets
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif", ".tif", ".tiff", ".svg"}
-IMAGE_FILE_FILTER = (
-    "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif *.svg);;"
-    "SVG vector (*.svg);;"
-    "All files (*.*)"
-)
+IMAGE_FILE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.webp *.gif *.svg);;SVG vector (*.svg);;All files (*.*)"
 # Back-compat alias used by older call sites.
 _IMAGE_FILE_FILTER = IMAGE_FILE_FILTER
 _CLIPBOARD_MIME_FORMATS = (
@@ -230,7 +226,7 @@ def pixmap_from_image_path(path: str, max_edge: int | None = None) -> QtGui.QPix
             width = max(1, int(round(width * scale)))
             height = max(1, int(round(height * scale)))
         image = QtGui.QImage(width, height, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
-        image.fill(QtCore.Qt.GlobalColor.transparent)
+        image.fill(QtCore.Qt.GlobalColor().transparent)
         painter = QtGui.QPainter(image)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         renderer.render(painter)

@@ -472,7 +472,7 @@ class AbstractView(QtWidgets.QWidget):
         if old_model is not None:
             old_model.removeCallback(self._handle_model_changed)
         self._model = model
-        self._hash_key = None # reset last model hash
+        self._hash_key = None  # reset last model hash
         if model is not None:
             model.addCallback(self._handle_model_changed)
 
@@ -908,7 +908,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         super().__init__(mode_node, device_guid=device_guid, input_type=input_type)
 
-
         self.parent = mode_node  # mode object
         self.extra_data = extra_data if extra_data else {}
 
@@ -917,14 +916,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self.setInputId(input_id)
 
-
-
         if isinstance(mode_node, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
             assert device_guid is not None, "device_guid must be provided if mode provided as a name"
             mode_node = profile.getModeNode(device_guid, mode_node)
-
 
         self._data = data
 
@@ -997,7 +993,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             input_id = input_id.key
         elif hasattr(input_id, "identifier"):
             input_id = input_id.identifier
+        # if hasattr(input_id, "getKeys"):
+        #     for key in input_id.getKeys():
+        #         self._latched_input_ids.add(key)
+        # else:
         self._latched_input_ids.add(input_id)
+
+
 
     def getLatchedInputIds(self):
         """returns the set of latched input ids for this input item"""
@@ -2291,8 +2293,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         # icon setup
         size = self._getIconSize()  # icon size
-        active_color = gremlin.ui.ui_common.Color.activeColor()
-        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        active_color = gremlin.ui.ui_common.Color().activeColor()
+        normal_color = gremlin.ui.ui_common.Color().normalColor()
         self._curve_icon_inactive = load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self._curve_icon_active = load_icon("mdi.chart-bell-curve", qta_color=active_color)
         self._input_icon_inactive = load_icon("fa6s.power-off", qta_color=normal_color)
@@ -2321,6 +2323,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # clear input curve button
         self.clear_curve_widget = None
 
+
         self._toolbar_buttons = []
 
         if self.is_axis:
@@ -2330,7 +2333,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             self._curve_container_layout.addStretch()
 
-            css = gremlin.ui.ui_common.Color.cssInputHeaderButton()
+            css = gremlin.ui.ui_common.Color().cssInputHeaderButton()
 
             self._curve_button_widget = gremlin.ui.ui_common.QDataPushButton(
                 icon=self._curve_icon_inactive, size=size, callback=self._curve_button_cb, tooltip="Input Curve", css=css
@@ -2352,8 +2355,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._toolbar_buttons.append(self.clear_curve_widget)
 
         # description row
+        self._description_visible = True
         self._description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(style="font-style: italic;", data="description")
         self._description_icon = None
+        self._description_widget.setVisible(self._description_visible)
 
         # action icons
         self._action_icon_widget = gremlin.ui.ui_common.AutohideContainer()
@@ -2474,6 +2479,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         el = gremlin.event_handler.EventListener()
         el.action_crud.connect(self._handle_action_crud_event)
+
+    def setDescriptionVisible(self, visible: bool):
+        """sets the visibility of the description"""
+        self._description_visible = visible
+        gremlin.util.InvokeUiMethod(self._set_description_visible_ui, visible)
+
+    def _set_description_visible_ui(self, visible: bool):
+        self._description_widget.setVisible(visible)
 
     def setDebugEnabled(self, enabled: bool):
         """enables or disabled the debug information in the input widget visualizer"""
@@ -2735,7 +2748,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _update_title(self):
         """updates the title bar stylesheet based on the selection state"""
-        css = gremlin.ui.ui_common.Color.cssSelectedInputHeader() if self._selected else gremlin.ui.ui_common.Color.cssUnselectedInputHeader()
+        css = gremlin.ui.ui_common.Color().cssSelectedInputHeader() if self._selected else gremlin.ui.ui_common.Color().cssUnselectedInputHeader()
         self._title_container_widget.setStyleSheet(css)
 
     def _update_container_id(self):
@@ -3315,24 +3328,24 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _update_selected_ui(self):
         """called whenever selection changes"""
-        css_button = gremlin.ui.ui_common.Color.cssInputHeaderButton(self._selected)
+        css_button = gremlin.ui.ui_common.Color().cssInputHeaderButton(self._selected)
         if self._selected:
-            # css = gremlin.ui.ui_common.Color.cssItemSelected()
-            css = f"background-color: {gremlin.ui.ui_common.Color.selectColor()};"
+            # css = gremlin.ui.ui_common.Color().cssItemSelected()
+            css = f"background-color: {gremlin.ui.ui_common.Color().selectColor()};"
             if self._container_widget:
                 self._container_widget.setStyleSheet(css)
-            # css_bar = gremlin.ui.ui_common.Color.cssSelectedInputHeader()
-            bar_color = gremlin.ui.ui_common.Color.getHoverColor(gremlin.ui.ui_common.Color.selectColor(), 1.05).name()
+            # css_bar = gremlin.ui.ui_common.Color().cssSelectedInputHeader()
+            bar_color = gremlin.ui.ui_common.Color().getHoverColor(gremlin.ui.ui_common.Color().selectColor(), 1.05).name()
             css_bar = f"background-color: {bar_color}; border:none; padding: 0px; margin: 0px; border-radius: 0px;"
 
         else:
-            css = f"background-color: {gremlin.ui.ui_common.Color.unselectedBackgroundColor()};"
+            css = f"background-color: {gremlin.ui.ui_common.Color().unselectedBackgroundColor()};"
             if self._container_widget:
                 self._container_widget.setStyleSheet(css)
 
             self._default_style()
-            # css_bar = gremlin.ui.ui_common.Color.cssUnselectedInputHeader()
-            bar_color = gremlin.ui.ui_common.Color.inputTitleUnselectedColor()
+            # css_bar = gremlin.ui.ui_common.Color().cssUnselectedInputHeader()
+            bar_color = gremlin.ui.ui_common.Color().inputTitleUnselectedColor()
             css_bar = f"background-color: {bar_color}; border:none;"
 
         # update style for title bar
@@ -3352,8 +3365,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         """sets the default style"""
         # css = f"""
         #             #main_layout {{
-        #                 background: {gremlin.ui.ui_common.Color.backgroundColor()};
-        #                 border: 1px solid {gremlin.ui.ui_common.Color.borderColor()};
+        #                 background: {gremlin.ui.ui_common.Color().backgroundColor()};
+        #                 border: 1px solid {gremlin.ui.ui_common.Color().borderColor()};
         #                 }}
         #                 """
         self.setStyleSheet(None)
@@ -3863,8 +3876,6 @@ class InputItemListModel(AbstractCallbackModel):
                 self._custom_load_handler(self)
                 return
 
-
-
             registry = gremlin.shared_state.current_profile.registry
             device_guid = self._device_guid
             mode = self.mode
@@ -4097,7 +4108,7 @@ class InputItemListView(AbstractPaginatedView):
         if enable_filter:
             self._warning_widget = gremlin.ui.ui_common.QWarningWidget(
                 text="Some inputs are currently filtered",
-                icon=gremlin.ui.ui_common.Icons.warningIcon(gremlin.ui.ui_common.Color.blueColor()),
+                icon=gremlin.ui.ui_common.Icons.warningIcon(gremlin.ui.ui_common.Color().blueColor()),
                 tooltip="One or more inputs in this list are currently filtered.  Change the filter settings to show them.",
             )
             self.main_layout.addWidget(self._warning_widget)
@@ -4137,8 +4148,8 @@ class InputItemListView(AbstractPaginatedView):
 
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        background_color = gremlin.ui.ui_common.Color.backgroundColor()
+        border_color = gremlin.ui.ui_common.Color().borderColor()
+        background_color = gremlin.ui.ui_common.Color().backgroundColor()
         widget.setStyleSheet(f"""
             .QWidget {{ background-color: {background_color}; border: 1px solid {border_color};
             QLabel {{ background-color: {background_color}; }}
@@ -4646,9 +4657,7 @@ class InputItemListView(AbstractPaginatedView):
 
         self._apply_pending_selection_page()
 
-
-
-        hash_key = self.model.hashKey(self.filter) #  self._get_hash_key(self.filter)
+        hash_key = self.model.hashKey(self.filter)  #  self._get_hash_key(self.filter)
         changed = force or (hash_key != self._model_hash)
         if not changed:
             return  # no changes detected, skip redraw
@@ -4661,7 +4670,6 @@ class InputItemListView(AbstractPaginatedView):
         #     pass
 
         self._model_hash = hash_key
-
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui_level(1)
@@ -5216,9 +5224,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.parent = parent
 
         self._abstract_container_generating_xml = False  # true if generating
-        self._action_sets = ActionSets(
-            self, content_callback=content_callback
-        )
+        self._action_sets = ActionSets(self, content_callback=content_callback)
 
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
         self._priority = priority  # container execution priority when multiple containers are defined
@@ -5778,8 +5784,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 if nodes:
                     syslog.error(f"Old container is still generating action set data: type [{self.tag}]")
                     raise ValueError(f"Old container is still generating action set data: type [{self.tag}]")
-
-
 
             node.set("container_id", self.id)
 
@@ -6586,8 +6590,6 @@ class ActionSet(AbstractCallbackModel):
 
             if data is not None:
                 entry.data = data
-
-
 
 
 class ActionSetModel(AbstractCallbackModel):
@@ -7740,7 +7742,7 @@ class ActionSetView(AbstractView):
         self.view_type = view_type
 
         self._main_layout = gremlin.ui.ui_common.QSideBarContainer(
-            bar_color=gremlin.ui.ui_common.Color.normalColor(),
+            bar_color=gremlin.ui.ui_common.Color().normalColor(),
         )
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -7748,7 +7750,7 @@ class ActionSetView(AbstractView):
 
         # separator for the action set view
         if self._separator:
-            self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(size=4, color=gremlin.ui.ui_common.Color.normalColor()))
+            self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(size=4, color=gremlin.ui.ui_common.Color().normalColor()))
 
         # header widgets
         for widget in header_widgets:
@@ -7871,7 +7873,7 @@ class ActionSetView(AbstractView):
         """sets selected state"""
         if value and not self._selected:
             self._selected = True
-            background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
+            background_color = gremlin.ui.ui_common.Color().selectedDockTabBackgroundColor()
             self.setStyleSheet(f"background: {background_color};")
         elif not value and self._selected:
             self._selected = False
@@ -8715,11 +8717,11 @@ class ConditionStateTracker:
         # el.mapping_changed.connect(self._mapping_changed)
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.activeColor(),
+            qta_color=gremlin.ui.ui_common.Color().activeColor(),
         )
         self._icon_disabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.inactiveColor(),
+            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
         )
 
     def register(self, input_item, container, container_widget):
@@ -8874,7 +8876,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._container: AbstractContainer = None
         self._cleanup_started = False
 
-        background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
+        background_color = gremlin.ui.ui_common.Color().containerBackgroundColor()
         css = f"background-color:{background_color}"
         self.setStyleSheet(css)
 
@@ -8892,11 +8894,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # el.ui_ready.connect(self._ui_ready)
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.activeColor(),
+            qta_color=gremlin.ui.ui_common.Color().activeColor(),
         )
         self._icon_disabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color.inactiveColor(),
+            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
         )
 
         self._container_id_widget = None
@@ -8930,9 +8932,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create tab widget to display various UI controls in
         self.dock_tabs = gremlin.ui.ui_common.QDataTab()
-        self.dock_tabs.setStyleSheet(gremlin.ui.ui_common.Color.cssVerticalTab())
+        self.dock_tabs.setStyleSheet(gremlin.ui.ui_common.Color().cssVerticalTab())
 
-        background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
+        background_color = gremlin.ui.ui_common.Color().selectedDockTabBackgroundColor()
         self.setStyleSheet = f"QDockWidget: {{ background-color: {background_color}; }}"
 
         self.dock_tabs.setStyleSheet(f"QTabBar::tab:selected {{ background-color: {background_color}; }}")
@@ -9347,8 +9349,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         widget = gremlin.ui.ui_common.QStepTile(
             f"{self.container.name} Container Mapping Actions for input {self.container.input_display_name}",
-            background_color=gremlin.ui.ui_common.Color.selectColor(),
-            foreground_color=gremlin.ui.ui_common.Color.normalLightColor(),
+            background_color=gremlin.ui.ui_common.Color().selectColor(),
+            foreground_color=gremlin.ui.ui_common.Color().normalLightColor(),
         )
 
         self._action_tab_container_layout.addWidget(widget)
@@ -9395,8 +9397,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.action_condition_frame_widget = gremlin.ui.ui_common.QBoxFrame()
         self.action_condition_frame_widget.setContentsMargins(0, 0, 0, 0)
 
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color().borderColor()
+        background_color = gremlin.ui.ui_common.Color().actionBackgroundColor()
         css = f"#frame {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
         self.action_condition_frame_widget.setStyleSheet(css)
 
@@ -9639,7 +9641,7 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
         QtWidgets.QFrame.__init__(self, parent)
 
-        css = f"background-color: {gremlin.ui.ui_common.Color.actionBackgroundColor()}"
+        css = f"background-color: {gremlin.ui.ui_common.Color().actionBackgroundColor()}"
         self.setStyleSheet(css)
 
         self.action_data = action_data
@@ -9728,8 +9730,8 @@ class AbstractActionWrapper(QtWidgets.QDockWidget):
         self.dock_widget = QtWidgets.QFrame()
         self.dock_widget.setFrameShape(QtWidgets.QFrame.Box)
         self.dock_widget.setObjectName("frame")
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color().borderColor()
+        background_color = gremlin.ui.ui_common.Color().actionBackgroundColor()
         css = f"#frame {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
         self.dock_widget.setStyleSheet(css)
         self.setWidget(self.dock_widget)
@@ -10055,7 +10057,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
         self.title_frame_widget.addWidget(self._title_bar_widget)
 
-        self.title_frame_widget.setBackgroundColor(gremlin.ui.ui_common.Color.actionBackgroundColor())
+        self.title_frame_widget.setBackgroundColor(gremlin.ui.ui_common.Color().actionBackgroundColor())
         self.setTitleBarWidget(self.title_frame_widget)
 
         self.main_layout.addWidget(self.action_widget)
@@ -10793,8 +10795,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         # header widget - shows what mappings this is for
         widget = gremlin.ui.ui_common.QStepTile(
             f"Mappings for input {self.input_item.display_name}",
-            background_color=gremlin.ui.ui_common.Color.selectColor(),
-            foreground_color=gremlin.ui.ui_common.Color.normalLightColor(),
+            background_color=gremlin.ui.ui_common.Color().selectColor(),
+            foreground_color=gremlin.ui.ui_common.Color().normalLightColor(),
         )
 
         container_layout.addWidget(widget)
@@ -12236,8 +12238,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         widget = gremlin.ui.ui_common.QStepTile(
             f"Mapping conditions for input {self.container.input_display_name}",
-            background_color=gremlin.ui.ui_common.Color.selectColor(),
-            foreground_color=gremlin.ui.ui_common.Color.normalLightColor(),
+            background_color=gremlin.ui.ui_common.Color().selectColor(),
+            foreground_color=gremlin.ui.ui_common.Color().normalLightColor(),
         )
 
         widgets = [(widget, 100), self.help_button]
@@ -12432,7 +12434,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.device = device
         self.profile = profile
         self.device_node = profile.getDeviceNode(device.device_guid)
-
 
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"
@@ -12909,7 +12910,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def inputItemListModel(self, model: InputItemListModel):
         self.setInputItemListModel(model)
 
-    def setInputItemListModel(self, model: InputItemListModel, change_callback : Callable = None):
+    def setInputItemListModel(self, model: InputItemListModel, change_callback: Callable = None):
         """sets the model"""
 
         model_callback = getattr(self, "_handle_model_changed", None) if change_callback is None else change_callback
@@ -12927,7 +12928,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._input_item_list_view.setModel(model)
             if model_callback is not None:
                 self._input_item_list_model.addCallback(model_callback)
-
 
         # trap input item add/remove events
         if self._input_item_list_model is not None:
@@ -13398,9 +13398,9 @@ class FilterChip(QWidget):
     def __init__(self, key, label, on_remove, foreground=None, background=None, border=None, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # plain QWidget subclasses don't paint QSS background/border otherwise
-        self._foreground_color = foreground or Color.keyForegroundColor()
-        self._background_color = background or Color.keyBackgroundColor()
-        self._border_color = border or Color.keyBorderColor()
+        self._foreground_color = foreground or Color().keyForegroundColor()
+        self._background_color = background or Color().keyBackgroundColor()
+        self._border_color = border or Color().keyBorderColor()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 2, 6, 2)
         layout.setSpacing(4)
@@ -13552,16 +13552,16 @@ class FilterControlWidget(QWidget):
         self.clearFilters()
 
     def _on_search(self, text):
-        self._set_chip("search", text if text else None, background_color=Color.nameColor())
+        self._set_chip("search", text if text else None, background_color=Color().nameColor())
         self.searchChanged.emit(text)
 
     def _on_category(self, _index):
         category = self.category_combo.currentData()
-        self._set_chip("category", category if category is not None else None, background_color=Color.categoryColor())
+        self._set_chip("category", category if category is not None else None, background_color=Color().categoryColor())
         self.categoryChanged.emit(category)
 
     def _on_attribute(self, attr, checked):
-        self._set_chip(f"attr_{attr}", attr if checked else None, background_color=Color.attributeColor())
+        self._set_chip(f"attr_{attr}", attr if checked else None, background_color=Color().attributeColor())
         self.attributesChanged.emit([name for name, action in self.attribute_actions.items() if action.isChecked()])
 
     def _set_chip(self, key, label, foreground_color=None, background_color=None, border_color=None):

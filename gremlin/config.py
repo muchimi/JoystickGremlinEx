@@ -3120,13 +3120,14 @@ class Configuration(QtCore.QObject):
 
     @property
     def theme(self) -> str:
+        """current theme setting - default is 'auto'"""
         return self._get_data("theme", "auto")
 
     @theme.setter
     def theme(self, value: str):
         if value:
             value = value.casefold()
-            if value in ("auto", "light", "dark"):
+            if value in ("auto", "light", "dark","custom"):
                 self._data["theme"] = value
                 self.save()
 
@@ -4188,3 +4189,4 @@ class Configuration(QtCore.QObject):
     @device_label_visible.setter
     def device_label_visible(self, value: bool):
         self._set_data("device_label_visible", value)
+

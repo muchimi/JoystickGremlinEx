@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 
 import ctypes
+from collections.abc import Iterable
 import logging
 from ctypes import wintypes
 import enum
@@ -83,6 +84,7 @@ class Key:
 
     """
 
+
     def __init__(self, name=None, scan_code: int = None, is_extended: bool = None, virtual_code: int = None, is_mouse: bool = False):
         """Creates a new Key instance.
 
@@ -110,8 +112,7 @@ class Key:
         self._latched_name = ""
         self._display_name = ""
 
-        self._latched_keys = []  # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
-        # self._latched_keys.add_callback(self._changed_cb)
+        self._latched_keys = [] # gremlin.util.TriggerList(on_change=self._handle_latched_change)  # list of additional keys latched to this keystroke (such as modifiers) - DOES NOT CONTAIN THE PRIMARY KEY
 
         self._name = None
         self._key_id_translate = None
@@ -272,8 +273,17 @@ class Key:
     @property
     def sequence(self):
         """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
-        sequence = [lk.index_tuple() for lk in self._latched_keys]
+        # include the primary key itself in the sequence
+        sequence = [self] + self._latched_keys
         return sequence
+
+    @property
+    def callbackKey(self) -> tuple:
+        """returns the key identifier used for callbacks"""
+        import gremlin.shared_state
+        import gremlin.input_types
+        return (gremlin.shared_state.keyboard_tab_guid, gremlin.input_types.InputType.KeyboardLatched, (self._scan_code, self._is_extended), self.is_latched)
+
 
     @property
     def mouse_button(self):
@@ -291,8 +301,8 @@ class Key:
         self._update()
 
     def _update(self):
-
-        if len(self._latched_keys) > 0:
+        if self._latched_keys:
+            # latched keys defined
             keys = []
             if self.name:
                 keys.append(self)
@@ -316,8 +326,10 @@ class Key:
 
             self._display_name = " + ".join(key_names)
         else:
+            # single key / primary key
             code = f"0x{self._scan_code:02X}({self._scan_code:02}){' EX' if self._is_extended else ''}"
             self._latched_name = ""
+            self._display_name = self._name
         self._latched_code = code
 
     @property
@@ -375,6 +387,55 @@ class Key:
     def key_tuple(self):
         return self._scan_code, self._is_extended
 
+    @staticmethod
+    def _as_key_tuple(key: Key | tuple[int, bool]) -> tuple[int, bool]:
+        """Return a physical key identity without using Key equality or hashing."""
+        if isinstance(key, Key):
+            return key.key_tuple
+        scan_code, is_extended = key
+        return scan_code, is_extended
+
+    @property
+    def chord_key(self) -> frozenset[tuple[int, bool]]:
+        """Order-independent identity of the primary key and its latched keys.
+
+        This is computed on demand because latched_keys is mutable. The same
+        physical keys produce the same identity regardless of the primary key.
+        """
+        return frozenset(self._as_key_tuple(key) for key in [self, *self._latched_keys])
+
+    def matches_pressed_keys(
+        self, pressed_keys: Iterable[Key | tuple[int, bool]], *, exact: bool = False
+    ) -> bool:
+        """Check whether every key in this chord is currently held.
+
+        pressed_keys must contain only currently pressed keys, as Key objects
+        or (scan_code, is_extended) pairs. Press order is irrelevant. Unrelated
+        held keys are allowed unless exact=True. Does not modify pressed_keys.
+        """
+        pressed = {self._as_key_tuple(key) for key in pressed_keys}
+        required = self.chord_key
+        return required == pressed if exact else required.issubset(pressed)
+
+    def matches_keypress(
+        self,
+        key: Key | tuple[int, bool],
+        pressed_keys: Iterable[Key | tuple[int, bool]],
+        *,
+        exact: bool = False,
+    ) -> bool:
+        """Match a key-down event from ANY member of a fully held chord.
+
+        Update pressed_keys with the incoming event BEFORE calling this method;
+        remove released keys from that collection on key-up. An unrelated key
+        event never matches, even when this chord is already held. This method
+        is stateless: repeated key-down events match while the chord is held;
+        ignore auto-repeat events in the caller if only one trigger is wanted.
+        """
+        if self._as_key_tuple(key) not in self.chord_key:
+            return False
+        return self.matches_pressed_keys(pressed_keys, exact=exact)
+
     @property
     def debug_name(self):
         return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
@@ -385,6 +446,11 @@ class Key:
         data.extend([(key._scan_code, key._is_extended) for key in self.latched_keys])
         data = tuple(data)
         return hash(data)
+
+    def __eq__(self, other):
+        if not isinstance(other, Key):
+            return False
+        return self.key_tuple == other.key_tuple
 
 
     def __lt__(self, other):
@@ -415,7 +481,7 @@ class Key:
         # eliminate duplicate keys
         for key in keys:
             assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
-            if key.name:
+            if key.name and key not in self._latched_keys:
                 # skip not a null key
                 self._latched_keys.append(key)
         self._update()
@@ -423,22 +489,22 @@ class Key:
     def addLatchedKey(self, key: Key):
         """adds a key to the list of latched keys"""
         assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
-        if key.name and key not in self._latched_keys:
+        if key.name and key not in self._latched_keys and key != self:
             self._latched_keys.append(key)
         self._update()
 
     def getKeys(self) -> list[Key]:
         """returns a list of latched keys including the primary key"""
-        keys = set(self._latched_keys)
-        if self not in keys:
-            keys.add(self)
-        sorted_keys = sort_keys(keys)
-        return sorted_keys
+        if self.name:
+            if self._latched_keys:
+                return sort_keys([self] + self._latched_keys)
+            return [self]
+        return []
 
     @property
     def is_latched(self):
         """true if this key is latched"""
-        return len(self._latched_keys) > 0
+        return bool(self._latched_keys)
 
     @property
     def is_modifier(self):
@@ -530,7 +596,7 @@ class Key:
 
         self._load(scan_code, is_extended, virtual_code, is_mouse = scan_code >= 0x1000)
 
-        self._latched_keys = []
+        self._latched_keys = [] #  gremlin.util.TriggerList(on_change = self._handle_latched_change)
         latched_nodes = node.xpath(f".//{latched_tag}")
         for latched_node in latched_nodes:
             latched_virtual_code = safe_read(latched_node, "virtual-code", int, 0)
@@ -543,6 +609,22 @@ class Key:
             self._latched_keys.append(latched_key)
 
         self._update()
+
+    def _handle_latched_change(self, action: str, data):
+        """Handles changes to the latched keys list."""
+        if action == "add":
+            # Handle addition of a latched key
+            pass
+        elif action == "remove":
+            # Handle removal of a latched key
+            pass
+        elif action == "replace":
+            # Handle replacement of a latched key
+            pass
+        elif action == "clear":
+            # Handle clearing of latched keys
+            pass
+        pass
 
     @staticmethod
     def fromXml(node: etree.Element):

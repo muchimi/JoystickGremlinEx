@@ -1431,16 +1431,13 @@ def _fill_cache_key(fill) -> str:
 
     if is_gradient(fill):
         g = normalize_gradient(fill)
-        stops = tuple(
-            (round(float(s.get("pos", 0.0)), 4), str(s.get("color") or ""))
-            for s in (g.get("stops") or [])
-        )
+        stops = tuple((round(float(s.get("pos", 0.0)), 4), str(s.get("color") or "")) for s in (g.get("stops") or []))
         return (
             f"g|{g.get('style')}|{round(float(g.get('angle') or 0.0), 2)}|"
             f"{round(float(g.get('scale') or 100.0), 2)}|"
             f"{round(float(g.get('smoothness') or 0.0), 2)}|{stops}"
         )
-    return f"c|{qcolor(fill, '#00000000').name(QtGui.QColor.NameFormat.HexArgb)}"
+    return f"c|{qcolor(fill, '#00000000').name(QtGui.QColor().NameFormat.HexArgb)}"
 
 
 def _image_content_rect(path: str, rect: QtCore.QRectF, keep_aspect: bool) -> QtCore.QRectF | None:
@@ -1594,10 +1591,7 @@ def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawRect(rect)
     path = style.get("image_path") or ""
     keep_aspect = bool(style.get("image_keep_aspect", True))
-    has_content = bool(path) and (
-        (is_svg_path(path) and svg_renderer(path) is not None)
-        or (not is_svg_path(path) and not _widget_image_pixmap(path).isNull())
-    )
+    has_content = bool(path) and ((is_svg_path(path) and svg_renderer(path) is not None) or (not is_svg_path(path) and not _widget_image_pixmap(path).isNull()))
     if not has_content:
         painter.setPen(_pen(style.get("border"), border_w))
         painter.setBrush(QtCore.Qt.NoBrush)
@@ -1784,9 +1778,7 @@ def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) 
     if pen.style() == QtCore.Qt.NoPen:
         return pen
 
-    kind = normalize_ocr_border_style(
-        style.get("border_style_on" if armed else "border_style") or style.get("border_style")
-    )
+    kind = normalize_ocr_border_style(style.get("border_style_on" if armed else "border_style") or style.get("border_style"))
     if kind == "solid":
         pen.setStyle(QtCore.Qt.SolidLine)
         return pen
@@ -1957,9 +1949,11 @@ def _streamdeck_slot_pixmap(slot_item, pressed: bool, side: int, lcd: bool = Fal
 
         kind = getattr(slot_item, "kind", "") or ""
         use_lcd = lcd or kind in ("dial", "dial_press")
-        if item_needs_composite(slot_item, pressed=pressed) or (
-            pressed and item_needs_composite(slot_item, pressed=False)
-        ) or (use_lcd and (getattr(slot_item, "bg_color", "") or getattr(slot_item, "bg_color_pressed", ""))):
+        if (
+            item_needs_composite(slot_item, pressed=pressed)
+            or (pressed and item_needs_composite(slot_item, pressed=False))
+            or (use_lcd and (getattr(slot_item, "bg_color", "") or getattr(slot_item, "bg_color_pressed", "")))
+        ):
             if use_lcd:
                 pixmap = compose_key_pixmap(slot_item, pressed=pressed, width=200, height=100)
             else:
@@ -2194,8 +2188,7 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     image_path = on_path if (on and on_path) else off_path
     keep_aspect = bool(style.get("image_keep_aspect", True))
     has_image = bool(image_path) and (
-        (is_svg_path(image_path) and svg_renderer(image_path) is not None)
-        or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
+        (is_svg_path(image_path) and svg_renderer(image_path) is not None) or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
     )
     use_shape = button_uses_shape_path(item)
     painter.save()
@@ -3448,11 +3441,7 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
     if label_font is not None:
         label_h = float(QtGui.QFontMetricsF(label_font).height()) + 6.0
         label_h = min(label_h, max(12.0, rect.height() * 0.45))
-    content = (
-        QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h))
-        if label_h > 0
-        else QtCore.QRectF(rect)
-    )
+    content = QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h)) if label_h > 0 else QtCore.QRectF(rect)
     painter.save()
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
@@ -4211,9 +4200,9 @@ def _default_sphere_gradient(seed: str | None = None) -> dict[str, Any]:
         "scale": 130.0,
         "smoothness": 100.0,
         "stops": [
-            {"pos": 0.0, "color": highlight.name(QtGui.QColor.HexArgb)},
-            {"pos": 42.0, "color": mid.name(QtGui.QColor.HexArgb)},
-            {"pos": 100.0, "color": shadow.name(QtGui.QColor.HexArgb)},
+            {"pos": 0.0, "color": highlight.name(QtGui.QColor().HexArgb)},
+            {"pos": 42.0, "color": mid.name(QtGui.QColor().HexArgb)},
+            {"pos": 100.0, "color": shadow.name(QtGui.QColor().HexArgb)},
         ],
         "midpoints": [0.45, 0.55],
     }
@@ -4232,7 +4221,7 @@ def _sphere_fill_brush(style: dict[str, Any], ball: QtCore.QRectF) -> QtGui.QBru
     if color.alpha() <= 0:
         return QtCore.Qt.NoBrush
     # Auto-shade so a flat swatch still reads as a sphere.
-    return paint_value_brush(_default_sphere_gradient(color.name(QtGui.QColor.HexArgb)), ball, "#b0b0b0")
+    return paint_value_brush(_default_sphere_gradient(color.name(QtGui.QColor().HexArgb)), ball, "#b0b0b0")
 
 
 def _unit(vx: float, vy: float, vz: float) -> tuple[float, float, float]:
@@ -4510,11 +4499,7 @@ def _draw_polar_projections(
         return
     origin = project(0.0, 0.0, 0.0)
     try:
-        path_w = float(
-            style.get("projection_width")
-            if style.get("projection_width") is not None
-            else (style.get("needle_width") or 2.0)
-        )
+        path_w = float(style.get("projection_width") if style.get("projection_width") is not None else (style.get("needle_width") or 2.0))
     except (TypeError, ValueError):
         path_w = 2.0
     path_w = max(0.8, path_w)
@@ -4528,16 +4513,8 @@ def _draw_polar_projections(
     if eq_dir[0] == 0.0 and eq_dir[2] == 0.0:
         eq_dir = (1.0, 0.0, 0.0)
     eq_on = (eq_dir[0] * tip_radius, 0.0, eq_dir[2] * tip_radius)
-    meridian = [
-        (d[0] * tip_radius, d[1] * tip_radius, d[2] * tip_radius)
-        for d in (
-            _slerp_dirs(north, tip_dir, 20)
-            + _slerp_dirs(tip_dir, eq_dir, 14)[1:]
-        )
-    ]
-    _draw_front_back_polyline(
-        painter, origin, meridian, project, color, path_w, screen_radius
-    )
+    meridian = [(d[0] * tip_radius, d[1] * tip_radius, d[2] * tip_radius) for d in (_slerp_dirs(north, tip_dir, 20) + _slerp_dirs(tip_dir, eq_dir, 14)[1:])]
+    _draw_front_back_polyline(painter, origin, meridian, project, color, path_w, screen_radius)
 
     if style.get("show_projection", True):
         # Plane radial to the equator (same azimuth) — clamp so it cannot leave the ball.
@@ -4677,11 +4654,7 @@ def _paint_3d_axes_body(
         on_x = project(x, 0.0, 0.0)
         on_z = project(0.0, 0.0, z)
         try:
-            path_w = float(
-                style.get("projection_width")
-                if style.get("projection_width") is not None
-                else (style.get("needle_width") or 2.5)
-            )
+            path_w = float(style.get("projection_width") if style.get("projection_width") is not None else (style.get("needle_width") or 2.5))
         except (TypeError, ValueError):
             path_w = 2.5
         painter.setBrush(QtCore.Qt.NoBrush)
@@ -4697,9 +4670,7 @@ def _paint_3d_axes_body(
     if style.get("show_vector", False) or polar:
         try:
             vec_w = float(
-                style.get("vector_width")
-                if style.get("vector_width") is not None
-                else (style.get("projection_width") or style.get("needle_width") or 2.5)
+                style.get("vector_width") if style.get("vector_width") is not None else (style.get("projection_width") or style.get("needle_width") or 2.5)
             )
         except (TypeError, ValueError):
             vec_w = 2.5
@@ -5039,9 +5010,7 @@ def paint_widget(
         else:
             fn(painter, item, value)
     except Exception:
-        syslog.exception(
-            f"OBS OVERLAY: paint failed for {item.get('type')} id={item.get('id')}"
-        )
+        syslog.exception(f"OBS OVERLAY: paint failed for {item.get('type')} id={item.get('id')}")
     finally:
         painter.restore()
 
@@ -5064,7 +5033,24 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "browser", "efb", "ocr", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch"):
+    if widget_type in (
+        "label",
+        "panel",
+        "shape",
+        "image",
+        "application",
+        "remote_view",
+        "streamdeck",
+        "browser",
+        "efb",
+        "ocr",
+        "button",
+        "axis_mouse",
+        "axis_graph",
+        "axis_bars",
+        "sys_stats",
+        "stopwatch",
+    ):
         return None
     if widget_type == "input_display":
         from .input_display import input_display_key_at_point

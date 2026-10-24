@@ -467,7 +467,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addLayout(self.dialog_layout)
         self.tab_container = QtWidgets.QTabWidget()
-        self.tab_container.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
+        self.tab_container.setStyleSheet(gremlin.ui.ui_common.Color().cssTab())
         self.main_layout.addWidget(self.tab_container)
 
         self.closed.connect(self._save_on_close_cb)
@@ -802,7 +802,6 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.filter_axis_threshold_widget.setValue(self.config.filter_axis_threshold)
         self.filter_axis_threshold_widget.valueChanged.connect(self._filter_axis_threshold_update)
 
-
         filter_widget = gremlin.ui.ui_common.getHContainer(
             [
                 self.filter_axis_widget,
@@ -873,11 +872,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         page_layout.addWidget(col2_widget, 0, 1)
 
         # themes
-        themes = [
-            ("Windows", "auto"),
-            ("Light", "light"),
-            ("Dark", "dark"),
-        ]
+        themes = [("Windows", "auto"), ("Light", "light"), ("Dark", "dark"), ("Custom", "custom")]
 
         widgets = []
         current_theme = self.config.theme
@@ -888,6 +883,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
             widget.clicked.connect(self._theme_changed)
             widgets.append(widget)
 
+        self.customize_theme_widget = gremlin.ui.ui_common.QDataPushButton("Custom Colors...", tooltip="Customize theme", callback=self._handle_customize_theme)
         widgets.append("(Restart Required)")
 
         self.theme_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -895,6 +891,8 @@ class OptionsDialog(ui_common.BaseDialogUi):
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title="Theme", transparent=True)
         box.addWidget(self.theme_widget)
+        box.addWidget(gremlin.ui.ui_common.getHContainer([self.customize_theme_widget, "||"], widget_only=True))
+        # self.customize_theme_widget.setEnabled(current_theme == "custom")
 
         col1_layout.addWidget(box)
 
@@ -952,8 +950,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.show_joystick_input_widget.clicked.connect(self._show_joystick_input_cb)
 
         # device label visibility
-        self.device_label_visible_widget = QDataCheckbox("Show device label", value = self.config.device_label_visible, callback=self._device_label_visible_cb)
-
+        self.device_label_visible_widget = QDataCheckbox("Show device label", value=self.config.device_label_visible, callback=self._device_label_visible_cb)
 
         # disable live repeaters when input viewer visible
         # self.disable_joystick_input_widget = QtWidgets.QCheckBox("Disable joystick repeaters when Input Viewer visible")
@@ -1333,6 +1330,11 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
 
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
+
+    def _handle_customize_theme(self):
+        # Implement the logic to customize the theme here
+        dialog = gremlin.ui.ui_common.QCustomThemeDialog(self)
+        dialog.exec_()
 
     def _handle_cache_count_enable_changed(self, checked: bool):
         self.config.ui_max_input_enabled = checked
@@ -1770,7 +1772,7 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
         page_layout.setContentsMargins(6, 0, 6, 0)
         page_widget.setStyleSheet("background: black;")
-        color = gremlin.ui.ui_common.Color.tabBackgroundColor()
+        color = gremlin.ui.ui_common.Color().tabBackgroundColor()
         css = f"background: {color};"
         page_widget.setStyleSheet(css)
 
@@ -2285,17 +2287,18 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout.addWidget(QtWidgets.QLabel("Module Configuration Options"))
 
         modules = [
-            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.", 'GEX_STREAMDECK_ENABLED'),
-            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen.", 'GEX_OVERLAY_ENABLED'),
-            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS visual axis-flow designer tab and Map to AFCS action.", 'GEX_AFCS_ENABLED'),
-            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.", 'GEX_MIDI_ENABLED'),
+            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.", "GEX_STREAMDECK_ENABLED"),
+            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen.", "GEX_OVERLAY_ENABLED"),
+            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS visual axis-flow designer tab and Map to AFCS action.", "GEX_AFCS_ENABLED"),
+            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.", "GEX_MIDI_ENABLED"),
             (
                 "osc",
                 "OSC",
-                "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.", 'GEX_OSC_ENABLED'),
-            ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", 'GEX_VOICE_ENABLED'),
-            ("octavi", "Octavi", "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.", 'GEX_OCTAVI_ENABLED'),
-
+                "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.",
+                "GEX_OSC_ENABLED",
+            ),
+            ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", "GEX_VOICE_ENABLED"),
+            ("octavi", "Octavi", "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.", "GEX_OCTAVI_ENABLED"),
         ]
 
         self._module_visible_map = {
@@ -2325,14 +2328,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.voice_enabled
                 case "octavi":
                     value = self.config.octavi_enabled
-            checkbox = gremlin.ui.ui_common.QDataCheckbox(name,
-                                                          value = value,
-                                                          data=data,
-                                                          tooltip=description,
-                                                          callbackEx=self._handle_module_enabled_changed)
+            checkbox = gremlin.ui.ui_common.QDataCheckbox(name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed)
             if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
                 var_widget = QtWidgets.QLabel(f"({env_var} set)")
-                widget = gremlin.ui.ui_common.getHContainer([checkbox, var_widget,"||"], widget_only=True)
+                widget = gremlin.ui.ui_common.getHContainer([checkbox, var_widget, "||"], widget_only=True)
             else:
                 widget = checkbox
 
@@ -2356,7 +2355,7 @@ Enabled modules may not show until the device filter is updated.
         self.tab_container.addTab(content_widget, "Modules")
 
     def _handle_module_enabled_changed(self, widget, checked):
-        """ handle module activation/deactivation
+        """handle module activation/deactivation
 
         if a module is newly activated, the device filter is updated to make sure it is visible
 
@@ -2590,8 +2589,9 @@ Enabled modules may not show until the device filter is updated.
     def _theme_changed(self):
         theme = self.sender().data
         self.config.theme = theme
+        # self.customize_theme_widget.setEnabled(theme == "custom")
         app = QtWidgets.QApplication.instance()
-        app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
+        app.setStyleSheet(gremlin.ui.ui_common.Color().cssApplication())
 
     @QtCore.Slot(bool)
     def _highlight_enabled_cb(self, checked: bool):
@@ -3468,7 +3468,7 @@ Enabled modules may not show until the device filter is updated.
                 container_layout.addWidget(duplicate_button, 1, 3)
 
                 if not item.valid:
-                    warning_color = gremlin.ui.ui_common.Color.warningColor()
+                    warning_color = gremlin.ui.ui_common.Color().warningColor()
                     warning_widget = ui_common.QIconLabel(
                         "ph.shield-warning-fill",
                         text=item.warning,
@@ -3642,7 +3642,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
         self.refresh_button = gremlin.ui.ui_common.QDataPushButton("Refresh")
-        self.refresh_button.setIcon(load_icon("ei.refresh", qta_color=gremlin.ui.ui_common.Color.activeColor()))
+        self.refresh_button.setIcon(load_icon("ei.refresh", qta_color=gremlin.ui.ui_common.Color().activeColor()))
         self.refresh_button.clicked.connect(self._refresh)
 
         self.main_layout.addWidget(self.list_view)
@@ -3993,7 +3993,7 @@ class ModeManagerDialog(ui_common.BaseDialogUi):
         self.add_button.setToolTip("Adds a new mode to the profile")
 
         label = QtWidgets.QLabel('A mode represents a unique set of mappings.A parent for a mode causes the the mode "inherits" all actions of the parent. ')
-        label.setStyleSheet(f"QLabel {{ background-color : {gremlin.ui.ui_common.Color.selectColor()}; }}")
+        label.setStyleSheet(f"QLabel {{ background-color : {gremlin.ui.ui_common.Color().selectColor()}; }}")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
@@ -4890,7 +4890,6 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
             value=self.config.ReportShowFolder,
         )
 
-
         self.show_profile_tree_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Show profile tree",
             tooltip="Opens the profile tree dialog after the report is generated",
@@ -4949,15 +4948,13 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
     def _ok_button_cb(self):
         import gremlin.reporting
 
-
         if self.config.ReportShowProfileTree:
-
             profile = gremlin.shared_state.current_profile
             if profile is not None and getattr(profile, "graph", None) is not None:
                 profile.graph.show_tree_dialog(self)
         else:
-
             import gremlin.reporting
+
             report = gremlin.reporting.ReportEngine()
 
             options = gremlin.reporting.ReportOptions()
@@ -4968,9 +4965,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
 
             report.generate(options)
 
-
         self.close()
-
 
     @QtCore.Slot()
     def _cancel_button_cb(self):
@@ -5308,7 +5303,6 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
             self.close()
         finally:
             wm.popCursor()
-
 
     @QtCore.Slot()
     def _cancel_cb(self):

@@ -651,7 +651,7 @@ class StateInputItem(InputItem):
         """gets the state value"""
         if self._is_expression:
             return self.evaluate()
-        return self._value or False # default to False if value is None
+        return self._value or False  # default to False if value is None
 
     @value.setter
     def value(self, data: bool):
@@ -1978,7 +1978,6 @@ class StateData:
             return self._data[key].value or False
         return False
 
-
     def toggle(self, key: str):
         """toggles a state"""
 
@@ -2739,8 +2738,8 @@ class StateAttributeEditorWidget(QtWidgets.QWidget):
         self._remove_button.clicked.connect(self._remove_clicked)
         self._sort_button = QDataPushButton("Sort A-Z", checkable=True)
         self._sort_button.toggled.connect(self._sort_toggled)
-        self._clear_button = Buttons.getDeleteWidget(callback=self._handle_clear, tooltip="Clear all attributes", color=Color.blueColor())
-        self._copy_button = Buttons.getCopyWidget(callback=self._handle_copy, color=Color.yellowColor())
+        self._clear_button = Buttons.getDeleteWidget(callback=self._handle_clear, tooltip="Clear all attributes", color=Color().blueColor())
+        self._copy_button = Buttons.getCopyWidget(callback=self._handle_copy, color=Color().yellowColor())
         self._paste_button = Buttons.getPasteWidget(
             callback=self._handle_paste, tooltip="Paste attributes from clipboard.\nThe pasted content should be text and contain one attribute per line."
         )
@@ -3509,7 +3508,7 @@ class StateFilterCountWidget(QtWidgets.QLabel):
         if total == 0:
             self.setText("")
             return
-        self.setText(f"<i>({self._prefix + ' ' if self._prefix else ''}showing {count:,} of {total:,}{' ' +self._suffix if self._suffix else ''})</i>")
+        self.setText(f"<i>({self._prefix + ' ' if self._prefix else ''}showing {count:,} of {total:,}{' ' + self._suffix if self._suffix else ''})</i>")
 
 
 class StateFilterWidget(FilterControlWidget):
@@ -3524,7 +3523,7 @@ class StateFilterWidget(FilterControlWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
         self.count_widget = count_widget
-        self._last_hash = None # tracks changes in the returned data
+        self._last_hash = None  # tracks changes in the returned data
 
         if count_widget is not None:
             count_widget.setModel(model)
@@ -3540,9 +3539,9 @@ class StateFilterWidget(FilterControlWidget):
         self.attributesChanged.connect(self.setActiveAttributes)
 
     def setModel(self, model: StateInputItemModel):
-        """ updates the state input model to use for the fitler"""
+        """updates the state input model to use for the fitler"""
         if model != self.model:
-            self._last_hash = None # reset tracker
+            self._last_hash = None  # reset tracker
             if self.model:
                 self.model.unregisterFilteredDataChangeCallback(self.updateFilter)
             self.model = model
@@ -3551,7 +3550,6 @@ class StateFilterWidget(FilterControlWidget):
                 syslog.info(f"StateFilterWidget: setting input items [{len(items)}] found")
                 self.setInputItems(items)
                 self.model.registerFilteredDataChangeCallback(self.updateFilter)
-
 
     def ensureItems(self):
         if self.model and len(self.input_items) == 0:
@@ -3573,7 +3571,7 @@ class StateFilterWidget(FilterControlWidget):
         self.model.setActiveAttributes(attributes, filter=self.filter, emit=False)
         self.updateFilter()
 
-    def updateFilter(self, force = False):
+    def updateFilter(self, force=False):
         # look for a change
         current_hash = self.model.hashKey(filter=self.filter)
         if not force and current_hash == self._last_hash:
@@ -3583,9 +3581,6 @@ class StateFilterWidget(FilterControlWidget):
 
         self.updateCounts()
         self.changed.emit()
-
-
-
 
     def updateCounts(self):
         if self.count_widget is not None:
@@ -3600,8 +3595,8 @@ class StateRepeaterButton(QDataPushButton):
 
         font_size = int(gremlin.config.Configuration().input_viewer_button_size)
         self.setCheckable(True)
-        css = Color.cssStateButton(font_size)
-        cssAlternate = Color.cssStateExpressionButton(font_size)
+        css = Color().cssStateButton(font_size)
+        cssAlternate = Color().cssStateExpressionButton(font_size)
         self.data = state
         if not state:
             syslog.warning("StateRepeater: State is not provided, setting checked to False")
@@ -3611,8 +3606,10 @@ class StateRepeaterButton(QDataPushButton):
         if state.expression:
             self.setEnabled(False)
             self.setStyleSheet(cssAlternate)
+            self.setToolTip(f"State [{state.key}]\nExpression [{state.expression}]")
         else:
             self.setStyleSheet(css)
+            self.setToolTip(f"State [{state.key}]")
 
         if isinstance(state.value, bool):
             self.setChecked(state.value)
@@ -3679,7 +3676,7 @@ class StateVisualizerWidget(QWidget):
 
         profile = gremlin.shared_state.current_profile
         self._state_filter_widget = StateFilterWidget(model=self.model, profile=profile, count_widget=count_widget, filter=self.VISUALIZER_FILTER)
-        self._state_filter_widget.changed.connect(self._populateState_ui) # update on filter change
+        self._state_filter_widget.changed.connect(self._populateState_ui)  # update on filter change
 
         filter_container = getHContainer([self._state_filter_widget], widget_only=True)
 
@@ -3731,7 +3728,7 @@ class StateVisualizerWidget(QWidget):
         if self.model:
             self.model.unregisterFilter(self.VISUALIZER_FILTER)  # also clears any callbacks for that filter
 
-        self._state_filter_widget.changed.disconnect(self._populateState_ui) # disconnect filter change signal
+        self._state_filter_widget.changed.disconnect(self._populateState_ui)  # disconnect filter change signal
 
         for btn in self._state_buttons.values():
             gremlin.util.delete_widget(btn)
@@ -3833,7 +3830,7 @@ class StateVisualizerWidget(QWidget):
                 i += 1
 
         else:
-            icon = Icons.warningIcon(gremlin.ui.ui_common.Color.yellowColor())
+            icon = Icons.warningIcon(gremlin.ui.ui_common.Color().yellowColor())
             stub = f"Showing {len(items)} out of {state_count}" if has_states else "No states available"
             widget = QWarningWidget(stub, icon=icon)
             layout.addWidget(widget)
@@ -4032,12 +4029,10 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.find_next.connect(self._handle_find_next)
         el.state_added.connect(self._handle_state_added)
 
-
         self.model.popSuspend()
 
         # tell the UI items that depend on the state model it changed
         el.state_model_change.emit(self.model)
-
 
     def _handle_filter_changed(self):
         if self.inputItemListView:
@@ -4047,11 +4042,10 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         super().ensureLoaded()
         # model_count = self.model.unfilteredCount()
         filter_count = len(self._filter_widget.input_items)
-        #syslog.info(f"Model count: {model_count}, Filter count: {filter_count}")
+        # syslog.info(f"Model count: {model_count}, Filter count: {filter_count}")
         if filter_count == 0:
             # sync the data
             self._filter_widget.updateFilter()
-
 
     def _cleanup_ui(self):
         """called when the state device UI is being cleaned up"""
@@ -4482,7 +4476,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             widget.addWidget(label)
 
         if input_item.expression:
-            icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
+            icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color().expressionColor())
             expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data=input_item)
             widget.addWidget(expression_widget)
             StateData().expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))

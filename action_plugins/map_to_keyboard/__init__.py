@@ -53,7 +53,7 @@ class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.record_button, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,

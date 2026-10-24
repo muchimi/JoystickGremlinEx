@@ -1108,7 +1108,7 @@ class CommandMatcher:
             vc.registerCallback(self._handle_command_trigger)
         self._update_commands()
 
-    def removeCommand(self, command: list[VoiceCommand] | VoiceCommand ):
+    def removeCommand(self, command: list[VoiceCommand] | VoiceCommand):
         """removes a single command from the matcher"""
 
         if isinstance(command, VoiceCommand):
@@ -1649,11 +1649,11 @@ class Voice:
         el.profile_stop.connect(self.stop)
 
     def ensureModel(self):
-        """ ensure the voice recognition model is loaded """
+        """ensure the voice recognition model is loaded"""
         InvokeUiMethod(self._ensure_model_ui)
 
     def _ensure_model_ui(self):
-        """ load the model if needed """
+        """load the model if needed"""
 
         if self._model_valid:
             # nothing to do
@@ -1669,7 +1669,7 @@ class Voice:
             on_gui_thread = app is not None and QtCore.QThread.currentThread() is app.thread()
             if on_gui_thread:
                 parent = app.activeWindow()
-                css = gremlin.ui.ui_common.Color.cssProgressDialog()
+                css = gremlin.ui.ui_common.Color().cssProgressDialog()
                 dialog = QtWidgets.QProgressDialog(f"Downloading {self._model_size} voice recognition model...", None, 0, 0, parent)
                 dialog.setWindowModality(QtCore.Qt.WindowModal)
                 dialog.setCancelButton(None)
@@ -1697,10 +1697,6 @@ class Voice:
             self._model_valid = True
             syslog.info(f"Voice: using local voice recognition model [{self._model_size}]")
 
-
-
-
-
     def _beep_init(self):
         # audio beep when toggling voice
 
@@ -1713,7 +1709,6 @@ class Voice:
         self._beep_on_path = os.path.join(sound_folder, "voice_beep_on.wav")
         self._beep_off_path = os.path.join(sound_folder, "voice_beep_off.wav")
 
-
         # sound files located
         if (
             self._beep_on_path
@@ -1724,14 +1719,13 @@ class Voice:
             and os.path.isfile(self._beep_on_recognize_path)
         ):
             self._beep_valid = True
-            self._beep_options = PlaybackOptions("voice_beep",blocking=True)
+            self._beep_options = PlaybackOptions("voice_beep", blocking=True)
             self._sound = Sound()
 
     def ensureBeep(self):
         if self._beep_valid:
             return
         self._beep_init()
-
 
     def _beep(self, enabled: bool):
         if not self._beep_valid:
@@ -1965,7 +1959,7 @@ class Voice:
 
             try:
                 # Input buffers are reused after the callback returns.
-                audio_queue.put_nowait(indata[:, 0].copy()) # @IgnoreException
+                audio_queue.put_nowait(indata[:, 0].copy())  # @IgnoreException
             except queue.Full:
                 # Drop audio rather than blocking the real-time callback.
                 syslog.warning("Audio processing queue full; dropping block")

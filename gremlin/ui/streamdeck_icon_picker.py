@@ -198,9 +198,7 @@ def _scan_pack_dir(
     out: list[IconEntry] = []
     if not os.path.isdir(pack_path):
         return out
-    files = sorted(
-        f for f in os.listdir(pack_path) if f.lower().endswith(_IMAGE_EXTS) and not f.startswith(".")
-    )
+    files = sorted(f for f in os.listdir(pack_path) if f.lower().endswith(_IMAGE_EXTS) and not f.startswith("."))
     for fname in files:
         stem = os.path.splitext(fname)[0]
         out.append(
@@ -239,9 +237,7 @@ def list_library_icons() -> list[IconEntry]:
     user_dirs.sort(key=lambda n: str(cats.get(n, _display_name(n))).casefold())
     for pack_id in user_dirs:
         title = str(cats.get(pack_id) or _display_name(pack_id))
-        out.extend(
-            _scan_pack_dir(os.path.join(user_root, pack_id), pack_id, title, user_owned=True)
-        )
+        out.extend(_scan_pack_dir(os.path.join(user_root, pack_id), pack_id, title, user_owned=True))
 
     return out
 
@@ -264,7 +260,7 @@ def render_icon_to_png(
             if not renderer.isValid():
                 return None
             image = QtGui.QImage(size, size, QtGui.QImage.Format.Format_ARGB32)
-            image.fill(QtCore.Qt.GlobalColor.transparent)
+            image.fill(QtCore.Qt.GlobalColor().transparent)
             painter = QtGui.QPainter(image)
             renderer.render(painter)
             painter.end()
@@ -370,7 +366,7 @@ class _IconTile(QtWidgets.QToolButton):
             if renderer.isValid():
                 side = max(48, self._tile - 8)
                 image = QtGui.QImage(side, side, QtGui.QImage.Format.Format_ARGB32)
-                image.fill(QtCore.Qt.GlobalColor.transparent)
+                image.fill(QtCore.Qt.GlobalColor().transparent)
                 painter = QtGui.QPainter(image)
                 renderer.render(painter)
                 painter.end()
@@ -402,8 +398,8 @@ class _PackSection(QtWidgets.QWidget):
         self._header = QtWidgets.QPushButton()
         self._header.setFlat(True)
         self._header.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        hdr = Color.headerBarBackgroundColor()
-        fg = Color.normalColor()
+        hdr = Color().headerBarBackgroundColor()
+        fg = Color().normalColor()
         self._header.setStyleSheet(
             f"""
             QPushButton {{
@@ -415,7 +411,7 @@ class _PackSection(QtWidgets.QWidget):
                 border: none;
                 background: transparent;
             }}
-            QPushButton:hover {{ color: {Color.normalLightColor()}; background-color: {hdr}; border-radius: 4px; }}
+            QPushButton:hover {{ color: {Color().normalLightColor()}; background-color: {hdr}; border-radius: 4px; }}
             """
         )
         self._header.clicked.connect(self._toggle)
@@ -564,16 +560,16 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_filter)
         search_row.addWidget(self._search, 1)
-        new_cat_btn = QDataPushButton("New category…", tooltip="Create a personal icon category (stored for your user, not in the profile)", clicked=self._new_category)
+        new_cat_btn = QDataPushButton(
+            "New category…", tooltip="Create a personal icon category (stored for your user, not in the profile)", clicked=self._new_category
+        )
         import_btn = QDataPushButton("Import icons…", tooltip="Import image files into a personal category", clicked=lambda: self._import_icons())
         search_row.addWidget(new_cat_btn)
         search_row.addWidget(import_btn)
         layout.addLayout(search_row)
 
-        hint = QtWidgets.QLabel(
-            "Personal categories & imports are saved for your Windows user — not inside a profile."
-        )
-        hint.setStyleSheet(f"color: {Color.inactiveColor()}; font-size: 11px;")
+        hint = QtWidgets.QLabel("Personal categories & imports are saved for your Windows user — not inside a profile.")
+        hint.setStyleSheet(f"color: {Color().inactiveColor()}; font-size: 11px;")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -633,8 +629,7 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         for btn in (zoom_down, zoom_up):
             btn.setFixedSize(28, 28)
             btn.setStyleSheet(
-                "QToolButton { background:#2b2b2b; border:1px solid #4a4a4a; border-radius:14px; color:#e8e8e8; }"
-                "QToolButton:hover { background:#353535; }"
+                "QToolButton { background:#2b2b2b; border:1px solid #4a4a4a; border-radius:14px; color:#e8e8e8; }QToolButton:hover { background:#353535; }"
             )
         footer.addWidget(zoom_down)
         footer.addWidget(zoom_up)
@@ -642,16 +637,12 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         self._ok = Buttons.getOkWidget(callback=self._accept_selection)
         self._ok.setEnabled(False)
         cancel_btn = Buttons.getCancelWidget(callback=self.reject)
-        footer.addWidget(
-            gremlin.ui.ui_common.getHContainer([self._ok, cancel_btn], widget_only=True)
-        )
+        footer.addWidget(gremlin.ui.ui_common.getHContainer([self._ok, cancel_btn], widget_only=True))
         layout.addLayout(footer)
 
     def _update_color_swatch(self):
         c = self._color
-        self._color_swatch.setStyleSheet(
-            f"QPushButton {{ background-color: {c.name()}; border: 1px solid #888; border-radius: 4px; }}"
-        )
+        self._color_swatch.setStyleSheet(f"QPushButton {{ background-color: {c.name()}; border: 1px solid #888; border-radius: 4px; }}")
 
     def _set_color(self, color: QtGui.QColor):
         if color.isValid():
@@ -694,7 +685,7 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
             self._sections.append(section)
         if not icons:
             empty = QtWidgets.QLabel("No icons found. Import some or use New category…")
-            empty.setStyleSheet(f"color: {Color.inactiveColor()}; padding: 24px;")
+            empty.setStyleSheet(f"color: {Color().inactiveColor()}; padding: 24px;")
             self._body_layout.addWidget(empty)
         self._body_layout.addStretch(1)
         # Re-apply active search filter
@@ -842,8 +833,7 @@ class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
         self._again: QtWidgets.QCheckBox | None = None
         if show_tip:
             banner = gremlin.ui.ui_common.QInfoBox(
-                "Tip: you can also drag and drop an image file directly onto a "
-                "Stream Deck key (or onto the Released / Pressed icon preview)."
+                "Tip: you can also drag and drop an image file directly onto a Stream Deck key (or onto the Released / Pressed icon preview)."
             )
             self._again = QtWidgets.QCheckBox("Don't show this again")
             tip_wrap = QtWidgets.QWidget()
@@ -866,9 +856,7 @@ class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
         layout.addLayout(row)
 
         cancel_btn = Buttons.getCancelWidget(callback=self.reject)
-        layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(["||", cancel_btn], widget_only=True)
-        )
+        layout.addWidget(gremlin.ui.ui_common.getHContainer(["||", cancel_btn], widget_only=True))
 
     def _persist_tip(self):
         if self._again is not None and self._again.isChecked():

@@ -168,12 +168,11 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         self.stop_widget = gremlin.ui.ui_common.QDataCheckbox(
-                    "Stop previous audio",
-                    value=self.action_data.stop_previous,
-                    callback=self._handle_stop_audio_changed,
-                    tooltip="If checked, any other audio currently playing will stop before playing this sample.",
-                )
-
+            "Stop previous audio",
+            value=self.action_data.stop_previous,
+            callback=self._handle_stop_audio_changed,
+            tooltip="If checked, any other audio currently playing will stop before playing this sample.",
+        )
 
         cooldown_container = gremlin.ui.ui_common.getHContainer(
             [
@@ -354,7 +353,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.etts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()))
+        self.play_widget.setIcon(load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color().activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._handle_play)
 
@@ -422,7 +421,6 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Maximum time in seconds the sample has to play.\nThe sample will be cut short if the specified time is shorter than the normal sample play time.\nUse 0 to disable (default).",
         )
 
-
         self.block_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Block playback",
             value=self.action_data.blocking,
@@ -443,7 +441,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         block_group = gremlin.ui.ui_common.getHContainer(
-            [ self.block_widget, gremlin.ui.ui_common.QHorizontalSeparator(), self.block_delay_widget, block_sync_widget, "||"], widget_only=True
+            [self.block_widget, gremlin.ui.ui_common.QHorizontalSeparator(), self.block_delay_widget, block_sync_widget, "||"], widget_only=True
         )
 
         value = not (self.action_data.trim_all or self.action_data.trim_end)
@@ -653,17 +651,17 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
     def _handle_trim_threshold(self, value: int):
         self.action_data.silence_threshold_db = value
 
-    def _handle_trim_none(self, checked : bool):
+    def _handle_trim_none(self, checked: bool):
         if checked:
             self.action_data.trim_all = False
             self.action_data.trim_end = False
 
-    def _handle_trim_all(self, checked : bool):
+    def _handle_trim_all(self, checked: bool):
         if checked:
             self.action_data.trim_all = True
             self.action_data.trim_end = True
 
-    def _handle_trim_end(self, checked : bool):
+    def _handle_trim_end(self, checked: bool):
         if checked:
             self.action_data.trim_all = False
             self.action_data.trim_end = True
@@ -1461,7 +1459,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             fname = self.file_path_widget.text()
             valid = os.path.isfile(fname)
             if valid:
-                self._setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color.activeColor())
+                self._setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color().activeColor())
                 self.action_data._sound_files.clear()  # force a reload at next play
             else:
                 self._setIcon("fa6s.circle-exclamation", color="red")
@@ -1618,7 +1616,9 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self.blocking = config.audio_blocking  # whether playback should block until finished
-        self.blocking_delay_ms = config.audio_blocking_delay_ms  # blocking delay in ms (this is an optional pause after the sound finishes playing when blocked)
+        self.blocking_delay_ms = (
+            config.audio_blocking_delay_ms
+        )  # blocking delay in ms (this is an optional pause after the sound finishes playing when blocked)
         self.trim_all = True  # controls if the audio is trimmed for silence at the beginning and end
         self.trim_end = True  # controls if the audio is trimmed for silence at the end (when trim_all is not set)
         self.silence_threshold_db: float = -55.0  # threshold in dB to consider as silence

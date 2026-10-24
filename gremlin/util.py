@@ -37,7 +37,7 @@ from ctypes import Structure, c_long
 import collections
 import qtawesome as qta
 from lxml import etree as ElementTree
-from typing import Callable
+from typing import Callable, Any
 import hashlib
 import random
 
@@ -65,7 +65,8 @@ g_loaded_modules = {}
 syslog = logging.getLogger("system")
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
-PACKAGED = hasattr(sys, '_MEIPASS') and not GEX_DEV_ENABLED
+PACKAGED = hasattr(sys, "_MEIPASS") and not GEX_DEV_ENABLED
+
 
 def debug_only(func):
     """decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
@@ -462,6 +463,7 @@ def hat_direction_to_tuple(value):
         return lookup[value]
     return None
 
+
 """
 workaround to QT's deferred delete mechanism for QWidget objects to keep python references in sync with QT's C++ references
 most of the problems with QT's memory management arise from its deferred delete mechanism for QWidget objects and teardown
@@ -483,6 +485,7 @@ def _trace(label: str) -> None:
     """Append one crash-trail breadcrumb. Never raises."""
     try:
         from gremlin.diagnostics import breadcrumb
+
         breadcrumb(label)
     except Exception:
         pass
@@ -570,7 +573,7 @@ def clear_layout(layout):
 
 
 def _clear_layout(layout):
-    """ clear all widgets and layouts from the given layout """
+    """clear all widgets and layouts from the given layout"""
     if not layout or not Shiboken.isValid(layout):
         return
     for index in reversed(range(layout.count())):
@@ -880,11 +883,11 @@ def find_file(file_path, root_folder=None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
 
+
 def find_sound(file_path):
     """locates a sound file"""
     root_folder = gremlin.shared_state.root_path
     return find_file(file_path, os.path.join(root_folder, "sounds"))
-
 
 
 def find_icon(icon_file):
@@ -971,10 +974,12 @@ def _find_file(file_path, root_folder=None):
     if os.path.isabs(file_path):
         direct_candidates.append(file_path)
     else:
-        direct_candidates.extend([
-            os.path.join(root_folder, file_path),
-            os.path.join(root_folder, os.path.basename(file_path)),
-        ])
+        direct_candidates.extend(
+            [
+                os.path.join(root_folder, file_path),
+                os.path.join(root_folder, os.path.basename(file_path)),
+            ]
+        )
 
     for candidate in direct_candidates:
         if os.path.isfile(candidate):
@@ -1135,7 +1140,7 @@ def load_pixmap(path, size=24, qta_color=None):
 
     if not is_image:
         if not qta_color:
-            qta_color = gremlin.ui.ui_common.Color.normalColor()
+            qta_color = gremlin.ui.ui_common.Color().normalColor()
         if isinstance(qta_color, str):
             assert qta_color.startswith("#") and len(qta_color) == 7
         icon = None
@@ -1164,7 +1169,7 @@ def load_pixmap(path, size=24, qta_color=None):
 
     # return a dummy pixmap so the code doesn't blow up
     syslog.error(f"load_pixmap(): invalid path: {the_path} {path}")
-    icon: QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
+    icon: QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color().warningColor())
     return icon.pixmap(desired_size)
 
 
@@ -1218,7 +1223,7 @@ def _load_icon(*paths, use_qta=False, qta_color=None):
         # assume a QTA icon if no extension
         try:
             if not qta_color:
-                qta_color = gremlin.ui.ui_common.Color.normalColor()
+                qta_color = gremlin.ui.ui_common.Color().normalColor()
             if isinstance(qta_color, str):
                 assert qta_color.startswith("#") and len(qta_color) == 7
             try:
@@ -2033,9 +2038,7 @@ class InvokeUiMethod(QtCore.QObject):
             app = QtWidgets.QApplication.instance()
             if app is not None:
                 try:
-                    on_ui = QtCore.QThread.currentThread() is app.thread() or (
-                        QtCore.QThread.currentThread() == app.thread()
-                    )
+                    on_ui = QtCore.QThread.currentThread() is app.thread() or (QtCore.QThread.currentThread() == app.thread())
                 except Exception:
                     on_ui = False
 
@@ -2795,30 +2798,30 @@ def ansiText(value, color=None, bold=False):
     """converts a value to an ansi colored expression"""
     import gremlin.ui.ui_common
 
-    ansiReset = gremlin.ui.ui_common.Color.ansiReset()
+    ansiReset = gremlin.ui.ui_common.Color().ansiReset()
     if not color and isinstance(value, bool):
         if value:
-            ansiColor = gremlin.ui.ui_common.Color.ansiYellow(bold)
+            ansiColor = gremlin.ui.ui_common.Color().ansiYellow(bold)
         else:
-            ansiColor = gremlin.ui.ui_common.Color.ansiGreen(bold)
+            ansiColor = gremlin.ui.ui_common.Color().ansiGreen(bold)
     else:
         match color:
             case "red":
-                ansiColor = gremlin.ui.ui_common.Color.ansiRed(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiRed(bold)
             case "green":
-                ansiColor = gremlin.ui.ui_common.Color.ansiGreen(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiGreen(bold)
             case "yellow":
-                ansiColor = gremlin.ui.ui_common.Color.ansiYellow(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiYellow(bold)
             case "blue":
-                ansiColor = gremlin.ui.ui_common.Color.ansiBlue(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiBlue(bold)
             case "magenta":
-                ansiColor = gremlin.ui.ui_common.Color.ansiMagenta(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiMagenta(bold)
             case "cyan":
-                ansiColor = gremlin.ui.ui_common.Color.ansiCyan(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiCyan(bold)
             case "white":
-                ansiColor = gremlin.ui.ui_common.Color.ansiWhite(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiWhite(bold)
             case "black":
-                ansiColor = gremlin.ui.ui_common.Color.ansiBlack(bold)
+                ansiColor = gremlin.ui.ui_common.Color().ansiBlack(bold)
             case _:
                 ansiColor = color
 
@@ -2829,8 +2832,8 @@ def ansiBold(value: str):
     """converts a value to an ansi bold expression"""
     import gremlin.ui.ui_common
 
-    ansiReset = gremlin.ui.ui_common.Color.ansiReset()
-    ansiBold = gremlin.ui.ui_common.Color.ansiBold()
+    ansiReset = gremlin.ui.ui_common.Color().ansiReset()
+    ansiBold = gremlin.ui.ui_common.Color().ansiBold()
     return f"{ansiBold}{value}{ansiReset}"
 
 
@@ -2872,6 +2875,7 @@ def ansiResult(result: bool):
         return ansiOk()
     else:
         return ansiFail()
+
 
 def ansiBool(value: bool):
     """returns an ansi colored boolean value"""
@@ -3015,7 +3019,6 @@ class TriggerDict(collections.UserDict):
         for key, value in dict(*args, **kwargs).items():
             self.__setitem__(key, value)
 
-
     def clearCallbacks(self):
         """clears any change callbacks"""
         self._on_change_callbacks.clear()
@@ -3041,10 +3044,67 @@ class TriggerDict(collections.UserDict):
         return hash(frozenset(self.values()))
 
     def __eq__(self, other):
-        if not isinstance(other, (type(self),dict)):
+        if not isinstance(other, (type(self), dict)):
             return NotImplemented
         data = other if isinstance(other, dict) else other.data
         return self.data == data
+
+
+class TriggerList(list):
+    """list that triggers an event on change"""
+
+    def __init__(self, iterable=None, on_change: Callable[[str, Any], None] = None):
+        """Initializes the TriggerList with an optional iterable and an optional on_change callback.
+
+        Args:
+            iterable (iterable, optional): Initial items for the list. Defaults to None.
+            on_change (Callable, optional): Callback function to be called on [operation, data]
+        """
+        super().__init__(iterable or [])
+        self.on_change = on_change
+
+    def _fire(self, action, data=None):
+        if callable(self.on_change):
+            self.on_change(action, data)
+
+    def append(self, item):
+        super().append(item)
+        self._fire("added", item)
+
+    def extend(self, iterable):
+        items = list(iterable)
+        super().extend(items)
+        self._fire("extended", items)
+
+    def insert(self, index, item):
+        super().insert(index, item)
+        self._fire("add", item)
+
+    def remove(self, item):
+        super().remove(item)
+        self._fire("remove", item)
+
+    def pop(self, index=-1):
+        item = super().pop(index)
+        self._fire("remove", item)
+        return item
+
+    def clear(self):
+        super().clear()
+        self._fire("clear", None)
+
+    def __setitem__(self, index, value):
+        old_value = self[index]
+        super().__setitem__(index, value)
+        self._fire("replace", {"index": index, "old": old_value, "new": value})
+
+    def __delitem__(self, index):
+        if isinstance(index, slice):
+            items = self[index]
+        else:
+            items = self[index]
+        super().__delitem__(index)
+        self._fire("remove", items)
 
 
 def sortDict(d: dict):
@@ -3217,18 +3277,17 @@ def safeJoin(thread: threading.Thread | None, timeout: float = 2.0):
 
     return
 
+
 def safeReplace(src, dst, retries=5, delay=0.1):
     for attempt in range(retries):
         try:
-            os.replace(src, dst) #@IgnoreException
+            os.replace(src, dst)  # @IgnoreException
             break
         except PermissionError as e:
             if attempt < retries - 1:
                 time.sleep(delay)
             else:
                 raise e
-
-
 
 
 def phraseSplit(phrase: str) -> list[str]:
@@ -3252,8 +3311,8 @@ def getSidecarFiles(path: str) -> list[str]:
     sidecar_files = list(xml_path.parent.glob(f"{base_name}*.json"))
     return [str(f) for f in sidecar_files]
 
+
 def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
     """Converts a hexadecimal color string to an RGB tuple."""
-    hex_str = hex_str.lstrip('#')
-    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
-
+    hex_str = hex_str.lstrip("#")
+    return tuple(int(hex_str[i : i + 2], 16) for i in (0, 2, 4))

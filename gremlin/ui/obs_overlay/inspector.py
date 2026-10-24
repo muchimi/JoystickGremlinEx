@@ -41,6 +41,7 @@ def button_callback(func, *args, **kwargs):
 
     return _call
 
+
 from .bindings import (
     find_overlay_state,
     overlay_device_label,
@@ -279,7 +280,7 @@ class ColorButton(QtWidgets.QPushButton):
             color = qcolor(self._value)
             if color.alpha() < 255:
                 # Checkerboard under translucent solids
-                painter.fillRect(rect, QtGui.QColor(Color.backgroundColor()))
+                painter.fillRect(rect, QtGui.QColor(Color().backgroundColor()))
                 tile = 5
                 light = QtGui.QColor("#3a3a3a")
                 for y in range(int(rect.top()), int(rect.bottom()), tile):
@@ -346,12 +347,12 @@ class ColorButton(QtWidgets.QPushButton):
             previous = qcolor(self._value if not is_gradient(self._value) else "#00000000")
             if not self._preserve_transparent and previous.alpha() == 0 and chosen.alpha() == 0:
                 chosen.setAlpha(255)
-            return chosen.name(QtGui.QColor.HexArgb)
+            return chosen.name(QtGui.QColor().HexArgb)
 
         def _on_gradient_toggled(on):
             nonlocal last_gradient
             if on:
-                seed = dialog.currentColor().name(QtGui.QColor.HexArgb)
+                seed = dialog.currentColor().name(QtGui.QColor().HexArgb)
                 if last_gradient is None:
                     last_gradient = default_gradient(seed)
                 _apply_value(normalize_gradient(last_gradient, seed_color=seed))
@@ -364,7 +365,7 @@ class ColorButton(QtWidgets.QPushButton):
 
         def _open_gradient():
             nonlocal last_gradient
-            seed = dialog.currentColor().name(QtGui.QColor.HexArgb)
+            seed = dialog.currentColor().name(QtGui.QColor().HexArgb)
             original = copy.deepcopy(self._value)
             current = self._value if is_gradient(self._value) else (last_gradient or default_gradient(seed))
             editor = GradientEditorDialog(current, seed_color=seed, parent=dialog)
@@ -451,7 +452,7 @@ class PaletteSwatch(QtWidgets.QPushButton):
         if is_gradient(fill_value):
             paint_gradient_spectrum(painter, QtCore.QRectF(rect), fill_value)
         elif fill.alpha() <= 0:
-            painter.fillRect(rect, QtGui.QColor(Color.backgroundColor()))
+            painter.fillRect(rect, QtGui.QColor(Color().backgroundColor()))
             painter.setPen(QtGui.QPen(accent if accent.alpha() > 0 else QtGui.QColor("#888888"), 2))
             painter.drawLine(rect.topLeft() + QtCore.QPoint(1, 1), rect.bottomRight() - QtCore.QPoint(1, 1))
             painter.drawLine(rect.topRight() + QtCore.QPoint(-1, 1), rect.bottomLeft() + QtCore.QPoint(1, -1))
@@ -504,7 +505,7 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
         listen_multi.setToolTip("Listen for multiple inputs. Click OK when done.")
         clear = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear)
         select = gremlin.ui.ui_common.QIconPushButton("Select...")
-        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color.listenColor()))
+        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
         select.setToolTip("Select keys using the virtual keyboard")
         select.setFixedHeight(24)
         select.clicked.connect(self._select)
@@ -694,9 +695,9 @@ class CollapsibleSection(QtWidgets.QWidget):
         self._toggle.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
         self._toggle.setAutoRaise(True)
         self._toggle.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-        hdr = Color.headerBarBackgroundColor()
-        hover = Color.backgroundLighterColor()
-        fg = Color.normalColor()
+        hdr = Color().headerBarBackgroundColor()
+        hover = Color().backgroundLighterColor()
+        fg = Color().normalColor()
         self._toggle.setStyleSheet(
             "#overlaySectionToggle {"
             "  font-weight: bold;"
@@ -757,7 +758,6 @@ class CollapsibleSection(QtWidgets.QWidget):
         self._body.setVisible(bool(expanded))
         self._apply_arrow(bool(expanded))
         self.toggled.emit(bool(expanded))
-
 
 
 def _enum_radios(options, value, callback, tooltip: str | None = None, parent=None) -> QDataRadioButtonGroup:
@@ -1254,14 +1254,12 @@ class OverlayInspector(QtWidgets.QWidget):
         page = self.scene.active_page() or {}
         onscreen = is_onscreen_mode(canvas)
 
-        name = QtWidgets.QLineEdit(str(page.get('name') or ''), self._host)
+        name = QtWidgets.QLineEdit(str(page.get("name") or ""), self._host)
         name.setToolTip("Name of this overlay page. Shown on the designer tab and in the live window title.")
         # Capture page id so a deferred editingFinished from a destroyed field
         # cannot rename the wrong page after an activate/deactivate rebuild.
         page_id = page.get("id")
-        name.editingFinished.connect(
-            lambda edit=name, pid=page_id: self._on_page_name(edit.text(), page_id=pid)
-        )
+        name.editingFinished.connect(lambda edit=name, pid=page_id: self._on_page_name(edit.text(), page_id=pid))
         form.addRow("Name", name)
 
         visible = QtWidgets.QCheckBox(self._host)
@@ -1283,7 +1281,10 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         interactive.toggled.connect(lambda v: self._set_canvas("interactive", bool(v)))
         form.addRow("Interactive", interactive)
-        touch_hint = QtWidgets.QLabel('vJoy buttons are held while pressed. A state button tap inverts the state. Sticks and hats return to center on lift; faders keep their value.', self._host)
+        touch_hint = QtWidgets.QLabel(
+            "vJoy buttons are held while pressed. A state button tap inverts the state. Sticks and hats return to center on lift; faders keep their value.",
+            self._host,
+        )
         touch_hint.setWordWrap(True)
         form.addRow(touch_hint)
 
@@ -1318,9 +1319,11 @@ class OverlayInspector(QtWidgets.QWidget):
             monitor.currentIndexChanged.connect(lambda _i, box=monitor: self._on_monitor(box.currentData()))
             form.addRow("Monitor", monitor)
             if bool(canvas.get("interactive")):
-                hint = QtWidgets.QLabel('Canvas size follows this monitor. Interactive is on: widgets capture touch; empty space passes through to the screen behind.', self._host)
+                hint = QtWidgets.QLabel(
+                    "Canvas size follows this monitor. Interactive is on: widgets capture touch; empty space passes through to the screen behind.", self._host
+                )
             else:
-                hint = QtWidgets.QLabel('Canvas size follows this monitor. The overlay is a transparent, click-through HUD.', self._host)
+                hint = QtWidgets.QLabel("Canvas size follows this monitor. The overlay is a transparent, click-through HUD.", self._host)
             hint.setWordWrap(True)
             form.addRow(hint)
         else:
@@ -1335,7 +1338,10 @@ class OverlayInspector(QtWidgets.QWidget):
             color_btn.color_changed.connect(lambda v: self._set_canvas("chroma_color", v))
             form.addRow("Background color", color_btn)
             form.addRow("Presets", self._windowed_color_presets_row(color_btn))
-            color_hint = QtWidgets.QLabel('Use a solid chromakey color for OBS, or Transparent (alpha 0) for a see-through desktop window (frameless). Width and height set the capture window size.', self._host)
+            color_hint = QtWidgets.QLabel(
+                "Use a solid chromakey color for OBS, or Transparent (alpha 0) for a see-through desktop window (frameless). Width and height set the capture window size.",
+                self._host,
+            )
             color_hint.setWordWrap(True)
             form.addRow(color_hint)
 
@@ -1368,8 +1374,7 @@ class OverlayInspector(QtWidgets.QWidget):
         snap_widgets = QtWidgets.QCheckBox(self._host)
         snap_widgets.setChecked(bool(canvas.get("snap_to_widgets", True)))
         snap_widgets.setToolTip(
-            "Snap move/resize to other widgets' left/center/right and top/middle/bottom. "
-            "A dashed white line shows the match while dragging."
+            "Snap move/resize to other widgets' left/center/right and top/middle/bottom. A dashed white line shows the match while dragging."
         )
         snap_widgets.toggled.connect(lambda v: self._set_canvas("snap_to_widgets", v))
         form.addRow("Snap to widget", snap_widgets)
@@ -1442,11 +1447,14 @@ class OverlayInspector(QtWidgets.QWidget):
                     callback=button_callback(QtCore.QTimer.singleShot, 0, self.rebuild),
                 )
                 form.addRow(refresh)
-                hint = QtWidgets.QLabel('Discord application share captures that program only. Pin the overlay inside the game window, then share that game. If the game is not running, the overlay stays a normal window (screen share still works).', self._host)
+                hint = QtWidgets.QLabel(
+                    "Discord application share captures that program only. Pin the overlay inside the game window, then share that game. If the game is not running, the overlay stays a normal window (screen share still works).",
+                    self._host,
+                )
                 hint.setWordWrap(True)
                 form.addRow(hint)
             else:
-                hint = QtWidgets.QLabel('Pinning the overlay into another application is available on Windows.', self._host)
+                hint = QtWidgets.QLabel("Pinning the overlay into another application is available on Windows.", self._host)
                 hint.setWordWrap(True)
                 form.addRow(hint)
 
@@ -1468,10 +1476,7 @@ class OverlayInspector(QtWidgets.QWidget):
         port = QtWidgets.QSpinBox(self._host)
         port.setRange(1024, 65534)
         port.setValue(int(canvas.get("ws_port") or WS_DEFAULT_PORT))
-        port.setToolTip(
-            "Preferred HTTP port (WebSocket uses the next free port). "
-            "GEX skips reserved ports (6012, 6013, 8000, 8001, 9020) and occupied binds."
-        )
+        port.setToolTip("Preferred HTTP port (WebSocket uses the next free port). GEX skips reserved ports (6012, 6013, 8000, 8001, 9020) and occupied binds.")
         port.valueChanged.connect(lambda v: self._set_canvas("ws_port", int(v)))
         form.addRow("Port", port)
 
@@ -1495,9 +1500,7 @@ class OverlayInspector(QtWidgets.QWidget):
         url_edit = QtWidgets.QPlainTextEdit(url_text, self._host)
         url_edit.setReadOnly(True)
         url_edit.setMaximumHeight(64)
-        url_edit.setToolTip(
-            "Open this URL on a phone/tablet on the same LAN while the overlay page is shown."
-        )
+        url_edit.setToolTip("Open this URL on a phone/tablet on the same LAN while the overlay page is shown.")
         form.addRow("LAN URL", url_edit)
 
         copy_btn = QDataPushButton("Copy URL", parent=self._host)
@@ -1530,11 +1533,7 @@ class OverlayInspector(QtWidgets.QWidget):
         idx = fit.findData(fit_mode)
         if idx >= 0:
             fit.setCurrentIndex(idx)
-        fit.currentIndexChanged.connect(
-            lambda _i, box=fit: self._set_canvas(
-                "ws_fit_mode", normalize_ws_fit_mode(box.currentData())
-            )
-        )
+        fit.currentIndexChanged.connect(lambda _i, box=fit: self._set_canvas("ws_fit_mode", normalize_ws_fit_mode(box.currentData())))
         form.addRow("Fit mode", fit)
 
         preset = QDataComboBox(parent=self._host)
@@ -1645,9 +1644,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     "stop:0.51 #777, stop:1 #777); }"
                 )
             else:
-                chip.setStyleSheet(
-                    f"QToolButton {{ border: 1px solid #666; border-radius: 3px; background: {fill.name()}; }}"
-                )
+                chip.setStyleSheet(f"QToolButton {{ border: 1px solid #666; border-radius: 3px; background: {fill.name()}; }}")
             chip.clicked.connect(button_callback(_apply_preset, hex_color))
             layout.addWidget(chip)
         layout.addStretch(1)
@@ -1741,7 +1738,7 @@ class OverlayInspector(QtWidgets.QWidget):
         row.addWidget(add_h)
         row.addStretch()
         form.addRow("Guides", buttons)
-        hint = QtWidgets.QLabel('Drag a guide on the canvas, or enter a percent of width (vertical) or height (horizontal).', self._host)
+        hint = QtWidgets.QLabel("Drag a guide on the canvas, or enter a percent of width (vertical) or height (horizontal).", self._host)
         hint.setWordWrap(True)
         form.addRow(hint)
         for guide in canvas.get("guides") or []:
@@ -1878,25 +1875,19 @@ class OverlayInspector(QtWidgets.QWidget):
         form = self._section("Geometry")
         if self._multi:
             types = sorted({(w.get("type") or "").replace("_", " ") for w in self.scene.selected_widgets()})
-            form.addRow("Selection", QtWidgets.QLabel(f'{len(self._edit_ids)} grouped widgets', self._host))
-            form.addRow("Types", QtWidgets.QLabel(', '.join(types), self._host))
-            group_ids = {
-                str(w.get("group") or "").strip()
-                for w in self.scene.selected_widgets()
-                if str(w.get("group") or "").strip()
-            }
+            form.addRow("Selection", QtWidgets.QLabel(f"{len(self._edit_ids)} grouped widgets", self._host))
+            form.addRow("Types", QtWidgets.QLabel(", ".join(types), self._host))
+            group_ids = {str(w.get("group") or "").strip() for w in self.scene.selected_widgets() if str(w.get("group") or "").strip()}
             if len(group_ids) == 1:
                 gid = next(iter(group_ids))
                 name_edit = QtWidgets.QLineEdit(self.scene.group_display_name(gid), self._host)
                 name_edit.setToolTip("Name for this widget group (shown in the runtime control panel).")
-                name_edit.editingFinished.connect(
-                    lambda box=name_edit, group=gid: self.scene.set_group_name(group, box.text().strip())
-                )
+                name_edit.editingFinished.connect(lambda box=name_edit, group=gid: self.scene.set_group_name(group, box.text().strip()))
                 form.addRow("Group name", name_edit)
         else:
-            type_label = QtWidgets.QLabel(item.get('type', '').replace('_', ' '), self._host)
+            type_label = QtWidgets.QLabel(item.get("type", "").replace("_", " "), self._host)
             form.addRow("Type", type_label)
-            name = QtWidgets.QLineEdit(str(item.get('name') or ''), self._host)
+            name = QtWidgets.QLineEdit(str(item.get("name") or ""), self._host)
             name.setPlaceholderText(widget_display_name({**item, "name": ""}))
             name.setToolTip("Name in the selection pane. The on-screen caption stays under Label.")
             name.editingFinished.connect(lambda wid=item["id"], box=name: self._update(wid, name=box.text().strip()))
@@ -1975,7 +1966,7 @@ class OverlayInspector(QtWidgets.QWidget):
             mode_box.toggled.connect(lambda v, wid=item["id"]: self._set_show_current_mode(wid, bool(v)))
             label_form.addRow("Show current mode", mode_box)
             if show_mode:
-                hint = QtWidgets.QLabel('Updates live: edit mode now, runtime mode while the profile is running.', self._host)
+                hint = QtWidgets.QLabel("Updates live: edit mode now, runtime mode while the profile is running.", self._host)
                 hint.setWordWrap(True)
                 label_form.addRow(hint)
         if widget_type == "stopwatch":
@@ -2242,8 +2233,8 @@ class OverlayInspector(QtWidgets.QWidget):
         types = {item.get("type") for item in items}
         item = items[0]
         form = self._section("Geometry")
-        form.addRow("Selection", QtWidgets.QLabel(f'{len(items)} grouped widgets', self._host))
-        form.addRow("Types", QtWidgets.QLabel(', '.join(sorted(((t or '').replace('_', ' ') for t in types))), self._host))
+        form.addRow("Selection", QtWidgets.QLabel(f"{len(items)} grouped widgets", self._host))
+        form.addRow("Types", QtWidgets.QLabel(", ".join(sorted(((t or "").replace("_", " ") for t in types))), self._host))
         for key, lo, hi in (("w", 8, 4000), ("h", 8, 4000), ("z", -100, 100)):
             spin = QtWidgets.QSpinBox(self._host)
             spin.setRange(lo, hi)
@@ -2326,9 +2317,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
         if types <= {"switch_4way", "switch_2way"}:
-            self._switch_cardinal_appearance(
-                look, item, include_orientation=("switch_2way" in types)
-            )
+            self._switch_cardinal_appearance(look, item, include_orientation=("switch_2way" in types))
         elif types <= {"switch_3way"}:
             self._orientation_combo(look, item)
         if types <= {"axis_bar", "axis_radio", "axis_fader"}:
@@ -2473,9 +2462,7 @@ class OverlayInspector(QtWidgets.QWidget):
             "Use letters A, B, C… for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
             "Leave empty to require every condition (AND)."
         )
-        expr.editingFinished.connect(
-            lambda wid=item["id"], box=expr: self._set_visibility(wid, expression=box.text())
-        )
+        expr.editingFinished.connect(lambda wid=item["id"], box=expr: self._set_visibility(wid, expression=box.text()))
         preview = QDataPushButton(
             "Preview",
             tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.",
@@ -2488,13 +2475,20 @@ class OverlayInspector(QtWidgets.QWidget):
         expr_layout.addWidget(preview)
         form.addRow("Expression", expr_row)
 
-        ops = QDataPushButton("Boolean operators", tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.", clicked=self._show_boolean_operators)
+        ops = QDataPushButton(
+            "Boolean operators",
+            tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.",
+            clicked=self._show_boolean_operators,
+        )
         form.addRow("", ops)
 
         hint = QtWidgets.QLabel(self._visibility_summary(vis), self._host)
         hint.setWordWrap(True)
         form.addRow(hint)
-        note = QtWidgets.QLabel('Each condition gets a letter (A, B, C…). The live overlay hides the widget when the expression is false. The designer keeps a faded copy so you can still edit it.', self._host)
+        note = QtWidgets.QLabel(
+            "Each condition gets a letter (A, B, C…). The live overlay hides the widget when the expression is false. The designer keeps a faded copy so you can still edit it.",
+            self._host,
+        )
         note.setWordWrap(True)
         form.addRow(note)
 
@@ -2562,11 +2556,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow("", remove)
             return box
 
-        when_opts = (
-            [("is current", "on"), ("is not current", "off")]
-            if kind == "mode"
-            else [("is on", "on"), ("is off", "off")]
-        )
+        when_opts = [("is current", "on"), ("is not current", "off")] if kind == "mode" else [("is on", "on"), ("is off", "off")]
         when_cur = "off" if str(cond.get("when") or "on").casefold() == "off" else "on"
         when = _enum_radios(
             when_opts,
@@ -2595,9 +2585,7 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow("State", combo)
         elif kind == "keyboard":
             picker = OverlayKeyCombinationWidget(cond.get("keys") or [])
-            picker.keys_changed.connect(
-                lambda keys, wid=item["id"], cid=cond_id: self._set_visibility_condition(wid, cid, keys=normalize_overlay_keys(keys))
-            )
+            picker.keys_changed.connect(lambda keys, wid=item["id"], cid=cond_id: self._set_visibility_condition(wid, cid, keys=normalize_overlay_keys(keys)))
             form.addRow(picker)
         else:
             self._fill_visibility_input(form, item, cond)
@@ -2627,9 +2615,7 @@ class OverlayInspector(QtWidgets.QWidget):
             var_box.addItem(overlay_variable_token(name), name)
             idx = var_box.count() - 1
             var_box.setItemData(idx, str(row.get("id") or ""), QtCore.Qt.UserRole + 1)
-            if (current_name and name.casefold() == current_name.casefold()) or (
-                current_id and str(row.get("id") or "") == current_id
-            ):
+            if (current_name and name.casefold() == current_name.casefold()) or (current_id and str(row.get("id") or "") == current_id):
                 selected = idx
         if selected == 0 and current_name:
             var_box.addItem(f"{overlay_variable_token(current_name)} (missing)", current_name)
@@ -2670,9 +2656,7 @@ class OverlayInspector(QtWidgets.QWidget):
         match_radios = _enum_radios(
             [("Exact", "exact"), ("Contains", "contain")],
             "contain" if test == "contain" else "exact",
-            lambda v, wid=item["id"], cid=cond_id: self._set_visibility_condition(
-                wid, cid, rebuild=True, variable_test=normalize_visibility_variable_test(v)
-            ),
+            lambda v, wid=item["id"], cid=cond_id: self._set_visibility_condition(wid, cid, rebuild=True, variable_test=normalize_visibility_variable_test(v)),
             tooltip="Exact requires the full variable value. Contains matches a substring (case-insensitive).",
         )
         form.addRow("Match", match_radios)
@@ -2683,9 +2667,7 @@ class OverlayInspector(QtWidgets.QWidget):
         value_edit.setPlaceholderText("Comparison text")
         value_edit.setToolTip("Text to compare against the variable value.")
         value_edit.editingFinished.connect(
-            lambda wid=item["id"], cid=cond_id, box=value_edit: self._set_visibility_condition(
-                wid, cid, variable_value=box.text()
-            )
+            lambda wid=item["id"], cid=cond_id, box=value_edit: self._set_visibility_condition(wid, cid, variable_value=box.text())
         )
         form.addRow("Value", value_edit)
         value_fields.append(value_edit)
@@ -2737,17 +2719,13 @@ class OverlayInspector(QtWidgets.QWidget):
                 except (TypeError, ValueError):
                     vjoy_id = 0
                 if vjoy_id <= 0:
-                    self._set_visibility_condition(
-                        item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
-                    )
+                    self._set_visibility_condition(item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
             else:
                 guid = str(device_box.currentData() or "").strip()
                 if not guid:
-                    self._set_visibility_condition(
-                        item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
-                    )
+                    self._set_visibility_condition(item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
             if not dev:
@@ -3040,9 +3018,7 @@ class OverlayInspector(QtWidgets.QWidget):
         appearance = _enum_radios(
             opts,
             current,
-            lambda v, wid=item["id"]: self._style(
-                wid, switch_appearance=str(v or "arrows"), rebuild=True
-            ),
+            lambda v, wid=item["id"]: self._style(wid, switch_appearance=str(v or "arrows"), rebuild=True),
         )
         form.addRow("Style", appearance)
         if include_orientation:
@@ -3062,7 +3038,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 item = self.scene.widget_by_id(wid)
                 if not item:
                     continue
-                previous = (item["style"].get("orientation") or "vertical")
+                previous = item["style"].get("orientation") or "vertical"
                 fields = {"style": {"orientation": orientation}}
                 if previous != orientation:
                     width, height = int(item["w"]), int(item["h"])
@@ -3265,6 +3241,7 @@ class OverlayInspector(QtWidgets.QWidget):
         layout.addWidget(spin, 0)
         form.addRow(title, row)
         if live_getter is not None:
+
             def _sync(bar=slider, box=spin, get=live_getter):
                 if not alive(bar) or not alive(box):
                     return
@@ -3550,9 +3527,7 @@ class OverlayInspector(QtWidgets.QWidget):
             values = [bool((w.get("blink") or {}).get(key)) for w in self.scene.selected_widgets()] or [bool(blink.get(key))]
             self._set_bool_widget(box, values)
             box.setToolTip(tooltip)
-            box.stateChanged.connect(
-                lambda _s, wid=item["id"], k=key, b=box: self._on_blink_flag(b, wid, k)
-            )
+            box.stateChanged.connect(lambda _s, wid=item["id"], k=key, b=box: self._on_blink_flag(b, wid, k))
             form.addRow(title, box)
             dependents.append(box)
 
@@ -3643,6 +3618,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         toggle._callback = _on_toggle
         _sync(enabled)
+
     def _on_blink_flag(self, box: QtWidgets.QCheckBox, widget_id: str, key: str):
         if self._building:
             return
@@ -3851,7 +3827,9 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip="Connect the last point back to the first. Off for an open line or path.",
         )
         if current == "freeform" or is_custom_kind(current):
-            hint = QtWidgets.QLabel(shape_kind_tooltip(current) + ' Dragging a handle past the widget edge grows the shape. Delete removes the selected point.', self._host)
+            hint = QtWidgets.QLabel(
+                shape_kind_tooltip(current) + " Dragging a handle past the widget edge grows the shape. Delete removes the selected point.", self._host
+            )
             hint.setWordWrap(True)
             hint.setToolTip(hint.text())
             form.addRow(hint)
@@ -3866,7 +3844,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_row = QtWidgets.QWidget(self._host)
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
-        path_edit = QtWidgets.QLineEdit(item['style'].get('image_path') or '', self._host)
+        path_edit = QtWidgets.QLineEdit(item["style"].get("image_path") or "", self._host)
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip("Choose an image or SVG file.")
@@ -3880,7 +3858,10 @@ class OverlayInspector(QtWidgets.QWidget):
         path_layout.addWidget(browse)
         path_layout.addWidget(paste)
         form.addRow("Image", path_row)
-        hint = QtWidgets.QLabel('PNG, WebP, GIF, and SVG keep transparency. SVG is vector (Illustrator-friendly) and stays sharp at any size. Fill is only a backdrop behind those pixels. JPEG has no alpha.', self._host)
+        hint = QtWidgets.QLabel(
+            "PNG, WebP, GIF, and SVG keep transparency. SVG is vector (Illustrator-friendly) and stays sharp at any size. Fill is only a backdrop behind those pixels. JPEG has no alpha.",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
 
@@ -3920,7 +3901,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_row = QtWidgets.QWidget(self._host)
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
-        path_edit = QtWidgets.QLineEdit(item['style'].get('paddle_image') or '', self._host)
+        path_edit = QtWidgets.QLineEdit(item["style"].get("paddle_image") or "", self._host)
         path_edit.setPlaceholderText("Optional — replaces built-in art (pivot = image center)")
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
@@ -3934,9 +3915,7 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip="Use the built-in vector paddle.",
             callback=button_callback(self._style, item["id"], paddle_image="", rebuild=True),
         )
-        path_edit.editingFinished.connect(
-            lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
-        )
+        path_edit.editingFinished.connect(lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip()))
         path_layout.addWidget(path_edit)
         path_layout.addWidget(browse)
         path_layout.addWidget(clear)
@@ -4021,9 +4000,7 @@ class OverlayInspector(QtWidgets.QWidget):
             label="Clear",
             callback=button_callback(self._style, item["id"], launch_path=""),
         )
-        path_edit.editingFinished.connect(
-            lambda wid=item["id"], w=path_edit: self._style(wid, launch_path=w.text().strip())
-        )
+        path_edit.editingFinished.connect(lambda wid=item["id"], w=path_edit: self._style(wid, launch_path=w.text().strip()))
         path_layout.addWidget(path_edit)
         path_layout.addWidget(browse)
         path_layout.addWidget(clear)
@@ -4032,9 +4009,7 @@ class OverlayInspector(QtWidgets.QWidget):
         args_edit = QtWidgets.QLineEdit(str(style.get("launch_args") or ""), self._host)
         args_edit.setPlaceholderText('Command-line arguments, e.g. --profile "My Pit"')
         args_edit.setToolTip("Arguments passed to the executable when it is launched. Quoted tokens stay together.")
-        args_edit.editingFinished.connect(
-            lambda wid=item["id"], w=args_edit: self._style(wid, launch_args=w.text())
-        )
+        args_edit.editingFinished.connect(lambda wid=item["id"], w=args_edit: self._style(wid, launch_args=w.text()))
         form.addRow("Arguments", args_edit)
 
         launch_now = QDataPushButton("Launch now")
@@ -4077,10 +4052,9 @@ class OverlayInspector(QtWidgets.QWidget):
             client_box.addItem(f"{label}{mark}", cid)
         idx = client_box.findData(current_id)
         client_box.setCurrentIndex(idx if idx >= 0 else 0)
-        client_box.currentIndexChanged.connect(
-            lambda _i, box=client_box, wid=item["id"]: self._style(wid, remote_client_id=int(box.currentData() or 0))
-        )
+        client_box.currentIndexChanged.connect(lambda _i, box=client_box, wid=item["id"]: self._style(wid, remote_client_id=int(box.currentData() or 0)))
         form.addRow("Remote client", client_box)
+
         def _on_refresh_clients():
             try:
                 import gremlin.remote
@@ -4097,7 +4071,10 @@ class OverlayInspector(QtWidgets.QWidget):
             callback=_on_refresh_clients,
         )
         form.addRow(refresh)
-        hint = QtWidgets.QLabel('Clients must enable Remote Control → Video return. Dot (●) means the peer advertised a video port. Master connects to that peer over TCP (default 6013).', self._host)
+        hint = QtWidgets.QLabel(
+            "Clients must enable Remote Control → Video return. Dot (●) means the peer advertised a video port. Master connects to that peer over TCP (default 6013).",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
 
@@ -4196,7 +4173,7 @@ class OverlayInspector(QtWidgets.QWidget):
             vmax.setValue(1.0)
         vmax.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, value_max=float(v)))
         form.addRow("Max", vmax)
-        unit = QtWidgets.QLineEdit(str(style.get('unit') or ''), self._host)
+        unit = QtWidgets.QLineEdit(str(style.get("unit") or ""), self._host)
         unit.setPlaceholderText("%  °  or leave blank")
         unit.setToolTip("Shown next to the min / mid / max labels on the left.")
         unit.editingFinished.connect(lambda wid=item["id"], w=unit: self._style(wid, unit=w.text()))
@@ -4235,7 +4212,7 @@ class OverlayInspector(QtWidgets.QWidget):
         hi.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, value_max=float(v)))
         form.addRow("Max", hi)
         if bool(style.get("range_auto", True)):
-            note = QtWidgets.QLabel(f'Current scale: {vmin:g} to {vmax:g} %', self._host)
+            note = QtWidgets.QLabel(f"Current scale: {vmin:g} to {vmax:g} %", self._host)
             note.setWordWrap(True)
             form.addRow(note)
 
@@ -4261,7 +4238,10 @@ class OverlayInspector(QtWidgets.QWidget):
             lambda v, wid=item["id"]: self._style(wid, temp_unit=str(v or "C")),
         )
         form.addRow("Temperature", unit)
-        hint = QtWidgets.QLabel('Add one or more stats in Datasets, each with its own color. FPS is in-game (MSI Afterburner / RTSS). A Manual counter increments and decrements from keybinds.', self._host)
+        hint = QtWidgets.QLabel(
+            "Add one or more stats in Datasets, each with its own color. FPS is in-game (MSI Afterburner / RTSS). A Manual counter increments and decrements from keybinds.",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
 
@@ -4274,7 +4254,9 @@ class OverlayInspector(QtWidgets.QWidget):
 
     def _build_stat_datasets(self, item: dict):
         form = self._section("Datasets")
-        hint = QtWidgets.QLabel('Each dataset is one value on this counter. Pick a color per row. Remove all but one if you only need a single reading.', self._host)
+        hint = QtWidgets.QLabel(
+            "Each dataset is one value on this counter. Pick a color per row. Remove all but one if you only need a single reading.", self._host
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
         stats = self._stats_for(item)
@@ -4291,7 +4273,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         kind = normalize_stat(entry.get("stat"))
         title = str(entry.get("label") or "").strip() or stat_caption(kind)
-        box = QtWidgets.QGroupBox(f'{index + 1}. {title}', self._host)
+        box = QtWidgets.QGroupBox(f"{index + 1}. {title}", self._host)
         form = QtWidgets.QFormLayout(box)
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         sid = str(entry.get("id") or "")
@@ -4301,9 +4283,7 @@ class OverlayInspector(QtWidgets.QWidget):
         found = combo.findData(kind)
         combo.setCurrentIndex(found if found >= 0 else 0)
         combo.currentIndexChanged.connect(
-            lambda _i, c=combo, wid=item["id"], ident=sid: self._set_stat_entry(
-                wid, ident, rebuild=True, stat=str(c.currentData() or "time")
-            )
+            lambda _i, c=combo, wid=item["id"], ident=sid: self._set_stat_entry(wid, ident, rebuild=True, stat=str(c.currentData() or "time"))
         )
         form.addRow("Stat", combo)
         color = ColorButton(entry.get("color") or GRAPH_SERIES_COLORS[index % len(GRAPH_SERIES_COLORS)])
@@ -4329,9 +4309,7 @@ class OverlayInspector(QtWidgets.QWidget):
             value.setRange(0, 999999)
             value.setValue(max(0, current))
             value.setToolTip("Current counter value. Edits apply immediately and are saved with the profile.")
-            value.valueChanged.connect(
-                lambda v, wid=item["id"], ident=sid: self._set_manual_stat_value(wid, ident, int(v))
-            )
+            value.valueChanged.connect(lambda v, wid=item["id"], ident=sid: self._set_manual_stat_value(wid, ident, int(v)))
             form.addRow("Value", value)
             step = QtWidgets.QSpinBox(self._host)
             step.setRange(1, 100)
@@ -4521,9 +4499,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         color_key = "border_on" if armed else "border"
         fallback = "#6ecf8e" if armed else "#3a6ea5"
-        values = [(w.get("style") or {}).get(color_key) for w in self.scene.selected_widgets()] or [
-            style.get(color_key)
-        ]
+        values = [(w.get("style") or {}).get(color_key) for w in self.scene.selected_widgets()] or [style.get(color_key)]
         same = all(v == values[0] for v in values)
         color_btn = ColorButton(values[0] or fallback)
         if not same:
@@ -4537,14 +4513,7 @@ class OverlayInspector(QtWidgets.QWidget):
         width.setRange(0.5, 20)
         width.setSingleStep(0.5)
         try:
-            width.setValue(
-                float(
-                    style.get(width_key)
-                    if style.get(width_key) is not None
-                    else style.get("border_width")
-                    or 2.0
-                )
-            )
+            width.setValue(float(style.get(width_key) if style.get(width_key) is not None else style.get("border_width") or 2.0))
         except (TypeError, ValueError):
             width.setValue(2.0)
         width.valueChanged.connect(lambda v, wid=item["id"], k=width_key: self._style(wid, **{k: float(v)}))
@@ -4556,9 +4525,7 @@ class OverlayInspector(QtWidgets.QWidget):
         style_radios = _enum_radios(
             [("Solid", "solid"), ("Dashed", "dashed"), ("Dotted", "dotted")],
             current_style,
-            lambda v, wid=item["id"], k=style_key: self._style(
-                wid, **{k: normalize_ocr_border_style(v)}, rebuild=True
-            ),
+            lambda v, wid=item["id"], k=style_key: self._style(wid, **{k: normalize_ocr_border_style(v)}, rebuild=True),
         )
         form.addRow("Style", style_radios)
         dependents.append(style_radios)
@@ -4586,10 +4553,7 @@ class OverlayInspector(QtWidgets.QWidget):
         amount = QtWidgets.QSpinBox(self._host)
         amount.setRange(0, 64)
         amount.setSpecialValueText("Auto")
-        amount.setToolTip(
-            "Preferred number of dashes along the longer edge (0 = use Dash size as given). "
-            "Spacing is still applied between dashes."
-        )
+        amount.setToolTip("Preferred number of dashes along the longer edge (0 = use Dash size as given). Spacing is still applied between dashes.")
         try:
             amount.setValue(int(style.get(dash_keys["amount"]) or 0))
         except (TypeError, ValueError):
@@ -4607,9 +4571,7 @@ class OverlayInspector(QtWidgets.QWidget):
             spacing.setValue(float(style.get(dash_keys["spacing"]) or 4.0))
         except (TypeError, ValueError):
             spacing.setValue(4.0)
-        spacing.valueChanged.connect(
-            lambda v, wid=item["id"], k=dash_keys["spacing"]: self._style(wid, **{k: float(v)})
-        )
+        spacing.valueChanged.connect(lambda v, wid=item["id"], k=dash_keys["spacing"]: self._style(wid, **{k: float(v)}))
         form.addRow("Dash spacing", spacing)
         dash_widgets.append(spacing)
         dependents.append(spacing)
@@ -4673,9 +4635,7 @@ class OverlayInspector(QtWidgets.QWidget):
             "when the engine reports confidence (RapidOCR). Windows OCR does not expose "
             "per-line scores, so this filter has no effect there."
         )
-        conf_spin.valueChanged.connect(
-            lambda v, wid=item["id"]: self._style(wid, ocr_confidence=normalize_ocr_confidence(v))
-        )
+        conf_spin.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_confidence=normalize_ocr_confidence(v)))
         form.addRow("Min confidence", conf_spin)
 
         engine = _enum_radios(
@@ -4705,12 +4665,9 @@ class OverlayInspector(QtWidgets.QWidget):
         miss.setRange(1, 20)
         miss.setValue(normalize_ocr_miss_tolerance(style.get("ocr_miss_tolerance")))
         miss.setToolTip(
-            "Consecutive non-matching scans before a held rule releases (default 3). "
-            "Raise this if hold-mode labels flash while the text is still on screen."
+            "Consecutive non-matching scans before a held rule releases (default 3). Raise this if hold-mode labels flash while the text is still on screen."
         )
-        miss.valueChanged.connect(
-            lambda v, wid=item["id"]: self._style(wid, ocr_miss_tolerance=normalize_ocr_miss_tolerance(v))
-        )
+        miss.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_miss_tolerance=normalize_ocr_miss_tolerance(v)))
         form.addRow("Miss tolerance", miss)
 
         tracker = OcrOverlayTracker()
@@ -4723,10 +4680,7 @@ class OverlayInspector(QtWidgets.QWidget):
         btn_layout = QtWidgets.QHBoxLayout(btn_row)
         btn_layout.setContentsMargins(0, 0, 0, 0)
         test = QDataPushButton("Test once")
-        test.setToolTip(
-            "Highlights the OCR region on screen, counts down 5 seconds so you can place text, "
-            "then captures that region and runs OCR."
-        )
+        test.setToolTip("Highlights the OCR region on screen, counts down 5 seconds so you can place text, then captures that region and runs OCR.")
         test.clicked.connect(button_callback(self._ocr_test_once, item["id"]))
         clear = QDataPushButton("Clear results")
         clear.setToolTip("Clear last OCR text, status, and rule match state for this widget.")
@@ -4830,28 +4784,20 @@ class OverlayInspector(QtWidgets.QWidget):
             "The rule matches if any value is found."
         )
         texts.setEnabled(not region_mode)
-        texts.editingFinished.connect(
-            lambda wid=item["id"], rid=rule_id, w=texts: self._update_ocr_rule(wid, rid, texts=w.text())
-        )
+        texts.editingFinished.connect(lambda wid=item["id"], rid=rule_id, w=texts: self._update_ocr_rule(wid, rid, texts=w.text()))
         form.addRow("Texts", texts)
 
         name = QtWidgets.QLineEdit(str(rule.get("name") or rule.get("display_name") or ""), self._host)
         name.setPlaceholderText("e.g. Quantainium")
         name.setToolTip("Rule title. For Contain/Exact with Base, also drives the detection label (×count).")
-        name.editingFinished.connect(
-            lambda wid=item["id"], rid=rule_id, w=name: self._update_ocr_rule(wid, rid, name=w.text())
-        )
+        name.editingFinished.connect(lambda wid=item["id"], rid=rule_id, w=name: self._update_ocr_rule(wid, rid, name=w.text()))
         form.addRow("Name", name)
 
         match = _enum_radios(
             [("Contain", "contain"), ("Exact", "exact"), ("Any text (region)", "any")],
             match_mode,
-            lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(
-                wid, rid, match=normalize_ocr_match(v), rebuild=True
-            ),
-            tooltip=(
-                "Contain / Exact: match Texts. Any text (region): fire whenever OCR reads something."
-            ),
+            lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(wid, rid, match=normalize_ocr_match(v), rebuild=True),
+            tooltip=("Contain / Exact: match Texts. Any text (region): fire whenever OCR reads something."),
         )
         form.addRow("Match", match)
 
@@ -4862,9 +4808,7 @@ class OverlayInspector(QtWidgets.QWidget):
         base_spin.setValue(int(base_val or 0))
         base_spin.setToolTip("Signature base for rock count (count = signature ÷ base). 0 = unused. Ignored for region capture.")
         base_spin.setEnabled(not region_mode)
-        base_spin.valueChanged.connect(
-            lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(wid, rid, base=v or None)
-        )
+        base_spin.valueChanged.connect(lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(wid, rid, base=v or None))
         form.addRow("Base", base_spin)
 
         input_id = ocr_rule_input_id(str(item.get("id") or ""), rule_id)
@@ -4876,10 +4820,7 @@ class OverlayInspector(QtWidgets.QWidget):
             if xml:
                 from .overlay_input import apply_overlay_mapping_xml
 
-                mapped = (
-                    apply_overlay_mapping_xml(input_id, f"OCR · {title}", xml)
-                    or find_overlay_input(input_id)
-                )
+                mapped = apply_overlay_mapping_xml(input_id, f"OCR · {title}", xml) or find_overlay_input(input_id)
         for line in overlay_mapping_summary_lines(mapped):
             summary = QtWidgets.QLabel(line, self._host)
             summary.setWordWrap(True)
@@ -4995,10 +4936,7 @@ class OverlayInspector(QtWidgets.QWidget):
         box.setWindowTitle(title)
         box.setIcon(QtWidgets.QMessageBox.Question)
         box.setText("How should this pack be applied?")
-        box.setInformativeText(
-            "Replace removes existing OCR rules on this widget, then loads the pack.\n"
-            "Add keeps existing rules and appends the pack."
-        )
+        box.setInformativeText("Replace removes existing OCR rules on this widget, then loads the pack.\nAdd keeps existing rules and appends the pack.")
         replace_btn = box.addButton("Replace", QtWidgets.QMessageBox.AcceptRole)
         add_btn = box.addButton("Add", QtWidgets.QMessageBox.ActionRole)
         box.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
@@ -5100,7 +5038,10 @@ class OverlayInspector(QtWidgets.QWidget):
         from .input_display import PRESET_CHOICES, matching_preset
 
         form = self._section("Keys")
-        hint = QtWidgets.QLabel('Presets match common streaming layouts. Select keys… opens the same virtual keyboard as Map to Keyboard/Mouse Ex. Only selected keys and mouse buttons are drawn.', self._host)
+        hint = QtWidgets.QLabel(
+            "Presets match common streaming layouts. Select keys… opens the same virtual keyboard as Map to Keyboard/Mouse Ex. Only selected keys and mouse buttons are drawn.",
+            self._host,
+        )
         hint.setWordWrap(True)
         form.addRow(hint)
         preset = QDataComboBox()
@@ -5109,14 +5050,12 @@ class OverlayInspector(QtWidgets.QWidget):
             preset.addItem(label, key)
         index = preset.findData(current)
         preset.setCurrentIndex(index if index >= 0 else preset.findData("custom"))
-        preset.currentIndexChanged.connect(
-            lambda _i, box=preset, wid=item["id"]: self._apply_input_display_preset(wid, str(box.currentData() or "custom"))
-        )
+        preset.currentIndexChanged.connect(lambda _i, box=preset, wid=item["id"]: self._apply_input_display_preset(wid, str(box.currentData() or "custom")))
         form.addRow("Preset", preset)
         count = QtWidgets.QLabel(f"{len(item.get('keys') or [])} selected", self._host)
         form.addRow("Selection", count)
         select = gremlin.ui.ui_common.QIconPushButton("Select keys...")
-        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color.listenColor()))
+        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
         select.setToolTip("Choose keys and mouse buttons on the virtual keyboard.")
         select.setFixedHeight(24)
         select.clicked.connect(button_callback(self._open_input_display_picker, item["id"]))
@@ -5165,9 +5104,7 @@ class OverlayInspector(QtWidgets.QWidget):
         gremlin.shared_state.push_suspend_ui_keyinput()
         dialog = OverlayInputDisplayPicker(sequence=list(overlay_keys_from_item(item)), parent=self.window())
         dialog_ref = weakref.ref(dialog)  # avoid dialog -> lambda -> dialog cycle
-        dialog.accepted.connect(
-            lambda: self._apply_input_display_picker_keys(widget_id, dialog_ref().keys) if dialog_ref() else None
-        )
+        dialog.accepted.connect(lambda: self._apply_input_display_picker_keys(widget_id, dialog_ref().keys) if dialog_ref() else None)
         dialog.closed.connect(self._input_display_picker_closed)
         dialog.setModal(True)
         self._input_display_dialog = dialog
@@ -5204,9 +5141,12 @@ class OverlayInspector(QtWidgets.QWidget):
     def _build_graph_datasets(self, item: dict):
         form = self._section("Datasets")
         if item.get("type") == "axis_bars":
-            hint = QtWidgets.QLabel('Each dataset is one physical or vJoy axis. Pick Centered (−100 to +100) or 0 to 100% per axis. Bar colors match the graph. Auto range uses negatives only when a centered axis is selected.', self._host)
+            hint = QtWidgets.QLabel(
+                "Each dataset is one physical or vJoy axis. Pick Centered (−100 to +100) or 0 to 100% per axis. Bar colors match the graph. Auto range uses negatives only when a centered axis is selected.",
+                self._host,
+            )
         else:
-            hint = QtWidgets.QLabel('Each dataset is one physical or vJoy axis. Colors match the plot and legend.', self._host)
+            hint = QtWidgets.QLabel("Each dataset is one physical or vJoy axis. Colors match the plot and legend.", self._host)
         hint.setWordWrap(True)
         form.addRow(hint)
         series = self._series_for(item)
@@ -5231,9 +5171,7 @@ class OverlayInspector(QtWidgets.QWidget):
         source = _enum_radios(
             [("Physical", "physical"), ("vJoy", "vjoy")],
             src,
-            lambda v, wid=item["id"], sid=series_id: self._set_graph_series(
-                wid, sid, rebuild=True, source=str(v or "physical")
-            ),
+            lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, rebuild=True, source=str(v or "physical")),
         )
         form.addRow("Source", source)
 
@@ -5278,17 +5216,13 @@ class OverlayInspector(QtWidgets.QWidget):
                 except (TypeError, ValueError):
                     vjoy_id = 0
                 if vjoy_id <= 0:
-                    self._set_graph_series(
-                        item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
-                    )
+                    self._set_graph_series(item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
             else:
                 guid = str(device_box.currentData() or "").strip()
                 if not guid:
-                    self._set_graph_series(
-                        item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0
-                    )
+                    self._set_graph_series(item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDevice(guid, show_error=False)
             if not dev:
@@ -5363,9 +5297,7 @@ class OverlayInspector(QtWidgets.QWidget):
             lines=2,
             placeholder="Legend name (optional)",
         )
-        label.editingFinished.connect(
-            lambda wid=item["id"], sid=series_id, w=label: self._set_graph_series(wid, sid, rebuild=True, label=w.text())
-        )
+        label.editingFinished.connect(lambda wid=item["id"], sid=series_id, w=label: self._set_graph_series(wid, sid, rebuild=True, label=w.text()))
         form.addRow("Name", label)
 
         inv = QtWidgets.QCheckBox(self._host)
@@ -5382,9 +5314,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     ("0–100%", "unipolar"),
                 ],
                 current_mode,
-                lambda v, wid=item["id"], sid=series_id: self._set_graph_series(
-                    wid, sid, rebuild=True, range_mode=str(v or "auto")
-                ),
+                lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, rebuild=True, range_mode=str(v or "auto")),
                 tooltip=(
                     "Centered stick axes plot from −100 to +100. Throttles and sliders are typically 0 to 100%. "
                     "Auto guesses from the axis name (S1/S2 and throttle-like names are 0–100)."
@@ -5531,12 +5461,9 @@ class OverlayInspector(QtWidgets.QWidget):
                 selected = index
         combo.setCurrentIndex(selected)
         combo.setToolTip(
-            "Windows default is the browser Windows opens for web links. "
-            "The page stays in this widget. The choice is which browser the site sees."
+            "Windows default is the browser Windows opens for web links. The page stays in this widget. The choice is which browser the site sees."
         )
-        combo.currentIndexChanged.connect(
-            lambda _index, box=combo, wid=item["id"]: self._style(wid, browser=str(box.currentData() or "default"))
-        )
+        combo.currentIndexChanged.connect(lambda _index, box=combo, wid=item["id"]: self._style(wid, browser=str(box.currentData() or "default")))
         form.addRow("Browser", combo)
         self._style_bool(
             form,
@@ -5563,9 +5490,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_edit = QtWidgets.QLineEdit(str(style.get("efb_root") or ""), self._host)
         path_edit.setPlaceholderText(r"C:\Users\...\Desktop\SC EFB")
         path_edit.setToolTip("Local Delta Consulting EFB install folder (JPG plates).")
-        path_edit.editingFinished.connect(
-            lambda wid=item["id"], box=path_edit: self._style(wid, efb_root=box.text().strip())
-        )
+        path_edit.editingFinished.connect(lambda wid=item["id"], box=path_edit: self._style(wid, efb_root=box.text().strip()))
         browse = Buttons.getFolderWidget(tooltip="Choose install folder")
         browse.setFixedWidth(28)
         browse.clicked.connect(button_callback(self._browse_efb_root, item["id"], path_edit))
@@ -5584,9 +5509,7 @@ class OverlayInspector(QtWidgets.QWidget):
         discord = QtWidgets.QLineEdit(str(style.get("discord_url") or _DEFAULT_DISCORD), self._host)
         discord.setPlaceholderText(_DEFAULT_DISCORD)
         discord.setToolTip("Delta Consulting Discord invite.")
-        discord.editingFinished.connect(
-            lambda wid=item["id"], box=discord: self._style(wid, discord_url=box.text().strip() or _DEFAULT_DISCORD)
-        )
+        discord.editingFinished.connect(lambda wid=item["id"], box=discord: self._style(wid, discord_url=box.text().strip() or _DEFAULT_DISCORD))
         form.addRow("Discord invite", discord)
         join = QDataPushButton("Join Discord", parent=self._host)
         join.setToolTip("Opens the Discord invite above.")
@@ -5659,7 +5582,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style(widget_id, efb_root=chosen)
 
     def _efb_add_section_button(self, widget_id: str, working: list):
-        working.append({"id": f"custom{len(working)+1}", "label": "NEW", "path": ""})
+        working.append({"id": f"custom{len(working) + 1}", "label": "NEW", "path": ""})
         self._style(widget_id, section_buttons=[dict(b) for b in working])
         self.rebuild()
 
@@ -5672,7 +5595,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
             bridge = StreamDeckBridge()
         except Exception:
-            form.addRow(QtWidgets.QLabel('Stream Deck bridge is unavailable.', self._host))
+            form.addRow(QtWidgets.QLabel("Stream Deck bridge is unavailable.", self._host))
             return
 
         style = item.get("style") or {}
@@ -5689,9 +5612,7 @@ class OverlayInspector(QtWidgets.QWidget):
             combo.addItem(f"Disconnected ({wanted[:8]})", wanted)
         idx = combo.findData(wanted)
         combo.setCurrentIndex(idx if idx >= 0 else 0)
-        combo.currentIndexChanged.connect(
-            lambda _i, w=combo, wid=item["id"]: self._on_streamdeck_device(wid, w.currentData() or "")
-        )
+        combo.currentIndexChanged.connect(lambda _i, w=combo, wid=item["id"]: self._on_streamdeck_device(wid, w.currentData() or ""))
         form.addRow("Device", combo)
 
         follow = bool(style.get("streamdeck_follow_page", True))
@@ -5712,19 +5633,19 @@ class OverlayInspector(QtWidgets.QWidget):
             pidx = page_combo.findData(current_page)
         page_combo.setCurrentIndex(pidx if pidx >= 0 else 0)
         page_combo.setEnabled(not follow)
-        page_combo.currentIndexChanged.connect(
-            lambda _i, w=page_combo, wid=item["id"]: self._style(wid, streamdeck_page=int(w.currentData() or 1))
-        )
+        page_combo.currentIndexChanged.connect(lambda _i, w=page_combo, wid=item["id"]: self._style(wid, streamdeck_page=int(w.currentData() or 1)))
 
         follow_box = QtWidgets.QCheckBox(self._host)
         follow_box.setChecked(follow)
         follow_box.setToolTip("Show the GEX virtual page currently painted on the hardware.")
-        follow_box.stateChanged.connect(
-            lambda _s, wid=item["id"], box=follow_box, combo=page_combo: self._on_streamdeck_follow(wid, box, combo)
-        )
+        follow_box.stateChanged.connect(lambda _s, wid=item["id"], box=follow_box, combo=page_combo: self._on_streamdeck_follow(wid, box, combo))
         form.addRow("Follow hardware page", follow_box)
         form.addRow("Page", page_combo)
-        fit = QDataPushButton("Fit to device", tooltip="Resize this widget to the key layout of the selected Stream Deck.", clicked=button_callback(self._fit_streamdeck_item, item["id"], force=True))
+        fit = QDataPushButton(
+            "Fit to device",
+            tooltip="Resize this widget to the key layout of the selected Stream Deck.",
+            clicked=button_callback(self._fit_streamdeck_item, item["id"], force=True),
+        )
         form.addRow(fit)
         hint = QtWidgets.QLabel(
             "Mirrors the selected deck’s keys (and Stream Deck + dials) using the current GEX page art.",
@@ -5809,7 +5730,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_row = QtWidgets.QWidget(self._host)
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
-        path_edit = QtWidgets.QLineEdit(item['style'].get(key) or '', self._host)
+        path_edit = QtWidgets.QLineEdit(item["style"].get(key) or "", self._host)
         path_edit.setPlaceholderText("Optional")
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
@@ -5819,9 +5740,7 @@ class OverlayInspector(QtWidgets.QWidget):
             label="Clear",
             callback=button_callback(lambda wid, k: self._style(wid, **{k: ""}), item["id"], key),
         )
-        path_edit.editingFinished.connect(
-            lambda wid=item["id"], w=path_edit, k=key: self._style(wid, **{k: w.text().strip()})
-        )
+        path_edit.editingFinished.connect(lambda wid=item["id"], w=path_edit, k=key: self._style(wid, **{k: w.text().strip()}))
         path_layout.addWidget(path_edit)
         path_layout.addWidget(browse)
         path_layout.addWidget(clear)
@@ -6146,8 +6065,12 @@ class OverlayInspector(QtWidgets.QWidget):
             _set_stroke(spin.value(), enabled=on)
 
         stroke_box.toggled.connect(_stroke_toggled)
-        stroke_slider.valueChanged.connect(lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True)))
-        stroke_spin.valueChanged.connect(lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True)))
+        stroke_slider.valueChanged.connect(
+            lambda v, box=stroke_spin: (box.blockSignals(True), box.setValue(v), box.blockSignals(False), _set_stroke(v, enabled=True))
+        )
+        stroke_spin.valueChanged.connect(
+            lambda v, bar=stroke_slider: (bar.blockSignals(True), bar.setValue(v), bar.blockSignals(False), _set_stroke(v, enabled=True))
+        )
         stroke_color.setVisible(stroke_w > 0)
         stroke_slider.setVisible(stroke_w > 0)
         stroke_spin.setVisible(stroke_w > 0)
@@ -6501,9 +6424,7 @@ class OverlayInspector(QtWidgets.QWidget):
             pulses.setRange(1, 100)
             pulses.setValue(normalize_ocr_arm_pulses(style.get("ocr_arm_pulses")))
             pulses.setToolTip("How many detections to run when Multiple (pulses) is selected.")
-            pulses.valueChanged.connect(
-                lambda v, wid=item["id"]: self._style(wid, ocr_arm_pulses=normalize_ocr_arm_pulses(v))
-            )
+            pulses.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_arm_pulses=normalize_ocr_arm_pulses(v)))
             form.addRow("# of pulses", pulses)
             pulse_fields.append(pulses)
 
@@ -6513,11 +6434,7 @@ class OverlayInspector(QtWidgets.QWidget):
             spacing.setSuffix(" ms")
             spacing.setValue(normalize_ocr_arm_pulse_spacing_ms(style.get("ocr_arm_pulse_spacing_ms")))
             spacing.setToolTip("Delay between Multiple (pulses) detections (e.g. 5 × 500 ms).")
-            spacing.valueChanged.connect(
-                lambda v, wid=item["id"]: self._style(
-                    wid, ocr_arm_pulse_spacing_ms=normalize_ocr_arm_pulse_spacing_ms(v)
-                )
-            )
+            spacing.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_arm_pulse_spacing_ms=normalize_ocr_arm_pulse_spacing_ms(v)))
             form.addRow("Spacing", spacing)
             pulse_fields.append(spacing)
             _set_form_rows_visible(form, pulse_fields, arm_mode == "multi_pulse")
@@ -6608,10 +6525,7 @@ class OverlayInspector(QtWidgets.QWidget):
             current_source = "keyboard"
         if current_source not in sources:
             current_source = "physical"
-        source_opts = [
-            ("Keyboard/mouse" if value == "keyboard" else ("vJoy" if value == "vjoy" else value.capitalize()), value)
-            for value in sources
-        ]
+        source_opts = [("Keyboard/mouse" if value == "keyboard" else ("vJoy" if value == "vjoy" else value.capitalize()), value) for value in sources]
 
         def _on_source(v, wid=item["id"], ch=channel, ft=force_type, bind=binding):
             src = str(v or "physical")
@@ -6645,11 +6559,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if active_source == "state":
             combo = QDataComboBox()
             populate_overlay_state_combo(combo, binding.get("state_id"), binding.get("state_name"))
-            combo.currentIndexChanged.connect(
-                lambda _i, combo=combo, wid=item["id"], ch=channel: self._bind(
-                    wid, ch, **overlay_state_combo_fields(combo)
-                )
-            )
+            combo.currentIndexChanged.connect(lambda _i, combo=combo, wid=item["id"], ch=channel: self._bind(wid, ch, **overlay_state_combo_fields(combo)))
             form.addRow("State", combo)
             self._finish_channel(form, item, channel, extra_hint, show_clear)
             return
@@ -6657,11 +6567,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if active_source == "mode":
             combo = QDataComboBox()
             populate_overlay_mode_combo(combo, binding.get("mode_id"), binding.get("mode_name"))
-            combo.currentIndexChanged.connect(
-                lambda _i, box=combo, wid=item["id"], ch=channel: self._bind(
-                    wid, ch, **overlay_mode_combo_fields(box)
-                )
-            )
+            combo.currentIndexChanged.connect(lambda _i, box=combo, wid=item["id"], ch=channel: self._bind(wid, ch, **overlay_mode_combo_fields(box)))
             form.addRow("Mode", combo)
             self._finish_channel(form, item, channel, extra_hint, show_clear)
             return
@@ -6669,9 +6575,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if active_source == "keyboard":
             picker = OverlayKeyCombinationWidget(binding.get("keys") or [])
             picker.keys_changed.connect(
-                lambda keys, wid=item["id"], ch=channel: self._bind(
-                    wid, ch, keys=normalize_overlay_keys(keys), input_type="keyboard", source="keyboard"
-                )
+                lambda keys, wid=item["id"], ch=channel: self._bind(wid, ch, keys=normalize_overlay_keys(keys), input_type="keyboard", source="keyboard")
             )
             form.addRow(picker)
             self._finish_channel(form, item, channel, extra_hint, show_clear)

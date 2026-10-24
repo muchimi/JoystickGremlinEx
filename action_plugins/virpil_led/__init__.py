@@ -188,6 +188,7 @@ def classify_virpil_device(device: DeviceSummary | None) -> VirpilDeviceFamily:
 
     return VirpilDeviceFamily.Unknown
 
+
 # Map legacy flat enum names (pre device-aware lists) to LED keys
 _LEGACY_LED_KEY_MAP = {
     "buttonb1": "b1",
@@ -637,13 +638,13 @@ class VirpilButtonWidget(QtWidgets.QWidget):
         self.blink_button.setVisible(visible)
 
     def _pick_color(self, current_rgb: int, title: str) -> int | None:
-        color = QColor.fromRgb(current_rgb)
+        color = QColor().fromRgb(current_rgb)
         # Qt keeps the custom color palette in process-global state, so it has to be
         # restored before the dialog opens and harvested after it closes.
         config = gremlin.config.Configuration()
         slot_count = QColorDialog.customCount()
         for index, rgb in enumerate(config.custom_colors[:slot_count]):
-            QColorDialog.setCustomColor(index, QColor.fromRgb(rgb))
+            QColorDialog.setCustomColor(index, QColor().fromRgb(rgb))
 
         # Use Qt's dialog, not the Windows native one. Native "Add to Custom Colors"
         # always overwrites the selected (usually first) custom slot.
@@ -679,8 +680,8 @@ class VirpilButtonWidget(QtWidgets.QWidget):
             self._update_colors()
 
     def _paint_swatch(self, widget: QtWidgets.QLabel, rgb: int):
-        color = QColor.fromRgb(rgb)
-        border_color = gremlin.ui.ui_common.Color.borderColor()
+        color = QColor().fromRgb(rgb)
+        border_color = gremlin.ui.ui_common.Color().borderColor()
         widget.setStyleSheet(f".QLabel {{ background-color: {color.name()}; border: 4px solid {border_color}; }}")
 
     def _update_colors(self):
@@ -723,9 +724,7 @@ class VirpilLedPickerDialog(QtWidgets.QDialog):
         if not available:
             layout.addWidget(gremlin.ui.ui_common.QWarningWidget("All LEDs for this device are already added."))
 
-        self.add_selected_widget = gremlin.ui.ui_common.Buttons.getOkWidget(
-            label="Add Selected", callback=self._add_selected
-        )
+        self.add_selected_widget = gremlin.ui.ui_common.Buttons.getOkWidget(label="Add Selected", callback=self._add_selected)
         self.add_all_widget = gremlin.ui.ui_common.QDataPushButton("Add All", callback=self._add_all)
         self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
 
@@ -904,22 +903,17 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
 
         self.blink_while_held_widget = QtWidgets.QCheckBox("Blink while held")
         self.blink_while_held_widget.setToolTip(
-            "Checked: blink while the button is held, stop on release.\n"
-            "Unchecked: each press toggles blinking on/off (then Off colors)."
+            "Checked: blink while the button is held, stop on release.\nUnchecked: each press toggles blinking on/off (then Off colors)."
         )
         self.blink_while_held_widget.setChecked(bool(self.action_data.blink_while_held))
         self.blink_while_held_widget.toggled.connect(self._handle_blink_while_held_changed)
 
-        self.blink_interval_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.blink_interval_ms, callback=self._handle_blink_interval_changed
-        )
+        self.blink_interval_widget = gremlin.ui.ui_common.QDelayWidget(value=self.action_data.blink_interval_ms, callback=self._handle_blink_interval_changed)
 
         self.main_layout.addWidget(self.output_mode_widget)
         self.main_layout.addWidget(self.device_selector)
 
-        self.no_device_warning_widget = gremlin.ui.ui_common.QWarningWidget(
-            "Select a Virpil device first before adding LEDs."
-        )
+        self.no_device_warning_widget = gremlin.ui.ui_common.QWarningWidget("Select a Virpil device first before adding LEDs.")
         self.main_layout.addWidget(self.no_device_warning_widget)
 
         self.main_layout.addWidget(self.view_widget)
@@ -970,7 +964,7 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         if not self._has_valid_device():
             return
         for index, button in enumerate(self.action_data.model):
-            widget = VirpilButtonWidget(self.action_data, button, delete_callback=self._handle_delete, index = index)
+            widget = VirpilButtonWidget(self.action_data, button, delete_callback=self._handle_delete, index=index)
             item = QtWidgets.QListWidgetItem()
             self.view_widget.addItem(item)
             self.view_widget.setItemWidget(item, widget)
@@ -1002,7 +996,6 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
                 r, g, b = button.getRGB()
                 self.action_data.setState(r, g, b, button.led_id)
 
-
     def _handle_delay_changed(self, value: int):
         self.action_data.pulse_duration = value
 
@@ -1020,7 +1013,7 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         fname = self.file_path_widget.text()
         valid = os.path.isfile(fname)
         if valid:
-            self._setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color.activeColor())
+            self._setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color().activeColor())
             self.action_data.virpil_executable = self.action_data.virpil_executable  # force a reload at next play
             self._populate_ui()
         else:
@@ -1094,7 +1087,7 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
             self.action_data.output_mode = widget.data
             self._update()
 
-    def _handle_device_changed(self, device : dinput.DeviceSummary):
+    def _handle_device_changed(self, device: dinput.DeviceSummary):
         self.action_data.device = device
         for button in self.action_data.model:
             button.sync_led_to_device(device)
@@ -1300,7 +1293,6 @@ class VirpilAction(gremlin.input_item.AbstractAction):
     @property
     def device_guid(self) -> dinput.GUID:
         return self.device.device_guid if self.device else None
-
 
     def getDeviceMap(self) -> dict[str, DeviceSummary]:
         """gets the map  of virpil devices"""

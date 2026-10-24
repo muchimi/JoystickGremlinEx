@@ -1935,7 +1935,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         self.warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
@@ -2327,7 +2327,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         profile = gremlin.shared_state.current_profile
         default_mode = profile.get_default_mode()
 
-        _icon_color = gremlin.ui.ui_common.Color.normalColor()
+        _icon_color = gremlin.ui.ui_common.Color().normalColor()
 
         create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
 
@@ -2809,7 +2809,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}"
             )
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         self._warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
@@ -3127,8 +3127,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
 
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
-        active_color = gremlin.ui.ui_common.Color.activeColor()
-        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        active_color = gremlin.ui.ui_common.Color().activeColor()
+        normal_color = gremlin.ui.ui_common.Color().normalColor()
         self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
 
@@ -3260,7 +3260,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         # self.main_layout.addWidget(self._toolbar_container_widget)
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,

@@ -126,13 +126,13 @@ class QKeyWidget(QtWidgets.QPushButton):
 
     def _update_style(self):
         Color = gremlin.ui.ui_common.Color
-        foreground_color = Color.keyForegroundColor()
-        background_color = Color.keyBackgroundColor()
-        selected_color = Color.selectColor()
-        border = Color.keyBorderColor()
-        hover_border = Color.keyHoverBorderColor()
-        hover_background_color = Color.keyHoverBackgroundColor()
-        hover_selected_background_color = Color.keyHoverSelectedBackgroundColor()
+        foreground_color = Color().keyForegroundColor()
+        background_color = Color().keyBackgroundColor()
+        selected_color = Color().selectColor()
+        border = Color().keyBorderColor()
+        hover_border = Color().keyHoverBorderColor()
+        hover_background_color = Color().keyHoverBackgroundColor()
+        hover_selected_background_color = Color().keyHoverSelectedBackgroundColor()
         radius = self._border_radius
 
         h = self._max_height

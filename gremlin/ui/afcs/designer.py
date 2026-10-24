@@ -663,7 +663,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             )
             expr.editingFinished.connect(self._on_expression_finished)
             self._expression_edit = expr
-            preview = QDataPushButton("Preview", tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.", clicked=self._preview_expression)
+            preview = QDataPushButton(
+                "Preview", tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.", clicked=self._preview_expression
+            )
             expr_row = QtWidgets.QWidget()
             expr_layout = QtWidgets.QHBoxLayout(expr_row)
             expr_layout.setContentsMargins(0, 0, 0, 0)
@@ -671,7 +673,11 @@ class NodeConditionWidget(QtWidgets.QWidget):
             expr_layout.addWidget(preview)
             self._form.addRow("Expression", expr_row)
 
-            ops = QDataPushButton("Boolean operators", tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.", clicked=self._show_boolean_operators)
+            ops = QDataPushButton(
+                "Boolean operators",
+                tooltip="Show AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, and truth tables.",
+                clicked=self._show_boolean_operators,
+            )
             self._form.addRow("", ops)
 
             hint = QtWidgets.QLabel(_condition_summary(vis))
@@ -737,9 +743,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         self._emit(rebuild=True)
 
     def _remove_condition(self, cond_id: str) -> None:
-        self._vis["conditions"] = [
-            c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)
-        ]
+        self._vis["conditions"] = [c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)]
         self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._emit(rebuild=True)
 
@@ -769,11 +773,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             lambda _i, combo=kind_box, cid=cond_id: self._set_condition(cid, rebuild=True, kind=str(combo.currentData() or "mode"))
         )
         form.addRow("If", kind_box)
-        when_opts = (
-            [("is current", "on"), ("is not current", "off")]
-            if kind == "mode"
-            else [("is on", "on"), ("is off", "off")]
-        )
+        when_opts = [("is current", "on"), ("is not current", "off")] if kind == "mode" else [("is on", "on"), ("is off", "off")]
         when_cur = "off" if str(cond.get("when") or "on").casefold() == "off" else "on"
         when = QDataRadioButtonGroup(
             when_opts,
@@ -803,9 +803,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             form.addRow("State", combo)
         elif kind == "keyboard":
             picker = OverlayKeyCombinationWidget(cond.get("keys") or [])
-            picker.keys_changed.connect(
-                lambda keys, cid=cond_id: self._set_condition(cid, keys=normalize_overlay_keys(keys))
-            )
+            picker.keys_changed.connect(lambda keys, cid=cond_id: self._set_condition(cid, keys=normalize_overlay_keys(keys)))
             form.addRow(picker)
         else:
             self._fill_button(form, cond)
@@ -876,9 +874,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             id_box.addItem(f"Button {current_id}", current_id)
             id_box.setCurrentIndex(id_box.count() - 1)
         id_box.currentIndexChanged.connect(
-            lambda _i, cid=cond_id, combo=id_box: self._set_condition(
-                cid, input_id=int(combo.currentData() if combo.currentData() is not None else 0)
-            )
+            lambda _i, cid=cond_id, combo=id_box: self._set_condition(cid, input_id=int(combo.currentData() if combo.currentData() is not None else 0))
         )
         form.addRow("Button", id_box)
 
@@ -1030,12 +1026,14 @@ class AfcsSelectionPane(QtWidgets.QWidget):
         if designer is None or self._syncing:
             return
         nodes = designer._graph_nodes()
+
         def sort_key(node):
             name = str(node.name() or "").casefold()
             kind = _NODE_SECTION.get(kind_for_node(node), kind_for_node(node)).casefold()
             if self._sort == "type":
                 return (kind, name)
             return (name, kind)
+
         ordered = sorted(nodes, key=sort_key)
         selected_ids = {node.id for node in designer._canvas_selected_nodes()}
         self._syncing = True
@@ -1209,10 +1207,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if self._graph is None:
             return []
         try:
-            return [
-                node for node in (self._graph.selected_nodes() or [])
-                if node is not None and hasattr(node, "AFCS_KIND")
-            ]
+            return [node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")]
         except Exception:
             return []
 
@@ -1293,9 +1288,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if len(selected) == 1:
             title = f"{title} — {label}"
         help_text = inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
-        help_text = (
-            help_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        )
+        help_text = help_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         return title, (
             f"<b>This module</b> — {help_text}<br>"
             "<b>Mouse</b> — Drag to move. Middle button pans. Ctrl+wheel zooms. "
@@ -1427,7 +1420,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._mode_tabs.setMovable(True)
         self._mode_tabs.setUsesScrollButtons(True)
         self._mode_tabs.setObjectName("afcs_modes")
-        self._mode_tabs.setStyleSheet(Color.cssTab())
+        self._mode_tabs.setStyleSheet(Color().cssTab())
         self._mode_tabs.setToolTip("Each tab is a flight mode. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder.")
         self._mode_tabs.currentChanged.connect(self._on_mode_tab)
         self._mode_tabs.tabBarDoubleClicked.connect(self._rename_mode_tab)
@@ -1474,7 +1467,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         layout.addWidget(self._node_palette_host)
         self._rebuild_node_palette()
         layout.addStretch()
-        panel.setStyleSheet(f"QWidget {{ background: {Color.actionBackgroundColor()}; }}")
+        panel.setStyleSheet(f"QWidget {{ background: {Color().actionBackgroundColor()}; }}")
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -1931,10 +1924,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if self._graph is None:
             return []
         try:
-            selected = [
-                node for node in (self._graph.selected_nodes() or [])
-                if node is not None and hasattr(node, "AFCS_KIND")
-            ]
+            selected = [node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")]
         except Exception:
             selected = []
         if selected:
@@ -2116,7 +2106,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
         elif kind == "limiter":
             self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
-            self._assign_spec_property(graph_node, "range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")))
+            self._assign_spec_property(
+                graph_node, "range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered"))
+            )
             self._assign_spec_property(graph_node, "shape", normalize_limiter_shape(props.get("shape")))
             self._update_limiter_preview(graph_node)
         elif kind == "deadzone":
@@ -2479,7 +2471,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             )
             if shape.layout() is not None:
                 shape.layout().setContentsMargins(0, 0, 0, 0)
-            shape.setToolTip("Linear scales throw. Bezier morphs GEX-style handles toward a flat center. Min-max follows 1:1 then clips at the live limiter axis from 100% down to 0%.")
+            shape.setToolTip(
+                "Linear scales throw. Bezier morphs GEX-style handles toward a flat center. Min-max follows 1:1 then clips at the live limiter axis from 100% down to 0%."
+            )
             self._inspector_form.addRow("Shape", shape)
             combo = QDataRadioButtonGroup(
                 [(LIMITER_RANGE_LABELS[mode], mode) for mode in LIMITER_RANGES],
@@ -2683,7 +2677,6 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         node.set_property("axis_id", int(event.identifier))
         self._capture_graph()
         self._rebuild_inspector(node)
-
 
     def _on_snap_toggled(self, checked: bool) -> None:
         gremlin.config.Configuration().afcs_snap_to_grid = bool(checked)

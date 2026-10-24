@@ -28,11 +28,9 @@ from psygnal import Signal
 
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
-
     """Base class for activation condition widgets."""
 
     virtual_button_modified = Signal()
-
 
     def __init__(self, condition_data, parent=None, layout_direction="vertical"):
         """Creates a new activation condition widget.
@@ -54,21 +52,14 @@ class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
 
     def _create_ui(self):
         """Creates all required UI elements."""
-        raise gremlin.error.MissingImplementationError(
-            "AbstractVirtualButtonWidget._create_ui not "
-            "implemented in subclass."
-        )
+        raise gremlin.error.MissingImplementationError("AbstractVirtualButtonWidget._create_ui not implemented in subclass.")
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
-        raise gremlin.error.MissingImplementationError(
-            "AbstractVirtualButtonWidget._populate_ui not "
-            "implemented in subclass."
-        )
+        raise gremlin.error.MissingImplementationError("AbstractVirtualButtonWidget._populate_ui not implemented in subclass.")
 
 
 class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
-
     """Condition widget for axis, turning an axis area into a button."""
 
     def __init__(self, condition_data, parent=None):
@@ -92,20 +83,19 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color= gremlin.ui.ui_common.Color.activeColor())
+        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color().activeColor())
 
         self.grab_low_widget = ui_common.QDataPushButton()
-        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
+        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor()))
         self.grab_low_widget.setMaximumWidth(20)
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
 
         self.grab_high_widget = ui_common.QDataPushButton()
-        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle",qta_color = gremlin.ui.ui_common.Color.recordColor()))
+        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor()))
         self.grab_high_widget.setMaximumWidth(20)
         self.grab_high_widget.clicked.connect(self._grab_high)
         self.grab_high_widget.setToolTip("Grab axis value")
-
 
         self.range_layout = QtWidgets.QHBoxLayout()
         self.lower_limit_widget = ui_common.DynamicDoubleSpinBox()
@@ -131,8 +121,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.range_layout.addWidget(self.range_status_widget)
         self.range_layout.addStretch()
 
-
-        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint) # QtWidgets.QPushButton(load_icon("help.png"), "")
+        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback=self._show_hint)  # QtWidgets.QPushButton(load_icon("help.png"), "")
         self.help_button_widget.clicked.connect(self._show_hint)
         self.range_layout.addWidget(self.help_button_widget)
 
@@ -151,26 +140,26 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.last_value = None
 
     @QtCore.Slot(bool)
-    def _enabled_changed(self, checked : bool):
+    def _enabled_changed(self, checked: bool):
         self.condition_data.enabled = checked
 
     @QtCore.Slot()
     def _grab_low(self):
         value = self.axis_repeater_widget.value()
-        self.lower_limit_widget.setValue(value) # also updates condition_data
-
+        self.lower_limit_widget.setValue(value)  # also updates condition_data
 
     @QtCore.Slot()
     def _grab_high(self):
         value = self.axis_repeater_widget.value()
-        self.upper_limit_widget.setValue(value) # also updates condition_data
+        self.upper_limit_widget.setValue(value)  # also updates condition_data
 
     @QtCore.Slot(float, float)
-    def _axis_value_changed(self, value : float, curved_value : float):
+    def _axis_value_changed(self, value: float, curved_value: float):
         self._update_range_state(value)
 
     def _update_range_state(self, value):
         import gremlin.util
+
         if self.range_status_widget:
             visible = False
 
@@ -194,30 +183,21 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
                         self.range_status_widget.setText("(below)")
                         visible = True
 
-
             self.range_status_widget.setVisible(visible)
             self.last_value = value
-
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
         self.lower_limit_widget.setValue(self.condition_data.lower_limit)
         self.upper_limit_widget.setValue(self.condition_data.upper_limit)
 
-        self.axis_repeater_widget.hookDevice(self.condition_data.hook_id,
-                                             self.condition_data.device_guid,
-                                             self.condition_data.input_type,
-                                             self.condition_data.input_id)
-        self.direction_widget.setCurrentText(
-            gremlin.types.AxisButtonDirection.to_string(
-                self.condition_data.direction
-            ).capitalize()
+        self.axis_repeater_widget.hookDevice(
+            self.condition_data.hook_id, self.condition_data.device_guid, self.condition_data.input_type, self.condition_data.input_id
         )
+        self.direction_widget.setCurrentText(gremlin.types.AxisButtonDirection.to_string(self.condition_data.direction).capitalize())
 
     def unhook(self):
         self.axis_repeater_widget.unhookDevice(self.condition_data.hook_id)
-
-
 
     def _lower_limit_cb(self, value):
         """Updates the lower limit value.
@@ -236,20 +216,15 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.virtual_button_modified.emit()
 
     def _direction_changed_cb(self, value):
-        self.condition_data.direction = \
-            gremlin.types.AxisButtonDirection.to_enum(value.lower())
+        self.condition_data.direction = gremlin.types.AxisButtonDirection.to_enum(value.lower())
         self.virtual_button_modified.emit()
 
     def _show_hint(self):
         """Displays a hint explaining the activation condition."""
-        QtWidgets.QWhatsThis.showText(
-            self.help_button_widget.mapToGlobal(QtCore.QPoint(0, 10)),
-            gremlin.hints.hint.get("axis-condition", "")
-        )
+        QtWidgets.QWhatsThis.showText(self.help_button_widget.mapToGlobal(QtCore.QPoint(0, 10)), gremlin.hints.hint.get("axis-condition", ""))
 
 
 class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
-
     """Condition widget for hats, turning a set of directions into a button."""
 
     locked = False
@@ -270,7 +245,6 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
             return
 
         try:
-
             VirtualHatButtonWidget.locked = True
 
             self.setTitle("Virtual Hat Button")
@@ -285,28 +259,17 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch()
 
-            self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
+            self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback=self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:
             VirtualHatButtonWidget.locked = False
 
     def _populate_ui(self):
         """Populates the UI elements with data."""
-        direction_map = {
-            "north": "n",
-            "north-east": "ne",
-            "east": "e",
-            "south-east": "se",
-            "south": "s",
-            "south-west": "sw",
-            "west": "w",
-            "north-west": "nw"
-        }
+        direction_map = {"north": "n", "north-east": "ne", "east": "e", "south-east": "se", "south": "s", "south-west": "sw", "west": "w", "north-west": "nw"}
 
         for direction in self.condition_data.directions:
-            self._widgets[direction_map[direction]].setCheckState(
-                QtCore.Qt.Checked
-            )
+            self._widgets[direction_map[direction]].setCheckState(QtCore.Qt.Checked)
 
     def _state_changed(self, direction, state):
         """Updates the set of directions making up the button.
@@ -314,16 +277,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
         :param direction the direction being modified
         :param state the change being performed
         """
-        direction_map = {
-            "n": "north",
-            "ne": "north-east",
-            "e": "east",
-            "se": "south-east",
-            "s": "south",
-            "sw": "south-west",
-            "w": "west",
-            "nw": "north-west"
-        }
+        direction_map = {"n": "north", "ne": "north-east", "e": "east", "se": "south-east", "s": "south", "sw": "south-west", "w": "west", "nw": "north-west"}
 
         name = direction_map[direction]
         if state is False and name in self.condition_data.directions:
@@ -331,8 +285,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
             del self.condition_data.directions[idx]
         elif state is True and name not in self.condition_data.directions:
             self.condition_data.directions.append(name)
-        self.condition_data.directions = \
-            list(set(self.condition_data.directions))
+        self.condition_data.directions = list(set(self.condition_data.directions))
 
     def _create_state_changed_cb(self, direction):
         """Creates a state change callback.
@@ -344,7 +297,4 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
     def _show_hint(self):
         """Displays a hint explaining the activation condition."""
-        QtWidgets.QWhatsThis.showText(
-            self.help_button.mapToGlobal(QtCore.QPoint(0, 10)),
-            gremlin.hints.hint.get("hat-condition", "")
-        )
+        QtWidgets.QWhatsThis.showText(self.help_button.mapToGlobal(QtCore.QPoint(0, 10)), gremlin.hints.hint.get("hat-condition", ""))

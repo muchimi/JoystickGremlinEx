@@ -3115,7 +3115,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
                         syslog.info(f"OSC: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index + 1}] - ensure inputs are unique")
-                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        warning_color = gremlin.ui.ui_common.Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         valid = False
@@ -3132,14 +3132,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
                     if self._min_range > self._max_range:
                         self._validation_message_widget.setText("Min range must be less than max range")
-                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        warning_color = gremlin.ui.ui_common.Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
 
                     if self._min_range == self._max_range:
                         self._validation_message_widget.setText("Min range cannot be the same as the max range")
-                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        warning_color = gremlin.ui.ui_common.Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
@@ -3150,7 +3150,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
                         self._validation_message_widget.setText("First data item must be a number for axis input")
-                        warning_color = gremlin.ui.ui_common.Color.warningColor()
+                        warning_color = gremlin.ui.ui_common.Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
@@ -3837,7 +3837,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # load from list button - load / edit from list
         load_button = QtWidgets.QPushButton("Import")
         load_button.setToolTip("Adds multiple OSC message inputs to the profile from a list.")
-        icon = gremlin.ui.ui_common.Icons.addIcon(gremlin.ui.ui_common.Color.yellowColor())
+        icon = gremlin.ui.ui_common.Icons.addIcon(gremlin.ui.ui_common.Color().yellowColor())
         load_button.setIcon(icon)
         load_button.clicked.connect(self._handle_bulk_load)
         button_container_layout.addWidget(load_button)
@@ -3872,7 +3872,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             (el.config_changed, self._config_changed_cb),
             (el.lock_inputs, self._handle_lock_inputs),
             (el.unlock_inputs, self._handle_unlock_inputs),
-            (el.find_next, self._handle_find_next)
+            (el.find_next, self._handle_find_next),
         ):
             try:
                 signal.disconnect(slot)
@@ -4280,7 +4280,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                 other_key = other_input.message_key
                 if key == other_key:
                     index = widgets.index(widget)
-                    warning_color = gremlin.ui.ui_common.Color.warningColor()
+                    warning_color = gremlin.ui.ui_common.Color().warningColor()
                     icon_color = QtGui.QColor(warning_color)
 
                     self._set_status(
@@ -4320,7 +4320,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         input_item: OscInputItem = input_widget.input_item
         input_item._update_display_name()
 
-        css = gremlin.ui.ui_common.Color.cssEntry()
+        css = gremlin.ui.ui_common.Color().cssEntry()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
         input_widget.setInputDescriptionStyle(css)
@@ -4334,7 +4334,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         icon = None
         if is_warning:
-            warning_color = gremlin.ui.ui_common.Color.warningColor()
+            warning_color = gremlin.ui.ui_common.Color().warningColor()
             icon_color = QtGui.QColor(warning_color)
             icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=icon_color)
 

@@ -130,13 +130,15 @@ class KeyboardInputItem(InputItem):
             return self._key.scan_code, self._key.is_extended
         return None
 
-    def setKeys(self, keys: list):
+    def setKeys(self, keys: list[Key]):
         """sets the primary key and any latched keys"""
         if keys:
             keys = gremlin.keyboard.sort_keys(keys)
             # primary key is the last one
             self.key = keys[-1]
-            self._key._latched_keys = keys[1:]
+            key : Key
+            for key in keys[:-1]:
+                self.key.addLatchedKey(key)
         else:
             self.key = None
 
@@ -270,7 +272,7 @@ class KeyboardInputItem(InputItem):
                         (scan_code, is_extended), _ = KeyMap.translate((scan_code, is_extended))
                         key = KeyMap.find(scan_code, is_extended)
                     if key not in self._key.latched_keys:
-                        self._key._latched_keys.append(key)
+                        self._key.addLatchedKey(key)
 
             self._key._update()
 
@@ -1357,14 +1359,16 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         values = input_item.getKeyList()
         self._set_custom_content(input_widget, values)
 
-        input_widget.setDescription(input_item.description)
+        show_scan_codes = gremlin.config.Configuration().show_scancodes
+        input_widget.setDescriptionVisible(False)
+
 
         is_warning = False
         status_text = ""
         if input_item.key is None or not input_item.key.name:
             is_warning = True
             status_text = "Not configured"
-        elif gremlin.config.Configuration().show_scancodes:
+        elif show_scan_codes:
             status_text = input_item.key.latched_code
 
         icon = None

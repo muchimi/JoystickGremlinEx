@@ -78,7 +78,7 @@ def _icon_eye(visible: bool) -> QtGui.QIcon:
     pm.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pm)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    color = QtGui.QColor(Color.normalColor() if visible else Color.inactiveColor())
+    color = QtGui.QColor(Color().normalColor() if visible else Color().inactiveColor())
     painter.setPen(QtGui.QPen(color, 1.4))
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawEllipse(QtCore.QRectF(2.5, 5.0, 11.0, 6.0))
@@ -101,7 +101,7 @@ def _icon_lock(locked: bool) -> QtGui.QIcon:
     pm.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pm)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    color = QtGui.QColor(Color.orangeColor() if locked else Color.inactiveColor())
+    color = QtGui.QColor(Color().orangeColor() if locked else Color().inactiveColor())
     painter.setPen(QtGui.QPen(color, 1.4))
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.drawRoundedRect(QtCore.QRectF(4.0, 7.5, 8.0, 6.0), 1.5, 1.5)
@@ -123,8 +123,8 @@ def _icon_folder(expanded: bool) -> QtGui.QIcon:
     pm.fill(QtCore.Qt.transparent)
     painter = QtGui.QPainter(pm)
     painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    stroke = QtGui.QColor(Color.normalColor())
-    fill = QtGui.QColor(Color.normalColor())
+    stroke = QtGui.QColor(Color().normalColor())
+    fill = QtGui.QColor(Color().normalColor())
     fill.setAlpha(55 if expanded else 90)
     painter.setPen(QtGui.QPen(stroke, 1.2))
     painter.setBrush(fill)
@@ -215,9 +215,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
             tooltip="Ungroup the selected widgets (Ctrl+Shift+G).",
             clicked=self._ungroup,
         )
-        root.addWidget(
-            gremlin.ui.ui_common.getHContainer([self._group_btn, self._ungroup_btn], widget_only=True)
-        )
+        root.addWidget(gremlin.ui.ui_common.getHContainer([self._group_btn, self._ungroup_btn], widget_only=True))
 
         self._structure_sig = None
         # Remember which group folders the user left open/closed across refreshes.
@@ -468,9 +466,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
             if not members:
                 return
             if column == 0:
-                visible = all(
-                    bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in members
-                )
+                visible = all(bool((self.scene.widget_by_id(wid) or {}).get("visible", True)) for wid in members)
                 self.scene.push_undo()
                 self.scene.apply_widget_updates(members, visible=not visible)
                 return

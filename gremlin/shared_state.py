@@ -64,6 +64,7 @@ data_path = None # application data path
 
 vjoy_enabled = True # assume vjoy enabled
 is_dark_theme = False # true if windows is in dark theme
+custom_theme = False # true if the theme is a custom theme set by the user
 
 # Flag indicating whether or not input highlighting should be
 # prevented even if it is enabled by the user

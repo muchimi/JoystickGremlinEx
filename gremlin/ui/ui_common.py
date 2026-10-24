@@ -16,12 +16,16 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 
+import copy
+import json
+import tempfile
 import time
 import threading
 import anytree
 import os
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+import enum
 from PySide6.QtWidgets import (
     QSizePolicy,
     QLayout,
@@ -132,482 +136,862 @@ class Ansi:
 QWIDGETSIZE_MAX = 16_777_215
 
 
+@SingletonDecorator
 class Color:
     """general UI color and stylesheet handling"""
 
-    @staticmethod
-    def activeColor():
-        return "#51f56f" if gremlin.shared_state.is_dark_theme else "#3BAC41"
+    class ColorName(enum.Enum):
+        activeColor = 0
 
-    @staticmethod
-    def inactiveColor():
-        return "#686a6e" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
+    def __init__(self):
+        self.theme = "auto"  # default to automatic mode
 
-    @staticmethod
-    def onColor():
-        return "#93f551" if gremlin.shared_state.is_dark_theme else "#3BAC41"
+        # Palette keys match the color accessor names below.
+        self._color_map = {
+            "dark": {
+                "activeColor": "#51f56f",
+                "inactiveColor": "#686a6e",
+                "onColor": "#93f551",
+                "offColor": "#6D6D6D",
+                "normalColor": "#AAAAAA",
+                "disabledColor": "#2E2E2E",
+                "normalDarkColor": "#AAAAAA",
+                "selectedDockTabBackgroundColor": "#303030",
+                "textHighlightColor": "#AFC757",
+                "normalLightColor": "#E9E9E9",
+                "normalGradientColor": "#A7A7A7",
+                "backgroundColor": "#212121",
+                "backgroundLighterColor": "#0C0B0B",
+                "watermarkColor": "#242424",
+                "blueColor": "#34b7eb",
+                "orangeColor": "#ebd034",
+                "orangeOffColor": "#4e4511",
+                "redColor": "#bd542a",
+                "greenColor": "#2abd38",
+                "yellowColor": "#d9eb34",
+                "grayColor": "#949494",
+                "buttonGradientStartColor": "#757575",
+                "buttonGradientEndColor": "#5A5A5A",
+                "buttonTextColor": "#AAAAAA",
+                "buttonSelectedTextColor": "#AAAAAA",
+                "buttonDisabledTextColor": "#1D1D1D",
+                "selectedBackgroundColor": "#658265",
+                "unselectedBackgroundColor": "#3F3F3F",
+                "highlightBackgroundColor": "#66612f",
+                "borderColor": "#585858",
+                "menuSeparatorColor": "#CACACA",
+                "titleBackgroundColor": "#222222",
+                "selectColor": "#658265",
+                "alternateSelectColor": "#8a761c",
+                "selectGradientColor": "#448044",
+                "selectEndGradientColor": "#61BB61",
+                "alternateSelectGradientColor": "#677517",
+                "alternateSelectEndGradientColor": "#ACC425",
+                "ChannelColors": [
+                    ("#448044", "#61BB61"),
+                    ("#677517", "#ACC425"),
+                    ("#177533", "#25C4B7"),
+                    ("#5F1775", "#B725C4"),
+                    ("#174875", "#504EC0"),
+                    ("#A7A7A7", "#E4E4E4"),
+                ],
+                "extraChannelC1Color": "#ACC425",
+                "selectGradientAltColor": "#448080",
+                "selectEndGradientAltColor": "#8ac1be",
+                "selectBorderColor": "#408540",
+                "alternateSelectBorderColor": "#997e14",
+                "expressionColor": "#cc7d1f",
+                "rangeColor": "#8FBC8F",
+                "alternateRangeColor": "#8fb9bc",
+                "rangeBorderColor": "#8FBC8F",
+                "actionIconBackgroundColor": "#424242",
+                "keyBackgroundColor": "#424242",
+                "keyHoverBackgroundColor": "#525252",
+                "hoverBackgroundColor": "#525252",
+                "keyHoverSelectedBackgroundColor": "#9ab19a",
+                "keyEntryBackgroundColor": "#293d2d",
+                "keyForegroundColor": "#AAAAAA",
+                "keyBorderColor": "#AAAAAA",
+                "hoverBorderColor": "#CCCCCC",
+                "keyHoverBorderColor": "#CCCCCC",
+                "containerBackgroundColor": "#101010",
+                "actionBackgroundColor": "#202020",
+                "sliderTickColor": "#303030",
+                "sliderHandleColor": "#a7b59e",
+                "sliderHandleBorderColor": "#e0e0e0",
+                "sliderRangeBorderColor": "#8fb9bc",
+                "sliderRangeColor": "#8fb9bc",
+                "sliderAlternateRangeColor": "#8fb9bc",
+                "sliderBackgroundColor": "#060606",
+                "recordColor": "#c7450e",
+                "activeContentColor": "#458ae6",
+                "buttonBackgroundColor": "#414141",
+                "checkboxBackgroundColor": "#414141",
+                "buttonColor": "#AAAAAA",
+                "buttonBorderColor": "#424242",
+                "buttonHoverBorderColor": "#CCCCCC",
+                "buttonHoverBackgroundColor": "#525252",
+                "headerBarBackgroundColor": "#333333",
+                "headerBarBorderColor": "#1F5C1C",
+                "warningColor": "#ab8d18",
+                "disconnectedBackgroundColor": "#ab8d18",
+                "disconnectedColor": "#db6512",
+                "unmappedColor": "#a1a1a1",
+                "mappedColor": "#ffffff",
+                "entryBackgroundColor": "#5D6B52",
+                "listenColor": "#34b7eb",
+                "infoBackgroundColor": "#658265",
+                "infoColor": "#f1f1f1",
+                "frameColor": "#8a8a8a",
+                "inputTitleColor": "#5A725A",
+                "inputTitleUnselectedColor": "#3A3A3A",
+                "repeaterColor": "#0C8D12",
+                "repeaterBackgroundColor": "#374438",
+                "tabBackgroundColor": "#212121",
+                "tabForegroundColor": "#B6B6B6",
+                "tabMissingForegroundColor": "#8a761c",
+                "tabUsedForegroundColor": "#FFFFFF",
+                "tabUsedOtherForegroundColor": "#B9B9B9",
+                "tabSelectedTextColor": "#FFFFFF",
+                "tabHoverColor": "#303030",
+                "tabTextColor": "#B6B6B6",
+                "tabSelectedBackgroundColor": "#2b2b2b",
+                "headerBackgroundColor": "#353535",
+                "categoryColor": "#09406D",
+                "attributeColor": "#2D582E",
+                "nameColor": "#4D4D4D",
+                "PenColors": {0: "#c0c0c0", 1: "#e41a1c", 2: "#377eb8", 3: "#4daf4a", 4: "#984ea3", 5: "#ff7f00", 6: "#ffff33", 7: "#9cad1c", 8: "#2cb2f5"},
+            },
+            "light": {
+                "activeColor": "#3BAC41",
+                "inactiveColor": "#8c8c8c",
+                "onColor": "#3BAC41",
+                "offColor": "#8c8c8c",
+                "normalColor": "#111111",
+                "disabledColor": "#9C9C9C",
+                "normalDarkColor": "#AAAAAA",
+                "selectedDockTabBackgroundColor": "#DDDDDD",
+                "textHighlightColor": "#A5B855",
+                "normalLightColor": "#252525",
+                "normalGradientColor": "#CCCCCC",
+                "backgroundColor": "#EEEEEE",
+                "backgroundLighterColor": "#C4C4C4",
+                "watermarkColor": "#D3D3D3",
+                "blueColor": "#0B15AA",
+                "orangeColor": "#968215",
+                "orangeOffColor": "#3D3B30",
+                "redColor": "#bd542a",
+                "greenColor": "#088814",
+                "yellowColor": "#818b20",
+                "grayColor": "#585858",
+                "buttonGradientStartColor": "#E2E2E2",
+                "buttonGradientEndColor": "#BDBDBD",
+                "buttonTextColor": "#000000",
+                "buttonSelectedTextColor": "#000000",
+                "buttonDisabledTextColor": "#111111",
+                "selectedBackgroundColor": "#8FBC8F",
+                "unselectedBackgroundColor": "#BDBDBD",
+                "highlightBackgroundColor": "#FFF4B0",
+                "borderColor": "#111111",
+                "menuSeparatorColor": "#111111",
+                "titleBackgroundColor": "#AAAAAA",
+                "selectColor": "#8FBC8F",
+                "alternateSelectColor": "#bcaf8f",
+                "selectGradientColor": "#448044",
+                "selectEndGradientColor": "#61BB61",
+                "alternateSelectGradientColor": "#677517",
+                "alternateSelectEndGradientColor": "#ACC425",
+                "ChannelColors": [
+                    ("#448044", "#61BB61"),
+                    ("#7A8B14", "#8DA311"),
+                    ("#177533", "#25C4B7"),
+                    ("#5F1775", "#B725C4"),
+                    ("#174875", "#504EC0"),
+                    ("#494949", "#858585"),
+                ],
+                "extraChannelC1Color": "#ACC425",
+                "selectGradientAltColor": "#568c8f",
+                "selectEndGradientAltColor": "#8fb5bc",
+                "selectBorderColor": "#76c276",
+                "alternateSelectBorderColor": "#c2b476",
+                "expressionColor": "#cc7d1f",
+                "rangeColor": "#8FBC8F",
+                "alternateRangeColor": "#8fb9bc",
+                "rangeBorderColor": "#8FBC8F",
+                "actionIconBackgroundColor": "#EEEEEE",
+                "keyBackgroundColor": "#EEEEEE",
+                "keyHoverBackgroundColor": "#F0F0F0",
+                "hoverBackgroundColor": "#F0F0F0",
+                "keyHoverSelectedBackgroundColor": "#F0F0F0",
+                "keyEntryBackgroundColor": "#EEEEEE",
+                "keyForegroundColor": "#000000",
+                "keyBorderColor": "#000000",
+                "hoverBorderColor": "#222222",
+                "keyHoverBorderColor": "#222222",
+                "containerBackgroundColor": "#EEEEEE",
+                "actionBackgroundColor": "#CCCCCC",
+                "sliderTickColor": "#232323",
+                "sliderHandleColor": "#a7b59e",
+                "sliderHandleBorderColor": "#e0e0e0",
+                "sliderRangeBorderColor": "#8fb9bc",
+                "sliderRangeColor": "#8fb9bc",
+                "sliderAlternateRangeColor": "#8fb9bc",
+                "sliderBackgroundColor": "#c3c3c3",
+                "recordColor": "#c7450e",
+                "activeContentColor": "#458ae6",
+                "buttonBackgroundColor": "#CACACA",
+                "checkboxBackgroundColor": "#E0E0E0",
+                "buttonColor": "#111111",
+                "buttonBorderColor": "#CDE0CD",
+                "buttonHoverBorderColor": "#222222",
+                "buttonHoverBackgroundColor": "#F0F0F0",
+                "headerBarBackgroundColor": "#C5C5C5",
+                "headerBarBorderColor": "#EEEEEE",
+                "warningColor": "#fc1900",
+                "disconnectedBackgroundColor": "#fc1900",
+                "disconnectedColor": "#db6512",
+                "unmappedColor": "#5a5a5a",
+                "mappedColor": "#ffffff",
+                "entryBackgroundColor": "#C5C5C5",
+                "listenColor": "#0B15AA",
+                "infoBackgroundColor": "#8FBC8F",
+                "infoColor": "#3d3d3d",
+                "frameColor": "#dddddd",
+                "inputTitleColor": "#678867",
+                "inputTitleUnselectedColor": "#C9C9C9",
+                "repeaterColor": "#0C8D12",
+                "repeaterBackgroundColor": "#829784",
+                "tabBackgroundColor": "#EEEEEE",
+                "tabForegroundColor": "#303030",
+                "tabMissingForegroundColor": "#725919",
+                "tabUsedForegroundColor": "#000000",
+                "tabUsedOtherForegroundColor": "#777777",
+                "tabSelectedTextColor": "#000000",
+                "tabHoverColor": "#E0E0E0",
+                "tabTextColor": "#303030",
+                "tabSelectedBackgroundColor": "#DDDDDD",
+                "headerBackgroundColor": "#DDDDDD",
+                "categoryColor": "#103C68",
+                "attributeColor": "#3C5F3E",
+                "nameColor": "#5F5F5F",
+                "PenColors": {0: "#111111", 1: "#e41a1c", 2: "#377eb8", 3: "#4daf4a", 4: "#984ea3", 5: "#ff7f00", 6: "#ffff33", 7: "#9cad1c", 8: "#2cb2f5"},
+            },
+            "custom": {},
+        }
 
-    @staticmethod
-    def offColor():
-        return "#6D6D6D" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
+        self._non_customizable_colors = {
+            "redColor",
+            "blueColor",
+            "orangeColor",
+            "orangeOffColor",
+            "greenColor",
+            "yellowColor",
+            "grayColor",
+            "sliderTickColor",
+            "sliderHandleColor",
+            "sliderHandleBorderColor",
+            "sliderRangeColor",
+            "sliderAlternateRangeColor",
+            "recordColor",
+            "listenColor",
+        }
+        # convert to casefolded set for easier comparison
+        self._non_customizable_colors = {name.casefold() for name in self._non_customizable_colors}
 
-    @staticmethod
-    def normalColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
+        # Copy nested color collections so custom edits preserve built-in themes.
+        self.is_dark_theme = gremlin.shared_state.is_dark_theme
+        default_theme = "dark" if self.is_dark_theme else "light"
+        self._color_map["custom"] = copy.deepcopy(self._color_map[default_theme])
+        user_folder = gremlin.config.Configuration().data_path()
+        self._theme_path = os.path.join(user_folder, "theme.json")
+        self.load_custom_theme()
 
-    @staticmethod
-    def disabledColor():
-        return "#2E2E2E" if gremlin.shared_state.is_dark_theme else "#9C9C9C"
+    def _is_color_customizable(self, color_name: str) -> bool:
+        """true if the color is customizable by the end user"""
+        return color_name.casefold() not in self._non_customizable_colors
 
-    @staticmethod
-    def normalDarkColor():
-        return "#AAAAAA"
+    def _color_description(self, color_name: str) -> str:
+        """Return a human-readable description for a given color name."""
+        descriptions = {
+            "activeColor": "Active color",
+            "inactiveColor": "Inactive color",
+            "onColor": "On state color",
+            "offColor": "Off state color",
+            "normalColor": "Normal text color",
+            "disabledColor": "Disabled color",
+            "normalDarkColor": "Dark theme text color",
+            "selectedDockTabBackgroundColor": "Selected dock tab background",
+            "textHighlightColor": "Highlighted text color",
+            "normalLightColor": "Light theme text color",
+            "normalGradientColor": "Normal gradient color",
+            "backgroundColor": "Background color",
+            "backgroundLighterColor": "Lighter background color",
+            "watermarkColor": "Watermark color",
+            "blueColor": "Blue accent color",
+            "orangeColor": "Orange accent color",
+            "orangeOffColor": "Orange off-state color",
+            "redColor": "Red accent color",
+            "greenColor": "Green accent color",
+            "yellowColor": "Yellow accent color",
+            "grayColor": "Gray accent color",
+            "buttonGradientStartColor": "Button gradient start color",
+            "buttonGradientEndColor": "Button gradient end color",
+            "buttonTextColor": "Button text color",
+            "buttonSelectedTextColor": "Selected button text color",
+            "buttonDisabledTextColor": "Disabled button text color",
+            "selectedBackgroundColor": "Selected background color",
+            "unselectedBackgroundColor": "Unselected background color",
+            "highlightBackgroundColor": "Highlighted background color",
+            "borderColor": "Border color",
+            "menuSeparatorColor": "Menu separator color",
+            "titleBackgroundColor": "Title background color",
+            "selectColor": "Selection color",
+            "alternateSelectColor": "Alternate selection color",
+            "selectGradientColor": "Selection gradient start color",
+            "selectEndGradientColor": "Selection gradient end color",
+            "alternateSelectGradientColor": "Alternate selection gradient start color",
+            "alternateSelectEndGradientColor": "Alternate selection gradient end color",
+            "ChannelColors": "Channel color pairs",
+            "extraChannelC1Color": "Additional channel color",
+            "selectGradientAltColor": "Alternate selection gradient start color",
+            "selectEndGradientAltColor": "Alternate selection gradient end color",
+            "selectBorderColor": "Selection border color",
+            "alternateSelectBorderColor": "Alternate selection border color",
+            "expressionColor": "Expression color",
+            "rangeColor": "Range color",
+            "alternateRangeColor": "Alternate range color",
+            "rangeBorderColor": "Range border color",
+            "actionIconBackgroundColor": "Action icon background color",
+            "keyBackgroundColor": "Key background color",
+            "keyHoverBackgroundColor": "Key hover background color",
+            "hoverBackgroundColor": "Hover background color",
+            "keyHoverSelectedBackgroundColor": "Selected key hover background color",
+            "keyEntryBackgroundColor": "Key entry background color",
+            "keyForegroundColor": "Key foreground color",
+            "keyBorderColor": "Key border color",
+            "hoverBorderColor": "Hover border color",
+            "keyHoverBorderColor": "Key hover border color",
+            "containerBackgroundColor": "Container background color",
+            "actionBackgroundColor": "Action background color",
+            "sliderTickColor": "Slider tick color",
+            "sliderHandleColor": "Slider handle color",
+            "sliderHandleBorderColor": "Slider handle border color",
+            "sliderRangeBorderColor": "Slider range border color",
+            "sliderRangeColor": "Slider range color",
+            "sliderAlternateRangeColor": "Alternate slider range color",
+            "sliderBackgroundColor": "Slider background color",
+            "recordColor": "Recording color",
+            "activeContentColor": "Active content color",
+            "buttonBackgroundColor": "Button background color",
+            "checkboxBackgroundColor": "Checkbox background color",
+            "buttonColor": "Button color",
+            "buttonBorderColor": "Button border color",
+            "buttonHoverBorderColor": "Button hover border color",
+            "buttonHoverBackgroundColor": "Button hover background color",
+            "headerBarBackgroundColor": "Header bar background color",
+            "headerBarBorderColor": "Header bar border color",
+            "warningColor": "Warning color",
+            "disconnectedBackgroundColor": "Disconnected background color",
+            "disconnectedColor": "Disconnected color",
+            "unmappedColor": "Unmapped control color",
+            "mappedColor": "Mapped control color",
+            "entryBackgroundColor": "Entry background color",
+            "listenColor": "Listening color",
+            "infoBackgroundColor": "Information background color",
+            "infoColor": "Information text color",
+            "frameColor": "Frame color",
+            "inputTitleColor": "Input title color",
+            "inputTitleUnselectedColor": "Unselected input title color",
+            "repeaterColor": "Repeater color",
+            "repeaterBackgroundColor": "Repeater background color",
+            "tabBackgroundColor": "Tab background color",
+            "tabForegroundColor": "Tab foreground color",
+            "tabMissingForegroundColor": "Missing tab foreground color",
+            "tabUsedForegroundColor": "Used tab foreground color",
+            "tabUsedOtherForegroundColor": "Other used tab foreground color",
+            "tabSelectedTextColor": "Selected tab text color",
+            "tabHoverColor": "Tab hover color",
+            "tabTextColor": "Tab text color",
+            "tabSelectedBackgroundColor": "Selected tab background color",
+            "headerBackgroundColor": "Header background color",
+            "categoryColor": "Category color",
+            "attributeColor": "Attribute color",
+            "nameColor": "Name color",
+            "PenColors": "Axis graph pen colors",
+            "gradientStartColor": "Gradient start color",
+            "gradientEndColor": "Gradient end color",
+            "gradientSubStartColor": "Sub gradient start",
+            "gradientSubEndColor": "Sub gradient end color",
+        }
+        return descriptions.get(color_name, color_name)
 
-    @staticmethod
-    def selectedDockTabBackgroundColor():
-        return "#303030" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+    def setTheme(self, theme: str):
+        theme = theme.lower()
+        assert theme in ("light", "dark", "custom", "auto"), "Invalid theme specified"
+        self._theme = theme
+        self.disabledColor = False
+        self.custom_theme = False
 
-    @staticmethod
-    def textHighlightColor():
-        return "#AFC757" if gremlin.shared_state.is_dark_theme else "#A5B855"
+        match theme:
+            case "light":
+                self.is_dark_theme = False
+            case "dark":
+                self.is_dark_theme = True
+            case "custom":
+                self.custom_theme = True
+            case "auto":
+                self.is_dark_theme = gremlin.shared_state.is_dark_theme
 
-    @staticmethod
-    def normalLightColor():
-        return "#E9E9E9" if gremlin.shared_state.is_dark_theme else "#252525"
+    def _decode_theme_color(self, value, default):
+        """Validate JSON colors and restore the palette's collection types."""
+        if isinstance(default, str):
+            if not isinstance(value, str) or len(value) not in (7, 9) or not value.startswith("#"):
+                raise ValueError("expected a #RRGGBB or #AARRGGBB color")
+            if any(character not in "0123456789abcdefABCDEF" for character in value[1:]):
+                raise ValueError("invalid hexadecimal color")
+            return value
+        if isinstance(default, dict):
+            if not isinstance(value, dict):
+                raise ValueError("expected a color dictionary")
+            # JSON object keys are strings; restore integer keys such as PenColors.
+            return {key: self._decode_theme_color(value.get(str(key), value.get(key, item)), item) for key, item in default.items()}
+        if isinstance(default, (list, tuple)):
+            if not isinstance(value, (list, tuple)) or len(value) != len(default):
+                raise ValueError("unexpected color collection size")
+            return type(default)(self._decode_theme_color(item, base) for item, base in zip(value, default))
+        raise ValueError("unsupported palette value")
 
-    @staticmethod
-    def normalGradientColor():
-        return "#A7A7A7" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+    def load_custom_theme(self) -> bool:
+        """Load custom colors, falling back to the current base theme per entry.
 
-    @staticmethod
-    def backgroundColor():
-        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+        A missing sidecar is created with defaults. Invalid files are left intact.
+        Returns True when the file was loaded or successfully created.
+        """
+        default_theme = "dark" if self.is_dark_theme else "light"
+        defaults = self._color_map[default_theme]
+        self._color_map["custom"] = copy.deepcopy(defaults)
+        colors = {}
+        if os.path.isfile(self._theme_path):
+            try:
+                with open(self._theme_path, "r", encoding="utf-8") as theme_file:
+                    colors = json.load(theme_file)
+                if not isinstance(colors, dict):
+                    raise ValueError("theme.json must contain an object of named colors")
+                return False
+            except Exception as error:
+                pass
 
-    @staticmethod
-    def backgroundLighterColor():
-        return "#0C0B0B" if gremlin.shared_state.is_dark_theme else "#C4C4C4"
+        for name, default in defaults.items():
+            if name not in colors:
+                continue
+            if not self._is_color_customizable(name):
+                continue
+            try:
+                self._color_map["custom"][name] = self._decode_theme_color(colors[name], default)
+            except ValueError as error:
+                syslog.warning("Invalid custom theme color %s: %s", name, error)
+        return True
 
-    @staticmethod
-    def watermarkColor():
-        return "#242424" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
+    def save_custom_theme(self) -> bool:
+        """Persist the custom palette atomically to the theme.json sidecar.
 
-    @staticmethod
-    def blueColor():
-        return "#34b7eb" if gremlin.shared_state.is_dark_theme else "#0B15AA"
+        Call after modifying self._color_map["custom"]. Returns False on failure.
+        """
+        temporary_path = None
+        try:
+            # Serialize first so invalid values cannot truncate the saved theme.
+            # make a copy and remove the non customizable colors
+            custom_colors = copy.deepcopy(self._color_map["custom"])
+            for name in self._non_customizable_colors:
+                if name in custom_colors:
+                    del custom_colors[name]
+            content = json.dumps(custom_colors, indent=4, ensure_ascii=False) + "\n"
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=os.path.dirname(self._theme_path),
+                prefix=".theme-",
+                suffix=".tmp",
+                delete=False,
+            ) as theme_file:
+                temporary_path = theme_file.name
+                theme_file.write(content)
+            gremlin.util.safeReplace(temporary_path, self._theme_path)
+            return True
+        except (OSError, TypeError, ValueError) as error:
+            syslog.warning(f"Unable to save custom theme {self._theme_path}: {error}")
+            return False
+        finally:
+            if temporary_path is not None and os.path.exists(temporary_path):
+                try:
+                    os.unlink(temporary_path)
+                except OSError as error:
+                    syslog.warning(f"Unable to remove temporary theme {temporary_path}: {error}")
 
-    @staticmethod
-    def orangeColor():
-        return "#ebd034" if gremlin.shared_state.is_dark_theme else "#968215"
+    def _get_color(self, name):
+        """Resolve the configured theme on each call so theme switches take effect."""
+        theme = self.theme
+        if theme == "auto" or theme not in self._color_map:
+            theme = "dark" if gremlin.shared_state.is_dark_theme else "light"
+        value = self._color_map[theme][name]
+        return copy.deepcopy(value) if isinstance(value, (dict, list, tuple)) else value
 
-    @staticmethod
-    def orangeOffColor():
-        return "#4e4511" if gremlin.shared_state.is_dark_theme else "#3D3B30"
+    def activeColor(self):
+        return self._get_color("activeColor")
 
-    @staticmethod
-    def redColor():
-        return "#bd542a"
+    def inactiveColor(self):
+        return self._get_color("inactiveColor")
 
-    @staticmethod
-    def greenColor():
-        return "#2abd38" if gremlin.shared_state.is_dark_theme else "#088814"
+    def onColor(self):
+        return self._get_color("onColor")
 
-    @staticmethod
-    def yellowColor():
-        return "#d9eb34" if gremlin.shared_state.is_dark_theme else "#818b20"
+    def offColor(self):
+        return self._get_color("offColor")
 
-    @staticmethod
-    def grayColor():
-        return "#949494" if gremlin.shared_state.is_dark_theme else "#585858"
+    def normalColor(self):
+        return self._get_color("normalColor")
 
-    @staticmethod
-    def buttonGradientStartColor():
-        return "#757575" if gremlin.shared_state.is_dark_theme else "#E2E2E2"
+    def disabledColor(self):
+        return self._get_color("disabledColor")
 
-    @staticmethod
-    def buttonGradientEndColor():
-        return "#5A5A5A" if gremlin.shared_state.is_dark_theme else "#BDBDBD"
+    def normalDarkColor(self):
+        return self._get_color("normalDarkColor")
 
-    @staticmethod
-    def selectedBackgroundColor():
-        return Color.selectColor()
+    def selectedDockTabBackgroundColor(self):
+        return self._get_color("selectedDockTabBackgroundColor")
 
-    @staticmethod
-    def unselectedBackgroundColor():
-        return "#3F3F3F" if gremlin.shared_state.is_dark_theme else "#BDBDBD"
+    def textHighlightColor(self):
+        return self._get_color("textHighlightColor")
 
-    @staticmethod
-    def highlightBackgroundColor():
-        return "#66612f" if gremlin.shared_state.is_dark_theme else "#FFF4B0"
+    def normalLightColor(self):
+        return self._get_color("normalLightColor")
 
-    @staticmethod
-    def borderColor():
-        return "#585858" if gremlin.shared_state.is_dark_theme else "#111111"
+    def normalGradientColor(self):
+        return self._get_color("normalGradientColor")
 
-    @staticmethod
-    def menuSeparatorColor():
-        return "#CACACA" if gremlin.shared_state.is_dark_theme else "#111111"
+    def backgroundColor(self):
+        return self._get_color("backgroundColor")
 
-    @staticmethod
-    def titleBackgroundColor():
-        return "#222222" if gremlin.shared_state.is_dark_theme else "#AAAAAA"
+    def backgroundLighterColor(self):
+        return self._get_color("backgroundLighterColor")
 
-    @staticmethod
-    def selectColor():
-        return "#658265" if gremlin.shared_state.is_dark_theme else "#8FBC8F"
+    def watermarkColor(self):
+        return self._get_color("watermarkColor")
 
-    @staticmethod
-    def alternateSelectColor():
-        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#bcaf8f"
+    def blueColor(self):
+        return self._get_color("blueColor")
 
-    @staticmethod
-    def selectGradientColor():
-        return "#448044"
+    def orangeColor(self):
+        return self._get_color("orangeColor")
 
-    @staticmethod
-    def selectEndGradientColor():
-        return "#61BB61"
+    def orangeOffColor(self):
+        return self._get_color("orangeOffColor")
 
-    @staticmethod
-    def alternateSelectGradientColor():
-        return "#677517"
+    def redColor(self):
+        return self._get_color("redColor")
 
-    @staticmethod
-    def alternateSelectEndGradientColor():
-        return "#ACC425"
+    def greenColor(self):
+        return self._get_color("greenColor")
 
-    @staticmethod
-    def ChannelColors():
+    def yellowColor(self):
+        return self._get_color("yellowColor")
+
+    def grayColor(self):
+        return self._get_color("grayColor")
+
+    def buttonGradientStartColor(self):
+        return self._get_color("buttonGradientStartColor")
+
+    def buttonGradientEndColor(self):
+        return self._get_color("buttonGradientEndColor")
+
+    def buttonTextColor(self):
+        return self._get_color("buttonTextColor")
+
+    def buttonSelectedTextColor(self):
+        return self._get_color("buttonSelectedTextColor")
+
+    def buttonDisabledTextColor(self):
+        return self._get_color("buttonDisabledTextColor")
+
+    def selectedBackgroundColor(self):
+        return self._get_color("selectedBackgroundColor")
+
+    def unselectedBackgroundColor(self):
+        return self._get_color("unselectedBackgroundColor")
+
+    def highlightBackgroundColor(self):
+        return self._get_color("highlightBackgroundColor")
+
+    def borderColor(self):
+        return self._get_color("borderColor")
+
+    def menuSeparatorColor(self):
+        return self._get_color("menuSeparatorColor")
+
+    def titleBackgroundColor(self):
+        return self._get_color("titleBackgroundColor")
+
+    def selectColor(self):
+        return self._get_color("selectColor")
+
+    def alternateSelectColor(self):
+        return self._get_color("alternateSelectColor")
+
+    def selectGradientColor(self):
+        return self._get_color("selectGradientColor")
+
+    def selectEndGradientColor(self):
+        return self._get_color("selectEndGradientColor")
+
+    def alternateSelectGradientColor(self):
+        return self._get_color("alternateSelectGradientColor")
+
+    def alternateSelectEndGradientColor(self):
+        return self._get_color("alternateSelectEndGradientColor")
+
+    def ChannelColors(self):
         """pairs of channel colors"""
-        if gremlin.shared_state.is_dark_theme:
-            return [
-                ("#448044", "#61BB61"),
-                ("#677517", "#ACC425"),
-                ("#177533", "#25C4B7"),
-                ("#5F1775", "#B725C4"),
-                ("#174875", "#504EC0"),
-                ("#A7A7A7", "#E4E4E4"),
-            ]
-        else:
-            return [
-                ("#448044", "#61BB61"),
-                ("#7A8B14", "#8DA311"),
-                ("#177533", "#25C4B7"),
-                ("#5F1775", "#B725C4"),
-                ("#174875", "#504EC0"),
-                ("#494949", "#858585"),
-            ]
+        return self._get_color("ChannelColors")
 
-    @staticmethod
-    def extraChannelC1Color():
-        return "#ACC425"
+    def extraChannelC1Color(self):
+        return self._get_color("extraChannelC1Color")
 
-    @staticmethod
-    def selectGradientAltColor():
-        return "#448080" if gremlin.shared_state.is_dark_theme else "#568c8f"
+    def selectGradientAltColor(self):
+        return self._get_color("selectGradientAltColor")
 
-    @staticmethod
-    def selectEndGradientAltColor():
-        return "#8ac1be" if gremlin.shared_state.is_dark_theme else "#8fb5bc"
+    def selectEndGradientAltColor(self):
+        return self._get_color("selectEndGradientAltColor")
 
-    @staticmethod
-    def selectBorderColor():
-        return "#408540" if gremlin.shared_state.is_dark_theme else "#76c276"
+    def selectBorderColor(self):
+        return self._get_color("selectBorderColor")
 
-    @staticmethod
-    def alternateSelectBorderColor():
-        return "#997e14" if gremlin.shared_state.is_dark_theme else "#c2b476"
+    def alternateSelectBorderColor(self):
+        return self._get_color("alternateSelectBorderColor")
 
-    @staticmethod
-    def expressionColor():
-        return "#cc7d1f"
+    def expressionColor(self):
+        return self._get_color("expressionColor")
 
-    @staticmethod
-    def rangeColor():
-        return "#8FBC8F"
+    def rangeColor(self):
+        return self._get_color("rangeColor")
 
-    @staticmethod
-    def alternateRangeColor():
-        return "#8fb9bc"
+    def alternateRangeColor(self):
+        return self._get_color("alternateRangeColor")
 
-    @staticmethod
-    def rangeBorderColor():
-        return "#8FBC8F"
+    def rangeBorderColor(self):
+        return self._get_color("rangeBorderColor")
 
-    @staticmethod
-    def actionIconBackgroundColor():
-        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def actionIconBackgroundColor(self):
+        return self._get_color("actionIconBackgroundColor")
 
-    @staticmethod
-    def keyBackgroundColor():
-        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def keyBackgroundColor(self):
+        return self._get_color("keyBackgroundColor")
 
-    @staticmethod
-    def keyHoverBackgroundColor():
-        return Color.hoverBackgroundColor()
+    def keyHoverBackgroundColor(self):
+        return self._get_color("keyHoverBackgroundColor")
 
-    @staticmethod
-    def hoverBackgroundColor():
-        return "#525252" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
+    def hoverBackgroundColor(self):
+        return self._get_color("hoverBackgroundColor")
 
-    @staticmethod
-    def keyHoverSelectedBackgroundColor():
-        return "#9ab19a" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
+    def keyHoverSelectedBackgroundColor(self):
+        return self._get_color("keyHoverSelectedBackgroundColor")
 
-    @staticmethod
-    def keyEntryBackgroundColor():
-        return "#293d2d" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def keyEntryBackgroundColor(self):
+        return self._get_color("keyEntryBackgroundColor")
 
-    @staticmethod
-    def keyForegroundColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    def keyForegroundColor(self):
+        return self._get_color("keyForegroundColor")
 
-    @staticmethod
-    def keyBorderColor():
-        return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
+    def keyBorderColor(self):
+        return self._get_color("keyBorderColor")
 
-    @staticmethod
-    def hoverBorderColor():
-        return "#CCCCCC" if gremlin.shared_state.is_dark_theme else "#222222"
+    def hoverBorderColor(self):
+        return self._get_color("hoverBorderColor")
 
-    @staticmethod
-    def keyHoverBorderColor():
-        return Color.hoverBorderColor()
+    def keyHoverBorderColor(self):
+        return self._get_color("keyHoverBorderColor")
 
-    @staticmethod
-    def containerBackgroundColor():
-        return "#101010" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def containerBackgroundColor(self):
+        return self._get_color("containerBackgroundColor")
 
-    @staticmethod
-    def actionBackgroundColor():
-        return "#202020" if gremlin.shared_state.is_dark_theme else "#CCCCCC"
+    def actionBackgroundColor(self):
+        return self._get_color("actionBackgroundColor")
 
-    @staticmethod
-    def sliderTickColor():
-        return "#303030" if gremlin.shared_state.is_dark_theme else "#232323"
+    def sliderTickColor(self):
+        return self._get_color("sliderTickColor")
 
-    @staticmethod
-    def sliderHandleColor():
-        return "#a7b59e" if gremlin.shared_state.is_dark_theme else "#a7b59e"
+    def sliderHandleColor(self):
+        return self._get_color("sliderHandleColor")
 
-    @staticmethod
-    def sliderHandleBorderColor():
-        return "#e0e0e0" if gremlin.shared_state.is_dark_theme else "#e0e0e0"
+    def sliderHandleBorderColor(self):
+        return self._get_color("sliderHandleBorderColor")
 
-    @staticmethod
-    def sliderRangeBorderColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    def sliderRangeBorderColor(self):
+        return self._get_color("sliderRangeBorderColor")
 
-    @staticmethod
-    def sliderRangeColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    def sliderRangeColor(self):
+        return self._get_color("sliderRangeColor")
 
-    @staticmethod
-    def sliderAlternateRangeColor():
-        return "#8fb9bc" if gremlin.shared_state.is_dark_theme else "#8fb9bc"
+    def sliderAlternateRangeColor(self):
+        return self._get_color("sliderAlternateRangeColor")
 
-    @staticmethod
-    def sliderBackgroundColor():
-        return "#060606" if gremlin.shared_state.is_dark_theme else "#c3c3c3"
+    def sliderBackgroundColor(self):
+        return self._get_color("sliderBackgroundColor")
 
-    @staticmethod
-    def recordColor():
-        return "#c7450e"
+    def recordColor(self):
+        return self._get_color("recordColor")
 
-    @staticmethod
-    def activeContentColor():
-        return "#458ae6"
+    def activeContentColor(self):
+        return self._get_color("activeContentColor")
 
-    @staticmethod
-    def buttonBackgroundColor():
-        return "#414141" if gremlin.shared_state.is_dark_theme else "#DBDBDB"
+    def buttonBackgroundColor(self):
+        return self._get_color("buttonBackgroundColor")
 
-    @staticmethod
-    def checkboxBackgroundColor():
-        return "#414141" if gremlin.shared_state.is_dark_theme else "#9B9B9B"
+    def checkboxBackgroundColor(self):
+        return self._get_color("checkboxBackgroundColor")
 
-    @staticmethod
-    def buttonColor():
-        return Color.normalColor()
+    def buttonColor(self):
+        return self._get_color("buttonColor")
 
-    @staticmethod
-    def buttonBorderColor():
-        return "#424242" if gremlin.shared_state.is_dark_theme else "#CDE0CD"
+    def buttonBorderColor(self):
+        return self._get_color("buttonBorderColor")
 
-    @staticmethod
-    def buttonHoverBorderColor():
-        return Color.hoverBorderColor()
+    def buttonHoverBorderColor(self):
+        return self._get_color("buttonHoverBorderColor")
 
-    @staticmethod
-    def buttonHoverBackgroundColor():
-        return Color.hoverBackgroundColor()
+    def buttonHoverBackgroundColor(self):
+        return self._get_color("buttonHoverBackgroundColor")
 
-    @staticmethod
-    def headerBarBackgroundColor():
-        return "#333333" if gremlin.shared_state.is_dark_theme else "#C5C5C5"
+    def headerBarBackgroundColor(self):
+        return self._get_color("headerBarBackgroundColor")
 
-    @staticmethod
-    def headerBarBorderColor():
-        return "#1F5C1C" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def headerBarBorderColor(self):
+        return self._get_color("headerBarBorderColor")
 
-    @staticmethod
-    def warningColor():  # color for the warning flag
-        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
+    def warningColor(self):  # color for the warning flag
+        return self._get_color("warningColor")
 
-    @staticmethod
-    def disconnectedBackgroundColor():  # color for the disconnected device
-        return "#ab8d18" if gremlin.shared_state.is_dark_theme else "#fc1900"
+    def disconnectedBackgroundColor(self):  # color for the disconnected device
+        return self._get_color("disconnectedBackgroundColor")
 
-    @staticmethod
-    def disconnectedColor():  # color for the disconnected device
-        return "#db6512"
+    def disconnectedColor(self):  # color for the disconnected device
+        return self._get_color("disconnectedColor")
 
-    @staticmethod
-    def unmappedColor():  # color for the unmapped device
-        return "#a1a1a1" if gremlin.shared_state.is_dark_theme else "#5a5a5a"
+    def unmappedColor(self):  # color for the unmapped device
+        return self._get_color("unmappedColor")
 
-    @staticmethod
-    def mappedColor():  # color for the unmapped device
-        return "#ffffff"  # if gremlin.shared_state.is_dark_theme else "#5a5a5a"
+    def mappedColor(self):  # color for the unmapped device
+        return self._get_color("mappedColor")
 
-    @staticmethod
-    def entryBackgroundColor():
-        return "#5D6B52" if gremlin.shared_state.is_dark_theme else "#C5C5C5"
+    def entryBackgroundColor(self):
+        return self._get_color("entryBackgroundColor")
 
-    @staticmethod
-    def listenColor():  # color used for listen type buttons
-        return Color.blueColor()
+    def listenColor(self):  # color used for listen type buttons
+        return self._get_color("listenColor")
 
-    @staticmethod
-    def infoBackgroundColor():  # color used for information boxes
-        return Color.selectedBackgroundColor()
+    def infoBackgroundColor(self):  # color used for information boxes
+        return self._get_color("infoBackgroundColor")
         # return "#92882b" if gremlin.shared_state.is_dark_theme else "#dbd496"
 
-    def infoColor():  # color used for information boxes
-        return "#f1f1f1" if gremlin.shared_state.is_dark_theme else "#3d3d3d"
+    def infoColor(self):  # color used for information boxes
+        return self._get_color("infoColor")
 
-    @staticmethod
-    def frameColor():  # color used for frame boxes
-        return "#8a8a8a" if gremlin.shared_state.is_dark_theme else "#dddddd"
+    def frameColor(self):  # color used for frame boxes
+        return self._get_color("frameColor")
 
-    @staticmethod
-    def inputTitleColor():  # color for the input title bar
-        return "#5A725A" if gremlin.shared_state.is_dark_theme else "#678867"
+    def inputTitleColor(self):  # color for the input title bar
+        return self._get_color("inputTitleColor")
 
-    @staticmethod
-    def inputTitleUnselectedColor():  # color for the input title bar
-        return "#3A3A3A" if gremlin.shared_state.is_dark_theme else "#C9C9C9"
+    def inputTitleUnselectedColor(self):  # color for the input title bar
+        return self._get_color("inputTitleUnselectedColor")
 
-    @staticmethod
-    def repeaterColor():  # color for repeaters
-        return "#0C8D12"
+    def repeaterColor(self):  # color for repeaters
+        return self._get_color("repeaterColor")
 
-    def repeaterBackgroundColor():  # color for repeaters
-        return "#374438" if gremlin.shared_state.is_dark_theme else "#829784"
+    def repeaterBackgroundColor(self):  # color for repeaters
+        return self._get_color("repeaterBackgroundColor")
 
-    @staticmethod
-    def ansiRed(bold=False):
+    def ansiRed(self, bold=False):
         if bold:
             return "\033[1;91m"
         return "\033[91m"
 
-    @staticmethod
-    def ansiGreen(bold=False):
+    def ansiGreen(self, bold=False):
         if bold:
             return "\033[1;92m"
         return "\033[92m"
 
-    @staticmethod
-    def ansiBold():
+    def ansiBold(self):
         return "\x1b[1m"
 
-    @staticmethod
-    def ansiBlue(bold=False):
+    def ansiBlue(self, bold=False):
         if bold:
             return "\033[1;94m"
         return "\033[94m"
 
-    @staticmethod
-    def ansiYellow(bold=False):
+    def ansiYellow(self, bold=False):
         if bold:
             return "\033[1;93m"
         return "\033[93m"
 
-    @staticmethod
-    def ansiMagenta(bold=False):
+    def ansiMagenta(self, bold=False):
         if bold:
             return "\033[1;95m"
         return "\033[95m"
 
-    @staticmethod
-    def ansiCyan(bold=False):
+    def ansiCyan(self, bold=False):
         if bold:
             return "\033[1;96m"
         return "\033[96m"
 
-    @staticmethod
-    def ansiWhite(bold=False):
+    def ansiWhite(self, bold=False):
         if bold:
             return "\033[1;97m"
         return "\033[97m"
 
-    @staticmethod
-    def ansiReset():
+    def ansiReset(self):
         return "\033[0m"
 
-    @staticmethod
-    def tabBackgroundColor():
-        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+    def tabBackgroundColor(self):
+        return self._get_color("tabBackgroundColor")
 
-    @staticmethod
-    def tabForegroundColor():
-        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
+    def tabForegroundColor(self):
+        return self._get_color("tabForegroundColor")
 
-    @staticmethod
-    def tabMissingForegroundColor():
-        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#725919"
+    def tabMissingForegroundColor(self):
+        return self._get_color("tabMissingForegroundColor")
 
-    @staticmethod
-    def tabUsedForegroundColor():
-        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
+    def tabUsedForegroundColor(self):
+        return self._get_color("tabUsedForegroundColor")
 
-    @staticmethod
-    def tabUsedOtherForegroundColor():
-        return "#B9B9B9" if gremlin.shared_state.is_dark_theme else "#777777"
+    def tabUsedOtherForegroundColor(self):
+        return self._get_color("tabUsedOtherForegroundColor")
 
-    @staticmethod
-    def tabSelectedTextColor():
-        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
+    def tabSelectedTextColor(self):
+        return self._get_color("tabSelectedTextColor")
 
-    @staticmethod
-    def tabHoverColor():
-        return "#303030" if gremlin.shared_state.is_dark_theme else "#E0E0E0"
+    def tabHoverColor(self):
+        return self._get_color("tabHoverColor")
 
-    @staticmethod
-    def tabTextColor():
-        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
+    def tabTextColor(self):
+        return self._get_color("tabTextColor")
 
-    @staticmethod
-    def tabSelectedBackgroundColor():
-        return "#2b2b2b" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+    def tabSelectedBackgroundColor(self):
+        return self._get_color("tabSelectedBackgroundColor")
 
-    @staticmethod
-    def headerBackgroundColor():
-        return "#353535" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+    def headerBackgroundColor(self):
+        return self._get_color("headerBackgroundColor")
 
-    @staticmethod
-    def categoryColor():
-        return "#09406D" if gremlin.shared_state.is_dark_theme else "#103C68"
+    def categoryColor(self):
+        return self._get_color("categoryColor")
 
-    @staticmethod
-    def attributeColor():
-        return "#2D582E" if gremlin.shared_state.is_dark_theme else "#3C5F3E"
+    def attributeColor(self):
+        return self._get_color("attributeColor")
 
-    @staticmethod
-    def nameColor():
-        return "#4D4D4D" if gremlin.shared_state.is_dark_theme else "#5F5F5F"
+    def nameColor(self):
+        return self._get_color("nameColor")
 
-    @staticmethod
-    def getHoverColor(base_color: QColor, percent: float = 1.15) -> QColor:
+    def getHoverColor(self, base_color: QColor, percent: float = 1.15) -> QColor:
         """Calculates a hover color by scaling the base color's lightness.
         percent > 1.0 lightens, percent < 1.0 darkens.
         """
@@ -617,13 +1001,12 @@ class Color:
         # HSL Lightness is typically in the range [0, 255] in Qt
         lightness = int(min(255, hsl.lightness() * percent))
 
-        hover_color = QColor.fromHsl(hsl.hue(), hsl.saturation(), lightness)
+        hover_color = QColor().fromHsl(hsl.hue(), hsl.saturation(), lightness)
         return hover_color
 
-    @staticmethod
-    def cssEntry() -> str:
-        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
-        border_color = gremlin.ui.ui_common.Color.keyBorderColor()
+    def cssEntry(self) -> str:
+        background_color = self.keyBackgroundColor()
+        border_color = self.keyBorderColor()
         css = f"""
             QLabel {{
                 background-color: {background_color};
@@ -635,27 +1018,24 @@ class Color:
         """
         return css
 
-    @staticmethod
-    def cssSelectedInputHeader():
-        # background_color = Color.inputTitleColor()
-        button_background_color = Color.buttonBackgroundColor()
-        bar_color = gremlin.ui.ui_common.Color.getHoverColor(gremlin.ui.ui_common.Color.selectColor()).name()
+    def cssSelectedInputHeader(self):
+        # background_color = Color().inputTitleColor()
+        button_background_color = Color().buttonBackgroundColor()
+        bar_color = Color().getHoverColor(Color().selectColor()).name()
         css = f"#title_bar {{ background: {bar_color}; max-height = 32px; border: none;}} QPushButton {{ background: {button_background_color};}}"
         return css
 
-    @staticmethod
-    def cssUnselectedInputHeader():
-        bar_color = Color.inputTitleUnselectedColor()
-        button_background_color = Color.buttonBackgroundColor()
+    def cssUnselectedInputHeader(self):
+        bar_color = Color().inputTitleUnselectedColor()
+        button_background_color = Color().buttonBackgroundColor()
         css = f"#title_bar {{ background: {bar_color}; max-height = 32px; }} QPushButton {{ background: {button_background_color};}}"
         return css
 
-    @staticmethod
-    def cssButton():
-        background_color = Color.buttonBackgroundColor()
-        hover_color = Color.buttonHoverBackgroundColor()
-        border_hover_color = Color.buttonHoverBorderColor()
-        border_normal_color = Color.buttonBorderColor()
+    def cssButton(self):
+        background_color = self.buttonBackgroundColor()
+        hover_color = self.buttonHoverBackgroundColor()
+        border_hover_color = self.buttonHoverBorderColor()
+        border_normal_color = self.buttonBorderColor()
         css = f"""
           QPushButton {{ background: {background_color}; border: {border_normal_color}; border-radius: 6px; padding: 4px 6px; }}
           QPushButton:hover {{ background: {hover_color}; border: 1px {border_hover_color}; }}
@@ -664,18 +1044,16 @@ class Color:
         # QPushButton:pressed {{ padding-top: 2px; padding-left: 2px; }}
         return css
 
-    @staticmethod
-    def cssRepeater():
-        background_color = Color.repeaterBackgroundColor()
-        color = Color.repeaterColor()
+    def cssRepeater(self):
+        background_color = self.repeaterBackgroundColor()
+        color = Color().repeaterColor()
         css = f"QProgressBar {{ background: {background_color}; color: {color}}}"
         return css
 
-    @staticmethod
-    def cssInfoBox():
-        border_color = Color.borderColor()
-        background_color = Color.infoBackgroundColor()
-        foreground_color = Color.infoColor()
+    def cssInfoBox(self):
+        border_color = self.borderColor()
+        background_color = self.infoBackgroundColor()
+        foreground_color = self.infoColor()
         css = f"""
             background: {background_color};
             color: {foreground_color};
@@ -690,24 +1068,22 @@ class Color:
             """
         return css
 
-    @staticmethod
-    def cssInputHeaderButton(selected=False):
-        background_color = Color.buttonBackgroundColor()
+    def cssInputHeaderButton(self, selected=False):
+        background_color = self.buttonBackgroundColor()
         if selected:
-            background_color = Color.selectColor()
-        hover_color = Color.buttonHoverBackgroundColor()
-        border_hover_color = Color.buttonHoverBorderColor()
-        border_normal_color = Color.buttonBorderColor()
+            background_color = Color().selectColor()
+        hover_color = Color().buttonHoverBackgroundColor()
+        border_hover_color = Color().buttonHoverBorderColor()
+        border_normal_color = Color().buttonBorderColor()
         css = f"""
             QWidget  {{ background-color: {background_color}; border: {border_normal_color}; border-radius: 6px; }}
             QWidget:hover {{ background-color: {hover_color}; border: 1px {border_hover_color}; }}
             """
         return css
 
-    @staticmethod
-    def cssNormalBox():
-        border_color = Color.borderColor()
-        background_color = Color.backgroundColor()
+    def cssNormalBox(self):
+        border_color = self.borderColor()
+        background_color = self.backgroundColor()
         css = f"""
             .QFrame {{
                 border: 1px solid {border_color};
@@ -719,17 +1095,17 @@ class Color:
             """
         return css
 
-    @staticmethod
     def cssTitleBox(
+        self,
         fontSize=14,
         foreground_color=None,
         background_color=None,
         padding: int = 4,
     ):
         if background_color is None:
-            background_color = Color.normalColor()
+            background_color = self.normalColor()
         if foreground_color is None:
-            foreground_color = Color.backgroundColor()
+            foreground_color = self.backgroundColor()
         css = f"""
             .QLabel {{
                 border: 0px solid {background_color};
@@ -743,9 +1119,8 @@ class Color:
             """
         return css
 
-    @staticmethod
-    def cssTitleBar():
-        background_color = Color.selectedBackgroundColor()
+    def cssTitleBar(self):
+        background_color = self.selectedBackgroundColor()
         css = f"""
             #title_bar {{
                 background-color: {background_color};
@@ -754,15 +1129,14 @@ class Color:
         """
         return css
 
-    @staticmethod
-    def cssTab():
-        background_color = gremlin.ui.ui_common.Color.backgroundColor()
-        tab_color = gremlin.ui.ui_common.Color.tabBackgroundColor()
-        selected_tab_color = gremlin.ui.ui_common.Color.tabSelectedBackgroundColor()
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        text_color = gremlin.ui.ui_common.Color.tabTextColor()
-        select_text_color = gremlin.ui.ui_common.Color.tabSelectedTextColor()
-        hover_color = gremlin.ui.ui_common.Color.tabHoverColor()
+    def cssTab(self):
+        background_color = self.backgroundColor()
+        tab_color = self.tabBackgroundColor()
+        selected_tab_color = self.tabSelectedBackgroundColor()
+        border_color = self.borderColor()
+        text_color = self.tabTextColor()
+        select_text_color = self.tabSelectedTextColor()
+        hover_color = self.tabHoverColor()
 
         css = f"""
 
@@ -806,15 +1180,14 @@ class Color:
         """
         return css
 
-    @staticmethod
-    def cssVerticalTab():
-        background_color = gremlin.ui.ui_common.Color.backgroundColor()
-        tab_color = gremlin.ui.ui_common.Color.tabBackgroundColor()
-        selected_tab_color = gremlin.ui.ui_common.Color.tabSelectedBackgroundColor()
-        border_color = gremlin.ui.ui_common.Color.borderColor()
-        text_color = gremlin.ui.ui_common.Color.tabTextColor()
-        select_text_color = gremlin.ui.ui_common.Color.tabSelectedTextColor()
-        hover_color = gremlin.ui.ui_common.Color.tabHoverColor()
+    def cssVerticalTab(self):
+        background_color = self.backgroundColor()
+        tab_color = self.tabBackgroundColor()
+        selected_tab_color = self.tabSelectedBackgroundColor()
+        border_color = self.borderColor()
+        text_color = self.tabTextColor()
+        select_text_color = self.tabSelectedTextColor()
+        hover_color = self.tabHoverColor()
 
         css = f"""
 
@@ -857,9 +1230,8 @@ class Color:
 
         return css
 
-    @staticmethod
-    def cssTabContent():
-        background_color = Color.tabSelectedBackgroundColor()
+    def cssTabContent(self):
+        background_color = self.tabSelectedBackgroundColor()
         # background_color = "green"
         css = f"""
             background-color: {background_color};
@@ -867,13 +1239,12 @@ class Color:
         """
         return css
 
-    @staticmethod
-    def cssItemSelected():
+    def cssItemSelected(self):
 
         css = f"""
             {{
-                background-color: {Color.selectColor()};
-                border: 2px solid {Color.selectBorderColor()};
+                background-color: {self.selectColor()};
+                border: 2px solid {self.selectBorderColor()};
             }}
         """
         return css
@@ -912,13 +1283,12 @@ class Color:
             """
         return css
 
-    @staticmethod
-    def cssApplication():
-        border_color = Color.borderColor()
-        _background_color = Color.backgroundColor()
-        hover_color = Color.buttonHoverBackgroundColor()
-        _foreground_color = Color.normalColor
-        selected_background_color = Color.selectedBackgroundColor()
+    def cssApplication(self):
+        border_color = self.borderColor()
+        _background_color = self.backgroundColor()
+        hover_color = self.buttonHoverBackgroundColor()
+        _foreground_color = self.normalColor()
+        selected_background_color = self.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
             relative_path = "icons/"
         else:
@@ -929,16 +1299,16 @@ class Color:
         checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
         checkbox_checked = f"{prefix}checkbox_intermediate.png"
         checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
-        checkbox_background_color = Color.checkboxBackgroundColor()
+        checkbox_background_color = self.checkboxBackgroundColor()
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
 
-        header_background_color = Color.headerBackgroundColor()
-        button_background_color = Color.buttonBackgroundColor()
-        button_hover_color = Color.buttonHoverBackgroundColor()
+        header_background_color = self.headerBackgroundColor()
+        button_background_color = self.buttonBackgroundColor()
+        button_hover_color = self.buttonHoverBackgroundColor()
 
-        progress_start, progress_stop = Color.ChannelColors()[0]
+        progress_start, progress_stop = self.ChannelColors()[0]
 
         css = f"""
 
@@ -984,7 +1354,7 @@ class Color:
             }}
             QPlainTextEdit {{
                  border: 1px solid {border_color};
-                 background-color: {Color.backgroundLighterColor()};
+                 background-color: {self.backgroundLighterColor()};
             }}
             QMenu::separator {{
                 border: {border_color};
@@ -1027,34 +1397,34 @@ class Color:
             }}
 
             QMenuBar {{
-                background-color: {Color.backgroundColor()};
+                background-color: {self.backgroundColor()};
             }}
             QMenuBar::item {{
-                background-color: {Color.backgroundColor()};
+                background-color: {self.backgroundColor()};
                 padding: 4px 10px;
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
             }}
             QMenuBar::item:hover {{
-                background-color: {Color.buttonHoverBackgroundColor()};
+                background-color: {self.buttonHoverBackgroundColor()};
                 padding: 4px 10px;
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
             }}
 
             QmenuBar::item:selected {{
-                background-color: {Color.selectedBackgroundColor()};
+                background-color: {self.selectedBackgroundColor()};
             }}
 
             QMenu::item:selected {{
-                background-color: {Color.selectedBackgroundColor()};
+                background-color: {self.selectedBackgroundColor()};
             }}
 
             QToolButton {{
 
                 border-radius: 8px;
 
-                background-color: {button_background_color};
+                background-color: {self.buttonBackgroundColor()};
                 height: 24px;
                 width: 24px;
                 padding: 4px;
@@ -1064,11 +1434,11 @@ class Color:
 
             QToolButton:hover {{
                 border: none;
-                background-color: {button_hover_color};
+                background-color: {self.buttonHoverBackgroundColor()};
             }}
             QToolButton:pressed {{
                 border: none;
-                background-color: {button_hover_color};
+                background-color: {self.buttonHoverBackgroundColor()};
                 padding-right: 2px;
                 padding-bottom: 2px;
             }}
@@ -1097,29 +1467,28 @@ class Color:
 
         return css
 
-    @staticmethod
-    def cssProgressDialog():
+    def cssProgressDialog(self):
 
-        progress_start, progress_stop = Color.ChannelColors()[0]
+        progress_start, progress_stop = self.ChannelColors()[0]
         css = f"""
             QProgressDialog QProgressBar {{
-                border: 2px solid {Color.borderColor()};
+                border: 2px solid {self.borderColor()};
                 border-radius: 5px;
                 text-align: center;
-                background-color: {Color.backgroundColor()};
-                color: {Color.normalColor()}; /* Text color inside the bar */
+                background-color: {self.backgroundColor()};
+                color: {self.normalColor()}; /* Text color inside the bar */
             }}
 
 
             QProgressDialog QProgressBar::chunk {{
-                background-color: {Color.selectGradientAltColor()};
+                background-color: {self.selectGradientAltColor()};
                 width: 10px; /* Width of chunks for blocks, omit for smooth fill */
                 margin: 0.5px;
             }}
 
             QProgressDialog QProgressBar:indeterminate {{
-                background-color: {Color.selectGradientAltColor()};
-                border: 1px solid {Color.borderColor()};
+                background-color: {self.selectGradientAltColor()};
+                border: 1px solid {self.borderColor()};
             }}
 
             QProgressDialog QProgressBar::chunk:indeterminate {{
@@ -1131,20 +1500,19 @@ class Color:
             """
         return css
 
-    @staticmethod
-    def cssButtonState():
+    def cssButtonState(self):
         """gets a pushbutton state for the input viewer"""
 
-        _normal_color = Color.normalColor()
-        _normal_gradient_color = Color.normalGradientColor()
-        background_color = Color.keyBackgroundColor()
+        _normal_color = self.normalColor()
+        _normal_gradient_color = self.normalGradientColor()
+        background_color = self.keyBackgroundColor()
 
-        _border_color = Color.borderColor()
-        selected_border_color = Color.selectBorderColor()
-        selected_color = Color.selectColor()
-        selected_gradient_color = Color.selectGradientColor()
-        gradient_start = Color.buttonGradientStartColor()
-        gradient_end = Color.buttonGradientEndColor()
+        _border_color = self.borderColor()
+        selected_border_color = self.selectBorderColor()
+        selected_color = self.selectColor()
+        selected_gradient_color = self.selectGradientColor()
+        gradient_start = self.buttonGradientStartColor()
+        gradient_end = self.buttonGradientEndColor()
         css = f"""
         QPushButton {{
             border: 2px solid #8f8f91;
@@ -1186,7 +1554,8 @@ class Color:
         selected_border_color,
         selected_color,
         selected_gradient_color,
-        foreground_disabled,
+        selected_foreground_color,
+        disabled_foreground_color,
     ):
         min_size = font_size * 2
         radius = font_size
@@ -1211,6 +1580,7 @@ class Color:
         QPushButton:checked {{
             background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 {selected_color}, stop: 1 {selected_gradient_color});
             border-color: {selected_border_color};
+            color: {selected_foreground_color};
         }}
 
 
@@ -1220,77 +1590,69 @@ class Color:
 
         QPushButton:!enabled
         {{
-             color: {foreground_disabled};
+             color: {disabled_foreground_color};
         }}
         """
         return css
 
-    @staticmethod
-    def cssStateButton(font_size=16):
+    def cssStateButton(self, font_size=16):
         """gets a pushbutton state for the input viewer"""
 
-        normal_color = Color.normalColor()
-        background_start_color = Color.buttonGradientStartColor()
-        background_end_color = Color.buttonGradientEndColor()
-        selected_border_color = Color.selectBorderColor()
-        selected_color = Color.selectColor()
-        selected_gradient_color = Color.selectGradientColor()
-        disabled_color = Color.disabledColor()
-        return Color._cssStateButton(
-            font_size,
-            background_start_color,
-            background_end_color,
-            normal_color,
-            selected_border_color,
-            selected_color,
-            selected_gradient_color,
-            disabled_color,
+        normal_color = self.buttonTextColor()
+        background_start_color = self.buttonGradientStartColor()
+        background_end_color = self.buttonGradientEndColor()
+        selected_border_color = self.selectBorderColor()
+        selected_color = self.selectColor()
+        selected_foreground_color = self.buttonSelectedTextColor()
+        selected_gradient_color = self.selectGradientColor()
+        disabled_foreground_color = self.buttonDisabledTextColor()
+        css = self._cssStateButton(
+            font_size=font_size,
+            background_start_color=background_start_color,
+            background_end_color=background_end_color,
+            foreground_color=normal_color,
+            selected_border_color=selected_border_color,
+            selected_color=selected_color,
+            selected_gradient_color=selected_gradient_color,
+            selected_foreground_color=selected_foreground_color,
+            disabled_foreground_color=disabled_foreground_color,
         )
 
-    @staticmethod
-    def cssStateExpressionButton(font_size=16):
+        return css
+
+    def cssStateExpressionButton(self, font_size=16):
         """gets a pushbutton state for the input viewer"""
 
-        background_start_color = Color.buttonGradientStartColor()
-        background_end_color = Color.buttonGradientEndColor()
-        normal_color = Color.normalColor()
-        selected_border_color = Color.alternateSelectBorderColor()
-        selected_color = Color.alternateSelectColor()
-        selected_gradient_color = Color.alternateSelectGradientColor()
-        disabled_color = Color.disabledColor()
-        return Color._cssStateButton(
-            font_size,
-            background_start_color,
-            background_end_color,
-            normal_color,
-            selected_border_color,
-            selected_color,
-            selected_gradient_color,
-            disabled_color,
+        background_start_color = self.buttonGradientStartColor()
+        background_end_color = self.buttonGradientEndColor()
+        normal_color = self.buttonTextColor()
+        selected_border_color = self.alternateSelectBorderColor()
+        selected_color = self.alternateSelectColor()
+        selected_gradient_color = self.alternateSelectGradientColor()
+        selected_foreground_color = self.buttonSelectedTextColor()
+        disabled_foreground_color = self.buttonDisabledTextColor()
+        css = self._cssStateButton(
+            font_size=font_size,
+            background_start_color=background_start_color,
+            background_end_color=background_end_color,
+            foreground_color=normal_color,
+            selected_border_color=selected_border_color,
+            selected_color=selected_color,
+            selected_gradient_color=selected_gradient_color,
+            selected_foreground_color=selected_foreground_color,
+            disabled_foreground_color=disabled_foreground_color,
         )
 
-    @staticmethod
-    def PenColors():
+        return css
+
+    def PenColors(self):
         """list of pen colors"""
+        return self._get_color("PenColors")
 
-        colors = {
-            0: "#c0c0c0" if gremlin.shared_state.is_dark_theme else "#111111",
-            1: "#e41a1c",
-            2: "#377eb8",
-            3: "#4daf4a",
-            4: "#984ea3",
-            5: "#ff7f00",
-            6: "#ffff33",
-            7: "#9cad1c",
-            8: "#2cb2f5",
-        }
-        return colors
-
-    @staticmethod
-    def Pens():
+    def Pens(self):
         # Pre-defined colors for eight time series
         pens = {}
-        colors = Color.PenColors()
+        colors = self.PenColors()
         for index in colors.keys():
             pens[index] = QtGui.QPen(QtGui.QColor(colors[index]), 2 if index else 1)
         return pens
@@ -1322,49 +1684,49 @@ class Icons:
     @staticmethod
     def trashIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("ei.trash", qta_color)
 
     @staticmethod
     def eraserIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa6s.eraser", qta_color)
 
     @staticmethod
     def folderIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.yellowColor()
+            qta_color = Color().yellowColor()
         return Icons._icon("fa5s.folder-open", qta_color)
 
     @staticmethod
     def saveIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.yellowColor()
+            qta_color = Color().yellowColor()
         return Icons._icon("fa5s.save", qta_color)
 
     @staticmethod
     def keyboardIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa6s.keyboard", qta_color)
 
     @staticmethod
     def addIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("msc.diff-added", qta_color)
 
     @staticmethod
     def sortIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa5s.sort-amount-down-alt", qta_color)
 
     @staticmethod
     def removeIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa6s.minus", qta_color)
 
     @staticmethod
@@ -1374,7 +1736,7 @@ class Icons:
     @staticmethod
     def findIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("ei.search", qta_color)
 
     @staticmethod
@@ -1404,7 +1766,7 @@ class Icons:
     @staticmethod
     def questionIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa5s.question-circle", qta_color)
 
     @staticmethod
@@ -1418,13 +1780,13 @@ class Icons:
     @staticmethod
     def copyIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa6.copy", qta_color)
 
     @staticmethod
     def pasteIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("fa6.paste", qta_color)
 
     @staticmethod
@@ -1434,7 +1796,7 @@ class Icons:
     @staticmethod
     def editIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("mdi6.rename-box-outline", qta_color)
 
     @staticmethod
@@ -1490,19 +1852,19 @@ class Icons:
         return Icons._icon("fa6s.microphone", qta_color=qta_color)
 
     @staticmethod
-    def disconnectedIcon(qta_color=Color.tabMissingForegroundColor()):
+    def disconnectedIcon(qta_color=Color().tabMissingForegroundColor()):
         return Icons._icon("mdi.power-plug-off", qta_color=qta_color)
 
     @staticmethod
-    def usedIcon(qta_color=Color.tabUsedForegroundColor()):
+    def usedIcon(qta_color=Color().tabUsedForegroundColor()):
         return Icons._icon("fa6s.sitemap", qta_color=qta_color)
 
     @staticmethod
-    def warningIcon(qta_color=Color.yellowColor()):
+    def warningIcon(qta_color=Color().yellowColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
     @staticmethod
-    def yellowWarningIcon(qta_color=Color.yellowColor()):
+    def yellowWarningIcon(qta_color=Color().yellowColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
     @staticmethod
@@ -1516,7 +1878,7 @@ class Icons:
     @staticmethod
     def mappedOtherIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.normalColor()
+            qta_color = Color().normalColor()
         return Icons._icon("ph.tree-structure-thin", qta_color=qta_color)
 
     @staticmethod
@@ -1526,25 +1888,25 @@ class Icons:
     @staticmethod
     def lockIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.orangeColor()
+            qta_color = Color().orangeColor()
         return Icons._icon("fa5s.lock", qta_color=qta_color)
 
     @staticmethod
     def unlockIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.greenColor()
+            qta_color = Color().greenColor()
         return Icons._icon("fa5s.lock-open", qta_color=qta_color)
 
     @staticmethod
     def filterIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("mdi.filter", qta_color=qta_color)
 
     @staticmethod
     def tabIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("mdi6.table-row", qta_color=qta_color)
 
     @staticmethod
@@ -1554,37 +1916,37 @@ class Icons:
     @staticmethod
     def mappedIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.blueColor()
+            qta_color = Color().blueColor()
         return Icons._icon("ri.organization-chart", qta_color=qta_color)
 
     @staticmethod
     def noMappedIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.grayColor()
+            qta_color = Color().grayColor()
         return Icons._icon("ri.organization-chart", qta_color=qta_color)
 
     @staticmethod
     def treeIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.yellowColor()
+            qta_color = Color().yellowColor()
         return Icons._icon("ph.tree-structure-thin", qta_color=qta_color)
 
     @staticmethod
     def chevronIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.grayColor()
+            qta_color = Color().grayColor()
         return Icons._icon("ph.tag-chevron-fill", qta_color=qta_color)
 
     @staticmethod
     def emptyIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.grayColor()
+            qta_color = Color().grayColor()
         return Icons._icon("mdi.circle-off-outline", qta_color=qta_color)
 
     @staticmethod
     def waitIcon(qta_color=None):
         if not qta_color:
-            qta_color = Color.grayColor()
+            qta_color = Color().grayColor()
         return Icons._icon("mdi.refresh", qta_color=qta_color)
 
     @staticmethod
@@ -1675,9 +2037,9 @@ class Pixmaps:
 
     def __init__(self):
         self._icon_size = QtCore.QSize(16, 16)
-        on_icon = load_icon("mdi.checkbox-blank-circle", use_qta=True, qta_color=Color.onColor())
+        on_icon = load_icon("mdi.checkbox-blank-circle", use_qta=True, qta_color=Color().onColor())
         self.onIconPixmap = on_icon.pixmap(self._icon_size)
-        off_icon = load_icon("mdi.checkbox-blank-circle", use_qta=True, qta_color=Color.offColor())
+        off_icon = load_icon("mdi.checkbox-blank-circle", use_qta=True, qta_color=Color().offColor())
         self.offIconPixmap = off_icon.pixmap(self._icon_size)
         self.warningIconPixmap = Icons.to_pixmap(Icons.warningIcon(), pixels=24)
         icon = Icons.horizontalSeparatorIcon()
@@ -1947,7 +2309,7 @@ class Buttons:
 
     @staticmethod
     def getRefreshWidget(label: str = None, tooltip: str = "Refresh", callback: Callable = None, no_keyboard: bool = True, data: object = None):
-        icon = Icons.refreshIcon(Color.greenColor())
+        icon = Icons.refreshIcon(Color().greenColor())
         return Buttons._template(label=label, icon_source=icon, tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data)
 
     @staticmethod
@@ -3992,8 +4354,8 @@ class QBoxFrame(QtWidgets.QFrame):
 
     def _update_css(self):
         """internal style sheet update"""
-        border_color = Color.borderColor()
-        background_color = "none" if self._transparent else Color.backgroundColor()
+        border_color = Color().borderColor()
+        background_color = "none" if self._transparent else Color().backgroundColor()
         css = f"""
             QFrame {{
                 border: 1px solid {border_color};
@@ -5365,7 +5727,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         if css:
             self.setStyleSheet(css)
         else:
-            self.setStyleSheet(Color.cssButton())
+            self.setStyleSheet(Color().cssButton())
 
         if font_size:
             font = self.font()
@@ -6181,9 +6543,9 @@ class QPathLineItem(QWidget):
 
         valid = os.path.isdir(fname) if self._dir_mode else os.path.isfile(fname)
         if valid:
-            self._setIcon("mdi.checkbox-marked-outline", color=Color.activeColor())
+            self._setIcon("mdi.checkbox-marked-outline", color=Color().activeColor())
         else:
-            self._setIcon("fa6s.circle-exclamation", color=Color.warningColor())
+            self._setIcon("fa6s.circle-exclamation", color=Color().warningColor())
         self._text = fname
         self.pathChanged.emit(self, self._text)
 
@@ -6264,11 +6626,11 @@ class QProgressBar(QWidget):
         # self.setMinimumSize(self.sizeHint())
         # self.setMaximumSize(self.sizeHint())
 
-        self._background_color = Color.actionBackgroundColor()
-        self._border_color = Color.selectBorderColor()
+        self._background_color = Color().actionBackgroundColor()
+        self._border_color = Color().selectBorderColor()
 
         index = 0
-        pairs = Color.ChannelColors()
+        pairs = Color().ChannelColors()
         for c1, c2 in pairs:
             # channel gradients
             self._start_color[index] = c1
@@ -6732,7 +7094,7 @@ class QProgressBar(QWidget):
             for percent in self._percent.values():
                 if index not in self._colors:
                     # default colors if none found
-                    c1, c2 = Color.ChannelColors()[0]
+                    c1, c2 = Color().ChannelColors()[0]
                 else:
                     c1, c2 = self._colors[index]
                 if is_vertical:
@@ -7188,9 +7550,9 @@ class QOnOffStatusfWidget(QWidget):
 
         icon_size = QtCore.QSize(icon_size, icon_size)
         if not off_color:
-            off_color = Color.offColor()
+            off_color = Color().offColor()
         if not on_color:
-            on_color = Color.onColor()
+            on_color = Color().onColor()
 
         if on_icon:
             icon = load_icon(on_icon, use_qta=True, qta_color=on_color)
@@ -7608,11 +7970,11 @@ class HatWidget(QWidget):
 
         # syslog.info("hat paint start")
 
-        active_color = Color.activeColor()
-        _border_color = Color.borderColor()
-        inactive_color = Color.inactiveColor()
+        active_color = Color().activeColor()
+        _border_color = Color().borderColor()
+        inactive_color = Color().inactiveColor()
 
-        normal_color = Color.normalColor()
+        normal_color = Color().normalColor()
 
         pen_default = QtGui.QPen(QtGui.QColor(normal_color))
         pen_default.setWidth(2)
@@ -7755,7 +8117,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         self.plot_widget = TimeLinePlotWidget()
         self.legend_layout = QtWidgets.QHBoxLayout()
 
-        colors = Color.PenColors()
+        colors = Color().PenColors()
         for i in range(device.axis_count):
             # convert linear to axis input id
             input_id = device.axis_sequence_to_input_id(i)
@@ -7818,12 +8180,12 @@ class TimeLinePlotWidget(QWidget):
         """
         super().__init__(parent)
 
-        self._background_color = Color.actionBackgroundColor()
+        self._background_color = Color().actionBackgroundColor()
 
         self._render_flags = QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform
 
         # Plotting canvas
-        self._pens = Color.Pens()
+        self._pens = Color().Pens()
         self._pixmap = QtGui.QPixmap(1000, 200)
         self._pixmap.fill()
         self._rect = QtCore.QRect(0, 0, 1000, 200)
@@ -8050,7 +8412,6 @@ def required_container_height(
         row_count += 1
 
     return total_height + bottom_margin
-
 
 
 class JoystickDeviceWidget(QWidget):
@@ -8617,7 +8978,7 @@ class QUsedPushButton(QDataPushButton):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        color = Color.greenColor() if self._used else Color.grayColor()
+        color = Color().greenColor() if self._used else Color().grayColor()
 
         painter.setPen(QColor(color))
         painter.setBrush(QColor(color))
@@ -8628,7 +8989,7 @@ class QUsedPushButton(QDataPushButton):
 
         if self._marker is not None:
             # marker visible
-            color = Color.orangeColor() if self._marker else Color.grayColor()
+            color = Color().orangeColor() if self._marker else Color().grayColor()
             painter.setPen(QColor(color))
             painter.setBrush(QColor(color))
             painter.drawEllipse(QPoint(w - 9, 9), 3, 3)  # align RIGHT
@@ -8639,8 +9000,8 @@ class QUsedPushButton(QDataPushButton):
             c2 = QtGui.QColor(0, 255, 0, 64)
 
             if self._is_hovered and self._is_interactive:
-                c1 = Color.getHoverColor(c1)
-                c2 = Color.getHoverColor(c2)
+                c1 = Color().getHoverColor(c1)
+                c2 = Color().getHoverColor(c2)
 
             w2 = w / 2
             h2 = h / 2
@@ -8669,7 +9030,6 @@ class QUsedPushButton(QDataPushButton):
         painter.end()
 
 
-
 class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
     """Widget representing the state of a device's buttons.  used in the input viewer and other places"""
 
@@ -8696,10 +9056,10 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Buttons")
 
-        css = Color.cssRepeater()
+        css = Color().cssRepeater()
         self.setStyleSheet(css)
 
-        css = Color.cssButtonState()
+        css = Color().cssButtonState()
         self._widget_map = {}
         self.flow_layout = QFlowLayout()
         # button_layout = QtWidgets.QGridLayout()
@@ -8834,8 +9194,8 @@ class QRowSelectorFrame(QtWidgets.QFrame):
         self.installEventFilter(self)
         self._selectable = True
 
-        border_color = Color.borderColor()
-        background_color = Color.actionBackgroundColor()
+        border_color = Color().borderColor()
+        background_color = Color().actionBackgroundColor()
         css = f"Qframe {{ border 1px solid {border_color}; border-top: none; background-color:{background_color} }}"
         self.setStyleSheet(css)
 
@@ -8863,9 +9223,9 @@ class QRowSelectorFrame(QtWidgets.QFrame):
             self._selected = value
 
             if value:
-                background_color = Color.selectColor()
+                background_color = Color().selectColor()
             else:
-                background_color = Color.actionBackgroundColor()
+                background_color = Color().actionBackgroundColor()
 
             style = f"QRowSelectorFrame{{background-color: {background_color}; }}"
             self.setStyleSheet(style)
@@ -10081,8 +10441,8 @@ class ActionLabel(QtWidgets.QLabel):
         if self._action is not None:
             self._action.icon_changed.connect(self._update_icon)
 
-        background_color = Color.actionIconBackgroundColor()
-        border_color = Color.keyBorderColor()
+        background_color = Color().actionIconBackgroundColor()
+        border_color = Color().keyBorderColor()
         self.setStyleSheet(f"QLabel {{ border: 1px solid {border_color}; border-radius: 4px; padding: 1px; background-color: {background_color}; }}")
         self._update_icon()
 
@@ -10388,7 +10748,7 @@ class QSplitTabWidget(QDataWidget):
         self.setObjectName(object_name)
         self._cleanup_started = False
 
-        self.setStyleSheet(gremlin.ui.ui_common.Color.cssTabContent())
+        self.setStyleSheet(gremlin.ui.ui_common.Color().cssTabContent())
         self.setContentsMargins(0, 0, 0, 0)
 
         self._id = gremlin.util.get_guid()  # unique ID
@@ -11373,6 +11733,216 @@ class QRememberDialog(QtWidgets.QDialog):
         super().reject()
 
 
+class QCustomThemeDialog(QRememberDialog):
+    """Edit a private copy of the custom palette and persist it on Save.
+
+    Connect theme_saved to the application's stylesheet refresh handler if needed.
+    The preview is local to this dialog; Cancel leaves the active palette untouched.
+    """
+
+    theme_saved = QtCore.Signal(object)  # a copy of the saved custom palette
+
+    def __init__(self, parent=None, color_manager=None):
+        super().__init__("QCustomThemeDialog", width=850, height=700, parent=parent)
+        self.setWindowTitle("Custom Theme")
+        self._colors = color_manager if color_manager is not None else Color()
+        self._working_colors = copy.deepcopy(self._colors._color_map["custom"])
+        # remove non-customizable colors from the working copy
+        for name in list(self._working_colors.keys()):
+            if not self._colors._is_color_customizable(name):
+                del self._working_colors[name]
+
+        self._editors = []
+        self._invalid_paths = set()
+
+        layout = QtWidgets.QVBoxLayout(self)
+        description = QtWidgets.QLabel("Edit colors below. The preview shows unsaved changes; Save updates the custom theme.")
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        self._search = QtWidgets.QLineEdit()
+        self._search.setPlaceholderText("Search colors…")
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(self._filter_rows)
+        layout.addWidget(self._search)
+
+        self._table = QtWidgets.QTableWidget(0, 3)
+        self._table.setHorizontalHeaderLabels(["Color", "Hex value", "Choose color"])
+        self._table.verticalHeader().hide()
+        self._table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self._table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self._table, 1)
+
+        reset_layout = QtWidgets.QHBoxLayout()
+        reset_layout.addWidget(QtWidgets.QLabel("Reset all colors to:"))
+        self._base_theme = QtWidgets.QComboBox()
+        self._base_theme.addItem("Dark defaults", "dark")
+        self._base_theme.addItem("Light defaults", "light")
+        self._base_theme.setCurrentIndex(0 if self._colors.is_dark_theme else 1)
+        reset_layout.addWidget(self._base_theme)
+        reset_button = QtWidgets.QPushButton("Reset colors")
+        reset_button.clicked.connect(self._reset_colors)
+        reset_layout.addWidget(reset_button)
+        reset_layout.addStretch()
+        layout.addLayout(reset_layout)
+
+        self._preview = QtWidgets.QFrame()
+        self._preview.setObjectName("customThemePreview")
+        preview_layout = QtWidgets.QVBoxLayout(self._preview)
+        preview_layout.addWidget(QtWidgets.QLabel("Theme preview"))
+        preview_layout.addWidget(QtWidgets.QLabel("Normal text and background"))
+        selected = QtWidgets.QLabel("Selected item")
+        selected.setObjectName("customThemeSelection")
+        preview_layout.addWidget(selected)
+        preview_button = QtWidgets.QPushButton("Example button")
+        preview_button.setAutoDefault(False)
+        preview_layout.addWidget(preview_button)
+        layout.addWidget(self._preview)
+
+        self._status = QtWidgets.QLabel()
+        self._status.setWordWrap(True)
+        layout.addWidget(self._status)
+        self._buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Save | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        self._buttons.accepted.connect(self.accept)
+        self._buttons.rejected.connect(self.reject)
+        layout.addWidget(self._buttons)
+        self._populate_rows()
+
+    @staticmethod
+    def _color_leaves(value, path=()):
+        """Yield editable strings, including nested channel and pen colors."""
+        if isinstance(value, dict):
+            for key, item in value.items():
+                yield from QCustomThemeDialog._color_leaves(item, path + (key,))
+        elif isinstance(value, (list, tuple)):
+            for index, item in enumerate(value):
+                yield from QCustomThemeDialog._color_leaves(item, path + (index,))
+        else:
+            yield path, value
+
+    @staticmethod
+    def _replace_color(value, path, color):
+        """Replace a nested leaf while preserving tuples and integer keys."""
+        if not path:
+            return color
+        key, *remaining = path
+        if isinstance(value, tuple):
+            items = list(value)
+            items[key] = QCustomThemeDialog._replace_color(items[key], remaining, color)
+            return tuple(items)
+        value[key] = QCustomThemeDialog._replace_color(value[key], remaining, color)
+        return value
+
+    def _populate_rows(self):
+        self._editors.clear()
+        self._invalid_paths.clear()
+        self._table.setRowCount(0)
+        for path, value in self._color_leaves(self._working_colors):
+            row = self._table.rowCount()
+            self._table.insertRow(row)
+            color_key = str(path[0])
+            description = self._colors._color_description(color_key)
+            name = description + "".join(f"[{part}]" for part in path[1:])
+            name_item = QtWidgets.QTableWidgetItem(name)
+            if description != color_key:
+                name_item.setToolTip(color_key)
+                name_item.setData(QtCore.Qt.ItemDataRole.UserRole, color_key)
+            self._table.setItem(row, 0, name_item)
+            editor = QtWidgets.QLineEdit(value)
+            editor.setAccessibleName(name + " hex color")
+            editor.setToolTip("#RRGGBB or #AARRGGBB (alpha first)")
+            editor.setMinimumWidth(110)
+            swatch = QtWidgets.QPushButton("Choose…")
+            swatch.setAccessibleName("Choose " + name)
+            swatch.setAutoDefault(False)
+            self._style_swatch(swatch, value)
+            editor.textChanged.connect(lambda text, p=path, e=editor, b=swatch: self._edit_color(p, e, b, text))
+            swatch.clicked.connect(lambda checked=False, e=editor: self._choose_color(e))
+            self._table.setCellWidget(row, 1, editor)
+            self._table.setCellWidget(row, 2, swatch)
+            self._editors.append((path, editor))
+        self._filter_rows(self._search.text())
+        self._update_validation()
+        self._update_preview()
+
+    @staticmethod
+    def _style_swatch(button, value):
+        color = QtGui.QColor(value)
+        foreground = "#000000" if color.lightness() > 128 else "#ffffff"
+        button.setStyleSheet(f"background-color: {value}; color: {foreground};")
+
+    def _filter_rows(self, text):
+        text = text.casefold().strip()
+        for row in range(self._table.rowCount()):
+            item = self._table.item(row, 0)
+            key = item.data(QtCore.Qt.ItemDataRole.UserRole) or ""
+            self._table.setRowHidden(row, text not in item.text().casefold() and text not in key.casefold())
+
+    def _edit_color(self, path, editor, swatch, text):
+        try:
+            value = Color()._decode_theme_color(text.strip(), "#000000")
+        except ValueError:
+            self._invalid_paths.add(path)
+            editor.setStyleSheet("border: 1px solid #bd542a;")
+        else:
+            self._invalid_paths.discard(path)
+            editor.setStyleSheet("")
+            self._working_colors = self._replace_color(self._working_colors, path, value)
+            self._style_swatch(swatch, value)
+            self._update_preview()
+        self._update_validation()
+
+    def _update_validation(self):
+        valid = not self._invalid_paths
+        self._buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Save).setEnabled(valid)
+        self._status.setText("" if valid else "Enter valid hex colors in the highlighted fields before saving.")
+
+    def _choose_color(self, editor):
+        initial = QtGui.QColor(editor.text().strip())
+        if not initial.isValid():
+            initial = QtGui.QColor("#ffffff")
+        selected = QtWidgets.QColorDialog.getColor(initial, self, "Choose theme color", QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        if selected.isValid():
+            format_ = QtGui.QColor().NameFormat.HexArgb if selected.alpha() < 255 else QtGui.QColor().NameFormat.HexRgb
+            editor.setText(selected.name(format_))
+
+    def _update_preview(self):
+        colors = self._working_colors
+        self._preview.setStyleSheet(
+            "QFrame#customThemePreview {"
+            f"background-color: {colors['backgroundColor']}; color: {colors['normalColor']};"
+            f"border: 1px solid {colors['borderColor']}; border-radius: 4px;"
+            "} QFrame#customThemePreview QLabel {"
+            f"color: {colors['normalColor']}; background-color: transparent; border: none;"
+            "} QFrame#customThemePreview QLabel#customThemeSelection {"
+            f"background-color: {colors['selectedBackgroundColor']}; color: {colors['normalColor']}; padding: 4px;"
+            "} QFrame#customThemePreview QPushButton {"
+            f"background-color: {colors['buttonBackgroundColor']}; color: {colors['buttonTextColor']};"
+            f"border: 1px solid {colors['buttonBorderColor']}; padding: 5px;"
+            "}"
+        )
+
+    def _reset_colors(self):
+        self._working_colors = copy.deepcopy(self._colors._color_map[self._base_theme.currentData()])
+        self._populate_rows()
+
+    def accept(self):
+        if self._invalid_paths:
+            return
+        previous = self._colors._color_map["custom"]
+        for color, value in self._working_colors.items():
+            self._colors._color_map["custom"][color] = copy.deepcopy(value)
+        if not self._colors.save_custom_theme():
+            self._colors._color_map["custom"] = previous
+            self._status.setText("Unable to save the custom theme. Check that the theme folder is writable and try again.")
+            return
+        self.theme_saved.emit(copy.deepcopy(self._working_colors))
+        super().accept()
+
+
 class MarkdownDialog(QRememberDialog):
     """
     Dialog box for instructions in markdown format
@@ -12012,7 +12582,7 @@ class QJoystickRangeWidget(QWidget):
         _output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
 
         # output range
-        border_color = Color.warningColor()
+        border_color = Color().warningColor()
         css = f"""
             QLineEdit {{
                 border: 1px solid {border_color};
@@ -12914,7 +13484,7 @@ class IconGenerator:
         background_color = QtGui.QColor(0x00, 0x00, 0x00, 0x00)
         image.fill(background_color)
 
-        foreground_color = QtGui.QColor(Color.normalDarkColor() if is_dark else Color.normalLightColor())
+        foreground_color = QtGui.QColor(Color().normalDarkColor() if is_dark else Color().normalLightColor())
         painter.setPen(foreground_color)
         font = QtGui.QFont("Arial", 24)
         painter.setFont(font)
@@ -13497,8 +14067,8 @@ class QFrameBox(QWidget):
         layout.addStretch()
 
         if not css:
-            border_color = Color.borderColor()
-            background_color = Color.frameColor()
+            border_color = Color().borderColor()
+            background_color = Color().frameColor()
             css = f"""
             QWidget {{
                 border: 2px solid {border_color};
@@ -13528,7 +14098,7 @@ class QInfoBox(QtWidgets.QFrame):
         self._label_widget = QAutoResizingTextEdit()
         self._label_widget.setReadOnly(True)
         self._hide_key = hide_key
-        css = Color.cssInfoBox()
+        css = Color().cssInfoBox()
         if hide_key:
             config = gremlin.config.Configuration()
             hidden = config.visualHidden(hide_key)
@@ -13921,7 +14491,7 @@ class QJoystickInputWidget(QWidget):
         if not Shiboken.isValid(self):
             return
         widgets = []
-        fcolor = Color.blueColor()
+        fcolor = Color().blueColor()
         if self._widget:
             self.main_layout.removeWidget(self._widget)
             gremlin.util.delete_widget(self._widget)
@@ -13931,7 +14501,7 @@ class QJoystickInputWidget(QWidget):
 
         has_inputs = (filtered_axis or 0) + (filtered_button or 0) + (filtered_hat or 0)
         if not has_inputs:
-            warning_color = gremlin.ui.ui_common.Color.blueColor()
+            warning_color = gremlin.ui.ui_common.Color().blueColor()
             widget = gremlin.ui.ui_common.QIconLabel(
                 "ph.shield-warning-fill",
                 use_qta=True,
@@ -14305,7 +14875,7 @@ class QCollapsible(QFrame):
         """Create a QIcon from a string."""
         size = self._toggle_widget.font().pointSize()
         pixmap = QPixmap(size, size)
-        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap.fill(Qt.GlobalColor().transparent)
         painter = QPainter(pixmap)
         color = self._toggle_widget.palette().color(QPalette.ColorRole.WindowText)
         painter.setPen(color)
@@ -14595,8 +15165,8 @@ class QCurveWidget(QWidget):
 
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
 
-        active_color = Color.activeColor()
-        normal_color = Color.normalColor()
+        active_color = Color().activeColor()
+        normal_color = Color().normalColor()
         self.curve_icon_inactive = load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = load_icon("mdi.chart-bell-curve", qta_color=active_color)
         self.curve_button_widget.setToolTip("Curve output")
@@ -15171,7 +15741,7 @@ class QBorderWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
-        border_color = Color.borderColor()
+        border_color = Color().borderColor()
 
         # self.setFrameShape(QtWidgets.QFrame.Box)
 
@@ -15200,7 +15770,7 @@ class QBorderWidget(QWidget):
 
     def setBackgroundColor(self, color: str):
         """sets the background color of the title bar"""
-        border_color = Color.borderColor()
+        border_color = Color().borderColor()
         if color:
             css = f"# frame {{border: 1px solid {border_color}; background-color: {color}}}')"
         else:
@@ -16195,9 +16765,9 @@ class QEmptyWidget(QWidget):
         super().__init__(parent=parent)
         match mode:
             case "empty":
-                icon = Icons.emptyIcon(Color.watermarkColor())
+                icon = Icons.emptyIcon(Color().watermarkColor())
             case "wait":
-                icon = Icons.waitIcon(Color.watermarkColor())
+                icon = Icons.waitIcon(Color().watermarkColor())
         pixmap = icon.pixmap(QSize(96, 96))
         label = QtWidgets.QLabel()
         label.setPixmap(pixmap)
@@ -16225,7 +16795,7 @@ class QArrowPairWidget(QWidget):
     def __init__(self, direction="right", prefix: str = None, suffix: str = None, parent=None, size=24, qta_color=None):
         super().__init__(parent=parent)
 
-        icon = Icons.arrowIcon(direction, qta_color=qta_color if qta_color is not None else Color.normalColor())
+        icon = Icons.arrowIcon(direction, qta_color=qta_color if qta_color is not None else Color().normalColor())
         pixmap = icon.pixmap(QSize(size, size))
         label = QtWidgets.QLabel()
         label.setPixmap(pixmap)
@@ -16687,6 +17257,7 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         self._size = size
         self._css = style
         self._tooltip = tooltip
+        self._visible = True # override for visibility flag
         widget = QtWidgets.QLabel(text)
         if self._css is not None:
             widget.setStyleSheet(self._css)
@@ -16698,9 +17269,13 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         self._widget = widget
         self._update()
 
+    def setVisible(self, visible: bool):
+        self._visible = visible
+        self._update()
+
     def _update(self):
         height = 0
-        if self._text or self._icon:
+        if self._visible and (self._text or self._icon):
             height = max(height, self._widget.sizeHint().height())
         self.setFixedHeight(height)
 
@@ -17003,7 +17578,7 @@ class QStepTile(QtWidgets.QWidget):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color, padding=padding))
+        self.setStyleSheet(Color().cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color, padding=padding))
         if icon:
             self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
             self.main_layout.addWidget(self.icon_label)
@@ -17079,7 +17654,7 @@ class QAutoResizeStackedWidget(QtWidgets.QStackedWidget):
 class QSideBarContainer(QWidget):
     """A custom widget that features a colored vertical bar on its left side."""
 
-    def __init__(self, widget=None, bar_width=5, bar_color=Color.selectColor(), left_margin=8, spacing=8, parent=None):
+    def __init__(self, widget=None, bar_width=5, bar_color=Color().selectColor(), left_margin=8, spacing=8, parent=None):
         """constructor
         :param widget: The main content widget to be placed inside the sidebar container.
         :param bar_width: The width of the vertical bar on the left side.
@@ -17574,7 +18149,7 @@ class QDataRepeaterWidget(QtWidgets.QWidget):
         layout.addWidget(self._widget)
         self._value = value
 
-        border_color = Color.borderColor()
+        border_color = Color().borderColor()
 
         css = f"""
             .QLabel {{
@@ -17624,7 +18199,7 @@ class FixedTabBar(QTabBar):
 
     # def setStyleSheet(self, css: str):
     #     # cssTab() only targets QTabWidget/pane, which never match a bare tab bar
-    #     bar_css = f"#fixedTabBar {{ background-color: {Color.backgroundColor()}; }}"
+    #     bar_css = f"#fixedTabBar {{ background-color: {Color().backgroundColor()}; }}"
     #     super().setStyleSheet(f"{css or ''}\n{bar_css}")
 
 
@@ -17649,7 +18224,7 @@ class QTabHeader(FixedTabBar):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._open_context_menu)
 
-        self.setStyleSheet(Color.cssTab())
+        self.setStyleSheet(Color().cssTab())
 
     @property
     def moveInProgress(self) -> bool:

@@ -40,7 +40,16 @@ from .property_clipboard import (
     paste_clipboard_to_widgets,
 )
 from .selection_pane import OverlaySelectionPane
-from .model import DEFAULT_SIZES, PALETTE_GROUPS, OverlayScene, is_interactive_overlay, overlay_path_for_profile, profile_display_name, profile_xml_path, widget_is_locked
+from .model import (
+    DEFAULT_SIZES,
+    PALETTE_GROUPS,
+    OverlayScene,
+    is_interactive_overlay,
+    overlay_path_for_profile,
+    profile_display_name,
+    profile_xml_path,
+    widget_is_locked,
+)
 from .overlay_window import CROP_HANDLE_BASE, OverlayView, ROTATE_HANDLE
 from .qt_guard import alive, on_ui
 from .widgets import (
@@ -224,10 +233,7 @@ def _banner_type_help(item: dict) -> list[str]:
     widget_type = item.get("type")
     lines: list[str] = []
     if widget_type == "label":
-        lines.append(
-            "Inspector: type the caption, or check Show current mode to follow the active profile mode live. "
-            "Fill, border, and font are in Label."
-        )
+        lines.append("Inspector: type the caption, or check Show current mode to follow the active profile mode live. Fill, border, and font are in Label.")
     elif is_shape_widget(item):
         lines.append("Inspector: pick Rectangle, Circle, Triangle, Diamond, Line, Freeform, or a saved custom shape. Uncheck Closed for an open path.")
         if uses_editable_points(item):
@@ -246,13 +252,10 @@ def _banner_type_help(item: dict) -> list[str]:
                 )
         else:
             lines.append("Mouse: resize from the handles. Switch to Freeform, Line, Triangle, or Diamond to edit points on the canvas.")
-        lines.append(
-            "Right-click: Turn into button to bind the same outline. Save as custom shape to add it to the Shape list."
-        )
+        lines.append("Right-click: Turn into button to bind the same outline. Save as custom shape to add it to the Shape list.")
     elif button_uses_shape_path(item):
         lines.append(
-            "This button uses a shape outline. Off/On fill follow press. Bind it like any button. "
-            "Right-click: Turn into shape, or Save as custom shape."
+            "This button uses a shape outline. Off/On fill follow press. Bind it like any button. Right-click: Turn into shape, or Save as custom shape."
         )
     elif widget_type == "image":
         lines.append(
@@ -270,7 +273,9 @@ def _banner_type_help(item: dict) -> list[str]:
     elif widget_type == "remote_view":
         lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
     elif widget_type == "streamdeck":
-        lines.append("Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding.")
+        lines.append(
+            "Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding."
+        )
     elif widget_type == "browser":
         lines.append(
             "Inspector Browser section: enter a URL. The page is drawn in the widget, so you can type and click it. "
@@ -292,7 +297,9 @@ def _banner_type_help(item: dict) -> list[str]:
             "for the output. Not shown as a filled widget on the live overlay — the designer box marks the capture region."
         )
     elif widget_type == "axis_graph":
-        lines.append("Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding.")
+        lines.append(
+            "Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding."
+        )
     elif widget_type == "axis_bars":
         lines.append(
             "Inspector: Orientation (vertical/horizontal). Datasets are the bars — color and Range per axis "
@@ -338,8 +345,7 @@ def _banner_type_help(item: dict) -> list[str]:
         )
     elif widget_type == "switch_3way":
         lines.append(
-            "Inspector: bind Up, Center, and Down. Center is optional when neither end is pressed. "
-            "Interactive overlay springs back to center on lift."
+            "Inspector: bind Up, Center, and Down. Center is optional when neither end is pressed. Interactive overlay springs back to center on lift."
         )
     elif widget_type == "axis_xyz":
         lines.append(
@@ -347,10 +353,7 @@ def _banner_type_help(item: dict) -> list[str]:
             "Appearance: dot, path, vector, grid, sphere, axis length/invert, bounds box."
         )
     elif widget_type == "axis_polar":
-        lines.append(
-            "Inspector: Azimuth (−180°…180°), Elevation (−90°…90°), and Range (0…1 from −1…1). "
-            "Same Look as 3D axes, plus vector and sphere."
-        )
+        lines.append("Inspector: Azimuth (−180°…180°), Elevation (−90°…90°), and Range (0…1 from −1…1). Same Look as 3D axes, plus vector and sphere.")
     elif widget_type == "axis_ternary":
         lines.append("Inspector: Axis X, Axis Y, and Axis Z are independent (mix devices). The drawing is the live value. 100 is full axis, 0 is center.")
     elif widget_type == "axis_radar":
@@ -359,7 +362,9 @@ def _banner_type_help(item: dict) -> list[str]:
             "The wedge is the live FoV — no tip dot."
         )
     elif widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair"):
-        lines.append("Inspector: Axis X and Axis Y are independent (mix devices). Dot, grid, and crosshair options. Drag on an Interactive overlay if bound to vJoy.")
+        lines.append(
+            "Inspector: Axis X and Axis Y are independent (mix devices). Dot, grid, and crosshair options. Drag on an Interactive overlay if bound to vJoy."
+        )
     elif widget_type in ("axis_bar", "axis_radio", "axis_fader"):
         lines.append("Inspector: Orientation, binding (Listen…). Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type == "axis_paddle":
@@ -404,12 +409,7 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
         title = f"{kind} selected"
         extras = _banner_type_help(item)
         extra_html = "".join(f"<br><b>This widget</b> — {line}" for line in extras)
-        body = (
-            f"<b>Mouse</b> — {_COMMON_WIDGET_MOUSE}<br>"
-            f"<b>Keys</b> — {_COMMON_WIDGET_KEYS}<br>"
-            f"<b>Palette</b> — {_COMMON_WIDGET_PALETTE}"
-            f"{extra_html}"
-        )
+        body = f"<b>Mouse</b> — {_COMMON_WIDGET_MOUSE}<br><b>Keys</b> — {_COMMON_WIDGET_KEYS}<br><b>Palette</b> — {_COMMON_WIDGET_PALETTE}{extra_html}"
         return title, body
 
     type_names = ", ".join(sorted(WIDGET_TITLES.get(t, str(t or "").replace("_", " ")) for t in types))
@@ -462,9 +462,9 @@ class ActionBanner(QtWidgets.QFrame):
         self._apply_style()
 
     def _apply_style(self):
-        bg = Color.backgroundLighterColor()
-        fg = Color.normalColor()
-        border = Color.normalGradientColor()
+        bg = Color().backgroundLighterColor()
+        fg = Color().normalColor()
+        border = Color().normalGradientColor()
         self.setStyleSheet(
             f"#overlayActionBanner {{ background: {bg}; border: 1px solid {border}; border-radius: 6px; }}"
             f"#overlayActionBanner QLabel {{ color: {fg}; background: transparent; }}"
@@ -686,9 +686,7 @@ class DesignerCanvas(OverlayView):
                 self._rotate_center = widget_center(item)
             else:
                 self._rotate_center = pos
-            self._rotate_start_mouse = math.degrees(
-                math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x())
-            )
+            self._rotate_start_mouse = math.degrees(math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x()))
             self._start_rotations = {}
             self._start_geoms = {}
             for sid in self.scene.selected_ids:
@@ -725,11 +723,7 @@ class DesignerCanvas(OverlayView):
                         "h": float(it.get("h") or 1),
                     }
             bounds = self._selected_bounds()
-            self._start_bounds = (
-                {"x": bounds.x(), "y": bounds.y(), "w": bounds.width(), "h": bounds.height()}
-                if bounds is not None
-                else {}
-            )
+            self._start_bounds = {"x": bounds.x(), "y": bounds.y(), "w": bounds.width(), "h": bounds.height()} if bounds is not None else {}
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             self._start_geom = dict(item) if item else {}
             return
@@ -786,11 +780,7 @@ class DesignerCanvas(OverlayView):
             dx = pos.x() - self._last.x()
             dy = pos.y() - self._last.y()
             primary = self.scene.primary_selection()
-            before = (
-                (float(primary["x"]), float(primary["y"]))
-                if primary
-                else None
-            )
+            before = (float(primary["x"]), float(primary["y"])) if primary else None
             self.scene.move_selected(int(dx), int(dy), snap=True)
             # Only advance the drag anchor by how far the widget actually moved.
             # If snap held it in place, keep _last so further mouse travel accumulates
@@ -856,9 +846,7 @@ class DesignerCanvas(OverlayView):
             event.accept()
             return
         if self._mode == "rubber":
-            ids = self.scene.widgets_in_rect(
-                self._rubber.x(), self._rubber.y(), self._rubber.width(), self._rubber.height()
-            )
+            ids = self.scene.widgets_in_rect(self._rubber.x(), self._rubber.y(), self._rubber.width(), self._rubber.height())
             ids = self.scene.expand_group_ids(ids)
             self.scene.set_selection(ids, additive=bool(event.modifiers() & QtCore.Qt.ShiftModifier))
             if event.modifiers() & QtCore.Qt.ShiftModifier:
@@ -1672,7 +1660,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         scroll.setAlignment(QtCore.Qt.AlignCenter)
         scroll.setWidget(self.canvas)
         scroll.viewport().installEventFilter(self.canvas)
-        bg = Color.actionBackgroundColor()
+        bg = Color().actionBackgroundColor()
         scroll.setStyleSheet(f"QScrollArea {{ background: {bg}; border: none; }}")
         scroll.viewport().setAutoFillBackground(True)
         scroll.viewport().setStyleSheet(f"background: {bg};")
@@ -1981,7 +1969,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._page_tabs.setMovable(True)
         self._page_tabs.setUsesScrollButtons(True)
         self._page_tabs.setObjectName("overlay_pages")
-        self._page_tabs.setStyleSheet(Color.cssTab())
+        self._page_tabs.setStyleSheet(Color().cssTab())
         self._page_tabs.setToolTip("Each tab is a separate overlay. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder.")
         self._page_tabs.currentChanged.connect(self._on_page_tab_changed)
         self._page_tabs.tabBarDoubleClicked.connect(self._rename_page_tab)
@@ -2130,9 +2118,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
     def _initial_layout_pass(self):
         """Full side panels + autofit canvas once the Overlay tab is shown."""
         self._ensure_splitter_layout()
-        self._apply_splitter_sizes(
-            bool(self._pane_box.isChecked()) if getattr(self, "_pane_box", None) is not None else True
-        )
+        self._apply_splitter_sizes(bool(self._pane_box.isChecked()) if getattr(self, "_pane_box", None) is not None else True)
         self._fit_canvas_to_viewport()
         self._did_initial_fit = True
 
@@ -2310,7 +2296,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         layout.addWidget(self._user_templates_host)
         self._refresh_user_templates()
         layout.addStretch()
-        bg = Color.actionBackgroundColor()
+        bg = Color().actionBackgroundColor()
         panel.setStyleSheet(f"QWidget {{ background: {bg}; }}")
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -2329,10 +2315,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
     def _palette_type_button(self, widget_type: str) -> QDataPushButton:
         title = WIDGET_TITLES.get(widget_type, widget_type)
         tip = WIDGET_TOOLTIPS.get(widget_type) or f"Add a {title}."
-        tip = (
-            f"{tip}\n\n"
-            "Click to add. If a widget is selected, change it to this type and keep compatible settings."
-        )
+        tip = f"{tip}\n\nClick to add. If a widget is selected, change it to this type and keep compatible settings."
         return QDataPushButton(
             title,
             tooltip=tip,
@@ -2535,12 +2518,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         try:
             from .model import is_websocket_mode
 
-            if (
-                visible
-                and page_id
-                and is_websocket_mode(self.scene.canvas_for(page_id))
-                and self._overlay_manager is not None
-            ):
+            if visible and page_id and is_websocket_mode(self.scene.canvas_for(page_id)) and self._overlay_manager is not None:
                 n = self._overlay_manager.websocket_client_count(page_id)
                 if n > 0:
                     button.setToolTip(f"Websocket live — {n} client{'s' if n != 1 else ''} connected.")
@@ -2681,9 +2659,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         control = getattr(self, "_control_button", None)
         if control is not None and alive(control):
             control.setEnabled(True)
-            control.setToolTip(
-                "Open the overlay control panel. Controls inside are active while the profile is running."
-            )
+            control.setToolTip("Open the overlay control panel. Controls inside are active while the profile is running.")
         banner = getattr(self, "_action_banner", None)
         if locked:
             if banner is not None and alive(banner):

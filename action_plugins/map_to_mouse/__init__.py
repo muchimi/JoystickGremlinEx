@@ -87,7 +87,7 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
         else:
             self._create_button_hat_ui()
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,

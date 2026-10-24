@@ -83,7 +83,7 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         self.rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()))
+        self.play_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color().activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 
@@ -276,7 +276,6 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
     hint = "Converts a text string to voice using the TTS API."
     DEFAULT_PYTTS_SPEAKER = "Microsoft David Desktop - English (United States)"  # default PyTTS speaker
 
-
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
     # override default allowed inputs here
@@ -441,7 +440,6 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("override-suppress", safe_format(self.override_suppress, bool))
         node.set("speaker", html.escape(self.voice_name))
-
 
         return node
 

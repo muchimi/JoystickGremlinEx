@@ -996,7 +996,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
 
         self._button_widget = gremlin.ui.ui_common.getHContainer([self.add_arg_widget, self.clear_args_widget], left_stretch=True, widget_only=True)
 
-        warning_color = gremlin.ui.ui_common.Color.warningColor()
+        warning_color = gremlin.ui.ui_common.Color().warningColor()
         self._warning_widget = gremlin.ui.ui_common.QIconLabel(
             "ph.shield-warning-fill", use_qta=True, icon_color=QtGui.QColor(warning_color), text="", use_wrap=False
         )
@@ -1289,8 +1289,6 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
                 latch_pair = (arg_device_id, InputType.JoystickAxis, arg_input_id, self)
                 if latch_pair not in latched_list:
                     latched_list.append(latch_pair)
-
-
 
         return latched_list
 

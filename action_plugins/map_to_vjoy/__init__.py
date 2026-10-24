@@ -1311,19 +1311,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_hat_mapping_ui(self):
         """creates the 8 way hat inputs based on the hat input value"""
 
-
-
-
-
         # self.rb_hat_pulse_list = []
 
-        self.hat_pulse_widget = QDataPushButton("All Pulse", tooltip="Sets all mappings to pulse mode",callback=self._set_all_pulse)
-        self.hat_hold_widget = QDataPushButton("All Hold", tooltip="Sets all mappings to hold mode",callback=self._set_all_hold)
-        self.hat_press_widget = QDataPushButton("All Press", tooltip="Sets all mappings to press mode",callback=self._set_all_press)
-        self.hat_release_widget = QDataPushButton("All Release", tooltip="Sets all mappings to release mode",callback=self._set_all_release)
-        self.hat_noop_widget = QDataPushButton("All NoOp", tooltip="Sets all mappings to NoOp (do nothing) mode",callback=self._set_all_noop)
-        self.hat_unmap_widget = QDataPushButton("Clear Buttons", tooltip="Clears all mappings",callback=self._clear_map)
-        self.hat_map_widget = QDataPushButton("Map Buttons", tooltip="Maps all positions sequentially using the first button as the reference if set.",callback=self._auto_map)
+        self.hat_pulse_widget = QDataPushButton("All Pulse", tooltip="Sets all mappings to pulse mode", callback=self._set_all_pulse)
+        self.hat_hold_widget = QDataPushButton("All Hold", tooltip="Sets all mappings to hold mode", callback=self._set_all_hold)
+        self.hat_press_widget = QDataPushButton("All Press", tooltip="Sets all mappings to press mode", callback=self._set_all_press)
+        self.hat_release_widget = QDataPushButton("All Release", tooltip="Sets all mappings to release mode", callback=self._set_all_release)
+        self.hat_noop_widget = QDataPushButton("All NoOp", tooltip="Sets all mappings to NoOp (do nothing) mode", callback=self._set_all_noop)
+        self.hat_unmap_widget = QDataPushButton("Clear Buttons", tooltip="Clears all mappings", callback=self._clear_map)
+        self.hat_map_widget = QDataPushButton(
+            "Map Buttons", tooltip="Maps all positions sequentially using the first button as the reference if set.", callback=self._auto_map
+        )
 
         widgets = [
             self.hat_hold_widget,
@@ -1335,18 +1333,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.hat_map_widget,
         ]
 
-
-
         self.container_hat_options_widget = getHContainer(widgets, widget_only=True)
 
         positions = self.action_data.hat_positions
 
-
         # create the table for each hat position
         hat_grid_widget = QtWidgets.QWidget()
         hat_grid_layout = QtWidgets.QGridLayout(hat_grid_widget)
-
-
 
         row = 0
         for position in positions:  # 9 positions - 8 cardinal and center push
@@ -1358,7 +1351,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 icon_path=icon,
                 text=f"{name}:",
                 use_wrap=False,
-                icon_color=QtGui.QColor(Color.activeColor()),
+                icon_color=QtGui.QColor(Color().activeColor()),
                 icon_size=32,
                 use_qta=True,
             )
@@ -1369,12 +1362,18 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.cb_hat_list.append(cb)
             cb.currentIndexChanged.connect(self._hat_mapping_changed)
 
-            rb_hold = QDataRadioButton("Hold", tooltip="Output will match the current state of the input.", callback=self._hat_hold_changed, data = position)
-            rb_pulse = QDataRadioButton("Pulse", tooltip="Output will pulse on (pressed), wait a delay, and turn off (released) when triggered.", callback=self._hat_pulse_changed, data = position)
-            rb_press = QDataRadioButton("Press", tooltip="Output will be turned on (pressed) when triggered.", callback=self._hat_press_changed, data = position)
-            rb_release = QDataRadioButton("Release", tooltip="Output will be turned off (released) when triggered.", callback=self._hat_release_changed, data = position)
-            rb_noop = QDataRadioButton("NoOp", tooltip="No output.", callback=self._hat_noop_changed, data = position)
-
+            rb_hold = QDataRadioButton("Hold", tooltip="Output will match the current state of the input.", callback=self._hat_hold_changed, data=position)
+            rb_pulse = QDataRadioButton(
+                "Pulse",
+                tooltip="Output will pulse on (pressed), wait a delay, and turn off (released) when triggered.",
+                callback=self._hat_pulse_changed,
+                data=position,
+            )
+            rb_press = QDataRadioButton("Press", tooltip="Output will be turned on (pressed) when triggered.", callback=self._hat_press_changed, data=position)
+            rb_release = QDataRadioButton(
+                "Release", tooltip="Output will be turned off (released) when triggered.", callback=self._hat_release_changed, data=position
+            )
+            rb_noop = QDataRadioButton("NoOp", tooltip="No output.", callback=self._hat_noop_changed, data=position)
 
             mode_container_widget = getHContainer([rb_hold, rb_pulse, rb_press, rb_release, rb_noop], widget_only=True)
 
@@ -1390,7 +1389,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             ]
 
             row += 1
-
 
         widget = getVContainer([self.container_hat_options_widget, hat_grid_widget], widget_only=True)
 
@@ -1717,8 +1715,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
 
-        active_color = Color.activeColor()
-        normal_color = Color.normalColor()
+        active_color = Color().activeColor()
+        normal_color = Color().normalColor()
         self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
         self.curve_button_widget.setToolTip("Curve output")
@@ -1761,9 +1759,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             reset_widget,
         ]
 
-        self.container_output_range_widget, self.container_output_range_layout = getHContainer(
-            widgets, "Output Scale:", min_height=self.container_height
-        )
+        self.container_output_range_widget, self.container_output_range_layout = getHContainer(widgets, "Output Scale:", min_height=self.container_height)
         self.container_output_range_widget.setToolTip(
             "Allows you to set limits to the output range of an axis to constrain the output to a particular reduced range from normal."
         )
@@ -1832,7 +1828,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not self.action_data._merge_data:
             # add at least one
             self.action_data._merge_data = [MergeData()]
-
 
         self.container_merge_layout.addWidget(invert_merged_output_widget)
 
@@ -2279,7 +2274,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             value=self.action_data.pulse_delay,
             callback=self._pulse_value_changed,
             tooltip="Pulse Delay in milliseconds",
-
         )
 
         self.pulse_interval_widget = QDelayWidget(
@@ -2437,8 +2431,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(widget)
         self.main_layout.addWidget(QHorizontalLine())
 
-
-        warning_color = Color.warningColor()
+        warning_color = Color().warningColor()
         self.warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
@@ -2448,16 +2441,29 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
         self.container_warning_widget = getHContainer(self.warning_widget, min_height=self.container_height, widget_only=True)
 
-        self._execute_widget =  QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
         self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
 
-        self.chkb_ignore_release = QDataCheckbox("Ignore release", tooltip="If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF")
-        self.chkb_paired = QDataCheckbox("Paired Group Member", tooltip="Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used).")
-        self.chkb_auto_release_widget = QDataCheckbox("Auto Release", tooltip="Autorelease will trigger a release action when the input is released if the input does not issue one and that is the desired behavior.", value=self.action_data.auto_release)
-        self.grid_visible_widget = QDataCheckbox("Show button grid", tooltip = "Sets the button grid visibility, use ctrl+ to enable/disable globally", value = self.action_data.grid_visible, callback = self._grid_visible_cb)
+        self.chkb_ignore_release = QDataCheckbox(
+            "Ignore release", tooltip="If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF"
+        )
+        self.chkb_paired = QDataCheckbox(
+            "Paired Group Member", tooltip="Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used)."
+        )
+        self.chkb_auto_release_widget = QDataCheckbox(
+            "Auto Release",
+            tooltip="Autorelease will trigger a release action when the input is released if the input does not issue one and that is the desired behavior.",
+            value=self.action_data.auto_release,
+        )
+        self.grid_visible_widget = QDataCheckbox(
+            "Show button grid",
+            tooltip="Sets the button grid visibility, use ctrl+ to enable/disable globally",
+            value=self.action_data.grid_visible,
+            callback=self._grid_visible_cb,
+        )
 
         widgets = [
             self._execute_widget,
@@ -3047,9 +3053,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.stepped_selector_input_widget = QDataComboBox(
             source=button_items, value=self.action_data.stepped_input_id, callback=self._stepped_input_changed_cb
         )
-        self.stepped_direction_widget = QHatSelectorComboBox(
-            value=self.action_data.stepped_hat_direction, callback=self._handle_direction_changed
-        )
+        self.stepped_direction_widget = QHatSelectorComboBox(value=self.action_data.stepped_hat_direction, callback=self._handle_direction_changed)
 
         w1 = ["Reverse Device:", self.stepped_selector_device_widget, listen_widget]
 
@@ -3107,10 +3111,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 widget_only=True,
             )
         )
-        self.pid_acceleration_widget = QDataCheckbox("Accelerate setpoint steps with faster input",
-                                                  tooltip = "Enable acceleration of setpoint steps based on input speed.  In this mode, faster inputs will accelerate the setpoint changes with the frequency of the inputs received for non linear response times.",
-                                                  value = self.action_data.pid_acceleration,
-                                                  callback = self._handle_pid_acceleration_mode_changed)
+        self.pid_acceleration_widget = QDataCheckbox(
+            "Accelerate setpoint steps with faster input",
+            tooltip="Enable acceleration of setpoint steps based on input speed.  In this mode, faster inputs will accelerate the setpoint changes with the frequency of the inputs received for non linear response times.",
+            value=self.action_data.pid_acceleration,
+            callback=self._handle_pid_acceleration_mode_changed,
+        )
 
         layout.addWidget(self.pid_acceleration_widget)
 
@@ -3169,8 +3175,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_pid_acceleration_mode_changed(self, enabled):
         self.pid_acceleration_controls_container.setVisible(enabled)
 
-
-
     def _pid_accel_setting_changed(self, name, value):
         setattr(self.action_data, name, value)
         start = self.action_data.pid_accel_start_hz
@@ -3217,9 +3221,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         self.encoder_spring_container = getHContainer(["Spring delay (ms):", self.encoder_spring_timer_widget], widget_only=True)
-        container_layout.addWidget(
-            getHContainer([self.encoder_direction_widget, self.encoder_mode_widget, self.encoder_spring_container], widget_only=True)
-        )
+        container_layout.addWidget(getHContainer([self.encoder_direction_widget, self.encoder_mode_widget, self.encoder_spring_container], widget_only=True))
 
         w1 = []
         w2 = []
@@ -3257,7 +3259,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         w2.extend(["Max Step:", self.max_step_widget])
 
         # full frequency
-        self.full_frequency_widget =    QFloatLineEdit(
+        self.full_frequency_widget = QFloatLineEdit(
             min_range=0,
             max_range=100,
             value=self.action_data.encoder_accel_full_hz,
@@ -3376,9 +3378,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.slider_widget.setMinimumWidth(200)
         self.slider_widget.setMarkerVisible(False)
 
-        self.normalize_widget = QDataPushButton(
-            "Normalize", callback=self._normalize_steps, tooltip="Normalizes steps to be evenly spaced"
-        )
+        self.normalize_widget = QDataPushButton("Normalize", callback=self._normalize_steps, tooltip="Normalizes steps to be evenly spaced")
 
         self.low_progression_widget = QDataPushButton(
             "Low", callback=self._low_progression_steps, tooltip="Steps follow a linear progression from the low range.  Most steps are in the lower half."
@@ -3396,15 +3396,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             "Geometric High", callback=self._geometric_progression_steps_high, tooltip="Steps follow a geometric (log) progression."
         )
 
-        self.cubic_progression_center_widget = QDataPushButton(
-            "Cubic Center", callback=self._cubic_steps_center, tooltip="Steps follow a cubic progression."
-        )
+        self.cubic_progression_center_widget = QDataPushButton("Cubic Center", callback=self._cubic_steps_center, tooltip="Steps follow a cubic progression.")
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
-        self.step_value_container_layout.addWidget(
-            QDataLabel("Use step preset:", tooltip="Choose a step preset for the initial axis value")
-        )
+        self.step_value_container_layout.addWidget(QDataLabel("Use step preset:", tooltip="Choose a step preset for the initial axis value"))
         self.step_value_container_layout.addWidget(self.step_start_index_widget)
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Preset value:"))
         self.step_value_container_layout.addWidget(self.step_start_value_widget)
@@ -4511,7 +4507,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         size = 24
         radius = 4
         pixmap = QPixmap(size, size)
-        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap.fill(Qt.GlobalColor().transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)  # For smooth, anti-aliased edges
         pen = QPen(QColor(color))  # Blue outline, 4px thick
@@ -4563,9 +4559,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         label_used_somewhere_widget = QtWidgets.QLabel("Used in the profile")
         label_unused_widget = QtWidgets.QLabel("Not used")
 
-        used_pixmap = self._create_pixmal(Color.greenColor())
-        used_elsewhere_pixmap = self._create_pixmal(Color.orangeColor())
-        unused_pixmap = self._create_pixmal(Color.grayColor())  # assuming gray for not used
+        used_pixmap = self._create_pixmal(Color().greenColor())
+        used_elsewhere_pixmap = self._create_pixmal(Color().orangeColor())
+        unused_pixmap = self._create_pixmal(Color().grayColor())  # assuming gray for not used
         icon_used_here_widget = QtWidgets.QLabel()
         icon_used_here_widget.setPixmap(used_pixmap)
         icon_used_somewhere_widget = QtWidgets.QLabel()
@@ -4599,7 +4595,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # vjoy_id = dev.vjoy_id  # use joystick id as vjoy_id is -1 if disconnected
         # input_type = self.action_data.input_type
-        css = Color.cssButtonState()
+        css = Color().cssButtonState()
 
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
         used_list = state.used_button_list(self.action_data.virtual_device_guid)
@@ -7501,10 +7497,13 @@ Supports axis merging, curved output, command, hat and button mappings.
     def setKeys(self, value):
         self._latched_keys.clear()
         for key in value:
+            if key is self:
+                # do not add self to the latched keys - only different keys
+                continue
             self._latched_keys.append(key)
 
     def addKey(self, key):
-        if key not in self._latched_keys:
+        if key not in self._latched_keys and key is not self:
             self._latched_keys.append(key)
 
     def removeKey(self, key):

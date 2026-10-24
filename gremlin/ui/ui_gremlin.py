@@ -19,7 +19,7 @@ class Ui_Gremlin(object):
         import gremlin.ui.ui_common
         import gremlin.ktts
 
-        # background_color = gremlin.ui.ui_common.Color.backgroundColor()
+        # background_color = gremlin.ui.ui_common.Color().backgroundColor()
         # css = f"background-color: black;"
 
         # main content panel - holds the device tabs
@@ -50,7 +50,6 @@ class Ui_Gremlin(object):
         tab_header_layout.addWidget(self.devices_tab_header_widget)
 
         self.tab_content_layout.addLayout(tab_header_layout)
-
 
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         self.device_page_widget.setContentsMargins(0, 0, 0, 0)

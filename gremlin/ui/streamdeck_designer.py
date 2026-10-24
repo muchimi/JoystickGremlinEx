@@ -274,9 +274,11 @@ def _pixmap_from_item(item, pressed: bool = False, *, dial_lcd: bool = False) ->
 
         kind = getattr(item, "kind", "") or ""
         use_lcd = dial_lcd or kind in ("dial", "dial_press")
-        if item_needs_composite(item, pressed=pressed) or (
-            pressed and item_needs_composite(item, pressed=False)
-        ) or (use_lcd and (getattr(item, "bg_color", "") or getattr(item, "bg_color_pressed", ""))):
+        if (
+            item_needs_composite(item, pressed=pressed)
+            or (pressed and item_needs_composite(item, pressed=False))
+            or (use_lcd and (getattr(item, "bg_color", "") or getattr(item, "bg_color_pressed", "")))
+        ):
             if use_lcd:
                 return compose_key_pixmap(item, pressed=pressed, width=200, height=100)
             return compose_key_pixmap(item, size=144, pressed=pressed)
@@ -366,9 +368,7 @@ class _BgColorSquare(QtWidgets.QLabel):
         self._color = color or ""
         if self._color:
             self.setText("")
-            self.setStyleSheet(
-                f"QLabel {{ background:{self._color}; border:2px solid #888; border-radius:8px; }}"
-            )
+            self.setStyleSheet(f"QLabel {{ background:{self._color}; border:2px solid #888; border-radius:8px; }}")
         else:
             self.setText("BG")
             self.setStyleSheet(_swatch_empty_style())
@@ -421,8 +421,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         if (
             self._drag_start is not None
             and (event.buttons() & QtCore.Qt.LeftButton)
-            and (event.position().toPoint() - self._drag_start).manhattanLength()
-            >= QtWidgets.QApplication.startDragDistance()
+            and (event.position().toPoint() - self._drag_start).manhattanLength() >= QtWidgets.QApplication.startDragDistance()
         ):
             self._start_slot_drag()
             self._drag_start = None
@@ -443,9 +442,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         mime.setText(payload)
         drag.setMimeData(mime)
         if not self._pixmap.isNull():
-            drag.setPixmap(
-                self._pixmap.scaled(48, 48, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-            )
+            drag.setPixmap(self._pixmap.scaled(48, 48, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
         drag.exec(QtCore.Qt.MoveAction)
 
     def set_link_pages(self, pages: list[tuple[int, str]], current_page: int = 0, multi_count: int = 1):
@@ -487,11 +484,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             if not link_actions:
                 empty = link_menu.addAction("(no other pages)")
                 empty.setEnabled(False)
-            act_unlink = menu.addAction(
-                "Unlink from page"
-                if multi <= 1
-                else f"Unlink {multi} buttons"
-            )
+            act_unlink = menu.addAction("Unlink from page" if multi <= 1 else f"Unlink {multi} buttons")
             act_unlink.setEnabled(bool(getattr(self, "_linked_page", 0)) or multi > 1)
             if multi <= 1 and getattr(self, "_linked_page", 0):
                 act_unlink.setText(f"Unlink from page {int(self._linked_page)}")
@@ -632,9 +625,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             )
         else:
             tip = self._label or f"{self.row}:{self.column}"
-            self.setToolTip(
-                f"{tip}\nCtrl+click multi-select · drop image · drag to move · right-click menu"
-            )
+            self.setToolTip(f"{tip}\nCtrl+click multi-select · drop image · drag to move · right-click menu")
         self._apply_style()
         self.update()
 
@@ -647,13 +638,13 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
     def _apply_style(self):
         if not Shiboken.isValid(self):
             return
-        bg = Color.actionBackgroundColor()
-        border = Color.activeColor() if self.isChecked() else Color.normalColor()
+        bg = Color().actionBackgroundColor()
+        border = Color().activeColor() if self.isChecked() else Color().normalColor()
         if self._foreign:
             border = "#a45a5a"
             bg = "#2a1818"
         elif self._linked_page:
-            border = "#7a6cff" if not self.isChecked() else Color.activeColor()
+            border = "#7a6cff" if not self.isChecked() else Color().activeColor()
             bg = "#1c1a32"
         elif self._has_mappings and not self.isChecked():
             border = "#6a9" if not border else border
@@ -666,7 +657,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         radius = max(6, getattr(self, "_side", 80) // 10)
         self.setStyleSheet(
             f"QPushButton {{ background:{bg}; border:2px solid {border}; border-radius:{radius}px; padding:2px; }}"
-            f"QPushButton:checked {{ border:2px solid {Color.activeColor()}; }}"
+            f"QPushButton:checked {{ border:2px solid {Color().activeColor()}; }}"
         )
 
     def paintEvent(self, event):
@@ -681,28 +672,16 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             margin = max(4, self.width() // 14)
             avail = self.rect().adjusted(margin, margin, -margin, -margin)
             side = min(avail.width(), avail.height())
-            scaled = self._pixmap.scaled(
-                side, side, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
-            )
+            scaled = self._pixmap.scaled(side, side, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
             x = avail.x() + (avail.width() - scaled.width()) // 2
             y = avail.y() + (avail.height() - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
         else:
             caption = (self._label or "").strip()
             if not caption:
-                caption = (
-                    f"{self.column + 1}/{self.row + 1}"
-                    if self.kind == "button"
-                    else f"D{self.column + 1}"
-                )
+                caption = f"{self.column + 1}/{self.row + 1}" if self.kind == "button" else f"D{self.column + 1}"
             # Light-on-light fails in light mode; use theme text color.
-            painter.setPen(
-                QtGui.QColor(
-                    "#c47878"
-                    if self._foreign
-                    else ("#b8b0ff" if self._linked_page else Color.normalColor())
-                )
-            )
+            painter.setPen(QtGui.QColor("#c47878" if self._foreign else ("#b8b0ff" if self._linked_page else Color().normalColor())))
             font = painter.font()
             font.setFamily("Segoe UI")
             font.setBold(True)
@@ -790,8 +769,8 @@ class StreamDeckDialScreenWidget(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
         painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
         r = self.rect().adjusted(1, 1, -1, -1)
-        fill = self._bg if self._bg else Color.actionBackgroundColor()
-        border = Color.activeColor() if self._selected else Color.normalColor()
+        fill = self._bg if self._bg else Color().actionBackgroundColor()
+        border = Color().activeColor() if self._selected else Color().normalColor()
         painter.setBrush(QtGui.QColor(fill))
         painter.setPen(QtGui.QPen(QtGui.QColor(border), 2 if self._selected else 1))
         painter.drawRoundedRect(r, 6, 6)
@@ -799,13 +778,11 @@ class StreamDeckDialScreenWidget(QtWidgets.QWidget):
         inner = r.adjusted(3, 3, -3, -3)
         if not self._pixmap.isNull():
             # Stretch to fill the LCD window (hardware canvas is already 2:1).
-            scaled = self._pixmap.scaled(
-                inner.size(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation
-            )
+            scaled = self._pixmap.scaled(inner.size(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
             painter.drawPixmap(inner.topLeft(), scaled)
         else:
             caption = (self._label or "").strip() or f"LCD {self.column + 1}"
-            painter.setPen(QtGui.QColor(Color.normalColor() if self._bg else Color.grayColor()))
+            painter.setPen(QtGui.QColor(Color().normalColor() if self._bg else Color().grayColor()))
             font = painter.font()
             font.setFamily("Segoe UI")
             font.setBold(True)
@@ -868,12 +845,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
         self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setToolTip(
-            "Center: dial press mappings\n"
-            "↻: clockwise rotate mappings\n"
-            "↺: counterclockwise rotate mappings\n"
-            "LCD above: icon / title / background"
-        )
+        self.setToolTip("Center: dial press mappings\n↻: clockwise rotate mappings\n↺: counterclockwise rotate mappings\nLCD above: icon / title / background")
         self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self._apply_size()
 
@@ -890,8 +862,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         self._apply_size()
         self.update()
 
-    def set_cell(self, label: str, has_press: bool, pixmap: QtGui.QPixmap | None = None,
-                 has_inc: bool = False, has_dec: bool = False, foreign: bool = False):
+    def set_cell(self, label: str, has_press: bool, pixmap: QtGui.QPixmap | None = None, has_inc: bool = False, has_dec: bool = False, foreign: bool = False):
         if not Shiboken.isValid(self):
             return
         self._label = label or ""
@@ -907,10 +878,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
             self._sel = ""
         else:
             self.setToolTip(
-                "Center: dial press mappings\n"
-                "↻: clockwise rotate mappings\n"
-                "↺: counterclockwise rotate mappings\n"
-                "LCD above: icon / title / background"
+                "Center: dial press mappings\n↻: clockwise rotate mappings\n↺: counterclockwise rotate mappings\nLCD above: icon / title / background"
             )
         self.update()
 
@@ -948,9 +916,9 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
         painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
 
-        bg = Color.actionBackgroundColor()
-        text = Color.normalColor()
-        active = Color.activeColor()
+        bg = Color().actionBackgroundColor()
+        text = Color().normalColor()
+        active = Color().activeColor()
 
         # Arrows (counterclockwise left, clockwise right)
         dec_r, inc_r = self._arrow_rects()
@@ -969,7 +937,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
             font.setBold(True)
             font.setPixelSize(max(16, int(self._side * 0.36)))
             painter.setFont(font)
-            painter.setPen(QtGui.QColor(active if selected else (Color.greenColor() if mapped else text)))
+            painter.setPen(QtGui.QColor(active if selected else (Color().greenColor() if mapped else text)))
             painter.drawText(rect, QtCore.Qt.AlignCenter, glyph)
             if mapped and not selected:
                 painter.setPen(QtCore.Qt.NoPen)
@@ -978,7 +946,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
 
         # Circle face (knob) — LCD content lives on the strip above.
         cr = self._circle_rect()
-        border = active if self._sel == "press" else Color.normalColor()
+        border = active if self._sel == "press" else Color().normalColor()
         if self._has_press and self._sel != "press":
             border = "#6a9"
         painter.setBrush(QtGui.QColor(bg))
@@ -1272,11 +1240,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
     def _clear_cells(self):
         """Drop grid buttons immediately so stale refs cannot be painted."""
-        old = (
-            list(self._cells.values())
-            + list(self._dial_cells.values())
-            + list(getattr(self, "_dial_screens", {}).values())
-        )
+        old = list(self._cells.values()) + list(self._dial_cells.values()) + list(getattr(self, "_dial_screens", {}).values())
         self._cells.clear()
         self._dial_cells.clear()
         self._dial_screens = {}
@@ -1347,7 +1311,9 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         row.addWidget(del_btn)
         layout.addLayout(row)
 
-        import_btn = QDataPushButton("Import", tooltip="Import page appearance from a Bitfocus Companion configuration export", clicked=self._import_companion_pages)
+        import_btn = QDataPushButton(
+            "Import", tooltip="Import page appearance from a Bitfocus Companion configuration export", clicked=self._import_companion_pages
+        )
         layout.addWidget(import_btn)
         return panel
 
@@ -1366,9 +1332,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         preview_row.setContentsMargins(0, 0, 0, 0)
         preview_row.setSpacing(0)
         preview_lbl = QtWidgets.QLabel("Preview:")
-        preview_lbl.setStyleSheet(
-            f"color: {Color.normalColor()}; padding-right: 8px; font-size: 12px;"
-        )
+        preview_lbl.setStyleSheet(f"color: {Color().normalColor()}; padding-right: 8px; font-size: 12px;")
         preview_font = QtGui.QFont(self.font())
         preview_font.setPointSize(11)
         preview_font.setBold(False)
@@ -1432,7 +1396,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
-        bg = Color.actionBackgroundColor()
+        bg = Color().actionBackgroundColor()
         scroll.setStyleSheet(f"QScrollArea {{ background: {bg}; border: none; }}")
         self._scroll = scroll
 
@@ -1447,9 +1411,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         scroll_body.setMinimumWidth(0)
 
         self._grid_host = QtWidgets.QWidget()
-        self._grid_host.setSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
-        )
+        self._grid_host.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
         self._grid_layout = QtWidgets.QGridLayout(self._grid_host)
         self._grid_layout.setSpacing(16)
         self._grid_layout.setContentsMargins(8, 4, 8, 4)
@@ -1458,9 +1420,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._props_host = QtWidgets.QWidget()
         self._props_host.setMinimumWidth(0)
-        self._props_host.setSizePolicy(
-            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum
-        )
+        self._props_host.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
         props = QtWidgets.QVBoxLayout(self._props_host)
         props.setContentsMargins(4, 0, 4, 8)
         props.setSpacing(6)
@@ -1475,8 +1435,8 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             box.setFont(font)
             c = _state_panel_colors(kind)
             panel_bg, border, title_fg = c["panel_bg"], c["border"], c["title_fg"]
-            text_fg = Color.normalColor()
-            popup_bg = Color.backgroundColor()
+            text_fg = Color().normalColor()
+            popup_bg = Color().backgroundColor()
             # Title/style fields: tinted enough to see the panel, opaque enough in light mode.
             if gremlin.shared_state.is_dark_theme:
                 field_bg = "rgba(0,0,0,0.28)"
@@ -1544,10 +1504,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         )
         if self._appearance_mode_combo.layout() is not None:
             self._appearance_mode_combo.layout().setContentsMargins(0, 0, 0, 0)
-        self._appearance_mode_combo.setToolTip(
-            "Press / Release follows the physical key hold. "
-            "GEX State uses State OFF / State ON looks from a named state."
-        )
+        self._appearance_mode_combo.setToolTip("Press / Release follows the physical key hold. GEX State uses State OFF / State ON looks from a named state.")
         driver_layout.addWidget(self._appearance_mode_combo)
         self._appearance_state_label = QtWidgets.QLabel("State")
         driver_layout.addWidget(self._appearance_state_label)
@@ -1601,7 +1558,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             edit.setFixedHeight(height)
             edit.installEventFilter(self)
             pal = edit.palette()
-            pal.setColor(QtGui.QPalette.PlaceholderText, QtGui.QColor(Color.grayColor()))
+            pal.setColor(QtGui.QPalette.PlaceholderText, QtGui.QColor(Color().grayColor()))
             edit.setPalette(pal)
 
         # --- Released column ---
@@ -1697,7 +1654,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._link_banner = QtWidgets.QFrame()
         self._link_banner.setObjectName("sdLinkBanner")
-        self._link_banner.setStyleSheet(Color.cssInfoBox())
+        self._link_banner.setStyleSheet(Color().cssInfoBox())
         link_layout = QtWidgets.QVBoxLayout(self._link_banner)
         link_layout.setContentsMargins(12, 10, 12, 10)
         link_layout.setSpacing(8)
@@ -1716,7 +1673,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._multi_banner = QtWidgets.QFrame()
         self._multi_banner.setObjectName("sdMultiBanner")
-        self._multi_banner.setStyleSheet(Color.cssInfoBox())
+        self._multi_banner.setStyleSheet(Color().cssInfoBox())
         multi_layout = QtWidgets.QVBoxLayout(self._multi_banner)
         multi_layout.setContentsMargins(12, 10, 12, 10)
         self._multi_banner_label = QtWidgets.QLabel()
@@ -1751,9 +1708,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         font_size.setValue(18)
         font_size.valueChanged.connect(lambda *_: self._apply_style_fields())
         font_color_btn = QDataPushButton("Color")
-        font_color_btn.clicked.connect(
-            lambda: self._pick_font_color(pressed=pressed)
-        )
+        font_color_btn.clicked.connect(lambda: self._pick_font_color(pressed=pressed))
         shrink_fit = QtWidgets.QCheckBox("Shrink to fit")
         shrink_fit.setChecked(True)
         shrink_fit.toggled.connect(lambda *_: self._apply_style_fields())
@@ -1852,9 +1807,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             if self._device_id and not (bridge._page_names.get(self._device_id) or {}):
                 bridge._load_page_metadata(emit=False)
                 # Sidecar may key names under a prior Elgato id — bind to this deck.
-                bridge._adopt_orphan_page_metadata(
-                    [self._device_id] if self._device_id else None
-                )
+                bridge._adopt_orphan_page_metadata([self._device_id] if self._device_id else None)
         except Exception:
             pass
         pages = bridge.list_pages(self._device_id) if self._device_id else [1]
@@ -1927,9 +1880,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 else:
                     self._grid_cols = 0
                     self._grid_rows = 0
-                    label = friendly_streamdeck_name(
-                        info.get("name"), info.get("type"), self._device_id or ""
-                    )
+                    label = friendly_streamdeck_name(info.get("name"), info.get("type"), self._device_id or "")
                     type_txt = str(dtype) if dtype is not None else "unknown"
                     msg = QtWidgets.QLabel(
                         f"<b>{label}</b> is connected, but this device type "
@@ -1942,7 +1893,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                     msg.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
                     msg.setTextFormat(QtCore.Qt.RichText)
                     msg.setMinimumWidth(420)
-                    msg.setStyleSheet(f"color: {Color.normalColor()}; padding: 12px;")
+                    msg.setStyleSheet(f"color: {Color().normalColor()}; padding: 12px;")
                     self._grid_layout.addWidget(msg, 0, 0, 1, 1, QtCore.Qt.AlignTop)
                     if Shiboken.isValid(self._grid_title):
                         self._grid_title.setText("Unsupported device")
@@ -1958,16 +1909,10 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             for r in range(rows):
                 for c in range(cols):
                     btn = StreamDeckKeyButton(r, c, kind="button", side=side)
-                    btn.clicked.connect(
-                        lambda checked=False, row=r, col=c: self._on_cell_clicked(row, col, "button")
-                    )
-                    btn.icon_dropped.connect(
-                        lambda path, row=r, col=c: self._on_icon_dropped(row, col, "button", path)
-                    )
+                    btn.clicked.connect(lambda checked=False, row=r, col=c: self._on_cell_clicked(row, col, "button"))
+                    btn.icon_dropped.connect(lambda path, row=r, col=c: self._on_icon_dropped(row, col, "button", path))
                     btn.slot_moved.connect(self._on_slot_moved)
-                    btn.context_action.connect(
-                        lambda action, row=r, col=c: self._on_context_action(action, row, col, "button")
-                    )
+                    btn.context_action.connect(lambda action, row=r, col=c: self._on_context_action(action, row, col, "button"))
                     self._grid_layout.addWidget(btn, r, c, QtCore.Qt.AlignCenter)
                     self._cells[("button", r, c)] = btn
 
@@ -1976,28 +1921,16 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 screen_w = max(72, int(side * 1.85))
                 for i in range(4):
                     screen = StreamDeckDialScreenWidget(i, width=screen_w)
-                    screen.clicked.connect(
-                        lambda col=i: self._on_cell_clicked(0, col, "dial_screen")
-                    )
-                    screen.icon_dropped.connect(
-                        lambda path, col=i: self._on_icon_dropped(0, col, "dial_screen", path)
-                    )
+                    screen.clicked.connect(lambda col=i: self._on_cell_clicked(0, col, "dial_screen"))
+                    screen.icon_dropped.connect(lambda path, col=i: self._on_icon_dropped(0, col, "dial_screen", path))
                     self._grid_layout.addWidget(screen, rows, i, QtCore.Qt.AlignCenter)
                     self._dial_screens[i] = screen
                 for i in range(4):
                     dial = StreamDeckDialWidget(i, side=side)
-                    dial.press_clicked.connect(
-                        lambda col=i: self._on_cell_clicked(0, col, "dial_press")
-                    )
-                    dial.inc_clicked.connect(
-                        lambda col=i: self._on_cell_clicked(0, col, "dial_inc")
-                    )
-                    dial.dec_clicked.connect(
-                        lambda col=i: self._on_cell_clicked(0, col, "dial_dec")
-                    )
-                    dial.context_action.connect(
-                        lambda action, col=i: self._on_context_action(action, 0, col, "dial_press")
-                    )
+                    dial.press_clicked.connect(lambda col=i: self._on_cell_clicked(0, col, "dial_press"))
+                    dial.inc_clicked.connect(lambda col=i: self._on_cell_clicked(0, col, "dial_inc"))
+                    dial.dec_clicked.connect(lambda col=i: self._on_cell_clicked(0, col, "dial_dec"))
+                    dial.context_action.connect(lambda action, col=i: self._on_context_action(action, 0, col, "dial_press"))
                     self._grid_layout.addWidget(dial, rows + 1, i, QtCore.Qt.AlignCenter)
                     self._dial_cells[i] = dial
 
@@ -2054,11 +1987,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 screen.set_width(screen_w)
 
     def eventFilter(self, obj, event):
-        if (
-            self._scroll is not None
-            and obj is self._scroll.viewport()
-            and event.type() == QtCore.QEvent.Type.Resize
-        ):
+        if self._scroll is not None and obj is self._scroll.viewport() and event.type() == QtCore.QEvent.Type.Resize:
             self._schedule_square_resize()
         elif event.type() == QtCore.QEvent.Type.FocusOut and obj in (
             getattr(self, "_title_edit", None),
@@ -2094,11 +2023,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
     def _restore_selection_highlight(self):
         kind = self._selected_kind or "button"
         dial_kinds = ("dial_press", "dial_screen", "dial_inc", "dial_dec")
-        multi = {
-            k
-            for k in getattr(self, "_multi_selection", set()) or set()
-            if isinstance(k, tuple) and len(k) == 3
-        }
+        multi = {k for k in getattr(self, "_multi_selection", set()) or set() if isinstance(k, tuple) and len(k) == 3}
         if kind in dial_kinds:
             for col, dial in list(self._dial_cells.items()):
                 if not Shiboken.isValid(dial):
@@ -2116,9 +2041,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             for col, screen in list(getattr(self, "_dial_screens", {}).items()):
                 if Shiboken.isValid(screen):
                     # Highlight LCD when editing appearance (screen) or press maps.
-                    screen.set_selected(
-                        col == self._selected_col and kind == "dial_screen"
-                    )
+                    screen.set_selected(col == self._selected_col and kind == "dial_screen")
             for btn in list(self._cells.values()):
                 if Shiboken.isValid(btn):
                     btn.setChecked(False)
@@ -2280,20 +2203,14 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if label is not None and Shiboken.isValid(label):
             extra = f" ({linked} linked)" if linked else ""
             label.setText(
-                f"{n} keys selected{extra}.\n"
-                "Ctrl+click to add or remove keys. Right-click for Link to page, "
-                "Unlink, Delete, or Paste on the whole selection."
+                f"{n} keys selected{extra}.\nCtrl+click to add or remove keys. Right-click for Link to page, Unlink, Delete, or Paste on the whole selection."
             )
         self.mapping_enabled_changed.emit(False)
         self.selection_changed.emit(None)
 
     def _button_selection_keys(self) -> list[tuple[str, int, int]]:
         """Ordered button slots in the current multi-selection (falls back to primary)."""
-        multi = [
-            k
-            for k in getattr(self, "_multi_selection", set()) or set()
-            if isinstance(k, tuple) and len(k) == 3 and k[0] == "button"
-        ]
+        multi = [k for k in getattr(self, "_multi_selection", set()) or set() if isinstance(k, tuple) and len(k) == 3 and k[0] == "button"]
         if multi:
             multi.sort(key=lambda t: (t[1], t[2]))
             return multi
@@ -2372,9 +2289,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if len(keys) > 1:
             self._show_multi_selection_ui()
         else:
-            self._on_cell_clicked(
-                self._selected_row, self._selected_col, self._selected_kind or "button"
-            )
+            self._on_cell_clicked(self._selected_row, self._selected_col, self._selected_kind or "button")
         self._refresh_cell_contents()
         bridge = self._bridge()
         if bridge.get_active_page(self._device_id) == self._edit_page:
@@ -2444,11 +2359,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         items = self._items_for_keys(keys, create=True)
         if not items:
             return
-        to_change = [
-            i
-            for i in items
-            if getattr(i, "linked_page", 0) != target_page or self._item_has_local_content(i)
-        ]
+        to_change = [i for i in items if getattr(i, "linked_page", 0) != target_page or self._item_has_local_content(i)]
         if not to_change:
             return
         if any(self._item_has_local_content(i) for i in to_change):
@@ -2542,18 +2453,10 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 use_pressed = preview_pressed and not foreign and not linked_page
                 if linked_page and display is not None:
                     use_pressed = preview_pressed and not foreign
-                has = (
-                    (not linked_page)
-                    and self._item_has_mappings(item)
-                    and not foreign
-                )
+                has = (not linked_page) and self._item_has_mappings(item) and not foreign
                 if linked_page and display is not None:
                     has = self._item_has_mappings(display) and not foreign
-                pm = (
-                    _pixmap_from_item(display, pressed=use_pressed)
-                    if display is not None
-                    else QtGui.QPixmap()
-                )
+                pm = _pixmap_from_item(display, pressed=use_pressed) if display is not None else QtGui.QPixmap()
                 lines = text_lines_for_item(display, pressed=use_pressed) if display is not None else []
                 label = (lines[0] if lines else "").strip()
                 if not label and pm.isNull():
@@ -2900,38 +2803,26 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         title_p = getattr(self, "_title_pressed_edit", None)
         if title_p is not None and Shiboken.isValid(title_p):
             title_p.setPlaceholderText(
-                "State ON title — up to 3 lines (blank = use State OFF)"
-                if use_state
-                else "Pressed title — up to 3 lines (blank = use released)"
+                "State ON title — up to 3 lines (blank = use State OFF)" if use_state else "Pressed title — up to 3 lines (blank = use released)"
             )
 
         preview_rel = getattr(self, "_preview_released_btn", None)
         preview_prs = getattr(self, "_preview_pressed_btn", None)
         if preview_rel is not None and Shiboken.isValid(preview_rel):
             preview_rel.setText("State OFF" if use_state else "Released")
-            preview_rel.setToolTip(
-                "Show State OFF appearance on the grid" if use_state else "Show released (idle) appearance on the grid"
-            )
+            preview_rel.setToolTip("Show State OFF appearance on the grid" if use_state else "Show released (idle) appearance on the grid")
             preview_rel.setMinimumWidth(80 if use_state else 72)
         if preview_prs is not None and Shiboken.isValid(preview_prs):
             preview_prs.setText("State ON" if use_state else "Pressed")
-            preview_prs.setToolTip(
-                "Show State ON appearance on the grid" if use_state else "Show pressed appearance on the grid"
-            )
+            preview_prs.setToolTip("Show State ON appearance on the grid" if use_state else "Show pressed appearance on the grid")
             preview_prs.setMinimumWidth(72 if use_state else 64)
 
         icon = getattr(self, "_icon_preview", None)
         if icon is not None and Shiboken.isValid(icon):
-            icon.setToolTip(
-                "State OFF icon — drop image or click to choose"
-                if use_state
-                else "Released (unpressed) icon — drop image or click to choose"
-            )
+            icon.setToolTip("State OFF icon — drop image or click to choose" if use_state else "Released (unpressed) icon — drop image or click to choose")
         icon_p = getattr(self, "_pressed_preview", None)
         if icon_p is not None and Shiboken.isValid(icon_p):
-            icon_p.setToolTip(
-                "State ON icon — drop image or click to choose" if use_state else "Pressed icon — drop image or click to choose"
-            )
+            icon_p.setToolTip("State ON icon — drop image or click to choose" if use_state else "Pressed icon — drop image or click to choose")
         bg = getattr(self, "_bg_swatch", None)
         if bg is not None and Shiboken.isValid(bg):
             bg.setToolTip("State OFF background color" if use_state else "Released background color")
@@ -3163,9 +3054,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         item = self._selected_item()
         if item is None:
             return
-        look_only = self._slot_is_foreign(
-            self._selected_row, self._selected_col, self._selected_kind or "button"
-        )
+        look_only = self._slot_is_foreign(self._selected_row, self._selected_col, self._selected_kind or "button")
         if look_only:
             # Other-plugin keys: persist background only; icon is set via browse/drop.
             item.bg_color = getattr(self, "_bg_color", "") or ""
@@ -3174,9 +3063,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             if bridge.get_active_page(self._device_id) == self._edit_page:
                 bridge.paint_active_page(self._device_id)
             return
-        self._apply_title_lines_to_item(
-            item, getattr(self, "_title_edit", None), ("title", "text_line2", "text_line3")
-        )
+        self._apply_title_lines_to_item(item, getattr(self, "_title_edit", None), ("title", "text_line2", "text_line3"))
         self._apply_title_lines_to_item(
             item,
             getattr(self, "_title_pressed_edit", None),
@@ -3199,9 +3086,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
     def _pick_font_color(self, pressed: bool = False):
         key = "_font_color_p" if pressed else "_font_color"
-        color = QtWidgets.QColorDialog.getColor(
-            QtGui.QColor(getattr(self, key, "#ffffff")), self, "Text color"
-        )
+        color = QtWidgets.QColorDialog.getColor(QtGui.QColor(getattr(self, key, "#ffffff")), self, "Text color")
         if color.isValid():
             setattr(self, key, color.name())
             self._update_color_button_styles()
@@ -3232,11 +3117,19 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             return
         bridge = self._bridge()
         src_item = bridge.ensure_slot_input(
-            self._device_id, self._edit_page, kind=sk, row=sr, column=sc,
+            self._device_id,
+            self._edit_page,
+            kind=sk,
+            row=sr,
+            column=sc,
             button_id=str(sc) if sk != "button" else "",
         )
         dst_item = bridge.ensure_slot_input(
-            self._device_id, self._edit_page, kind=dk, row=dr, column=dc,
+            self._device_id,
+            self._edit_page,
+            kind=dk,
+            row=dr,
+            column=dc,
             button_id=str(dc) if dk != "button" else "",
         )
         if src_item is None or dst_item is None:
@@ -3324,9 +3217,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if action == "copy" and item is not None:
             # Copy always uses the right-clicked / primary key.
             snap = item.style_snapshot()
-            snap[_CLIPBOARD_CONTAINERS_KEY] = (
-                None if look_only else _containers_xml_snapshot(item)
-            )
+            snap[_CLIPBOARD_CONTAINERS_KEY] = None if look_only else _containers_xml_snapshot(item)
             _button_clipboard = snap
         elif action == "paste":
             if _button_clipboard is None:
@@ -3487,8 +3378,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.information(
                 self,
                 "Linked key",
-                f"This key is linked to page {item.linked_page}.\n"
-                f"Change the icon on that page instead.",
+                f"This key is linked to page {item.linked_page}.\nChange the icon on that page instead.",
             )
             return
         self._apply_icon_path(item, path)

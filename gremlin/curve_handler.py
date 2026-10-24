@@ -935,10 +935,14 @@ class CurveGraphicsView(QtWidgets.QGraphicsView):
         self.setRenderHint(QtGui.QPainter.Antialiasing)
         # Include the tracker/point radii and their outlines at the endpoints.
         padding = 8.0
-        self.setSceneRect(QtCore.QRectF(
-            -g_scene_size - padding, -g_scene_size - padding,
-            2 * (g_scene_size + padding), 2 * (g_scene_size + padding),
-        ))
+        self.setSceneRect(
+            QtCore.QRectF(
+                -g_scene_size - padding,
+                -g_scene_size - padding,
+                2 * (g_scene_size + padding),
+                2 * (g_scene_size + padding),
+            )
+        )
 
     def sizeHint(self):
         return QtCore.QSize(510, 510)
@@ -1275,7 +1279,7 @@ class CurveView(QtWidgets.QGraphicsScene):
                 path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
             self.addPath(
                 path,
-                QtGui.QPen(QtGui.QColor(gremlin.ui.ui_common.Color.selectColor()), 4),
+                QtGui.QPen(QtGui.QColor(gremlin.ui.ui_common.Color().selectColor()), 4),
             )
 
             # update the tracking item
@@ -1778,7 +1782,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.container_curve_widget = QtWidgets.QFrame()
 
-        background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
+        background_color = gremlin.ui.ui_common.Color().actionBackgroundColor()
         self.container_curve_widget.setStyleSheet(f".QFrame{{background-color: {background_color}; border-radius: 10px;}}")
         self.container_curve_layout = QtWidgets.QHBoxLayout(self.container_curve_widget)
 

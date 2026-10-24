@@ -726,7 +726,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             name = vjoy.vjoy.Hat.direction_to_name[position]
             icon = vjoy.vjoy.Hat.direction_to_icon[position]
             lbl = gremlin.ui.ui_common.QIconLabel(
-                icon_path=icon, text=f"{name}:", use_wrap=False, icon_color=QtGui.QColor(gremlin.ui.ui_common.Color.activeColor()), icon_size=32, use_qta=True
+                icon_path=icon, text=f"{name}:", use_wrap=False, icon_color=QtGui.QColor(gremlin.ui.ui_common.Color().activeColor()), icon_size=32, use_qta=True
             )
 
             lbl.setIcon(icon)

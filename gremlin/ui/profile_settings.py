@@ -102,7 +102,7 @@ class ProfileSettingsWidget(QDataWidget):
         gremlin.util.InvokeUiMethod(self._refresh_ui, emit)  # UI thread
 
     @QtCore.Slot(int, bool)
-    def vjoy_as_input_changed(self, vjoy_map : dict[int, bool]):
+    def vjoy_as_input_changed(self, vjoy_map: dict[int, bool]):
         """ask the UI to add a new tab for the vjoy device that was enabled"""
         vid_list = [vid for vid, enabled in vjoy_map.items() if enabled]
         for vid in vid_list:
@@ -172,7 +172,6 @@ class ProfileSettingsWidget(QDataWidget):
         self.scroll_layout.addWidget(container)
 
         self.scroll_layout.addStretch(1)
-
 
 
 class DefaultDelay(QtWidgets.QWidget):
@@ -277,7 +276,7 @@ class VjoyDefaultsDialog(gremlin.ui.ui_common.QRememberDialog):
         self.ok_widget = QDataPushButton("Ok", callback=self._ok_button_cb)
         self.cancel_widget = QDataPushButton("Cancel", callback=self._cancel_button_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer(["||",self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
+        widget = gremlin.ui.ui_common.getHContainer(["||", self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
 
         main_layout.addWidget(widget)
 
@@ -368,11 +367,11 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
         # helper commands
 
-        enabled_widget = QDataPushButton("All Enabled", callback = self._all_enabled, tooltip="Sets all axes to enabled")
-        disabled_widget = QDataPushButton("All Disabled", callback = self._all_disabled, tooltip="Sets all axes to disabled")
-        min_widget = QDataPushButton("All Min", callback = self._all_min, tooltip="Sets all axes to minimum")
-        max_widget = QDataPushButton("All Max", callback = self._all_max, tooltip="Sets all axes to maximum")
-        zero_widget = QDataPushButton("All Center", callback = self._all_zero, tooltip="Sets all axes to center")
+        enabled_widget = QDataPushButton("All Enabled", callback=self._all_enabled, tooltip="Sets all axes to enabled")
+        disabled_widget = QDataPushButton("All Disabled", callback=self._all_disabled, tooltip="Sets all axes to disabled")
+        min_widget = QDataPushButton("All Min", callback=self._all_min, tooltip="Sets all axes to minimum")
+        max_widget = QDataPushButton("All Max", callback=self._all_max, tooltip="Sets all axes to maximum")
+        zero_widget = QDataPushButton("All Center", callback=self._all_zero, tooltip="Sets all axes to center")
 
         widgets = [enabled_widget, disabled_widget, " ", min_widget, zero_widget, max_widget]
 
@@ -482,7 +481,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             axis_name = self.device.get_axis_name(input_id)
             self.grid_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
             # frame = gremlin.ui.ui_common.QBoxFrame()
-            # frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color.selectColor()};")
+            # frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color().selectColor()};")
             # frame.setLayout(QtWidgets.QHBoxLayout())
 
             value = self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id)
@@ -637,7 +636,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         self.settings = profile_settings
 
         self.setTitle("vJoy as Input")
-        self._vjoy_widgets= {}  # map of vjoy IDs to their corresponding widgets
+        self._vjoy_widgets = {}  # map of vjoy IDs to their corresponding widgets
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.vjoy_layout = QtWidgets.QVBoxLayout()
 
@@ -656,7 +655,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
             widget.setReadOnly(True)  # make readonly - use the dialog to change vjoy as input
             widget.setEnabled(enabled)
             if enabled:
-                settings = QDataPushButton("...", tooltip=f"Configure vJoy {dev.vjoy_id} settings", data = dev, callback=self._edit_dialog)
+                settings = QDataPushButton("...", tooltip=f"Configure vJoy {dev.vjoy_id} settings", data=dev, callback=self._edit_dialog)
                 self.vjoy_layout.addWidget(getHContainer([widget, settings], widget_only=True))
             else:
                 self.vjoy_layout.addWidget(widget)
@@ -665,14 +664,14 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         dialog_button = gremlin.ui.ui_common.QDataPushButton(
             "Configure...", tooltip="Select which vJoy devices can be used as input in this profile.", callback=self._open_dialog
         )
-        self.vjoy_layout.addWidget(getHContainer([dialog_button,"||"], widget_only=True))
+        self.vjoy_layout.addWidget(getHContainer([dialog_button, "||"], widget_only=True))
 
         self.main_layout.addLayout(self.vjoy_layout)
 
         self.main_layout.addStretch()
 
     def _edit_dialog(self, widget, device):
-        """ startup options for a given device """
+        """startup options for a given device"""
         self.dialog = VjoyDefaultsDialog(device, self.settings)
         self.dialog.exec()
 
@@ -680,7 +679,6 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         self._dialog = gremlin.input_item.VJoyAsInputDialog(self.settings, parent=self)
         self._dialog.accepted.connect(self._accepted)
         self._dialog.exec()
-
 
     def _accepted(self):
         vjoy_map = self._dialog.vjoy_map
@@ -705,10 +703,8 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
             el = gremlin.event_handler.EventListener()
             el.vjoy_as_input_changed.emit()
 
-
     @QtCore.Slot(bool)
     def _state_changed(self, widget, checked: bool):
         vid: int = widget.data
         self.settings.setVjoyAsInput(vid, checked)
         self.changed.emit(vid, checked)
-

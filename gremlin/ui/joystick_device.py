@@ -43,7 +43,6 @@ from gremlin.util import parse_bool, safe_read, safe_format, parse_guid, write_g
 from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction, AbstractCondition
 
 
-
 syslog = logging.getLogger("system")
 
 # Prevent stacked Curve Editor dialogs when multiple device tabs still hold
@@ -57,9 +56,9 @@ class BaseJoystickCondition(BaseAbstractCondition):
     This condition is based on the state of a joystick axis, button, or hat.
     """
 
-    def __init__(self, extra_data: dict = None, target : AbstractContainer | AbstractAction = None):
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance."""
-        super().__init__(extra_data, target = target)
+        super().__init__(extra_data, target=target)
         self.device_guid = 0  # use this as the invalid GUID
         self.input_type = None
         self.input_id = 0
@@ -149,11 +148,7 @@ class BaseJoystickCondition(BaseAbstractCondition):
 class JoystickConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a joystick based condition."""
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
 
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.input_event = None
@@ -379,7 +374,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.grab_high_widget.setIcon(
             load_icon(
                 "mdi.checkbox-blank-circle",
-                qta_color=gremlin.ui.ui_common.Color.recordColor(),
+                qta_color=gremlin.ui.ui_common.Color().recordColor(),
             )
         )
         self.grab_high_widget.setMaximumWidth(20)
@@ -398,7 +393,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.range_status_widget = gremlin.ui.ui_common.QIconLabel()
         self.range_status_widget.setIcon(
             "mdi.checkbox-marked-outline",
-            color=gremlin.ui.ui_common.Color.activeColor(),
+            color=gremlin.ui.ui_common.Color().activeColor(),
         )
 
         range_layout = QtWidgets.QHBoxLayout()
@@ -935,7 +930,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             model._update_filter()
 
-    def _filter_data(self, input_item: InputItem, filter : str):
+    def _filter_data(self, input_item: InputItem, filter: str):
         """custom filter handled - true if the item is included in the list, false if not"""
         profile = gremlin.shared_state.current_profile
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
@@ -956,7 +951,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.update_stats_display(refresh=True)
 
-    def _handle_model_changed(self, data, force : bool = False):
+    def _handle_model_changed(self, data, force: bool = False):
         """called when the input model changes to update the display of stats and filter status"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -1134,8 +1129,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._device_label_widget = None
         self.last_event = None
 
-
-
         super()._cleanup_ui()
 
         el = gremlin.event_handler.EventListener()
@@ -1152,10 +1145,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 signal.disconnect(slot)
             except (RuntimeError, TypeError):
                 pass
-
-
-
-
 
     def _edit_curve_item_cb(self, index: int, input_item: InputItem):
         gremlin.util.InvokeUiMethod(self._edit_curve_item_ui, index, input_item)
@@ -1477,7 +1466,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             stats_container = gremlin.ui.ui_common.getHContainer(container, widget_only=True)
             self.main_layout.addWidget(stats_container)
 
-            css = gremlin.ui.ui_common.Color.cssButtonState()
+            css = gremlin.ui.ui_common.Color().cssButtonState()
 
             data = []
             if device.axis_count:
