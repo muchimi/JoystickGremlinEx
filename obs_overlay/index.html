@@ -1,0 +1,1154 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/obs_overlay/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Overlay - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#overlay" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overlay
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../actions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ktts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI and DevOps
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ktts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI and DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#enable-it-on-a-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable it on a profile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#background-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Background modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chroma-image-obs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chroma / image (OBS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on-screen-hud" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On-screen HUD
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discord-application-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discord / application share
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interactive-touch-vjoy-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactive (touch → vJoy / states)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profile-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profile start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#designer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Designer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bindings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ocr-widgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCR widgets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="overlay">Overlay<a class="headerlink" href="#overlay" title="Permanent link">¶</a></h1>
+<p>The Overlay tab draws live physical, vJoy, and GEX state inputs on either a chromakey (or image) window for OBS, or a transparent on-screen HUD. It replaces a Touch OSC + OSC round-trip when you only need a joystick overlay.</p>
+<h2 id="enable-it-on-a-profile">Enable it on a profile<a class="headerlink" href="#enable-it-on-a-profile" title="Permanent link">¶</a></h2>
+<p>Open the <strong>Overlay</strong> tab (next to Settings and Plugins). Each GEX profile has its own overlay; switching profiles loads that profile’s layout. The tab title shows the active profile name.</p>
+<p>Layouts are stored in the profile companion JSON (<code>&lt;profile&gt;.json</code>, key <code>obs_overlay</code>) next to the profile XML. Saving the GEX profile (including Save As into another folder) writes the overlay into that same file. <strong>Export overlay...</strong> copies the current layout to a JSON file you choose. <strong>Import overlay...</strong> replaces this profile’s overlay with a JSON file.</p>
+<p>A user plugin is <strong>not</strong> required. <a href="../user_plugins/obs_overlay.py"><code>user_plugins/obs_overlay.py</code></a> only adds a Plugins-tab button that jumps to Overlay.</p>
+<h2 id="pages">Pages<a class="headerlink" href="#pages" title="Permanent link">¶</a></h2>
+<p>The Overlay tab can hold several independent <strong>pages</strong> (sub-tabs under the toolbar). Each page has its own widgets, background, Interactive flag, and live window.</p>
+<ul>
+<li><strong>Add</strong> with the <strong>+</strong> button. <strong>Rename</strong> by double-clicking a tab (or Canvas → <strong>Name</strong>). Right-click a tab to <strong>Duplicate</strong> or <strong>Delete</strong> (at least one page remains).</li>
+<li><strong>Show overlay</strong> and <strong>Interactive</strong> on the toolbar apply only to the <strong>selected</strong> page. Other pages keep their own windows and Interactive setting. <strong>Hide overlay</strong> closes that page’s window.</li>
+<li><strong>Visible</strong> (Canvas, when nothing is selected) closes this page’s live window when unchecked. Per-page <strong>Toggle overlay</strong> and <strong>Show at profile start</strong> can still open other pages.</li>
+<li>Designer edits one page at a time (the active tab). Widgets do not drag between tabs; Duplicate page copies the layout.</li>
+<li>Older layouts load as a single tab named <strong>Overlay</strong>.</li>
+</ul>
+<h2 id="background-modes">Background modes<a class="headerlink" href="#background-modes" title="Permanent link">¶</a></h2>
+<h3 id="chroma-image-obs">Chroma / image (OBS)<a class="headerlink" href="#chroma-image-obs" title="Permanent link">¶</a></h3>
+<ol>
+<li>Set <strong>Background</strong> to <strong>chroma</strong> or <strong>image</strong>.</li>
+<li>Click <strong>Show overlay</strong>. That opens the selected page’s window, titled <code>GEX Overlay — {page name}</code> (for example <code>GEX Overlay — HUD</code>). Switch tabs and click Show overlay again to open another page.</li>
+<li>In OBS, add a <strong>Window Capture</strong> source for that title.</li>
+<li>For chroma, add a <strong>Chroma Key</strong> filter. The default key color is <code>#00FF00</code>. Set the color’s <strong>alpha to 0</strong> if you want the overlay itself to be transparent so the desktop shows through. That live window is frameless (use the drag bar to move it). The designer canvas shows a checkerboard. OBS window capture still needs an opaque chroma color.</li>
+<li>Hide the overlay drag bar (right-click the overlay, or uncheck <strong>Overlay drag bar</strong>) before going live.</li>
+</ol>
+<p>A background <strong>image</strong> can be used instead of chroma if you want a static HUD plate.</p>
+<p>Chroma/image windows remember their <strong>screen position</strong>. <strong>Reset position</strong> (Canvas) clears the saved coordinates and recenters the window. The same reset runs automatically if the saved monitor is gone. On-screen pages cover a chosen monitor instead; Reset position falls back to the primary display.</p>
+<h3 id="on-screen-hud">On-screen HUD<a class="headerlink" href="#on-screen-hud" title="Permanent link">¶</a></h3>
+<ol>
+<li>Set <strong>Background</strong> to <strong>on-screen</strong>.</li>
+<li>Pick the <strong>Monitor</strong>. The canvas width and height update to that monitor’s resolution.</li>
+<li>Click <strong>Show overlay</strong> (or enable <strong>Show at profile start</strong>). The overlay covers that monitor and stays on top. With <strong>Interactive</strong> off it is click-through so games keep mouse and keyboard focus. With <strong>Interactive</strong> on it captures touch on that screen.</li>
+</ol>
+<p>Use <strong>Hide overlay</strong> on the Overlay tab to close the selected page’s on-screen HUD.</p>
+<h3 id="discord-application-share">Discord / application share<a class="headerlink" href="#discord-application-share" title="Permanent link">¶</a></h3>
+<p>A separate overlay window is composed into a <strong>screen</strong> share, but Discord <strong>application</strong> share only captures that one program. Enable <strong>Include in app share</strong> on Canvas and pick the game (or other) window, then share that same application in Discord. GEX parents the live overlay into that window so window capture can see it.</p>
+<p>This is best-effort: use <strong>windowed or borderless</strong>. Exclusive full-screen and many DirectX/Vulkan game captures still omit a foreign overlay. If the game is not running, the overlay stays a normal window (screen share still works). OBS window capture of the GEX overlay is unchanged.</p>
+<h2 id="interactive-touch-vjoy-states">Interactive (touch → vJoy / states)<a class="headerlink" href="#interactive-touch-vjoy-states" title="Permanent link">¶</a></h2>
+<p>Check <strong>Interactive</strong> on the Overlay toolbar (or Canvas when nothing is selected). It applies to the selected page only. Touch or click a widget on that page’s live overlay window — not the designer canvas, and not an OBS preview. Physical device bindings stay display-only.</p>
+<ul>
+<li><strong>vJoy button:</strong> held while pressed, released on lift.</li>
+<li><strong>State button:</strong> tap inverts the state.</li>
+<li><strong>Mode button:</strong> tap switches to that mode; tap again leaves it (previous / Default).</li>
+<li><strong>4-way switch:</strong> press a direction; lift returns to center (and the Center button if bound).</li>
+<li><strong>2-way toggle:</strong> tap a side; it stays until you tap the other side.</li>
+<li><strong>3-way switch:</strong> press an end; lift returns to center.</li>
+<li><strong>Sticks / radar / circular / hat:</strong> drag; lift returns to center.</li>
+<li><strong>Bar / fader / radio / radial / encoder:</strong> drag; lift keeps the value.</li>
+<li>Multi-touch is supported (one finger per widget). Empty space is click-through so the desktop or game keeps the mouse.</li>
+</ul>
+<p>vJoy writes go straight to that device; the profile does not have to be running. Hide overlay to release any held vJoy buttons.</p>
+<h2 id="profile-start">Profile start<a class="headerlink" href="#profile-start" title="Permanent link">¶</a></h2>
+<p>Check <strong>Show at profile start</strong> on a page (Canvas). Activating the profile opens that page automatically if <strong>Visible</strong> is also on, and hides live windows when the profile stops.</p>
+<p><strong>Toggle overlay</strong> (Canvas) is per page: assign a physical, vJoy, GEX state, <strong>mode</strong>, or <strong>keyboard/mouse</strong> the same way widget bindings do. Keyboard/mouse uses the Map to Keyboard/Mouse Ex layout: the current combination is shown in the inspector; <strong>Select...</strong> opens the virtual keyboard popup, and <strong>Listen</strong> / <strong>Listen (multi)</strong> capture keys or mouse buttons. A physical, vJoy, or keyboard/mouse <strong>press</strong> shows or hides <strong>that page’s</strong> window. A <strong>state</strong> or <strong>mode</strong> assignment follows the value instead: the window is shown while the state is pressed / that mode is active, and hidden when it is not. This works whether or not Show at profile start is on.</p>
+<h2 id="designer">Designer<a class="headerlink" href="#designer" title="Permanent link">¶</a></h2>
+<ul>
+<li><strong>Palette:</strong> click to add a widget at the center of the current canvas view. If a widget is already selected, the click changes it to this type and keeps compatible settings (geometry, colors, fonts, and bindings when they still apply).</li>
+<li><strong>Templates:</strong> dual-stick HUD, Xbox-style gamepad, throttle pair. Saved templates live globally under the GEX data folder (<code>overlay_templates/</code>), not in the profile. Use <strong>+</strong> next to <strong>Saved templates</strong> to store the current widgets. An empty canvas is the default for a new profile. Built-in templates are click-to-apply only. Right-click a <strong>saved</strong> template to overwrite it with the current widgets and properties, or to delete it.</li>
+<li>Drag, resize, snap-to-grid, Shift+click multi-select. Hold the <strong>middle mouse button</strong> to pan the designer canvas. Hold <strong>Shift</strong> while resizing to keep the aspect ratio (widgets and groups). Right-click selected widgets to duplicate, <strong>copy/paste properties</strong> (position, size, visibility, label, appearance), delete, bring forward, send backward, group, or ungroup. A grouped (or multi-selected) set resizes together from the dashed bounding-box handles. Delete, Ctrl+D, Ctrl+G / Ctrl+Shift+G, Ctrl+Z, and arrow-key nudge still work. After a widget snaps to a guide, further arrow keys move it off the guide instead of sticking. Widgets that sit outside a smaller canvas (after a resize or leaving on-screen mode) stay visible in the dark overflow area and can be dragged back; the live overlay still only shows what is on the canvas. The <strong>Hints</strong> banner at the top of the canvas lists the mouse and key actions that apply to the current selection (or the canvas when nothing is selected). Uncheck <strong>Hints</strong> on the toolbar, or close the banner, to hide it. <strong>Selection pane</strong> (toolbar, off by default) lists widgets on this page: sort by <strong>Name</strong> or <strong>Type</strong>, click the eye to show/hide, the lock to freeze position, a row to select and center the canvas, and Group / Ungroup for a multi-selection.</li>
+<li>Inspector <strong>Geometry</strong> includes <strong>Name</strong> (selection pane), <strong>Lock position</strong>, and <strong>Scale font with size</strong>. <strong>Visibility</strong> (right pane) has the master <strong>Visible</strong> checkbox plus live conditions: mode, GEX state, physical button, vJoy button, or <strong>keyboard/mouse</strong>. Each condition is assigned a letter (A, B, C…). Type a boolean <strong>Expression</strong> such as <code>A AND (B OR C)</code> or <code>A XOR B</code> (AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses). Leave the expression empty to require every condition (AND). <strong>Preview</strong> opens a Venn diagram (up to three inputs), the boolean algebra, a truth table, and a legend of what A/B/C refer to. <strong>Boolean operators</strong> shows AND, OR, XOR, NAND, NOR, XNOR, and NOT with gate symbols, Venn diagrams, algebra, and truth tables. Keyboard/mouse rows use the same combination picker as Map to Keyboard/Mouse Ex (<strong>Select...</strong> opens the popup). Incomplete rows are ignored. The live overlay hides the widget; the designer keeps a faded copy so you can still edit it. Hidden widgets also appear as a dashed outline in the designer. Appearance puts <strong>Opacity</strong> (percent slider) above fill color, then widget-specific fill/dot controls. A fill with <strong>alpha 0</strong> draws outline only (the border stays visible). <strong>Blinking</strong> is off until you check a trigger (Off→On, On→Off, While on, While off, and/or a GEX state). Frequency is in Hz. Permanent keeps blinking while the condition holds; Temporary blinks for the chosen duration after a trigger. While blinking, the widget swaps Off and On appearance. <strong>Grid</strong>, <strong>Crosshairs</strong>, <strong>Axis</strong> (N/S/E/W labels, distance, font), and <strong>Border</strong> (color, width, corner radius) are separate groups. Grids reach the widget border; <strong>Fade at border</strong> tapers them toward the edge.</li>
+<li><strong>Shape</strong> replaces Panel: rectangle, circle, triangle, diamond, line, freeform, or a <strong>custom</strong> shape you saved. Freeform points are added by double-clicking the outline; drag a point, then drag its yellow handles to Bézier-curve that corner. Hold <strong>Ctrl</strong> while dragging a handle to snap it to 15° steps. Dragging a handle (or point) past the widget edge grows the bounding box so the curve stays inside. Uncheck <strong>Closed</strong> for an open path. Right-click a shape to <strong>Turn into button</strong> (same outline, bind and press like a button) or <strong>Save as custom shape</strong> (adds it to the Shape list for this machine, stored as <code>overlay_custom_shapes.json</code> in the GEX data folder).</li>
+<li><strong>Image</strong> is a separate palette widget. Browse to a PNG, WebP, GIF, JPEG, or BMP. Formats with an alpha channel keep their transparency; Fill is only a backdrop behind those pixels. <strong>Keep aspect ratio</strong> (on by default) fits the picture in the widget instead of stretching it. Right-click an image to <strong>Turn into button</strong> (no label, the picture is the released/off background) or <strong>Turn into paddle</strong> (the picture rotates around its center).</li>
+<li><strong>Application</strong> shows a live picture of a running window. Pick it from the inspector list (Refresh windows if it was started later). The choice is stored by window title and process name so it can reconnect after a restart. This widget has no joystick binding.</li>
+<li><strong>Stream Deck</strong> mirrors a connected Elgato deck: pick the device (or First connected), optionally follow the hardware GEX page, and the overlay draws that deck’s keys with the same art as the Stream Deck designer. Stream Deck + also shows the LCD row and dials. <strong>Fit to device</strong> sizes the widget to that layout. This widget has no joystick binding.</li>
+<li>Inspector: size, <strong>Rotation</strong> (−180° to 180°, clockwise), visibility conditions, colors, fonts (family, size, bold/italic/underline/strikethrough, shadow offset and color, stroke width and color), line/dot sizes, labels (including fill and border), invert, deadzone, blinking, and binding. Drag the round handle above a selected widget to rotate it; hold Shift to snap to 15°. Selecting a <strong>group</strong> (or multiple widgets) shows only shared properties; edits apply to every selected widget. With <strong>Scale font with size</strong> on, Font size shows the size currently drawn and updates while you resize the widget.</li>
+<li><strong>Guides</strong> (Canvas): add vertical and/or horizontal lines, set a color, drag them on the canvas, or type a percent of width/height. Moving or resizing a widget snaps its left/right/center (or top/bottom/center) to nearby guides. Nudging with the arrow keys can snap onto a guide, then a further nudge moves away instead of sticking.</li>
+<li><strong>Color palettes</strong> sit at the top of Appearance as two rows: built-in defaults (click to apply) and user palettes. They are per widget type and stored globally (<code>overlay_color_palettes.json</code> in the GEX data folder), not in the profile. <strong>+</strong> saves the current colors as a user square. Right-click a user square to overwrite it or delete it. Default palettes cannot be changed. Transparent fills show as a square with a cross. Built-in squares: default, Touch OSC (red), transparent green.</li>
+</ul>
+<p>Widget mapping (Touch OSC-style names in the palette):</p>
+<table>
+<thead>
+<tr>
+<th>Palette</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Button</td>
+<td>Momentary / state / mode / keyboard button</td>
+</tr>
+<tr>
+<td>Hat</td>
+<td>POV hat (4- or 8-way)</td>
+</tr>
+<tr>
+<td>4-way switch</td>
+<td>Hat that reports as five buttons: N, E, S, W, and optional center</td>
+</tr>
+<tr>
+<td>2-way toggle</td>
+<td>Two-position switch; each end is a button</td>
+</tr>
+<tr>
+<td>3-way switch</td>
+<td>Three-position switch with a spring-loaded center</td>
+</tr>
+<tr>
+<td>Bar</td>
+<td>1D pad with a moving dot (horizontal or vertical), same language as the X/Y square; N/S labels when vertical, E/W when horizontal</td>
+</tr>
+<tr>
+<td>Radio</td>
+<td>Stepped cells along one axis</td>
+</tr>
+<tr>
+<td>Fader</td>
+<td>Ladder track, fill below the thumb, and a sliding thumb</td>
+</tr>
+<tr>
+<td>Radial</td>
+<td>270° arc with ticks</td>
+</tr>
+<tr>
+<td>Encoder</td>
+<td>Full donut with ticks and one moving highlighted wedge</td>
+</tr>
+<tr>
+<td>Temporal graph</td>
+<td>One or more physical / vJoy axes over time (Input Viewer–style). Add or remove datasets, set period, min/max, and unit</td>
+</tr>
+<tr>
+<td>Bar graph</td>
+<td>One or more physical / vJoy axes as moving bars. Horizontal or vertical. Auto range is −100…+100 if any axis is centered, otherwise 0…100. Per-axis color and range</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td>One or more live stats in the same widget, each with its own color: time, in-game FPS, CPU, GPU, memory, temperatures, or a keybind tally</td>
+</tr>
+<tr>
+<td>Stopwatch</td>
+<td>Digital mm:ss / hh:mm:ss or analog watch. Bind start/stop and optional reset. Analog hour/minute/second needles have color, width, and arrow</td>
+</tr>
+<tr>
+<td>Keyboard / Mouse</td>
+<td>Live key and mouse-button overlay. Presets (WASD + mouse, full keyboard, mouse only) or pick keys on the virtual keyboard. Separate mouse silhouette / button-map graphics</td>
+</tr>
+<tr>
+<td>X/Y</td>
+<td>2D square pad; optional lines through the dot, circle/square dot, shadow</td>
+</tr>
+<tr>
+<td>Radar</td>
+<td>Concentric rings, a beam from the center, and a circle through the current position; optional 15/30/45° angle lines</td>
+</tr>
+<tr>
+<td>Circular</td>
+<td>Round 2D pad; optional angle lines</td>
+</tr>
+<tr>
+<td>Mouse</td>
+<td>Live mouse: <strong>VJoy</strong> draws an arrow from rest (length = displacement, <strong>Max displacement</strong> sets full scale); <strong>Standard</strong> shows a top-down mouse that recenters after idle</td>
+</tr>
+<tr>
+<td>Shape</td>
+<td>Rectangle, circle, triangle, diamond, line, freeform Bézier path, or a saved custom shape</td>
+</tr>
+<tr>
+<td>Image</td>
+<td>Custom picture; PNG/WebP/GIF keep transparency. Paste a Windows Snipping Tool screenshot with Ctrl+V, right-click <strong>Paste image</strong>, or inspector <strong>Paste</strong>. Right-click <strong>Turn into button</strong> / <strong>Turn into paddle</strong></td>
+</tr>
+<tr>
+<td>Application</td>
+<td>Live capture of a running local window. Inspector lists visible applications</td>
+</tr>
+<tr>
+<td>Stream Deck</td>
+<td>Live preview of a connected Elgato Stream Deck</td>
+</tr>
+</tbody>
+</table>
+<h2 id="bindings">Bindings<a class="headerlink" href="#bindings" title="Permanent link">¶</a></h2>
+<p>Each widget (except labels, shapes, images, Application widgets, Stream Deck widgets, <strong>Mouse</strong> widgets, <strong>Temporal graph</strong> widgets, <strong>Bar graph</strong> widgets, <strong>Counter</strong> widgets, and <strong>Keyboard / Mouse</strong> widgets) can bind to:</p>
+<ul>
+<li>a <strong>physical</strong> device axis, button, or hat (use <strong>Listen...</strong> or pick from the lists)</li>
+<li>a <strong>vJoy</strong> axis, button, or hat</li>
+<li>a named GEX <strong>state</strong></li>
+<li>a GEX <strong>mode</strong> (buttons and Stopwatch): the button uses Pressed fill while that mode is current (unless <strong>Appearance from</strong> is set to a GEX state); a Stopwatch runs while that mode is current</li>
+<li>a <strong>keyboard/mouse</strong> combination (buttons, Toggle overlay, Stopwatch, and Counter increment/decrement/reset): <strong>Select...</strong> opens the Keyboard &amp; Mouse Input Mapper; the inspector shows the current key combination</li>
+</ul>
+<p>Button widgets also have <strong>Appearance from</strong>: <strong>Pressed / released</strong> (default) uses the binding above for Released/Pressed fill and border, or <strong>GEX state</strong> to drive State OFF / State ON colors from a state you pick (independent of the binding used for touch/output).</p>
+<p>A <strong>4-way switch</strong> binds five buttons (North, East, South, West, Center). Use this when a hat is exposed as discrete buttons instead of a POV hat. Center is optional. A <strong>2-way toggle</strong> binds Position 1 and Position 2. A <strong>3-way switch</strong> binds Up, Center, and Down; if the hardware has no center button, leave Center empty and the widget sits in the middle when neither end is pressed.</p>
+<p>A <strong>Label</strong> can check <strong>Show current mode</strong> to display the active profile mode name. The text updates live when you change edit mode, or when the runtime mode changes while the profile is running. The Text field then shows the live mode name and is not edited by hand.</p>
+<p>2D sticks and the radar widget have <strong>two independent bindings</strong> (Axis X and Axis Y). Each axis has its own device and axis picker (or Listen). You can mix devices — for example physical X on a stick and vJoy Y on another device.</p>
+<p>A <strong>Temporal graph</strong> has a <strong>Datasets</strong> list instead of a single binding. Each dataset is a physical or vJoy axis (Listen or pick). <strong>Period</strong> is how many seconds of history are shown. <strong>Min</strong> / <strong>Max</strong> set the vertical scale; <strong>Unit</strong> is drawn next to those labels. The live overlay samples at the same 60 Hz poll as other widgets.</p>
+<p>A <strong>Bar graph</strong> uses the same Datasets list. <strong>Orientation</strong> is vertical (bars grow up) or horizontal (bars grow right). Each dataset has a <strong>Range</strong>: Auto, Centered (−100 to +100), or 0 to 100%. Auto treats sliders/throttles as 0–100 and stick axes as centered. If any selected axis is centered, the scale includes negatives; if every axis is 0–100, there is no negative region. Uncheck <strong>Auto range</strong> to type Min / Max. Bar color is per dataset.</p>
+<p>A <strong>Counter</strong> has no joystick binding on the widget itself. <strong>Datasets</strong> list the values to show (time, in-game FPS, CPU usage/clock/temperature, GPU usage/temperature, memory, or a <strong>Manual counter</strong>). Each row has its own color and optional caption. <strong>Orientation</strong> stacks rows or places them side by side. FPS is the foreground game’s frame rate when <strong>MSI Afterburner / RTSS</strong> is running; otherwise it shows n/a. CPU/GPU temperature and GPU usage come from Libre Hardware Monitor, NVIDIA NVML, or Windows GPU Engine counters when those are available.</p>
+<p>A <strong>Manual counter</strong> (for deaths, kills, and similar tallies) lives in Datasets. Bind <strong>Increment</strong> and optional <strong>Decrement</strong> / <strong>Reset</strong> the same way as other overlay buttons (keyboard/mouse, physical, vJoy, state, or mode). A press adds or subtracts <strong>Step</strong>; the value does not go below zero.</p>
+<p>A <strong>Stopwatch</strong> binds <strong>Start / stop</strong> like a button (physical, vJoy, state, mode, or keyboard/mouse). A press toggles run/pause; a GEX state or mode keeps the clock running while that input is on. <strong>Reset</strong> is an optional second binding. <strong>Display</strong> is a digital counter or analog watch. Analog hour, minute, and second needles each have color, width, and an optional arrow at the tip.</p>
+<p>A <strong>Keyboard / Mouse</strong> widget has no joystick binding. Pick a <strong>Preset</strong> (WASD + mouse, WASD + extra mouse, full keyboard, full keyboard + mouse, mouse only, or all picker keys) or <strong>Select keys…</strong> to choose keys on the same virtual keyboard as Map to Keyboard/Mouse Ex. <strong>Select all</strong> / <strong>Deselect all</strong> apply to that picker. Off/On fill, border, and font follow the other overlay widgets. <strong>Mouse graphic</strong> is a top-down silhouette or a labeled button map (M1–M5, wheel up/down, tilt, double-click). Only selected keys and mouse buttons light when pressed.</p>
+<h2 id="ocr-widgets">OCR widgets<a class="headerlink" href="#ocr-widgets" title="Permanent link">¶</a></h2>
+<p>An <strong>OCR</strong> widget marks a capture region on the chosen monitor. While <strong>armed</strong> (Arming binding), it scans and treats each <strong>rule</strong> as a virtual overlay button: pressed while the text matches, released when it does not.</p>
+<ul>
+<li><strong>Arm mode</strong>: <strong>Continuous (Toggle)</strong> latches scanning on each press; <strong>Continuous (Hold)</strong> scans only while the input is held; <strong>Single (pulse)</strong> runs one detection on press then disarms; <strong>Multiple (pulses)</strong> runs <strong># of pulses</strong> detections spaced by <strong>Spacing</strong> (ms), then disarms.</li>
+<li>Inspector <strong>OCR</strong>: <strong>Region</strong>, <strong>Min confidence</strong> (default <strong>0.70</strong>; RapidOCR only — Windows OCR has no per-line score), <strong>Engine</strong>, <strong>Scan interval</strong> (continuous modes), and <strong>Miss tolerance</strong> (default <strong>3</strong> consecutive non-matching scans before a held rule releases, so hold-mode labels do not flash on flaky frames).</li>
+<li><strong>Texts</strong> may list several needles (comma-separated); the rule matches if any is found (Contain or Exact).</li>
+<li>Optional <strong>Base</strong> (signature packs): matching <code>6340</code> with base <code>3170</code> yields detection label <code>Quantainium ×2</code>.</li>
+<li><strong>Map…</strong> opens the same mapping dialog as overlay buttons. Use <strong>Map to Overlay → Set variable</strong> with <strong>Contribute</strong> and <strong>Use detection label</strong> to write into a single variable such as <code>%rock%</code>.</li>
+<li>Labels substitute <code>%name%</code> from Overlay Variables (saved with the overlay in the profile JSON). Simultaneous contributions join as <code>Savrilium, Laranite, Agricium</code>.</li>
+<li><strong>Load pack… / Import… / Export…</strong> share rule packs:</li>
+<li><strong>SC mineables</strong> — mining signatures → <code>%rock%</code> (contribute / detection label).</li>
+<li><strong>SC Intelligence</strong> — place the OCR region over a player nameplate. The pack rule uses <strong>Match = Any text (region)</strong> — leave <strong>Texts</strong> empty (OCR output <em>is</em> the handle). While armed, cleaned OCR text is polled at <code>robertsspaceindustries.com/en/citizens/{handle}</code> (cached ~10 minutes). Blank OCR or HUD chrome words (e.g. Idle/Armed) are ignored — no citizen fetch. Results fill <code>%SCintell_handle%</code>, <code>%SCintell_name%</code>, <code>%SCintell_org%</code>, <code>%SCintell_enlisted%</code>, <code>%SCintell_location%</code>, <code>%SCintell_fluency%</code>. Cleared when the match is released.</li>
+<li><strong>OCR Appearance</strong> is border-only (no fill, image, or shadow) and is drawn on the live overlay. <strong>Unarmed</strong> and <strong>Armed</strong> each have a Border on/off toggle, color, width, and style (<strong>Solid</strong> / <strong>Dashed</strong> / <strong>Dotted</strong>).</li>
+</ul>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">¶</a></h2>
+<ul>
+<li>For OBS, capture <strong>GEX Overlay — {page name}</strong>, not the Overlay tab. Each page is a separate window.</li>
+<li>Layouts are per profile. Saving the GEX profile writes the overlay into <code>&lt;profile&gt;.json</code> (key <code>obs_overlay</code>) next to that profile XML. <strong>Export overlay...</strong> copies the layout to another file. <strong>Import overlay...</strong> loads a JSON file into the current profile.</li>
+<li>Axis labels (N/S/E/W) have their own font, size, weight, color, and <strong>Distance from center</strong> slider in the inspector (100 = near the border with even padding; 0 = stacked at the center). 2D sticks and hats use all four; bars show North/South when vertical and East/West when horizontal.</li>
+<li><strong>Deadzone display</strong> is overlay-only. Axis values inside that range around center are drawn as zero; it does not change GEX mappings.</li>
+<li>Photoreal HOTAS meshes, DJ decks, and an OBS Browser Source path are not in this version.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

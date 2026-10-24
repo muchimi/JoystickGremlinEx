@@ -1,0 +1,1577 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/keyboard_ex_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Keyboard Ex — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#keyboard-ex-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Keyboard Ex — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ktts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI and DevOps
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ktts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI and DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before you start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-combination-is-not-a-typing-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A combination is not a typing sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-keys-and-mouse-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose keys and mouse inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose keys and mouse inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#record-a-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record a shortcut
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select-a-shortcut-visually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select a shortcut visually
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-an-output-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose an output mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose an output mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#press-and-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Press and Release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pulse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autorepeat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AutoRepeat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-duration-and-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set duration and interval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-triggering-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the triggering event
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-mouse-buttons-and-the-wheel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use mouse buttons and the wheel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Use mouse buttons and the wheel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mouse-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mouse buttons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mouse-wheel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mouse wheel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-the-startup-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set the startup state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-local-remote-or-process-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose local, remote, or process output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose local, remote, or process output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#normal-local-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normal local output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remote-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-a-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target a process
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hold-a-push-to-talk-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hold a push-to-talk key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-one-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send one shortcut
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repeat-an-adjustment-while-held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repeat an adjustment while held
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#separate-on-and-off-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate “on” and “off” controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-a-command-when-a-button-is-released" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send a command when a button is released
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-and-troubleshoot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test and troubleshoot
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="keyboard-ex-user-guide">Keyboard Ex — User Guide<a class="headerlink" href="#keyboard-ex-user-guide" title="Permanent link">¶</a></h1>
+<p><strong>Map to Keyboard/Mouse Ex</strong> converts an input into a keyboard combination, mouse-button action, or mouse-wheel event. Use it to hold a command while a joystick button is down, send a timed shortcut, repeat a command, or control when an output is pressed and released.</p>
+<p>This guide describes the Map to Keyboard/Mouse EX action. Shared dialogs and process-routing options may have different wording in another build.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#keyboard-ex--user-guide">Keyboard Ex — User Guide</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#before-you-start">Before you start</a><ul>
+<li><a href="#a-combination-is-not-a-typing-sequence">A combination is not a typing sequence</a></li>
+</ul>
+</li>
+<li><a href="#create-your-first-mapping">Create your first mapping</a></li>
+<li><a href="#choose-keys-and-mouse-inputs">Choose keys and mouse inputs</a><ul>
+<li><a href="#record-a-shortcut">Record a shortcut</a></li>
+<li><a href="#select-a-shortcut-visually">Select a shortcut visually</a></li>
+</ul>
+</li>
+<li><a href="#choose-an-output-mode">Choose an output mode</a><ul>
+<li><a href="#hold">Hold</a></li>
+<li><a href="#press-and-release">Press and Release</a></li>
+<li><a href="#pulse">Pulse</a></li>
+<li><a href="#autorepeat">AutoRepeat</a></li>
+<li><a href="#toggle">Toggle</a></li>
+</ul>
+</li>
+<li><a href="#set-duration-and-interval">Set duration and interval</a></li>
+<li><a href="#choose-the-triggering-event">Choose the triggering event</a></li>
+<li><a href="#use-mouse-buttons-and-the-wheel">Use mouse buttons and the wheel</a><ul>
+<li><a href="#mouse-buttons">Mouse buttons</a></li>
+<li><a href="#mouse-wheel">Mouse wheel</a></li>
+</ul>
+</li>
+<li><a href="#set-the-startup-state">Set the startup state</a></li>
+<li><a href="#choose-local-remote-or-process-output">Choose local, remote, or process output</a><ul>
+<li><a href="#normal-local-output">Normal local output</a></li>
+<li><a href="#remote-output">Remote output</a></li>
+<li><a href="#target-a-process">Target a process</a></li>
+</ul>
+</li>
+<li><a href="#worked-examples">Worked examples</a><ul>
+<li><a href="#hold-a-push-to-talk-key">Hold a push-to-talk key</a></li>
+<li><a href="#send-one-shortcut">Send one shortcut</a></li>
+<li><a href="#repeat-an-adjustment-while-held">Repeat an adjustment while held</a></li>
+<li><a href="#separate-on-and-off-controls">Separate “on” and “off” controls</a></li>
+<li><a href="#send-a-command-when-a-button-is-released">Send a command when a button is released</a></li>
+</ul>
+</li>
+<li><a href="#test-and-troubleshoot">Test and troubleshoot</a></li>
+</ul>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">¶</a></h2>
+<p>Have a profile containing the source input and know the key or mouse command expected by the target application.</p>
+<p>The action advertises support for <strong>joystick buttons and hats</strong>. Hat inputs require a virtual-button activation condition so the action receives an on/off state. Configure the required hat direction in the surrounding input/container controls.</p>
+<p>The implementation also requests virtual-button activation for axis inputs that reach it, but axes are not in its declared action input list. Do not assume you can add it directly to a raw axis in every build.</p>
+<p>For your first test:</p>
+<ul>
+<li>Choose one source button.</li>
+<li>Use one output key.</li>
+<li>Leave process targeting off and test local output with the intended application focused.</li>
+<li>Keep <strong>State on profile start</strong> set to Ignore.</li>
+</ul>
+<h3 id="a-combination-is-not-a-typing-sequence">A combination is not a typing sequence<a class="headerlink" href="#a-combination-is-not-a-typing-sequence" title="Permanent link">¶</a></h3>
+<p>The keys shown under <strong>Current key combination</strong> form a group of outputs. For example, <code>Ctrl + Shift + A</code> is one shortcut, not three separately timed keystrokes, like a <strong>macro</strong> or <strong>sequence</strong> would be.</p>
+<p>The action sorts its keys for pressing and releases them in reverse order. Recording multiple inputs does not preserve typing pauses or create a timed macro. Use a sequence/macro action if you need “press A, wait, then press B.”</p>
+<p>Put together, the keys that make up a shortcut are called <strong>latched keys</strong>.  They can be pressed in any order, but to trigger, they must all be pressed at the same time.</p>
+<h2 id="create-your-first-mapping">Create your first mapping<a class="headerlink" href="#create-your-first-mapping" title="Permanent link">¶</a></h2>
+<ol>
+<li>Select the profile mode and source joystick button.</li>
+<li>Add <strong>Map to Keyboard/Mouse Ex</strong> to its action container.</li>
+<li>Select <strong>Select...</strong> and choose the output key, or use the single-input listen control.</li>
+<li>Confirm that the key appears under <strong>Current key combination</strong>.</li>
+<li>Select <strong>Hold</strong> under <strong>Output Mode</strong>.</li>
+<li>Leave the trigger configured for input press rather than release-only operation.</li>
+<li>Save and start the profile.</li>
+<li>Focus the target application, hold the source button, and then release it.</li>
+<li>Confirm that the output activates while held and stops when released.</li>
+</ol>
+<p>To send a brief command instead of following the source button's state, change Output Mode to <strong>Pulse</strong> and set <strong>Duration (ms)</strong>.</p>
+<h2 id="choose-keys-and-mouse-inputs">Choose keys and mouse inputs<a class="headerlink" href="#choose-keys-and-mouse-inputs" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single-input listen</td>
+<td>Capture one output input through the listener.</td>
+</tr>
+<tr>
+<td>Listen (multi)</td>
+<td>Capture multiple keyboard or mouse inputs; confirm with OK when finished.</td>
+</tr>
+<tr>
+<td>Select...</td>
+<td>Choose keys through the virtual-keyboard dialog. <strong>This is often the fastest and easiest option to select keys</strong></td>
+</tr>
+<tr>
+<td>Clear</td>
+<td>Remove the current output selection.</td>
+</tr>
+<tr>
+<td>Right-click an output key, then Delete</td>
+<td>Remove that key from the combination.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="record-a-shortcut">Record a shortcut<a class="headerlink" href="#record-a-shortcut" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select <strong>Listen (multi)</strong>.</li>
+<li>Enter the shortcut you want to send, such as <code>Ctrl + Shift + A</code>.</li>
+<li>Select <strong>OK</strong> in the listener.</li>
+<li>Review the resulting combination before testing it.</li>
+</ol>
+<p>The listener's tooltip states that clicks on its dialog buttons are excluded from the recorded selection. It accepts keyboard and mouse inputs.</p>
+<h3 id="select-a-shortcut-visually">Select a shortcut visually<a class="headerlink" href="#select-a-shortcut-visually" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select <strong>Select...</strong>.</li>
+<li>Choose the required keys in the virtual keyboard.</li>
+<li>Accept the dialog.</li>
+<li>Check the displayed combination.</li>
+</ol>
+<p>This method is the easiest and preferred method to select (or deselect) keys, as it lets you also pick keys that may not exist on your keyboard/input device.  For example, the media keys, the F13 to F24 keys, or all mouse buttons and horizontal wheel triggers, may all be hard to input using the <strong>listen</strong> mode.  This is also difficult if your keyboard is not a <strong>100%</strong> sized keyboard, does not have a numeric keypad or combines multiple keys like a <strong>60%</strong> keyboard.  The visual keyboard includes all standard keys, including many that are not on a normal keyboard but can be output to a game.</p>
+<p>Pay attention to left/right modifiers or extended or numpad keys when the target application distinguishes them.  These keys report as different keys even if they normally produce the same output (a good example of that would be the <strong>home</strong> key or the <strong>multiply</strong> or <strong>enter</strong> keys).</p>
+<p>For ordinary output mappings, select at least one key or mouse input.</p>
+<h2 id="choose-an-output-mode">Choose an output mode<a class="headerlink" href="#choose-an-output-mode" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Result</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold</td>
+<td>Presses the combination while the source is on; releases it when the source turns off.</td>
+<td>Push-to-talk, momentary controls, or dragging with a mouse button.</td>
+</tr>
+<tr>
+<td>Press</td>
+<td>Sends key-down or mouse-button-down without an automatic matching release.</td>
+<td>One control starts a held command.</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Sends key-up or mouse-button-up for the selected outputs.</td>
+<td>A second control ends a held command.</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>Presses the combination, holds it for Duration, then releases it.</td>
+<td>Shortcuts and single commands.</td>
+</tr>
+<tr>
+<td>AutoRepeat</td>
+<td>Repeatedly presses and releases the combination while the source is active.</td>
+<td>Repeated adjustment or navigation.</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>Changes each selected output to the opposite of its observed pressed state.</td>
+<td>Alternating a held command on and off.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="hold">Hold<a class="headerlink" href="#hold" title="Permanent link">¶</a></h3>
+<p>Hold follows the source input's state. Keep a normal source release path available so the output can be released.</p>
+<p>The action does not generate its own repeat pulses in Hold mode. If you need deliberate press/release repetition, use AutoRepeat. How the receiving application interprets a continuously held key is separate from this action's repeat behavior.</p>
+<h3 id="press-and-release">Press and Release<a class="headerlink" href="#press-and-release" title="Permanent link">¶</a></h3>
+<p>Treat these as a pair when creating a persistent output:</p>
+<ol>
+<li>Configure one source with <strong>Press</strong> and the desired combination.</li>
+<li>Configure another source with <strong>Release</strong> and the same combination.</li>
+<li>Verify both actions use the same output destination.</li>
+<li>Test starting and ending the held command.</li>
+</ol>
+<p>Releasing the source that triggered Press does not automatically send key-up. Stopping the profile does not provide the same explicit held-key cleanup for Press as it does for Hold.</p>
+<h3 id="pulse">Pulse<a class="headerlink" href="#pulse" title="Permanent link">¶</a></h3>
+<p>Pulse sends one timed press/release. Its duration is independent of how long you hold the source button. In this implementation, an ordinary source release does not cancel a running one-shot pulse.</p>
+<p>While a pulse is already running, another request for that same action is ignored. For rapid successive commands, choose a duration short enough to finish before the next trigger, or consider AutoRepeat.</p>
+<h3 id="autorepeat">AutoRepeat<a class="headerlink" href="#autorepeat" title="Permanent link">¶</a></h3>
+<p>AutoRepeat pulses the selected combination while the source is active. Source release stops the pulse worker. Profile stop and runtime-mode changes also request that the worker stop.</p>
+<p>Use the normal press-triggered configuration. The editor warns against execute-on-release operation for this mode; a release-only configuration does not provide the intended start/stop cycle.</p>
+<h3 id="toggle">Toggle<a class="headerlink" href="#toggle" title="Permanent link">¶</a></h3>
+<p>Toggle checks the current observed state of each selected output and sends the opposite state. It is not a single stored on/off flag for the entire combination.</p>
+<p>For predictable results, start with a single output key or mouse button. When toggling a combination, physical keys or other mappings can leave different members in different states. Provide a Release action if you need a definite “all selected outputs off” command.</p>
+<h2 id="set-duration-and-interval">Set duration and interval<a class="headerlink" href="#set-duration-and-interval" title="Permanent link">¶</a></h2>
+<p>Timing controls use <strong>milliseconds</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Applies to</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Duration (ms)</td>
+<td>Pulse and AutoRepeat</td>
+<td>How long the outputs remain pressed during a pulse.</td>
+</tr>
+<tr>
+<td>Interval (ms)</td>
+<td>AutoRepeat</td>
+<td>The pause between pulses.</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a Duration of <code>100 ms</code> and Interval of <code>200 ms</code> describe a brief press followed by a longer gap. Use these as example values, not fixed product defaults.</p>
+<p>New actions take their timing values from the application's last-used keyboard-mapper settings. Changing a timing value updates that preference. Do not assume every new action starts at <code>250 ms</code> or another fixed value.</p>
+<p>If the target application misses a command, increase Duration. If repetition is too fast, increase Interval. Test with the target application before choosing very short timings.</p>
+<h2 id="choose-the-triggering-event">Choose the triggering event<a class="headerlink" href="#choose-the-triggering-event" title="Permanent link">¶</a></h2>
+<p>The execution controls choose whether supported actions activate on the source <strong>press</strong>, <strong>release</strong>, or both.</p>
+<p>For most mappings, begin with:</p>
+<ul>
+<li>Execute on press: enabled.</li>
+<li>Execute on release: disabled.</li>
+</ul>
+<p>For <strong>Press</strong>, <strong>Release</strong>, <strong>Pulse</strong>, and <strong>Toggle</strong>, a qualifying source release can be used as the activation event. A Release output action triggered by a source press is also valid: the output operation and the source event are separate choices.</p>
+<p>For example, selecting Pulse with execute on release sends a short shortcut when you let go of the source button.</p>
+<p>Enabling both press and release can produce two activations per physical cycle. Avoid that for toggles or commands you want to send only once.</p>
+<p><strong>Hold and AutoRepeat need special care.</strong> The editor warns against execute-on-release use for both. Hold's runtime path follows input state directly rather than acting as a release-triggered one-shot. AutoRepeat should start on press and stop on release.</p>
+<h2 id="use-mouse-buttons-and-the-wheel">Use mouse buttons and the wheel<a class="headerlink" href="#use-mouse-buttons-and-the-wheel" title="Permanent link">¶</a></h2>
+<p>Keyboard Ex can include mouse buttons and wheel events in its output selection as a convenience. It does not provide cursor-position or cursor-motion configuration.  The mouse <strong>buttons</strong> and <strong>wheel</strong> events are momentary events as well like other keys, which makes them particularly suitable to be mapped in this action.  It is also helpful to include mouse functions with other <strong>latched keys</strong> such as the usual modifier (<code>shift</code> or <code>alt</code> or <code>ctrl</code>, but also other keys.    For example in GEX, you can create a shortcut that includes <code>left ctrl + right shift + A + mouse 5</code>.</p>
+<p>Internally, GEX creates special keys for these inputs and translates them to mouse output for the game / application to use, even if they appear in this action as keyboard keys.  This is a visual, convenience representation, not a special translation GEX does.</p>
+<h3 id="mouse-buttons">Mouse buttons<a class="headerlink" href="#mouse-buttons" title="Permanent link">¶</a></h3>
+<p>Use the listener to select the desired mouse input, then choose its behavior:</p>
+<ul>
+<li><strong>Hold</strong> keeps the button down while the source is held.</li>
+<li><strong>Pulse</strong> produces a timed down/up pair.</li>
+<li><strong>Press</strong> and <strong>Release</strong> let separate sources control the down and up operations.</li>
+<li><strong>Toggle</strong> changes the observed button state.</li>
+</ul>
+<p>If the combination includes a keyboard modifier and a mouse button, test the complete interaction in the target application.</p>
+<h3 id="mouse-wheel">Mouse wheel<a class="headerlink" href="#mouse-wheel" title="Permanent link">¶</a></h3>
+<p>Select the desired wheel direction and set <strong>Mouse Wheel Factor</strong>. The field accepts values from <strong>1 to 100</strong>, with a supplied default of <strong>1</strong>.</p>
+<p>The factor controls wheel movement per trigger. It does not select a repeat rate. Start at 1 and increase it only after verifying the direction and amount.</p>
+<p>In this version, the direct mouse-output paths pass the wheel factor explicitly, but the Pulse and AutoRepeat paths do not pass that action setting. Do not assume the factor scales wheel output identically in every mode. Verify timed wheel output before relying on it.</p>
+<h2 id="set-the-startup-state">Set the startup state<a class="headerlink" href="#set-the-startup-state" title="Permanent link">¶</a></h2>
+<p><strong>State on profile start</strong> offers Ignore and Input behavior.</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ignore</td>
+<td>Does not issue an output merely to synchronize with the source at startup. This is the supplied default.</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>Reads the source state and processes a corresponding input event when the profile starts.</td>
+</tr>
+</tbody>
+</table>
+<p>For joystick buttons, the action reads whether the button is held. For hats, it reads the current hat state; the surrounding direction/activation setup still matters.</p>
+<p>Input synchronization uses the selected output mode. It can therefore press a key, start a timed operation, or toggle an output when the startup event qualifies. It is not limited to Hold.</p>
+<p>Use Ignore when starting the profile should not send a command. Test Input synchronization with the source both held and released before using it in a regular profile. The supplied startup routine does not sample an axis position for this action.</p>
+<h2 id="choose-local-remote-or-process-output">Choose local, remote, or process output<a class="headerlink" href="#choose-local-remote-or-process-output" title="Permanent link">¶</a></h2>
+<h3 id="normal-local-output">Normal local output<a class="headerlink" href="#normal-local-output" title="Permanent link">¶</a></h3>
+<p>Without process targeting, the action uses the focused-window target for keyboard output. Focus the intended application before the first test.</p>
+<p>Check the action's output-routing controls if the source triggers but no local output appears. The selected route must include local output for a local test.</p>
+<h3 id="remote-output">Remote output<a class="headerlink" href="#remote-output" title="Permanent link">¶</a></h3>
+<p>Use the remote-client controls to choose the intended recipients. The action obtains its client list when the profile starts and passes routing information to its send routines.</p>
+<p>Configure the application's remote connection first. When diagnosing a remote mapping, verify the same key locally, then verify the chosen client and routing settings.</p>
+<h3 id="target-a-process">Target a process<a class="headerlink" href="#target-a-process" title="Permanent link">¶</a></h3>
+<p>The process-target controls let the action look for a configured process/window instead of using the default keyboard target.</p>
+<ol>
+<li>Start the target application.</li>
+<li>Configure the target process in the action's process controls.</li>
+<li>Choose exact or partial matching as appropriate to the shared selector.</li>
+<li>Start the profile so the action performs its process lookup.</li>
+<li>Test a simple key before using a larger combination.</li>
+</ol>
+<p>For local process output, failure to find the target window disables this action's output. The target is looked up during profile startup, not rediscovered for every input event. If the application was absent, fix the selection and restart or reload the profile to reinitialize the action; check the log if output remains disabled.</p>
+<p>Do not assume mouse output follows the same process-target path as keyboard output. Direct mouse-button sends do not carry the same target-window information. Test mouse behavior separately.</p>
+<p>Process-name and partial-match metadata are also passed with supported remote keyboard sends so the remote side can resolve its target. The behavior of the shared process selector and receiver is outside this action file.</p>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="hold-a-push-to-talk-key">Hold a push-to-talk key<a class="headerlink" href="#hold-a-push-to-talk-key" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add Keyboard Ex to the desired joystick button.</li>
+<li>Select the target application's push-to-talk key, such as <code>F10</code>.</li>
+<li>Choose <strong>Hold</strong>.</li>
+<li>Leave startup state at Ignore for the first test.</li>
+<li>Start the profile and test the source press and release.</li>
+</ol>
+<p>Expected result: F10 is held while the source is held and released when the source is released.</p>
+<h3 id="send-one-shortcut">Send one shortcut<a class="headerlink" href="#send-one-shortcut" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select <code>Ctrl + Shift + A</code> using <strong>Select...</strong> or <strong>Listen (multi)</strong>.</li>
+<li>Choose <strong>Pulse</strong>.</li>
+<li>Set Duration to <code>120 ms</code>.</li>
+<li>Enable execute on press only.</li>
+<li>Test in an application where that shortcut has the intended effect.</li>
+</ol>
+<p>Expected result: one activation presses the combination, waits for the duration, and releases it in reverse order.</p>
+<h3 id="repeat-an-adjustment-while-held">Repeat an adjustment while held<a class="headerlink" href="#repeat-an-adjustment-while-held" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select the adjustment key expected by the target application.</li>
+<li>Choose <strong>AutoRepeat</strong>.</li>
+<li>Begin with Duration <code>80 ms</code> and Interval <code>250 ms</code>.</li>
+<li>Use execute on press, then verify that releasing the source stops the output.</li>
+<li>Adjust the timings to suit the receiving application.</li>
+</ol>
+<p>These timings are example starting values, not product defaults.</p>
+<h3 id="separate-on-and-off-controls">Separate “on” and “off” controls<a class="headerlink" href="#separate-on-and-off-controls" title="Permanent link">¶</a></h3>
+<ol>
+<li>On the first source, select the required output and choose <strong>Press</strong>.</li>
+<li>On the second source, select the same output and choose <strong>Release</strong>.</li>
+<li>Match their routing and process settings.</li>
+<li>Activate the first source, then the second.</li>
+</ol>
+<p>Expected result: the first source holds the output on; the second explicitly releases it.</p>
+<h3 id="send-a-command-when-a-button-is-released">Send a command when a button is released<a class="headerlink" href="#send-a-command-when-a-button-is-released" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select the desired shortcut.</li>
+<li>Choose <strong>Pulse</strong>.</li>
+<li>Disable execute on press and enable execute on release.</li>
+<li>Set the duration and test a full source press/release cycle.</li>
+</ol>
+<p>Expected result: the shortcut is sent when the source is released. Do not substitute Hold or AutoRepeat for this release-triggered one-shot setup.</p>
+<h2 id="test-and-troubleshoot">Test and troubleshoot<a class="headerlink" href="#test-and-troubleshoot" title="Permanent link">¶</a></h2>
+<p>Test a simple key first, then the complete combination. Verify press, hold, release, startup, runtime-mode change, and profile stop where relevant to the chosen output mode.</p>
+<p>You may find it helpful to not test your keyboard/mouse output to the game directly, but to an application that repeats these keys for you.  One example is the <code>Thrustmaster key/event tester</code> that comes with the Thrusmaster control software.  Another is this utility <a href="https://dennisbabkin.com/kbdkeyinfo/">keyboard key info</a>.  The utility shoudl be able to handle non-standard keystrokes and mouse input - as a normal text editor may not understand some keys, not display them, or ignore them.</p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No output</td>
+<td>Profile running; correct runtime mode; action/container conditions; nonempty key selection; output routing; target window/process.</td>
+</tr>
+<tr>
+<td>Output goes to the wrong application</td>
+<td>Focused window, configured process target, process match, and selected remote client.</td>
+</tr>
+<tr>
+<td>Action stops working after a process lookup failure</td>
+<td>Start the target, correct the process selection, and reinitialize the action by restarting/reloading the profile.</td>
+</tr>
+<tr>
+<td>Key remains held</td>
+<td>Press or Toggle mode, absent Release action, missing source release event, or an activation condition that never returns off.</td>
+</tr>
+<tr>
+<td>Hold does not generate repeated commands</td>
+<td>Hold does not create repeat pulses; use AutoRepeat when repeated down/up events are required.</td>
+</tr>
+<tr>
+<td>Repeat continues after letting go</td>
+<td>Source release reaches the action; normal press-triggered AutoRepeat configuration; no other action generating the same output.</td>
+</tr>
+<tr>
+<td>Command fires twice</td>
+<td>Both source press and release enabled, repeated source events, or duplicate mappings. GEX triggers keys twice, once on press (make), and once on release (break).</td>
+</tr>
+<tr>
+<td>Rapid presses are missed in Pulse mode</td>
+<td>The previous pulse may still be running; shorten Duration or revise the desired repeat behavior.</td>
+</tr>
+<tr>
+<td>Target misses brief commands</td>
+<td>Increase Duration and test again.  Some games may not poll keyboard/mouse input rapidly enough, and conversely, some games treat everything as a trigger.  Some games may consider 100 or 125 millisecond a short tap, and anything above 150 a long tap, which may change the behavior of the game.</td>
+</tr>
+<tr>
+<td>Target does not trigger</td>
+<td>Ensure that a key, if pressed, is released at some point.  Keeping a key pressed may lock up of freeze the game, and even the operating system because it's waiting for a release.  You can have a press in one action, a release in another, but you should aim to release every key you have sent as a press by the time the profile stops.  You can clear a key that is stuck in pressed mode by pressing it again on the physical keyboard, which will send a release.  This may not be possible for special keys if they don't exist on your keyboard in which case you'll have to code the profile for that.</td>
+</tr>
+<tr>
+<td>Wheel movement is excessive</td>
+<td>Reduce Mouse Wheel Factor; start at 1. Check repeat settings separately.  Some mouse drivers may accelerate the mouse differently and in some implementations, using <code>high DPI</code> resolution can impact the response of the wheel.</td>
+</tr>
+<tr>
+<td>Wheel factor appears ignored in a timed mode</td>
+<td>Pulse/AutoRepeat do not explicitly pass the factor in this version.</td>
+</tr>
+<tr>
+<td>Shortcut becomes separate letters</td>
+<td>Review the selected modifier combination, output mode, other mappings, and actual target.</td>
+</tr>
+<tr>
+<td>Toggle combination reaches a mixed state</td>
+<td>Toggle checks individual key states; use Release to establish a definite off state.</td>
+</tr>
+<tr>
+<td>Starting the profile sends a command</td>
+<td>State on profile start is Input and the startup event qualifies under the chosen mode. Use Ignore if that is unwanted.</td>
+</tr>
+<tr>
+<td>Hat mapping triggers in the wrong direction</td>
+<td>Review the surrounding virtual-button activation/direction configuration.</td>
+</tr>
+</tbody>
+</table>
+<p>To recover during testing, release the source and stop the profile. For Press or Toggle outputs, use the configured Release action rather than assuming profile stop releases everything.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
