@@ -50,14 +50,23 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T83):
+
 - New: UI (experimental): custom color theme (this may not presently entirely work as intended as more testing is needed).  This is available under theme options in the UI configuration options and brings up a custom dialog.  Presently a number of color usage descriptions may not make a lot of sense at this point, nor indicate where they are used.  The custom theme can be saved.  A GEX restart is required after making changes.
+- New: DOC: New user guides for [Map to Vjoy](https://muchimi.github.io/JoystickGremlinEx/actions/map_to_vjoy_user_guide/)
+- New: DOC: New user guide for [Gated Axis Action](https://muchimi.github.io/JoystickGremlinEx/actions/gated_axis_user_guide/)
+- New: DOC: New user guid for [Map to Keyboard/Mouse EX Action](https://muchimi.github.io/JoystickGremlinEx/actions/keyboard_ex_user_guide/) 
+- Change: DOC: started updating the documentation for m77.
 - Change: UI: adjusted some light mode colors for improved contrast.
-- Change: Input Viewer: Added tooltips to state visualizer.
+- Change: Input Viewer: Added tooltips to state visualizer buttons - expression states will include their definitions.
 - Fix: UI: last input recall fails when no profile exists.
-- Fix: API: key latching may not always trigger depending on the order of the keys (or mouse inputs) pressed.
+- Fix: API (Keyboard Device): key latching (pressing multiple keys in a shortcut defined as inputs in the keyboard device) may not always trigger depending on the order of the keys (or mouse inputs) pressed due to a change in the keyboard API, as well as changes in the execution engine recognition logic.  This is resolved.
+- Fix: Map to Vjoy action: output curve dialog stopped dynamically updating with input changes.
+- Fix: API (States): resolved a tear-down logic issue when a state is deleted and calls look for a non existent state while the UI is being updated.
+- Fix: API (profile): stop attempting to update devices that are readonly (special devices).
 
 
 ### (m77T82):
+
 - New: Map to VJoy action: stepped axis mode gains a PID mode. PID stands for Proportional-Integral-Derivative controller.  This mode uses an adaptive algorithm commonly found in cruise-control or setpoint applications: in this case, it allows a target value (setpoint) to be designated on an axis, and over time GEX will generate axis output values that drive toward that setpoint using a smooth curve.  The more the current axis value deviates from the target setpoint, the steeper the acceleration curve (the faster the rate of change). The target (setpoint) value is set by the increase/decrease inputs mapped to the action.  The curve is computed dynamically and will smooth out automatically as the output value nears the set point which prevents jerky movements.  The PID mode differs from the other modes in that it takes time and deviation from the new setpoint into consideration when setting the target value, resulting in a smooth output.  Example application: setting a target speed, or setting a trim value.  Default parameters can be changed to change how fast or slow PID algorithm responds.
 - New: Map to Vjoy action: ability to set the initial axis value on profile start when using the stepped mode.
 - Fix: API (State): ensure default value a state reports is off/released if the state value is not defined yet.

@@ -1,0 +1,1785 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/gated_axis_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Gated Axis — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gated-axis-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Gated Axis — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ktts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI and DevOps
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ktts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI and DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understand-gates-and-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understand gates and ranges
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Understand gates and ranges">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gates-are-positions-ranges-are-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gates are positions; ranges are intervals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalized-values-and-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized values and direction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-range-condition-and-an-output-mode-are-different" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A range condition and an output mode are different
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-and-position-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add and position gates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Add and position gates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-a-gate-at-the-physical-control-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add a gate at the physical control position
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-a-gate-at-a-chosen-slider-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add a gate at a chosen slider position
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#move-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Move a gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-the-gate-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set the gate count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalize-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalize positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#display-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-gate-crossing-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure gate-crossing actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-range-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure range actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configure range actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-range-continuous-value-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In Range: continuous value mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enter-range-and-exit-range-one-shot-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enter Range and Exit Range: one-shot events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-hold-matched-press-and-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range Hold: matched press and release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outside-of-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outside of Range
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-a-range-output-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a range output mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose a range output mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#normal-versus-rebased-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normal versus rebased values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ranged-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranged scaling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filtered-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtered output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configure-releases-and-trigger-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure releases and trigger timing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitor-and-test-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitor and test events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitor and test events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-test-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended test sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-and-runtime-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup and runtime behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hold-a-virtual-button-above-a-throttle-detent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hold a virtual button above a throttle detent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-different-shortcuts-across-a-detent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send different shortcuts across a detent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-the-upper-half-of-an-axis-for-a-full-virtual-axis-span" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use the upper half of an axis for a full virtual-axis span
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select-discrete-axis-presets-with-lever-zones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select discrete axis presets with lever zones
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edit-an-existing-layout-safely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit an existing layout safely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="gated-axis-user-guide">Gated Axis — User Guide<a class="headerlink" href="#gated-axis-user-guide" title="Permanent link">¶</a></h1>
+<p><strong>Gated Axis</strong> divides an axis into boundaries called <strong>gates</strong> and the <strong>ranges</strong> between them. Each gate or range can contain its own action containers. Use it to send commands when a throttle crosses a detent, hold a button while a lever is in a zone, or remap part of an axis to a different output span.</p>
+<p>Gated Axis decides <strong>when</strong> nested actions run and <strong>which axis value</strong> they receive. The nested actions—such as Map to vJoy or Keyboard Ex—produce the actual output. Adding gates without adding actions does not create an output mapping by itself.</p>
+<p>This guide is based on the supplied action and the available supporting gate-handler implementation. Shared action/container controls may differ between builds.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#gated-axis--user-guide">Gated Axis — User Guide</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#understand-gates-and-ranges">Understand gates and ranges</a><ul>
+<li><a href="#gates-are-positions-ranges-are-intervals">Gates are positions; ranges are intervals</a></li>
+<li><a href="#normalized-values-and-direction">Normalized values and direction</a></li>
+<li><a href="#a-range-condition-and-an-output-mode-are-different">A range condition and an output mode are different</a></li>
+</ul>
+</li>
+<li><a href="#create-your-first-mapping">Create your first mapping</a></li>
+<li><a href="#add-and-position-gates">Add and position gates</a><ul>
+<li><a href="#add-a-gate-at-the-physical-control-position">Add a gate at the physical control position</a></li>
+<li><a href="#add-a-gate-at-a-chosen-slider-position">Add a gate at a chosen slider position</a></li>
+<li><a href="#move-a-gate">Move a gate</a></li>
+<li><a href="#set-the-gate-count">Set the gate count</a></li>
+<li><a href="#normalize-positions">Normalize positions</a></li>
+<li><a href="#display-mode">Display Mode</a></li>
+</ul>
+</li>
+<li><a href="#configure-gate-crossing-actions">Configure gate-crossing actions</a></li>
+<li><a href="#configure-range-actions">Configure range actions</a><ul>
+<li><a href="#in-range-continuous-value-mapping">In Range: continuous value mapping</a></li>
+<li><a href="#enter-range-and-exit-range-one-shot-events">Enter Range and Exit Range: one-shot events</a></li>
+<li><a href="#range-hold-matched-press-and-release">Range Hold: matched press and release</a></li>
+<li><a href="#outside-of-range">Outside of Range</a></li>
+</ul>
+</li>
+<li><a href="#choose-a-range-output-mode">Choose a range output mode</a><ul>
+<li><a href="#normal-versus-rebased-values">Normal versus rebased values</a></li>
+<li><a href="#ranged-scaling">Ranged scaling</a></li>
+<li><a href="#fixed-output">Fixed output</a></li>
+<li><a href="#filtered-output">Filtered output</a></li>
+</ul>
+</li>
+<li><a href="#configure-releases-and-trigger-timing">Configure releases and trigger timing</a></li>
+<li><a href="#monitor-and-test-events">Monitor and test events</a><ul>
+<li><a href="#recommended-test-sequence">Recommended test sequence</a></li>
+</ul>
+</li>
+<li><a href="#startup-and-runtime-behavior">Startup and runtime behavior</a></li>
+<li><a href="#worked-examples">Worked examples</a><ul>
+<li><a href="#hold-a-virtual-button-above-a-throttle-detent">Hold a virtual button above a throttle detent</a></li>
+<li><a href="#send-different-shortcuts-across-a-detent">Send different shortcuts across a detent</a></li>
+<li><a href="#use-the-upper-half-of-an-axis-for-a-full-virtual-axis-span">Use the upper half of an axis for a full virtual-axis span</a></li>
+<li><a href="#select-discrete-axis-presets-with-lever-zones">Select discrete axis presets with lever zones</a></li>
+</ul>
+</li>
+<li><a href="#edit-an-existing-layout-safely">Edit an existing layout safely</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">¶</a></h2>
+<p>Select an <strong>axis input</strong> in the profile and decide what should happen at each position. The action declares support for joystick-axis inputs; it is not a button or hat mapper.</p>
+<p>Have the required output available before adding nested mappings:</p>
+<ul>
+<li>For a virtual joystick output, know the destination device and axis or button.</li>
+<li>For a keyboard command, know the shortcut the target application expects.</li>
+<li>For a held output, decide what will release it.</li>
+</ul>
+<p>Start with one interior gate and one simple action. Test that configuration before adding more boundaries or output behaviors.</p>
+<p>Finalize the general gate layout before configuring many nested actions. Deleting gates or reducing the gate count can remove mappings from those gates and their adjacent ranges.</p>
+<h2 id="understand-gates-and-ranges">Understand gates and ranges<a class="headerlink" href="#understand-gates-and-ranges" title="Permanent link">¶</a></h2>
+<h3 id="gates-are-positions-ranges-are-intervals">Gates are positions; ranges are intervals<a class="headerlink" href="#gates-are-positions-ranges-are-intervals" title="Permanent link">¶</a></h3>
+<p>A gate is a particular axis value. A range is the interval between two neighboring gates.</p>
+<p>For example:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Position</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low boundary</td>
+<td><code>-1.0</code></td>
+</tr>
+<tr>
+<td>Detent</td>
+<td><code>0.60</code></td>
+</tr>
+<tr>
+<td>High boundary</td>
+<td><code>+1.0</code></td>
+</tr>
+</tbody>
+</table>
+<p>These three gates define two ranges:</p>
+<table>
+<thead>
+<tr>
+<th>Range</th>
+<th>Bounds</th>
+<th>Possible use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lower range</td>
+<td><code>-1.0</code> to <code>0.60</code></td>
+<td>Normal throttle travel</td>
+</tr>
+<tr>
+<td>Upper range</td>
+<td><code>0.60</code> to <code>+1.0</code></td>
+<td>Boost or afterburner zone</td>
+</tr>
+</tbody>
+</table>
+<p>Choose a <strong>gate condition</strong> when movement across a position should trigger a command. Choose a <strong>range condition</strong> when the position within an interval should control behavior.</p>
+<h3 id="normalized-values-and-direction">Normalized values and direction<a class="headerlink" href="#normalized-values-and-direction" title="Permanent link">¶</a></h3>
+<p>The underlying axis values use <code>-1.0</code> to <code>+1.0</code>:</p>
+<ul>
+<li><code>-1.0</code>: low end.</li>
+<li><code>0.0</code>: center.</li>
+<li><code>+1.0</code>: high end.</li>
+</ul>
+<p>An <strong>increasing</strong> crossing moves from a lower value to a higher value. A <strong>decreasing</strong> crossing moves from a higher value to a lower value. These describe numeric direction, not necessarily the physical forward/backward direction of your lever.</p>
+<p>Move the control and watch its marker before assigning increasing/decreasing commands. Account for the axis processing in the profile rather than assuming a particular physical orientation.</p>
+<h3 id="a-range-condition-and-an-output-mode-are-different">A range condition and an output mode are different<a class="headerlink" href="#a-range-condition-and-an-output-mode-are-different" title="Permanent link">¶</a></h3>
+<p>The <strong>condition tab</strong> determines when its nested actions run. The range's <strong>Output Mode</strong> determines how its continuous axis value is transformed.</p>
+<p>For example, <strong>In Range</strong> with <strong>Rebased to [-1,1]</strong> sends a remapped axis value to its nested axis action. <strong>Range Hold</strong> instead supplies press/release events suitable for holding a virtual button or keyboard key.</p>
+<h2 id="create-your-first-mapping">Create your first mapping<a class="headerlink" href="#create-your-first-mapping" title="Permanent link">¶</a></h2>
+<p>This example sends a command when an axis crosses a detent in the increasing direction.</p>
+<ol>
+<li>Select the source axis in the desired profile mode.</li>
+<li>Add <strong>Gated Axis</strong> to its action container.</li>
+<li>Move the physical control to the desired detent position.</li>
+<li>Select <strong>Add</strong> to create a gate at the live marker position.</li>
+<li>Double-click that gate's handle, or right-click it and select <strong>Configure...</strong>.</li>
+<li>In the gate configuration dialog, select <strong>Condition: Cross (inc)</strong>.</li>
+<li>Add a container and the required output action inside that tab.</li>
+<li>Configure the nested action's output. For example, use Keyboard Ex in Pulse mode to send a short command.</li>
+<li>Close the configuration dialog and save the profile.</li>
+<li>Move across the gate in both directions while observing the event display.</li>
+<li>Start the profile and confirm that the target application receives the intended command.</li>
+</ol>
+<p>The increasing condition should respond when the axis crosses from below the gate to above it. Moving back uses the decreasing direction, which can have a different mapping.</p>
+<h2 id="add-and-position-gates">Add and position gates<a class="headerlink" href="#add-and-position-gates" title="Permanent link">¶</a></h2>
+<h3 id="add-a-gate-at-the-physical-control-position">Add a gate at the physical control position<a class="headerlink" href="#add-a-gate-at-the-physical-control-position" title="Permanent link">¶</a></h3>
+<p>Move the axis until the live marker is at the desired position, then select <strong>Add</strong>. This is useful for matching a physical detent.</p>
+<h3 id="add-a-gate-at-a-chosen-slider-position">Add a gate at a chosen slider position<a class="headerlink" href="#add-a-gate-at-a-chosen-slider-position" title="Permanent link">¶</a></h3>
+<p>Right-click the range on the slider and select <strong>Add Gate...</strong>. The new gate is added at the clicked position.</p>
+<p>Duplicate positions are rejected or marked as conflicts. Keep neighboring gates separated so each range has usable width.</p>
+<h3 id="move-a-gate">Move a gate<a class="headerlink" href="#move-a-gate" title="Permanent link">¶</a></h3>
+<p>Drag its slider handle or edit its value in the gate row. The gate row also provides a grab control for capturing the current source position.</p>
+<p>After repositioning a gate, verify both adjacent ranges. Changing a boundary changes which physical positions belong to each range.</p>
+<h3 id="set-the-gate-count">Set the gate count<a class="headerlink" href="#set-the-gate-count" title="Permanent link">¶</a></h3>
+<p>Enter the required total in <strong>Set gate count</strong>, then select <strong>Set</strong>.</p>
+<ul>
+<li>The editor supports at least <strong>2</strong> gates and a maximum of <strong>20</strong> in the current implementation.</li>
+<li>The count includes the low and high boundary gates. Three ordered gates normally define two adjacent ranges.</li>
+<li>Reducing the count prompts for confirmation because it can remove gate configurations and normalize positions.</li>
+</ul>
+<p>Use the actual range rows shown by the editor to confirm the resulting layout.</p>
+<h3 id="normalize-positions">Normalize positions<a class="headerlink" href="#normalize-positions" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normalize</td>
+<td>Spaces gates evenly over the existing outer-gate range.</td>
+</tr>
+<tr>
+<td>Normalize (reset)</td>
+<td>Uses the full axis range and spaces gates evenly across it.</td>
+</tr>
+</tbody>
+</table>
+<p>Normalization changes gate positions. Do it before tuning detents to a particular physical device, or recheck those positions afterward.</p>
+<h3 id="display-mode">Display Mode<a class="headerlink" href="#display-mode" title="Permanent link">¶</a></h3>
+<p>The standard action widget offers <strong>Normal</strong> and <strong>Percent</strong> displays. The shared widget can also expose other labels when embedded elsewhere.</p>
+<p>Display Mode controls the representation of values. It is separate from the range Output Mode and does not, by itself, select an output mapping or change its behavior. Examples in this guide use normalized values to avoid ambiguity.</p>
+<h2 id="configure-gate-crossing-actions">Configure gate-crossing actions<a class="headerlink" href="#configure-gate-crossing-actions" title="Permanent link">¶</a></h2>
+<p>Open a gate through its configuration control, by double-clicking its slider handle, or through the right-click <strong>Configure...</strong> command.</p>
+<p>Use <strong>Gate Description</strong> to give it a meaningful name, such as “Idle detent” or “Boost threshold.” Add containers/actions separately on the condition tabs you need.</p>
+<table>
+<thead>
+<tr>
+<th>Gate condition</th>
+<th>When it triggers</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Crossed</td>
+<td>The axis crosses the gate in either direction.</td>
+<td>A notification at a detent.</td>
+</tr>
+<tr>
+<td>Cross (inc)</td>
+<td>The axis crosses from a lower value toward a higher value.</td>
+<td>Enable a function above a threshold.</td>
+</tr>
+<tr>
+<td>Cross (dec)</td>
+<td>The axis crosses from a higher value toward a lower value.</td>
+<td>Disable a function on the return movement.</td>
+</tr>
+</tbody>
+</table>
+<p>A crossing is an event, not a held state. Remaining on one side of a gate does not create repeated crossing events unless the axis crosses it again.</p>
+<p>Do not put the same one-shot command on both Crossed and Cross (inc) unless you want both mappings to run on an increasing crossing. Each tab has its own mapping.</p>
+<p>For a momentary output from a crossing, choose either a nested action that handles its own timed release or configure the gate's <strong>Autorelease</strong> behavior. See <a href="#configure-releases-and-trigger-timing">Configure releases and trigger timing</a>.</p>
+<h2 id="configure-range-actions">Configure range actions<a class="headerlink" href="#configure-range-actions" title="Permanent link">¶</a></h2>
+<p>Double-click the space between gate handles, use a range's configuration control, or right-click the range and select <strong>Configure...</strong>.</p>
+<p>Set a <strong>Range Description</strong>, then choose the relevant condition tab.</p>
+<table>
+<thead>
+<tr>
+<th>Range condition</th>
+<th>Meaning</th>
+<th>Suitable use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>In Range</td>
+<td>Supplies axis-value updates while the source is inside the interval.</td>
+<td>Drive a virtual axis using this part of the input travel.</td>
+</tr>
+<tr>
+<td>Enter Range</td>
+<td>Generates an activation when the source enters the interval.</td>
+<td>Send a one-shot command on entry.</td>
+</tr>
+<tr>
+<td>Exit Range</td>
+<td>Generates an activation when the source leaves the interval.</td>
+<td>Send a one-shot command on exit.</td>
+</tr>
+<tr>
+<td>Range Hold</td>
+<td>Press on entry; release on exit.</td>
+<td>Hold a virtual button or keyboard command while in the zone.</td>
+</tr>
+<tr>
+<td>Outside of Range</td>
+<td>Processes updates while the source is outside this interval.</td>
+<td>Specialized outside-state behavior.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="in-range-continuous-value-mapping">In Range: continuous value mapping<a class="headerlink" href="#in-range-continuous-value-mapping" title="Permanent link">¶</a></h3>
+<p>Use this tab when the nested action needs an axis value. Its <strong>Output Mode</strong> controls whether that value is unchanged, scaled, fixed, rebased, or filtered.</p>
+<p>Add an axis-capable action, such as Map to vJoy configured for an axis destination. Set the destination inside that nested action; defining the range alone does not choose an output device.</p>
+<p>In Range responds to incoming value changes. It is not a periodic timer that repeatedly runs a command while the axis is stationary.</p>
+<h3 id="enter-range-and-exit-range-one-shot-events">Enter Range and Exit Range: one-shot events<a class="headerlink" href="#enter-range-and-exit-range-one-shot-events" title="Permanent link">¶</a></h3>
+<p>Both conditions produce activation events. <strong>Exit Range is not a key-up event for an Enter Range action.</strong> It is a separate condition with its own mappings.</p>
+<p>For example, put a Keyboard Ex Pulse action on Enter Range to send one shortcut, and a different Pulse action on Exit Range to send another.</p>
+<p>If you want a single output held throughout the interval, use Range Hold instead of trying to pair unrelated entry and exit containers.</p>
+<h3 id="range-hold-matched-press-and-release">Range Hold: matched press and release<a class="headerlink" href="#range-hold-matched-press-and-release" title="Permanent link">¶</a></h3>
+<p>Use Range Hold with an output action that follows button state:</p>
+<ol>
+<li>Select <strong>Condition: Range Hold</strong>.</li>
+<li>Add a container and a button-capable output action.</li>
+<li>For a virtual button, configure a normal hold mapping to the destination button.</li>
+<li>For a keyboard key, configure Keyboard Ex in <strong>Hold</strong> mode.</li>
+<li>Move into and out of the interval and verify both output states.</li>
+</ol>
+<p>This condition supplies the natural release when the axis leaves. It does not need a timed release to simulate the end of a crossing pulse.</p>
+<h3 id="outside-of-range">Outside of Range<a class="headerlink" href="#outside-of-range" title="Permanent link">¶</a></h3>
+<p>This condition can process many input updates while the axis remains outside the interval. It is not equivalent to “fire once when exiting.” Use Exit Range for a one-shot exit command.</p>
+<p>In the reviewed handler, Outside of Range events carry a released/false button state, and the editor exposes a button-type mapping on this tab. Check the nested action's execution settings; a press-only mapping may not react. Use Range Hold for the common “on inside, off outside” requirement.</p>
+<h2 id="choose-a-range-output-mode">Choose a range output mode<a class="headerlink" href="#choose-a-range-output-mode" title="Permanent link">¶</a></h2>
+<p>The following settings are available on a range's <strong>In Range</strong> tab.</p>
+<table>
+<thead>
+<tr>
+<th>Output Mode</th>
+<th>Value sent to nested axis actions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal</td>
+<td>The input axis value, unchanged.</td>
+</tr>
+<tr>
+<td>Output Fixed Value</td>
+<td>The configured Fixed Value while inside the interval.</td>
+</tr>
+<tr>
+<td>Ranged</td>
+<td>The position within this interval, scaled to Range Min and Range Max.</td>
+</tr>
+<tr>
+<td>Filtered (no output)</td>
+<td>Suppresses the regular in-range axis-value output.</td>
+</tr>
+<tr>
+<td>Rebased to [-1,1]</td>
+<td>Maps this interval's low boundary to <code>-1.0</code> and high boundary to <code>+1.0</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="normal-versus-rebased-values">Normal versus rebased values<a class="headerlink" href="#normal-versus-rebased-values" title="Permanent link">¶</a></h3>
+<p>Suppose a range runs from <code>0.60</code> to <code>1.00</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Source position</th>
+<th>Normal output</th>
+<th>Rebased output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0.60</code></td>
+<td><code>0.60</code></td>
+<td><code>-1.00</code></td>
+</tr>
+<tr>
+<td><code>0.80</code></td>
+<td><code>0.80</code></td>
+<td><code>0.00</code></td>
+</tr>
+<tr>
+<td><code>1.00</code></td>
+<td><code>1.00</code></td>
+<td><code>+1.00</code></td>
+</tr>
+</tbody>
+</table>
+<p>Use Normal to preserve the source's position. Use Rebased when a small part of the physical travel should operate a complete virtual-axis span.</p>
+<h3 id="ranged-scaling">Ranged scaling<a class="headerlink" href="#ranged-scaling" title="Permanent link">¶</a></h3>
+<p>Select <strong>Ranged</strong>, then enter <strong>Range Min</strong> and <strong>Range Max</strong> under <strong>Scaling options</strong>.</p>
+<p>For a physical interval of <code>0.60</code> to <code>1.00</code>, output limits of <code>0.00</code> and <code>1.00</code> produce:</p>
+<table>
+<thead>
+<tr>
+<th>Source position</th>
+<th>Ranged output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0.60</code></td>
+<td><code>0.00</code></td>
+</tr>
+<tr>
+<td><code>0.80</code></td>
+<td><code>0.50</code></td>
+</tr>
+<tr>
+<td><code>1.00</code></td>
+<td><code>1.00</code></td>
+</tr>
+</tbody>
+</table>
+<p>The range dialog's <strong>Reset</strong> restores its scaling limits to that interval's input bounds. It does not necessarily select <code>-1.0</code> to <code>+1.0</code>. Choose Rebased or explicitly enter full-span limits when that is what you want.</p>
+<h3 id="fixed-output">Fixed output<a class="headerlink" href="#fixed-output" title="Permanent link">¶</a></h3>
+<p>Select <strong>Output Fixed Value</strong> and enter the required value. This is useful for mapping a lever position zone to a discrete axis setting, such as a flap preset.</p>
+<p>The value is an output to nested actions; it does not physically lock the source control. Outside the zone, another mapping must define any subsequent output you require.</p>
+<h3 id="filtered-output">Filtered output<a class="headerlink" href="#filtered-output" title="Permanent link">¶</a></h3>
+<p>Use <strong>Filtered (no output)</strong> when this range should not pass its normal axis-value stream to nested actions.</p>
+<p>Filtering is not a command to set an output to zero or release a key. The destination can retain its previous value. Gate crossings and other configured range conditions are separate from the continuous axis-value output, so review those tabs as well.</p>
+<h2 id="configure-releases-and-trigger-timing">Configure releases and trigger timing<a class="headerlink" href="#configure-releases-and-trigger-timing" title="Permanent link">¶</a></h2>
+<p>Gate-crossing tabs and range Enter/Exit tabs expose <strong>Autorelease</strong>. The configuration dialog also has <strong>Trigger Delay</strong>, in milliseconds.</p>
+<p>With Autorelease enabled, a trigger is followed by a release after the delay. This lets a crossing or entry event behave like a short button press for a nested action that expects a down/up pair.</p>
+<p>Trigger Delay is <strong>not</strong> a dwell time, gate-crossing sensitivity, or noise filter. It does not require the axis to stay beyond a gate before activating the command.</p>
+<p>Choose the release strategy that matches the task:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Suggested setup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold a button while in a zone</td>
+<td>Range Hold plus a nested hold-style output.</td>
+</tr>
+<tr>
+<td>Brief key command at a crossing</td>
+<td>Gate condition plus Keyboard Ex Pulse.</td>
+</tr>
+<tr>
+<td>Make a crossing resemble a momentary button</td>
+<td>Gate condition with Autorelease, plus an action that follows the generated button state.</td>
+</tr>
+<tr>
+<td>Separate commands on entering and leaving</td>
+<td>Different one-shot actions on Enter Range and Exit Range.</td>
+</tr>
+</tbody>
+</table>
+<p>If a nested action has its own pulse duration, distinguish that duration from Gated Axis Trigger Delay. Adding two independent release mechanisms can make diagnosis harder; begin with the one your output actually needs.</p>
+<h2 id="monitor-and-test-events">Monitor and test events<a class="headerlink" href="#monitor-and-test-events" title="Permanent link">¶</a></h2>
+<p>Enable <strong>Show events</strong> to display <strong>Range events</strong> and <strong>Gate events</strong>. Use the event-type checkboxes to reduce clutter:</p>
+<ul>
+<li><strong>All</strong> selects every event type for display.</li>
+<li><strong>None</strong> hides all event types from these lists.</li>
+<li>Individual checkboxes select the displayed categories.</li>
+</ul>
+<p>These are <strong>display filters</strong>. They do not disable the action mappings. Likewise, hiding Show events does not turn off the Gated Axis action.</p>
+<p>The reviewed handler keeps a short rolling history of the latest events rather than a permanent event log. These display histories are populated for editor-time diagnostics; do not assume they are a complete runtime execution trace.</p>
+<h3 id="recommended-test-sequence">Recommended test sequence<a class="headerlink" href="#recommended-test-sequence" title="Permanent link">¶</a></h3>
+<ol>
+<li>With the profile stopped, move the axis slowly through every range.</li>
+<li>Cross each configured gate in the increasing direction.</li>
+<li>Cross it again in the decreasing direction.</li>
+<li>Pause on each side and watch for unexpected repeated crossings.</li>
+<li>Test the low and high ends and positions close to each boundary.</li>
+<li>Start the profile and verify the actual virtual/key output.</li>
+<li>Test a fast sweep, startup at several positions, and relevant runtime-mode changes.</li>
+</ol>
+<p>An event appearing in the editor confirms trigger detection. It does not, by itself, prove that the nested action has a valid destination or that the target application accepts its output.</p>
+<h2 id="startup-and-runtime-behavior">Startup and runtime behavior<a class="headerlink" href="#startup-and-runtime-behavior" title="Permanent link">¶</a></h2>
+<p>After profile startup, the action reads the current axis position and sends an initialization event to the gate handler. You do not necessarily have to move the control before range-related actions become active.</p>
+<p>The reviewed handler's first evaluation can initialize:</p>
+<ul>
+<li>Enter Range and Range Hold for ranges containing the current value.</li>
+<li>Exit Range and outside-state behavior for other ranges.</li>
+</ul>
+<p>Consequently, a one-shot mapped to Enter Range or Exit Range can run at startup without a physical crossing. Test startup separately, particularly when those commands have lasting effects. Do not assume “Exit Range” always proves the axis previously occupied that range during the current run.</p>
+<p>Unchanged axis values are skipped by the trigger processor. Normal axis updates drive the evaluation; Gated Axis is not a repeating command timer.</p>
+<p>A fast change can cross several gates between samples and produce several crossing events. Do not depend on their delivery order for a tightly timed command sequence. Configure a sequence action if strict ordering is required.</p>
+<p>The action participates in profile-mode handling. If behavior changes after a mode switch, verify the active mode, its inherited mappings, and the nested action's conditions.</p>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="hold-a-virtual-button-above-a-throttle-detent">Hold a virtual button above a throttle detent<a class="headerlink" href="#hold-a-virtual-button-above-a-throttle-detent" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add an interior gate at <code>0.80</code>.</li>
+<li>Open the upper range, <code>0.80</code> to <code>1.00</code>.</li>
+<li>Select <strong>Condition: Range Hold</strong>.</li>
+<li>Add Map to vJoy with a normal button-hold mapping to the required destination button.</li>
+<li>Save, start the profile, and move across the detent in both directions.</li>
+</ol>
+<p>Expected result: the virtual button is on while the throttle is in the upper zone and off after it leaves. Verify the exact boundary and startup position on your device.</p>
+<h3 id="send-different-shortcuts-across-a-detent">Send different shortcuts across a detent<a class="headerlink" href="#send-different-shortcuts-across-a-detent" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add a gate at the desired threshold, such as <code>0.50</code>.</li>
+<li>Open <strong>Condition: Cross (inc)</strong> and add Keyboard Ex Pulse with the command for increasing travel.</li>
+<li>Open <strong>Condition: Cross (dec)</strong> and add a second Pulse action with the command for decreasing travel.</li>
+<li>Leave Crossed empty unless a separate both-directions command is also required.</li>
+<li>Test the actual command sent in each direction.</li>
+</ol>
+<p>Use the condition-tab names and the direction of the live axis value when testing. The event history has a direction-label issue in the reviewed handler; see the version notes below.</p>
+<h3 id="use-the-upper-half-of-an-axis-for-a-full-virtual-axis-span">Use the upper half of an axis for a full virtual-axis span<a class="headerlink" href="#use-the-upper-half-of-an-axis-for-a-full-virtual-axis-span" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create gates at <code>-1.0</code>, <code>0.0</code>, and <code>1.0</code>.</li>
+<li>Open the upper range's <strong>In Range</strong> tab.</li>
+<li>Select <strong>Rebased to [-1,1]</strong>.</li>
+<li>Add Map to vJoy in Absolute axis mode and choose the destination axis.</li>
+<li>Move from just above <code>0.0</code> to <code>1.0</code> and verify full virtual travel.</li>
+</ol>
+<p>Normal output on that interval would use only <code>0.0</code> to <code>1.0</code>; rebasing expands the interval to the full normalized span. Configure the lower range separately. If it is filtered, the destination may retain its last value while the source is there.</p>
+<h3 id="select-discrete-axis-presets-with-lever-zones">Select discrete axis presets with lever zones<a class="headerlink" href="#select-discrete-axis-presets-with-lever-zones" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add gates to divide the travel into the desired zones.</li>
+<li>On each range's <strong>In Range</strong> tab, select <strong>Output Fixed Value</strong>.</li>
+<li>Enter a different output value for each zone, such as <code>-1.0</code>, <code>0.0</code>, and <code>+1.0</code> for three zones.</li>
+<li>Add a Map to vJoy axis action in each zone, all targeting the intended axis.</li>
+<li>Check each zone and start the profile with the lever in different positions.</li>
+</ol>
+<p>Expected result: the virtual axis receives the configured preset for the occupied zone. Use descriptions to keep the zones recognizable after editing.</p>
+<h2 id="edit-an-existing-layout-safely">Edit an existing layout safely<a class="headerlink" href="#edit-an-existing-layout-safely" title="Permanent link">¶</a></h2>
+<p>Before deleting or substantially repositioning gates, save the profile and preserve important mappings using the application's duplication, template, or clipboard features where available.</p>
+<p>To delete a gate, right-click its handle and select <strong>Delete Gate</strong>, or use the gate-row delete control. The editor prevents deletion below two gates and can prompt when the gate or adjacent ranges contain mappings.</p>
+<p>Removing a gate changes the adjacent intervals. Reopen those ranges and check their condition tabs and output modes afterward. Do the same after reducing the gate count or normalizing the layout.</p>
+<p>The editor provides a <strong>Ctrl+Z</strong> snapshot undo mechanism while the profile is stopped and UI key input is not suspended. The history is limited to <strong>20</strong> snapshots. Do not treat it as complete undo coverage for every gate operation or nested action edit; saving a known-good profile remains the dependable recovery point.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Moving the axis produces no output</td>
+<td>The intended condition tab contains an action; the profile is running in the correct mode; nested conditions are satisfied; its output destination is valid.</td>
+</tr>
+<tr>
+<td>Gates move, but commands never run</td>
+<td>Editing a layout alone does not add output actions. Open the gate/range and configure a container on the relevant condition tab.</td>
+</tr>
+<tr>
+<td>A command repeats throughout a zone</td>
+<td>A continuous In Range or Outside of Range condition may be driving it. Use Enter Range or Exit Range for a one-shot.</td>
+</tr>
+<tr>
+<td>A button remains pressed after leaving</td>
+<td>Use Range Hold with a hold-style nested action, or provide an appropriate timed/explicit release for a crossing action.</td>
+</tr>
+<tr>
+<td>Exit Range does not release the Enter Range output</td>
+<td>Exit Range is a separate activation. Use Range Hold for matched press/release behavior.</td>
+</tr>
+<tr>
+<td>Output uses only part of a virtual axis</td>
+<td>Use Rebased or Ranged rather than Normal; also check scaling in the nested action.</td>
+</tr>
+<tr>
+<td>Filtered range leaves the last output in place</td>
+<td>Expected: filtering suppresses updates; it does not reset the destination. Configure a fixed value or another condition if a reset is required.</td>
+</tr>
+<tr>
+<td>Direction appears backward</td>
+<td>Check numeric movement and the chosen Cross (inc)/(dec) tab. Account for the event-history label issue noted below.</td>
+</tr>
+<tr>
+<td>Small movement triggers a gate repeatedly</td>
+<td>Observe whether the input oscillates across the boundary; reposition the gate away from an unstable rest position or address source-axis processing. Trigger Delay is not a deadband.</td>
+</tr>
+<tr>
+<td>One crossing causes duplicate commands</td>
+<td>Check Crossed and directional tabs, adjacent range Enter/Exit mappings, and other actions on the same source.</td>
+</tr>
+<tr>
+<td>Startup sends an unexpected command</td>
+<td>The initialization evaluation can fire range conditions without movement. Test the initial position and review Enter/Exit mappings.</td>
+</tr>
+<tr>
+<td>Mapping information disappeared after editing</td>
+<td>Gate deletion, gate-count reduction, or normalization may have changed affected ranges. Restore the saved profile or preserved mapping.</td>
+</tr>
+<tr>
+<td>Cannot add a gate</td>
+<td>Check for an existing gate at that value and the 20-gate maximum.</td>
+</tr>
+<tr>
+<td>Range cannot be configured sensibly</td>
+<td>Separate coincident gates and check adjacent boundaries.</td>
+</tr>
+<tr>
+<td>No event-history text</td>
+<td>Enable Show events and at least one display filter; test in the editor. The history is not a complete runtime log.</td>
+</tr>
+<tr>
+<td>Analog output looks scaled twice</td>
+<td>Review the range Output Mode and the nested action's own range/curve processing.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

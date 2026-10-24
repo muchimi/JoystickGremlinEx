@@ -13,11 +13,11 @@ Actions are contained in [containers](containers.md#containers).
 | Control | Modifies GremlinEx runtime options  | Enable or disable remote control, pause a profile, etc... |
 | Cycle Modes | Changes profile modes as a sequence | Each trigger of the input advances to the next mode in the list |
 | Description | Adds a descriptive note to actions in a container, optionally placing an output to the log file | Used in sequence or chain containers to document/add a comment to profile logic |
-| Gated Axis | This action is an advanced linear axis mapper and executes actions based on axis movement, such as crossing a particular point on an axis, entering or exiting a range between two points. | Use for advanced axis mapping if you need something to happen at specific points on an axis, or specific ranges.  The action can also scale, remap or split up an axis into multiple outputs |
+| [Gated Axis](actions/gated_axis_user_guide.md) | This action is an advanced linear axis mapper and executes actions based on axis movement, such as crossing a particular point on an axis, entering or exiting a range between two points. | Use for advanced axis mapping if you need something to happen at specific points on an axis, or specific ranges.  The action can also scale, remap or split up an axis into multiple outputs |
 | Macro | This action defines simple steps to execute such as pressing or releasing a key, setting an axis value or a state | Use this for simple macro situations.  For more advanced features, look at the sequence container |
 | Map to Gamepad | This action lets you map to a console game controller output via VIGEM | Use this if your target application only understands game controllers |
 | Map to Keyboard (legacy) | This action is a legacy action to create keyboard output, included here to be compatible with original Joystick Gremlin profiles |
-| Map to Keyboard/Mouse Ex | This action lets you output keyboard, and mouse button or mouse wheel to the output.  Supports advanced options for auto-repeat, hold, latching and various other controls.  Support multimedia key output such as volume control. | Use this when you need to send keyboard / mouse output to the target application |
+| [Map to Keyboard/Mouse Ex](actions/keyboard_ex_user_guide.md) | This action lets you output keyboard, and mouse button or mouse wheel to the output.  Supports advanced options for auto-repeat, hold, latching and various other controls.  Support multimedia key output such as volume control. | Use this when you need to send keyboard / mouse output to the target application |
 | Map to Mouse | This action is a legacy action to create mouse output.  Supports button and axis (mouse movement) actions.  | Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
 | Map to Mouse Ex | More advanced version of the legacy action to create mouse output. Ability to trigger a mouse button, mouse motion, or set the mouse to a set position. |Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
 | Map to Octavi IFR1 | Allows you to change/set LEDs on the IFR1 device | Use this to manage modes and LEDs on the Octavi IFR1 hardware panel |
@@ -27,7 +27,7 @@ Actions are contained in [containers](containers.md#containers).
 | Map to Simconnect | Sends commands and inputs to Microsoft Flight Simulator using the Simconnect SDK.  Works with the GremlinEx WASM module for MSFS to process internal calculator code, which mostly lets you control add-on software for MSFS not exposed via the usual SDK.  This lets you use GremlinEx to completely bypass the MSFS internal mapper. |
 | Map to State | This action modifies states at runtime.  This action lets you toggle a state on/off, pulse, repeat or set a state and otherwise modify the state based on the input. | Use this to set states used as a condition or a mode replacement, to track input status such as mechanical switch positions. This can also be used to enable or disable containers via the State Container, and perform sophisticated profile logic actions when used on conjunction with expression based states (states that are based on other states using boolean logic). |
 | Map to trigger | This action sends a virtual trigger to the profile as if the input hardware was triggered.  This can send any joystick event such as a button, hat or axis change, and looks to the profile as if the actual hardware was touched. | Use this to trigger other parts of the profile that are already mapped. This enables one input to trigger other inputs. |
-| Map to Vjoy (Vjoy Remap) | This action lets you do advanced mapping to VJOY devices, including applying curves or merging axes. | Use this when you need to map to a vjoy device. |
+| [Map to Vjoy (Vjoy Remap)](actions/map_to_vjoy_user_guide.md) | This action lets you do advanced mapping to VJOY devices, including applying curves or merging axes. | Use this when you need to map to a vjoy device. |
 | Noop | This action is a placeholder action if a container requires an action and you want nothing to happen yet while using the other functionality from the container. | Use this to fill required action slots you want ignored. |
 | Pause | This action adds a delay or pauses profile execution.  | Use this as a pause/delay in sequence or chained containers.  See the Resume action to re-enable a suspended profile if used in that mode. |
 | Play Sound | This action plays an audio file.  Optionally let you play a random audio file from a folder at every trigger for variety.  Supports audio output to multiple concurrent audio devices, and supports concurrent audio on the same device.  Supports faders to manage clip duration, ramp up and ramp down, volume, and pitch corrected playback rate. | Use this to play WAV or MP3 audio (WAV recommended for low latency). |
@@ -37,7 +37,7 @@ Actions are contained in [containers](containers.md#containers).
 | Response Curve Ex | This is a more advanced legacy action added early on to GremlinEx. | Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead. |
 | Resume | Resumes profile execution paused with the Pause action | Use this to resume a profile after it has been paused |
 | Run Process | This action will execute a command line. | Use this to launch another process from within a profile.  Be aware that UAC may prevent on some systems the execution if the account used to run GremlinEx has insufficient rights. |
-| Split Axis | This is a legacy action to split up an axis into multiple ranges. This action is to be compatible with older profiles.  | Use the Gated Axis action instead.| 
+| Split Axis | This is a legacy action to split up an axis into multiple ranges. This action is to be compatible with older profiles.  | Use the Gated Axis action instead.|
 | Switch Mode | This action lets you change the profile mode at runtime. | Use this to change modes. |
 | Temporary Mode Switch | This action temporarily changes the mode while the input is pressed, and changes back to the previous mode when released. | Use to temporarily switch modes. |
 | Text to Speech (TTS) | This action converts text to speech using the internal operating system TTS synthesis.  Voices available depend on what voice packs are installed on the system.  The output is limited to the default audio device. | While you can use this for TTS, the recommendation is to use an online AI TTS converter that lets you save a WAV file (or MP3 you can convert to WAV via Audacity for example), and use the Play Sound action instead as it is both faster and less resource intensive, and allows multiple sounds at the same time unlike TTS. |
@@ -146,13 +146,13 @@ This action is an advanced joystick axis mapper/filter.   The premise of Gated A
 
 ### What is a gate?
 
-A gate is a fixed point along the axis, with a normalized floating point value between -1 and +1.  Two gates are always defined, representing the extremities of an axis.  
+A gate is a fixed point along the axis, with a normalized floating point value between -1 and +1.  Two gates are always defined, representing the extremities of an axis.
 
 ### What is a range?
 
 The space between two gates is called a range.  It is a linear space between two specific points on an axis.  There is always at least one range defined, because there is a minimum of two gates.
 
-Unlike gates, ranges have two conditions that output linear values with optional scaling/rebasing or even output supression to create deadzones on a given axis.  
+Unlike gates, ranges have two conditions that output linear values with optional scaling/rebasing or even output supression to create deadzones on a given axis.
 
 ### Available triggers
 
@@ -184,7 +184,7 @@ Some of the triggers are duplicative: a range exit could be also triggered via a
 
 ### Gates
 
-A gate is a point along the input axis with a specific floating point value in the range -1 to +1.  
+A gate is a point along the input axis with a specific floating point value in the range -1 to +1.
 
 Up to 20 gates can be defined.
 
@@ -327,13 +327,13 @@ This includes sending calculation and expressions via the GremlinEX WASM module 
 
 ![map to simconnect calculator action](assets/action_map_to_simconnect_calculator.png)
 
-Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the [Microsoft Flight Simulator SDK](https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm).  
+Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the [Microsoft Flight Simulator SDK](https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm).
 
 The recommended setup is to have a single profile for Microsoft Flight Simulator, and have a mode for each aircraft type, and under that if needed, a mode for each subtype/variant.  Recommendations including having a setup for Boeing, Airbus, single prop, dual prop, single turboprop and dual turboprop, and quad engine as the base.  The Simconnect options page in GremlinEx while the sim is running will pull the current aircraft and let you associate a mode with that aircraft.  If you find the aircraft uses the default mode, it means it's being reported as a new type and likely needs to be associated with a profile mode for that type.
 
 For aircraft with detents, such as for spoiler or throttles, use the Gated Axis as it was designed precisely for this complicated need and in conjunction with other mapping features make mapping complex throttle assignments relatively easy.
 
-It is also recommended to use calculator expressions as much as a possible due to the capabilities to access add-on variables that are not in SimConnect.  A [guide to calculator expressions can be found here](https://hubhop.mobiflight.com/presets/) with examples for commond add-ons.  All these work as-is in GremlinEx and allow you to access variables defined by each add-on.  
+It is also recommended to use calculator expressions as much as a possible due to the capabilities to access add-on variables that are not in SimConnect.  A [guide to calculator expressions can be found here](https://hubhop.mobiflight.com/presets/) with examples for commond add-ons.  All these work as-is in GremlinEx and allow you to access variables defined by each add-on.
 
 SimConnect itself is a bit of an arcane art due to the historically poor documentation, lack of examples and errors / ommissions which combined with bugs make controlling MSFS via SimConnect an interesting challenge, however one miles better than using the built-in MSFS control mapper.  A number of add-ons also define variables that are not part of the base simulator, so are not exposed by the SimConnect SDK.  The only way to set them is to use calculator expressions, and consult the add-on manual and the MSFS user commmunity for what the variables are.
 
@@ -520,8 +520,8 @@ The action can synchronize the state value on profile start with the input.  Thi
 
 ## Map to mouse EX action
 
-This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
-  
+This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.
+
 The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.
 
 | Command      | Description |

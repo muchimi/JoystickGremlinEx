@@ -35,6 +35,7 @@ import dinput
 from gremlin.util import TriggerDict
 import _collections_abc
 import gremlin.joystick_handling
+import traceback
 
 
 syslog = logging.getLogger("system")
@@ -741,9 +742,19 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
     def update_inputs(self, item_data):
         """updates inputs from another profile entry"""
-        self._input_item.setInputId(item_data.input_id)
-        self._input_item.device_guid = item_data.device_guid
-        self._input_item.device_name = item_data.device_name
+        # non special devices only
+        if gremlin.joystick_handling.isSpecialDevice(item_data.device_guid):
+            return
+        try:
+            self._input_item.setInputId(item_data.input_id)
+            self._input_item.setInputType(item_data.get_input_type())
+            self._input_item.device_guid = item_data.device_guid
+            self._input_item.device_name = item_data.device_name
+        except AttributeError:
+            syslog.warning("Failed to update input item from item_data due to AttributeError")
+            syslog.debug(f"Item data: {item_data}")
+            syslog.warning(traceback.format_exc())
+
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.

@@ -1418,6 +1418,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def device_name(self):
         return self._device_name
 
+
+
     @property
     def data(self):
         return self._data

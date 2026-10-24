@@ -58,6 +58,14 @@ sympy >= 1.14.0
 pycaw >= 20260927
 OdenGraphQt >= 0.7.4
 
+
+# documentation related
+mkdocs >= 1.5.1
+mkdocs-material >= 9.2.0
+mkdocs-glightbox >= 1.0.0
+mkdocs-autorefs >= 0.5.0
+
+
 # ffmpeg is included in the distro under ffmpeg
 
 

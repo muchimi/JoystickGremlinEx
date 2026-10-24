@@ -5396,6 +5396,8 @@ class Profile:
         #             return # stop
 
         # look for sub conditions
+        if not input_item:
+            return False
         for container in input_item.containers:
             if container.has_conditions:
                 for condition in container.activation_condition.conditions:

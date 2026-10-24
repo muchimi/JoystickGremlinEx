@@ -1353,6 +1353,15 @@ def getSpecialDevices() -> list:
     # with _device_registry_lock:
     return list(_special_devices)
 
+def isSpecialDevice(device_guid: str) -> bool:
+    """checks if a device is a special device"""
+    global _special_devices
+    device_guid = gremlin.util.normalize_guid(device_guid)
+    for device in _special_devices:
+        if device.device_guid == device_guid:
+            return True
+    return False
+
 
 def getConfigDevices() -> list:
     """gets all configuration devices"""

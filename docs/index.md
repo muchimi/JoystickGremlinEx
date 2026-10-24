@@ -1,16 +1,191 @@
 # Introduction
 
-(this documentation is a work in progress)
+(this documentation is a work in progress as new features and updates are made for the m77 version currently in testing).
 
-## What is GremlinEx?
+## What is GremlinEx (GEX)?
 
-GremlinEx is a universal game/simpit controller integrator: it allows you to take concurrnt input from various hardware or network devices, such as joysticks, panels, game controllers, and audio-visual hardware and software that supports OSC (Open Source Control) such as a glass surface (touch screen) panel, MIDI, keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.  GremlinEx maps this input to a simplified and consolidated set of outputs, and it is vendor agnostic.   GremlinEx also has the ability to directly send data to Microsoft Flight Simulator via the SimConnect API and a custom WASM module.
+GremlinEx also known as GEX is a universal game/simpit controller integrator: it allows you to take input from various hardware or network devices, process or combine that input, and send the computed output to a simulator, game or application.
 
-Gremlin supports glass surfaces (touch screens), hardware panels like StreamDeck, and even MIDI control panels and works well with tools like Bitfocus Companion and Open Stage Control.
+### Audience
 
-The audience for GremlinEx is anyone looking to easily integrate multiple hardware input devices from joysticks to control panels and map it to a game without having to use proprietary vendor software.  GremlinEx is simple to use for simple mapping scenarios, and it also includes a rich set of tools for the transformations, manipulation and routing of inputs.  GEX supports anything from custom joystick curve editing to conditional output, execution, and has modes and states to dynamically control the execution of mappings at runtime.  GremlinEx can also remote control other GremlinEx instances on the network, playback audio, supports dynamic text to speech, axis merging and axis splitting and scaling, curving and calibration.
+The audience for GremlinEx (GEX) is anyone looking to easily integrate and unify multiple hardware input devices from joysticks to control panels and map it to a game without having to use proprietary vendor software.
+
+
+GremlinEx is simple to use for simple mapping scenarios, yet can also perform very complex mapping tasks with its more advanced options.
+
+GEX includes a rich set of tools for the transformations, manipulation, processing and routing of inputs.  GEX supports anything from custom joystick curve editing to conditional output, execution.  It supports profile modes and a dynamic state machine to dynamically control the branching and execution of mappings at runtime.  GremlinEx can also remote control other GEX instances on the network, playback audio, supports dynamic text to speech, voice recognition, axis merging and axis splitting and scaling, curving and calibration.
+
+GEX is based on years of experience with various game mapping software and specific challenges related to supporting multiple simulation games, each with their own approach, and wanting to provide a unified experience that does all the mapping in one unified application.
 
 A more detailed look at features supported by GremlinEx can be found in the [overview section](overview.md) of the documentation.
+
+
+### Supported inputs
+
+- Joysticks axis (linear)
+- Joystick buttons (momentary)
+- Joystick hats (momentary, 8 position + center)
+- Throttles axis and buttons
+- Hardware panels (in HID controller mode)
+- Keyboards with advanced multi-key latching, media keys, and extended key support such as F13 to F24.
+- Mouse (movement, buttons, horizontal and vertical wheel)
+- Generic HID game controllers
+- Custom simpit Arduino or Rasberry Pi (in HID controller mode)
+- OSC (Open Sound Control) devices such as audio mixers, touch surfaces with axis and button parameter support
+- MIDI devices (via USB interface) (linear, momentary and CC/channel support)
+- Touch Screen Panels
+- Audio Visual equipment and stage controllers including Streamdeck and LoupeDeck (via Bitfocus Companion and OSC)
+- GEX network clients
+- Voice inputs (voice recognition) [experimental] with supression mode (PTT) support to disable on the fly.
+- Overlay touch input [experimental]
+- Overlay web input [experimental] for touch support on non Windows devices (phones, tablets)
+- Streamdeck input (native and via BitFocus Companion/OSC)
+
+### Supported outputs
+
+- Virtual joystick output via VJOY for axes, buttons and hats (up to 16 devices with up to 8 axis, 128 buttons and four 8-way hats)
+- Keyboard
+- Mouse
+- OSC protocol devices for output control
+- Ability to execute a process
+- AI enabled advanced text to speech with high quality voices
+- Advanced screen Overlays [experimental] - design and superimpose widgets that react to input on any monitor
+- Advanced text to speech (TTS) to convert text
+- Multi-stream audio playback
+- External process execution
+- Output to other GEX network clients for remote control including full KVM exclusive mode
+- Virtual gamepad controller
+- Microsoft SimConnect API for Flight Simulator 2024 output including support for custom API expressions and in-sim bridge WASM module
+
+### Supported processing includes
+
+- multi-step axis merging (combining) from same or different device, with scale, add, substract, center and trim modes
+- advanced axis processing including multiple custom triggler points on axis, directional triggers, range entry/exit/in-range logic, range suppression, output re-scaling based on range
+- State machine logic including boolean expressions, exclusive and grouping behaviors
+- Grouping of actions in profile modes that can be nested
+- Multi-latch of keyboard inputs
+- Two input encoder inputs (multi button or multi key) including acceleration and PID (setpoint) output models
+- Axis to button with custom stepped and PID behaviors
+- Button to axis with custom steps
+- Macro execution
+- Advanced sequence execution (any output) including random modes
+- Hold, pulse, press, release, toggle functionality for actions
+- Convenience containers for easier and faster mapping of common processing tasks (repeater, button press/release)
+- Timed containers for single click, double click, short press and long press
+- Advanced keyboard mapper with multi-latch of any key beyond the usual modifiers
+- Remote control of other GEX clients on the local network
+- Custom Python plugin API to add custom functionality not built in
+
+### GEX performance
+
+- targets high speed runtime processing in the millisecond range (sub 50 millisecond is the target with most being under 10 milliseconds in benchmarks)
+- low CPU overhead for most modes (varies with profile complexity)
+- built in Python but leverages native C++ libraries for fast execution
+- Note that complex profiles and displaying hundreds of inputs concurrently may increase CPU and memory usage by a significant amount.  To this end, GEX offers multiple UI filters to reduce the visible input count.   This usage is for design time only and does not typically carry over into the execution phase, although it is recommend once the profile is designed to limit the number of inputs displayed in the UI to reduce the overall footprint, and to disable modules that you do not use so they don't consume resources just by being loaded.
+
+### What can you do with GEX?
+
+- GEX is hardware agnostic and lets you combine inputs from different controllers and unify them with a single profile, removing the need to program these devices separately using vendor specific software.
+- GEX provides advanced processing of linear (axis) and momentary (button/key) inputs and lets you combine them for specific behaviors
+- Rich set of containers and actions to simplify typical mapping tasks, each with basic and advanced functions.  GEX can thus handle simple mapping tasks or very advanced layered/branching for simulation/simpit applications.
+- Create a graphical game overlay that responds and displays your inputs on any game or application, for streaming, or instructional purposes or just visual feedback.
+- Trigger commands using your own voice using the voice recognition module (experimental)
+- Supplement actions with audio cues through the abilty to play multiple sounds at once, including text to speech
+- Design a state machine that branches profile execution extremely efficiently
+- Use hardware data or or states as input conditions to determine if an action should execute or not
+- Perform "setup" actions on profile start, or mode entry, to set buttons, axes or press/release keys just by start/stop or changing modes.
+- Works with any game/application that supports joysticks, keyboard or mouse input
+- Ability to send axis/buttons/keys to remote GEX clients on the local network with low latency to share hardware devices - this can be exclusive or concurrent
+- When used with HID Hide, lets your game or simulator only see the GEX outputs, so it does not get confused with your real hardware.
+- When used with Bitfocus Companion, lets you incorporate non tradditional control surfaces with buttons and faders into your simpit, including touch-screen (via OSC)
+- The new web overlay lets you use a networked phone or tablet to design and send control inputs to GEX that can then send it to your game/simulator.
+- The plugin architecture lets you use simulator APIs for two way communication.  GEX includes MSFS support built-in.
+
+### Supported platforms
+
+- GEX is currently 64 bit Windows only due to underlying dependencies.
+- Non Windows support is offered via the web overlay module (experimental) so that phones and tablets can be used as touch screen inputs.
+- GEX is built on Python 3.14.x, QT 6.x for the UI components and open source underlying libraries.  GEX does not include any non-open source components.  AI services are using free, publicly accessible, APIs.
+
+
+### Requirements
+
+- Windows 11 x64
+- Python 3.14 and any redistributable libraries are included in the base package and do not need to be installed. Some optional modules may download automatically if not installed from their respective open source projects.
+- VJOY is required (other virtual controllers are being considered such as HIDMaestro)
+- 1Gb of disk space and 16Gb memory.
+- A multi-core processor as GEX is heavily threaded.
+
+### Supported protocols
+
+- OSC (Open Sound Control) protocol devices
+- MIDI protocol for older MIDI controllers (local or networked via MIDI/OX)
+- UDP (for local network communication)
+
+
+### Recommended setup
+
+- one or more USB connected hardware joystick / panel / throttle that looks to Windows as an HID game controller
+- VJOY devices configured (two or three recommended as most titles recognize the first three joysticks - this gives you more axes, hats and buttons you can program).
+
+### Example of hardware tested with GEX
+
+- Raberry Pi custom HID controller
+- Derek Spears Design hardware panels (racing)
+- Wooting HE/HE2 keyboard (in joystick and regular modes)
+- Steelseries, HyperX and Logitech keyboards
+- Azeron
+- Octavi IFR1
+- Touch/OSC by Hexler (payware)
+- OSC/Pilot (payware)
+- Open Stage Control OSC surface (open source)
+- Arturia and Korg-mini MIDI controllers
+- Corsair Elgato StreamDeck and LoupeDeck (various models - button, encoder/touch fader modes, one and two way communication)
+- Logitech and Razor gaming mouse
+- Thrusmaster, Virpil, VPC, MFG, Logitech and Honeycomb controllers (throttles, pedals, panels, joysticks, yokes) - should work with Moza and WingWing as well
+- Rotary USB encoders (keyboard output)
+- OBS (Open Broadcaster Software) for streaming with the GEX overlay module
+- Windows touch screen functionality via Open Stage Control (network device) for glass surface game control
+
+### Example of tested applications with GEX
+
+- Cloud Imperium Games - Star Citizen
+- Eagle Dynamics DCS - Digital Combat Simulator
+- Microsoft Flight Simulator 2024 (direct via API)
+- Egosoft X4 Foundations
+- Blender 3D
+- OBS (Open Broadcaster Software)
+
+
+## What's new in m77?
+
+GEX m77 is the current iteration of GremlinEx in testing/development and incorporates:
+
+- Python 3.14.x support (without JIT compiler support as JIT is, for the moment, incompatible with QT)
+- bug fixes from m76
+- feature polish from m76 and a more consistent user interface
+- new overlay module for dynamic graphical widgets used as an overlay to a game screen
+- new Streamdeck bridge module (allows communication without Bitfocus or OSC)
+- new web module (allows interaction with GEX from any networked web browser such as a phone or tablet)
+- new audio engine with concurrent audio stream playback, fade in/out processing, pitch correct playback speed controls, volume controls
+- new AI text to speech for high quality TTS audio cues (up to 300 voices) (runs once to generate, caches generated audio files locally)
+- new voice recognition module (GEX will listen to voice commands and trigger actions) based on OpenAI's open source Whisper (runs local)
+- new state behaviors, including exclusive mode, grouping and attribute based triggering in map to state action
+- new PID (setpoint) controller mode for stepped axis (button to axis or encoder) - allows for dynamic time and deviation based response curve to smooth axis output to a specific value
+- new rotary encoder input support with acceleration support (these devices pulse in one direction or the other for axis output)
+- updated user interface and streamlined look and feel
+- EMA (exponential moving average) filter for chatty or noisy axis input filtering (this is aimed at older potentiometer based controllers or very chatty devices like Wooting or Azeron that spam the axis input queues)
+- more polished and responsive user interface with numerous improvements to memory management and workarounds for native issues between QT and Python
+- new custom color theme in addition to the existing dark/light modes
+- reworked sequence container for advanced macro-type functionality
+- reworked legacy macro execution engine to reduce latency
+- improved performance of input viewer repeaters
+- optimized custom UI components
+- reworked condition shortcut branching in the execution engine to increase performance and eliminate redundant evaluations
+- optimized API flows to reduce overhead and further reduce TTO (time to output) on processed triggers
+- reworked DINPUT input queues and event distribution, more use of direct callbacks and teardowns to optimize response time and reduce Python overhead/leverage caching (prior event handling model could choke on heavy inputs).
+- focus on quality of life improvements with container/action and input manipulation in particular
+
 
 ## How can I support the project?
 
@@ -18,7 +193,7 @@ The project is a labor of love and started as "I really want to be able to do [m
 
 Please consider supporting the project by making a secure donation, either one time or recurring, via the sponsor link on [the home project on Github](https://github.com/muchimi/JoystickGremlinEx).
 
-This project is open source.  It has as of this writing, more than 133,000 of lines of code (almost 200,000 if you include comments) - it is a large project.  Donations help with the purchase of hardware, maintaining computing resources for testing and development platform purposes.  Donations make more time available to research, develop features and support the project on an on-going basis.  Thanks to your help, the project has already seen hundreds of updates, many of them daily.  It has seen the implementation of nearly all requested features, many of which are not available in other similar tools.  It has a [rich set of features](overview.md#key-features-what-can-gremlinex-do), many of them not found in payware tools.   It is your support and shared passion for this hobby that makes GremlinEx, and its continuing support, possible.  
+This project is open source.  It has as of this writing, more than 133,000 of lines of code (almost 200,000 if you include comments) - it is a large project.  Donations help with the purchase of hardware, maintaining computing resources for testing and development platform purposes.  Donations make more time available to research, develop features and support the project on an on-going basis.  Thanks to your help, the project has already seen hundreds of updates, many of them daily.  It has seen the implementation of nearly all requested features, many of which are not available in other similar tools.  It has a [rich set of features](overview.md#key-features-what-can-gremlinex-do), many of them not found in payware tools.   It is your support and shared passion for this hobby that makes GremlinEx, and its continuing support, possible.
 
 Thank you for considering supporting the project if you have not already, and thank you to those of you who have already supported.
 
@@ -42,21 +217,21 @@ There should be no expectation that a single input always results in a single ou
 
 ## Differences with Joystick Gremlin
 
-GremlinEx started as a fork of the excellent Joystick Gremlin serveral years ago, with the goal of seeing if it could be ported to 64 bit and a more up to date version of Python.
+GremlinEx started as a fork of the excellent Joystick Gremlin by Lionel Ott years ago.  The initial goal of was to port that code to 64 bit and a more recent version of Python.  This quickly grew into updating underlying libraries including QT and others, and resolving incompatibilities.  Then came new actions and containers, a completely new execution engine and underlying data structures, etc...
 
-Fast forward to today: GremlinEx (GEX) at this point is not Joystick Gremlin nor a new version of Joystick Gremlin - it's been re-architected and converted, while keeping with the spirit of the original.  While common in origin, GEX is very significantly different internally with a different run engine, multi-threading, new and reworked mapping actions and containers, and core new functionality. GremlinEx may have started as a fork, however in the last several years has evolved to look similar, and functions differently and is now more than hundred thousand line of codes, two hundred if you include comments - I am a firm believer in comments to understand what the code does and perhaps more importantly, why.
+Fast forward to today: GremlinEx (GEX) at this point is not Joystick Gremlin **nor a new version of Joystick Gremlin**.  Very little remains from the original fork except for the concept.  GEX has been re-architected, is well over 90% new code, and converted, while keeping with the spirit of the original, to a new framework which extends to how it works internally.   While common in origin, GEX is very significantly different internally with a different run engine, heavy use of multi-threading, new, deprecated or significantly reworked actions and containers.  GEX also has core new functionality including networking, voice and a completely new API.
 
-GremlinEx is now heavily event driven, uses multi-threading, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.  Available [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
+What it retains is the general ability to convert older profiles, provided the containers and actions still exist and can be converted, which should be the case.  However in many cases, the new features suplant these older constructs.  For example, you would not use merge axis or separate curve actions anymore, you'd find all of this directly baked in the [map to vjoy action](actions/map_to_vjoy_user_guide.md).  You would not use axis to buttons, you'd use the new [gated axis action](action/gated_axis_user_guide.md).
 
-GremlinEx is squarely focused on performance, with most mappings aiming for millisecond processing time, and has many UI features to reduce the UI complexity to help with performance at design time.
+Available reworked and new [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
 
-GremlinEx is heavily networked: it supports remote control of multiple clients.  It supports network protocols to accept inputs from other devices on the network, and send data to other devices on the network for two-way communication/updates.
+GremlinEx is squarely focused on runtime performance, with most mappings aiming for millisecond processing time, and has many UI features to reduce the UI complexity to help with performance at design time.  To this end, the idea is you design the profile once, where you spend most of the time planning, designing and leveraging new features such as **states** intead of **modes** for condition and structure.
 
-GremlinEx even has a KVM mode to completly take over a client for game control purposes.
+GEX is heavily networked now: it supports remote control of multiple clients and can listen to protocols like OSC.  It supports network protocols to accept inputs from other devices on the network, and send data to other devices on the network for two-way communication/updates.
 
-The internal wiring is completely new, implementing a high performance execution graph runtime engine.
+GremlinEx even has a KVM (keyboard video mouse) mode to take over a remote GEX client for game control purposes as if the controls were connected locally to the remote machine.
 
-While most Joystick Gremlin profiles should load as-is, some may not depending on the version of the profile and features used, especially if the features were deprecated in GremlinEx and replaced.  This said, simpler profiles should work "as-is".  A lot of care was applied to ensuring older profiles can load "as is" with the necessary conversions happening automatically - however this only goes so far.
+While most Joystick Gremlin profiles should load as-is, some may not depending on the version of the profile and features used, especially if the features were deprecated in GremlinEx and replaced.  This said, simpler profiles `should` work `as-is`.  A lot of care was applied to ensuring older profiles can load "as is" with the necessary conversions happening automatically - however this only goes so far.
 
 Also note that once a profile has been touched by GremlinEx, it may not work at all with any other prior version, including Joystick Gremlin because of changes to the profile file.
 
@@ -111,7 +286,7 @@ For Elgato Stream Deck specifically, GremlinEx also supports a direct [Stream De
 
 Joystick axes and buttons can be drawn on a chromakey window for OBS, or as an on-screen HUD, without Touch OSC. See the [overlay](obs_overlay.md) guide.
 
-Please see the [OSC configuration section](usage.md#osc-device-open-sound-control) for OSC specific setup to enable this feature.  
+Please see the [OSC configuration section](usage.md#osc-device-open-sound-control) for OSC specific setup to enable this feature.
 
 ### Virus False positives
 
@@ -157,6 +332,6 @@ GremlinEx makes an attempt to keep with the philosophy and concepts of the origi
 GremlinEx is in active development and thus may include bugs and issues refered to as dragons.  Rather than releasing new features and fixes sporadically, I have adopted an open development model where pre-releases are posted to the dev branch for you to use as the features and fixes are implemented.  Some are more bleeding edge than others.
 
 I am a firm believer that open development outweighs the drawbacks, it encourages feedback and input and participation from the community. I appreciate the patience as not everything will work in every pre-release patch as expected, that is part of the process.
-  
+
 
 

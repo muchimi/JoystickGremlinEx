@@ -1959,17 +1959,46 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_update_handler = dialog.curve_update_handler
         self._update_axis_widget()
 
-        # disable highlighting
-        gremlin.shared_state.push_suspend_highlighting()
-        dialog.exec()
-        gremlin.shared_state.pop_suspend_highlighting()
-        self.curve_update_handler = None
-        self.action_data.curve_data = dialog.getCurveData()
-        self.action_data.curve_data.curve_update()  # update any changes to the curve
+        device_guid = self.action_data.hardware_device_guid
+        input_id = self.action_data.hardware_input_id
+        joystick_events = gremlin.event_handler.JoystickEventProcessor()
+        is_axis = self.action_data.input_is_axis()
+
+        try:
+            if is_axis:
+                joystick_events.registerListenerUICallback(
+                    device_guid=device_guid,
+                    input_type=InputType.JoystickAxis,
+                    input_id=input_id,
+                    callback=self._curve_input_event_handler,
+                )
+
+            # disable highlighting
+            gremlin.shared_state.push_suspend_highlighting()
+            try:
+                dialog.exec()
+            finally:
+                gremlin.shared_state.pop_suspend_highlighting()
+            self.action_data.curve_data = dialog.getCurveData()
+            self.action_data.curve_data.curve_update()  # update any changes to the curve
+        finally:
+            if is_axis:
+                joystick_events.unregisterListenerUICallback(
+                    device_guid=device_guid,
+                    input_type=InputType.JoystickAxis,
+                    input_id=input_id,
+                    callback=self._curve_input_event_handler,
+                )
+            self.curve_update_handler = None
 
         syslog.info(f"After curve update: {self.action_data.curve_data}")
 
         self._update_curve_icon()
+
+    def _curve_input_event_handler(self, event: gremlin.event_handler.Event):
+        """Updates the curve preview when its input axis moves."""
+        if event.event_type == InputType.JoystickAxis and self.curve_update_handler is not None:
+            self.curve_update_handler(event.value)
 
     QtCore.Slot()
 

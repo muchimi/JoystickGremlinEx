@@ -1,0 +1,1986 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/map_to_vjoy_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Map to vJoy — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#map-to-vjoy-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Map to vJoy — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ktts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI and DevOps
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ktts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI and DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before you start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#axis-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Axis values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-a-mapping-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a mapping mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-and-shape-an-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Map and shape an axis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map and shape an axis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#absolute-axis-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Absolute axis mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limit-the-output-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limit the output range
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apply-an-output-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Apply an output curve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relative-axis-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relative axis mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Map buttons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map buttons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trigger-on-press-or-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trigger on press or release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pulse-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pulse timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#turn-an-axis-range-into-a-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turn an axis range into a button
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-hats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Map hats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map hats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hat-to-virtual-hat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hat to virtual hat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#button-to-hat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Button to hat
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hat-to-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hat to buttons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-an-axis-with-a-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set an axis with a button
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-an-axis-with-two-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control an axis with two inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control an axis with two inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#set-the-reverse-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set the reverse input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#velocity-move-while-held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Velocity: move while held
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stepped-move-between-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stepped: move between presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#encoder-adjust-with-pulses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoder: adjust with pulses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pid-move-a-target-and-follow-it-smoothly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PID: move a target and follow it smoothly
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#merge-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge axes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-and-output-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup and output options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup and output options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#startup-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-and-remote-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local and remote output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#release-and-display-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release and display options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-throttle-with-a-high-end-detent-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A throttle with a high-end detent button
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#five-discrete-flap-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Five discrete flap positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smooth-trim-adjustment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smooth trim adjustment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-hat-separate-command-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One hat, separate command buttons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="map-to-vjoy-user-guide">Map to vJoy — User Guide<a class="headerlink" href="#map-to-vjoy-user-guide" title="Permanent link">¶</a></h1>
+<p>Map to vJoy sends an input to a virtual joystick output. Use it to map a physical control to a virtual axis, button, or hat; turn an axis range into a button; combine axes; or move an axis with buttons or an encoder.</p>
+<p>The action is also identified as <strong>Vjoy Remap</strong> and <strong>Map to Vjoy</strong>. This guide describes the supplied GremlinEx implementation. Available controls depend on the source input and the selected action mode. Mode descriptions below describe their behavior; the wording in the Mode list may vary by build.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#map-to-vjoy--user-guide">Map to vJoy — User Guide</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#before-you-start">Before you start</a><ul>
+<li><a href="#axis-values">Axis values</a></li>
+</ul>
+</li>
+<li><a href="#create-your-first-mapping">Create your first mapping</a></li>
+<li><a href="#choose-a-mapping-mode">Choose a mapping mode</a></li>
+<li><a href="#map-and-shape-an-axis">Map and shape an axis</a><ul>
+<li><a href="#absolute-axis-mapping">Absolute axis mapping</a></li>
+<li><a href="#limit-the-output-range">Limit the output range</a></li>
+<li><a href="#apply-an-output-curve">Apply an output curve</a></li>
+<li><a href="#relative-axis-mapping">Relative axis mapping</a></li>
+</ul>
+</li>
+<li><a href="#map-buttons">Map buttons</a><ul>
+<li><a href="#trigger-on-press-or-release">Trigger on press or release</a></li>
+<li><a href="#pulse-timing">Pulse timing</a></li>
+</ul>
+</li>
+<li><a href="#turn-an-axis-range-into-a-button">Turn an axis range into a button</a></li>
+<li><a href="#map-hats">Map hats</a><ul>
+<li><a href="#hat-to-virtual-hat">Hat to virtual hat</a></li>
+<li><a href="#button-to-hat">Button to hat</a></li>
+<li><a href="#hat-to-buttons">Hat to buttons</a></li>
+</ul>
+</li>
+<li><a href="#set-an-axis-with-a-button">Set an axis with a button</a></li>
+<li><a href="#control-an-axis-with-two-inputs">Control an axis with two inputs</a><ul>
+<li><a href="#set-the-reverse-input">Set the reverse input</a></li>
+<li><a href="#velocity-move-while-held">Velocity: move while held</a></li>
+<li><a href="#stepped-move-between-presets">Stepped: move between presets</a></li>
+<li><a href="#encoder-adjust-with-pulses">Encoder: adjust with pulses</a></li>
+<li><a href="#pid-move-a-target-and-follow-it-smoothly">PID: move a target and follow it smoothly</a></li>
+</ul>
+</li>
+<li><a href="#merge-axes">Merge axes</a></li>
+<li><a href="#startup-and-output-options">Startup and output options</a><ul>
+<li><a href="#startup-state">Startup state</a></li>
+<li><a href="#local-and-remote-output">Local and remote output</a></li>
+<li><a href="#release-and-display-options">Release and display options</a></li>
+</ul>
+</li>
+<li><a href="#worked-examples">Worked examples</a><ul>
+<li><a href="#a-throttle-with-a-high-end-detent-button">A throttle with a high-end detent button</a></li>
+<li><a href="#five-discrete-flap-positions">Five discrete flap positions</a></li>
+<li><a href="#smooth-trim-adjustment">Smooth trim adjustment</a></li>
+<li><a href="#one-hat-separate-command-buttons">One hat, separate command buttons</a></li>
+</ul>
+</li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">¶</a></h2>
+<p>Have the following ready:</p>
+<ul>
+<li>A GremlinEx profile containing the source input you want to use.</li>
+<li>A connected virtual output device with the axis, button, or hat you need.</li>
+<li>A way to observe the virtual output while testing, such as the application's output display or a joystick monitor.</li>
+</ul>
+<p>Configure the target game or application to use the virtual output you select. A physical input and its virtual output are separate controls; verify which one the target application has bound.</p>
+<p>For the first test, use one source input and one virtual output. Add curves, merging, or remote output after the basic mapping works.</p>
+<p>You can test output values in the GEX <strong>input viewer</strong> or you can also view VJOY output in the <strong>VJOY Monitor</strong> utility included with your VJOY installation.  This is often much faster and easier than to test things in the game directly.</p>
+<h3 id="axis-values">Axis values<a class="headerlink" href="#axis-values" title="Permanent link">¶</a></h3>
+<p>Axis settings generally use a normalized range:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-1.0</code></td>
+<td>Low end</td>
+</tr>
+<tr>
+<td><code>0.0</code></td>
+<td>Center</td>
+</tr>
+<tr>
+<td><code>+1.0</code></td>
+<td>High end</td>
+</tr>
+</tbody>
+</table>
+<p>The full span is <strong>2.0 units</strong>. A change of <code>0.05</code> is 2.5% of the full span. Center does not necessarily mean “off” in a game; that depends on the control you bind.</p>
+<h2 id="create-your-first-mapping">Create your first mapping<a class="headerlink" href="#create-your-first-mapping" title="Permanent link">¶</a></h2>
+<ol>
+<li>Select the profile mode and source input you want to map.</li>
+<li>Add <strong>Map to vJoy</strong> to the input's action container.</li>
+<li>In <strong>Mode</strong>, select the required mapping behavior. For a simple test, use direct axis, button, or hat mapping to match the source control.</li>
+<li>In <strong>Device</strong>, select the destination virtual joystick.</li>
+<li>In <strong>Output</strong>, select its axis, button, or hat.</li>
+<li>Save the profile and start it.</li>
+<li>Operate the source control and observe the virtual output.</li>
+<li>Bind that virtual output in the target game or application.</li>
+</ol>
+<p><strong>Next Unused</strong> selects an available output according to the profile's usage information. It does not guarantee that the output is unused by other applications.</p>
+<p><strong>Show disconnected</strong> includes unavailable virtual devices in the selector. Selecting one does not connect it. Resolve the device warning before relying on the mapping.</p>
+<h2 id="choose-a-mapping-mode">Choose a mapping mode<a class="headerlink" href="#choose-a-mapping-mode" title="Permanent link">¶</a></h2>
+<p>The Mode list changes with the input type. Select the source input first, then choose the behavior.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Available behavior families</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Axis</td>
+<td>Direct axis output, axis-to-button, axis merging</td>
+</tr>
+<tr>
+<td>Button or input treated as a button</td>
+<td>Button hold/invert/press/release/pulse/toggle; hat output; axis inversion; set-axis; stepped-axis; change-axis-range; merging; local/remote control commands</td>
+</tr>
+<tr>
+<td>Hat</td>
+<td>Direct hat output or hat-to-button mapping</td>
+</tr>
+</tbody>
+</table>
+<p>Keyboard and other supported event inputs may be treated as buttons by the surrounding input/container configuration. Use <strong>Override input type</strong> only when the action needs to interpret an input as an axis, button, or hat differently from its current configuration. An override changes the interpretation; it does not create missing input data.</p>
+<h2 id="map-and-shape-an-axis">Map and shape an axis<a class="headerlink" href="#map-and-shape-an-axis" title="Permanent link">¶</a></h2>
+<h3 id="absolute-axis-mapping">Absolute axis mapping<a class="headerlink" href="#absolute-axis-mapping" title="Permanent link">¶</a></h3>
+<p>Use <strong>Absolute</strong> when the virtual axis should follow the source axis position.</p>
+<ol>
+<li>Choose the axis mapping mode.</li>
+<li>Select the destination device and axis.</li>
+<li>Select <strong>Absolute</strong>.</li>
+<li>Move the source through its full travel.</li>
+<li>Enable <strong>Reverse Axis</strong> if the direction is opposite to the one you need.</li>
+</ol>
+<p>For example, a throttle can drive a virtual throttle axis directly, while a stick axis can drive virtual pitch or roll.</p>
+<h3 id="limit-the-output-range">Limit the output range<a class="headerlink" href="#limit-the-output-range" title="Permanent link">¶</a></h3>
+<p>Under <strong>Output Scale</strong>, set <strong>Range Min</strong> and <strong>Range Max</strong> to constrain the output span.</p>
+<table>
+<thead>
+<tr>
+<th>Range Min</th>
+<th>Range Max</th>
+<th>Resulting span</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-1.0</code></td>
+<td><code>+1.0</code></td>
+<td>Full travel</td>
+</tr>
+<tr>
+<td><code>-0.5</code></td>
+<td><code>+0.5</code></td>
+<td>Middle half of full travel</td>
+</tr>
+<tr>
+<td><code>0.0</code></td>
+<td><code>+1.0</code></td>
+<td>Upper half of the normalized range</td>
+</tr>
+</tbody>
+</table>
+<p>Use <strong>Reset</strong> to restore the normal full range. Test both endpoints after changing the range.</p>
+<h3 id="apply-an-output-curve">Apply an output curve<a class="headerlink" href="#apply-an-output-curve" title="Permanent link">¶</a></h3>
+<p>Select <strong>Output Curve</strong> to edit the action's curve. A curve changes how input movement translates into output movement—for example, to make movement near the center less sensitive.</p>
+<p>Use the adjacent remove control to clear the action's output curve. Other curves applied elsewhere in the input configuration can still affect the result. Watch the input/output values rather than assuming this is the only curve in the profile.</p>
+<h3 id="relative-axis-mapping">Relative axis mapping<a class="headerlink" href="#relative-axis-mapping" title="Permanent link">¶</a></h3>
+<p>Use <strong>Relative</strong> when the source should increase or decrease the current output instead of commanding an absolute position.</p>
+<ol>
+<li>Select <strong>Relative</strong>.</li>
+<li>Set <strong>Relative Value</strong>, the amount applied per update.</li>
+<li>Set the pulse/update delay in milliseconds.</li>
+<li>For a centered analog input, enable <strong>Use relative value</strong> so the amount is scaled by input deflection and updates stop near the center.</li>
+<li>Test movement in both directions and return the source to center.</li>
+</ol>
+<p>Smaller increments or longer delays produce slower movement. Reversing the axis reverses the direction of relative adjustment.</p>
+<p>Unlike Absolute mode, returning the source to center normally leaves the virtual axis at its accumulated position. Verify the stop behavior before using a large increment.</p>
+<h2 id="map-buttons">Map buttons<a class="headerlink" href="#map-buttons" title="Permanent link">¶</a></h2>
+<p>Choose the behavior that matches the desired output state.</p>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>What it does</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold / normal button</td>
+<td>Output follows the input's pressed/released state.</td>
+<td>Momentary commands</td>
+</tr>
+<tr>
+<td>Inverted button</td>
+<td>Output uses the opposite input state.</td>
+<td>Reversing switch logic</td>
+</tr>
+<tr>
+<td>Press</td>
+<td>Sets the output button on without automatically pairing it with a release.</td>
+<td>One input turns a function on</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Sets the output button off.</td>
+<td>A second input turns that function off</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>Sends a timed press followed by a release.</td>
+<td>A brief command from a switch or button</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>Alternates the output state on successive qualifying triggers.</td>
+<td>Latching a function with one button</td>
+</tr>
+</tbody>
+</table>
+<p>For a normal momentary mapping, start with Hold and leave <strong>Ignore release</strong> off. For Press mappings, provide a deliberate way to release the same output, such as a separate Release action.</p>
+<h3 id="trigger-on-press-or-release">Trigger on press or release<a class="headerlink" href="#trigger-on-press-or-release" title="Permanent link">¶</a></h3>
+<p>The execution controls select whether supported actions run on the source press, release, or both. They are especially useful for pulse, set-axis, and command actions.</p>
+<p>Select only the event you need for a one-shot action. Enabling both can cause one physical press-and-release cycle to trigger the action twice. Hold-style mappings still need the appropriate release behavior to avoid leaving the output on.</p>
+<h3 id="pulse-timing">Pulse timing<a class="headerlink" href="#pulse-timing" title="Permanent link">¶</a></h3>
+<ul>
+<li><strong>Pulse Delay</strong> is the duration of the output press, in milliseconds.</li>
+<li><strong>Repeat delay</strong> controls the spacing of repeated pulses.</li>
+<li>Enable pulse repetition to keep pulsing while the triggering condition remains active.</li>
+</ul>
+<p>The supplied default duration is <strong>125 ms</strong>; the default repeat delay is also <strong>125 ms</strong>. If the target application misses brief pulses, increase the duration and test again.</p>
+<h2 id="turn-an-axis-range-into-a-button">Turn an axis range into a button<a class="headerlink" href="#turn-an-axis-range-into-a-button" title="Permanent link">¶</a></h2>
+<p>Use axis-to-button mapping for a detent, end-stop, or position zone.</p>
+<ol>
+<li>Select the source axis and add the action.</li>
+<li>Choose the axis-to-button mode.</li>
+<li>Select a destination device and button.</li>
+<li>Set <strong>Axis to Button Range Min</strong> and <strong>Range Max</strong>.</li>
+<li>Choose <strong>Hold</strong> or <strong>Pulse</strong>.</li>
+<li>Move into, within, and out of the range while observing the output.</li>
+</ol>
+<p>Use the grab controls to capture the current axis value as either boundary.</p>
+<table>
+<thead>
+<tr>
+<th>Quick setting</th>
+<th>Range</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reset</td>
+<td><code>-1.0</code> to <code>+1.0</code></td>
+</tr>
+<tr>
+<td>Half</td>
+<td><code>-0.5</code> to <code>+0.5</code></td>
+</tr>
+<tr>
+<td>L-Half</td>
+<td><code>-1.0</code> to <code>0.0</code></td>
+</tr>
+<tr>
+<td>U-Half</td>
+<td><code>0.0</code> to <code>+1.0</code></td>
+</tr>
+<tr>
+<td>Bot</td>
+<td><code>-1.0</code> to <code>-0.75</code></td>
+</tr>
+<tr>
+<td>Top</td>
+<td><code>+0.75</code> to <code>+1.0</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hold</strong> keeps the output on while the axis is in range and releases it when the axis leaves. <strong>Pulse</strong> starts when the axis enters the range; repetition, if enabled, continues until it leaves.</p>
+<p>For a throttle detent near the high end, try <code>0.90</code> to <code>1.00</code>. These are example values; use the displayed axis value to find the correct range for your device. Curves and other axis processing can affect the value being tested.</p>
+<p>For position-dependent behavior, use Hold or Pulse in this version. See <a href="#behavior-notes-for-this-version">Behavior notes for this version</a> before using the range panel's Press or Release options.</p>
+<h2 id="map-hats">Map hats<a class="headerlink" href="#map-hats" title="Permanent link">¶</a></h2>
+<h3 id="hat-to-virtual-hat">Hat to virtual hat<a class="headerlink" href="#hat-to-virtual-hat" title="Permanent link">¶</a></h3>
+<p>Select the hat mapping mode, destination device, and output hat. Test all eight directions and the centered position.</p>
+<h3 id="button-to-hat">Button to hat<a class="headerlink" href="#button-to-hat" title="Permanent link">¶</a></h3>
+<p>For button-based hat output, select the output hat and configure:</p>
+<ul>
+<li><strong>Press Position</strong>: the direction to send when activated.</li>
+<li><strong>Release position</strong>: the position to send when released or when a pulse completes.</li>
+</ul>
+<p>Choose centered as the release position when the hat should return to neutral. Use a hat press action to retain a position, or a hat pulse action for a timed direction command.</p>
+<h3 id="hat-to-buttons">Hat to buttons<a class="headerlink" href="#hat-to-buttons" title="Permanent link">¶</a></h3>
+<p>Use hat-to-button mapping when the target application needs separate buttons for hat positions.</p>
+<ol>
+<li>Choose the hat-to-button mode and destination device.</li>
+<li>Assign a button to each direction you want to use.</li>
+<li>Choose a behavior for each position.</li>
+<li>Configure the center position deliberately; select <strong>Not mapped</strong> or <strong>NoOp</strong> if it should not issue a command.</li>
+<li>Test transitions between adjacent directions, diagonals, and center.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Per-position behavior</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold</td>
+<td>Tracks the active position and releases previously held positions as the hat changes.</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>Sends a timed output for that position.</td>
+</tr>
+<tr>
+<td>Press</td>
+<td>Turns the selected button on.</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Turns the selected button off.</td>
+</tr>
+<tr>
+<td>NoOp</td>
+<td>Sends no output for that position.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Map Buttons</strong> assigns sequential button numbers, using the first position's selection as a starting reference when set. <strong>Clear Buttons</strong> removes the assignments. The <strong>All Hold</strong>, <strong>All Pulse</strong>, <strong>All Press</strong>, <strong>All Release</strong>, and <strong>All NoOp</strong> controls set the behavior across the table.</p>
+<p>After automatic assignment, check every row, including center. Stay within the destination device's available button count. NoOp means “do nothing”; it should not be used as an implicit release command for an output you intentionally left on.</p>
+<h2 id="set-an-axis-with-a-button">Set an axis with a button<a class="headerlink" href="#set-an-axis-with-a-button" title="Permanent link">¶</a></h2>
+<p>Choose the set-axis mode when a button should command a particular virtual axis position.</p>
+<ol>
+<li>Select a button-like input.</li>
+<li>Choose set-axis mode and the destination axis.</li>
+<li>Enter <strong>Set Value</strong> within <code>-1.0</code> to <code>+1.0</code>.</li>
+<li>Select the triggering event, usually press only.</li>
+<li>Start the profile and test the button.</li>
+</ol>
+<p>Examples include setting a throttle to an idle position or centering a virtual control at <code>0.0</code>.</p>
+<p><strong>Is Relative</strong> is presented as the option for adding the entered value to the current output. In the supplied implementation, that checkbox does not control the setting read by the set-axis output routine, so do not rely on it alone for incremental movement. For repeatable increments, use the stepped-axis modes below. Axis output is limited to the normalized bounds.</p>
+<p><strong>Use last</strong> resends the last axis value with a small temporary movement intended to make the target application reread it. Use it only when that behavior is needed.</p>
+<p>Two related modes are available for button-like inputs:</p>
+<ul>
+<li><strong>Invert axis</strong> changes the target axis's reversal state when triggered.</li>
+<li><strong>Change axis range</strong> changes the range used for the selected output axis. It does not itself move a physical input.</li>
+</ul>
+<h2 id="control-an-axis-with-two-inputs">Control an axis with two inputs<a class="headerlink" href="#control-an-axis-with-two-inputs" title="Permanent link">¶</a></h2>
+<p>Choose the stepped-axis action mode to use <strong>Velocity</strong>, <strong>Stepped</strong>, <strong>Encoder</strong>, or <strong>PID</strong> behavior. All four modes expose <strong>Initial axis value</strong>, which is applied when the profile starts.</p>
+<h3 id="set-the-reverse-input">Set the reverse input<a class="headerlink" href="#set-the-reverse-input" title="Permanent link">¶</a></h3>
+<p>The source input is the primary control. To add a control for the opposite direction:</p>
+<ol>
+<li>Enable <strong>Latch secondary input for reverse action</strong>.</li>
+<li>Under <strong>Latched Input Type</strong>, choose <strong>Keyboard</strong> or <strong>Joystick</strong>.</li>
+<li>For Keyboard, use <strong>Select Keys</strong> to define the secondary key sequence.</li>
+<li>For Joystick, select the device and input, or use the listen control. Select the direction when using a hat input.</li>
+<li>Test each input separately.</li>
+</ol>
+<p>Here, “secondary” or “latched” input is a reverse-direction trigger. It is not an instruction to hold the primary and secondary controls together. A keyboard sequence assigned to the secondary trigger can itself require multiple simultaneous keys.</p>
+<h3 id="velocity-move-while-held">Velocity: move while held<a class="headerlink" href="#velocity-move-while-held" title="Permanent link">¶</a></h3>
+<p>Use Velocity for continuous adjustment while a button is held.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Update Interval (ms)</td>
+<td>Time between output updates.</td>
+</tr>
+<tr>
+<td>Rate of change</td>
+<td>Axis movement per second.</td>
+</tr>
+<tr>
+<td>Acceleration</td>
+<td>How quickly the movement rate changes; <code>0</code> gives a constant rate.</td>
+</tr>
+</tbody>
+</table>
+<p>Choose a modest rate, test a short press, and then test a longer hold. The secondary input moves in the opposite direction.</p>
+<h3 id="stepped-move-between-presets">Stepped: move between presets<a class="headerlink" href="#stepped-move-between-presets" title="Permanent link">¶</a></h3>
+<p>Use Stepped for a fixed set of positions, such as flap or mixture presets.</p>
+<ol>
+<li>Define the step values, keeping them in ascending order within <code>-1.0</code> to <code>+1.0</code>.</li>
+<li>Adjust <strong>Steps</strong>, use <strong>Add Step</strong>, or edit the individual values.</li>
+<li>Set <strong>Step direction</strong>.</li>
+<li>Choose a preset where needed and verify the displayed <strong>Preset value</strong>.</li>
+<li>Set <strong>Initial axis value</strong> explicitly and test from a fresh profile start.</li>
+</ol>
+<p>Distribution controls help generate values:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normalize</td>
+<td>Even spacing</td>
+</tr>
+<tr>
+<td>Low / High</td>
+<td>More positions toward the low or high portion of the range</td>
+</tr>
+<tr>
+<td>Geometric Low / Geometric High</td>
+<td>Nonlinear spacing toward an end</td>
+</tr>
+<tr>
+<td>Cubic Center</td>
+<td>Cubic progression around the center</td>
+</tr>
+</tbody>
+</table>
+<p>The step sequence stops at its endpoints rather than wrapping. From an initial value between presets, the first step selects the next preset in the requested direction.</p>
+<p><strong>Initial axis value</strong> determines the immediate startup output in this implementation. Do not assume that selecting <strong>Use step preset</strong> alone changes that startup output.</p>
+<h3 id="encoder-adjust-with-pulses">Encoder: adjust with pulses<a class="headerlink" href="#encoder-adjust-with-pulses" title="Permanent link">¶</a></h3>
+<p>Use Encoder when a rotary control generates momentary events in each direction.</p>
+<p>Bind one direction as the primary input and the other as the secondary reverse input. Then choose:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Relative</td>
+<td>Keeps the accumulated axis position after rotation stops.</td>
+</tr>
+<tr>
+<td>Spring</td>
+<td>Returns the axis to center after pulses stop.</td>
+</tr>
+<tr>
+<td>Spring delay (ms)</td>
+<td>Idle time before the return to center.</td>
+</tr>
+<tr>
+<td>Min Step / Max Step</td>
+<td>Smallest and largest movement per pulse.</td>
+</tr>
+<tr>
+<td>Start Frequency (Hz)</td>
+<td>Pulse frequency where acceleration begins.</td>
+</tr>
+<tr>
+<td>Full Frequency (Hz)</td>
+<td>Pulse frequency that reaches the maximum step.</td>
+</tr>
+<tr>
+<td>Curve Power</td>
+<td>Shapes how the step grows with input speed.</td>
+</tr>
+<tr>
+<td>Timeout (ms)</td>
+<td>Idle time before acceleration resets.</td>
+</tr>
+</tbody>
+</table>
+<p>Keep Full Frequency above Start Frequency. Use small steps for fine adjustment and larger accelerated steps for rapid travel. In Spring mode, use a positive spring delay if automatic return is required.</p>
+<h3 id="pid-move-a-target-and-follow-it-smoothly">PID: move a target and follow it smoothly<a class="headerlink" href="#pid-move-a-target-and-follow-it-smoothly" title="Permanent link">¶</a></h3>
+<p>Use PID when each momentary press should change a target position and the axis should move smoothly toward it. The axis moves quickly at first and eases into the target.</p>
+<ol>
+<li>Select <strong>PID</strong>.</li>
+<li>Set <strong>Initial axis value</strong>.</li>
+<li>Set <strong>Setpoint change per press</strong>.</li>
+<li>Set <strong>Response time (s)</strong>.</li>
+<li>Choose <strong>Primary increases</strong> or <strong>Primary decreases</strong>.</li>
+<li>Configure the secondary reverse input if needed.</li>
+<li>Test single presses before enabling acceleration.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Supplied default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setpoint change per press</td>
+<td><code>0.05</code></td>
+<td>Change in the target per incoming press event.</td>
+</tr>
+<tr>
+<td>Response time (s)</td>
+<td><code>1.0</code></td>
+<td>Approximate time to close 99% of the gap; lower values make the response faster.</td>
+</tr>
+</tbody>
+</table>
+<p>Holding a button is not the same as Velocity mode. PID changes the target on incoming press events; it continues following the target after release. If the input source produces repeated press events while held, those events can produce additional target changes.</p>
+<p>Enable <strong>Accelerate setpoint steps with faster input</strong> to make rapid presses change the target by larger amounts.</p>
+<table>
+<thead>
+<tr>
+<th>Acceleration setting</th>
+<th>Supplied default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Maximum step multiplier</td>
+<td><code>4.0</code></td>
+<td>Largest step relative to the base step.</td>
+</tr>
+<tr>
+<td>Acceleration starts (triggers/s)</td>
+<td><code>2.0</code></td>
+<td>At or below this rate, use the base step.</td>
+</tr>
+<tr>
+<td>Full acceleration (triggers/s)</td>
+<td><code>12.0</code></td>
+<td>Rate that reaches the maximum step.</td>
+</tr>
+<tr>
+<td>Acceleration curve</td>
+<td><code>2.0</code></td>
+<td>Higher values delay the increase toward the maximum step.</td>
+</tr>
+<tr>
+<td>Idle reset (s)</td>
+<td><code>0.75</code></td>
+<td>A pause this long resets acceleration; direction changes reset it too.</td>
+</tr>
+</tbody>
+</table>
+<p>Keep Full acceleration above Acceleration starts. Output remains within <code>-1.0</code> to <code>+1.0</code>.</p>
+<h2 id="merge-axes">Merge axes<a class="headerlink" href="#merge-axes" title="Permanent link">¶</a></h2>
+<p>Use axis merging to combine a primary axis with one or more additional axes.</p>
+<ol>
+<li>Select the primary axis and choose the merge-axis mode.</li>
+<li>Choose the destination device and axis.</li>
+<li>In <strong>Merge Information</strong>, select a <strong>Merge Device</strong> and <strong>Merge Axis</strong>, or use the listen control.</li>
+<li>Choose the merge operation.</li>
+<li>Configure a curve for the additional axis if needed.</li>
+<li>Test each source separately, then move them together.</li>
+<li>Add further merge entries only after the first combination behaves correctly.</li>
+</ol>
+<p>Each merge entry uses the running result as <strong>A</strong> and its selected axis as <strong>B</strong>. Entries are processed in order, so changing the sequence can change the result.</p>
+<table>
+<thead>
+<tr>
+<th>Operation family</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Add</td>
+<td>Combines A and B by addition.</td>
+</tr>
+<tr>
+<td>Average</td>
+<td>Uses <code>(A + B) / 2</code>.</td>
+</tr>
+<tr>
+<td>Center</td>
+<td>Uses <code>(A - B) / 2</code>, useful for opposing controls.</td>
+</tr>
+<tr>
+<td>Minimum / Maximum</td>
+<td>Chooses the lower or higher value.</td>
+</tr>
+<tr>
+<td>Multiply</td>
+<td>Uses one input to scale the other by multiplication.</td>
+</tr>
+<tr>
+<td>Scale variants</td>
+<td>Uses B as a scaling control; centered and half variants interpret B differently.</td>
+</tr>
+<tr>
+<td>Trim / Trim (centered)</td>
+<td>Uses B to adjust the primary axis's response.</td>
+</tr>
+</tbody>
+</table>
+<p>Scaling and range processing also affect the final output. For scale and trim variants, watch the live values while moving B through both ends and center rather than assuming the variant matches your device's rest position.</p>
+<p>Use <strong>Reverse Axis</strong> to invert the primary input before merging. Use <strong>Invert Merged Output</strong> to reverse the final combined result.</p>
+<h2 id="startup-and-output-options">Startup and output options<a class="headerlink" href="#startup-and-output-options" title="Permanent link">¶</a></h2>
+<h3 id="startup-state">Startup state<a class="headerlink" href="#startup-state" title="Permanent link">¶</a></h3>
+<p>Where displayed, the startup synchronization controls let you initialize an output from a configured default or the source input. Test startup with the source in more than one position to confirm that the initial output is appropriate.</p>
+<p>For the four stepped-axis modes, <strong>Initial axis value</strong> is applied immediately at profile start. These modes initialize their own movement state from that value.</p>
+<h3 id="local-and-remote-output">Local and remote output<a class="headerlink" href="#local-and-remote-output" title="Permanent link">¶</a></h3>
+<p>The action includes output routing through its remote-client controls. Check the routing when a mapping works remotely but not locally, or vice versa.</p>
+<p>Button-like inputs can also select command modes that enable or disable local output, enable or disable remote output, choose local-only or remote-only output, enable both, toggle remote output, or control paired remote behavior. These commands change routing state; they are not ordinary button mappings.</p>
+<p>Configure remote clients through the application's remote-output features before using remote routing. Leave <strong>Paired Group Member</strong> unchanged unless the mapping is part of an intentionally paired setup.</p>
+<h3 id="release-and-display-options">Release and display options<a class="headerlink" href="#release-and-display-options" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ignore release</td>
+<td>Suppresses release handling where supported. Normally leave it off for a momentary mapping.</td>
+</tr>
+<tr>
+<td>Auto Release</td>
+<td>Requests release handling for inputs/containers that need it. Test the entire press/release cycle.</td>
+</tr>
+<tr>
+<td>Show button grid</td>
+<td>Shows the output assignment grid.</td>
+</tr>
+<tr>
+<td>Override input type</td>
+<td>Changes how the action interprets the source input.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="a-throttle-with-a-high-end-detent-button">A throttle with a high-end detent button<a class="headerlink" href="#a-throttle-with-a-high-end-detent-button" title="Permanent link">¶</a></h3>
+<p>Create two actions on the throttle input:</p>
+<ol>
+<li>A direct Absolute mapping to the virtual throttle axis.</li>
+<li>An axis-to-button mapping to a separate virtual button, using a range of <code>0.90</code> to <code>1.00</code> and Hold behavior.</li>
+</ol>
+<p>The virtual axis follows the throttle. The virtual button turns on near the high end and off when the throttle leaves the zone. Adjust the boundary using the live value on your hardware.</p>
+<h3 id="five-discrete-flap-positions">Five discrete flap positions<a class="headerlink" href="#five-discrete-flap-positions" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add the stepped-axis action to the increase control.</li>
+<li>Select <strong>Stepped</strong> and the virtual flap axis.</li>
+<li>Set presets to <code>-1.0</code>, <code>-0.5</code>, <code>0.0</code>, <code>0.5</code>, and <code>1.0</code>.</li>
+<li>Set <strong>Initial axis value</strong> to the desired startup position, such as <code>-1.0</code>.</li>
+<li>Configure a secondary reverse control.</li>
+<li>Start the profile and verify that each trigger moves to the adjacent preset and stops at the ends.</li>
+</ol>
+<h3 id="smooth-trim-adjustment">Smooth trim adjustment<a class="headerlink" href="#smooth-trim-adjustment" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add the stepped-axis action to the trim-increase control.</li>
+<li>Select <strong>PID</strong> and the virtual trim axis.</li>
+<li>Set <strong>Initial axis value</strong> to <code>0.0</code>, <strong>Setpoint change per press</strong> to <code>0.02</code>, and <strong>Response time (s)</strong> to <code>0.5</code>.</li>
+<li>Select <strong>Primary increases</strong> and assign trim-decrease as the secondary input.</li>
+<li>Leave acceleration off for the initial test.</li>
+</ol>
+<p>Each press moves the target by <code>0.02</code>; the virtual axis follows smoothly. These are example settings, not the supplied defaults.</p>
+<h3 id="one-hat-separate-command-buttons">One hat, separate command buttons<a class="headerlink" href="#one-hat-separate-command-buttons" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select the physical hat and choose hat-to-button mapping.</li>
+<li>Assign a different virtual button to each direction you need.</li>
+<li>Use Hold for commands that should remain active while held, or Pulse for brief commands.</li>
+<li>Leave unused directions unassigned and configure center deliberately.</li>
+<li>Test transitions through diagonals before binding the buttons in the target application.</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No virtual output</td>
+<td>Profile running; correct profile mode; action/container enabled; destination connected; valid output selected; local/remote routing.</td>
+</tr>
+<tr>
+<td>Virtual output works, but the game does not respond</td>
+<td>The game is bound to the selected virtual device and output rather than the physical control or another virtual device.</td>
+</tr>
+<tr>
+<td>Desired axis, button, or hat is missing</td>
+<td>The selected destination actually exposes that output type and number.</td>
+</tr>
+<tr>
+<td>Output moves backward</td>
+<td>Reverse Axis, final merge inversion, and other curves or reversal settings.</td>
+</tr>
+<tr>
+<td>Axis does not reach the expected endpoints</td>
+<td>Output Scale, output curves, merge operations, and any range-changing action on that output.</td>
+</tr>
+<tr>
+<td>Relative axis keeps moving at center</td>
+<td>Enable Use relative value for deflection-scaled updates; verify the source returns near zero.</td>
+</tr>
+<tr>
+<td>Button remains on</td>
+<td>Press/toggle behavior, Ignore release, missing Release action, or a container that does not deliver release events.</td>
+</tr>
+<tr>
+<td>One press causes two adjustments</td>
+<td>Both press and release selected, duplicate actions targeting the output, or repeated input events.</td>
+</tr>
+<tr>
+<td>Pulses are missed</td>
+<td>Increase pulse duration; verify the destination button and trigger condition.</td>
+</tr>
+<tr>
+<td>Axis-range button activates at the wrong position</td>
+<td>Observe the processed axis value, review the range, and check the behavior notes below.</td>
+</tr>
+<tr>
+<td>Secondary input does nothing</td>
+<td>Enable reverse-input latching; verify Keyboard/Joystick selection, device, input, hat direction, and relevant conditions.</td>
+</tr>
+<tr>
+<td>Stepped axis starts at an unexpected value</td>
+<td>Check Initial axis value; the preset selector alone does not determine startup output here.</td>
+</tr>
+<tr>
+<td>Stepped axis stops changing</td>
+<td>It may have reached the first or last preset.</td>
+</tr>
+<tr>
+<td>PID output continues after release</td>
+<td>Expected: it is finishing the move to the target. Increase/decrease Response time to change the transition speed.</td>
+</tr>
+<tr>
+<td>Encoder feels too fast or too slow</td>
+<td>Min Step, Max Step, acceleration frequencies, Curve Power, and Timeout.</td>
+</tr>
+<tr>
+<td>Merged axis jumps or disagrees with expectations</td>
+<td>Source rest positions, curves, operation order, conflicting writers to the same output, and final inversion.</td>
+</tr>
+</tbody>
+</table>
+<p>When diagnosing a problem, temporarily reduce the mapping to one action with no extra curve or merge. Verify the input event, the virtual output, and then the target application's binding in that order.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
