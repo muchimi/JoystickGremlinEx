@@ -23,6 +23,7 @@ import threading
 
 import gremlin.config
 import gremlin.event_handler
+from gremlin.singleton_decorator import SingletonDecorator
 
 import gremlin.input_devices
 import gremlin.joystick_handling
@@ -34,7 +35,6 @@ from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, Inpu
 from gremlin.util import read_guid, safe_read, safe_format, list_to_csv, csv_to_list
 import gremlin.base_profile
 import uuid
-from gremlin.singleton_decorator import SingletonDecorator
 import collections
 import re
 import time
@@ -71,6 +71,8 @@ import enum
 # from gremlin.base_classes import AbstractInputItem
 import gremlin.util
 from psygnal import Signal
+
+
 
 
 syslog = logging.getLogger("system")
@@ -1731,7 +1733,7 @@ class OscClient:
     def _send(self, content):
         self._client.send(content)
 
-
+@SingletonDecorator
 class OscServer:
     def __init__(self):
         # syslog.info("OSC: server init")
@@ -3722,6 +3724,23 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         if self.custom_change_handler:
             self.custom_change_handler(model, index, new_item, old_item, operation)
 
+@SingletonDecorator
+class OscData():
+    def __init__(self):
+        self.model = None
+
+    def setModel(self, model : OscInputItemModel):
+        self.model = model
+
+    def getOsc(self, id):
+        if self.model is None:
+            return None
+        for row in range(self.model.rowCount()):
+            item = self.model.item(row)
+            if item and item.id == id:
+                return item
+        return None
+
 
 class OscDeviceTabWidget(BaseDeviceTabWidget):
     """Widget used to configure open sound control (OSC) inputs"""
@@ -3769,6 +3788,8 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             custom_filter_handler=self._filter_data,
         )
 
+        osc = OscData()
+        osc.setModel(model)
         self.setInputItemListModel(model)
 
         # lock widget
@@ -4447,7 +4468,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             self.selectInputItemIndex(self._last_selected_index)
 
 
-@gremlin.singleton_decorator.SingletonDecorator
+@SingletonDecorator
 class InputOscClient(QtCore.QObject):
     """runtime client for OSC messages
 

@@ -991,7 +991,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         self.show_parent_mode_widget.setChecked(self.config.show_parent_mode)
         self.show_parent_mode_widget.clicked.connect(self._show_parent_mode_widget_cb)
 
-        box = gremlin.ui.ui_common.QBoxFrameLayout(title="Repeaters", transparent=True)
+        box = gremlin.ui.ui_common.QBoxFrameLayout(title="Inputs & Repeaters", transparent=True)
         box.addWidget(self.device_label_visible_widget)
         box.addWidget(self.show_button_grid_widget)
         box.addWidget(self.split_joystick_repeater_widget)

@@ -1179,7 +1179,7 @@ class Settings:
         if verbose and enabled:
             syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
         el = gremlin.event_handler.EventListener()
-        el.vjoy_as_input_changed.emit(vid, enabled)
+        el.vjoy_as_input_changed.emit()
 
     def getVjoyAsInput(self, vid) -> bool:
         """returns true if the vjoy device is configured as an input device"""

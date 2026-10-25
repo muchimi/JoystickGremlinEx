@@ -7858,12 +7858,11 @@ class ActionSetView(AbstractView):
         self.redraw()
 
     def _cleanup_ui(self):
-        if self._model_callback_cleaned:
-            return
         container_widget = getattr(self, "_container_widget", None)
-        if Shiboken.isValid(container_widget):
+        if container_widget and Shiboken.isValid(container_widget):
             gremlin.util.clear_layout(container_widget.layout())
         super()._cleanup_ui()
+
 
     @property
     def selected(self) -> bool:
@@ -9561,6 +9560,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         return action_set_view
 
+
     def _container_remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
@@ -9651,12 +9651,15 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self.main_layout = layout_type(self)
 
         el = gremlin.event_handler.EventListener()
-        # eh.profile_unload.connect(self._cleanup_ui)
         el.action_deleted.connect(self._action_delete)
 
         self._create(action_data)
         self._create_ui()
         self._populate_ui()
+
+    def _cleanup_ui(self):
+        """Cleans up the UI elements for the widget."""
+        pass
 
     @QtCore.Slot(object)
     def _action_delete(self, action):
@@ -12577,6 +12580,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self._input_item_list_view is not None and Shiboken.isValid(self._input_item_list_view):
             gremlin.util.delete_widget(self._input_item_list_view)
 
+        super()._cleanup_ui()
         gremlin.util.clear_layout(self.main_layout)
 
         self._input_item_list_view = None

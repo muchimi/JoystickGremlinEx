@@ -49,6 +49,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T84):
+- Change: UI: GEX active profile icon now propagates to the main application in addition to the system tray icon.
+- Change: Vjoy Remap Action: Refactor to use new axis input API for UI events.
+- Fix: Vjoy Remap Action: Merged axis widget exception if not yet created when the action is in merge axis mode.
+- Fix: Vjoy Remap Action: Merged axis repeater does not always update.
+- Fix: API: some handlers for vjoy as input did not refactor correctly during last parameter change.
+- Fix: UI: system tray icon no longer updates when the profile is active due to a recent activation chain change.
+- Fix: UI: resolved a tear-down chain gap that prevented some UI components from being disposed.
+
 ### (m77T83):
 
 - New: UI (experimental): custom color theme (this may not presently entirely work as intended as more testing is needed).  This is available under theme options in the UI configuration options and brings up a custom dialog.  Presently a number of color usage descriptions may not make a lot of sense at this point, nor indicate where they are used.  The custom theme can be saved.  A GEX restart is required after making changes.

@@ -5634,9 +5634,10 @@ class JoystickEventProcessor:
                                             continue
 
                                     self._listener_callbacks[source][l_mode][l_device_guid][l_input_type][l_input_id].remove(callback)
-                                    key = (l_device_guid, l_input_type, l_input_id)
-                                    if key in self._callback_map[callback]:
-                                        self._callback_map[callback].remove(key)
+                                    for mode in (l_mode, CallbackMode.All):
+                                        key = (source, mode, l_device_guid, l_input_type, l_input_id)
+                                        if key in self._callback_map[callback]:
+                                            self._callback_map[callback].remove(key)
 
                                     if verbose:
                                         syslog.info(

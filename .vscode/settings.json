@@ -34,4 +34,5 @@
   },
   "terminal.integrated.defaultProfile.windows": "Command Prompt",
   "update.mode": "default",
+  "python.terminal.useEnvFile": true,
 }

@@ -1619,18 +1619,22 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if active != gremlin.shared_state.profile_state:
             gremlin.shared_state.profile_state = active
 
+        # toolbar icon
+        checked =  self.ui.actionActivate.isChecked()
+        if checked != active:
             with QtCore.QSignalBlocker(self.ui.actionActivate):
                 self.ui.actionActivate.setChecked(active)  # toolbar icon "off" or "on"
 
-            if active:
-                # system tray icon to active
-                self.ui.tray_icon.setIcon(load_icon("gex_active.ico"))
+        # system tray icon and primary window icons
+        if active:
+            # system tray icon to active
+            icon = load_icon("gex_active.ico")
+        else:
+            # system tray icon to inactivek
+            icon = load_icon("gex.ico")
 
-                # disable the UI
-                self.setUIState(False)
-            else:
-                # system tray icon to inactivek
-                self.ui.tray_icon.setIcon(load_icon("gex.ico"))
+        self.ui.tray_icon.setIcon(icon)
+        self.setWindowIcon(icon)
 
         # syslog.info(f"Profile activation state changed to {'active' if active else 'inactive'}")
 
