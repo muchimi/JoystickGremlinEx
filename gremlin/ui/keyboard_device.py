@@ -73,6 +73,7 @@ class KeyboardInputItem(InputItem):
         self._display_tooltip = None
         self._suspend_update = False
         self.setInputIdCallback(self._handle_input_id_callback)
+        self._mapping_description = None # no mapping description
 
         self.setSortCallback(self._handle_get_sort_key)
         self._update()
@@ -343,7 +344,7 @@ class KeyboardInputItem(InputItem):
             self._message_key = self._guid
             self._title_name = "Keyboard Input (not configured)"
             self._display_name = ""
-            self._description = ""
+            self._mapping_description = ""
             self._display_tooltip = ""
             return
 
@@ -361,7 +362,7 @@ class KeyboardInputItem(InputItem):
         self._title_name = f"Key/Mouse input {'(latched)' if is_latched else ''}"
 
         self._display_name = self._key.display_name
-        self._description = self.key.latched_code
+        # self._description = self.key.latched_code
         try:
             self._display_tooltip = self._key.latched_name + " " + self.key.latched_code
         except Exception:

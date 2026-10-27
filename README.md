@@ -51,11 +51,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T85):
-- New: Vjoy Remap Action: Stepped axis mode gains a fixed step PID mode.  The difference between Stepped and Stepped + PID is that in stepped mode, the axis value is immediately set to the step.  In the Stepped + PID mode, the axis value smoothly transitions over time to the new step value using the PID controller.
-- New: Vjoy Remap Action: stepped axis mode gains an auto setting to determine if the start step is forced (the output axis will be set to the initial step) or if the step index is initially determined by the current position of the output axis.  In auto mode, the output axis will be set to the closest step value based on the current position of the axis on profile start.
-- Change: UI: sliders now supports moving a handle via the mouse wheel.
-- Fix: UI: disabled float and integer widgets can be changed via the mouse wheel.
-- Fix: UI: mapping description not visible (there is now a distinction between description of the input which may be set automatically based on the input type, and the mapping description which is set separately.)
+- New: Vjoy Remap Action: Stepped axis mode gains a **stepped+PID** mode. In **Stepped** mode, the axis value is immediately set to the step.  In the **Stepped+PID** mode, the axis value smoothly transitions over time to the new step value using a PID controller.  This can be useful in applications where a smooth transition is desired, such as a speed limiter, trim or continuous flap function.
+- New: Vjoy Remap Action: stepped modes now show steps on the input slider.
+- New: Vjoy Remap Action: stepped modes gain a preset button to select from various stepped presets.
+- New: Vjoy Remap Action: stepped axis mode gains as a default **auto step**. Selecting this step will, on profile start, read the current output axis and pick the step closest to the starting position. This is helpful when stopping/starting a profile to keep a previous output position on the axis.
+- Change: UI: slider now supports moving handles via the mouse wheel.
+- Fix: UI: fixed an issue when a disabled float and integer widgets could be changed via the mouse wheel.
+- Fix: UI: fixed an issue with input mapping descriptions not visible, and there is now a distinction made between input description which is dependent on the input, vs mapping description which is a manual entry so they don't conflict with each other.
+- Fix: Vjoy Remap Action: fixed an issue with latched keys not aggregating to a single key when using keyboard latching.
+- Fix: API (Keyboard): getKey() could return duplicated latched keys.
 
 ### (m77T84):
 - Change: UI: GEX active profile icon now propagates to the main application in addition to the system tray icon.

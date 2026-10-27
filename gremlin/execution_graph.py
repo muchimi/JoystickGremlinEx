@@ -1365,6 +1365,7 @@ class ExecutionContext:
 
         self._action_functor_map[action.id] = functor  # update the map of the action to its functor instance
 
+        # get the list of latched inputs for the action - these are additional input triggers that need to execute an action when they are seen
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
             verbose = gremlin.config.Configuration().verbose_mode_exec

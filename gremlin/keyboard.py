@@ -476,14 +476,15 @@ class Key:
         return self._latched_keys
 
     @latched_keys.setter
-    def latched_keys(self, keys):
+    def latched_keys(self, keys : list[Key] | tuple[Key]):
         self._latched_keys.clear()
         # eliminate duplicate keys
-        for key in keys:
-            assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
-            if key.name and key not in self._latched_keys:
-                # skip not a null key
-                self._latched_keys.append(key)
+        if keys:
+            for key in keys:
+                assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
+                if key.name and key not in self._latched_keys:
+                    # skip not a null key
+                    self._latched_keys.append(key)
         self._update()
 
     def addLatchedKey(self, key: Key):
@@ -497,7 +498,8 @@ class Key:
         """returns a list of latched keys including the primary key"""
         if self.name:
             if self._latched_keys:
-                return sort_keys([self] + self._latched_keys)
+                # remove duplicates and sort the keys
+                return list(set(sort_keys([self] + self._latched_keys)))
             return [self]
         return []
 
@@ -519,14 +521,15 @@ class Key:
             return modifiers.index(lookup_name)
         return -1  # not found
 
-    def key_order(self):
+    def key_order(self, lookup_name : str =None):
         """gets a unique and predictable key index for ordering a key sequence
 
         Modifiers will be a lower index than normal character which will be lower than special keys
 
         """
 
-        lookup_name = self.lookup_name
+        if lookup_name is None:
+            lookup_name = self.lookup_name
         if not lookup_name:
             return -1
 
@@ -609,6 +612,37 @@ class Key:
             self._latched_keys.append(latched_key)
 
         self._update()
+
+    @staticmethod
+    def from_xml_latched(nodes : list[etree.Element]):
+        """ reads a list of XML latch nodes and derives a lached key from the individual entries """
+        latched_keys = []
+        index_pairs = []
+        for node in nodes:
+            if node.tag != "latched-key":
+                continue
+            latched_virtual_code = safe_read(node, "virtual-code", int, 0)
+            if latched_virtual_code > 0:
+                latched_key = KeyMap.find_virtual(latched_virtual_code)
+            else:
+                latched_scan_code = int(node.get("scan-code", 0))
+                latched_is_extended = parse_bool(node.get("extended", ""))
+                latched_key = Key(scan_code=latched_scan_code, is_extended=latched_is_extended)
+            latched_keys.append(latched_key)
+            index_pairs.append((latched_key.key_order(), latched_key))
+
+        # get the primary key from the latched keys list
+
+        if latched_keys:
+            # sort the latched keys based on their key order
+            index_pairs.sort(key=lambda x: x[0])
+            # the primary key will be on of the highest orders so we take the last one
+            primary_key = latched_keys.pop()
+            primary_key.latched_keys = latched_keys
+
+            return primary_key
+        return None
+
 
     def _handle_latched_change(self, action: str, data):
         """Handles changes to the latched keys list."""

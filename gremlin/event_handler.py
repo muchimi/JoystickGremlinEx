@@ -1615,7 +1615,7 @@ class EventListener(QtCore.QObject):
                     identifier=key_id,
                     virtual_code=virtual_code,
                     is_pressed=is_pressed,
-                    data=self._keyboard_buffer,
+                    data=self._keyboard_buffer.copy(),  # snapshot - the event is handled asynchronously
                 )
                 # if verbose:
                 #     syslog.info(
@@ -2443,7 +2443,7 @@ class EventListener(QtCore.QObject):
                 device_guid=dinput.GUID_Keyboard,
                 identifier=event.button_id,  # mouse handler is expecting a mouse ID, not a keyboard ID
                 is_pressed=event.is_pressed,
-                data=self._keyboard_state,
+                data={**self._keyboard_state, (event.button_id + 0x1000, False): event.is_pressed},
             )
 
             # record the mouse state as a key
