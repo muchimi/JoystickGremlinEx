@@ -60,7 +60,7 @@ class QSliderWidget(QtWidgets.QWidget):
     rangeDoubleRightClicked = QtCore.Signal(
         float, int, int
     )  # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    valueChanged = QtCore.Signal(int, float)  # called when a gate value changes via dragging (index of handle, updated value)
+    valueChanged = QtCore.Signal(int, float)  # called when a gate is dragged or scrolled (index of handle, updated value)
     handleDragStart = QtCore.Signal(int)  # called when a handle is being dragged (handle index)
     handleDragStop = QtCore.Signal(int)  # called when a handle stops being dragged (handle index)
 
@@ -79,6 +79,7 @@ class QSliderWidget(QtWidgets.QWidget):
         self._internal_handle_pixmaps = {}  # holds the pixmaps for the current handle icons keyed by handle ID
         self._minimum = -1.0
         self._maximum = 1.0
+        self._single_step = 0.01  # value change per mouse wheel notch
         self._draw_handles = True
         self.setObjectName(object_name if object_name else "QSliderWidget")
 
@@ -143,6 +144,8 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._tick_marks = None
         self._tick_count = 0
+        self._show_tick_marks = False # true if tick marks are visible on the widget
+        
 
         self._value_lock = False
 
@@ -158,6 +161,8 @@ class QSliderWidget(QtWidgets.QWidget):
         self._update_offsets_ui()
         self._update_all_handle_pixmaps()
         self.setMouseTracking(True)  # track mouse movements
+
+
 
     def unhook(self):
         """cleanup"""
@@ -251,19 +256,33 @@ class QSliderWidget(QtWidgets.QWidget):
             self._tick_count = value
             self.update()
 
-    def setTickMarks(self, value: int):
+    def setTickMarks(self, value: int | list | tuple):
         gremlin.util.InvokeUiMethod(self._set_tick_marks_ui, value)
 
-    def _set_tick_marks_ui(self, value: int):
+    def _set_tick_marks_ui(self, value: int | list | tuple):
         """sets the tick marks for the axis as set values"""
         gremlin.util.assert_ui_thread()
         if not self._is_active():
             return
-        marks = list(value) if value is not None else []
+        if isinstance(value, int):
+            marks = [value]
+        else:
+            marks = value if value is not None else []
         if self._tick_marks == marks and self._tick_count == len(marks):
             return
         self._tick_marks = marks or None
         self._tick_count = len(marks)
+        self.update()
+
+
+    def showTickMarks(self, value: bool):
+        gremlin.util.InvokeUiMethod(self._show_tick_marks_ui, value)
+
+    def _show_tick_marks_ui(self, value: bool):
+        gremlin.util.assert_ui_thread()
+        if not self._is_active():
+            return
+        self._show_tick_marks = value
         self.update()
 
     def setDrawHandles(self, value: bool):
@@ -446,6 +465,19 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def readOnly(self) -> bool:
         return self._readOnly
+
+    def singleStep(self) -> float:
+        return self._single_step
+
+    def setSingleStep(self, value: float):
+        """Sets the value change for one mouse wheel notch."""
+        gremlin.util.InvokeUiMethod(self._set_single_step_ui, value)
+
+    def _set_single_step_ui(self, value: float):
+        gremlin.util.assert_ui_thread()
+        if not self._is_active() or value <= 0:
+            return
+        self._single_step = float(value)
 
     def _update_offsets_ui(self):
         """recomputes pixel offsets based on gate values"""
@@ -680,7 +712,7 @@ class QSliderWidget(QtWidgets.QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         self._draw_widget(painter)
-        if self._tick_count > 0:
+        if self._show_tick_marks and self._tick_count > 0:
             # draw the tick marks
             self._draw_ticks(painter)
         if self._marker_visible:
@@ -1049,7 +1081,7 @@ class QSliderWidget(QtWidgets.QWidget):
             gremlin.util.assert_ui_thread()
             QToolTip.showText(QCursor.pos(), self._tooltip_message, self)
 
-    def _hover_update(self, event: QMouseEvent):
+    def _hover_update(self, event: QMouseEvent | QtGui.QWheelEvent):
         """updates the hover state"""
         hover_changed = False
         if self._readOnly:
@@ -1060,7 +1092,7 @@ class QSliderWidget(QtWidgets.QWidget):
             is_hover = False
             rect: QRect
 
-            point: QPoint = event.pos()
+            point: QPoint = event.position().toPoint()
             # look for hover entry/exit on handles first
             for index, rect in enumerate(self._handle_hotspots):
                 if rect.contains(point):
@@ -1101,6 +1133,42 @@ class QSliderWidget(QtWidgets.QWidget):
                 QToolTip.hideText()
 
         return hover_changed
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        if event.type() == QtCore.QEvent.Type.Wheel:
+            # Dispatch to wheelEvent before preventing propagation to the parent.
+            super().event(event)
+            event.accept()
+            return True
+        return super().event(event)
+
+    def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
+        """Moves the handle nearest the pointer in the wheel direction."""
+        event.accept()
+        if not self._is_active() or self._readOnly or not self.isEnabled() or not self._draw_handles or self._drag_active:
+            return
+        gremlin.util.assert_ui_thread()
+        if not self._values or not self._handle_positions:
+            return
+
+        steps = event.angleDelta().y() / 120.0
+        if not steps:
+            return
+        x = event.position().x()
+        index = min(range(len(self._values)), key=lambda i: abs(self._handle_positions[i] + self._handle_radius - x))
+        old_value = self._values[index]
+        value = gremlin.util.clamp(old_value + steps * self._single_step, self._minimum, self._maximum)
+        if value == old_value:
+            return
+
+        # Match dragging: keep handles sorted and report the updated index.
+        self._values.pop(index)
+        new_index = bisect_left(self._values, value) if value > old_value else bisect_right(self._values, value)
+        self._values.insert(new_index, value)
+        self._update_offsets_ui()
+        self._hover_update(event)
+        self.update()
+        self.valueChanged.emit(new_index, value)
 
     def mouseDoubleClickEvent(self, event):
         """double click event"""

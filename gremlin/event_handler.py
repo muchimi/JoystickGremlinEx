@@ -2549,12 +2549,13 @@ class TTSNotifyData:
 class LatchedCallbackData:
     """holds callback data for latched data"""
 
-    def __init__(self, input_item, event_type, callback, action_data=None, permanent=False):
+    def __init__(self, input_item, event_type, callback, action_data=None, permanent=False, key=None):
         self.permanent = permanent
         self.event_type = event_type
         self.callback = callback
         self.input_item = input_item
         self.action_data = action_data
+        self.key = key
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -3122,8 +3123,11 @@ class EventHandler(QtCore.QObject):
                 raise ValueError("Keyboard/chord callback registration requires an input_item with a configured Key")
 
             installed_callback = self._install_plugins(callback)
+            # A functor's reverse shortcut belongs to the same input item but
+            # has its own chord. Register that chord instead of the primary one.
+            chord_key = event.identifier if isinstance(event.identifier, gremlin.keyboard.Key) else input_item.key
             seen_keys = set()
-            for latched_key in input_item.key.getKeys():
+            for latched_key in chord_key.getKeys():
                 key_id = latched_key.index_tuple()
                 if key_id in seen_keys:
                     continue
@@ -3145,7 +3149,7 @@ class EventHandler(QtCore.QObject):
                 mode_inputs = self.latched_input_map.setdefault(device_guid, {}).setdefault(mode, {})
                 mode_inputs.setdefault(key, []).append(LatchedCallbackData(
                     input_item, event.event_type, installed_callback,
-                    action_data=action_data, permanent=permanent,
+                    action_data=action_data, permanent=permanent, key=chord_key,
                 ))
                 if verbose:
                     syslog.info(f"CALLBACK: registered chord member {key_id} for {input_item.display_name} in mode {mode}")
@@ -3788,12 +3792,14 @@ class EventHandler(QtCore.QObject):
             matching_functors = []
             for data in items:
                 callback = None
+                latched_key = None
                 if isinstance(data, LatchedCallbackData):
                     if not self.process_callbacks and not data.permanent:
                         continue
                     if verbose:
                         syslog.info(f"Latched callback data found: {data}")
                     input_item, callback = data.input_item, data.callback
+                    latched_key = data.key
                     action_data = data.action_data
                     if action_data:
                         if event.extra_data is None:
@@ -3804,7 +3810,7 @@ class EventHandler(QtCore.QObject):
                     input_item = data
 
                 m_list, f_list = self._execute_event(
-                    event, input_item, skip_execute=skip_execute, callback=callback
+                    event, input_item, skip_execute=skip_execute, callback=callback, latched_key=latched_key
                 )
                 matching_callbacks.extend(m_list or [])
                 matching_functors.extend(f_list or [])
@@ -3815,7 +3821,7 @@ class EventHandler(QtCore.QObject):
 
 
 
-    def _execute_event(self, event: Event, input_item=None, skip_execute=False, callback: Callable = None):
+    def _execute_event(self, event: Event, input_item=None, skip_execute=False, callback: Callable = None, latched_key=None):
         """main execution (runtime) event handler - queues trigger callbacks on event input
 
         :param event: the event to run callbacks for
@@ -3946,7 +3952,7 @@ class EventHandler(QtCore.QObject):
 
                 config = gremlin.config.Configuration()
 
-                latched_inputs = input_item.getLatchedInputIds()
+                latched_inputs = [latched_key] if latched_key is not None else input_item.getLatchedInputIds()
                 if verbose:
                     syslog.info(f"Found {len(latched_inputs)} latched inputs for input item: {input_item.display_name}")
                     for index, latched_input in enumerate(latched_inputs):
@@ -4000,9 +4006,8 @@ class EventHandler(QtCore.QObject):
 
                         # process release events if any
                         if not event.is_pressed:
-                            # Press callbacks are stored under the whole input's
-                            # primary key. Releasing ANY member ends that chord.
-                            latch_key = input_item.key
+                            # Releasing any member ends this registered chord.
+                            latch_key = input_id
                             r_list = self._keyboard_callback_map.pop(latch_key, [])
                             if r_list:
                                 if not skip_execute:
@@ -4013,7 +4018,7 @@ class EventHandler(QtCore.QObject):
                         is_latched = all(keyPressed(key) for key in latched_keys)
                         if is_latched:
                             latch_found = True
-                            latch_key = input_item.key
+                            latch_key = input_id
                             if callback:
                                 # already have a callback
                                 m_list = [callback]
@@ -4118,8 +4123,8 @@ class EventHandler(QtCore.QObject):
                     m_list = [callback]
                 else:
                     m_list = self._matching_callbacks(event, input_item)
-                if not m_list:
-                    f_list = self._matching_functors(event)
+                # A mapped button can also be a reverse input for another action.
+                f_list = self._matching_functors(event)
 
                 if not (m_list or f_list):
                     if verbose_detailed:

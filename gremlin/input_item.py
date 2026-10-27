@@ -852,6 +852,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         device_type: DeviceType = None,  # noqa: F405,
         description: str = None,
         description_readonly: bool = None,
+        mapping_description: str = None,
         custom_description_handler: Callable[["InputItem"], str] = None,
         tooltip: str = None,
         data: object = None,
@@ -913,6 +914,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
+        self._mapping_description = mapping_description  # mapping description for this input
 
         self.setInputId(input_id)
 
@@ -978,6 +980,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self._initialized = True
 
+
+
     def notifyContentChanged(self, extra_data: dict = None, force: bool = False, operation: str = None):
         """notifies that the content has changed"""
         self._handle_content_changed(extra_data=extra_data, force=force, operation=operation)
@@ -998,8 +1002,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         #         self._latched_input_ids.add(key)
         # else:
         self._latched_input_ids.add(input_id)
-
-
 
     def getLatchedInputIds(self):
         """returns the set of latched input ids for this input item"""
@@ -1219,6 +1221,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self.resetLatchedInputs()  # reset the list of latched inputs whenever the profile starts so old latches don't persist across profile runs
 
     @property
+    def mapping_description(self) -> str:
+        return self._mapping_description
+
+    @mapping_description.setter
+    def mapping_description(self, value: str):
+        if value != self._mapping_description:
+            self._mapping_description = value
+            self.fieldChanged.emit("mapping description", self)
+
+    @property
     def description(self):
         if self._custom_description_handler is not None:
             return self._custom_description_handler(self)
@@ -1239,8 +1251,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @description.setter
     def description(self, value):
         if not self._description_readonly:
-            self._description = value
-            self.fieldChanged.emit("description", self)
+            if value != self._description:
+                self._description = value
+                self.fieldChanged.emit("description", self)
 
     @property
     def descriptionReadOnly(self) -> bool:
@@ -1418,8 +1431,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def device_name(self):
         return self._device_name
 
-
-
     @property
     def data(self):
         return self._data
@@ -1583,7 +1594,17 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             return
 
         if not skip_root:  # skip header processing if set
-            self.description = html.unescape(safe_read(node, "description", str, ""))
+            # handle old description field vs new mapping description field in m77T85
+
+            if "description" in node.attrib:
+                description = html.unescape(safe_read(node, "description", str, ""))
+                self._mapping_description = description
+                self._description = description
+
+            if "mapping-description" in node.attrib:
+                self._mapping_description = html.unescape(safe_read(node, "mapping-description", str, ""))
+
+
             self.always_execute = read_bool(node, "always-execute", False)
 
             if "locked" in node.attrib:
@@ -1704,6 +1725,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
             if self.always_execute:
                 node.set("always-execute", "True")
+
+            if self._mapping_description:
+                node.set("mapping-description", html.escape(self._mapping_description))
 
             if self._description:
                 node.set("description", html.escape(self._description))
@@ -2325,7 +2349,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # clear input curve button
         self.clear_curve_widget = None
 
-
         self._toolbar_buttons = []
 
         if self.is_axis:
@@ -2355,6 +2378,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             )
             self._curve_container_layout.addWidget(self.clear_curve_widget)
             self._toolbar_buttons.append(self.clear_curve_widget)
+
+        # mappin description row
+        self._mapping_description_widget = QtWidgets.QLabel()
 
         # description row
         self._description_visible = True
@@ -2405,6 +2431,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             # "t3": QtWidgets.QLabel("t3"),
             "repeater": self._repeater_container_widget,
             "action_icons": self._action_icon_widget,
+            "mapping_description": self._mapping_description_widget,
             "description": self._description_widget,
             "status": self._status_widget,
             "input_description": gremlin.ui.ui_common.getVContainer(
@@ -2479,8 +2506,19 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        self.setMappingDescription(input_item._mapping_description)
+
         el = gremlin.event_handler.EventListener()
         el.action_crud.connect(self._handle_action_crud_event)
+
+    def setMappingDescription(self, description: str):
+        """sets the mapping description"""
+        self._mapping_description = description
+        gremlin.util.InvokeUiMethod(self._set_mapping_description_ui, description)
+
+    def _set_mapping_description_ui(self, description: str):
+        self._mapping_description_widget.setText(description)
+        self._mapping_description_widget.setVisible(bool(description))
 
     def setDescriptionVisible(self, visible: bool):
         """sets the visibility of the description"""
@@ -2540,6 +2578,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             case "is_button":
                 # handle button change
                 pass
+            case "mapping description":
+                # handle mapping description change
+                self.setMappingDescription(input_item.mapping_description)
+
             case "description":
                 # handle description change
                 if self._description_callback:
@@ -4097,6 +4139,7 @@ class InputItemListView(AbstractPaginatedView):
         self.mapping_changed_handler = mapping_changed_handler
         self._selection_change_callbacks = []
         self._model_hash = None  # model hash key
+        self._mapping_description = None
 
         self._last_selected_widget: InputItemWidget = None  # holds a reference to the last widget selected in the list
 
@@ -7863,7 +7906,6 @@ class ActionSetView(AbstractView):
             gremlin.util.clear_layout(container_widget.layout())
         super()._cleanup_ui()
 
-
     @property
     def selected(self) -> bool:
         """returns selected state"""
@@ -9560,7 +9602,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         return action_set_view
 
-
     def _container_remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
@@ -11251,10 +11292,10 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self.description_layout = QtWidgets.QHBoxLayout()
         self.description_layout.addWidget(QtWidgets.QLabel("Mapping Description:"))
         self.description_field = QtWidgets.QLineEdit()
-        self.description_field.setText(self._input_item.description)
+        self.description_field.setText(self._input_item.mapping_description)
         self.description_field.textChanged.connect(self._edit_description_cb)
         self.description_layout.addWidget(self.description_field)
-        self.description_field.setReadOnly(self._input_item.descriptionReadOnly)
+        # self.description_field.setReadOnly(self._input_item.descriptionReadOnly)
         self.description_clear_button = gremlin.ui.ui_common.Buttons.getEraserWidget(
             callback=self._delete_description_cb,
             tooltip="Reset description to default",
@@ -12808,13 +12849,13 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = InputItemMappingWidget(input_item=input_item, object_name=f"{prefix}: {input_item.display_name}")
         device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
         widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} input item: [{input_item.display_name}] ")
-        widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
+        widget.description_changed.connect(lambda x: self._mapping_description_changed(index, x))
         widget_ref = weakref.ref(widget)  # avoid widget -> lambda -> widget cycle
         widget.description_clear.connect(lambda: self._description_clear_cb(index, widget_ref()))
         input_item.setMappingWidget(widget)  # keep a reference to the mapping widget
         return widget
 
-    def _description_changed_cb(self, index, text):
+    def _mapping_description_changed(self, index, text):
         """called when the description text of the widget changes to update the description on the input item
 
         :param: index = the index of the input widget to update with the new text
@@ -12826,8 +12867,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
         widget = view.widget(index)
         if widget:
-            assert hasattr(widget, "setDescription"), "invalid widget - missing setDescription method"
-            widget.setDescription(text)
+            assert hasattr(widget, "setMappingDescription"), "invalid widget - missing setMappingDescription method"
+            widget.setMappingDescription(text)
+            widget.input_item.mapping_description = text
         else:
             syslog.error(f"set description (joystick input) failed: index: [{index}] does not exist.")
 
@@ -12840,8 +12882,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
         item_widget = view.widget(index)
         if item_widget:
-            assert hasattr(item_widget, "setDescription"), "invalid widget - missing setDescription method"
-            item_widget.setDescription(None)
+            assert hasattr(item_widget, "setMappingDescription"), "invalid widget - missing setMappingDescription method"
+            item_widget.setMappingDescription(None)
 
     def _handle_tab_changed(self, device_guid):
         """occurs when a tab is made visible"""

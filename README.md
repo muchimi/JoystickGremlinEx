@@ -49,6 +49,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T85):
+- New: Vjoy Remap Action: Stepped axis mode gains a fixed step PID mode.  The difference between Stepped and Stepped + PID is that in stepped mode, the axis value is immediately set to the step.  In the Stepped + PID mode, the axis value smoothly transitions over time to the new step value using the PID controller.
+- New: Vjoy Remap Action: stepped axis mode gains an auto setting to determine if the start step is forced (the output axis will be set to the initial step) or if the step index is initially determined by the current position of the output axis.  In auto mode, the output axis will be set to the closest step value based on the current position of the axis on profile start.
+- Change: UI: sliders now supports moving a handle via the mouse wheel.
+- Fix: UI: disabled float and integer widgets can be changed via the mouse wheel.
+- Fix: UI: mapping description not visible (there is now a distinction between description of the input which may be set automatically based on the input type, and the mapping description which is set separately.)
+
 ### (m77T84):
 - Change: UI: GEX active profile icon now propagates to the main application in addition to the system tray icon.
 - Change: Vjoy Remap Action: Refactor to use new axis input API for UI events.

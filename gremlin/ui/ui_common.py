@@ -2832,6 +2832,7 @@ class QFloatLineEdit(QWidget):
 
     valueChanged = QtCore.Signal(float)  # fires when the value changes
     doubleClick = QtCore.Signal()  # fires when the input is double clicked
+    enabledChanged = QtCore.Signal(bool)  # fires when the enabled state changes
 
     def __init__(
         self,
@@ -2929,12 +2930,17 @@ class QFloatLineEdit(QWidget):
         w = get_text_width(str("m" * chars))
         self.setMaximumWidth(w)
 
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.EnabledChange:
+            self.enabledChanged.emit(self.isEnabled())
+            super().changeEvent(event)
+
     def eventFilter(self, widget, event):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
-            if self._widget.isReadOnly():
-                return True  # cannot change the value if readonly
+            if self._widget.isReadOnly() or not self._widget.isEnabled():
+                return True  # cannot change the value if readonly or if the widget is not enabled
             v = self._to_value()
             if v is not None:
                 el = gremlin.event_handler.EventListener()
@@ -3182,8 +3188,8 @@ class QFloatLineEditEx(QWidget):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
-            if self.isReadOnly():
-                return True  # cannot change the value if readonly
+            if self.isReadOnly() or not self.isEnabled():
+                return True  # cannot change the value if readonly or if the widget is not enabled
             v = self.value()
             if v is not None:
                 eh = gremlin.event_handler.EventListener()
@@ -3457,8 +3463,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
-            if self.isReadOnly():
-                return True  # cannot change the value if readonly
+            if self.isReadOnly() or not self.isEnabled():
+                return True  # cannot change the value if readonly or if the widget is not enabled
             v = self.value()
             if v is not None:
                 eh = gremlin.event_handler.EventListener()
@@ -5287,6 +5293,7 @@ class QDataLabel(QtWidgets.QLabel):
 
 class QDataCheckbox(QtWidgets.QCheckBox):
     """a checkbox that has a data property to track an object associated with the checkbox"""
+    enabledChanged = QtCore.Signal(bool)  # fires when the enabled state changes
 
     def __init__(
         self,
@@ -5373,6 +5380,12 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def setValue(self, value: bool):
         """sets the checked state of the checkbox"""
         self.setChecked(value)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.EnabledChange:
+            self.enabledChanged.emit(self.isEnabled())
+            super().changeEvent(event)
+
 
 
 class QActionCheckbox(QWidget):
@@ -5479,7 +5492,7 @@ class QActionCheckbox(QWidget):
 
 class QDataRadioButton(QtWidgets.QRadioButton):
     """a radio button that has a data property to track an object associated with the checkbox"""
-
+    enabledChanged = QtCore.Signal(bool)  # fires when the enabled state changes
     def __init__(
         self,
         label: str = None,
@@ -5512,6 +5525,12 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         self.clicked.connect(self._handle_callback)
         if tooltip:
             self.setToolTip(tooltip)
+
+    def changeEvent(self, event):
+        if event.type() == QtCore.QEvent.EnabledChange:
+            self.enabledChanged.emit(self.isEnabled())
+        super().changeEvent(event)
+
 
     def _handle_callback(self):
         if self._callback:

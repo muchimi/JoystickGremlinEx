@@ -152,6 +152,7 @@ class StepMode(enum.Enum):
     Stepped = 2  # stepped mode - increments in discrete steps
     Encoder = 3  # encoder mode - increments based on encoder input - this counts encoder steps and keeps on going until input stops - uses a delay to determine when to stop after the last encoder trigger
     PID = 4  # momentary inputs change a smoothly followed target
+    SteppedPID = 5  # stepped mode with PID control (smooth transition to next value using PID controller)
 
     @staticmethod
     def from_string(mode_str: str) -> StepMode:
@@ -165,6 +166,8 @@ class StepMode(enum.Enum):
                     return StepMode.Encoder
                 case "pid":
                     return StepMode.PID
+                case "steppedpid":
+                    return StepMode.SteppedPID
             return StepMode[mode_str]
         except KeyError:
             return StepMode.NotSet
@@ -186,6 +189,8 @@ class StepMode(enum.Enum):
                 return "Encoder mode - increments based on encoder input"
             case StepMode.PID:
                 return "Two momentary inputs change a target; the axis follows a curved PID response"
+            case StepMode.SteppedPID:
+                return "Stepped mode with PID control (smooth transition to next value using PID controller)"
         return ""
 
 
@@ -196,6 +201,14 @@ class StepWidgetGroup:
 
     def clear(self):
         self.group = QtWidgets.QButtonGroup()
+
+    def addButton(self, button):
+        self.group.addButton(button)
+
+    def removeButton(self, button):
+        self.group.removeButton(button)
+
+
 
 
 class MergeWidget(QDataWidget):
@@ -633,7 +646,7 @@ class MergeWidget(QDataWidget):
 
 
 class StepWidget(QDataWidget):
-    defaultChanged = Signal(int, bool)  # fires when default flag changes (index, flag)
+    selectionChanged = Signal(int, bool)  # fires when default flag changes (index, flag)
     valueChanged = Signal(int, float)  # fires when value changes (index, value)
     deleteRequested = Signal(int)  # fires when delete is requested
 
@@ -642,33 +655,38 @@ class StepWidget(QDataWidget):
         self.index = index
         layout = QtWidgets.QHBoxLayout(self)
 
-        w = get_text_width("-0.000")
+        self.default_cb = QDataRadioButton("", tooltip="Set as axis start value", callback = self._step_selection_changed, data = index)
 
-        self.value_widget = QFloatLineEdit()
-        self.value_widget.setMinimumWidth(w)
-        self.value_widget.setValue(value)
-        self.value_widget.valueChanged.connect(self._step_value_changed)
-        self.default_cb = QDataRadioButton("")
-        bg = StepWidgetGroup()
-        bg.group.addButton(self.default_cb)
+        # bg = StepWidgetGroup()
+        # bg.group.addButton(self.default_cb)
 
-        self.default_cb.setToolTip("Set as profile start value")
-        self.default_cb.clicked.connect(self._step_default_changed)
+        if index == -1:
+            # default
+            layout.addWidget(QtWidgets.QLabel("Auto"))
+        else:
+            w = get_text_width("-0.000")
 
-        self.delete_widget = QtWidgets.QPushButton()
-        self.delete_widget.setToolTip("Delete step")
-        self.delete_widget.setIcon(load_icon("mdi.delete"))
-        self.delete_widget.setMaximumWidth(20)
-        self.delete_widget.clicked.connect(self._delete)
+            self.value_widget = QFloatLineEdit()
+            self.value_widget.setMinimumWidth(w)
+            self.value_widget.setValue(value)
+            self.value_widget.valueChanged.connect(self._step_value_changed)
 
-        layout.addWidget(self.value_widget)
-        layout.addWidget(self.delete_widget)
+
+            self.delete_widget = QtWidgets.QPushButton()
+            self.delete_widget.setToolTip("Delete step")
+            self.delete_widget.setIcon(load_icon("mdi.delete"))
+            self.delete_widget.setMaximumWidth(20)
+            self.delete_widget.clicked.connect(self._delete)
+            layout.addWidget(self.value_widget)
+            layout.addWidget(self.delete_widget)
+
         layout.addWidget(self.default_cb)
         layout.addStretch()
 
     @QtCore.Slot(bool)
-    def _step_default_changed(self, checked: bool):
-        self.defaultChanged.emit(self.index, checked)
+    def _step_selection_changed(self, checked: bool):
+        if checked:
+            self.selectionChanged.emit(self.index, checked)
 
     @QtCore.Slot()
     def _step_value_changed(self):
@@ -685,10 +703,22 @@ class StepWidget(QDataWidget):
         with QtCore.QSignalBlocker(self.value_widget):
             self.value_widget.setValue(value)
 
-    def setDefault(self, value: bool):
-        """enable or disable default state"""
-        bg = StepWidgetGroup()
-        bg.group.buttons()[self.index].setChecked(value)
+    def setChecked(self, checked: bool):
+        """checks the widget"""
+        with QtCore.QSignalBlocker(self.default_cb):
+            self.default_cb.setChecked(checked)
+
+    def isChecked(self) -> bool:
+        """true if the widget is checked"""
+        return self.default_cb.isChecked()
+
+
+    def setSelectionEnabled(self, enabled: bool):
+        """enable or disable selection"""
+        with QtCore.QSignalBlocker(self.default_cb):
+            self.default_cb.setEnabled(enabled)
+
+
 
 
 class MergeOperationType(enum.IntEnum):
@@ -933,6 +963,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.key_map = {}
         self.keys = []
         self._stepped_mode_map = {}  # stepped mode page map
+        self._stepped_last_hash = None # last hash value for steps
 
         if VJoyRemapWidget.locked:
             return
@@ -1435,8 +1466,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         el.button_usage_changed.disconnect(self._handle_virtual_button_usage_changed)
         gremlin.util.clear_widget_references(self)
         super()._cleanup_ui()
-
-
 
     @QtCore.Slot(bool)
     def _hat_sticky_changed(self, checked: bool):
@@ -2754,6 +2783,20 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not self._step_ui_loaded:
             return
 
+        # disable/enable relevant interactions when in auto mode
+        auto = self.action_data.target_step_auto
+        step_count = len(self.action_data.target_step_list)
+        enabled = not auto and step_count > 0
+        self.step_start_index_widget.setEnabled(enabled)
+        self.stepped_axis_start_widget.setEnabled(enabled)
+        self.stepped_axis_start_slider.setEnabled(enabled)
+
+        for index, widget in self.target_step_widget_map.items():
+            if index != -1:
+                widget.setSelectionEnabled(enabled)
+
+
+
         self.step_container.setVisible(self.action_data.action_mode == VjoyAction.VJoySetAxisStepped)
 
         # latch configuration for stepping mode (hide if not enabled)
@@ -2762,20 +2805,18 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # select the visual for the current mode
         self.stepped_page_visualizer_container.setCurrentIndex(self._stepped_mode_map.get(self.action_data.step_mode, 0))
 
-        steps = len(self.action_data.target_step_list)
-        enabled = steps > 0
-        self.step_start_index_widget.setEnabled(enabled)
-        self.step_start_value_widget.setEnabled(enabled)
+
+        self.slider_widget.setTickMarks(self.action_data.target_step_list)
 
         self.latched_device_widget.setEnabled(self.action_data._stepped_latched)
 
         index = self.step_start_index_widget.value()
-        if steps > 0:
-            index = gremlin.util.clamp(index, 1, steps)
+        if step_count > 0:
+            index = gremlin.util.clamp(index, 1, step_count)
 
             with QtCore.QSignalBlocker(self.step_start_index_widget):
                 self.step_start_index_widget.setValue(index)
-                self.step_start_index_widget.setRange(1, steps + 1)
+                self.step_start_index_widget.setRange(1, step_count + 1)
             self.action_data.target_step_list.sort()
 
             with QtCore.QSignalBlocker(self.step_list_widget):
@@ -2785,10 +2826,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             # updates individual step widgets and layout
             self._ensure_step_widgets()
 
-            self.step_count_widget.setValue(steps, False)
+            self.step_count_widget.setValue(step_count, False)
 
             self.action_data: VjoyRemap
-            if not 0 <= self.action_data.target_step_start_index < steps:
+            if not 0 <= self.action_data.target_step_start_index < step_count:
                 # reset the default if no longer in the list
                 self.action_data.target_step_start_index = 0
 
@@ -2797,7 +2838,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 emit=False,
             )
 
-            self.slider_widget.setTickMarks(self.action_data.target_step_list)
+            # show tickmarks on the slider
+            if self.action_data.target_step_list:
+                self.stepped_axis_start_slider.showTickMarks(True)
+                self.stepped_axis_start_slider.setTickMarks(self.action_data.target_step_list)
+            else:
+                self.stepped_axis_start_slider.showTickMarks(False)
 
             self._update_start_value()
 
@@ -2805,38 +2851,57 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """creates a step widget for the step value"""
         widget = StepWidget(id, value)
         widget.valueChanged.connect(self._step_value_changed)
-        widget.defaultChanged.connect(self._step_default_changed)
+        widget.selectionChanged.connect(self._step_selection_changed)
         widget.deleteRequested.connect(self._step_delete)
         return widget
 
     def _ensure_step_widgets(self):
         """ensures we have a widget for each defined step value"""
-        widgets = []
-        self.target_step_index_map.clear()
+
+        hash_key = hash(tuple(self.action_data.target_step_list))
+        if self._stepped_last_hash == hash_key:
+            return
+        self._stepped_last_hash = hash_key
+
+        self.target_step_widget_map.clear()
         bg = StepWidgetGroup()
         bg.clear()
-        for index, value in enumerate(self.action_data.target_step_list):
-            widget = self._create_step_widget(index, value)
-            widgets.append((index, widget))
 
-        for index, widget in widgets:
-            self.target_step_index_map[index] = widget
+        index_list = sorted(self.action_data.target_step_index_map.keys())
+
+        for index in index_list:
+            value = self.action_data.target_step_index_map[index]
+            widget = self._create_step_widget(index, value)
+            self.target_step_widget_map[index] = widget
 
         # redo the layout in sorted order if needed
         self._update_step_widget_layout()
 
     def _update_step_widget_layout(self):
         """ensures the step widgets appear in the step sort order"""
-        clear_layout(self.step_widget_layout)
+        bg = StepWidgetGroup()
+        bg.clear()
+        clear_layout(self.step_widget_layout)  # delete existing widgets
         row = 0
         col = 0
         max_col = 5
-        for index, widget in self.target_step_index_map.items():
+
+        step_list = sorted(self.action_data.target_step_index_map.keys())
+        checked_index = self.action_data.target_step_start_index
+        for index in step_list:
+            widget = self.target_step_widget_map[index]
             self.step_widget_layout.addWidget(widget, row, col)
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(False)
             col += 1
             if col > max_col:
                 row += 1
                 col = 0
+
+        if checked_index in self.target_step_widget_map:
+            widget = self.target_step_widget_map[checked_index]
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(True)
 
     @QtCore.Slot()
     def _add_step(self):
@@ -2861,9 +2926,60 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 v2 = 1
 
         value = (v1 + v2) / 2
+
         self.action_data.target_step_list.append(value)
-        self.action_data.target_step_list.sort()
+        self.action_data.rebuildStepIndexMap()
         self._update_steps_ui()
+
+    def _pick_preset_clicked(self):
+        """ builds the preset menu for steps"""
+        menu = QtWidgets.QMenu(self)
+        presets = {
+            "2 steps": "norm_2",
+            "3 steps": "norm_3",
+            "5 steps": "norm_5",
+            "8 steps": "norm_8",
+            "12 steps": "norm_12",
+            "17 steps": "norm_17",
+            "Ends + Quarters + Center (9)": "quarters_9",
+            "Geometric Low (8)": "geom_low_8",
+            "Geometric High (8)": "geom_high_8",
+        }
+        for name, steps in presets.items():
+            action = menu.addAction(name)
+            action.triggered.connect(lambda checked, s=steps: self._apply_preset(s))
+        menu.exec_(QtGui.QCursor.pos())
+
+    def _get_preset(self, name):
+        match name:
+            case "norm_2":
+                return [-1, 1]
+            case "norm_8":
+                return [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]
+            case "norm_12":
+                return [-1, -0.818, -0.636, -0.455, -0.273, -0.091, 0.091, 0.273, 0.455, 0.636, 0.818, 1]
+            case "norm_17":
+                return [-1, -0.875, -0.75, -0.625, -0.5, -0.375, -0.25, -0.125, 0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1]
+            case "norm_5":
+                return [-1, -0.5, 0, 0.5, 1]
+            case "norm_3":
+                return [-1, 0, 1]
+            case "quarters_9":
+                return [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]
+            case "geom_low_8":
+                return self._generate_geometric_progression(count=8)
+            case "geom_high_8":
+                return self._generate_geometric_progression(inverted=True, count=8)
+
+        return []
+
+    def _apply_preset(self, steps):
+        """applies the selected step preset"""
+        data = self._get_preset(steps)
+        if data:
+            self.action_data.target_step_list = data
+
+            self._update_steps_ui()
 
     @QtCore.Slot()
     def _step_count_changed(self):
@@ -2908,6 +3024,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             index = new_index
 
         self.action_data.target_step_start_index = index - 1
+
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setValue(value)
         self._stepped_axis_start_changed(value)
@@ -2932,11 +3049,23 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_steps_ui()
 
     @QtCore.Slot(int, bool)
-    def _step_default_changed(self, index: int, flag: bool):
-        if flag:
-            self.action_data.target_step_start_index = index
+    def _step_selection_changed(self, index: int, checked: bool):
+        """called when the checkbox on a step is set to select it"""
+        gremlin.util.assert_ui_thread()
+        if checked:
+            for i, widget in self.target_step_widget_map.items():
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(i == index)
+
+            self.action_data.target_step_start_index = index # -1 for auto
+            if index == -1:
+                # auto mode
+                value = gremlin.joystick_handling.get_axis(self.action_data.vjoy_id, self.action_data.vjoy_input_id)
+                self.action_data.target_step_list[index] = value
+
             self._stepped_axis_start_changed(self.action_data.target_step_list[index])
             self._update_start_value()
+            self._update_ui()
 
     @QtCore.Slot(int)
     def _step_delete(self, index: int):
@@ -2978,9 +3107,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             callback=self._stepped_axis_start_changed,
             tooltip="Set this output axis value immediately when the profile starts, for every stepped mode.",
         )
+        self.stepped_axis_start_widget.enabledChanged.connect(self._handle_axis_start_enabled_changed)
         self.stepped_axis_start_slider = QSliderWidget(
             object_name="Stepped axis profile start value",
         )
+        self.stepped_axis_start_slider.tickColor = Color().blueColor()
         self.stepped_axis_start_slider.setRange(-1.0, 1.0)
         self.stepped_axis_start_slider.setValue(self.action_data.axis_start_value)
         self.stepped_axis_start_slider.setMarkerVisible(False)
@@ -2989,12 +3120,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.stepped_axis_start_slider.setToolTip(self.stepped_axis_start_widget.toolTip())
         self.stepped_axis_start_slider.valueChanged.connect(lambda index, value: self._stepped_axis_start_changed(value))
         self.stepped_axis_start_slider.rangeClicked.connect(lambda value, left, right: self._stepped_axis_start_changed(value))
-        container_layout.addWidget(
-            getHContainer(
-                ["Initial axis value:", self.stepped_axis_start_widget, self.stepped_axis_start_slider],
-                widget_only=True,
-            )
+
+        self.stepped_axis_start_container = getHContainer(
+            ["Initial axis value:",  self.stepped_axis_start_widget, self.stepped_axis_start_slider],
+            widget_only=True,
         )
+        container_layout.addWidget(self.stepped_axis_start_container)
 
         # stepped mode options
         self.stepped_page_visualizer_container = QAutoResizeStackedWidget()
@@ -3007,6 +3138,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._create_axis_stepping_ui()
 
         self._update_steps_ui()
+
+    def _handle_axis_start_enabled_changed(self, enabled: bool):
+        pass
 
     def _stepped_axis_start_changed(self, value):
         if not math.isfinite(value):
@@ -3057,6 +3191,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._stepped_mode_map = {
             StepMode.Velocity: 0,
             StepMode.Stepped: 1,
+            StepMode.SteppedPID: 4,
             StepMode.Encoder: 2,
             StepMode.PID: 3,
         }
@@ -3445,12 +3580,19 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         container_layout = QtWidgets.QVBoxLayout(container)
         container_layout.addWidget(QtWidgets.QLabel("Stepped (tick) Mode Configuration:"))
 
-        self.target_step_index_map = {}  # map of step index to step widget ID keyed by index in the step list
+        self.target_step_widget_map = {}  # map of step index to step widget ID keyed by index in the step list
 
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
+
         self.step_start_index_widget = QIntLineEdit(tooltip="Choose a step preset for the initial axis value")
+
+        start_index_container = getHContainer(
+            ["Start Index:", self.step_start_index_widget, "||"],
+            widget_only=True,
+        )
+
         self.step_count_widget = QIntLineEdit()
         self.step_count_widget.setRange(0, 100)
         self.step_count_widget.valueChanged.connect(self._step_count_changed)
@@ -3460,16 +3602,16 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_start_value_widget.setValue(value)
 
         direction = self.action_data.target_step_direction
-        self_step_direction_up_widget = QDataRadioButton("Up", data=1)
-        self_step_direction_up_widget.setChecked(direction == 1)
-        self_step_direction_up_widget.clicked.connect(self._step_direction_changed)
+        self.step_direction_up_widget = QDataRadioButton("Up", data=1)
+        self.step_direction_up_widget.setChecked(direction == 1)
+        self.step_direction_up_widget.clicked.connect(self._step_direction_changed)
 
-        self_step_direction_down_widget = QDataRadioButton("Down", data=-1)
-        self_step_direction_down_widget.setChecked(direction == -1)
-        self_step_direction_down_widget.clicked.connect(self._step_direction_changed)
+        self.step_direction_down_widget = QDataRadioButton("Down", data=-1)
+        self.step_direction_down_widget.setChecked(direction == -1)
+        self.step_direction_down_widget.clicked.connect(self._step_direction_changed)
 
         self.step_direction_widget = getHContainer(
-            [self_step_direction_up_widget, self_step_direction_down_widget],
+            [self.step_direction_up_widget, self.step_direction_down_widget],
             "Step direction:",
             min_height=self.container_height,
             widget_only=True,
@@ -3481,9 +3623,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_list_widget = QDataLineEdit()
         self.step_list_widget.lostFocus.connect(self._step_list_changed)
 
-        self.add_step_widget = QtWidgets.QPushButton("Add Step")
-        self.add_step_widget.setToolTip("Adds a new step")
-        self.add_step_widget.clicked.connect(self._add_step)
+        self.add_step_widget = QDataPushButton("Add Step", callback=self._add_step, tooltip="Adds a new step")
+        self.add_multiple_steps_widget = QDataPushButton("Presets...", callback=self._pick_preset_clicked, tooltip="Set steps from a preset")
 
         self.slider_widget = QSliderWidget(object_name=f"Slider for VjoyWidget: {self.action_data.input_display_name}")
         self.slider_widget.setRange(-1, 1)
@@ -3514,8 +3655,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
+        self.step_value_container_layout.addWidget(self.add_multiple_steps_widget)
         self.step_value_container_layout.addWidget(QDataLabel("Use step preset:", tooltip="Choose a step preset for the initial axis value"))
-        self.step_value_container_layout.addWidget(self.step_start_index_widget)
+        self.step_value_container_layout.addWidget(start_index_container)
+
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Preset value:"))
         self.step_value_container_layout.addWidget(self.step_start_value_widget)
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Steps:"))
@@ -3673,15 +3816,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_step_acceleration_changed(self, value: float):
         self.action_data._target_step_acceleration = value
 
+    def _handle_start_index_auto_changed(self, value: bool):
+        """auto step index on start changed"""
+        self.action_data.target_step_start_index = -1 if value else self.action_data.last_step_start_index
+        self._update_ui()
+
     def get_axis_value(self, channels=False):
         """gets the current axis value - if channels enabled, returns a list of the transforms"""
-        # value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-        # if channels:
-        #     raw_value = self.action_data.get_raw_axis_value()
-        #     curve_value = self.action_data.get_curved_axis_value(raw_value)
-        #     data = gremlin.event_handler.AxisValues()
-
-        value = self.action_data.get_filtered_axis_value()
+        value = self.action_data.get_filtered_axis_value(channels=channels)
         return value
 
     def _update_start_value(self):
@@ -3690,9 +3832,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         value = self.action_data.target_step_list[index]
         self.step_start_value_widget.setValue(value)
 
-        # check the correct widget
-        widget = self.target_step_index_map[index]
-        widget.setDefault(True)
 
     @QtCore.Slot()
     def _normalize_steps(self):
@@ -3773,26 +3912,43 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_steps_ui()
 
     def _geometric_progression(self, inverted=False):
+        self._geometric_progression(inverted=inverted, target_steps=len(self.action_data.target_step_list))
+
+    def _geometric_progression(self, inverted=False, target_steps: int | None = None):
         import numpy as np
 
-        count = len(self.action_data.target_step_list)
+        count = len(self.action_data.target_step_list) if target_steps is None else target_steps
+
+        if count < 0:
+            raise ValueError("target_steps must be nonnegative")
         if count == 0:
             return
-        elif count == 2:
-            data = [-1, 1]
         elif count == 1:
             data = [0]
+        elif count == 2:
+            data = [-1, 1]
         else:
-            data = []
-            progression = np.geomspace(1, 10, count)
-            for n in progression:
-                value = gremlin.util.scale_to_range(float(n), source_min=1, source_max=10, invert=inverted)
-
-                data.append(value)
-            data.sort()
+            data = self._generate_geometric_progression(inverted=inverted, count=count)
 
         self.action_data.target_step_list = data
         self._update_steps_ui()
+
+    def _generate_geometric_progression(self, inverted=False, count: int = 0):
+        """generates a log geometric progression based on the given parameters"""
+        if count > 1:
+            progression = np.geomspace(1, 10, count)
+            data = [
+                gremlin.util.scale_to_range(
+                    float(n),
+                    source_min=1,
+                    source_max=10,
+                    invert=inverted,
+                )
+                for n in progression
+            ]
+            data.sort()
+            return data
+        return []
 
     @QtCore.Slot()
     def _grab_handler(self):
@@ -4449,7 +4605,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 if not self._step_ui_loaded:
                     self._create_axis_stepping_ui()
 
-                self._update_steps_ui()
+
                 output_range_visible = False
                 grid_visible = False
 
@@ -4458,6 +4614,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
                 hat_visible = self.action_data.stepped_input_type == InputType.JoystickHat
                 self.stepped_hat_container.setVisible(hat_visible)
+
+                self._update_steps_ui()
 
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
@@ -4506,8 +4664,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if self._merge_enabled:
             self.container_merge_widget.setVisible(merge_visible)
 
-        if self._step_ui_loaded:
-            self._update_steps_ui()
+
 
         # self.hardware_input_container_widget.setVisible(hardware_widget_visible)
         self.axis_range_container_widget.setVisible(output_range_visible)
@@ -5396,7 +5553,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             # grab the primary key (last one as modifiers are first - doesn't matter as long as we pick one)
                             keys = gremlin.keyboard.sort_keys(keys)
                             primary_key: gremlin.keyboard.Key = keys[-1]
-                            primary_key.latched_keys = keys
+                            primary_key.latched_keys = [key for key in keys if key != primary_key]
 
                             syslog.info("VJOYRemap keyboard latch: ")
                             for primary_key in primary_key.latched_keys:
@@ -5417,6 +5574,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         return []
 
+    def getSteppedIndexDataKey(self):
+        """gets the data key for the stepped axis entry"""
+        return ("stepped-axis", self.action_data.vjoy_id, self.action_data.vjoy_input_id)
+
     def profile_start(self):
         """occurs on profile start"""
         # Rebuild topology-derived curve metadata for every profile run.
@@ -5434,11 +5595,17 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.synced = False  # indicate not synchronized
         self._last_time = time.time()
         self.encoder_timer = None
+        self.device = gremlin.joystick_handling.getDeviceFromVjoyId(self.action_data.vjoy_id)
+        key = self.getSteppedIndexDataKey()
+        if key in self.device.data:
+            # force a re-read of the data
+            del self.device.data[key]
 
         # update the target client list
         self.client_list = self.action_data.remote_config.getClientList()
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
-            self._initialize_stepped_axis()
+            target = self._get_axis(self.vjoy_id, self.vjoy_input_id) if self.action_data.target_step_auto else None
+            self._initialize_stepped_axis(target)
             return
 
         # get the current mode
@@ -5505,10 +5672,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     trigger = False
 
                     if verbose:
-                        device = gremlin.joystick_handling.getDevice(self.hardware_device_guid)
-                        assert device is not None, f"Unable to find device for {str(self.hardware_device_guid)}"
+                        assert self.device is not None, f"Unable to find device for {str(self.hardware_device_guid)}"
                         vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
-                        device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
+                        device_stub = f"{self.device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
                     match self.action_data.sync_mode:
                         case SyncMode.Default:
@@ -5825,21 +5991,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             last_value = self._get_axis(device_id, input_id)
 
             if self.action_data._target_step_linear_mode:
-                # # PID mode
-                # sp = 1.0 if self.step_direction > 0 else -1.0 # target set point
-                # if not self._pid:
-                #     # setup a pid that returns values between 0 and 2 for the full axis range
-                #     kp = 0.1
-                #     ki = 0.2
-                #     kd = 0
-                #     self._pid = gremlin.pid.PID(kp, ki, kd,
-                #                                 setpointRamp=5.0,
-                #                                 proportionnalOnMeasurement=True,
-                #                                 outputLimits = (-1, 1))
-
-                #     if self.verbose: syslog.info(f"STEPPED AXIS: linear PID setup: starting value: [{last_value:0.3f}]")
-
-                # value = self._pid(sp, last_value)
                 value = self._compute_value(last_value, self.step_direction)
                 if self.verbose:
                     syslog.info(f"STEPPED AXIS: linear: direction: [{self.step_direction}] computednew value: [{value:0.3f}]")
@@ -6177,6 +6328,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.action_mode == VjoyAction.VJoySetAxisStepped and self.action_data.step_mode == StepMode.PID:
             return self._process_pid_axis_event(event)
+        if self.action_mode == VjoyAction.VJoySetAxisStepped and self.action_data.step_mode == StepMode.SteppedPID:
+            # Count every input against the latest target, even when inputs overlap.
+            # The PID output worker runs independently of this event lock.
+            with self.lock:
+                return self._process_event(event, action_value, extra_data)
         return self._process_event(event, action_value, extra_data)
 
     def _process_event(
@@ -6766,10 +6922,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                         and event.device_guid == self.action_data.stepped_device_guid
                                         and event.identifier == self.action_data.stepped_input_id
                                     )
-                            case InputType.KeyboardLatched:
-                                # keyboard latching mode
-                                fire_event = True  # cannot get here if the keys didn't match
-
                     match self.action_data.step_mode:
                         case StepMode.Velocity:
                             # velocity mode
@@ -6824,27 +6976,46 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     self._pulse_active = False
                                     self._pulse_input_type = None
 
-                        case StepMode.Stepped:
+                        case StepMode.Stepped | StepMode.SteppedPID:
                             # non linear step mode
                             # trigger = False
                             # verbose = True
+
                             if fire_event:
+                                use_pid = self.action_data.step_mode == StepMode.SteppedPID
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
-                                direction = 1 if primary else -1
-                                key = ("stepped-axis", self.vjoy_input_id)
-                                device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
-                                if key not in device.data:
-                                    device.data[key] = self.action_data.target_step_start_index
+                                direction = 1 if primary else -1 # latched
+                                key = self.getSteppedIndexDataKey()
+                                if key not in self.device.data:
+                                    index = self._closest_step_index()
+                                    syslog.info(f"Closest step index: {index}")
+                                    if index is None:
+                                        index = self.action_data.target_step_start_index
+                                    self.device.data[key] = index
 
-                                start_index = device.data[key]
+                                start_index = self.device.data[key]
                                 count = len(self.action_data.target_step_list)
                                 if count == 0:
                                     return True
-                                index = start_index
+
+                                # get the initial index based on the current axis value if not set before
+                                if key not in self.device.data:
+                                    index = self._closest_step_index()
+                                    if index is None:
+                                        index = start_index
+                                    self.device.data[key] = index
+                                else:
+                                    index = start_index
 
                                 value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                                if getattr(self, "_step_start_pending", False):
+                                if use_pid:
+                                    # Step from the commanded setpoint while the output is still moving.
+                                    target = self._pid_axis.target if self._pid_axis is not None else value
+                                    index = self._first_step_index(target, direction)
+                                    self._step_start_pending = False
+                                    self.synced = True
+                                elif getattr(self, "_step_start_pending", False):
                                     index = self._first_step_index(value, direction)
                                     self._step_start_pending = False
                                     self.synced = True
@@ -6874,9 +7045,16 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     index = gremlin.util.clamp(index, 0, count - 1)
                                 value = self.action_data.target_step_list[index]
 
-                                self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+                                if use_pid:
+                                    syslog.info(f"set PID target: {value:0.4f}")
+                                    if self._pid_axis is None:
+                                        self._start_pid_axis()
+                                    self._pid_set_target(value, force_remote=force_remote)
+                                else:
+                                    self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
-                                device.data[key] = index  # remember the last step index used
+                                self.device.data[key] = index  # remember the last step index used
+
                                 if verbose:
                                     syslog.info(f"STEPPED AXIS: previous index: [{start_index}] new index: [{index}] new value: {value:0.3f}")
                                     syslog.info(f"set step last value: {value:0.3f}")
@@ -6979,10 +7157,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             self.functor_complete.emit()  # indicate completed
         return result
 
-    def _initialize_stepped_axis(self):
+    def _initialize_stepped_axis(self, target: float = None):
         """Apply the configured start value and reset every mode's state."""
         self._stop_pid_axis()
-        value = self.action_data.axis_start_value
+        # start target specified or not
+        value = self.action_data.axis_start_value if target is None else target
         if not math.isfinite(value):
             value = 0.0
         value = max(-1.0, min(1.0, value))
@@ -7007,7 +7186,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 direction_change_speed_retention=self.action_data.encoder_direction_change_speed_retention,
                 frequency_timeout=self.action_data.encoder_frequency_timeout,
             )
-        elif self.action_data.step_mode == StepMode.PID:
+        elif self.action_data.step_mode in (StepMode.PID, StepMode.SteppedPID):
             self._start_pid_axis(value)
         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
         self.action_data.axis_last_value = value
@@ -7066,42 +7245,94 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     @staticmethod
     def _pid_identifier_matches(actual, configured):
         def key_id(value):
+            if hasattr(value, "key") and value.key is not None:
+                value = value.key
             if hasattr(value, "scan_code") and hasattr(value, "is_extended"):
                 return (value.scan_code, value.is_extended)
             return value
 
         return key_id(actual) == key_id(configured)
 
+
     def _process_pid_axis_event(self, event):
-        primary = event.device_guid == self.hardware_device_guid and (
-            self._pid_identifier_matches(event.identifier, self.hardware_input_id)
-            or self._pid_identifier_matches(event.identifier, self.action_data.input_item.identifier)
-        )
-        secondary = False
-        if not primary and self.action_data._stepped_latched:
-            if self.action_data.latched_input_type == InputType.JoystickButton:
-                secondary = (
-                    event.device_guid == self.action_data.stepped_device_guid
-                    and event.getInputType() == self.action_data.stepped_input_type
-                    and self._pid_identifier_matches(event.identifier, self.action_data.stepped_input_id)
-                )
-            elif self.action_data.latched_input_type == InputType.KeyboardLatched:
-                keys = gremlin.keyboard.sort_keys(self.action_data.latched_keys)
-                secondary = (
-                    bool(keys) and event.device_guid == gremlin.shared_state.keyboard_tab_guid and (self._pid_identifier_matches(event.identifier, keys[-1]))
-                )
-        if not event.is_pressed or not (primary or secondary):
+        direction = self._step_input_direction(event)
+        fire_event = (self.action_data.exec_on_press and event.is_pressed) or (self.action_data.exec_on_release and not event.is_pressed)
+        if not fire_event or direction is None:
             return True
         with self._pid_axis_condition:
             if self._pid_axis_stopping or self._pid_axis is None:
                 return True
-            direction = self.action_data.target_step_direction * (1 if primary else -1)
             if self._pid_accelerator is not None:
                 target = self._pid_accelerator.pulse(direction, value=self._pid_axis.target)
             else:
                 target = self._pid_axis.target + direction * self.action_data.pid_step
-            self._pid_axis.set_target(target)
-            self._pid_force_remote = event.force_remote
+            self._pid_set_target(target, force_remote=event.force_remote)
+        return True
+
+    def get_closest_directed(numbers, target, direction):
+        """
+        direction =  1: next greatest (or equal) value
+        direction = -1: next lowest (or equal) value
+        """
+        if direction == 1:
+            # Keep only numbers greater than or equal to the target
+            filtered = [x for x in numbers if x >= target]
+            if not filtered:
+                return None  # Or raise an error if no higher value exists
+            return min(filtered, key=lambda x: abs(x - target))
+
+        elif direction == -1:
+            # Keep only numbers less than or equal to the target
+            filtered = [x for x in numbers if x <= target]
+            if not filtered:
+                return None  # Or raise an error if no lower value exists
+            return min(filtered, key=lambda x: abs(x - target))
+
+    def _closest_step_value(self, direction: int = 0):
+        """returns the closest step value to the current vjoy axis value, based on the specified direction
+        direction values:
+         0 = closest value regardless of direction
+         1 = next greatest (or equal) value
+        -1 = next lowest (or equal) value
+        """
+        value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+        if self.action_data.step_mode in (StepMode.Stepped, StepMode.SteppedPID):
+            match direction:
+                case 1:
+                    filtered = [x for x in self.action_data.target_step_list if x >= value]
+
+                case -1:
+                    filtered = [x for x in self.action_data.target_step_list if x <= value]
+
+                case 0:
+                    filtered = self.action_data.target_step_list
+
+            if not filtered:
+                return value
+            return min(filtered, key=lambda x: abs(x - value))
+
+        return value  # as is if no steps
+
+    def _closest_step_index(self, direction: int = 0):
+        """returns the index of the closest step value to the current vjoy axis value, based on the specified direction
+        direction values:
+         0 = closest value regardless of direction
+         1 = next greatest (or equal) value
+        -1 = next lowest (or equal) value
+        """
+        value = self._closest_step_value(direction)
+        try:
+            return self.action_data.target_step_list.index(value)
+        except ValueError:
+            return None
+
+    def _pid_set_target(self, value: float, force_remote: bool = False):
+        """Set an absolute PID target and wake the output worker."""
+        with self._pid_axis_condition:
+            if self._pid_axis_stopping or self._pid_axis is None:
+                return True
+            self._pid_axis.set_target(value)
+            self._pid_force_remote = force_remote
             if self._pid_axis_thread is None or not self._pid_axis_thread.is_alive():
                 self._pid_axis_thread = threading.Thread(
                     target=self._pid_axis_loop,
@@ -7110,7 +7341,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 )
                 self._pid_axis_thread.start()
             self._pid_axis_condition.notify_all()
-        return True
 
     def _pid_axis_loop(self):
         last_time = time.monotonic()
@@ -7241,6 +7471,7 @@ class MergeData:
         operation: MergeOperationType = MergeOperationType.Center,
         invert=False,
     ):
+
         device = gremlin.joystick_handling.getDevice(device_id)
         if device:
             self._device_id = device.device_id
@@ -7417,6 +7648,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._virtual_device = None  # the actual virtual device object assigned to the action output
         self.refresh_virtual_inputs()  # this also picks a default device
 
+        self._vjoy_id = gremlin.joystick_handling.getVjoyFirstIndex()   # default vjoy device
         self._vjoy_input_id: int = 1
         self._vjoy_axis_id = 1
         self._virtual_button_id = 1
@@ -7553,16 +7785,20 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.pulse_repeat = False  # true if pulses repeat
 
         self.target_value = 0.0
-        self.target_step_list = [
+        self.target_step_index_map = {}  # map of step indices to values, -1 for auto mode
+
+        self._target_step_list = [
             -1,
             -0.5,
             0,
             0.5,
             1,
         ]  # list of values to send - if empty - uses the fixed target_value
+        self.rebuildStepIndexMap()
 
         self._current_step_index = 0  # index of last value sent
-        self._target_step_start_index = 0  # start index when profile is loaded (initial step)
+        self._target_step_start_index = -1  # start index when profile is loaded (initial step) = -1 means closest value to the current value
+        self._last_step_start_index = -1  # last step start index used (not persisted)
         self._target_step_direction = 1  # direction of stepping, +1 or -1
 
         self._target_step_interval = 0.1  # interval for linear stepping
@@ -7589,6 +7825,19 @@ Supports axis merging, curved output, command, hat and button mappings.
         # trim curves
         curve = gremlin.curve_handler.AxisCurveData()
         self.trim_curve = curve
+
+    @property
+    def target_step_list(self) -> list[float]:
+        return self._target_step_list
+
+    @target_step_list.setter
+    def target_step_list(self, value: list[float]):
+        assert isinstance(value, list), "target_step_list must be a list of floats"
+        if __debug__:
+            for v in value:
+                assert isinstance(v, (int, float)), "target_step_list must be a list of floats"
+        self._target_step_list = value
+        self.rebuildStepIndexMap()
 
     def hasOutput(self) -> bool:
         """returns whether this action has output"""
@@ -7742,6 +7991,11 @@ Supports axis merging, curved output, command, hat and button mappings.
         return self._merge_data
 
     @property
+    def target_step_auto(self) -> bool:
+        """returns true if the target step is set to auto"""
+        return self._target_step_start_index == -1
+
+    @property
     def target_step_direction(self) -> int:
         return self._target_step_direction
 
@@ -7758,6 +8012,23 @@ Supports axis merging, curved output, command, hat and button mappings.
     def target_step_start_index(self, value: int):
         self._target_step_start_index = value
         self._current_step_index = value
+
+    @property
+    def last_step_start_index(self) -> int:
+        """returns the last step start index"""
+        return self._last_step_start_index
+
+    @last_step_start_index.setter
+    def last_step_start_index(self, value: int):
+        self._last_step_start_index = value
+
+    def rebuildStepIndexMap(self):
+        """rebuilds the target step index map from the target step list"""
+        self.target_step_index_map = {}
+        self.target_step_list.sort() # sort the target step list before rebuilding the index map
+        for index, value in enumerate(self.target_step_list):
+            self.target_step_index_map[index] = value
+        self.target_step_index_map[-1] = 0
 
     def is_scaled(self):
         """true if the axis output is scaled"""
@@ -8861,9 +9132,12 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "steps" in node.attrib:
                 csv = node.get("steps")
                 self.target_step_list = gremlin.util.csv_to_floatlist(csv)
+                self.rebuildStepIndexMap()
 
             if "step-start-index" in node.attrib:
-                self.target_step_start_index = safe_read(node, "step-start-index", int, 0)
+                index = safe_read(node, "step-start-index", int, 0)
+                self.target_step_start_index = index
+                self.last_step_start_index = index
 
             self._target_step_linear_mode = safe_read(node, "linear", bool, False)
             self._target_step_delta = safe_read(node, "delta", float, 0.01)

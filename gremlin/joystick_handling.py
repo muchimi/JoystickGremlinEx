@@ -1035,6 +1035,13 @@ def getDeviceFromVjoyId(vid: int) -> DeviceSummary | None:
         return dev
     return None
 
+def getVjoyFirstIndex():
+    """gets the first available vjoy index"""
+    devices = vjoy_devices()
+    if devices:
+        return devices[0].vjoy_id
+    return 1
+
 
 def getVjoyDeviceGuid(vid: int):
     """gets the vjoy device by the given vjoy id"""
