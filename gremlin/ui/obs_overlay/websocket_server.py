@@ -324,7 +324,7 @@ class OverlayWebsocketSession(QtCore.QObject):
             finally:
                 done.set()
 
-        QtCore.QTimer.singleShot(0, _run)
+        QtCore.QTimer.singleShot(0, self, _run)
         if not done.wait(0.2):
             return True
         return bool(box["empty"])
@@ -332,7 +332,7 @@ class OverlayWebsocketSession(QtCore.QObject):
     def queue_input(self, payload: dict):
         """Marshal pointer input from the HTTP thread onto the UI thread."""
         data = dict(payload) if isinstance(payload, dict) else {}
-        QtCore.QTimer.singleShot(0, lambda d=data: self._handle_input(None, d))
+        QtCore.QTimer.singleShot(0, self, lambda d=data: self._handle_input(None, d))
 
 
     @property

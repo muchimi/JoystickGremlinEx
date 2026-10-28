@@ -8157,25 +8157,24 @@ class AxesTimeline(QtWidgets.QGroupBox):
         self.device_guid = device.device_guid
         self.input_id_list = device.getAxisInputIdList()
         self.interval = 1 / 60
-        self._is_running = True
-        self._thread = threading.Thread(target=self._update_thread)
-        self._thread.name = "Timeline"
-        self._thread.start()
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(round(self.interval * 1000))
+        self._timer.timeout.connect(self._update_points)
+        self._timer.start()
 
-    def _update_thread(self):
+    def _update_points(self):
         astate = gremlin.event_handler.AxisState()
-        while self._is_running:
-            for input_id in self.input_id_list:
-                values = astate.getAxisValues(self.device_guid, input_id)
-                if values is not None:
-                    self.add_point(values.actual, input_id)
-            time.sleep(self.interval)
+        for input_id in self.input_id_list:
+            values = astate.getAxisValues(self.device_guid, input_id)
+            if values is not None:
+                self.add_point(values.actual, input_id)
 
     def unhook(self):
-        if self._is_running:
-            self._is_running = False
-            gremlin.util.safeJoin(self._thread)
-            self._thread = None
+        if not Shiboken.isValid(self):
+            return
+        self._timer.stop()
+        if Shiboken.isValid(self.plot_widget):
+            self.plot_widget.unhook()
         gremlin.util.clear_layout(self.layout())
 
     def add_point(self, value, series_id):
@@ -8221,20 +8220,13 @@ class TimeLinePlotWidget(QWidget):
         # Step size per update
         self._step_size = 1
 
-        # update m76T123 - remove all instances of QTimer to avoid mixing and matching QT threading model from Python threading model
-        # syncing with QT is manually handled to guard against pitfalls
-
-        self._interval = 1 / 60  # in seconds
-        self._is_running = True  # run flag for the update thread
-        self._thread = threading.Thread(target=self._update_runner)
-        self._thread.name = "TimeLinePlotRunner"
-        self._thread.start()
-
-    def _update_runner(self):
-        """update thread for the visualization"""
-        while self._is_running:
-            gremlin.util.InvokeUiMethod(self._handle_update_ui)
-            time.sleep(self._interval)
+        # Sampling, series updates and QPixmap painting share the GUI thread.
+        # A parented timer also stops when Qt destroys the viewer, even if an
+        # explicit unhook is missed; no worker keeps posting to a dead widget.
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(round(1000 / 60))
+        self._timer.timeout.connect(self._handle_update_ui)
+        self._timer.start()
 
     def _handle_update_ui(self):
         if Shiboken.isValid(self):
@@ -8243,9 +8235,8 @@ class TimeLinePlotWidget(QWidget):
 
     def unhook(self):
         """occurs on cleanup"""
-        self._is_running = False
-        gremlin.util.safeJoin(self._thread)
-        self._thread = None
+        if Shiboken.isValid(self):
+            self._timer.stop()
 
     def resizeEvent(self, event):
         """Handles resizing this widget.

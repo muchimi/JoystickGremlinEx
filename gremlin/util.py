@@ -2004,10 +2004,32 @@ def is_close(a, b, tolerance=0.0001):
     return math.isclose(a, b, abs_tol=tolerance)
 
 
-class InvokeUiMethod(QtCore.QObject):
-    """invokes a call on the UI thread as QT is not thread safe"""
+class _UiMethodDispatcher(QtCore.QObject):
+    """One persistent receiver for calls posted by Python worker threads."""
 
-    _called = QtCore.Signal(object, object, object, object, object, object, object, object)
+    _called = QtCore.Signal(object, object)
+
+    def __init__(self, app):
+        super().__init__()
+        self._app = app
+        self._called.connect(self._execute, QtCore.Qt.ConnectionType.QueuedConnection)
+        self.moveToThread(app.thread())
+
+    @QtCore.Slot(object, object)
+    def _execute(self, method, params):
+        # Parenting is a mutation of both objects: do it on their owning thread,
+        # never in the worker that first creates this dispatcher.
+        if self.parent() is None:
+            self.setParent(self._app)
+        InvokeUiMethod._exec(method, *params)
+
+
+_ui_method_dispatcher = None
+_ui_method_dispatcher_lock = threading.Lock()
+
+
+class InvokeUiMethod:
+    """Invoke on the UI thread without allocating a QObject for every call."""
 
     def __init__(
         self,
@@ -2027,62 +2049,31 @@ class InvokeUiMethod(QtCore.QObject):
 
         """
 
-        super().__init__()
         assert method is not None, "Method not provided"
-        # Prefer isMainThread(): Python QThread wrappers for the same C++ thread
-        # can fail `==`/`!=` and force a DirectConnection self-reenter loop.
-        on_ui = False
-        try:
-            on_ui = bool(QtCore.QThread.isMainThread())
-        except Exception:
-            app = QtWidgets.QApplication.instance()
-            if app is not None:
-                try:
-                    on_ui = QtCore.QThread.currentThread() is app.thread() or (QtCore.QThread.currentThread() == app.thread())
-                except Exception:
-                    on_ui = False
+        params = (p0, p1, p2, p3, p4, p5, p6, p7)
+        if is_ui_thread():
+            self._exec(method, *params)
+            return
 
-        if not on_ui:
-            # not on the QT UI thread, move it to the UI thread - because this is an indirect call
-            # create references to the objects so they don't go out of scope later
-            self._p0 = p0
-            self._p1 = p1
-            self._p2 = p2
-            self._p3 = p3
-            self._p4 = p4
-            self._p5 = p5
-            self._p6 = p6
-            self._p7 = p7
+        app = QtWidgets.QApplication.instance()
+        if app is None or QtCore.QCoreApplication.closingDown():
+            return
 
-            app = QtWidgets.QApplication.instance()
-            ui_thread = app.thread() if app is not None else None
-            if ui_thread is not None:
-                self.moveToThread(ui_thread)
-            if app is not None:
-                self.setParent(app)
-            # QueuedConnection: never DirectConnection-reenter the caller.
-            self._called.connect(
-                self._execute,
-                QtCore.Qt.ConnectionType.QueuedConnection,
-            )
-            self.method = method
-            self._called.emit(
-                self._p0,
-                self._p1,
-                self._p2,
-                self._p3,
-                self._p4,
-                self._p5,
-                self._p6,
-                self._p7,
-            )
-            self.deleteLater()
+        global _ui_method_dispatcher
+        with _ui_method_dispatcher_lock:
+            if _ui_method_dispatcher is None or not Shiboken.isValid(_ui_method_dispatcher):
+                _ui_method_dispatcher = _UiMethodDispatcher(app)
+            dispatcher = _ui_method_dispatcher
+        # The queued payload owns the callable and arguments until delivery.
+        dispatcher._called.emit(method, params)
 
-        else:
-            # Already on the UI thread — call directly.
-            self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
-
-    def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
+    @staticmethod
+    def _exec(method, p0, p1, p2, p3, p4, p5, p6, p7):
+        receiver = getattr(method, "__self__", None)
+        if isinstance(receiver, QtCore.QObject) and not Shiboken.isValid(receiver):
+            # A queued bound method keeps its Python wrapper alive, but its
+            # C++ widget may already have been deleted by the time we get here.
+            return
         try:
             sig = inspect.signature(method)
             pcount = len(sig.parameters)
@@ -2109,10 +2100,6 @@ class InvokeUiMethod(QtCore.QObject):
                 method(p0, p1, p2, p3, p4, p5, p6)
             case 8:
                 method(p0, p1, p2, p3, p4, p5, p6, p7)
-
-    @QtCore.Slot(object)
-    def _execute(self, p0=None, p1=None, p2=None, p3=None, p4=None, p5=None, p6=None, p7=None):
-        self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
 
 
 def is_ui_thread():

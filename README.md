@@ -49,6 +49,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T86):
+- Fix: added context to Overlay UI thread switcher to guard against a potential QT hard crash.
+- Fix: optimized thread invoker to eliminate the need for a QT object.
+- Fix: axis timeline widget call path rework to avoid context switching.
+
 ### (m77T85A):
 - Change: API: general first pass optimizations on m77
 - Change: API: refactor of mouse and keyboard output call paths for reduced overhead low level I/O and optimized call paths/waiting.
