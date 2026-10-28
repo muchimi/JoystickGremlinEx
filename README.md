@@ -50,6 +50,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T85A):
+- Change: API: general first pass optimizations on m77
 - Change: API: refactor of mouse and keyboard output call paths for reduced overhead low level I/O and optimized call paths/waiting.
 - Fix: KVM Action: correct hat handling and possible packet loss of keyboard data.
 - Fix: API (remoting): resolve serialization of hat position data, keyboard and gamepad and possible out of order processing.
