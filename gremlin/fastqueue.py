@@ -20,6 +20,7 @@ from __future__ import annotations
 import collections
 import threading
 from collections.abc import Callable, Iterator
+from itertools import filterfalse
 from typing import Generic, TypeVar
 
 
@@ -30,7 +31,10 @@ K = TypeVar("K")
 class FastQueue(Generic[T]):
     """A small, thread-safe FIFO queue backed by :class:`collections.deque`"""
 
-    __slots__ = ("name", "maxsize", "_queue", "_condition", "_not_full")
+    __slots__ = (
+        "name", "maxsize", "_queue", "_lock", "_condition", "_not_full",
+        "_consumers_waiting", "_producers_waiting",
+    )
 
     class Full(Exception):
         """Raised when an item cannot be added because the queue is full."""
@@ -47,9 +51,14 @@ class FastQueue(Generic[T]):
         self._queue: collections.deque[T] = collections.deque()
         # Keep a shared reentrant lock for callback compatibility, but use
         # separate wait sets: a put wakes consumers, a get wakes producers.
-        lock = threading.RLock()
-        self._condition = threading.Condition(lock)
-        self._not_full = threading.Condition(lock)
+        # Acquire the lock directly on hot paths to avoid Condition's Python
+        # context-manager wrappers. Waiter counts use this same lock, so an
+        # insertion cannot miss a consumer entering its wait.
+        self._lock = threading.RLock()
+        self._condition = threading.Condition(self._lock)
+        self._not_full = threading.Condition(self._lock)
+        self._consumers_waiting = 0
+        self._producers_waiting = 0
 
     @staticmethod
     def _validate_timeout(timeout: float | None) -> None:
@@ -65,8 +74,12 @@ class FastQueue(Generic[T]):
         if not block:
             raise self.Empty("Queue is empty") # @IgnoreException
 
-        if not self._condition.wait_for(lambda: bool(self._queue), timeout):
-            raise self.Empty("Queue is empty (timeout)")  # @IgnoreException
+        self._consumers_waiting += 1
+        try:
+            if not self._condition.wait_for(lambda: bool(self._queue), timeout):
+                raise self.Empty("Queue is empty (timeout)")  # @IgnoreException
+        finally:
+            self._consumers_waiting -= 1
 
     def _wait_for_space(self, block: bool, timeout: float | None) -> bool:
         """Wait for capacity; return whether the shared lock was released."""
@@ -77,39 +90,45 @@ class FastQueue(Generic[T]):
         if not block:
             raise self.Full("Queue is full")  # @IgnoreException
 
-        if not self._not_full.wait_for(
-            lambda: self.maxsize <= 0 or len(self._queue) < self.maxsize,
-            timeout,
-        ):
-            raise self.Full("Queue is full (timeout)")  # @IgnoreException
+        self._producers_waiting += 1
+        try:
+            if not self._not_full.wait_for(
+                lambda: self.maxsize <= 0 or len(self._queue) < self.maxsize,
+                timeout,
+            ):
+                raise self.Full("Queue is full (timeout)")  # @IgnoreException
+        finally:
+            self._producers_waiting -= 1
         return True
 
     def _notify_producer(self) -> None:
-        if self.maxsize > 0:
+        if self._producers_waiting:
             self._not_full.notify()
 
     def _notify_producers(self, count: int) -> None:
-        if self.maxsize > 0:
+        if self._producers_waiting:
             # Only this many producers can use the newly freed capacity.
             self._not_full.notify(count)
 
     def put(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
-        with self._condition:
+        with self._lock:
             if self.maxsize > 0 or timeout is not None:
                 self._wait_for_space(block, timeout)
             self._queue.append(item)
-            self._condition.notify()
+            if self._consumers_waiting:
+                self._condition.notify()
         return True
 
     def put_nowait(self, item: T) -> bool:
         return self.put(item, block=False)
 
     def putleft(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
-        with self._condition:
+        with self._lock:
             if self.maxsize > 0 or timeout is not None:
                 self._wait_for_space(block, timeout)
             self._queue.appendleft(item)
-            self._condition.notify()
+            if self._consumers_waiting:
+                self._condition.notify()
         return True
 
     def put_coalesce(
@@ -126,7 +145,7 @@ class FastQueue(Generic[T]):
         """
         key = key_fn(item) if key_fn is not None else None
 
-        with self._condition:
+        with self._lock:
             if key is not None:
                 for index, existing in enumerate(self._queue):
                     try:
@@ -153,11 +172,12 @@ class FastQueue(Generic[T]):
                         continue
 
             self._queue.append(item)
-            self._condition.notify()
+            if self._consumers_waiting:
+                self._condition.notify()
         return True
 
     def get(self, block: bool = True, timeout: float | None = None) -> T:
-        with self._condition:
+        with self._lock:
             if timeout is not None or not self._queue:
                 self._wait_for_item(block, timeout)
             item = self._queue.popleft()
@@ -168,7 +188,7 @@ class FastQueue(Generic[T]):
         return self.get(block=False)
 
     def pop(self, block: bool = True, timeout: float | None = None) -> T:
-        with self._condition:
+        with self._lock:
             if timeout is not None or not self._queue:
                 self._wait_for_item(block, timeout)
             item = self._queue.pop()
@@ -190,11 +210,12 @@ class FastQueue(Generic[T]):
         if max_batch_size <= 0:
             return []
 
-        with self._condition:
+        with self._lock:
             if timeout is not None or not self._queue:
                 self._wait_for_item(block, timeout)
-            count = min(max_batch_size, len(self._queue))
-            if count == len(self._queue):
+            size = len(self._queue)
+            count = min(max_batch_size, size)
+            if count == size:
                 # deque's bulk operations avoid a Python loop for full drains.
                 items = list(self._queue)
                 self._queue.clear()
@@ -205,7 +226,7 @@ class FastQueue(Generic[T]):
             return items
 
     def getall(self, block: bool = True, timeout: float | None = None) -> list[T]:
-        with self._condition:
+        with self._lock:
             if timeout is not None or not self._queue:
                 self._wait_for_item(block, timeout)
             items = list(self._queue)
@@ -215,7 +236,7 @@ class FastQueue(Generic[T]):
 
     def getNowait(self) -> list[T]:
         """Compatibility helper: remove all currently queued items."""
-        with self._condition:
+        with self._lock:
             if not self._queue:
                 return []
             items = list(self._queue)
@@ -224,7 +245,7 @@ class FastQueue(Generic[T]):
             return items
 
     def remove(self, item: T, fail_on_missing: bool = False) -> bool:
-        with self._condition:
+        with self._lock:
             try:
                 self._queue.remove(item)
             except ValueError:
@@ -235,14 +256,14 @@ class FastQueue(Generic[T]):
             return True
 
     def remove_callback(self, callback: Callable[[T], bool]) -> bool:
-        with self._condition:
+        with self._lock:
             original_size = len(self._queue)
             if not original_size:
                 return False
 
-            retained = collections.deque(
-                item for item in self._queue if not callback(item)
-            )
+            if callback is None:
+                raise TypeError("callback must be callable")
+            retained = collections.deque(filterfalse(callback, self._queue))
             if len(retained) == original_size:
                 return False
 
@@ -254,7 +275,7 @@ class FastQueue(Generic[T]):
         return self.remove_callback(callback)
 
     def clear(self) -> None:
-        with self._condition:
+        with self._lock:
             if self._queue:
                 count = len(self._queue)
                 self._queue.clear()
@@ -274,19 +295,19 @@ class FastQueue(Generic[T]):
         return self.empty()
 
     def qsize(self) -> int:
-        with self._condition:
+        with self._lock:
             return len(self._queue)
 
     def empty(self) -> bool:
-        with self._condition:
+        with self._lock:
             return not self._queue
 
     def full(self) -> bool:
-        with self._condition:
+        with self._lock:
             return self.maxsize > 0 and len(self._queue) >= self.maxsize
 
     def snapshot(self) -> list[T]:
-        with self._condition:
+        with self._lock:
             return list(self._queue)
 
     @property
@@ -301,7 +322,7 @@ class FastQueue(Generic[T]):
         return self.qsize()
 
     def __contains__(self, item: object) -> bool:
-        with self._condition:
+        with self._lock:
             return item in self._queue
 
     def __iter__(self) -> Iterator[T]:
@@ -311,7 +332,7 @@ class FastQueue(Generic[T]):
         return not self.empty()
 
     def __repr__(self) -> str:
-        with self._condition:
+        with self._lock:
             return (
                 f"{type(self).__name__}(maxsize={self.maxsize}, "
                 f"items={list(self._queue)!r})"

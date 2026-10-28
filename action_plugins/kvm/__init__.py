@@ -23,7 +23,7 @@ from PySide6 import QtCore
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.util import safe_read, safe_format
+from gremlin.util import hat_tuple_to_direction, safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.remote
@@ -223,28 +223,35 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
         self.verbose = gremlin.config.Configuration().verbose_mode_remote
         self.client_list = self.action_data.remote_config.getClientList()
         # current mouse position
-        self._last_x, self._last_x = win32api.GetCursorPos()
+        self._last_x, self._last_y = win32api.GetCursorPos()
         match self.action_data.sync_mode:
             case SyncMode.Input:
                 match input_type:
                     case InputType.JoystickHat:
-                        pass
-                    case InputType.JoystickAxis:
-                        pass
+                        position = gremlin.joystick_handling.get_hat_position(device_guid, input_id)
+                        container = self.action_data.get_container()
+                        if container.has_virtual_button:
+                            is_pressed = hat_tuple_to_direction(position) in container.virtual_button.directions
+                        else:
+                            is_pressed = position != (0, 0)
                     case InputType.JoystickButton:
                         is_pressed = gremlin.joystick_handling.get_button(device_guid, input_id)
+                    case _:
+                        return
 
-                        # construct the input event to sync
-                        event = gremlin.event_handler.Event(
-                            event_type=input_type, identifier=input_id, value=is_pressed, is_pressed=is_pressed, device_guid=device_guid
-                        )
-                        self.process_event(event, is_pressed)
+                # Hats activate KVM as buttons after their configured directions
+                # have been evaluated, just as they do in the execution graph.
+                event = gremlin.event_handler.Event(
+                    event_type=InputType.JoystickButton, identifier=input_id, value=is_pressed, is_pressed=is_pressed, device_guid=device_guid
+                )
+                self.process_event(event, is_pressed)
 
             case SyncMode.Ignore:
                 pass
 
     def profile_stop(self):
         """called when profile stops"""
+        self.stop()
         # ensure raw mode is off and mouse/keyboard suppression is turned off
         gremlin.raw_input.rawInputShutdown()
         mh = gremlin.windows_event_hook.MouseHook()
@@ -320,6 +327,10 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data=None):
         is_pressed = event.is_pressed
+        if event.event_type == InputType.JoystickHat:
+            # A raw hat event also presses its new centered position. Virtual
+            # hat buttons arrive as button events and retain their chosen state.
+            is_pressed = is_pressed and event.value != (0, 0)
         if is_pressed:
             self.start()
         else:
@@ -377,10 +388,7 @@ class KVM(gremlin.input_item.AbstractAction):
         :return True if an activation condition is required for this particular
             action instance, False otherwise
         """
-        # Need virtual buttons for button inputs on axes and hats
-        if self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]:
-            return not self.motion_input
-        return False
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """Reads the contents of an XML node to populate this instance.

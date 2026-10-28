@@ -23,6 +23,7 @@ import logging
 import threading
 import time
 import os
+from functools import cache
 
 import gremlin.util
 from vjoy.vjoy_interface import VJoyState, VJoyInterface
@@ -30,9 +31,23 @@ from gremlin.error import VJoyError
 import gremlin.spline
 import gremlin.types
 from gremlin.types import EventSourceType
+from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
 
 syslog = logging.getLogger("system")
+
+
+def _identity(value):
+    return value
+
+
+@cache
+def _output_event_context():
+    """Resolve event services lazily to avoid the vJoy/event-handler import cycle."""
+    import gremlin.event_handler
+    import gremlin.shared_state
+
+    return gremlin.event_handler, gremlin.shared_state, gremlin.event_handler.EventListener()
 
 
 def _error_string(vid, iid, value):
@@ -179,8 +194,8 @@ class Axis:
         self._max_value = tmp.value
         self._half_range = int(self._max_value / 2)
 
-        self._deadzone_fn = lambda x: deadzone(x, -1.0, -0.0, 0.0, 1.0)
-        self._response_curve_fn = lambda x: x
+        self._deadzone_fn = _identity
+        self._response_curve_fn = _identity
 
         # If this is not the case our value setter needs to change
         if self._min_value != 0:
@@ -198,7 +213,7 @@ class Axis:
             self._response_curve_fn = gremlin.spline.CubicBezierSpline(control_points)
         else:
             syslog.error("Invalid spline type specified")
-            self._response_curve_fn = lambda x: x
+            self._response_curve_fn = _identity
 
     def set_deadzone(self, low, center_low, center_high, high):
         """Sets the deadzone for the axis.
@@ -208,7 +223,10 @@ class Axis:
         :param center_high upper center deadzone limit
         :param high high deadzone limit
         """
-        self._deadzone_fn = lambda x: deadzone(x, low, center_low, center_high, high)
+        if low == -1.0 and center_low == 0.0 and center_high == 0.0 and high == 1.0:
+            self._deadzone_fn = _identity
+        else:
+            self._deadzone_fn = lambda x: deadzone(x, low, center_low, center_high, high)
 
     @property
     def value(self):
@@ -225,10 +243,6 @@ class Axis:
 
         :param value the position of the axis in the range [-1, 1]
         """
-        import gremlin.event_handler
-        import gremlin.joystick_handling
-        from gremlin.input_types import InputType
-
         # import gremlin.event_handler
         # from gremlin.input_types import InputType
 
@@ -241,16 +255,17 @@ class Axis:
             syslog.warning("Invalid null value provided")
             return
 
-        if p_value < -1.0:
+        # Match the previous min/max clamp, including NaN mapping to -1.0.
+        if not p_value >= -1.0:
             p_value = -1.0
         elif p_value > 1.0:
             p_value = 1.0
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
-        self._value = self._response_curve_fn(self._deadzone_fn(min(1.0, max(-1.0, p_value))))
+        self._value = self._response_curve_fn(self._deadzone_fn(p_value))
 
-        vjm = VJoyMonitor()
+        vjm = self.vjoy_dev._vjoy_monitor
         vjm.ensure_ownership(self.vjoy_id)
 
 
@@ -264,9 +279,9 @@ class Axis:
 
         self.vjoy_dev.used()
 
-        el = gremlin.event_handler.EventListener()
+        event_handler, shared_state, el = _output_event_context()
 
-        event = gremlin.event_handler.Event(
+        event = event_handler.Event(
             device_guid=self.device_guid,
             event_type = InputType.JoystickAxis,
             identifier= self.axis_id - 0x30 + 1, # convert vjoy ID to input id 1 to 8
@@ -281,11 +296,10 @@ class Axis:
         # Loopback only for "vJoy as input" devices. Needed so mappings on the
         # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis — DINPUT
         # echo is unreliable. Gated to avoid flooding normal output-only devices.
-        import gremlin.shared_state
-        profile = gremlin.shared_state.current_profile
+        profile = shared_state.current_profile
         if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
             el.vjoy_event.emit(
-                gremlin.event_handler.VjoyEvent(
+                event_handler.VjoyEvent(
                     self.vjoy_id,
                     InputType.JoystickAxis,
                     self.axis_id - 0x30 + 1,
@@ -355,12 +369,8 @@ class Button:
         # if self.button_id == 2 and not is_pressed:
         #     pass
 
-        import gremlin.event_handler
-        import gremlin.joystick_handling
-        from gremlin.input_types import InputType
-
         # el.vjoy_callback(event) disable 10/8 in m76T23+
-        vjm = VJoyMonitor()
+        vjm = self.vjoy_dev._vjoy_monitor
         vjm.ensure_ownership(self.vjoy_id)
 
         self._is_pressed = is_pressed
@@ -370,10 +380,10 @@ class Button:
 
         self.vjoy_dev.used()
 
-        el = gremlin.event_handler.EventListener()
+        event_handler, shared_state, el = _output_event_context()
         # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
 
-        event = gremlin.event_handler.Event(
+        event = event_handler.Event(
             device_guid=self.device_guid,
             event_type = InputType.JoystickButton,
             identifier=self.button_id,
@@ -384,11 +394,10 @@ class Button:
 
         # Loopback only for "vJoy as input" devices (button chaining). Not emitted
         # for normal output-only vJoy writes.
-        import gremlin.shared_state
-        profile = gremlin.shared_state.current_profile
+        profile = shared_state.current_profile
         if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
             el.vjoy_event.emit(
-                gremlin.event_handler.VjoyEvent(
+                event_handler.VjoyEvent(
                     self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
                 )
             )
@@ -431,24 +440,18 @@ class Hat:
     @staticmethod
     def getName(position):
         """gets the name"""
-        if position in Hat.direction_to_name:
-            return Hat.direction_to_name[position]
-        return None
+        return Hat.direction_to_name.get(position)
 
     @staticmethod
     def getDirection(position) -> tuple:
         """gets the hat position as a tuple"""
-        if position in Hat.name_to_direction:
-            return Hat.name_to_direction[position]
-        return None
+        return Hat.name_to_direction.get(position)
 
     @staticmethod
     def getIcon(position):
         if isinstance(position, str):
             position = Hat.getDirection(position)
-        if position in Hat.direction_to_icon:
-            return Hat.direction_to_icon[position]
-        return None
+        return Hat.direction_to_icon.get(position)
 
     # Mapping from event directions to names
     direction_to_name = {
@@ -494,24 +497,12 @@ class Hat:
     @staticmethod
     def getEightDirections():
         """gets the positions for all hat positions"""
-        return [p for p in Hat.direction_to_name]
+        return list(Hat.direction_to_name)
 
     @staticmethod
     def getEightDirectionsNameMap():
         """gets the positions for all hat positions"""
         return Hat.direction_to_name
-
-    direction_to_icon = {
-        (0, 0): "mdi.image-filter-center-focus-strong",  # "Center",
-        (0, 1): "mdi.arrow-up-thin-circle-outline",  # "North",
-        (1, 1): "mdi.arrow-top-right-thin-circle-outline",  # "North-east",
-        (1, 0): "mdi.arrow-right-thin-circle-outline",  # "East",
-        (1, -1): "mdi.arrow-bottom-right-thin-circle-outline",  # "South-east",
-        (0, -1): "mdi.arrow-down-thin-circle-outline",  # "South",
-        (-1, -1): "mdi.arrow-bottom-left-thin-circle-outline",  # "South-west",
-        (-1, 0): "mdi.arrow-left-thin-circle-outline",  # "West",
-        (-1, 1): "mdi.arrow-top-left-thin-circle-outline",  # "North-west"
-    }
 
     @staticmethod
     def getEightDirectionsIconMap() -> dict:
@@ -561,14 +552,11 @@ class Hat:
         :param direction the new direction of the hat
         """
 
-        import gremlin.event_handler
-        from gremlin.input_types import InputType
-
-        el = gremlin.event_handler.EventListener()
+        event_handler, shared_state, el = _output_event_context()
         # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
         # el.vjoy_event.emit(event)
 
-        event = gremlin.event_handler.Event(
+        event = event_handler.Event(
             device_guid=self.device_guid,
             event_type = InputType.JoystickHat,
             identifier=self.hat_id,
@@ -579,18 +567,17 @@ class Hat:
         el.vjoy_output_event_ui.emit(event)
 
         # m76T185 hat loopback, gated to vJoy-as-input devices only.
-        import gremlin.shared_state
-        profile = gremlin.shared_state.current_profile
+        profile = shared_state.current_profile
         if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
             el.vjoy_event.emit(
-                gremlin.event_handler.VjoyEvent(
+                event_handler.VjoyEvent(
                     self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
                 )
             )
 
 
 
-        vjm = VJoyMonitor()
+        vjm = self.vjoy_dev._vjoy_monitor
         vjm.ensure_ownership(self.vjoy_id)
 
         if self.hat_type == HatType.Discrete:
@@ -609,11 +596,12 @@ class Hat:
         if direction is False or direction is None:
             direction = (0, 0)
 
-        if direction not in Hat.to_discrete_direction:
+        native_direction = Hat.to_discrete_direction.get(direction)
+        if native_direction is None:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
         self._direction = direction
-        if not VJoyInterface.SetDiscPov(Hat.to_discrete_direction[direction], self.vjoy_id, self.hat_id):
+        if not VJoyInterface.SetDiscPov(native_direction, self.vjoy_id, self.hat_id):
             raise VJoyError(f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
 
@@ -625,15 +613,13 @@ class Hat:
         if direction is False or direction is None:
             direction = (0, 0)
 
-        if direction not in Hat.to_continuous_direction:
+        native_direction = Hat.to_continuous_direction.get(direction)
+        if native_direction is None:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}")
 
         self._direction = direction
-        if not VJoyInterface.SetContPov(Hat.to_continuous_direction[direction], self.vjoy_id, self.hat_id):
+        if not VJoyInterface.SetContPov(native_direction, self.vjoy_id, self.hat_id):
             raise VJoyError(f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
-
-        vjm = VJoyMonitor()
-        vjm.used()
 
 class VJoy:
     """Represents a vJoy device present in the system."""
@@ -711,6 +697,8 @@ class VJoy:
     def ensure_released(self):
         if not self._enabled:
             return
+        if gremlin.util.is_ui_thread():
+            return self._ensure_released_ui()
         gremlin.util.InvokeUiMethod(self._ensure_released_ui)  # ui thread
 
     def _ensure_released_ui(self):
@@ -733,7 +721,7 @@ class VJoy:
 
         :return number of axes on this device
         """
-        return int(len(self._axis))
+        return len(self._axis)
 
     @property
     def button_count(self):
@@ -797,19 +785,21 @@ class VJoy:
         """
         if axis_id is not None:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
-            if not self.is_axis_valid(axis_id=axis_id):
+            try:
+                return self._axis[axis_id]
+            except KeyError:
                 syslog.error(
                     f"VJOY API:Invalid axis index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, axis_id, '')}"
                 )
                 return None
-            return self._axis[axis_id]
         elif linear_index is not None:
-            if not self.is_axis_valid(linear_index=linear_index):
+            try:
+                return self._axis[self._axis_lookup[linear_index]]
+            except KeyError:
                 syslog.error(
                     f"VJOY API:Invalid linear index for axis lookup provided - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, linear_index, '')}"
                 )
                 return None
-            return self._axis[self._axis_lookup[linear_index]]
         else:
             syslog.error("VJOY API:No vjoy_id or linear_index provided")
             return None
@@ -820,12 +810,13 @@ class VJoy:
         :param index the index of the button to return
         :return Button object corresponding to the provided index
         """
-        if index not in self._button:
+        try:
+            return self._button[index]
+        except KeyError:
             syslog.error(
                 f"VJOY API:Invalid button index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, '')}"
             )
             return None
-        return self._button[index]
 
     def hat(self, index):
         """Returns the hat object associated with the provided index.
@@ -833,12 +824,13 @@ class VJoy:
         :param index the index of the hat to return
         :return Hat object corresponding to the provided index
         """
-        if index not in self._hat:
+        try:
+            return self._hat[index]
+        except KeyError:
             syslog.error(
                 f"VJOY API:Invalid hat index requested - ensure VJOY settings are correct and reflected in the profile mapping: {_error_string(self.vjoy_id, index, '')}"
             )
             return None
-        return self._hat[index]
 
     def is_axis_valid(self, axis_id=None, linear_index=None):
         """Returns whether or not an axis is valid.
@@ -873,6 +865,8 @@ class VJoy:
 
 
     def reset(self):
+        if gremlin.util.is_ui_thread():
+            return self._reset_ui()
         gremlin.util.InvokeUiMethod(self._reset_ui)  # ui thread
 
     def _reset_ui(self):
@@ -1001,7 +995,7 @@ class VJoyMonitor:
     def __init__(self):
         # Timestamp of the last time the device was used
         import gremlin.event_handler
-        self._last_active = time.time() # time when VJOY was last active
+        self._last_active = time.monotonic() # time when VJOY was last active
         self._keep_alive_running = False
         self._keep_alive_started = False
         self._keep_alive_thread = None
@@ -1026,7 +1020,7 @@ class VJoyMonitor:
 
     def used(self):
         """Marks the vJoy device as used, updating the last active timestamp"""
-        self._last_active = time.time()
+        self._last_active = time.monotonic()
 
     def registerVJoyId(self, vjoy_id):
         """Registers a vJoy device ID to be monitored"""
@@ -1065,12 +1059,11 @@ class VJoyMonitor:
             return
 
         syslog.info("VJOY: keep alive request stopping")
-        if self._keep_alive_running:
-            if self._keep_alive_thread is not None and self._keep_alive_thread.is_alive():
-                self._keep_alive_running = False
-                self._keep_alive_abort_signal.set()
-                gremlin.util.safeJoin(self._keep_alive_thread)
-            self._keep_alive_thread = None
+        self._keep_alive_running = False
+        self._keep_alive_abort_signal.set()
+        if self._keep_alive_thread is not None and self._keep_alive_thread.is_alive():
+            gremlin.util.safeJoin(self._keep_alive_thread)
+        self._keep_alive_thread = None
         self._keep_alive_started = False
         syslog.info("VJOY: keep alive request stopped")
 
@@ -1081,27 +1074,36 @@ class VJoyMonitor:
         be reset to ensure it doesn't time out.
         """
         import gremlin.config
-        next_check = self._last_active + VJoy.keep_alive_timeout
+        interval = VJoy.keep_alive_timeout
+        next_check = self._last_active + interval
         syslog.info("VJOY: keep alive thread starting")
 
         while self._keep_alive_running:
-            if next_check < time.time():
+            remaining = max(0.0, next_check - time.monotonic())
+            if self._keep_alive_abort_signal.wait(timeout=remaining):
+                break
+            if not self._keep_alive_running:
+                break
+            now = time.monotonic()
+            idle_deadline = self._last_active + interval
+            if now >= idle_deadline:
                 verbose = gremlin.config.Configuration().verbose_mode_vjoy
                 if verbose:
                     syslog.info("VJOY: keep alive check triggered")
                 self.keep_awake()
-                next_check = self._last_active + VJoy.keep_alive_timeout
-            if self._keep_alive_abort_signal.wait(timeout=VJoy.keep_alive_timeout):
-                if self._keep_alive_abort_signal.is_set():
-                    self._keep_alive_running = False
-                    syslog.info("VJOY: keep alive stop event trigger")
-                    break # exit if abort signal is set
-            time.sleep(1)
+                # Keep-awake may be queued to the UI and leave _last_active
+                # unchanged. Schedule the next check to avoid a busy loop.
+                next_check = now + interval
+            else:
+                next_check = idle_deadline
 
+        self._keep_alive_running = False
         syslog.info("VJOY: keep alive thread exiting")
 
     def keep_awake(self):
         # run on ui thread
+        if gremlin.util.is_ui_thread():
+            return self.keep_awake_ui()
         gremlin.util.InvokeUiMethod(self.keep_awake_ui)
 
     def keep_awake_ui(self):
@@ -1122,6 +1124,8 @@ class VJoyMonitor:
                     syslog.warning(f"VJOY AWAKE: vjoy [{id}] is reporting no longer available. code: {status}")
 
     def ensure_ownership(self, vjoy_id : int):
+        if gremlin.util.is_ui_thread():
+            return self._ensure_ownership_ui(vjoy_id)
         gremlin.util.InvokeUiMethod(self._ensure_ownership_ui, vjoy_id)
 
     def _ensure_ownership_ui(self, vjoy_id : int):
@@ -1149,6 +1153,7 @@ class VJoyMonitor:
             syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {vjoy_id}")
 
             return False
+        return True
 
 @SingletonDecorator
 class VjoyDebug:

@@ -10308,37 +10308,36 @@ class QFlowLayout(QtWidgets.QLayout):
         line_height = 0
         line_count = 1
         spacing = self.spacing()
+        style_spacing = {}
 
         for item in self._item_list:
+            item_size = item.sizeHint()
             style = item.widget().style()
-            layout_spacing_x = style.layoutSpacing(
-                QSizePolicy.ControlType.PushButton,
-                QSizePolicy.ControlType.PushButton,
-                Qt.Orientation.Horizontal,
-            )
-            layout_spacing_y = style.layoutSpacing(
-                QSizePolicy.ControlType.PushButton,
-                QSizePolicy.ControlType.PushButton,
-                Qt.Orientation.Vertical,
-            )
-            space_x = spacing + layout_spacing_x
-            space_y = spacing + layout_spacing_y
-            next_x = x + item.sizeHint().width() + space_x
+            spaces = style_spacing.get(style)
+            if spaces is None:
+                spaces = (
+                    spacing + style.layoutSpacing(QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton, Qt.Orientation.Horizontal),
+                    spacing + style.layoutSpacing(QSizePolicy.ControlType.PushButton, QSizePolicy.ControlType.PushButton, Qt.Orientation.Vertical),
+                )
+                style_spacing[style] = spaces
+            space_x, space_y = spaces
+            next_x = x + item_size.width() + space_x
             if next_x - space_x > rect.right() and line_height > 0:
                 x = rect.x()
                 y = y + line_height + space_y
-                next_x = x + item.sizeHint().width() + space_x
+                next_x = x + item_size.width() + space_x
                 line_height = 0
                 line_count += 1
 
             if not test_only:
-                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+                item.setGeometry(QRect(QPoint(x, y), item_size))
 
             x = next_x
-            line_height = max(line_height, item.sizeHint().height())
+            line_height = max(line_height, item_size.height())
 
-        self._line_count = line_count
-        self.lineCountChanged.emit(self.parentWidget(), line_count)
+        if not test_only and line_count != self._line_count:
+            self._line_count = line_count
+            self.lineCountChanged.emit(self.parentWidget(), line_count)
         return y + line_height - rect.y()
 
 

@@ -49,6 +49,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T85A):
+- Change: API: refactor of mouse and keyboard output call paths for reduced overhead low level I/O and optimized call paths/waiting.
+- Fix: KVM Action: correct hat handling and possible packet loss of keyboard data.
+- Fix: API (remoting): resolve serialization of hat position data, keyboard and gamepad and possible out of order processing.
+- Fix: UI: Flow layout: streamline and reduce overhead.
+- Fix: API: mouse - wake on motion or stop only.
+
 
 ### (m77T85):
 - New: Vjoy Remap Action: Stepped axis mode gains a **stepped+PID** mode. In **Stepped** mode, the axis value is immediately set to the step.  In the **Stepped+PID** mode, the axis value smoothly transitions over time to the new step value using a PID controller.  This can be useful in applications where a smooth transition is desired, such as a speed limiter, trim or continuous flap function.

@@ -59,6 +59,16 @@ from gremlin.types import VjoyAction
 syslog = logging.getLogger("system")
 
 
+def _hat_direction(value):
+    """Restore MessagePack arrays to the tuples required by vJoy."""
+    if value is None or value is False:
+        return (0, 0)
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        if value[0] in (-1, 0, 1) and value[1] in (-1, 0, 1):
+            return tuple(value)
+    raise ValueError(f"Invalid remote hat direction: {value!r}")
+
+
 def _open_remote_vjoy(device_id):
     """Acquire a vJoy device for remote output (opens on demand if needed).
 
@@ -96,41 +106,55 @@ def _open_remote_vjoy(device_id):
 class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     allow_reuse_address = True
     daemon_threads = True
+    max_packet_size = 65535
 
     # Reuse explicitly daemonized workers: high-rate axis and mouse packets
     # must not create an OS thread on every datagram (including Qt callers).
     request_worker_count = 4
 
     def __init__(self, *args, **kwargs):
-        self._request_queue = queue.SimpleQueue()
+        self._request_queues = [queue.SimpleQueue() for _ in range(self.request_worker_count)]
         self._request_workers = []
         self._request_workers_lock = threading.Lock()
         self._request_workers_stopping = False
         super().__init__(*args, **kwargs)
 
     def process_request(self, request, client_address):
-        """Queue every datagram for a fixed set of reusable daemon workers."""
+        """Keep each sender's datagrams on one worker to preserve arrival order."""
         try:
             with self._request_workers_lock:
                 if self._request_workers_stopping:
                     self.shutdown_request(request)
                     return
                 while len(self._request_workers) < self.request_worker_count:
+                    request_queue = self._request_queues[len(self._request_workers)]
                     worker = threading.Thread(
                         target=self._request_worker,
+                        args=(request_queue,),
                         name="remote-packet-worker",
                         daemon=bool(self.daemon_threads),
                     )
                     worker.start()
                     self._request_workers.append(worker)
-                self._request_queue.put((request, client_address))
+                request_queue = self._request_queues[hash(client_address) % len(self._request_workers)]
+                request_queue.put((request, client_address))
         except Exception:
-            # Preserve the original synchronous fallback if threads cannot start.
+            # A partially started pool can still preserve ordering. Only fall
+            # back to synchronous handling when no worker could be started.
+            with self._request_workers_lock:
+                if self._request_workers_stopping:
+                    self.shutdown_request(request)
+                    return
+                if self._request_workers:
+                    self.request_worker_count = len(self._request_workers)
+                    request_queue = self._request_queues[hash(client_address) % len(self._request_workers)]
+                    request_queue.put((request, client_address))
+                    return
             self.process_request_thread(request, client_address)
 
-    def _request_worker(self):
+    def _request_worker(self, request_queue):
         while True:
-            item = self._request_queue.get()
+            item = request_queue.get()
             if item is None:
                 return
             request, client_address = item
@@ -146,8 +170,8 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
                 self._request_workers_stopping = True
                 # Accepted requests finish before the workers exit. As before,
                 # daemon request handlers do not block application shutdown.
-                for worker in self._request_workers:
-                    self._request_queue.put(None)
+                for request_queue in self._request_queues[: len(self._request_workers)]:
+                    request_queue.put(None)
         super().server_close()
 
     def handle_timeout(self):
@@ -185,7 +209,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
         try:
             data = msgpack.unpackb(raw_data)
 
-        except (ValueError, TypeError):
+        except (msgpack.UnpackException, ValueError, TypeError):
             return
         if not isinstance(data, dict):
             return
@@ -197,6 +221,8 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             host_ip = ""
         try:
             remote_client.handle(data, peer_ip=host_ip)
+        except (KeyError, TypeError, ValueError) as err:
+            syslog.warning(f"RPC: invalid packet from {host_ip}: {err}")
         except Exception as err:
             syslog.error(f"RPC: handle failed from {host_ip}: {err}")
             raise
@@ -205,8 +231,8 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 class RPCGremlin:
     """Remote UDP multicast listener"""
 
-    MULTICAST_GROUP = "224.3.29.72" # only use not routable multicast for local network comms between instances
-    MULTICAST_TTL = 2 # max jumps
+    MULTICAST_GROUP = "224.3.29.72"  # only use not routable multicast for local network comms between instances
+    MULTICAST_TTL = 2  # max jumps
 
     def __init__(self):
         config = gremlin.config.Configuration()
@@ -324,6 +350,7 @@ class RPCGremlin:
             self._thread = None
 
         syslog.info("GEX RPC server stopped...")
+
 
 # class RPCGremlin_v0:
 #     """GEX remote UDP multicast listener"""
@@ -518,6 +545,7 @@ class RemoteClient:
         """Initialises a new object."""
 
         self._sock = None
+        self._socket_lock = threading.RLock()
         config = gremlin.config.Configuration()
         self._verbose_remote_extra = config.verbose_mode_remote_extra
         self._verbose_remote = config.verbose_mode_remote
@@ -531,6 +559,7 @@ class RemoteClient:
         self._started = False
 
         self._callbacks = {}  # map of callbacks by client ID
+        self._callbacks_lock = threading.Lock()
 
         self.remote_control = RemoteControl()
 
@@ -586,14 +615,14 @@ class RemoteClient:
         """called when request to enable remote control has been made"""
         self.start()
 
-    def getDatablock(self, action: str = None, key : str = None, data=None) -> dict:
+    def getDatablock(self, action: str = None, key: str = None, data=None) -> dict:
         """gets a dict with the sender info"""
         block = {}
         if action:
             block["action"] = action
         if key:
             block["key"] = key
-        if data:
+        if data is not None:
             block["data"] = data
 
         return block
@@ -622,7 +651,7 @@ class RemoteClient:
                 el = gremlin.event_handler.EventListener()
                 if self._alive_ticker in el.heartbeat:
                     el.heartbeat.disconnect(self._alive_ticker)
-            except Exception as e:
+            except Exception:
                 pass
 
             # if self._alive_thread:
@@ -636,14 +665,24 @@ class RemoteClient:
             #     syslog.info("Alive thread stopped")
             #     self._alive_thread = None
 
-            if self._sock:
+            self._started = False
+
+        with self._socket_lock:
+            if self._sock is not None:
                 self._sock.close()
                 self._sock = None
                 syslog.info("Gremlin RPC client stopped.")
-
-            self._started = False
+        with self._callbacks_lock:
+            pending = list(self._callbacks.values())
+            self._callbacks.clear()
+        for packet in pending:
+            packet.stop()
 
     def ensure_socket(self):
+        with self._socket_lock:
+            return self._ensure_socket()
+
+    def _ensure_socket(self):
         # makes sure the socket exists
         import struct
 
@@ -682,6 +721,8 @@ class RemoteClient:
             return self._sock is not None
         except Exception:
             syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
+            if self._sock is not None:
+                self._sock.close()
             self._sock = None
             return False
 
@@ -719,10 +760,16 @@ class RemoteClient:
 
     def _dispatch(self, data, client_list: list | tuple | int):
         if client_list is None:
-            client_list = [0]
-        elif not hasattr(client_list, "__iter__"):
-            client_list = [client_list]
-        for client_id in client_list:
+            self.send(data)
+            return
+        if isinstance(client_list, (str, int)):
+            self.send(data, client_list)
+            return
+        clients = dict.fromkeys(int(client_id) for client_id in client_list)
+        if 0 in clients:
+            self.send(data)
+            return
+        for client_id in clients:
             self.send(data, client_id)
 
     def _alive_ticker(self):
@@ -750,9 +797,7 @@ class RemoteClient:
             verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")
-            bd = ButtonData.create(device_id, button_id, is_pressed, action="button")
-            data = self.getDatablock("button", key=ButtonData.key, data=bd.toPayload())
-            self._dispatch(data, client_list)
+            self._send_joystick("button", ButtonData.key, device_id, button_id, is_pressed, client_list)
 
     def toggle_button(self, device_id, button_id, client_list=None, force_remote=False):
         """sends toggle button to clients"""
@@ -760,9 +805,7 @@ class RemoteClient:
             verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")
-            bd = ButtonData.create(device_id, button_id, action="toggle")
-            data = self.getDatablock("toggle", key=ButtonData.key, data=bd.toPayload())
-            self._dispatch(data, client_list)
+            self._send_joystick("toggle", ButtonData.key, device_id, button_id, None, client_list)
 
     def send_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends axis data to clients"""
@@ -771,9 +814,7 @@ class RemoteClient:
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            payload = AxisData.create(device_id, axis_id, value, action="value").toPayload()
-            data = self.getDatablock("axis", key=AxisData.key, data=payload)
-            self._dispatch(data, client_list)
+            self._send_joystick("axis", AxisData.key, device_id, axis_id, value, client_list)
 
     def send_relative_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends relative axis data to clients"""
@@ -782,9 +823,7 @@ class RemoteClient:
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            payload = AxisData.create(device_id, axis_id, relative_value=value, action="relative").toPayload()
-            data = self.getDatablock("axis", key=AxisData.key, data=payload)
-            self._dispatch(data, client_list)
+            self._send_joystick("axis", AxisData.key, device_id, axis_id, None, client_list, relative_value=value)
 
     def send_hat(self, device_id, hat_id, direction, client_list=None, force_remote=False):
         """sends joystick hats to clients"""
@@ -792,9 +831,24 @@ class RemoteClient:
             verbose = self._verbose_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
-            payload = HatData.create(device_id, hat_id, direction, action="value").toPayload()
-            data = self.getDatablock("hat", key=HatData.key, data=payload)
-            self._dispatch(data, client_list)
+            self._send_joystick("hat", HatData.key, device_id, hat_id, _hat_direction(direction), client_list)
+
+    def _send_joystick(self, action, key, device_id, target, value, client_list, relative_value=None):
+        """Build the existing wire format without temporary data objects."""
+        command = action if key == ButtonData.key else "value"
+        if relative_value is not None:
+            command = "relative"
+        payload = {
+            "key": key,
+            "action": command,
+            "extra_data": None,
+            "device": device_id,
+            "target": target,
+            "value": value,
+        }
+        if key == AxisData.key:
+            payload["rvalue"] = relative_value
+        self._dispatch({"action": action, "key": key, "data": payload}, client_list)
 
     def send_key(
         self,
@@ -869,7 +923,7 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
 
             payload = MouseData.create(MouseButton.HWheel, direction, "hwheel", extra_data).toPayload()
-            data = self.getDatablock("mouse", key=MouseData.key, data= payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_motion(self, dx, dy, client_list=None, force_remote=False, extra_data: dict = None):
@@ -898,20 +952,19 @@ class RemoteClient:
             verbose = self._verbose_remote
             if verbose:
                 syslog.info("REMOTE OUTPUT: mouse motion acceleration")
-            payload = (
-                MouseData()
-                .create(
-                    MouseButton.NotSet,
-                    (a, min_speed, max_speed, time_to_max_speed),
-                    "amotion",
-                    extra_data,
-                )
-                .toPayload()
-            )
-            data = self.getDatablock("mouse", key=MouseData.key, data= payload)
+            payload = MouseData.create(
+                MouseButton.NotSet,
+                (a, min_speed, max_speed, time_to_max_speed),
+                "amotion",
+                extra_data,
+            ).toPayload()
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
-    def send_gamepad_axis(self, device_id : int | str, mode, value, client_list=None, force_remote=False):
+    # Retain the name used by the mouse mapper plugins.
+    send_mouse_acceleration = send_mouse_motion_acceleration
+
+    def send_gamepad_axis(self, device_id: int | str, mode, value, client_list=None, force_remote=False):
         """sends a gamepad axis to the remote client"""
         if self.enabled or force_remote:
             verbose = self._verbose_remote
@@ -922,11 +975,11 @@ class RemoteClient:
             data["key"] = "gamepad"
             data["subtype"] = "axis"
             data["index"] = device_id  # which device to send to
-            data["mode"] = mode
+            data["mode"] = getattr(mode, "value", mode)
             data["value"] = value
             self._dispatch(data, client_list)
 
-    def send_gamepad_button(self, device_id : int | str, mode, is_pressed, client_list=None, force_remote=False):
+    def send_gamepad_button(self, device_id: int | str, mode, is_pressed, client_list=None, force_remote=False):
         """sends a gamepad button to the remote client"""
         if self.enabled or force_remote:
             verbose = self._verbose_remote
@@ -937,7 +990,7 @@ class RemoteClient:
             data["key"] = "gamepad"
             data["index"] = device_id  # which device to send to (int or string)
             data["subtype"] = "button"
-            data["mode"] = mode
+            data["mode"] = getattr(mode, "value", mode)
             data["is_pressed"] = is_pressed
             self._dispatch(data, client_list)
 
@@ -1005,9 +1058,10 @@ class RemoteClient:
         """sends data to the socket. Returns True if a datagram was sent."""
         if not data:
             return False
+        data = data.copy()
         data["sender_id"] = self.clientId
         data["sender_name"] = self.clientName
-        data["to"] = client_id if client_id is not None else 0
+        data["to"] = int(client_id) if client_id is not None else 0
 
         # ensure listener is up when remote is enabled
         remote_server.start()
@@ -1023,17 +1077,16 @@ class RemoteClient:
             syslog.error(f"RPC: msgpack failed: {err}")
             return False
 
-        if not self._sock:
-            self.ensure_socket()
-        if not self._sock:
-            syslog.warning("RPC: send aborted — no outbound socket")
-            return False
-        try:
-            self._sock.sendto(raw_data, self._address)
-            return True
-        except OSError as err:
-            syslog.error(f"RPC: sendto failed: {err}")
-            return False
+        with self._socket_lock:
+            if self._sock is None and not self.ensure_socket():
+                syslog.warning("RPC: send aborted — no outbound socket")
+                return False
+            try:
+                self._sock.sendto(raw_data, self._address)
+                return True
+            except OSError as err:
+                syslog.error(f"RPC: sendto failed: {err}")
+                return False
 
     def sendRequest(self, callback, payload: dict = None, client_id: str = None):
         """sends a packet request to clients expecting a response
@@ -1045,29 +1098,36 @@ class RemoteClient:
         if a packet is sent to multiple clients, the callback will be called multiple times, once for each responding client
 
         """
-        if client_id is None:
-            # send to all clients
-            client_id = 0
+        client_id = int(client_id) if client_id is not None else 0
 
         id = gremlin.util.get_guid()
         data = self.getDatablock("request")
         data["request_id"] = id
         data["target"] = client_id
-        data["reply_id"] = self.id  # send response to self
+        data["reply_id"] = self.clientId
         data["data"] = payload
 
-        pd = PacketData(callback=callback, client_id=client_id, server_id=self.id, data=data)
-        self._callbacks[id] = pd
-        self.send(data)
+        pd = PacketData(id=id, callback=callback, client_id=client_id, server_id=self.clientId, data=data, on_timeout=self._expire_request)
+        with self._callbacks_lock:
+            self._callbacks[id] = pd
+        # Arm the timer before sending: an immediate reply must not restart it.
         pd.start()
+        if not self.send(data, client_id=client_id):
+            pd._handle_timeout()
+
+    def _expire_request(self, packet):
+        with self._callbacks_lock:
+            if self._callbacks.get(packet.id) is packet:
+                del self._callbacks[packet.id]
 
     def handleResponse(self, request_id, data: dict):
         """process a response from a client from sendRequest()"""
-        if request_id in self._callbacks:
-            pd: PacketData = self._callbacks[request_id]
-            del self._callbacks[request_id]  # remove the request
-            pd.stop()  # mark the request received
-            pd.trigger(data)  # trigger the callback
+        with self._callbacks_lock:
+            pd = self._callbacks.get(request_id)
+            if pd is not None and pd.client_id:
+                del self._callbacks[request_id]
+        if pd is not None:
+            pd.trigger(data)
 
     def requestAlive(self, callback):
         """sends an alive request to a client or all clients"""
@@ -1086,25 +1146,24 @@ class RemoteClient:
         :param peer_ip: UDP source address when known (used for video return connect-back)
         """
 
-        sender = data["sender_id"]
-        action = data["action"]
-        target = data["to"]
+        sender = data.get("sender_id")
+        action = data.get("action")
+        target = data.get("to", 0)
+        if sender is None or not isinstance(action, str):
+            return
 
         client_id = self.clientId
+        if sender == client_id or (target and target != client_id):
+            return
         if action not in (
             "identify",
             "identify_client",
             "unregister_client",
             "register_client",
+            "request",
+            "reply",
+            "hb",
         ):
-            # non global commands
-            if sender == client_id:
-                # ignore our own broadcasts
-                return
-            if target and target != client_id:
-                # ignore target if not the current client unless sending to all clients (target == 0)
-                return
-
             if not gremlin.shared_state.is_running:
                 # profile must be running
                 return
@@ -1153,6 +1212,8 @@ class RemoteClient:
                     else:
                         # send to window with focus
                         gremlin.sendinput.send_key(virtual_code, scan_code, flags)
+                else:
+                    gremlin.sendinput.send_key(virtual_code, scan_code, flags)
 
                 # win32api.keybd_event(virtual_code, scan_code, flags, 0) # deprecated
 
@@ -1266,22 +1327,21 @@ class RemoteClient:
                 # received a requet for information from a specific client - this is recevied by clients that need to reply
                 request_data = data["data"]
                 match request_data["action"]:
-                    case "identify":
-                        # identify client
-                        data["action"] = "reply"
-                        request_data["response"] = ClientData().toPayload()
-                        self.send(data, client_id=data["reply_id"])
+                    case "identify" | "alive":
+                        reply = {
+                            **data,
+                            "action": "reply",
+                            "data": {
+                                **request_data,
+                                "response": ClientData().toPayload(),
+                            },
+                        }
+                        self.send(reply, client_id=data["reply_id"])
 
             case "reply":
                 # received a reply packet from a prior request - this is received by the requesting client
                 request_id = data["request_id"]
-                if request_id in self._callbacks:
-                    # grab the specific request, ignore if not ours
-                    payload: PacketData = self._callbacks[request_id]
-                    request_data = data["data"]
-                    response = request_data["response"]
-                    payload.response = response
-                    payload.callback(payload)
+                self.handleResponse(request_id, data["data"]["response"])
 
             case "identify":
                 # received a request to self identify to the network
@@ -1295,7 +1355,7 @@ class RemoteClient:
                 except Exception as err:
                     syslog.error(f"RPC: identify reply failed: {err}")
 
-            case "identify_client":
+            case "identify_client" | "register_client":
                 # request to register the specified client as a result of a prior "identify" request
                 # Older T50L2R builds accidentally put the payload in "key" instead of "data".
                 payload = data.get("data")
@@ -1307,9 +1367,7 @@ class RemoteClient:
                 cd = ClientData.fromPayload(payload)
                 if peer_ip and not getattr(cd, "host_ip", ""):
                     cd.host_ip = peer_ip
-                syslog.info(
-                    f"RPC: identity received: {cd} version=[{cd.client_version}] ip=[{cd.host_ip}]"
-                )
+                syslog.info(f"RPC: identity received: {cd} version=[{cd.client_version}] ip=[{cd.host_ip}]")
 
                 self.remote_control.registerClient(cd)
 
@@ -1335,6 +1393,7 @@ class RemoteClient:
                 if vigem is not None:
                     if subtype == "axis":
                         value = data["value"]
+                        output_mode = GamePadOutput.to_enum(output_mode) if isinstance(output_mode, str) else GamePadOutput(output_mode)
 
                         if vigem:
                             if output_mode == GamePadOutput.LeftStickX:
@@ -1365,6 +1424,7 @@ class RemoteClient:
                                 vigem.right_trigger_float(value)
 
                     elif subtype == "button":
+                        button = output_mode
                         is_pressed = data["is_pressed"]
                         if is_pressed:
                             if verbose:
@@ -1376,35 +1436,26 @@ class RemoteClient:
                             vigem.release_button(button)
                     vigem.update()
 
-            case "button" | "axis" | "hat" | "relative_axis" | "toggle":
+            case "button" | "axis" | "hat" | "relative_axis" | "relative_Axis" | "toggle":
                 # joystick button / axis / hat — open vJoy on demand (do not require prior local claim)
 
-                relative_value = 0.0
                 payload = data["data"]
+                device = payload["device"]
+                target = payload["target"]
+                value = payload["value"]
                 match action:
                     case "button" | "toggle":
-                        packet = ButtonData.fromPayload(payload)
-                        device = packet.device_id
-                        target = packet.button_id
-                        value = packet.is_pressed
+                        if payload.get("key") != ButtonData.key:
+                            raise ValueError("Invalid button payload")
                     case "axis" | "relative_axis" | "relative_Axis":
-                        packet = AxisData.fromPayload(payload)
-                        device = packet.device_id
-                        target = packet.axis_id
-                        value = packet.value
-                        relative_value = packet.relative_value
+                        if payload.get("key") != AxisData.key:
+                            raise ValueError("Invalid axis payload")
+                        relative_value = payload.get("rvalue")
                     case "hat":
                         # Accept HatData; also tolerate legacy AxisData payloads (wrong key) from older masters
-                        try:
-                            packet = HatData.fromPayload(payload)
-                            device = packet.device_id
-                            target = packet.hat_id
-                            value = packet.direction
-                        except AssertionError:
-                            packet = AxisData.fromPayload(payload)
-                            device = packet.device_id
-                            target = packet.axis_id
-                            value = packet.value
+                        if payload.get("key") not in (HatData.key, AxisData.key):
+                            raise ValueError("Invalid hat payload")
+                        value = _hat_direction(value)
 
                 vid, vjoy = _open_remote_vjoy(device)
                 if vjoy is None:
@@ -1422,17 +1473,19 @@ class RemoteClient:
                         if target > 0 and target <= vjoy.button_count:
                             vjoy.button(target).is_pressed = not vjoy.button(target).is_pressed
                     case "axis" | "relative_axis" | "relative_Axis":
+                        if target <= 0 or not vjoy.is_axis_valid(axis_id=target):
+                            return
+                        axis = vjoy.axis(target)
                         if value is None:
-                            value = vjoy.axis(target).value
+                            value = axis.value
                         if relative_value:
                             value = gremlin.util.clamp(value + relative_value)
                             if verbose:
                                 syslog.info(f"REMOTE: relative axis vjoy {vid} input id: {target} relative value: {relative_value:0.3f}")
-                        if target > 0 and target <= vjoy.axis_count:
-                            if verbose:
-                                stub = f"{value:0.3f}" if value is not None else "None"
-                                syslog.info(f"REMOTE: axis vjoy {vid} input id: {target} {stub}")
-                            vjoy.axis(target).value = value
+                        if verbose:
+                            stub = f"{value:0.3f}" if value is not None else "None"
+                            syslog.info(f"REMOTE: axis vjoy {vid} input id: {target} {stub}")
+                        axis.value = value
                     case "hat":
                         if target > 0 and target <= vjoy.hat_count:
                             if verbose:
@@ -1468,10 +1521,10 @@ class InternalSpeech:
 class BaseData:
     """base class for input data"""
 
-    def __init__(self, key : str, action : str, extra_data : dict = None):
-        self.key : str = key
-        self.action : str= action
-        self.extra_data : dict = extra_data
+    def __init__(self, key: str, action: str, extra_data: dict = None):
+        self.key: str = key
+        self.action: str = action
+        self.extra_data: dict = extra_data
 
     def toPayload(self) -> dict:
         """creates a payload from the data"""
@@ -1483,21 +1536,19 @@ class BaseData:
 
     def fromPayload(data: dict) -> BaseData:
         """loads from payload"""
-        return BaseData(
-            key=data["key"],
-            action=data["action"],
-            extra_data=data.get("extra_data")
-        )
+        return BaseData(key=data["key"], action=data["action"], extra_data=data.get("extra_data"))
+
 
 class ButtonData(BaseData):
     """holds button data"""
-    key = "button"
-    def __init__(self, action : str = None, extra_data : dict = None):
-        super().__init__(self.key, action, extra_data)
-        self.device_id : int | str = None # vjoy device ID (int or guid) GUID
-        self.button_id : int = None
-        self.is_pressed : bool = None
 
+    key = "button"
+
+    def __init__(self, action: str = None, extra_data: dict = None):
+        super().__init__(self.key, action, extra_data)
+        self.device_id: int | str = None  # vjoy device ID (int or guid) GUID
+        self.button_id: int = None
+        self.is_pressed: bool = None
 
     @staticmethod
     def create(device_id: int | str, button_id: int, is_pressed: bool = None, action: str = None, extra_data: dict = None):
@@ -1520,7 +1571,8 @@ class ButtonData(BaseData):
     @staticmethod
     def fromPayload(data: dict) -> ButtonData:
         """loads from payload"""
-        assert data.get("key") == ButtonData.key, "Invalid key for ButtonData"
+        if data.get("key") != ButtonData.key:
+            raise ValueError("Invalid key for ButtonData")
         self = ButtonData(action=data["action"], extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.button_id = data["target"]
@@ -1530,14 +1582,15 @@ class ButtonData(BaseData):
 
 class AxisData(BaseData):
     """holds axis data"""
+
     key = "axis"
 
-    def __init__(self, action : str = None, extra_data : dict = None):
+    def __init__(self, action: str = None, extra_data: dict = None):
         super().__init__(self.key, action, extra_data)
         self.device_id: int | str = None
         self.axis_id: int = None
-        self.value : float = None
-        self.relative_value : float = None
+        self.value: float = None
+        self.relative_value: float = None
 
     @staticmethod
     def create(
@@ -1569,21 +1622,23 @@ class AxisData(BaseData):
     @staticmethod
     def fromPayload(data: dict) -> AxisData:
         """loads from payload"""
-        assert data.get("key") == AxisData.key, "Invalid key for AxisData"
+        if data.get("key") != AxisData.key:
+            raise ValueError("Invalid key for AxisData")
         self = AxisData(action=data["action"], extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.axis_id = data["target"]
         self.value = data["value"]
-        self.relative_value = data["rvalue"]
+        self.relative_value = data.get("rvalue")
 
         return self
 
 
 class HatData(BaseData):
     """holds hat data"""
+
     key = "hat"
 
-    def __init__(self, action : str = None, extra_data : dict = None):
+    def __init__(self, action: str = None, extra_data: dict = None):
         super().__init__(self.key, action, extra_data)
         self.device_id: int | str = None
         self.hat_id: int = None
@@ -1594,7 +1649,7 @@ class HatData(BaseData):
         self = HatData(action=action, extra_data=extra_data)
         self.device_id = device_id
         self.hat_id = hat_id
-        self.direction = direction
+        self.direction = _hat_direction(direction)
         self.action = action
         return self
 
@@ -1609,11 +1664,12 @@ class HatData(BaseData):
 
     @staticmethod
     def fromPayload(data: dict) -> HatData:
-        assert data.get("key") == HatData.key, "Invalid key for HatData"
+        if data.get("key") != HatData.key:
+            raise ValueError("Invalid key for HatData")
         self = HatData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.hat_id = data["target"]
-        self.direction = data["value"]
+        self.direction = _hat_direction(data["value"])
 
         return self
 
@@ -1623,13 +1679,11 @@ class KeyData(BaseData):
 
     key = "key"
 
-    def __init__(self, action : str = None, extra_data : dict = None):
+    def __init__(self, action: str = None, extra_data: dict = None):
         super().__init__(self.key, action, extra_data)
         self.virtual_code: int = None
         self.scan_code: int = None
         self.flags: int = None
-        self.action: str = None
-        self.extra_data: dict = None
 
     @staticmethod
     def create(
@@ -1658,7 +1712,8 @@ class KeyData(BaseData):
 
     @staticmethod
     def fromPayload(data: dict) -> KeyData:
-        assert data.get("key") == KeyData.key, "Invalid key for KeyData"
+        if data.get("key") != KeyData.key:
+            raise ValueError("Invalid key for KeyData")
         self = KeyData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.virtual_code = data["vc"]
         self.scan_code = data["sc"]
@@ -1696,7 +1751,8 @@ class MouseData(BaseData):
 
     @staticmethod
     def fromPayload(data: dict) -> MouseData:
-        assert data.get("key") == MouseData.key, "Invalid key for MouseData"
+        if data.get("key") != MouseData.key:
+            raise ValueError("Invalid key for MouseData")
         self = MouseData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.button_id = data["button"]
         self.value = data["value"]
@@ -1705,23 +1761,21 @@ class MouseData(BaseData):
 
 class BlockData(BaseData):
     """holds generic block data"""
+
     key = "data"
 
-    def __init__(self, data : dict, action: str = None, extra_data: dict = None):
+    def __init__(self, data: dict, action: str = None, extra_data: dict = None):
         super().__init__(self.key, action, extra_data)
         self.data = data
 
     @staticmethod
-    def create(data : dict, action: str = None, extra_data: dict = None) -> BlockData:
+    def create(data: dict, action: str = None, extra_data: dict = None) -> BlockData:
         self = BlockData(data=data, action=action, extra_data=extra_data)
         return self
 
     def toPayload(self) -> dict:
         payload = super().toPayload()
-        return {
-            **payload,
-            "data": self.data
-        }
+        return {**payload, "data": self.data}
 
     @staticmethod
     def fromPayload(data: dict) -> BlockData:
@@ -1961,6 +2015,7 @@ class RemoteControl:
 
     def _emit_client_change(self):
         """Notify UI of client list changes on the UI thread (UDP handlers are not)."""
+
         def _do():
             el = gremlin.event_handler.EventListener()
             el.remote_control_client_change.emit()
@@ -2157,9 +2212,13 @@ class PacketData:
         server_id: str = None,
         callback=None,
         data=None,
+        on_timeout=None,
     ):
         self.id = id if id else gremlin.util.get_guid()
         self.callback = callback
+        self.on_timeout = on_timeout
+        self._lock = threading.RLock()
+        self._active = False
         self.data = data
         self.response = None
         self.sent = time.time()
@@ -2172,25 +2231,48 @@ class PacketData:
         self.response = None  # receive data
 
     def start(self):
-        self.timer = threading.Timer(4, self._handle_timeout)
-        self.timer.start()
+        with self._lock:
+            if self.status != PacketState.New:
+                return
+            self._active = True
+            self.status = PacketState.Sent
+            self.timer = threading.Timer(4, self._handle_timeout)
+            self.timer.daemon = True
+            self.timer.start()
 
     def stop(self):
         """stops the timeout timer when a response is received"""
-        if self.timer:
-            self.timer.cancel()
-            self.timer = None
+        with self._lock:
+            self._active = False
+            if self.timer:
+                self.timer.cancel()
+                self.timer = None
 
     def trigger(self, data: dict = None):
         """trigger the callback"""
-        self.response = data
-        self.callback(self)
+        with self._lock:
+            if not self._active:
+                return
+            self.response = data
+            self.received = time.time()
+            self.status = PacketState.Received
+            if self.client_id:
+                self.stop()
+            if self.callback is not None:
+                self.callback(self)
 
     def _handle_timeout(self):
         """called when request times out before getting a response"""
-        if not self.received:
-            self.state = PacketState.TimedOut
-            self.trigger()
+        with self._lock:
+            if not self._active:
+                return
+            self.stop()
+            if self.on_timeout is not None:
+                self.on_timeout(self)
+            if self.received is None:
+                self.status = PacketState.TimedOut
+                if self.callback is not None:
+                    self.callback(self)
 
 
 class RemoteClientData:

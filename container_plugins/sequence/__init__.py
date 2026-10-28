@@ -124,7 +124,7 @@ class GlobalSequence:
         if max_concurrent:
             # concurrency is enabled if > 0
             with self._lock:
-                return self._sequence_count + 1 < max_concurrent
+                return self._sequence_count < max_concurrent
         # concurrency disabled - always succeeed
         return True
 
@@ -132,7 +132,7 @@ class GlobalSequence:
         """Atomically checks the concurrency limit and reserves a sequence slot."""
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
         with self._lock:
-            if max_concurrent and self._sequence_count + 1 >= max_concurrent:
+            if max_concurrent and self._sequence_count >= max_concurrent:
                 return False
             self._sequence_count += 1
             return True
@@ -189,7 +189,7 @@ class StepOptions:
 
         if self.randomize_autorelease_delay:
             return random.randint(self.autorelease_min_delay, self.autorelease_max_delay) / 1000
-        return self.autorelease_max_delay / 1000
+        return self.autorelease_min_delay / 1000
 
     def to_xml(self):
         """saves to xml"""
@@ -384,11 +384,11 @@ class StepOptionsWidget(QtWidgets.QWidget):
 
     @QtCore.Slot(float)
     def _handle_autorelease_delay_min_changed(self, value):
-        self.options.repeat_min_delay = value
+        self.options.autorelease_min_delay = value
 
     @QtCore.Slot(float)
     def _handle_autorelease_delay_max_changed(self, value):
-        self.options.repeat_max_delay = value
+        self.options.autorelease_max_delay = value
 
     @QtCore.Slot(bool)
     def _handle_randomize_delay_changed(self, checked: bool):
@@ -1064,9 +1064,10 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         self._current_step = None  # tracks the next step to execute
         self._runner_lock = threading.RLock()
+        self._stop_event = threading.Event()
 
     def _start_runner(self, runner, thread_name: str):
-        gs = GlobalSequence()
+        gs = _global_sequence
         with self._runner_lock:
             thread = self.action_data._thread
             if self.action_data._is_running or (thread is not None and thread.is_alive()):
@@ -1075,14 +1076,16 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 syslog.error("SEQUENCE: exceeded concurrent sequence limit")
                 return
 
+            self._stop_event.clear()
             self.action_data._is_running = True
-            thread = threading.Thread(target=self._run_runner, args=(runner,), name=thread_name)
-            self.action_data._thread = thread
             try:
+                thread = threading.Thread(target=self._run_runner, args=(runner,), name=thread_name)
+                self.action_data._thread = thread
                 thread.start()
             except BaseException:
                 self.action_data._thread = None
                 self.action_data._is_running = False
+                self._stop_event.set()
                 gs.popSequence()
                 raise
 
@@ -1094,15 +1097,17 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             runner()
         finally:
             with self._runner_lock:
+                _global_sequence.popSequence()
                 if self.action_data._thread is threading.current_thread():
                     self.action_data._thread = None
                 self.action_data._is_running = False
-            GlobalSequence().popSequence()
+                self._stop_event.set()
 
     def _stop_runner(self):
         with self._runner_lock:
             thread = self.action_data._thread
             self.action_data._is_running = False
+            self._stop_event.set()
 
         if thread is None or thread is threading.current_thread():
             return
@@ -1115,19 +1120,16 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def profile_start(self):
         if self._verbose:
             syslog.info("SEQUENCE: profile start")
-        self.action_data._is_running = False
+        self._stop_runner()
 
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
-        gs = GlobalSequence()
-        gs.resetSequenceCount()
 
         # stepped mode current step
         if self.container.stepped_exec_reset:
             self._current_step = None
 
-        config = gremlin.config.Configuration()
         if not config.mode_change_aborts_sequence:
             # only hook if mode change while running a sequence is not allowed
             self._hook_mode_change = True
@@ -1236,7 +1238,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         mode = self.action_data.mode
 
         verbose = self._verbose
-        verbose = True
 
         if verbose:
             profile_mode = gremlin.shared_state.current_mode
@@ -1326,12 +1327,13 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         event_release = event_press.fake_button(False, True)
 
-        nodes = [node for node in self.action_set_nodes]
+        nodes = self.action_set_nodes
+        execute_node = self._ec.execute_node
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
         # no resume mode if running once
-        resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
+        resume = self.action_data.mode != SequenceMode.Normal and self.action_data.resume_mode
 
         if verbose:
             syslog.info(f"SEQUENCE: normal mode: normal runner start [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
@@ -1352,6 +1354,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # start at the top
             index = 0
         count = len(nodes)
+        if not 0 <= index < count:
+            index = 0
 
         exec_delay_ms = self.container.normal_exec_delay
         exec_delay_s = exec_delay_ms / 1000
@@ -1366,9 +1370,11 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 syslog.info(f"\tstep [{index}] exec start - repeat count: {repeat_count}")
 
             for repeat_index in range(repeat_count):
+                if not self.action_data._is_running:
+                    break
                 if verbose:
                     syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-                self._ec.execute_node(node, event_press, True, None)  # issue press
+                execute_node(node, event_press, True, None)  # issue press
                 # autorelease delay computation
                 delay = options.getAutoreleaseDelay(autorelease_delay_ms)
                 if delay > 0:
@@ -1378,7 +1384,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
                 if verbose:
                     syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-                self._ec.execute_node(node, event_release, False, None)  # issue release
+                execute_node(node, event_release, False, None)  # issue release
 
                 if not self.action_data._is_running:
                     break
@@ -1397,7 +1403,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             if index == count:
                 if self.action_data.mode == SequenceMode.Normal:
                     self.action_data._is_running = False
-                    syslog.info("SEQUENCE: normal mode stop: reached end of sequence")
+                    if verbose:
+                        syslog.info("SEQUENCE: normal mode stop: reached end of sequence")
                     break  # only run once
                 # loop
                 index = 0
@@ -1421,7 +1428,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # send special end of sequence event to steps so they can stop whatever they are doing
         extra_data = {"sequence_end": True}
         for node in nodes:
-            self._ec.execute_node(node, event_release, False, extra_data)  # issue release for end of sequence
+            execute_node(node, event_release, False, extra_data)  # issue release for end of sequence
 
         if verbose:
             syslog.info(f"SEQUENCE: normal runner: exiting runner {self.id}")
@@ -1429,15 +1436,18 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def _stepped_runner(self):
         """step mode runner thread"""
+        if not self.action_data._is_running:
+            return
         event_press = gremlin.event_handler.Event(InputType.JoystickButton, 1, device_guid=gremlin.shared_state.fake_tab_guid, is_pressed=True)
 
         event_release = event_press.fake_button(False, True)
 
-        nodes = [node for node in self.action_set_nodes]
+        nodes = self.action_set_nodes
+        execute_node = self._ec.execute_node
         verbose = self._verbose
 
         # no resume mode if running once
-        resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
+        resume = self.action_data.resume_mode
 
         if verbose:
             syslog.info(f"SEQUENCE STEPPED: [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
@@ -1458,8 +1468,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # start at the top
             index = 0
         count = len(nodes)
-        if index >= count:
-            # loop back to first step
+        if not 0 <= index < count:
             index = 0
 
         exec_delay_ms = self.container.normal_exec_delay
@@ -1473,9 +1482,11 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             syslog.info(f"\tstep [{index}] exec start - repeat count: {repeat_count}")
 
         for repeat_index in range(repeat_count):
+            if not self.action_data._is_running:
+                break
             if verbose:
                 syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-            self._ec.execute_node(node, event_press, True, None)  # issue press
+            execute_node(node, event_press, True, None)  # issue press
             # autorelease delay computation
             delay = options.getAutoreleaseDelay(autorelease_delay_ms)
             if delay > 0:
@@ -1485,7 +1496,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
             if verbose:
                 syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-            self._ec.execute_node(node, event_release, False, None)  # issue release
+            execute_node(node, event_release, False, None)  # issue release
 
             if not self.action_data._is_running:
                 break
@@ -1517,9 +1528,9 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         event_release = event_press.fake_button(False, True)
 
-        nodes = [node for node in self.action_set_nodes]
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_sequence or config.verbose_mode_container
+        nodes = self.action_set_nodes
+        execute_node = self._ec.execute_node
+        verbose = self._verbose
         verbose_extra = self._verbose_extra
         count_enabled = self.action_data.wiggle_count_enabled
 
@@ -1552,6 +1563,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # start at the top
             index = 0
         count = len(nodes)
+        if not 0 <= index < count:
+            index = 0
 
         min_delay = self.container.wiggle_min_delay
         max_delay = self.container.wiggle_max_delay
@@ -1559,7 +1572,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         wiggle_random = self.container.wiggle_random and min_delay != max_delay
         wiggle_steps = self.container.wiggle_randomize_steps
         exec_delay_ms = self.container.wiggle_exec_delay
-        _exec_delay_s = exec_delay_ms / 1000
         step_delay_ms = self.container.wiggle_step_delay
         step_delay_s = step_delay_ms / 1000
         if verbose:
@@ -1583,31 +1595,28 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # handle single step repeats
             repeat_count = options.getCount()  # number of times to repeat
             for repeat_index in range(repeat_count):
+                if not self.action_data._is_running:
+                    break
                 if verbose:
                     syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: loop [{repeat_index}] executes step [{index}] node: [{node.id}]")
-                self._ec.execute_node(node, event_press, True, None)  # issue press
+                execute_node(node, event_press, True, None)  # issue press
                 # autorelease delay
                 delay = options.getAutoreleaseDelay(exec_delay_ms)
                 if delay > 0:
                     self._wait(delay)
-                self._ec.execute_node(node, event_release, False, None)  # issue release
+                execute_node(node, event_release, False, None)  # issue release
 
                 # delay between steps
                 if not self.action_data._is_running:
                     break
-                if wiggle_random:
-                    # random wiggle delay
-                    delay = random.randrange(min_delay, max_delay) / 1000  # to seconds
-                else:
-                    # step delay
-                    if repeat_index < repeat_count - 1:
-                        delay = options.getDelay(exec_delay_ms)
-                        if verbose_extra:
-                            syslog.info(f"step repeat interval delay [{delay}]")
-                        if delay > 0:
-                            self._wait(delay)
-                            if not self.action_data._is_running:
-                                break
+                if repeat_index < repeat_count - 1:
+                    delay = options.getDelay(exec_delay_ms)
+                    if verbose_extra:
+                        syslog.info(f"step repeat interval delay [{delay}]")
+                    if delay > 0:
+                        self._wait(delay)
+                        if not self.action_data._is_running:
+                            break
                 time.sleep(0)  # free up resources for other things to run
 
             if not self.action_data._is_running:
@@ -1653,13 +1662,19 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.action_data._is_running = False
 
     def _wait(self, delay: float):
-        """interruptible delay
-        :param delay: time in seconds
-
-        """
-        expires = time.time() + delay
-        while self.action_data._is_running and expires > time.time():
-            time.sleep(0.01)
+        """Interrupt long waits and finish short delays against a monotonic clock."""
+        if delay <= 0 or not self.action_data._is_running:
+            return
+        deadline = time.monotonic() + delay
+        # Windows event timeouts can round up by a scheduler tick. Leave a
+        # short tail for Python's higher resolution sleep, with bounded stops.
+        if delay > 0.02:
+            self._stop_event.wait(delay - 0.02)
+        while self.action_data._is_running:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(remaining, 0.01))
 
 
 class SequenceContainer(AbstractContainer):
@@ -1716,11 +1731,13 @@ Unlike a macro, any action suitable for the input can be used."""
 
     def getOptions(self, index):
         """gets the option object for the particular step index"""
-        if index not in self.step_options:
+        try:
+            return self.step_options[index]
+        except KeyError:
             options = StepOptions()
             options.index = index
             self.step_options[index] = options
-        return self.step_options[index]
+            return options
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.

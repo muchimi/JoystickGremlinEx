@@ -4005,7 +4005,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _keyboard_dialog(self):
         """opens the keyboard dialog"""
         gremlin.shared_state.push_suspend_ui_keyinput()
-        self._keyboard_dialog = InputKeyboardDialog(sequence=self.action_data.latched_keys, parent=self)
+        latched_key = self.action_data.latched_keys[0] if self.action_data.latched_keys else None
+        if latched_key:
+            keys = latched_key.getKeys()
+        else:
+            keys = []
+
+        self._keyboard_dialog = InputKeyboardDialog(sequence=keys, parent=self)
         self._keyboard_dialog.accepted.connect(self._keyboard_dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._keyboard_dialog_closed_cb)
         self._keyboard_dialog.setModal(True)
@@ -5396,6 +5402,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _step_runner(self, tick: float, start: float, target: float, offset: float):
         value = start
+        wait_event = threading.Event()
         while self._step_is_running:
             value += offset
             if offset < 0 and value <= target:
@@ -5403,9 +5410,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             elif offset > 0 and value >= target:
                 break
             self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
-            time_stop = time.time() + tick
-            while self._step_is_running and time.time() < time_stop:
-                time.sleep(0)
+            time_stop = time.monotonic() + tick
+            while self._step_is_running:
+                remaining = time_stop - time.monotonic()
+                if remaining <= 0:
+                    break
+                wait_event.wait(min(remaining, 0.001))
 
         self._step_is_running = False
 
@@ -7004,7 +7014,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 # determine if we should use PID smooth mode for stepping
                                 use_pid = self.action_data.step_mode == StepMode.SteppedPID
                                 identifier = self.action_data.input_item.identifier
-                                syslog.info("stepped event received")
+
 
                                 # determine if the trigger is the primary trigger or the latched trigger
 
@@ -7090,7 +7100,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 value = self.action_data.target_step_list[index]
 
                                 if use_pid:
-                                    syslog.info(f"set PID target: {value:0.4f}")
+                                    # syslog.info(f"set PID target: {value:0.4f}")
                                     if self._pid_axis is None:
                                         self._start_pid_axis()
                                     self._pid_set_target(value, force_remote=force_remote)
@@ -7298,9 +7308,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _process_pid_axis_event(self, event):
         direction = self._step_input_direction(event)
-        fire_event = (self.action_data.exec_on_press and event.is_pressed) or (self.action_data.exec_on_release and not event.is_pressed)
-        if not fire_event or direction is None:
+        if direction == 0:
+            # No movement needed if direction is 0
             return True
+
         with self._pid_axis_condition:
             if self._pid_axis_stopping or self._pid_axis is None:
                 return True
@@ -7310,6 +7321,17 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 target = self._pid_axis.target + direction * self.action_data.pid_step
             self._pid_set_target(target, force_remote=event.force_remote)
         return True
+
+    def _step_input_direction(self, event):
+        # Implement the logic to determine the step input direction based on the event
+        fire_event = (self.action_data.exec_on_press and event.is_pressed) or (self.action_data.exec_on_release and not event.is_pressed)
+        secondary = self.action_data.isInputLatched(event)
+        primary = fire_event and not secondary
+        if primary:
+            return 1
+        elif secondary:
+            return -1
+        return 0
 
     def get_closest_directed(numbers, target, direction):
         """
@@ -7464,6 +7486,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_id]
             self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
             is_local, is_remote = self.action_data.sendFlags()
+            wait_event = threading.Event()
             while self.thread_running:
                 try:
                     # If the vjoy value has was changed from what we set it to
@@ -7496,7 +7519,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if self.should_stop_thread and self.thread_last_update + 1.0 < time.time():
                         self.thread_running = False
-                    time.sleep(0)
+                    if self.thread_running:
+                        wait_event.wait(0.001)
 
                 except gremlin.error.VJoyError:
                     self.thread_running = False
@@ -7935,11 +7959,9 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     def setKeys(self, value):
         self._latched_keys.clear()
-        for key in value:
-            if key is self:
-                # do not add self to the latched keys - only different keys
-                continue
-            self._latched_keys.append(key)
+        latch_key = gremlin.keyboard.Key.fromKeys(value)
+        self._latched_keys = [latch_key] if latch_key else []
+
 
     def addKey(self, key):
         if key not in self._latched_keys and key is not self:

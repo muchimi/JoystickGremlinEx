@@ -503,6 +503,15 @@ class Key:
             return [self]
         return []
 
+    @staticmethod
+    def fromKeys(keys: list[Key] | tuple[Key]):
+        """sets the latched keys from a list of Key objects"""
+        latched_keys = list(set(sort_keys(keys)))
+        key = latched_keys.pop() if latched_keys else None
+        if key:
+            key.latched_keys = latched_keys
+        return key
+
     @property
     def is_latched(self):
         """true if this key is latched"""

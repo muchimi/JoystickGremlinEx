@@ -2,43 +2,65 @@
 
 Run with: python tools/test_vjoy_remap_pid.py
 
-The real functor and event-handler methods are loaded from source with device
+The real action, functor, and event-handler methods are loaded from source with device
 and UI services replaced by in-memory fakes, so no joystick listeners start.
 """
 
+import ast
+import copy
+import enum
+import logging
+import math
 import sys
+import threading
+import time
+import traceback
+import unittest
 from pathlib import Path
+from types import SimpleNamespace as NS
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-import ast
-import enum
-import logging
-import math
-import threading
-import time
-import unittest
-from pathlib import Path
-from types import SimpleNamespace as NS
-from gremlin.pid import PIDAxisTransition
-from gremlin.input_types import InputType
-from gremlin.types import VjoyAction, SyncMode, ButtonOutputMode
+
+from gremlin.pid import PIDAxisTransition  # noqa: E402
+from gremlin.input_types import InputType  # noqa: E402
+from gremlin.types import VjoyAction, SyncMode, ButtonOutputMode  # noqa: E402
+
+
+class ActionDataFixture:
+    """Initialize only test configuration, without device or Qt services."""
+
+    def __init__(self, **attributes):
+        self._latched_keys = []
+        for name, value in attributes.items():
+            setattr(self, name, value)
+
 
 # Load real methods without starting the application's device and UI services.
 source = ROOT / 'action_plugins/map_to_vjoy/__init__.py'
 module = ast.parse(source.read_bytes())
 classes = [n for n in module.body if isinstance(n, ast.ClassDef) and n.name in ('StepMode', 'EncoderMode', 'VJoyRemapFunctor')]
 classes[-1].bases = [ast.Name(id='object', ctx=ast.Load())]
+action_class = next(n for n in module.body if isinstance(n, ast.ClassDef) and n.name == 'VjoyRemap')
+action_methods = {'isInputPrimary', 'isInputLatched', 'stepped_device_guid', 'latched_keys', 'setKeys'}
+action_fixture = ast.ClassDef(
+    name='CheckActionData', bases=[ast.Name(id='ActionDataFixture', ctx=ast.Load())],
+    keywords=[], decorator_list=[],
+    body=[n for n in action_class.body if isinstance(n, ast.FunctionDef) and n.name in action_methods],
+)
 encoder = next(n for n in ast.parse((ROOT / 'gremlin/repeater.py').read_bytes()).body if isinstance(n, ast.ClassDef) and n.name == 'AcceleratedEncoder')
 device, axis = NS(data={}), NS(value=0.0)
 remote_control = NS(paired=False)
 joystick_handling = NS(is_vjoy_connected=lambda _: True, VJoyProxy=lambda: {1: NS(axis=lambda _: axis)}, getDeviceFromVjoyId=lambda _: device)
 gremlin = NS(pid=NS(PIDAxisTransition=PIDAxisTransition), util=NS(clamp=lambda value, low, high: max(low, min(high, value))), joystick_handling=joystick_handling, remote=NS(remote_control=remote_control), config=NS(Configuration=lambda: NS(verbose_mode_outputs=False, verbose_mode_vjoy=False)), keyboard=NS(sort_keys=lambda keys: keys), shared_state=NS(keyboard_tab_guid='keyboard'))
 namespace = dict(enum=enum, threading=threading, time=time, math=math, gremlin=gremlin, joystick_handling=joystick_handling, remote_control=remote_control, InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, ButtonOutputMode=ButtonOutputMode, syslog=logging.getLogger('pid-check'), VJoyRemapWidget=NS(input_type_buttons=[InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched]))
-code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), encoder, *classes], type_ignores=[])
+namespace['ActionDataFixture'] = ActionDataFixture
+code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), encoder, *classes, action_fixture], type_ignores=[])
 exec(compile(ast.fix_missing_locations(code), str(source), 'exec'), namespace)
 Functor, StepMode = namespace['VJoyRemapFunctor'], namespace['StepMode']
+CheckActionData = namespace['CheckActionData']
 
 def event(primary=True, pressed=True, force_remote=False, identifier=None, device_guid=None):
     return NS(device_guid=device_guid or ('primary' if primary else 'secondary'), identifier=(1 if primary else 2) if identifier is None else identifier, is_pressed=pressed, force_remote=force_remote, is_axis=False, getInputType=lambda: InputType.JoystickButton)
@@ -55,7 +77,7 @@ class PIDChecks(unittest.TestCase):
         f.hardware_device_guid, f.hardware_input_id = 'primary', 1
         f.action_mode = VjoyAction.VJoySetAxisStepped
         f.input_item, f.device = NS(identifier=1), device
-        f.action_data = NS(input_item=f.input_item, step_mode=mode or StepMode.PID, _stepped_latched=True, latched_input_type=InputType.JoystickButton, stepped_device_guid='secondary', stepped_input_type=InputType.JoystickButton, stepped_input_id=2, target_step_direction=1, exec_on_press=True, exec_on_release=False, pid_step=0.1, pid_response_time=0.05, pid_acceleration=acceleration, pid_accel_multiplier=4.0, pid_accel_start_hz=2.0, pid_accel_full_hz=12.0, pid_accel_curve=2.0, pid_accel_timeout=0.75, axis_start_value=0.0, axis_last_value=0.0, target_step_auto=False, target_step_start_index=2, target_step_list=[-1.0, -0.5, 0.0, 0.5, 1.0], sync_mode=SyncMode.Default, sendFlags=lambda: (True, False), remote_config=NS(getClientList=lambda: [0]), vjoy_id=1, vjoy_input_id=1, hardware_device_guid='primary', hardware_input_id=1, hardware_raw_input_type=InputType.JoystickButton)
+        f.action_data = CheckActionData(input_item=f.input_item, step_mode=mode or StepMode.PID, _stepped_latched=True, latched_input_type=InputType.JoystickButton, stepped_device_guid='secondary', stepped_input_type=InputType.JoystickButton, stepped_input_id=2, stepped_hat_direction=(0, 1), target_step_direction=1, exec_on_press=True, exec_on_release=False, pid_step=0.1, pid_response_time=0.05, pid_acceleration=acceleration, pid_accel_multiplier=4.0, pid_accel_start_hz=2.0, pid_accel_full_hz=12.0, pid_accel_curve=2.0, pid_accel_timeout=0.75, axis_start_value=0.0, axis_last_value=0.0, target_step_auto=False, target_step_start_index=2, target_step_list=[-1.0, -0.5, 0.0, 0.5, 1.0], sync_mode=SyncMode.Default, sendFlags=lambda: (True, False), remote_config=NS(getClientList=lambda: [0]), vjoy_id=1, vjoy_input_id=1, hardware_device_guid='primary', hardware_input_id=1, hardware_raw_input_type=InputType.JoystickButton)
         f._pid_axis_condition = threading.Condition()
         f._pid_axis = f._pid_axis_thread = f._pid_accelerator = None
         f._pid_axis_stopping = True
@@ -284,11 +306,10 @@ class PIDChecks(unittest.TestCase):
 
 
 # Exercise the actual keyboard registration and dispatch methods as well as the functor.
-import copy
-import traceback
-from typing import Callable
 
 class CheckKey:
+    state = {}
+
     def __init__(self, scan_code, modifiers=()):
         self.scan_code, self.is_extended = scan_code, False
         self.modifiers = list(modifiers)
@@ -301,6 +322,10 @@ class CheckKey:
     def getKeys(self):
         return [self, *self.modifiers]
 
+    @property
+    def latched(self):
+        return all(self.state.get(key.key_tuple, False) for key in self.getKeys())
+
 class CheckKeyboardInput:
     def __init__(self, primary, secondary):
         self.key = primary
@@ -312,18 +337,75 @@ class CheckKeyboardInput:
     def getLatchedInputIds(self):
         return self.chords
 
+    @property
+    def latched(self):
+        return self.key.latched
+
 class CheckKeyboardEvent:
     def __init__(self, identifier, pressed=True, data=None, extra_data=None, **kwargs):
         self.identifier, self.is_pressed = identifier, pressed
         self.data, self.extra_data = data, extra_data
         self.event_type, self.device_guid = InputType.Keyboard, 'keyboard'
         self.mode, self.is_axis, self.force_remote = 'Default', False, False
+        if data is not None:
+            CheckKey.state.update(data)
     @property
     def callbackKey(self):
         key = self.identifier.index_tuple() if isinstance(self.identifier, CheckKey) else self.identifier
         return 'keyboard', InputType.KeyboardLatched, key, 0
     def getInputType(self):
         return (self.extra_data or {}).get('override_input_type', self.event_type)
+
+
+class FixtureChecks(unittest.TestCase):
+    def setUp(self):
+        CheckKey.state.clear()
+        self.addCleanup(CheckKey.state.clear)
+        self.action = PIDChecks.make_functor(self).action_data
+
+    def test_action_matches_primary_and_secondary_buttons(self):
+        self.assertTrue(self.action.isInputPrimary(event()))
+        self.assertFalse(self.action.isInputPrimary(event(primary=False)))
+        self.assertFalse(self.action.isInputLatched(event()))
+        self.assertTrue(self.action.isInputLatched(event(primary=False)))
+        self.action._stepped_latched = False
+        self.assertFalse(self.action.isInputLatched(event(primary=False)))
+
+    def test_secondary_guid_property_tracks_configuration_changes(self):
+        self.action.stepped_device_guid = 'another-device'
+        self.assertEqual(self.action._stepped_device_guid, 'another-device')
+        self.assertEqual(self.action._stepped_device_id, 'another-device')
+        self.assertFalse(self.action.isInputLatched(event(primary=False)))
+        self.assertTrue(self.action.isInputLatched(event(primary=False, device_guid='another-device')))
+
+    def test_hat_fixture_matches_direction_and_input(self):
+        self.action.stepped_input_type = InputType.JoystickHat
+        hat = event(primary=False)
+        hat.value = (0, 1)
+        self.assertTrue(self.action.isInputLatched(hat))
+        hat.value = (0, 0)
+        self.assertFalse(self.action.isInputLatched(hat))
+        hat.value, hat.identifier = (0, 1), 3
+        self.assertFalse(self.action.isInputLatched(hat))
+
+    def test_keyboard_fixture_requires_complete_chord(self):
+        shift = CheckKey(42)
+        primary, secondary = CheckKey(108, [shift]), CheckKey(107, [shift])
+        self.action.latched_input_type = InputType.KeyboardLatched
+        self.action.stepped_input_type = InputType.KeyboardLatched
+        self.action.hardware_raw_input_type = InputType.KeyboardLatched
+        self.action.hardware_input_id = CheckKeyboardInput(primary, secondary)
+        self.action.setKeys([secondary])
+        self.assertEqual(self.action.latched_keys, [secondary])
+        self.assertEqual(self.action.stepped_device_guid, 'keyboard')
+        CheckKeyboardEvent(primary.key_tuple, data={primary.key_tuple: True, shift.key_tuple: True})
+        self.assertTrue(self.action.isInputPrimary(None))
+        self.assertFalse(self.action.isInputLatched(None))
+        CheckKeyboardEvent(secondary.key_tuple, data={secondary.key_tuple: True, shift.key_tuple: False})
+        self.assertFalse(self.action.isInputLatched(None))
+        CheckKeyboardEvent(shift.key_tuple, data={shift.key_tuple: True})
+        self.assertTrue(self.action.isInputLatched(None))
+
 
 handler_tree = ast.parse((ROOT / 'gremlin/event_handler.py').read_bytes())
 handler_class = next(n for n in handler_tree.body if isinstance(n, ast.ClassDef) and n.name == 'EventHandler')
@@ -345,15 +427,20 @@ CheckHandler = handler_namespace['CheckHandler']
 
 class LatchedRoutingChecks(unittest.TestCase):
     def setup_mapping(self):
+        CheckKey.state.clear()
         f = PIDChecks.make_functor(self, StepMode.SteppedPID)
         shift = CheckKey(42)
         primary, secondary = CheckKey(108, [shift]), CheckKey(107, [shift])
         item = CheckKeyboardInput(primary, secondary)
         f.hardware_device_guid, f.hardware_input_id, f.input_item = 'keyboard', item, item
         f.action_data.input_item = item
+        f.action_data.hardware_device_guid = 'keyboard'
+        f.action_data.hardware_input_id = item
+        f.action_data.hardware_raw_input_type = InputType.KeyboardLatched
         f.action_data.latched_input_type = InputType.KeyboardLatched
-        f.action_data.latched_keys = [shift, secondary]
+        f.action_data.setKeys([shift, secondary])
         f.action_data.stepped_device_guid = 'keyboard'
+        f.action_data.stepped_input_type = InputType.KeyboardLatched
         f.action_data.stepped_input_id = secondary
         f._start_pid_axis(0.0)
         h = CheckHandler()
@@ -364,7 +451,9 @@ class LatchedRoutingChecks(unittest.TestCase):
         h._install_plugins = lambda cb: cb
         h._mode_lookup_chain = lambda e: ('Default',)
         h._matching_input_item = lambda mode, e: h.latched_input_map.get(e.device_guid, {}).get(mode, {}).get(e.callbackKey, [])
-        callback = lambda e: f.process_event(e, NS(current=e.is_pressed, raw=e.is_pressed), e.extra_data)
+        def callback(e):
+            return f.process_event(e, NS(current=e.is_pressed, raw=e.is_pressed), e.extra_data)
+
         h.addCallback('keyboard', 'Default', CheckKeyboardEvent(item), callback, extra_data={'input_item': item})
         h.addCallback('keyboard', 'Default', CheckKeyboardEvent(secondary), callback, extra_data={'input_item': item, 'latched': True, 'action_data': f.action_data})
         return f, h, primary, secondary, shift
@@ -374,6 +463,8 @@ class LatchedRoutingChecks(unittest.TestCase):
         f, h, up, down, shift = self.setup_mapping()
         f.hardware_device_guid, f.hardware_input_id = 'primary', 1
         f.input_item = f.action_data.input_item = NS(identifier=1)
+        f.action_data.hardware_device_guid, f.action_data.hardware_input_id = 'primary', 1
+        f.action_data.hardware_raw_input_type = InputType.JoystickButton
         f.action_data.latched_input_type = InputType.JoystickButton
         f.action_data.stepped_device_guid = 'secondary'
         f.action_data.stepped_input_type = InputType.JoystickButton

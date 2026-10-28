@@ -39,6 +39,13 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
+def _invoke_ui(method, *args):
+    """Avoid allocating a Qt dispatcher when already on the UI thread."""
+    if gremlin.util.is_ui_thread():
+        return method(*args)
+    return gremlin.util.InvokeUiMethod(method, *args)
+
+
 class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
     """Dialog to calibrate joystick axes."""
 
@@ -50,6 +57,9 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         super().__init__(self.__class__.__name__, parent=parent)
         self.devices = gremlin.joystick_handling.physical_devices()
         self.current_selection_id = 0
+        self.axes = []
+        self._device_guid = None
+        self._axis_widgets = {}
 
         # Create the required layouts
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -75,7 +85,6 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
 
         # Device selection drop down
         self.device_dropdown = gremlin.ui.ui_common.QDataComboBox()
-        self.device_dropdown.currentIndexChanged.connect(self._create_axes)
         for device in self.devices:
             self.device_dropdown.addItem(device.name)
 
@@ -123,6 +132,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         # Create the axis calibration widgets
         self.axes = []
         self._create_axes(self.current_selection_id)
+        self.device_dropdown.currentIndexChanged.connect(self._create_axes)
 
         # Connect to the joystick events
         el = gremlin.event_handler.EventListener()
@@ -147,13 +157,25 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         """
         ui_common.clear_layout(self.axes_layout)
         self.axes = []
+        self._device_guid = None
+        self._axis_widgets = {}
+        if not 0 <= index < len(self.devices):
+            return
         self.current_selection_id = index
-        for i in range(self.devices[index].axis_count):
+        device = self.devices[index]
+        self._device_guid = device.device_guid
+        for i in range(device.axis_count):
             self.axes.append(AxisCalibrationWidget())
             self.axes_layout.addWidget(self.axes[-1])
+        self._axis_widgets = {
+            entry.axis_index: self.axes[entry.linear_index - 1]
+            for entry in device.axismap_list
+            if 0 < entry.linear_index <= len(self.axes)
+        }
 
     def _handle_event(self, event):
-        gremlin.util.InvokeUiMethod(self._handle_event_ui, event)
+        if event.event_type == InputType.JoystickAxis and event.device_guid == self._device_guid:
+            _invoke_ui(self._handle_event_ui, event)
 
     def _handle_event_ui(self, event):
         """Process a single joystick event.
@@ -161,9 +183,10 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         :param event the event to process
         """
         gremlin.util.assert_ui_thread()
-        if event.device_guid == self.devices[self.current_selection_id].device_guid and event.event_type == InputType.JoystickAxis:
-            axis_id = gremlin.joystick_handling.linear_axis_index(self.devices[self.current_selection_id].axismap_list, event.identifier)
-            self.axes[axis_id - 1].set_current(event.raw_value)
+        if event.device_guid == self._device_guid and event.event_type == InputType.JoystickAxis:
+            widget = self._axis_widgets.get(event.identifier)
+            if widget is not None:
+                widget.set_current(event.raw_value)
 
     def closeEvent(self, event):
         """Closes the calibration window.
@@ -175,6 +198,8 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         if len(self.devices) > 0:
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._handle_event)
+        self._device_guid = None
+        self._axis_widgets.clear()
         return super().closeEvent(event)
 
 
@@ -190,6 +215,8 @@ class AxisCalibrationWidget(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QGridLayout(self)
         self.limits = [0, 0, 0]
+        self._current_value = None
+        self._label_values = None
 
         # Create slider showing the axis position graphically
         self.slider = QtWidgets.QProgressBar()
@@ -222,6 +249,9 @@ class AxisCalibrationWidget(QtWidgets.QWidget):
 
         :param value the new value
         """
+        if value == self._current_value:
+            return
+        self._current_value = value
         self.slider.setValue(value)
         if value > self.limits[2]:
             self.limits[2] = value
@@ -236,10 +266,13 @@ class AxisCalibrationWidget(QtWidgets.QWidget):
 
     def _update_labels(self):
         """Updates the axis limit values."""
-        self.current.setText(f"{self.slider.value(): 5d}")
-        self.minimum.setText(f"{self.limits[0]: 5d}")
-        self.center.setText(f"{self.limits[1]: 5d}")
-        self.maximum.setText(f"{self.limits[2]: 5d}")
+        values = (self.slider.value(), *self.limits)
+        previous = self._label_values
+        labels = (self.current, self.minimum, self.center, self.maximum)
+        for index, (label, value) in enumerate(zip(labels, values)):
+            if previous is None or value != previous[index]:
+                label.setText(f"{value: 5d}")
+        self._label_values = values
 
 
 class CalibrationData:
@@ -258,6 +291,7 @@ class CalibrationData:
         "_trigger_threshold_enabled",
         "_last_value",
         "_inverted",
+        "_calibrating",
     ]
 
     def __init__(self, source=None):
@@ -287,8 +321,10 @@ class CalibrationData:
         self._trigger_threshold = config.filter_axis_threshold
 
         self._last_value = None  # last value (normalized)
+        self._calibrating = False
 
     def copyFrom(self, other: CalibrationData):  # noqa: F821
+        self._is_centered = other._is_centered
         self._calibrated_min = other._calibrated_min
         self._calibrated_max = other._calibrated_max
         self._calibrated_center = other._calibrated_center
@@ -297,8 +333,10 @@ class CalibrationData:
         self._deadzone_center_min = other._deadzone_center_min
         self._deadzone_center_max = other._deadzone_center_max
         self._inverted = other._inverted
+        self._trigger_threshold_enabled = other._trigger_threshold_enabled
+        self._trigger_threshold = other._trigger_threshold
 
-    @QtCore.Slot(str)
+    @QtCore.Slot(str, object)
     def _configuration_changed(self, key: str, value):
         if key == "filter_axis_events":
             self._trigger_threshold_enabled = value
@@ -310,9 +348,10 @@ class CalibrationData:
         self._calibrated_min = 0.0
         self._calibrated_max = 0.0
         self._calibrated_center = 0.0  # used only if the stick is centered
+        self._calibrating = True
 
     def stopCalibrate(self):
-        self._calibrate = False
+        self._calibrating = False
 
     def calibrating(self) -> bool:
         return self._calibrating
@@ -344,11 +383,19 @@ class CalibrationData:
         return gremlin.util.compare_guid(self.device_guid, other.device_guid) and self.input_id == other.input_id
 
     def __eq__(self, other: CalibrationData):  # noqa: F821
+        if not isinstance(other, CalibrationData):
+            return NotImplemented
         d1 = gremlin.util.normalize_guid(self.device_guid)
         d2 = gremlin.util.normalize_guid(other.device_guid)
         if d1 != d2:
             return False
         if self.input_id != other.input_id:
+            return False
+        if self._is_centered != other._is_centered:
+            return False
+        if self._deadzone_min != other._deadzone_min or self._deadzone_max != other._deadzone_max:
+            return False
+        if self._trigger_threshold_enabled != other._trigger_threshold_enabled or self._trigger_threshold != other._trigger_threshold:
             return False
         if self._deadzone_center_min != other._deadzone_center_min:
             return False
@@ -370,8 +417,9 @@ class CalibrationData:
 
     @inverted.setter
     def inverted(self, value: bool):
-        self._inverted = value
-        self._update()
+        if self._inverted != value:
+            self._inverted = value
+            self._update()
 
     @property
     def threshold_enabled(self) -> bool:
@@ -396,8 +444,9 @@ class CalibrationData:
 
     @centered.setter
     def centered(self, value: bool):
-        self._is_centered = value
-        self._update()
+        if self._is_centered != value:
+            self._is_centered = value
+            self._update()
 
     @property
     def deadzone(self) -> list:
@@ -409,14 +458,18 @@ class CalibrationData:
     def deadzone(self, value: list):
         if len(value) == 2:
             d_start, d_end = value
-            self.deadzone_min = d_start
-            self.deadzone_max = d_end
+            values = (d_start + 0.0, d_end + 0.0)
+            if values == (self._deadzone_min, self._deadzone_max):
+                return
+            self._deadzone_min, self._deadzone_max = values
         elif len(value) == 4:
             d_start, d_left, d_right, d_end = value
-            self.deadzone_min = d_start
-            self.deadzone_max = d_end
-            self.deadzone_center_min = d_left
-            self.deadzone_center_max = d_right
+            values = (d_start + 0.0, d_left + 0.0, d_right + 0.0, d_end + 0.0)
+            if values == (self._deadzone_min, self._deadzone_center_min, self._deadzone_center_max, self._deadzone_max):
+                return
+            self._deadzone_min, self._deadzone_center_min, self._deadzone_center_max, self._deadzone_max = values
+        else:
+            return
         self._update()
 
     @property
@@ -435,7 +488,7 @@ class CalibrationData:
 
     @deadzone_max.setter
     def deadzone_max(self, value):
-        if self._deadzone_max:
+        if self._deadzone_max != value:
             self._deadzone_max = value + 0.0
             self._update()
 
@@ -500,31 +553,51 @@ class CalibrationData:
         """
 
         if normalize:
-            normalized_value = gremlin.util.scale_to_range(raw_value, source_min=-32768, source_max=32767)
+            if raw_value < -32768:
+                normalized_value = -1.0
+            elif raw_value > 32767:
+                normalized_value = 1.0
+            else:
+                normalized_value = ((raw_value + 32768) * 2.0 / 65535.0) - 1.0
         else:
             normalized_value = raw_value
 
-        if self.inverted:
-            normalized_value = gremlin.util.scale_to_range(normalized_value, invert=self.inverted)  # just handle the inversion
+        if self._inverted:
+            if normalized_value < -1.0:
+                normalized_value = -1.0
+            elif normalized_value > 1.0:
+                normalized_value = 1.0
+            normalized_value = -normalized_value
 
-        value = 0.0
-
-        if self._is_centered:
+        # Most axes use the default mapping. Avoid repeating identity range
+        # conversions, without caching settings that the dialog edits directly.
+        if (
+            self._calibrated_min == -1.0 and self._calibrated_max == 1.0
+            and self._deadzone_min == -1.0 and self._deadzone_max == 1.0
+            and (not self._is_centered or (
+                self._calibrated_center == 0.0
+                and self._deadzone_center_min == 0.0 and self._deadzone_center_max == 0.0
+            ))
+        ):
+            value = normalized_value
+            if value < -1.0:
+                value = -1.0
+            elif value > 1.0:
+                value = 1.0
+        elif self._is_centered:
             # account for center calibration left/right
-            value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self.calibrated_center, self._calibrated_max)
+            value = gremlin.util.axis_calibration(normalized_value, self._calibrated_min, self._calibrated_center, self._calibrated_max)
+
+            if value > self._deadzone_center_min and value < self._deadzone_center_max:
+                value = 0.0
+            elif value <= self._deadzone_center_min:
+                # center deadzone set - update the range as it's been reduced
+                value = gremlin.util.scale_to_range(value, source_min=self._deadzone_min, source_max=self._deadzone_center_min, target_max=0)
+            elif value >= self._deadzone_center_max:
+                value = gremlin.util.scale_to_range(value, source_min=self._deadzone_center_max, source_max=self._deadzone_max, target_min=0)
         else:
             value = gremlin.util.slider_calibration(normalized_value, self._calibrated_min, self._calibrated_max)
-
-        if self._is_centered:
-            if value > self.deadzone_center_min and value < self.deadzone_center_max:
-                value = 0.0
-            elif value <= self.deadzone_center_min:
-                # center deadzone set - update the range as it's been reduced
-                value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_center_min, target_max=0)
-            elif value >= self.deadzone_center_max:
-                value = gremlin.util.scale_to_range(value, source_min=self.deadzone_center_max, source_max=self.deadzone_max, target_min=0)
-        else:
-            value = gremlin.util.scale_to_range(value, source_min=self.deadzone_min, source_max=self.deadzone_max)
+            value = gremlin.util.scale_to_range(value, source_min=self._deadzone_min, source_max=self._deadzone_max)
 
         value += 0.0  # flip negative zero in python (why?)
 
@@ -548,20 +621,21 @@ class CalibrationData:
         else:
             self.input_id = input_id
 
-        self.inverted = safe_read(node, "inverted", bool, False)
+        self._inverted = safe_read(node, "inverted", bool, False)
 
-        self.centered = safe_read(node, "centered", bool, False)
-        self.calibrated_min = safe_read(node, "calibrate-min", float, -1.0)
+        self._is_centered = safe_read(node, "centered", bool, False)
+        self._calibrated_min = safe_read(node, "calibrate-min", float, -1.0)
 
-        self.calibrated_max = safe_read(node, "calibrate-max", float, 1.0)
-        self.deadzone_min = safe_read(node, "deadzone-min", float, -1.0)
-        self.deadzone_max = safe_read(node, "deadzone-max", float, 1.0)
-        self.threshold_enabled = safe_read(node, "threshold-enabled", bool, False)
-        self.threshold = safe_read(node, "threshold-value", float, 0.005)
-        if self.centered:
-            self.calibrated_center = safe_read(node, "calibrate-center", float, 0.0)
-            self.deadzone_center_min = safe_read(node, "deadzone-center-min", float, 0.0)
-            self.deadzone_center_max = safe_read(node, "deadzone-center-max", float, 0.0)
+        self._calibrated_max = safe_read(node, "calibrate-max", float, 1.0)
+        self._deadzone_min = safe_read(node, "deadzone-min", float, -1.0)
+        self._deadzone_max = safe_read(node, "deadzone-max", float, 1.0)
+        self._trigger_threshold_enabled = safe_read(node, "threshold-enabled", bool, False)
+        self._trigger_threshold = safe_read(node, "threshold-value", float, 0.005)
+        if self._is_centered:
+            self._calibrated_center = safe_read(node, "calibrate-center", float, 0.0)
+            self._deadzone_center_min = safe_read(node, "deadzone-center-min", float, 0.0)
+            self._deadzone_center_max = safe_read(node, "deadzone-center-max", float, 0.0)
+        self._update()
 
     def to_xml(self):
 
@@ -649,22 +723,22 @@ class CalibrationManager:
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
 
-        if device_guid not in self.calibration_map:
-            self.calibration_map[device_guid] = {}
-        if input_id not in self.calibration_map[device_guid]:
+        device_calibrations = self.calibration_map.get(device_guid)
+        if device_calibrations is None:
+            device_calibrations = {}
+            self.calibration_map[device_guid] = device_calibrations
+        calibration = device_calibrations.get(input_id)
+        if calibration is None:
             calibration = CalibrationData()
             calibration.device_guid = device_guid
             calibration.input_id = input_id
             calibration._loadLegacy()  # load old data if present
-            self.calibration_map[device_guid][input_id] = calibration
-
-        return self.calibration_map[device_guid][input_id]
+            device_calibrations[input_id] = calibration
+        return calibration
 
     def saveCalibration(self, calibration: CalibrationData, to_global=True, to_local=False, callback=None):
         """saves calibration data"""
         device_guid = gremlin.util.normalize_guid(calibration.device_guid)
-        _device = gremlin.joystick_handling.getDevice(device_guid)
-
         input_id = calibration.input_id
         if device_guid not in self.calibration_map:
             self.calibration_map[device_guid] = {}
@@ -761,7 +835,7 @@ class CalibrationManager:
                     return False
 
     def _save(self, to_global=True, to_local=False, callback=None):
-        gremlin.util.InvokeUiMethod(self._save_ui, to_global, to_local, callback)
+        _invoke_ui(self._save_ui, to_global, to_local, callback)
 
     def _save_ui(self, to_global=True, to_local=False, callback=None):
         """saves the calibration data
@@ -854,17 +928,18 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
 
     def _kb_event_cb(self, event):
         """capture a key - esc"""
-        gremlin.util.InvokeUiMethod(self._kb_event_ui, event)
+        if event.is_pressed:
+            _invoke_ui(self._kb_event_ui, event)
 
     def accept(self):
-        gremlin.util.InvokeUiMethod(self._accept_ui)
+        _invoke_ui(self._accept_ui)
 
     def _accept_ui(self):
         self.result = True
         self.close()
 
     def reject(self):
-        gremlin.util.InvokeUiMethod(self._reject_ui)
+        _invoke_ui(self._reject_ui)
 
     def _reject_ui(self):
         self.result = False
@@ -889,7 +964,14 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
             self.reject()
 
     def joystick_event_handler(self, event):
-        gremlin.util.InvokeUiMethod(self._joystick_event_handler_ui, event)
+        if event.device_guid != self.device_guid:
+            return
+        if event.is_axis:
+            if event.identifier != self.input_id:
+                return
+        elif not event.is_pressed:
+            return
+        _invoke_ui(self._joystick_event_handler_ui, event)
 
     def _joystick_event_handler_ui(self, event):
         gremlin.util.assert_ui_thread()
@@ -957,6 +1039,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.hook_id = gremlin.util.normalize_guid(input_item.id)
         self.calibrated_on_entry = input_item.calibration.hasData  # true if the item has calibration data on entry
         self._closing = False
+        self._axis_widget_limits = None
+        self._last_raw_value = None
+        self._last_calibrated_value = None
         self.mgr: CalibrationManager = CalibrationManager()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -1173,6 +1258,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _joystick_event_handler(self, event: gremlin.event_handler.Event):
         """handles a joystick axis event"""
 
+        if self._closing:
+            return
         if not event.is_axis:
             return
         if event.device_guid != self._device_guid:
@@ -1183,6 +1270,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             return
         if self._calibrating:
             # ignore while calibrating
+            return
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._joystick_event_handler, event)
             return
 
         raw_value = event.value
@@ -1195,8 +1285,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 self.action_data.calibrated_max = raw_value
                 changed = True
             if changed:
-                self.action_data._update()
-                self._update_ui()
+                self._update_ui(raw_value)
+                return
 
         calibrated_value = self.action_data.getValue(raw_value, normalize=False)
         self._update_axis_widget_ui(
@@ -1301,6 +1391,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _slider_changed(self, handle, value):
         """slider changed"""
 
+        # A manual drag can be clamped back to the previous calibration value.
+        # Refresh handles even when the model's limits end up unchanged.
+        self._axis_widget_limits = None
         syslog.info("slider changed")
         match handle:
             case 0:
@@ -1319,7 +1412,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                     value = self.action_data.calibrated_min + 0.001
                 self.action_data.calibrated_max = value
 
-        gremlin.util.InvokeUiMethod(self._update_ui)  # ensure on UI thread
+        _invoke_ui(self._update_ui)
 
     @QtCore.Slot()
     def _reset_calibration(self, widget):
@@ -1439,7 +1532,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _getCalibratedValue(self, value: float):
         return self.action_data.getValue(value)
 
-    def _update_ui(self):
+    def _update_ui(self, raw_value=None):
         """updates the data"""
         if self._closing:
             return
@@ -1455,8 +1548,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._container_center_widget.setVisible(is_centered)
         self._calibrated_center_widget.setVisible(is_centered)
 
-        raw_value = gremlin.joystick_handling.get_axis(self.action_data.device_guid, self.action_data.input_id)  # raw value from dinput
-        self._raw_value_widget.setValue(raw_value)
+        if raw_value is None:
+            raw_value = gremlin.joystick_handling.get_axis(self.action_data.device_guid, self.action_data.input_id)
 
         # calibration mode = push the calibration to min/max
         if auto_calibrate:
@@ -1467,15 +1560,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         calibrated_value = self.action_data.getValue(raw_value, normalize=False)
 
-        with QtCore.QSignalBlocker(self._calibrated_min_widget):
-            self._calibrated_min_widget.setValue(self.action_data.calibrated_min)
-        with QtCore.QSignalBlocker(self._calibrated_max_widget):
-            self._calibrated_max_widget.setValue(self.action_data.calibrated_max)
-        with QtCore.QSignalBlocker(self._calibrated_center_widget):
-            self._calibrated_center_widget.setValue(self.action_data.calibrated_center)
-
-        with QtCore.QSignalBlocker(self._calibrated_value_widget):
-            self._calibrated_value_widget.setValue(calibrated_value)
+        self._calibrated_min_widget._update_value(self.action_data.calibrated_min, emit=False)
+        self._calibrated_max_widget._update_value(self.action_data.calibrated_max, emit=False)
+        self._calibrated_center_widget._update_value(self.action_data.calibrated_center, emit=False)
 
         with QtCore.QSignalBlocker(self._deadzone_widget):
             self._deadzone_widget.isCentered = is_centered
@@ -1490,13 +1577,24 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         )
 
     def _update_axis_widget(self, raw_value: float, calibrated_value: float, min_value: float, center_value: float, max_value: float):
-        gremlin.util.InvokeUiMethod(self._update_axis_widget_ui, raw_value, calibrated_value, min_value, center_value, max_value)
+        _invoke_ui(self._update_axis_widget_ui, raw_value, calibrated_value, min_value, center_value, max_value)
 
     def _update_axis_widget_ui(self, raw_value: float, calibrated_value: float, min_value: float, center_value: float, max_value: float):
+        if self._closing:
+            return
         if Shiboken.isValid(self._input_slider_widget) and Shiboken.isValid(self._calibrated_slider_widget):
-            self._input_slider_widget.setValue([min_value, center_value, max_value])
-            self._input_slider_widget.setMarkerValue(raw_value)
-            self._calibrated_slider_widget.setValue(calibrated_value)
+            limits = (min_value, center_value, max_value)
+            if limits != self._axis_widget_limits:
+                self._input_slider_widget._set_value_ui(list(limits))
+                self._axis_widget_limits = limits
+            if raw_value != self._last_raw_value:
+                self._input_slider_widget._set_marker_value_ui(raw_value)
+                self._raw_value_widget._update_value(raw_value, emit=False)
+                self._last_raw_value = raw_value
+            if calibrated_value != self._last_calibrated_value:
+                self._calibrated_slider_widget._set_value_ui(calibrated_value)
+                self._calibrated_value_widget._update_value(calibrated_value, emit=False)
+                self._last_calibrated_value = calibrated_value
 
 
 _calibration_manager = CalibrationManager()

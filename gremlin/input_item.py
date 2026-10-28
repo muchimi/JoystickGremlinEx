@@ -1614,20 +1614,22 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
             match self.input_type:
                 case InputType.JoystickAxis:
-                    # check for curve data
-                    for child in node:
-                        if _is_curve_tag(child.tag):
-                            self.curve_data = gremlin.curve_handler.AxisCurveData()
-                            self.curve_data._parse_xml(child)
-                            self.input_id = safe_read(node, "input_id", int, 0)
-                            self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
-                            break
+                    # Resolve the axis before attaching its curve calibration.
                     if "id" in node.attrib:
                         str_id = node.get("id")
                         if not str_id.isnumeric():
                             self.input_id = gremlin.base_classes.SpecialInputItem(str_id)
                         else:
                             self.input_id = safe_read(node, "id", int, 0)
+                    elif "input_id" in node.attrib:
+                        self.input_id = safe_read(node, "input_id", int, 0)
+                    # check for curve data
+                    for child in node:
+                        if _is_curve_tag(child.tag):
+                            self.curve_data = gremlin.curve_handler.AxisCurveData()
+                            self.curve_data._parse_xml(child)
+                            self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
+                            break
                     self.is_axis = True
 
                 case InputType.JoystickButton | InputType.JoystickHat:

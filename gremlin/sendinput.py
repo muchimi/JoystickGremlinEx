@@ -19,15 +19,18 @@
 import ctypes
 import ctypes.wintypes
 import enum
+import logging
 import math
 import threading
 import time
-import win32api, win32con
+import win32api
+import win32con
 
 
 import gremlin.util
 
 from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.types import MouseButton
 
 """Defines flags used when specifying MOUSEINPUT structures.
 
@@ -37,7 +40,6 @@ WHEEL_DELTA = 120
 XBUTTON1 = 0x0001
 XBUTTON2 = 0x0002
 MOUSEEVENTF_ABSOLUTE = 0x8000
-MOUSEEVENTF_HWHEEL = 0x01000
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_MOVE_NOCOALESCE = 0x2000
 MOUSEEVENTF_LEFTDOWN = 0x0002
@@ -63,7 +65,6 @@ https://msdn.microsoft.com/en-us/library/ms646270(v=vs.85).aspx
 INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 
-import logging
 syslog = logging.getLogger("system")
 
 class MotionType(enum.Enum):
@@ -107,7 +108,7 @@ class MouseMotion:
         delta_x = 0
         delta_y = 0
 
-        cur_time = time.time()
+        cur_time = time.monotonic()
         if self._dx_timestamp < cur_time:
             delta_x = self._tick_dx_value
             self._dx_timestamp = cur_time + self._tick_dx_time
@@ -122,12 +123,13 @@ class MouseMotion:
 
         :param delta the amount of change in pixels per second to discretize for
         """
-        delta = 0.0 if abs(delta) < 1e-6 else delta
-        tick_value = math.ceil(abs(delta) / 100.0)
+        magnitude = abs(delta)
+        magnitude = 0.0 if magnitude < 1e-6 else magnitude
+        tick_value = math.ceil(magnitude * MouseMotion.delta_t)
         if tick_value == 0:
             tick_time = MouseMotion.delta_t
         else:
-            tick_time = 1.0 / (abs(delta) / tick_value)
+            tick_time = tick_value / magnitude
             tick_value = int(math.copysign(tick_value, delta))
 
         return tick_value, tick_time
@@ -158,7 +160,6 @@ class FixedMouseMotion(MouseMotion):
         :param value speed in pixels per second along the x axis
         """
         self.dx = value
-        #self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
 
     def set_dy(self, value):
         """Updates the y velocity.
@@ -166,11 +167,10 @@ class FixedMouseMotion(MouseMotion):
         :param value speed in pixels per second along the y axis
         """
         self.dy = value
-        #self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
     def __call__(self):
-        time_now = time.time()
-        if self._call_time is None or self._call_time >= time_now:
+        time_now = time.monotonic()
+        if self._call_time is None or self._call_time <= time_now:
             self._call_time = time_now + self._rate # next call time
             return self.dx, self.dy
         return 0,0 # no movement as time hasn't lapsed
@@ -191,7 +191,6 @@ class AcceleratedMouseMotion(MouseMotion):
         """
         super().__init__()
 
-        self.direction = direction - 90.0
         self.min_velocity = min_speed
         self.max_velocity = max_speed
         # Make sure we don't get numerical issues with acceleration computation
@@ -201,10 +200,7 @@ class AcceleratedMouseMotion(MouseMotion):
             self.acceleration = (max_speed - min_speed) / time_to_max_speed
 
         self.current_velocity = self.min_velocity
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
-        self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
-        self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
+        self.set_direction(direction)
 
     def set_direction(self, direction):
         """Sets the direction for which to emit position changes.
@@ -212,8 +208,9 @@ class AcceleratedMouseMotion(MouseMotion):
         :param direction new direction of travel
         """
         self.direction = direction - 90.0
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
+        self._direction_x, self._direction_y = self._decompose_xy(self.direction, 1.0)
+        self.dx = self._direction_x * self.current_velocity
+        self.dy = self._direction_y * self.current_velocity
         self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
         self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
@@ -224,8 +221,8 @@ class AcceleratedMouseMotion(MouseMotion):
             positive y
         :param value the length of the direction vector
         """
-        return value * math.cos(gremlin.util.deg2rad(direction)),\
-            value * math.sin(gremlin.util.deg2rad(direction))
+        radians = math.radians(direction)
+        return value * math.cos(radians), value * math.sin(radians)
 
     def __call__(self):
         """Returns the change in x and y for this point in time.
@@ -236,14 +233,16 @@ class AcceleratedMouseMotion(MouseMotion):
         dx, dy = super().__call__()
 
         # Apply acceleration to obtain next integration step values
-        self.current_velocity = min(
+        velocity = min(
             self.max_velocity,
             self.current_velocity + self.acceleration * MouseMotion.delta_t
         )
-        self.dx, self.dy = \
-            self._decompose_xy(self.direction, self.current_velocity)
-        self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
-        self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
+        if velocity != self.current_velocity:
+            self.current_velocity = velocity
+            self.dx = self._direction_x * velocity
+            self.dy = self._direction_y * velocity
+            self._tick_dx_value, self._tick_dx_time = self._compute_values(self.dx)
+            self._tick_dy_value, self._tick_dy_time = self._compute_values(self.dy)
 
         # Return cached values
         return dx, dy
@@ -262,20 +261,23 @@ class MouseController:
         self._accel_generator = None
         self._is_running = False
         self._stop = threading.Event()
+        self._motion_condition = threading.Condition()
         self._thread = None
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.profile_stop.connect(self._profile_stop)
 
     def _profile_start(self):
-        self._delta_generator = None
-        self._accel_generator = None
-        self._stop = threading.Event()
+        self.stop()
+        with self._motion_condition:
+            self._delta_generator = None
+            self._accel_generator = None
 
     def _profile_stop(self):
-        self._delta_generator = None
-        self._accel_generator = None
         self.stop()
+        with self._motion_condition:
+            self._delta_generator = None
+            self._accel_generator = None
 
     def set_absolute_motion(self, dx=None, dy=None):
         """Configures a motion using absolute velocities.
@@ -285,23 +287,16 @@ class MouseController:
         :param dx velocity along the x axis in pixels per second
         :param dy velocity along the y axis in pixels per second
         """
-        self._motion_type = MotionType.Fixed
-        x = y = None
-        if dx is not None:
-            # update x is provide
-            x = dx
-        if dy is not None:
-            # update y if provided
-            y = dy
-
-
-        if not self._delta_generator:
-            self._delta_generator = FixedMouseMotion(x,y)
-        else:
-            if x is not None:
-                self._delta_generator.set_dx(x)
-            if y is not None:
-                self._delta_generator.set_dy(y)
+        with self._motion_condition:
+            self._motion_type = MotionType.Fixed
+            if self._delta_generator is None:
+                self._delta_generator = FixedMouseMotion(dx, dy)
+            else:
+                if dx is not None:
+                    self._delta_generator.set_dx(dx)
+                if dy is not None:
+                    self._delta_generator.set_dy(dy)
+            self._motion_condition.notify()
 
     def set_accelerated_motion(
             self,
@@ -317,57 +312,81 @@ class MouseController:
         :param max_speed maximum speed in pixels per second
         :param time_to_max_speed time to reach max_speed
         """
-        self._motion_type = MotionType.Accelerated
-        self._accel_generator = AcceleratedMouseMotion(
-            direction,
-            min_speed,
-            max_speed,
-            time_to_max_speed
-        )
+        with self._motion_condition:
+            self._motion_type = MotionType.Accelerated
+            self._accel_generator = AcceleratedMouseMotion(
+                direction,
+                min_speed,
+                max_speed,
+                time_to_max_speed
+            )
+            self._motion_condition.notify()
 
 
     def start(self):
         """Starts the thread that will send motions when required."""
-        if not self._thread or not self._thread.is_alive():
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._control_loop, daemon=False)
-            self._thread.name = "MouseController"
-            self._thread.start()
-            syslog.info("MouseController: start")
+        with self._motion_condition:
+            if not self._thread or not self._thread.is_alive():
+                self._stop.clear()
+                try:
+                    thread = threading.Thread(target=self._control_loop, name="MouseController", daemon=False)
+                    self._thread = thread
+                    thread.start()
+                except BaseException:
+                    self._thread = None
+                    self._stop.set()
+                    raise
+                syslog.info("MouseController: start")
 
     @property
     def started(self) -> bool:
         ''' true if controller is running'''
-        return self._thread is not None and self._thread.is_alive()
+        thread = self._thread
+        return thread is not None and thread.is_alive()
 
     def stop(self):
         """Stops the thread that sends motion events."""
-        if self._thread:
+        with self._motion_condition:
+            thread = self._thread
             self._stop.set()
-            gremlin.util.safeJoin(self._thread)
-            self._thread = None
+            self._motion_condition.notify_all()
+        if thread is not None and thread is not threading.current_thread():
+            gremlin.util.safeJoin(thread)
+            with self._motion_condition:
+                if not thread.is_alive() and self._thread is thread:
+                    self._thread = None
             syslog.info("MouseController: stop")
 
     def _control_loop(self):
         """Loop responsible for creating and sending mouse motion events."""
 
-        while not self._stop.is_set():
+        try:
+            while True:
+                with self._motion_condition:
+                    while not self._stop.is_set():
+                        if self._motion_type == MotionType.Fixed:
+                            generator = self._delta_generator
+                            active = generator is not None and (generator.dx or generator.dy)
+                        else:
+                            generator = self._accel_generator
+                            # A zero starting speed can still accelerate into motion.
+                            active = generator is not None and (generator.current_velocity or generator.max_velocity)
+                        if active:
+                            dx, dy = generator()
+                            break
+                        self._motion_condition.wait()
+                    else:
+                        return
 
-            if self._motion_type == MotionType.Fixed and self._delta_generator:
-                # fixed
-                dx, dy = self._delta_generator()
-
-            elif self._accel_generator:
-                # accelerated
-                dx, dy = self._accel_generator()
-            else:
-                dx = dy = 0
-
-
-            if dx or dy:
-                send_mouse_motion(int(dx), int(dy))
-
-            time.sleep(0)
+                # Native input hooks can reenter the controller; release the
+                # motion lock before sending input or waiting for the next tick.
+                if not self._stop.is_set() and (dx or dy):
+                    send_mouse_motion(int(dx), int(dy))
+                self._stop.wait(MouseMotion.delta_t)
+        finally:
+            with self._motion_condition:
+                if self._thread is threading.current_thread():
+                    self._thread = None
 
 
 class _MOUSEINPUT(ctypes.Structure):
@@ -404,10 +423,13 @@ class _KEYBDINPUT(ctypes.Structure):
 
 
 def _keyboard_input(virtual_key, scan_code, flags):
-    return _INPUT(
-        INPUT_KEYBOARD,
-        _INPUTunion(ki=_KEYBDINPUT(virtual_key, scan_code, flags, 0, None))
-    )
+    value = _INPUT()
+    value.type = INPUT_KEYBOARD
+    keyboard = value.union.ki
+    keyboard.wVk = virtual_key
+    keyboard.wScan = scan_code
+    keyboard.dwFlags = flags
+    return value
 
 class _INPUTunion(ctypes.Union):
 
@@ -435,6 +457,12 @@ class _INPUT(ctypes.Structure):
     )
 
 
+_INPUT_SIZE = ctypes.sizeof(_INPUT)
+_SendInput = ctypes.windll.user32.SendInput
+_SendInput.argtypes = (ctypes.wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int)
+_SendInput.restype = ctypes.wintypes.UINT
+
+
 def send_mouse_motion(dx, dy):
     ''' sends mouse relative motion '''
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
@@ -455,96 +483,50 @@ def send_mouse_position(x, y):
 
 def send_mouse_wheel_up():
     ''' sends a mouse wheel up '''
-    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = 120 ))
+    _send_input(_MOUSE_WHEEL_UP)
 
 def send_mouse_wheel_down():
     ''' sends a mouse wheel down '''
-    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = 65416 ))
+    _send_input(_MOUSE_WHEEL_DOWN)
 
 def send_mouse_wheel_left():
     ''' sends a mouse wheel left '''
-    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = 120 ))
+    _send_input(_MOUSE_WHEEL_LEFT)
 
 def send_mouse_wheel_right():
     ''' sends a mouse wheel right  '''
-    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = 65416 ))
+    _send_input(_MOUSE_WHEEL_RIGHT)
 
 
 
 
 def mouse_press(button):
     ''' sends a single click'''
-    from gremlin.types import MouseButton
-    if button == MouseButton.Left:
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
-    elif button == MouseButton.Right:
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTDOWN))
-    elif button == MouseButton.Middle:
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEDOWN))
-    elif button == MouseButton.Back:
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
-    elif button == MouseButton.Forward:
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
+    inputs = _MOUSE_BUTTON_INPUTS.get(button)
+    if inputs is not None:
+        _send_input(inputs[0])
 
 def mouse_press_double_click(button, delay = 0.05):
     ''' sends a double click (also releases the mouse) '''
-    from gremlin.types import MouseButton
-    if button == MouseButton.Left:
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
-    elif button == MouseButton.Right:
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTUP))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTUP))
-    elif button == MouseButton.Middle:
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEUP))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEDOWN))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEUP))
-    elif button == MouseButton.Back:
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
+    inputs = _MOUSE_BUTTON_INPUTS.get(button)
+    if inputs is None:
+        return
 
-    elif button == MouseButton.Forward:
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
-        time.sleep(delay)
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
+    press, release = inputs
+    _send_input(press)
+    time.sleep(delay)
+    _send_input(release)
+    time.sleep(delay)
+    _send_input(press)
+    time.sleep(delay)
+    _send_input(release)
 
 
 
 def mouse_release(button):
-    from gremlin.types import MouseButton
-    if button == MouseButton.Left:
-        _send_input(_mouse_input(MOUSEEVENTF_LEFTUP))
-    elif button == MouseButton.Right:
-        _send_input(_mouse_input(MOUSEEVENTF_RIGHTUP))
-    elif button == MouseButton.Middle:
-        _send_input(_mouse_input(MOUSEEVENTF_MIDDLEUP))
-    elif button == MouseButton.Back:
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
-    elif button == MouseButton.Forward:
-        _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
+    inputs = _MOUSE_BUTTON_INPUTS.get(button)
+    if inputs is not None:
+        _send_input(inputs[1])
 
 
 def mouse_wheel(factor : int):
@@ -569,10 +551,27 @@ def mousePos():
     return x,y
 
 def _mouse_input(flags, dx=0, dy=0, data=0):
-    return _INPUT(
-        INPUT_MOUSE,
-        _INPUTunion(mi=_MOUSEINPUT(dx, dy, data, flags, 0, None))
-    )
+    value = _INPUT()
+    mouse = value.union.mi
+    mouse.dx = dx
+    mouse.dy = dy
+    mouse.mouseData = data
+    mouse.dwFlags = flags
+    return value
+
+
+# These payloads are read-only after construction and safe to share across senders.
+_MOUSE_BUTTON_INPUTS = {
+    MouseButton.Left: (_mouse_input(MOUSEEVENTF_LEFTDOWN), _mouse_input(MOUSEEVENTF_LEFTUP)),
+    MouseButton.Right: (_mouse_input(MOUSEEVENTF_RIGHTDOWN), _mouse_input(MOUSEEVENTF_RIGHTUP)),
+    MouseButton.Middle: (_mouse_input(MOUSEEVENTF_MIDDLEDOWN), _mouse_input(MOUSEEVENTF_MIDDLEUP)),
+    MouseButton.Back: (_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1), _mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1)),
+    MouseButton.Forward: (_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2), _mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2)),
+}
+_MOUSE_WHEEL_UP = _mouse_input(MOUSEEVENTF_WHEEL, data=WHEEL_DELTA)
+_MOUSE_WHEEL_DOWN = _mouse_input(MOUSEEVENTF_WHEEL, data=-WHEEL_DELTA)
+_MOUSE_WHEEL_LEFT = _mouse_input(MOUSEEVENTF_HWHEEL, data=-WHEEL_DELTA)
+_MOUSE_WHEEL_RIGHT = _mouse_input(MOUSEEVENTF_HWHEEL, data=WHEEL_DELTA)
 
 
 def send_key(virtual_code, scan_code, flags):
@@ -589,9 +588,11 @@ def send_key_hwnd(hwnd, virtual_code, scan_code, flags):
 
 def _send_input(*inputs):
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
-    nInputs = len(inputs)
-    LPINPUT = _INPUT * nInputs
-    pInputs = LPINPUT(*inputs)
-    cbSize = ctypes.c_int(ctypes.sizeof(_INPUT))
+    count = len(inputs)
+    if count == 1:
+        return _SendInput(1, ctypes.byref(inputs[0]), _INPUT_SIZE)
+    if count == 0:
+        return 0
 
-    return ctypes.windll.user32.SendInput(nInputs, pInputs, cbSize)
+    buffer = (_INPUT * count)(*inputs)
+    return _SendInput(count, buffer, _INPUT_SIZE)
