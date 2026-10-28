@@ -314,6 +314,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         self._selector_widgets.clear()
         self._selector_callbacks.clear()
+        self._callbacks.clear()  # callbacks capture the selector widgets being replaced
         self._view_map.clear()
 
         bh_cb = None
@@ -1060,9 +1061,9 @@ States can be toggled by clicking on the state button.  Expression states will u
             case VisualizationType.Keyboard:
                 self.keyboard_widget_selector.setChecked(False)
             case _:
-                self.vis_selector.closeWidget(key)
-                callback = self.vis_selector.getCallback(key)
-                callback()
+                device = self._device_key_map.get(key)
+                if device is not None:
+                    self._add_remove_visualization_widget(device, visualization_type, False)
 
     def load_viewer_widgets(self):
         """loads the view widgets for all device inputs"""

@@ -1563,6 +1563,10 @@ class AbstractCallbackModel(AbstractModel):
         """returns the size of the unfiltered model"""
         return len(self._index_map)
 
+    def rowCount(self, filter = DEFAULT_FILTER) -> int:
+        """returns the number of rows in the model"""
+        return len(self._filtered_index_map[filter])
+
     def unfilteredCount(self) -> int:
         """returns the size of the unfiltered model"""
         return len(self._index_map)

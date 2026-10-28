@@ -106,7 +106,7 @@ import dinput
 
 from gremlin.ui import virtual_button
 import gremlin.error
-from gremlin.worker import WorkManager
+from gremlin.worker import WorkManager, with_wait_cursor
 
 from PySide6 import QtCore
 from PySide6.QtCore import Qt, QSortFilterProxyModel
@@ -549,7 +549,7 @@ class AbstractPaginatedView(AbstractView):
         model = self._model
         if model is None:
             return 0
-        return model.rows() if hasattr(model, "rows") else model.count()
+        return model.count()
 
     def _get_hash_key(self, filter=AbstractCallbackModel.DEFAULT_FILTER):
         self._clamp_page()
@@ -717,10 +717,11 @@ class PaginationWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self._view):
             return
         view = self._view
+        view._clamp_page()
         index = view.page_index
         count = view.page_count
         self._label.setText(f"{index + 1} / {count}")
-        filtered_count = view.count()
+        filtered_count = view._item_count()
         unfiltered_count = view.unfilteredCount()
 
         total_stub = f"Total items {filtered_count}" if filtered_count == unfiltered_count else f"Total items {filtered_count} (unfiltered: {unfiltered_count})"
@@ -3007,7 +3008,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _handle_button_state_change_callback(self, is_pressed: bool):
         config = gremlin.config.Configuration()
-        if gremlin.shared_state.is_highlighting_suspended:
+        if not is_pressed or gremlin.shared_state.is_running or gremlin.shared_state.is_highlighting_suspended():
             return
         if not self.selected and config.highlight_enabled and config.highlight_input_buttons:
             self.selected = True
@@ -3015,6 +3016,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _handle_axis_state_change_callback(self, value: float):
         config = gremlin.config.Configuration()
+        if gremlin.shared_state.is_running or gremlin.shared_state.is_highlighting_suspended():
+            return
         if not self.selected and config.highlight_enabled and config.highlight_input_axis:
             self.selected = True
             self.trigger()
@@ -4220,9 +4223,9 @@ class InputItemListView(AbstractPaginatedView):
         # load data and update
         self.popSuspended(emit=False)
 
-    def count(self) -> int:
-        """gets the number of filtered input items displayed"""
-        return self.model.count() if self.model is not None else 0
+    def _item_count(self) -> int:
+        """gets the number of inputs matching this view's filter across all pages"""
+        return self.model.count(filter=self.filter) if self.model is not None else 0
 
     def unfilteredCount(self) -> int:
         """gets the number of input items in the model without any filtering"""
@@ -4704,7 +4707,7 @@ class InputItemListView(AbstractPaginatedView):
 
         self._apply_pending_selection_page()
 
-        hash_key = self.model.hashKey(self.filter)  #  self._get_hash_key(self.filter)
+        hash_key = self._get_hash_key(self.filter)
         changed = force or (hash_key != self._model_hash)
         if not changed:
             return  # no changes detected, skip redraw
@@ -4787,7 +4790,7 @@ class InputItemListView(AbstractPaginatedView):
             self._redraw_force = False
             self._redraw_pending = False
             self.resetModelChanged()  # indicate changes are handled
-            if self.model.rows() == 0:
+            if self._item_count() == 0:
                 self.showBlank()
             else:
                 self.showContent()
@@ -7936,8 +7939,8 @@ class ActionSetView(AbstractView):
         return widget
 
     @gremlin.util.hold_cyclic_gc
-    def create_ui(self):
-        """(re)creates the contents - content is displayed on page 2 of the stacked container"""
+    def create_ui(self, force=False):
+        """Synchronize action rows while retaining unchanged plugin widgets."""
         import gremlin.config
         import gremlin.joystick_handling
 
@@ -7948,7 +7951,7 @@ class ActionSetView(AbstractView):
         clipboard.disable()
 
         try:
-            if self._stacked_widget.count() == 2:
+            if force and self._stacked_widget.count() == 2:
                 self._action_widget = None
                 self._widget_map.clear()
                 widget = self._stacked_widget.widget(1)
@@ -7958,15 +7961,34 @@ class ActionSetView(AbstractView):
 
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
-            self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
-
-            self._stacked_widget.addWidget(self._container_widget)  # index 1
-
-            self._action_widget = self._container_widget
+            if self._stacked_widget.count() != 2:
+                self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
+                self._stacked_widget.addWidget(self._container_widget)
+                self._action_widget = self._container_widget
+                if self._separator:
+                    self._container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
             with QtCore.QSignalBlocker(self.model):  # .data_changed.blocked():
+                actions = list(self.model)
+                by_id = {action.id: action for action in actions}
+                for action_id, wrapped_widget in list(self._widget_map.items()):
+                    if (
+                        action_id not in by_id
+                        or not Shiboken.isValid(wrapped_widget)
+                        or wrapped_widget.action_data is not by_id[action_id]
+                    ):
+                        del self._widget_map[action_id]
+                        if Shiboken.isValid(wrapped_widget):
+                            self._container_layout.removeWidget(wrapped_widget)
+                            gremlin.util.delete_widget(wrapped_widget)
                 # max_index = len(self.model) - 1
-                for index, action in enumerate(self.model):
+                for index, action in enumerate(actions):
+                    wrapped_widget = self._widget_map.get(action.id)
+                    if wrapped_widget is not None:
+                        target_index = index + int(self._separator)
+                        if self._container_layout.indexOf(wrapped_widget) != target_index:
+                            self._container_layout.insertWidget(target_index, wrapped_widget)
+                        continue
                     if verbose:
                         object_name = self.objectName()
                         device = gremlin.joystick_handling.getDevice(self.container.hardware_device_guid)
@@ -7992,10 +8014,7 @@ class ActionSetView(AbstractView):
                     # save the reference widget
                     self._widget_map[action.id] = wrapped_widget
                     # add the new widget to the layout
-                    self._container_layout.addWidget(wrapped_widget)
-
-                if self._separator:
-                    self._container_layout.insertWidget(0, gremlin.ui.ui_common.QHorizontalLine())
+                    self._container_layout.insertWidget(index + int(self._separator), wrapped_widget)
 
         finally:
             clipboard.enable()
@@ -8039,6 +8058,7 @@ class ActionSetView(AbstractView):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
 
+    @with_wait_cursor
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
         import gremlin.clipboard
@@ -8057,13 +8077,13 @@ class ActionSetView(AbstractView):
         model_count = self.model.count()
 
         hash_key = self.model.hashKey()
-        force = force or hash_key != self._last_action_hash
+        structure_changed = hash_key != self._last_action_hash
 
-        if not self._drawn_once or force or self.modelChanged() or widget_count != model_count:
+        if not self._drawn_once or force or structure_changed or self.modelChanged() or widget_count != model_count:
             # redraw if first time, no container layout created, or model size is different
             if verbose:
                 syslog.info(f"\tcreate UI for [{model_count}] actions")
-            self.create_ui()
+            self.create_ui(force=force)
             self._drawn_once = True
             self._show_content()
             self._last_action_hash = hash_key
@@ -8086,11 +8106,15 @@ class ActionSetView(AbstractView):
                 assert data.id in self._widget_map, f"ActionSetView model and UI are not synchronized: widget not found for action id [{data.id}]"
 
                 widget = self._widget_map[data.id]
+                if not Shiboken.isValid(widget) or widget.action_data is not data:
+                    self.create_ui()
+                    return
                 widget_index = self._container_layout.indexOf(widget)
-                if model_index != widget_index:
+                target_index = model_index + int(self._separator)
+                if target_index != widget_index:
                     # reorder the display to match model index if needed
                     self._container_layout.removeWidget(widget)
-                    self._container_layout.insertWidget(model_index, widget)
+                    self._container_layout.insertWidget(target_index, widget)
 
                 if hasattr(widget, "redraw"):
                     widget.redraw()
@@ -10385,8 +10409,8 @@ class ContainerView(AbstractView):
         self._drawn_once = False  # draw on demand only on first redraw
 
     @gremlin.util.hold_cyclic_gc
-    def create_ui(self):
-        """creates the UI for the container contents"""
+    def create_ui(self, force=False):
+        """Synchronize container rows, retaining unchanged container editors."""
         import gremlin.util
 
         if not self._is_alive():
@@ -10407,8 +10431,20 @@ class ContainerView(AbstractView):
                 syslog.info(f"container view create_ui: {msg}")
             self._blank_widget.setText(msg)
 
-            self._clear_widgets()  # remove current widgets and recreate
-            _trace("container view clear")
+            if force:
+                self._clear_widgets(show_blank=False)
+            containers = list(self.model)
+            by_id = {container.id: container for container in containers}
+            for container_id, widget in list(self._widget_map.items()):
+                if (
+                    container_id not in by_id
+                    or not Shiboken.isValid(widget)
+                    or widget.container is not by_id[container_id]
+                ):
+                    del self._widget_map[container_id]
+                    if Shiboken.isValid(widget):
+                        self._scroll_layout.removeWidget(widget)
+                        gremlin.util.delete_widget(widget)
 
             container_count = self.model.count()
             if verbose:
@@ -10417,19 +10453,23 @@ class ContainerView(AbstractView):
                 # has containers
                 # display container widgets in the defined order
 
-                for container in self.model:  # in range(container_count):
+                for index, container in enumerate(containers):
                     # data = self.model.data(model_index)
 
                     # create the container widget for that plugin
                     if verbose:
                         syslog.info(f"\tCreate container widget: [{container.name}]")
                     _trace(f"container view build {container.name}")
-                    widget = container.widget(self.input_item, container)
-                    widget.closed.connect(self._create_closed_cb(widget))
-                    self._scroll_layout.addWidget(widget)
-                    self._widget_map[container.id] = widget
+                    widget = self._widget_map.get(container.id)
+                    if widget is None:
+                        widget = container.widget(self.input_item, container)
+                        widget.closed.connect(self._create_closed_cb(widget))
+                        self._widget_map[container.id] = widget
+                    if self._scroll_layout.indexOf(widget) != index:
+                        self._scroll_layout.insertWidget(index, widget)
 
-                self._scroll_layout.addStretch()  # bump content to the top
+                if not self._scroll_layout.count() or self._scroll_layout.itemAt(self._scroll_layout.count() - 1).spacerItem() is None:
+                    self._scroll_layout.addStretch()
 
                 self._show_content()
 
@@ -10503,6 +10543,7 @@ class ContainerView(AbstractView):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
 
+    @with_wait_cursor
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
 
@@ -10514,9 +10555,8 @@ class ContainerView(AbstractView):
             return
 
         model_hash = self.model.hashKey()
-        if self._last_hash != model_hash:
-            self._last_hash = model_hash
-            force = True  # changed
+        structure_changed = self._last_hash != model_hash
+        self._last_hash = model_hash
 
         try:
             self._redraw_lock = True
@@ -10527,10 +10567,10 @@ class ContainerView(AbstractView):
             widget_count = len(self._widget_map)
             model_count = self.model.count()
 
-            if force or not self._drawn_once or widget_count != model_count:
+            if force or structure_changed or not self._drawn_once or widget_count != model_count:
                 if verbose:
                     syslog.info(f"\tcreate UI for [{model_count}] containers")
-                self.create_ui()
+                self.create_ui(force=force)
                 self._drawn_once = True
                 self._show_content()
                 return  # done
@@ -10546,7 +10586,12 @@ class ContainerView(AbstractView):
                         syslog.info(f"\t[{container_count}] containers to display")
                     # display container widgets in the defined order
                     for model_index, container in self.model.getFilteredMap():
-                        if container is None or container.id not in self._widget_map:
+                        if (
+                            container is None
+                            or container.id not in self._widget_map
+                            or not Shiboken.isValid(self._widget_map[container.id])
+                            or self._widget_map[container.id].container is not container
+                        ):
                             self.create_ui()
                             self._show_content()
                             return
@@ -10895,6 +10940,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)
 
+    @with_wait_cursor
     def _redraw_ui(self, force=False):
 
         if not Shiboken.isValid(self) or (self._container_view is not None and not Shiboken.isValid(self._container_view)):
@@ -10906,14 +10952,16 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         # look for changes in the model
 
         container_hash = self._input_item.containers.hashKey()
-        force = container_hash != self._last_container_hash
 
         if force or not self._drawn_once or self._container_view is None:
             if self._input_item is not None:
                 # syslog.info(f"redraw input item id [{self._input_item.id}] container count: [{self._input_item.containers.count()}]")
                 self._drawn_once = True  # indicate drawn at least once since creation
                 self.create_ui()
-                self._last_container_hash = container_hash
+        elif container_hash != self._last_container_hash:
+            # Keep the toolbar, description and existing container editors.
+            self._container_view.redraw()
+        self._last_container_hash = container_hash
 
         # update page to display
         self._update_page()
@@ -13182,6 +13230,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self.isInputListViewCreated():
             gremlin.util.InvokeUiMethod(self._refresh_ui, force, emit)  # ensure on UI thread
 
+    @with_wait_cursor
     def _refresh_ui(self, force=False, emit=False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread"""
 

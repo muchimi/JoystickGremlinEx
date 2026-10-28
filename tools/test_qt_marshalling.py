@@ -41,7 +41,8 @@ UTIL = dict(QtCore=QtCore, QtWidgets=QtWidgets, Shiboken=Shiboken,
             threading=threading, inspect=inspect, Callable=Callable)
 exec(compile(ast.Module(body=definitions("gremlin/util.py", {
     "_UiMethodDispatcher", "_ui_method_dispatcher", "_ui_method_dispatcher_lock",
-    "InvokeUiMethod", "is_ui_thread",
+    "InvokeUiMethod", "is_ui_thread", "CallbackEvent", "SingleShotInvoker",
+    "_single_shot_invoker", "_single_shot_invoker_lock", "singleShot",
 }), type_ignores=[]), "gremlin/util.py", "exec"), UTIL)
 invoke = UTIL["InvokeUiMethod"]
 
@@ -69,6 +70,9 @@ class Receiver(QtWidgets.QWidget):
         self.calls.append((QtCore.QThread.isMainThread(), value))
         self.setWindowTitle(str(value))
 
+    def refresh(self):
+        self.receive("refresh")
+
 
 class MarshallingTests(unittest.TestCase):
     def setUp(self):
@@ -86,6 +90,39 @@ class MarshallingTests(unittest.TestCase):
         calls = []
         invoke(lambda: calls.append(QtCore.QThread.isMainThread()))
         self.assertEqual(calls, [True])
+
+    def test_single_shot_first_created_in_worker_runs_on_gui(self):
+        previous = UTIL["_single_shot_invoker"]
+        UTIL["_single_shot_invoker"] = None
+        calls = []
+        try:
+            worker = threading.Thread(target=lambda: UTIL["singleShot"](
+                lambda: calls.append(QtCore.QThread.isMainThread()),
+            ))
+            worker.start()
+            worker.join()
+            pump_until(lambda: bool(calls), timeout=0.3)
+            self.assertEqual(calls, [True])
+        finally:
+            invoker = UTIL["_single_shot_invoker"]
+            UTIL["_single_shot_invoker"] = previous
+            if invoker is not None and Shiboken.isValid(invoker):
+                invoker.deleteLater()
+
+    def test_single_shot_on_gui_is_still_deferred(self):
+        calls = []
+        UTIL["singleShot"](lambda: calls.append(QtCore.QThread.isMainThread()))
+        self.assertEqual(calls, [])
+        pump_until(lambda: bool(calls))
+        self.assertEqual(calls, [True])
+
+    def test_single_shot_skips_deleted_receiver(self):
+        calls = []
+        receiver = Receiver(calls)
+        UTIL["singleShot"](receiver.refresh)
+        receiver.deleteLater()
+        flush_deletes(receiver)
+        self.assertEqual(calls, [])
 
     def test_worker_call_is_queued_and_keeps_all_arguments(self):
         calls = []

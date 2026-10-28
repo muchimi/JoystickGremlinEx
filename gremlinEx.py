@@ -19,6 +19,9 @@
 Main entry point and UI of GremlinEx (GEX)
 """
 
+## --------------
+## imports have to be listed here or they may be missed in packaging unless also included in the spec file
+## --------------
 # # ruff: disable[E401]
 from __future__ import annotations  # deprecated with python 3.14+
 
@@ -98,7 +101,7 @@ import gremlin.sound
 import gremlin.voice
 
 # import gremlin.ktts
-from gremlin.worker import WorkManager
+from gremlin.worker import WorkManager, with_wait_cursor
 import gremlin.maestro
 
 # Import QtMultimedia so pyinstaller doesn't miss it
@@ -195,6 +198,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self._profile_load_stack = []
         self._profile_loading_stack = 0
+        self._pending_profile_load = None
         self._profile_load_temporary_files = []
         self._profile_hash = None  # active profile hash to detect changes
         self.locked = False
@@ -215,6 +219,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._tabs_rebuild_pending = False  # coalesce overlapping tab rebuilds
         self._tabs_rebuild_refresh = False  # pending rebuild should restore selector/selection
         self._tabs_rebuild_timer = None
+        self._ui_refresh_cursor = False
         self._ui_enable_after_refresh = False
 
         self._comparative_file = os.path.join(os.getenv("temp"), "8c71a5a6eae74f989cf903816868028e.xml")
@@ -367,7 +372,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         el.suspend_keyboard_input.connect(self._kb_suspend_cb)
         el.profile_start.connect(self._profile_start)
-        el.profile_stop.connect(self._profile_stop)
+        el.profile_stopped.connect(self._profile_stop)
 
         el.profile_changed.connect(self._profile_changed_cb)
         el.button_state_change.connect(self._button_state_change)
@@ -1010,6 +1015,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
         if index == -1:
             # not a valid tab
+            return
+
+        if self._creating_tabs or self.isProfileLoading() or gremlin.shared_state.profile_loading:
+            # The rebuild restores its own selection once inputs are ready.
             return
 
         if self.ui.devices_tab_header_widget.moveInProgress:
@@ -2337,14 +2346,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _profile_stop(self):
         gremlin.util.InvokeUiMethod(self._profile_stop_ui)
 
+    @with_wait_cursor
     def _profile_stop_ui(self):
         gremlin.util.assert_ui_thread()
-        # self.setUiMode()
-        self.ui.tab_content_widget.setEnabled(True)
         self._update_status_bar_active(False)
         self._update_highlight_toolbar_enabled()
-        # highlight toolbar
-        self.ui_statusbar_highlight_container_widget.setEnabled(True)
+        if not gremlin.shared_state.profile_loading and not self.isProfileLoading():
+            self.ui.tab_content_widget.setEnabled(True)
+            self.ui_statusbar_highlight_container_widget.setEnabled(True)
+        # Runtime teardown does not change the tab structure. Keep the editors
+        # and their selection/scroll position, updating only the visible tab.
+        if not gremlin.shared_state.profile_loading and not self.isProfileLoading() and not self._tabs_rebuild_pending and not self._creating_tabs:
+            self._refresh_tab()
+        self._enable_ui_after_refresh_ui()
 
     @QtCore.Slot(str, str, object)
     def registerStatusModule(self, key, label: str, state: object, callback):
@@ -2626,20 +2640,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _unregister_all_widgets_ui(self):
         """removes all widgets from the devices tab widget"""
-        # remove python references
-        for index in self._widget_device_index_map.values():
-            widget = self.ui.device_page_widget.widget(index)
-            if widget:
-                widget.hide()
-                self.ui.device_page_widget.removeWidget(widget)
-                gremlin.util.delete_widget(widget)
+        stacked_widget = self.ui.device_page_widget
+        loading_widget = getattr(self.ui, "device_loading_widget", None)
+        if loading_widget is None or not Shiboken.isValid(loading_widget):
+            loading_widget = gremlin.ui.ui_common.QEmptyWidget(mode="wait")
+            self.ui.device_loading_widget = loading_widget
+        if stacked_widget.indexOf(loading_widget) != 0:
+            stacked_widget.insertWidget(0, loading_widget)
+        stacked_widget.setCurrentWidget(loading_widget)
+        # Paint the holder before expensive teardown, without processing other
+        # queued callbacks recursively. Device pages always start at index 1.
+        loading_widget.repaint()
+        for index in range(stacked_widget.count() - 1, 0, -1):
+            widget = stacked_widget.widget(index)
+            stacked_widget.removeWidget(widget)
+            gremlin.util.delete_widget(widget)
 
         self._widget_device_index_map.clear()
         self._widget_index_device_map.clear()
-
-        # manual QT cleanup
-        stacked_widget = self.ui.device_page_widget
-        gremlin.ui.ui_common.clearStackedWidget(stacked_widget)
 
     def unregisterAllWidgets(self):
         """clears all device widgets"""
@@ -2879,44 +2897,76 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._create_tabs()
 
     def _create_tabs(self, activate_tab=None):
+        gremlin.util.InvokeUiMethod(self._request_tabs_rebuild_ui, False)
+
+    def _request_tabs_rebuild_ui(self, refresh=False):
         self._tabs_rebuild_pending = True
-        gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
+        self._tabs_rebuild_refresh = self._tabs_rebuild_refresh or refresh
+        self._arm_tabs_rebuild_timer()
+
+    def _begin_ui_refresh_ui(self):
+        if not self._ui_refresh_cursor:
+            self._ui_refresh_cursor = True
+            WorkManager().pushCursor()
+
+    def _finish_ui_refresh_ui(self):
+        if not self._ui_refresh_cursor:
+            return
+        if (
+            self._creating_tabs or self._tabs_rebuild_pending or self._tabs_rebuild_refresh
+            or self._suspend_ui_update or gremlin.shared_state.profile_loading
+            or self.isProfileLoading() or self._startup_restore_target is not None
+        ):
+            return
+        self._ui_refresh_cursor = False
+        WorkManager().popCursor()
 
     def _arm_tabs_rebuild_timer(self):
         """Collapse burst tab rebuilds (profile load + Stream Deck handshake) into one pass."""
         if not gremlin.util.is_ui_thread():
             gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
             return
+        self._begin_ui_refresh_ui()
         self._tabs_rebuild_pending = True
-        if self._creating_tabs or gremlin.shared_state.profile_loading:
+        if self._suspend_ui_update:
+            self._ui_update_pending = True
+            return
+        if self._creating_tabs or gremlin.shared_state.profile_loading or self.isProfileLoading():
             return
         if self._tabs_rebuild_timer is None:
             self._tabs_rebuild_timer = QTimer(self)
             self._tabs_rebuild_timer.setSingleShot(True)
             self._tabs_rebuild_timer.timeout.connect(self._flush_tabs_rebuild)
-        self._tabs_rebuild_timer.start(50)
+        # One pass on the next event-loop turn. Further requests must not keep
+        # postponing an already scheduled update.
+        if not self._tabs_rebuild_timer.isActive():
+            self._tabs_rebuild_timer.start(0)
 
     def _flush_tabs_rebuild(self):
-        if self._creating_tabs or gremlin.shared_state.profile_loading:
+        if self._creating_tabs or gremlin.shared_state.profile_loading or self.isProfileLoading():
             self._arm_tabs_rebuild_timer()
             return
         if not self._tabs_rebuild_pending:
+            self._finish_ui_refresh_ui()
             return
         do_refresh = self._tabs_rebuild_refresh
         self._tabs_rebuild_pending = False
         self._tabs_rebuild_refresh = False
-        if do_refresh:
-            self._refresh_ui()
-        else:
-            self._create_tabs_ui()
-        if self._tabs_rebuild_pending:
-            self._arm_tabs_rebuild_timer()
-        self._enable_ui_after_refresh_ui()
+        try:
+            if do_refresh:
+                self._refresh_ui()
+            else:
+                self._create_tabs_ui()
+            if self._tabs_rebuild_pending:
+                self._arm_tabs_rebuild_timer()
+            self._enable_ui_after_refresh_ui()
+        finally:
+            self._finish_ui_refresh_ui()
 
     def _enable_ui_after_refresh_ui(self):
         if not self._ui_enable_after_refresh:
             return
-        if self._creating_tabs or self._tabs_rebuild_pending or self._tabs_rebuild_refresh or gremlin.shared_state.profile_loading:
+        if self._creating_tabs or self._tabs_rebuild_pending or self._tabs_rebuild_refresh or gremlin.shared_state.profile_loading or self.isProfileLoading():
             return
         self._ui_enable_after_refresh = False
         self.setUIState(True)
@@ -3185,6 +3235,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._tabs_rebuild_pending = True
             return
 
+        self._begin_ui_refresh_ui()
         self._creating_tabs = True
         self._tabs_rebuild_pending = False
 
@@ -3194,6 +3245,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # clear all cached widgets
             self._unregister_all_widgets_ui()
             self.clearWidgets()
+            # The selected ids may be unchanged, but their widgets are new.
+            self._last_selected_device_guid = None
+            self._last_selected_input_type = None
+            self._last_selected_input_id = None
 
             gremlin.shared_state.push_redraw()
             reset = len(self._tab_device_map) == 0
@@ -3805,7 +3860,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             last_input_id = None
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections
-                last_device_guid, last_input_type, last_input_id = config.get_last_input(active_device.device_guid if active_device else None)
+                last_device_guid, last_input_type, last_input_id = self.profile.getLastInput()
+                if last_input_id is None or not active_device or not gremlin.util.compare_guid(last_device_guid, active_device.device_guid):
+                    last_device_guid, last_input_type, last_input_id = config.get_last_input(active_device.device_guid if active_device else None)
                 if last_device_guid is None and active_device is not None and self.getTabIndexForDevice(active_device.device_guid) != -1:
                     # tab without inputs (plugins, overlay, voice...) has no config entry
                     last_device_guid = active_device.device_guid
@@ -3866,7 +3923,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             last_device_guid,
                             last_input_type,
                             last_input_id,
+                            force_update=True,
                             force_switch=True,
+                            tab_changed=True,
                         )
 
                         # self.selectTabWidgetByIndex(index)
@@ -3914,21 +3973,47 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # Keep the UI disabled until a pending stop refresh completes.
                 if not self._ui_enable_after_refresh:
                     self.setUIState(True)
+                self._finish_ui_refresh_ui()
 
     def _schedule_startup_input_restore(self, device_guid, input_type, input_id):
         """Schedules a post-load input restore after Qt has settled widget creation."""
         self._startup_restore_target = (device_guid, input_type, input_id)
         gremlin.util.singleShot(lambda: self._apply_startup_input_restore(0))
 
+    def _startup_input_is_ready(self, device_guid, input_type, input_id):
+        """Saved ids alone do not prove that a lazy tab has rendered its inputs."""
+        if not gremlin.util.compare_guid(self.getActiveTabDeviceGuid(), device_guid):
+            return False
+        widget = self.getRegisteredWidget(device_guid)
+        if not isinstance(widget, BaseDeviceTabWidget) or not Shiboken.isValid(widget) or not widget.isLoaded():
+            return False
+        view = widget.inputItemListView
+        if view is None or not Shiboken.isValid(view) or not widget.inputWidgetCount:
+            return False
+        selected = widget.getSelectedInputItem()
+        return (
+            selected is not None
+            and gremlin.util.compare_guid(selected.device_guid, device_guid)
+            and selected.input_type == input_type
+            and selected.input_id == input_id
+        )
+
     def _apply_startup_input_restore(self, attempt: int):
         """Attempts startup input restore with a few retries to avoid Qt timing races."""
         target = self._startup_restore_target
         if target is None:
+            self._finish_ui_refresh_ui()
             return
 
         device_guid, input_type, input_id = target
         if device_guid is None or input_type is None or input_id is None:
             self._startup_restore_target = None
+            self._finish_ui_refresh_ui()
+            return
+
+        if self._startup_input_is_ready(device_guid, input_type, input_id):
+            self._startup_restore_target = None
+            self._finish_ui_refresh_ui()
             return
 
         self._select_input(
@@ -3941,14 +4026,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             extra_data={"source": "startup_restore_retry"},
         )
 
-        selected_ok = (
-            gremlin.util.compare_guid(self._last_selected_device_guid, device_guid)
-            and self._last_selected_input_type == input_type
-            and self._last_selected_input_id == input_id
-        )
+        selected_ok = self._startup_input_is_ready(device_guid, input_type, input_id)
 
         if selected_ok or attempt >= 3:
             self._startup_restore_target = None
+            self._finish_ui_refresh_ui()
             return
 
         gremlin.util.singleShot(lambda: self._apply_startup_input_restore(attempt + 1))
@@ -4181,6 +4263,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         extra_data: dict = None,
     ):
         if gremlin.shared_state.is_input_selection_suspended:
+            if extra_data and extra_data.get("completion_callback"):
+                # A tab-selection worker waits for this callback, including
+                # when profile loading suppresses the selection itself.
+                gremlin.util.InvokeUiMethod(extra_data["completion_callback"], device_guid, input_type, input_id)
             return  # skip if disabled
 
         args = (
@@ -5666,7 +5752,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.shared_state.current_profile = value
 
     def _do_load_profile(self, source_xml: str, as_new_profile=False, emit=True):
-        self._profile_load_stack = []
+        gremlin.util.InvokeUiMethod(self._do_load_profile_ui, source_xml, as_new_profile, emit)
+
+    def _do_load_profile_ui(self, source_xml: str, as_new_profile=False, emit=True):
 
         # clear list of disconnected devices from any prior profile
         # gremlin.joystick_handling.clearDisconnectedDevices()
@@ -5682,7 +5770,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # file does not exist
             return
 
+        if self.isProfileLoading():
+            # Serialize overlapping autoload/reload requests; display the latest.
+            self._pending_profile_load = (source_xml, as_new_profile, emit)
+            return
+        self._profile_load_stack = []
+        self._begin_ui_refresh_ui()
         self.pushProfileLoading()
+        gremlin.shared_state.profile_loading = True
+        if emit and gremlin.shared_state.is_running:
+            self._activate_ui(False)
+        self.setUIState(False)
+        # Clear the old Qt objects on their owning thread, before parsing on a
+        # worker. The worker must not poll QTabBar or destroy cached widgets.
+        self._startup_restore_target = None
+        self._reset_tab_data()
+        self._unregister_all_widgets_ui()
+        self.clearWidgets()
 
         wm = WorkManager()
         wm.submit(
@@ -5694,63 +5798,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 emit,
             ),
         )
-
-    class delayed_runner_worker(QtCore.QObject):
-        finished = QtCore.Signal()
-
-        def __init__(self, ui):
-            super().__init__()
-            self.ui = ui
-
-        @QtCore.Slot()
-        def run(self):
-            widget = self.ui.getCurrentRegisteredWidget()
-            # Cap wait so a failed profile load cannot leave GEX Not Responding forever
-            waited_ms = 0
-            while widget is None and waited_ms < 10000:
-                QThread.msleep(100)
-                waited_ms += 100
-                widget = self.ui.getCurrentRegisteredWidget()
-            if widget is not None:
-                widget.refresh()
-            self.finished.emit()  # indicate done
+        return True
 
     def _profile_load_completed(self, *args):
-        """called when a profile has been loaded"""
-        self.popProfileLoading()  # decrement the profile loading stack
-        # force a UI update
-        verbose = gremlin.config.Configuration().verbose_mode_ui
-        # The load worker already schedules refresh(); don't rebuild the current
-        # device a second time (that re-execs plugins / Virpil rows).
-        if self._tabs_rebuild_pending or self._creating_tabs or self._tabs_rebuild_refresh:
-            if verbose:
-                syslog.info("profile loaded")
-            return
-        widget: BaseDeviceTabWidget = self.getCurrentRegisteredWidget()
-        if widget:
-            widget.refresh(force=True)
-        else:
-            # delay refresh the current widget and we wait until it's available
-            self._delay_refresh_thread = QThread()
-            self.worker = GremlinUi.delayed_runner_worker(self)
-            # Move worker to the new thread
-            self.worker.moveToThread(self._delay_refresh_thread)
+        """The load worker completes off-thread; publish the UI once on Qt."""
+        gremlin.util.InvokeUiMethod(self._profile_load_completed_ui)
 
-            # Connect thread lifecycle signals
-            self._delay_refresh_thread.started.connect(self.worker.run)
-            self.worker.finished.connect(self._delay_refresh_completed)
-            self._delay_refresh_thread.start()
-        if verbose:
-            syslog.info("profile loaded")
-
-    @QtCore.Slot()
-    def _delay_refresh_completed(self):
-        """called when the delayed refresh has completed"""
-        self.worker.deleteLater()
-        self._delay_refresh_thread.quit()
-        self._delay_refresh_thread.deleteLater()
-
-        self._select_last_input()
+    def _profile_load_completed_ui(self):
+        self.popProfileLoading()
+        if self._pending_profile_load is not None:
+            target = self._pending_profile_load
+            self._pending_profile_load = None
+            if self._do_load_profile_ui(*target):
+                return
+        self.refresh()
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
@@ -5778,9 +5839,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         eh = gremlin.event_handler.EventHandler()
         el = gremlin.event_handler.EventListener()
 
-        # indicate tabs will need to be reloaded
-        self.setTabsDirty()  #
-
         el.pushDeviceChangeSuppression()  # defer device changes until the load completes
         try:
             gremlin.shared_state.push_redraw()
@@ -5795,13 +5853,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             last_edit_mode = gremlin.config.Configuration().get_profile_last_edit_mode()
 
-            # clear any old data
-            self._reset_tab_data()
-            while self.getTabCount():
-                # wait for the tabs to go poof
-                QThread.sleep(0)
-            self.clearWidgets()
-
             # reset execution context
             ec = gremlin.execution_graph.ExecutionContext()
             ec.reset(no_rebuild=True)
@@ -5812,9 +5863,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # clear disconnected devices from prior profile
             gremlin.joystick_handling.clearDisconnectedDevices()
-
-            if emit:
-                el.request_activate.emit(False)
 
             if gremlin.shared_state.current_profile:
                 if emit:
@@ -5839,10 +5887,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     new_profile = gremlin.base_profile.Profile()
 
                     if not os.path.isfile(source_xml):
-                        gremlin.ui.ui_common.MessageBox(title="Profile Error", prompt="Specified file not found.")
+                        gremlin.util.InvokeUiMethod(gremlin.util.display_error, "Specified profile file not found.")
                         return False
                     if os.path.getsize(source_xml) == 0:
-                        gremlin.ui.ui_common.MessageBox(title="Profile Error", prompt="Specified file is empty.")
+                        gremlin.util.InvokeUiMethod(gremlin.util.display_error, "Specified profile file is empty.")
                         return False
 
                     gremlin.shared_state.current_profile = new_profile
@@ -5951,9 +5999,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # no longer in the current mode list
                 last_edit_mode = new_profile.get_default_mode()
 
-            # Make the first root node the default active mode
-            self.mode_selector.populate_selector(new_profile, last_edit_mode, emit=False)
-
             gremlin.shared_state.edit_mode = last_edit_mode
             gremlin.shared_state.runtime_mode = new_profile.get_default_start_mode()
 
@@ -5992,18 +6037,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # mode to restore post-load if possible
 
-            last_device_guid, last_input_type, last_input_id = new_profile.getLastInput()  # self.config.get_last_input()
-
             # enable saving the configuration
             new_profile.saveConfigEnabled = True
-            if last_device_guid is not None:
-                self._select_input(
-                    last_device_guid,
-                    last_input_type,
-                    last_input_id,
-                    force_switch=True,
-                    force_update=True,
-                )
 
         finally:
             gremlin.shared_state.pop_redraw()
@@ -6013,9 +6048,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             el.profile_loading_completed.emit()
 
-            # update UI post load
-            self.refresh()
-
             # replay any device change that arrived during the load (handler skips the reload if nothing changed)
             el.popDeviceChangeSuppression()
             if self._device_change_deferred:
@@ -6023,31 +6055,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self._handle_devices_changed()
 
     def refresh(self):
-        self._tabs_rebuild_pending = True
-        self._tabs_rebuild_refresh = True
-        gremlin.util.InvokeUiMethod(self._arm_tabs_rebuild_timer)
+        gremlin.util.InvokeUiMethod(self._request_tabs_rebuild_ui, True)
 
     def _refresh_ui(self):
         """refresh the UI"""
         gremlin.util.assert_ui_thread()
 
-        # save selection
-        current_device_guid = gremlin.shared_state.current_tab_device_guid
-        current_input_type, current_input_id = self._get_last_input(current_device_guid)
-
-        self._create_tabs_ui()
-
         current_profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.current_mode
-
-        # Make the first root node the default active mode
         self.mode_selector.populate_selector(current_profile, current_mode, emit=False)
-
-        # refresh current device tab
-        # self._refresh_tab()
-
-        # select
-        self._select_input(current_device_guid, current_input_type, current_input_id, True)
+        # Tab creation restores the selection itself. A second forced selection
+        # recreates the newly built mapping editor and can restore an old tab.
+        self._create_tabs_ui()
 
     def _force_close(self):
         """Forces the closure of the program."""

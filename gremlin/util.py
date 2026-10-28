@@ -2277,8 +2277,20 @@ class CallbackEvent(QtCore.QEvent):
 
 
 class SingleShotInvoker(QtCore.QObject):
+    def __init__(self, app):
+        super().__init__()
+        self._app = app
+        # Profile parsing can be the first caller (e.g. gated-axis actions).
+        # Python pool threads have no Qt event loop to deliver these callbacks.
+        self.moveToThread(app.thread())
+
     def event(self, event: QtCore.QEvent) -> bool:
         if event.type() == CallbackEvent.EVENT_TYPE:
+            if self.parent() is None:
+                self.setParent(self._app)
+            receiver = getattr(event.callback, "__self__", None)
+            if isinstance(receiver, QtCore.QObject) and not Shiboken.isValid(receiver):
+                return True
             event.callback()  # Executes safely on the UI thread
             return True
         return super().event(event)
@@ -2286,17 +2298,25 @@ class SingleShotInvoker(QtCore.QObject):
 
 # Global invoker lazily initialized to ensure QApplication exists
 _single_shot_invoker = None
+_single_shot_invoker_lock = threading.Lock()
 
 
 def singleShot(callback: Callable[[], None]):
     # syslog.info("single shot util")
     """Fires callback in the UI thread - returns immediately to caller"""
     global _single_shot_invoker
-    if _single_shot_invoker is None:
-        _single_shot_invoker = SingleShotInvoker()
+    app = QtCore.QCoreApplication.instance()
+    if app is None:
+        raise RuntimeError("singleShot requires a Qt application")
+    if QtCore.QCoreApplication.closingDown():
+        return
+    with _single_shot_invoker_lock:
+        if _single_shot_invoker is None or not Shiboken.isValid(_single_shot_invoker):
+            _single_shot_invoker = SingleShotInvoker(app)
+        invoker = _single_shot_invoker
 
     # Safely posts the event to the UI thread's event loop
-    QtCore.QCoreApplication.postEvent(_single_shot_invoker, CallbackEvent(callback))
+    QtCore.QCoreApplication.postEvent(invoker, CallbackEvent(callback))
 
 
 def cubic_progression(num_points, start, end):

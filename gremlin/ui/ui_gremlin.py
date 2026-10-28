@@ -58,7 +58,8 @@ class Ui_Gremlin(object):
         self.tab_content_layout.addWidget(self.device_page_widget)
 
         # blank input for device content
-        self.device_page_widget.addWidget(gremlin.ui.ui_common.QEmptyWidget(mode="wait"))  # index 0
+        self.device_loading_widget = gremlin.ui.ui_common.QEmptyWidget(mode="wait")
+        self.device_page_widget.addWidget(self.device_loading_widget)  # reserved index 0
 
         # bottom status bar
         self.statusbar_widget = QtWidgets.QWidget()

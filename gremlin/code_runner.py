@@ -837,9 +837,6 @@ class CodeRunner:
         # hook profiles - this tells all functors to unhook runtime events
         el.profile_unhook.emit()
 
-        # reload UI
-        el.request_ui_refresh.emit()
-
         # update mode
         el.edit_mode_ui_update.emit(edit_mode)
 
@@ -847,9 +844,9 @@ class CodeRunner:
         ec = gremlin.execution_graph.ExecutionContext()
         ec.clear()
 
-        # re-enable UI
-        # el.profile_stopped.emit()  # stopped
-        #self.enableUI()
+        # Notify the UI after runtime state and callbacks have been restored.
+        # Stopping does not require rebuilding every device tab.
+        el.profile_stopped.emit()
 
 
     def _reset_state(self):

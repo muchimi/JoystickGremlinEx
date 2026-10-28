@@ -3529,6 +3529,13 @@ class OscFilterWidget(QtWidgets.QWidget):
         self._last_search_term = None  # last search term for a succesful search
 
         self._update_count()
+        self._model.addCallback(self._handle_model_changed)
+
+    def _cleanup_ui(self):
+        self._model.removeCallback(self._handle_model_changed)
+
+    def _handle_model_changed(self, data=None, force=False):
+        gremlin.util.InvokeUiMethod(self.updateCounts)
 
     def _find_entry(self):
         """occurs when the find button is clicked"""
@@ -3736,7 +3743,7 @@ class OscData():
         if self.model is None:
             return None
         for row in range(self.model.rowCount()):
-            item = self.model.item(row)
+            item = self.model.itemAt(row)
             if item and item.id == id:
                 return item
         return None
@@ -4669,12 +4676,16 @@ class InputOscClient(QtCore.QObject):
         normalized_args = [gremlin.util.scale_to_range(value, source_min=0, source_max=1.0) for value in args] if args else []
         tokens = message.split(maxsplit=1)
         primary_message = tokens[0]
-        hits = [key for key in self._osc_map if key == primary_message]
+        # Message-mode keys include the configured parameter index after the
+        # address. Match that address as well as the first-parameter form.
+        hits = [key for key in self._osc_map if key.partition(" ")[0] == primary_message]
         for hit_key in hits:
             if message != hit_key:
                 # params
-                splits = hit_key.split()
-                source_index = int(splits[1])
+                parameter = hit_key.partition(" ")[2]
+                if not parameter.isdecimal():
+                    continue
+                source_index = int(parameter)
             else:
                 source_index = 0
 
@@ -4751,6 +4762,8 @@ class InputOscClient(QtCore.QObject):
                         continue
                     is_pressed = True
                     value = raw_value
+                    input_item.setButtonValue(is_pressed)
+                    self._state_data[input_item.message_key] = raw_value
 
                 elif input_item.mode == OscInputItem.InputMode.Button:
                     # trigger a button press event
@@ -4779,12 +4792,13 @@ class InputOscClient(QtCore.QObject):
 
                     self._state_data[input_item.message_key] = is_pressed
 
+                if input_item.mode in (OscInputItem.InputMode.Button, OscInputItem.InputMode.OnChange):
                     if self._verbose:
                         syslog.info(
                             f"OSC: send event: is_pressed: {is_pressed} value: {value} raw value: {raw_value} is axis: {is_axis} mode: [{input_item.mode.name}]"
                         )
 
-                    # button mode
+                    # Button and change-mode inputs share the same event path.
                     event = gremlin.event_handler.Event(
                         event_type=input_type,
                         device_guid=OscDeviceTabWidget.device_guid,

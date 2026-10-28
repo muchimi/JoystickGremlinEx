@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import functools
 import threading
 
 # from concurrent.futures import ThreadPoolExecutor, Future
@@ -43,6 +44,30 @@ class WorkerSignals(QObject):
     result = QtCore.Signal(str)
     finished = QtCore.Signal()
 
+
+class _CursorReleaseEvent(QtCore.QEvent):
+    EVENT_TYPE = QtCore.QEvent.Type(QtCore.QEvent.registerEventType())
+
+    def __init__(self, generation, turns=1, activity=0):
+        super().__init__(self.EVENT_TYPE)
+        self.generation = generation
+        self.turns = turns
+        self.activity = activity
+
+
+def with_wait_cursor(method):
+    """Keep the wait cursor through a GUI update and its deferred Qt events."""
+    @functools.wraps(method)
+    def wrapped(*args, **kwargs):
+        manager = WorkManager()
+        manager.pushCursor()
+        try:
+            return method(*args, **kwargs)
+        finally:
+            manager.popCursor()
+    return wrapped
+
+
 @SingletonDecorator
 class WorkManager(QObject):
     """handles UI wait cursor management when work is submitted - an hourglass is displayed while the work is completed
@@ -50,10 +75,19 @@ class WorkManager(QObject):
 
     """
 
+    # Only the final Qt settling phase is bounded; active work holds are not.
+    _CURSOR_SETTLE_SECONDS = 0.1
+
     def __init__(self):
         super().__init__()
         self._cursor_push = 0
-        self._cursor_timer = None  # timer to display hourglass
+        self._cursor_timer = QtCore.QTimer(self)
+        self._cursor_timer.setSingleShot(True)
+        self._cursor_timer.timeout.connect(self._cursor_show_hourglass)
+        self._cursor_generation = 0
+        self._cursor_activity = 0
+        self._cursor_release_pending = False
+        self._cursor_release_deadline = 0.0
         self._cursor_level = []
         self._cursor_wait = False
         self._qt_wait_cursor: QtGui.QCursor = None
@@ -90,7 +124,7 @@ class WorkManager(QObject):
         callback, complete_callback, args = args
 
 
-        self._pushCursor_ui()  # display hourglass - immediate
+        self.pushCursor()  # each submitted task owns one cursor hold
 
         if callback is not None:
             # start a worker thread to run the work
@@ -108,6 +142,8 @@ class WorkManager(QObject):
             if verbose:
                 syslog.info(f"starting worker: [{callback.__name__}]")
             self._threadpool.start(worker)
+        else:
+            self.popCursor()
 
 
     def _handle_worker_finish(self):
@@ -120,24 +156,16 @@ class WorkManager(QObject):
 
     def pushCursor(self, immediate=True):
         """displays an hourglass cursor"""
+        InvokeUiMethod(self._push_cursor_request_ui, immediate)
 
-        if self._cursor_push == 0:
-            # syslog.info("PUSH CURSOR: show cursor timer [immediate]")
-
-            if immediate:
-                # show the wait cursor
-                InvokeUiMethod(self._pushCursor_ui)  # ensure on UI thread
-            else:
-                # syslog.info("PUSH CURSOR: show cursor timer [delay]")
-                if self._cursor_timer:
-                    self._cursor_timer.cancel()
-                self._cursor_timer = threading.Timer(1.0, self._cursor_show_hourglass)
-                self._cursor_timer.start()
-
+    def _push_cursor_request_ui(self, immediate=True):
         self._cursor_push += 1
-
-        # allow other processing to happen
-        # syslog.info(f"PUSH CURSOR: [{self._cursor_push}]")
+        self._cursor_generation += 1
+        self._cursor_release_pending = False
+        if immediate:
+            self._pushCursor_ui()
+        elif not self._cursor_wait and not self._cursor_timer.isActive():
+            self._cursor_timer.start(1000)
 
     def _pushcursor_monitor_runner(self):
         """runs while the worker thread is going to monitor it"""
@@ -175,8 +203,7 @@ class WorkManager(QObject):
         self._running = False
 
     def _pushCursor_ui(self):
-
-        self._cursor_timer = None
+        self._cursor_timer.stop()
         # syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
         if not self._cursor_wait:
             self._cursor_wait = True
@@ -188,7 +215,7 @@ class WorkManager(QObject):
             # syslog.info("set hourglass")
             # win32gui.LoadCursor(None, win32con.IDC_WAIT)
             QtWidgets.QApplication.setOverrideCursor(self._qt_wait_cursor)
-            QtWidgets.QApplication.processEvents()
+            QtWidgets.QApplication.instance().installEventFilter(self)
 
             # cursor = QtWidgets.QApplication.overrideCursor()
             # while cursor != _qt_wait_cursor:
@@ -200,16 +227,52 @@ class WorkManager(QObject):
 
     def popCursor(self, reset=False):
         """decreases the wait cursor stack"""
-        # syslog.info(f"POP CURSOR: [{self._cursor_push}]")
+        InvokeUiMethod(self._pop_cursor_request_ui, reset)
+
+    def _pop_cursor_request_ui(self, reset=False):
         if self._cursor_push > 0:
             self._cursor_push -= 1
-        if self._cursor_push == 0 or reset:
-            if self._cursor_timer is not None:
-                self._cursor_timer.cancel()
-                self._cursor_timer = None
-            if self._cursor_wait or reset:
-                InvokeUiMethod(self._popCursor_ui, reset)
-                time.sleep(0.1)  # allow other processing to occur
+        if reset:
+            self._cursor_generation += 1
+            self._cursor_release_pending = False
+            self._cursor_timer.stop()
+            self._popCursor_ui(True)
+        elif self._cursor_push == 0:
+            self._cursor_timer.stop()
+            if self._cursor_wait and not self._cursor_release_pending:
+                self._cursor_release_pending = True
+                self._cursor_release_deadline = time.monotonic() + self._CURSOR_SETTLE_SECONDS
+                self._post_cursor_release(self._cursor_generation)
+
+    def _post_cursor_release(self, generation, turns=1):
+        # Layout/update requests can be posted by queued completion callbacks.
+        # Low-priority events yield to that work; a second turn also allows
+        # requests posted by the first batch to reach Qt before restoring.
+        QtCore.QCoreApplication.postEvent(
+            self, _CursorReleaseEvent(generation, turns, self._cursor_activity),
+            QtCore.Qt.EventPriority.LowEventPriority.value,
+        )
+
+    def event(self, event):
+        if event.type() == _CursorReleaseEvent.EVENT_TYPE:
+            if self._cursor_release_pending and event.generation == self._cursor_generation and self._cursor_push == 0:
+                if event.activity != self._cursor_activity and time.monotonic() < self._cursor_release_deadline:
+                    self._post_cursor_release(event.generation)
+                elif event.turns:
+                    self._post_cursor_release(event.generation, event.turns - 1)
+                else:
+                    self._cursor_release_pending = False
+                    self._popCursor_ui()
+            return True
+        return super().event(event)
+
+    def eventFilter(self, watched, event):
+        # Qt can post further layout/polish work while handling an earlier
+        # batch. Extend the release barrier briefly, but background layouts must
+        # not keep completed work busy forever. Paint events do not extend it.
+        if event.type() in (QtCore.QEvent.Type.LayoutRequest, QtCore.QEvent.Type.PolishRequest):
+            self._cursor_activity += 1
+        return False
 
     def _popCursor_ui(self, force: bool = False):
         """restores the normal cursor"""
@@ -220,12 +283,12 @@ class WorkManager(QObject):
             # win32gui.LoadCursor(None, win32con.IDC_ARROW)
 
             QtWidgets.QApplication.restoreOverrideCursor()
-            QtWidgets.QApplication.processEvents()
+            QtWidgets.QApplication.instance().removeEventFilter(self)
             # syslog.info("hide hourglass")
 
     def isWaitCursor(self) -> bool:
         """true if the cursor is an hourglass"""
-        return self._cursor_push > 0
+        return self._cursor_wait
 
     def pushCursorLevel(self, pop=True):
         """saves the cursor level"""
@@ -245,11 +308,8 @@ class WorkManager(QObject):
         time.sleep(0.01)  # allow other processing to happen
 
     def _cursor_show_hourglass(self):
-        self._cursor_timer = None
-        if not self._cursor_wait:
-            # syslog.info("PUSH CURSOR: show cursor timer")
-            InvokeUiMethod(self._pushCursor_ui)  # ensure on UI thread
-            time.sleep(0.1)
+        if self._cursor_push > 0:
+            self._pushCursor_ui()
 
     def popCursorTemporary_ui(self, pop=True):
         """restore cursor temporarily without changing the stack - use for dialog boxes/prompt
@@ -303,13 +363,14 @@ class WorkTask(QRunnable):
         QThread.currentThread().setObjectName(self._name)
         if verbose:
             syslog.info(f"executing task: [{self._name}]")
-        result = self._callback(self._args)
-        if verbose:
-            syslog.info(f"callback complete: [{self._name}]")
-        if self._completed_callback:
-            self._completed_callback(result, self._args)
-        if verbose:
-            syslog.info(f"work task [{self._name}] finished")
-
-        self.signals.finished.emit()
+        try:
+            result = self._callback(self._args)
+            if verbose:
+                syslog.info(f"callback complete: [{self._name}]")
+            if self._completed_callback:
+                self._completed_callback(result, self._args)
+            if verbose:
+                syslog.info(f"work task [{self._name}] finished")
+        finally:
+            self.signals.finished.emit()
 

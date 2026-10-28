@@ -51,9 +51,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T86):
-- Fix: added context to Overlay UI thread switcher to guard against a potential QT hard crash.
-- Fix: optimized thread invoker to eliminate the need for a QT object.
-- Fix: axis timeline widget call path rework to avoid context switching.
+- Fix: API: reworked the UI thread invoker to eliminate the need for a QT object (this should reduce overhead) and removed parameter limits.
+- Fix: UI (overlay): added a missing context parameter to the OBS Overlay UI thread switcher that could cause a hard crash (was unable to reproduce a crash on demand but this is based on the QT documentation as a potential gotcha).
+- Fix: UI (input viewer): reworked the axis timeline widget call path to minimize QT context switching.
+- Fix: UI (input viewer): resolved an issue where the timeline widget did not close when the trash button is clicked.
+- Fix: UI: rework of wait cursor (hourglass) logic to resolve the wait cursor not always indicating a busy status while the UI refreshes or a long running task is executed.
+- Fix: API (OSC): resolved an exception in the new OscData model.
+- Fix: UI (OSC): resolved an issue where, in highlight mode, an input was no longer selected when the corresponding OSC input is received at design time.
+- Fix: UI (OSC): resolved an issue where input filtering by name did not sync with the new pagination feature. Resolved another issue with filtering not always refreshing the matching input list with the new filter API.
 
 ### (m77T85A):
 - Change: API: general first pass optimizations on m77
