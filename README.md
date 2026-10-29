@@ -56,10 +56,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API (Overlay): a new OCR request will cancel the prior OCR in progress to avoid a potential loop and trigger based on OCR results.
 - Change: Control Action: added a control command to stop an OCR action in progress.  This allows a mapping to stop a prior OCR if needed as part of a mapped input.
 - Change: UI (options): refactor UI to use updated widgets for consistent look/feel
-- Change: UI (inputs): add 8 input filter for lower end systems
-- Change: Input Viewer: polish to show VJOY devices sorted by the VJOY device number.
-- Fix: API (input viewer): reload device list on device re-initialization.
-- Fix: UI: Device headers could disappear on profile load.
+- Change: UI (inputs): add input filter for lower end systems for a page size of 8.
+- Change: Input Viewer: polish to show VJOY devices sorted by the VJOY device number and display hourglass (wait cursor) while updating.
+- Fix: API (input viewer): reload device list on device rescan.
+- Fix: UI: Device headers could disappear on profile load and bug fix for device icons not showing (this was previously turned off due to a widget issue). Mapped icon is now visible again.
 - Fix: API: bug fix in the profile API list_actions that could cause an exception.
 
 
