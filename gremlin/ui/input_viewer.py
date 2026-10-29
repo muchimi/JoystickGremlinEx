@@ -43,6 +43,47 @@ import gremlin.ui.ui_common
 import gremlin.ui.state_device
 from psygnal import Signal
 from gremlin.types import DeviceType
+from gremlin.worker import with_wait_cursor
+
+from gremlin.ui.ui_common import (
+    BaseDialogUi,
+    Buttons,
+    clear_layout,
+    Color,
+    ConfirmBox,
+    get_mode_list,
+    get_text_width,
+    getFlowContainer,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
+    Icons,
+    InputListenerWidget,
+    MessageBox,
+    MessageBoxWarning,
+    MessageBoxYesNo,
+    QBoxFrameLayout,
+    QCustomThemeDialog,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataIPLineEdit,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
+    QDataRadioButtonGroup,
+    QDelayWidget,
+    QFloatLineEdit,
+    QHorizontalLine,
+    QIconLabel,
+    QInfoBox,
+    QIntLineEdit,
+    QLineEdit,
+    QPathLineItem,
+    QRememberDialog,
+    QScrollableWidget,
+    QWarningWidget,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 QWIDGETSIZE_MAX = 16777215
@@ -55,7 +96,7 @@ class VisualizationConfig:
     def __init__(self):
         self._config = {}  # map of device guid, input_type, input_id - selected flag
         self._device_map = {}  # map of key to device for mapping
-        self.reload()
+        self._initialized = False
         self._lock = threading.Lock()
 
         # special keys
@@ -64,6 +105,10 @@ class VisualizationConfig:
 
         device_id = gremlin.shared_state.keyboard_tab_id
         self.keyboard_key = (device_id, VisualizationType.Keyboard)
+
+        el = gremlin.event_handler.EventListener()
+        el.device_initialized.connect(self.reload)
+
 
     def register(self, key, device: DeviceSummary, visualization: VisualizationType):
         """registers a configuration entry
@@ -301,12 +346,14 @@ class VisualizationSelector(QtWidgets.QWidget):
     def updateSelector(self):
         gremlin.util.InvokeUiMethod(self._update_selector_ui)  # ensure on UI thread
 
+    @with_wait_cursor
     def _update_selector_ui(self):
         """updates the selector with input options"""
         if not Shiboken.isValid(self):
             return
 
         combine_button_hats = gremlin.config.Configuration().input_viewer_combine_buttonhats
+        self._devices.sort(key=lambda device: device.vjoy_id)
 
         for widget in gremlin.util.get_layout_widgets(self.main_layout):
             self.main_layout.removeWidget(widget)
@@ -510,6 +557,7 @@ class VisualizationSelector(QtWidgets.QWidget):
             self._create_callback(device, visualization, widget)()
 
     @QtCore.Slot()
+    @with_wait_cursor
     def _select_vjoy(self):
         widget = self.sender()
         if not Shiboken.isValid(widget):
@@ -527,6 +575,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                         self._create_callback(device, visualization, widget)()
 
     @QtCore.Slot()
+    @with_wait_cursor
     def _select_all(self):
         """selects all widgets"""
         vc = VisualizationConfig()
@@ -553,6 +602,52 @@ class VisualizationSelector(QtWidgets.QWidget):
                 assert device is not None, "unregistered device in widget"
                 self._create_callback(device, visualization, widget)()
 
+    @with_wait_cursor
+    def _select_used(self):
+        """Rebuilds the selection using only mapped devices."""
+
+        mapped_devices = {}
+        for device_guid in gremlin.shared_state.ui.getMappedDeviceList():
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                mapped_devices[device.key] = device
+
+        # Output vJoy devices need not be configured as profile inputs.
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            for action in profile.list_actions():
+                device = action.virtual_device
+                if device is None and action.vjoy_id:
+                    device = gremlin.joystick_handling.getDeviceFromVjoyId(action.vjoy_id)
+                if device:
+                    mapped_devices[device.key] = device
+
+        # Clear active visualizers and their saved selections before rebuilding.
+        self.viewer._clear_all()
+        self._devices = [
+            device for device in gremlin.joystick_handling.all_joystick_devices()
+            if device.key in mapped_devices and device.connected and not device.disabled
+        ]
+        self._update_selector_ui()
+
+        for key, widget in self._selector_widgets.items():
+            if not Shiboken.isValid(widget):
+                continue
+            device_key, visualization = key
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(visualization != VisualizationType.AxisTemporal)
+            self._create_callback(mapped_devices[device_key], visualization, widget)()
+
+        if gremlin.shared_state.keyboard_tab_id in mapped_devices:
+            with QtCore.QSignalBlocker(self.viewer.keyboard_widget_selector):
+                self.viewer.keyboard_widget_selector.setChecked(True)
+            self.viewer.showKeyboard()
+
+        if gremlin.shared_state.state_tab_id in mapped_devices:
+            with QtCore.QSignalBlocker(self.viewer.state_widget_selector):
+                self.viewer.state_widget_selector.setChecked(True)
+            self.viewer.showState()
+
     def _create_callback(self, device: dinput.DeviceSummary, visualization: VisualizationType, widget: QtWidgets.QWidget) -> Callable:
         """Creates the callback to trigger visualization updates.
 
@@ -568,6 +663,7 @@ class VisualizationSelector(QtWidgets.QWidget):
             self._callbacks[key] = lambda: self._callback(device, visualization, widget)
         return self._callbacks[key]
 
+    @with_wait_cursor
     def _callback(self, device: dinput.DeviceSummary, visualization: VisualizationType, widget: QtWidgets.QWidget):
 
         assert isinstance(device, DeviceSummary), "invalid device object"
@@ -896,31 +992,36 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self.scroll_selector_layout.addWidget(system_selector_widget)
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
-        clear_widget = gremlin.ui.ui_common.QDataPushButton("Clear")
+        clear_widget = QDataPushButton("Clear")
         clear_widget.setToolTip("Clears the selection")
         clear_widget.clicked.connect(self._clear_all)
 
-        select_all_widget = gremlin.ui.ui_common.QDataPushButton("Select All")
+        used_widget = QDataPushButton("Select Used")
+        used_widget.setToolTip("Selects only used inputs")
+        used_widget.clicked.connect(self.vis_selector._select_used)
+
+
+        select_all_widget = QDataPushButton("Select All")
         select_all_widget.setToolTip("Selects all (non temporal) inputs")
         select_all_widget.clicked.connect(self._select_all)
 
-        select_real_widget = gremlin.ui.ui_common.QDataPushButton("Select Hardware")
+        select_real_widget = QDataPushButton("Select Hardware")
         select_real_widget.setToolTip("Selects all hardware inputs")
         select_real_widget.clicked.connect(self.vis_selector._select_real)
 
-        widgets = [clear_widget, select_real_widget, select_all_widget]
+        widgets = [clear_widget, used_widget, select_real_widget, select_all_widget]
 
         vjoy_ids = [dev.vjoy_id for dev in gremlin.joystick_handling.virtual_devices()]
         vjoy_ids = vjoy_ids[:3]
         for i in vjoy_ids:
-            widget = gremlin.ui.ui_common.QDataPushButton(f"Select VJOY #{i}", data=i)
+            widget = QDataPushButton(f"Select VJOY #{i}", data=i)
             widget.setToolTip(f"Select VJOY #{i} axis and buttons")
             widget.clicked.connect(self.vis_selector._select_vjoy)
             widgets.append(widget)
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
-        options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, auto_size=True)
         options_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(options_widget)
@@ -1065,6 +1166,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if device is not None:
                     self._add_remove_visualization_widget(device, visualization_type, False)
 
+    @with_wait_cursor
     def load_viewer_widgets(self):
         """loads the view widgets for all device inputs"""
 
@@ -1086,6 +1188,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         # filter disconnected/disabled
         devices = [device for device in devices if device.connected and not device.disabled]
+        devices.sort(key=lambda device: device.vjoy_id)
         verbose = False
 
         device: DeviceSummary
@@ -1169,6 +1272,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         return widget
 
+    @with_wait_cursor
     def _clear_all(self):
         """clears all items"""
 
@@ -1178,6 +1282,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             _, visualization = key
             vc.setValue(key, device, visualization, False)
 
+        self._clear_joystick_visualizers()
         self.hideKeyboard()
         self.hideState()
 
@@ -1225,6 +1330,10 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.showState()
         self.showKeyboard()
 
+    def _select_used(self):
+        """selects only used inputs"""
+        self.vis_selector._select_used()
+
     def eventFilter(self, widget, event):
         # filter events for keys so the window hotkeys don't interfere with the keyboard repeater
         if self._keyboard_visible:
@@ -1259,6 +1368,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         gremlin.util.delete_widget(widget)
 
     @QtCore.Slot()
+    @with_wait_cursor
     def _clear(self):
         """clears all widgets"""
         assert gremlin.util.is_ui_thread()
@@ -1286,6 +1396,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         if Shiboken.isValid(self):
             gremlin.util.InvokeUiMethod(self._reload_ui)  # refresh the visuals and selectors
 
+    @with_wait_cursor
     def _reload_ui(self):
         visible_visualizers = self._visible_visualizer_keys()
         show_state = self._state_visible
@@ -1370,6 +1481,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         return None
 
     @QtCore.Slot(DeviceSummary, VisualizationType, bool)
+    @with_wait_cursor
     def _add_remove_visualization_widget(self, device: DeviceSummary, visualization: VisualizationType, enabled: bool | None):
         """Adds or removes a visualization widget.
 
@@ -1499,6 +1611,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._state_visualizer_widget.reloadStates()
 
+    @with_wait_cursor
     def showKeyboard(self):
         """keyboard device"""
         assert gremlin.util.is_ui_thread()
@@ -1566,6 +1679,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         # save keyboard state
         self.saveKeyboardState()
 
+    @with_wait_cursor
     def hideKeyboard(self):
         if self._keyboard_visible:
             vc = VisualizationConfig()
@@ -1583,6 +1697,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             # store the state
             self.saveKeyboardState()
 
+    @with_wait_cursor
     def showState(self):
         """state device"""
 
@@ -1625,6 +1740,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         # store the state
         self.saveStateState()
 
+    @with_wait_cursor
     def hideState(self):
         """hides the state device"""
         if self._state_visible:
@@ -1673,6 +1789,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         vc.setValue(key, device, VisualizationType.State, checked)
 
     @QtCore.Slot(bool)
+    @with_wait_cursor
     def _toggle_combine_button_hat(self, checked: bool):
         config = gremlin.config.Configuration()
         config.input_viewer_combine_buttonhats = checked
@@ -1715,6 +1832,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._viewer_widget_map.clear()
 
     @QtCore.Slot(bool)
+    @with_wait_cursor
     def _toggle_flow_layout(self, checked: bool):
         config = gremlin.config.Configuration()
         config.input_viewer_flow_layout = checked

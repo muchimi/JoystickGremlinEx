@@ -207,6 +207,7 @@ class ControlAction(IntEnum):
     OverlayEnable = 13  # enable overload
     OverlayDisable = 14  # disable overload
     OverlayToggle = 15  # toggle overload
+    OCRStop = 16  # abort overlay OCR scans/tests in progress
 
     @staticmethod
     def to_string(action):
@@ -242,6 +243,7 @@ _control_action_display = {
     ControlAction.OverlayEnable: "Enable Overlay",
     ControlAction.OverlayDisable: "Disable Overlay",
     ControlAction.OverlayToggle: "Toggle Overlay",
+    ControlAction.OCRStop: "Stop OCR (discard pending results)",
 }
 
 

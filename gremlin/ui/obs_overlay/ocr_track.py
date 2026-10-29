@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from collections import deque
 import re
 import threading
 import time
@@ -285,6 +286,17 @@ def rule_match_result(text: str, rule: dict[str, Any]) -> tuple[bool, int | None
     return False, None, detection_label_for_rule(rule, None)
 
 
+class _OcrSession:
+    """Identity and cancellation live longer than any individual scan result."""
+
+    def __init__(self, widget_id: str, serial: int, kind: str):
+        self.widget_id = widget_id
+        self.serial = serial
+        self.kind = kind
+        self.cancelled = threading.Event()
+        self.countdown = None
+
+
 @SingletonDecorator
 class OcrOverlayTracker:
     """Per-widget OCR scan state shared by the value bus and paint path."""
@@ -295,46 +307,102 @@ class OcrOverlayTracker:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._wake = threading.Event()
+        self._serial = 0
+        self._test_jobs = deque()
+        # GUI-thread ownership of delivered presses, separate from match state.
+        self._delivered = {}
+
+    def _session_current(self, session) -> bool:
+        if session is None or session.cancelled.is_set():
+            return False
+        with self._lock:
+            slot = self._slots.get(session.widget_id)
+            return slot is not None and slot.get("session") is session
+
+    def _cancel_session(self, session):
+        if session is None or session.cancelled.is_set():
+            return
+        session.cancelled.set()
+        countdown, session.countdown = session.countdown, None
+        if countdown is not None:
+            countdown.cancel()
+        import gremlin.util
+
+        # Defer releases so cancellation inside a mapped press can unwind first.
+        gremlin.util.singleShot(lambda: self._release_session(session))
+
+    def _new_session(self, widget_id, slot, kind="runtime"):
+        self._cancel_session(slot.get("session"))
+        self._test_jobs = deque(job for job in self._test_jobs if not job[2].cancelled.is_set())
+        self._serial += 1
+        session = _OcrSession(widget_id, self._serial, kind)
+        slot["session"] = session
+        slot["rule_state"] = {}
+        slot["matched"] = []
+        slot["last_scan"] = 0.0
+        return session
+
+    def cancel(self, widget_id: str | None = None):
+        """Stop a widget (or all widgets) without waiting for native OCR."""
+        with self._lock:
+            for ident, slot in self._slots.items():
+                if widget_id is not None and ident != str(widget_id):
+                    continue
+                self._cancel_session(slot.get("session"))
+                slot["armed"] = False
+                slot["manual_stop"] = True
+                slot["pulse_remaining"] = 0
+                slot["rule_state"] = {}
+                slot["matched"] = []
+                slot["status"] = "Cancelled"
+            self._test_jobs = deque(job for job in self._test_jobs if not job[2].cancelled.is_set())
+        self._wake.set()
+
+    def _release_delivery(self, key, session):
+        delivery = self._delivered.get(key)
+        if delivery is None or delivery[0] is not session:
+            return
+        self._delivered.pop(key, None)
+        try:
+            delivery[1]()
+        except Exception as err:
+            syslog.warning("OBS OVERLAY OCR: cleanup release failed: %s", err)
+
+    def _release_session(self, session):
+        """GUI-only cleanup; an old session cannot release a new session's press."""
+        for key, delivery in list(self._delivered.items()):
+            if delivery[0] is session:
+                self._release_delivery(key, session)
 
     def retain(self, widget_ids: set[str] | None):
         with self._lock:
             if not widget_ids:
                 for slot in self._slots.values():
-                    self._release_all_rules(slot)
+                    self._cancel_session(slot.get("session"))
                 self._slots.clear()
                 return
             for ident in list(self._slots):
                 if ident not in widget_ids:
                     slot = self._slots.pop(ident, None)
                     if slot:
-                        self._release_all_rules(slot)
+                        self._cancel_session(slot.get("session"))
 
     def stop_runtime(self):
-        """Disarm every slot and stop the scanner (profile deactivate / hide)."""
+        """Cancel all sessions and request worker exit; never join the GUI thread."""
+        self.cancel()
         with self._lock:
-            for slot in self._slots.values():
-                slot["armed"] = False
-                slot["arm_prev"] = False
-                slot["pulse_remaining"] = 0
-                self._release_all_rules(slot)
-                slot["status"] = "Idle"
-        self._stop.set()
-        self._wake.set()
-        thread = self._thread
-        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
-            try:
-                thread.join(timeout=1.0)
-            except Exception:
-                pass
-        self._thread = None
+            self._stop.set()
+            self._wake.set()
 
     def _ensure_thread(self):
-        if self._thread and self._thread.is_alive():
-            self._wake.set()
-            return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name="GexOverlayOCR", daemon=True)
-        self._thread.start()
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                self._wake.set()
+                return
+            # Each worker owns its stop flag. A replacement never revives it.
+            self._stop = threading.Event()
+            self._thread = threading.Thread(target=self._run, args=(self._stop,), name="GexOverlayOCR", daemon=True)
+            self._thread.start()
 
     @staticmethod
     def _profile_running() -> bool:
@@ -406,18 +474,24 @@ class OcrOverlayTracker:
             # Designer Show overlay / deactivated profile: never arm or scan.
             if not running:
                 if slot.get("armed"):
-                    self._release_all_rules(slot)
+                    self._cancel_session(slot.get("session"))
                 slot["armed"] = False
                 slot["arm_prev"] = False
                 slot["pulse_remaining"] = 0
-                if slot.get("status") not in ("Idle",):
+                session = slot.get("session")
+                if slot.get("status") != "Cancelled" and not (session and session.kind == "test" and not session.cancelled.is_set()):
                     slot["status"] = "Idle"
             else:
                 binding = item.get("binding")
                 configured = binding_is_configured(binding)
                 active = bool(configured and read_toggle_active(binding))
                 prev_armed = bool(slot.get("armed"))
-                if arm_mode == "hold":
+                if slot.get("manual_stop"):
+                    # A held arm input must be released before a fresh gesture.
+                    slot["manual_stop"] = active
+                    slot["arm_prev"] = active
+                    slot["armed"] = False
+                elif arm_mode == "hold":
                     slot["armed"] = active
                     slot["pulse_remaining"] = 0
                 elif arm_mode in ("pulse", "multi_pulse"):
@@ -444,6 +518,11 @@ class OcrOverlayTracker:
                     slot["arm_prev"] = active
                     slot["pulse_remaining"] = 0
                 if bool(slot.get("armed")) != prev_armed:
+                    if slot["armed"]:
+                        self._new_session(widget_id, slot)
+                        slot["status"] = "Armed"
+                    else:
+                        self._cancel_session(slot.get("session"))
                     syslog.info(
                         "OBS OVERLAY OCR: arm %s widget=%s mode=%s binding_ok=%s input_active=%s",
                         "ON" if slot.get("armed") else "OFF",
@@ -454,8 +533,8 @@ class OcrOverlayTracker:
                     )
                 if not slot["armed"]:
                     slot["pulse_remaining"] = 0
-                    self._release_all_rules(slot)
-                    if slot.get("status") not in ("Idle",):
+                    session = slot.get("session")
+                    if slot.get("status") != "Cancelled" and not (session and session.kind == "test" and not session.cancelled.is_set()):
                         slot["status"] = "Idle"
             # Live paint only needs armed (border on/off style). Matched/status
             # belong in the designer marker — including them here repainted the
@@ -525,7 +604,10 @@ class OcrOverlayTracker:
             slot = self._slots.get(widget_id)
             if not slot:
                 return
-            self._release_all_rules(slot)
+            if slot.get("armed"):
+                self._new_session(widget_id, slot)
+            else:
+                self._cancel_session(slot.get("session"))
             slot["last_text"] = ""
             slot["hits"] = []
             slot["engine"] = ""
@@ -540,52 +622,54 @@ class OcrOverlayTracker:
                 on_done("No widget")
             return "No widget"
         from .ocr_capture import run_test_capture_countdown
-        from .ocr_engine import joined_text, recognize
 
-        style = item.get("style") or {}
         widget_id = str(item.get("id") or "")
         with self._lock:
-            slot = self._slots.setdefault(widget_id, {"generation": 0, "rule_state": {}, "matched": []})
+            slot = self._slots.setdefault(widget_id, {"generation": 0, "armed": False, "arm_prev": False, "pulse_remaining": 0})
+            session = self._new_session(widget_id, slot, "test")
+            slot["item"] = item
+            slot["armed"] = False
+            slot["manual_stop"] = True
             slot["status"] = "Test countdown…"
             slot["last_text"] = ""
 
         def _after_capture(image):
-            hits, engine = recognize(
-                image,
-                engine=normalize_ocr_engine(style.get("ocr_engine")),
-                min_confidence=normalize_ocr_confidence(style.get("ocr_confidence")),
-            )
-            text = joined_text(hits)
+            session.countdown = None
             with self._lock:
-                slot = self._slots.setdefault(widget_id, {"generation": 0, "rule_state": {}, "matched": []})
-                slot["last_text"] = text
-                slot["hits"] = hits
-                slot["engine"] = engine
-                if image is None:
-                    slot["status"] = "Region unresolved"
-                else:
-                    slot["status"] = f"Test ({engine})" if engine != "none" else "No OCR engine"
-                slot["generation"] = int(slot.get("generation") or 0) + 1
-                self._apply_rules(item, text, slot, force_eval=True)
-                result = text or slot.get("status") or ""
-            if on_done is not None:
-                on_done(result)
+                if not self._session_current(session):
+                    return
+                slot["status"] = "Recognizing…"
+                self._test_jobs.append((widget_id, item, session, image, on_done))
+            self._ensure_thread()
 
-        ok = run_test_capture_countdown(item, seconds=5, on_done=_after_capture)
-        if not ok:
+        handle = run_test_capture_countdown(item, seconds=5, on_done=_after_capture, cancelled=session.cancelled.is_set)
+        if handle is None:
             with self._lock:
-                slot = self._slots.setdefault(widget_id, {"generation": 0, "rule_state": {}, "matched": []})
-                slot["status"] = "Region unresolved"
+                if self._session_current(session):
+                    slot["status"] = "Region unresolved"
             if on_done is not None:
                 on_done("Region unresolved")
             return "Region unresolved"
+        if not self._session_current(session):
+            handle.cancel()
+            return "Cancelled"
+        session.countdown = handle
         return "Test countdown…"
 
     def _emit_rule(self, widget_id: str, rule: dict[str, Any], is_pressed: bool, label: str, signature: int | None):
         """Emit press/release on the UI thread (scanner may run in a worker)."""
         import gremlin.util
 
+        with self._lock:
+            session = (self._slots.get(widget_id) or {}).get("session")
+        key = (widget_id, str(rule.get("id") or ""))
+
         def _do_emit():
+            if not self._session_current(session):
+                return
+            if not is_pressed:
+                self._release_delivery(key, session)
+                return
             from .overlay_input import (
                 emit_overlay_button_event,
                 ensure_overlay_input,
@@ -628,22 +712,7 @@ class OcrOverlayTracker:
                 "ocr_runtime_kind": str(runtime.get("kind") or ""),
             }
             has_runtime = bool(extra.get("ocr_runtime_kind") or runtime.get("kind"))
-            # Pack runtime hooks (citizen lookup / EFB chart) run first.
-            if has_runtime:
-                try:
-                    _dispatch_ocr_runtime(rule, is_pressed, label, extra)
-                except Exception as err:
-                    syslog.warning(f"OBS OVERLAY OCR: runtime hook failed: {err}")
-            if not has_map and not has_xml:
-                if has_runtime:
-                    syslog.info(
-                        "OBS OVERLAY OCR: runtime-only %s rule=%s label=%r kind=%s",
-                        "PRESS" if is_pressed else "RELEASE",
-                        title,
-                        label,
-                        extra.get("ocr_runtime_kind"),
-                    )
-                    return
+            if not has_map and not has_xml and not has_runtime:
                 syslog.warning(
                     "OBS OVERLAY OCR: emit SKIP — rule has no Map… actions "
                     "input_id=%s rule=%s press=%s label=%r (open Map on the rule)",
@@ -666,15 +735,33 @@ class OcrOverlayTracker:
                 signature,
                 has_map or has_xml,
             )
-            emit_overlay_button_event(item, is_pressed, extra_data=extra)
+            def _dispatch(pressed):
+                if pressed and not self._session_current(session):
+                    return
+                if has_runtime:
+                    try:
+                        _dispatch_ocr_runtime(rule, pressed, label, extra)
+                    except Exception as err:
+                        syslog.warning(f"OBS OVERLAY OCR: runtime hook failed: {err}")
+                if pressed and not self._session_current(session):
+                    return
+                if has_map or has_xml:
+                    emit_overlay_button_event(item, pressed, extra_data=extra)
+
+            previous = self._delivered.get(key)
+            if previous is not None and previous[0] is not session:
+                self._release_delivery(key, previous[0])
+            if not self._session_current(session):
+                return
+            # Capture the actual input and payload for cleanup, even after a
+            # profile replacement has introduced another input with this ID.
+            self._delivered[key] = (session, lambda: _dispatch(False))
+            _dispatch(True)
 
         try:
             gremlin.util.InvokeUiMethod(_do_emit)
-        except Exception:
-            try:
-                _do_emit()
-            except Exception as err:
-                syslog.warning(f"OBS OVERLAY OCR: emit failed: {err}")
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY OCR: emit failed: {err}")
 
     def _release_all_rules(self, slot: dict[str, Any]):
         item = slot.get("item") or {}
@@ -696,6 +783,7 @@ class OcrOverlayTracker:
 
     def _apply_rules(self, item: dict[str, Any], text: str, slot: dict[str, Any], force_eval: bool = False):
         widget_id = str(item.get("id") or "")
+        session = slot.get("session")
         rules = normalize_ocr_rules(item.get("ocr_rules"))
         style = item.get("style") or {}
         pack_id = str(style.get("ocr_pack_id") or "").strip()
@@ -707,6 +795,8 @@ class OcrOverlayTracker:
         )
         matched_names = []
         for rule in rules:
+            if not self._session_current(session):
+                return
             rule_id = str(rule.get("id") or "")
             # Re-attach pack id from widget style when the saved rule lost `_runtime`.
             if pack_id and not rule.get("pack_id"):
@@ -759,6 +849,8 @@ class OcrOverlayTracker:
                         (text or "")[:120],
                     )
                     self._emit_rule(widget_id, rule, True, label, signature)
+                    if not self._session_current(session):
+                        return
                     st["held"] = True
                 elif label != prev_label or signature != prev_sig:
                     # Still held — refresh contribute/replace with the new detection label.
@@ -811,7 +903,8 @@ class OcrOverlayTracker:
                 if st.get("held"):
                     rule = st.get("rule") or {"id": rid}
                     self._emit_rule(widget_id, rule, False, str(st.get("label") or ""), st.get("signature"))
-        slot["matched"] = matched_names
+        if self._session_current(session):
+            slot["matched"] = matched_names
 
     @staticmethod
     def _app_allows_scan() -> bool:
@@ -851,15 +944,71 @@ class OcrOverlayTracker:
         except Exception:
             return True
 
-    def _run(self):
-        while not self._stop.is_set():
+    def _run(self, stop):
+        try:
+            self._run_loop(stop)
+        finally:
+            with self._lock:
+                if self._thread is threading.current_thread():
+                    self._thread = None
+                    pending = any(not job[2].cancelled.is_set() for job in self._test_jobs)
+                    pending = pending or (self._profile_running() and any(s.get("armed") for s in self._slots.values()))
+                    if pending:
+                        self._ensure_thread()
+
+    def _notify_test(self, session, on_done, result):
+        if self._session_current(session) and on_done is not None:
+            on_done(result)
+
+    def _run_test_job(self, job, stop):
+        from .ocr_engine import joined_text, recognize
+        import gremlin.util
+
+        widget_id, item, session, image, on_done = job
+        cancelled = lambda: stop.is_set() or not self._session_current(session)
+        if cancelled():
+            return
+        style = item.get("style") or {}
+        try:
+            hits, engine = recognize(image, engine=normalize_ocr_engine(style.get("ocr_engine")),
+                                     min_confidence=normalize_ocr_confidence(style.get("ocr_confidence")), cancelled=cancelled)
+            if cancelled():
+                return
+            text = joined_text(hits)
+            with self._lock:
+                if cancelled():
+                    return
+                slot = self._slots[widget_id]
+                slot.update(last_text=text, hits=hits, engine=engine)
+                slot["status"] = "Region unresolved" if image is None else (f"Test ({engine})" if engine != "none" else "No OCR engine")
+                slot["generation"] = int(slot.get("generation") or 0) + 1
+                self._apply_rules(item, text, slot, force_eval=True)
+                result = text or slot["status"]
+        except Exception as err:
+            if cancelled():
+                return
+            with self._lock:
+                if cancelled():
+                    return
+                self._slots[widget_id]["status"] = result = f"Error: {err}"
+            syslog.warning("OBS OVERLAY OCR: test failed: %s", err)
+        gremlin.util.InvokeUiMethod(self._notify_test, session, on_done, result)
+
+    def _run_loop(self, stop):
+        while not stop.is_set():
+            with self._lock:
+                test_job = self._test_jobs.popleft() if self._test_jobs else None
+            if test_job is not None:
+                self._run_test_job(test_job, stop)
+                continue
             if not self._profile_running():
                 # Profile stopped while the scanner was live — exit cleanly.
                 with self._lock:
                     for slot in self._slots.values():
                         slot["armed"] = False
-                        self._release_all_rules(slot)
-                        slot["status"] = "Idle"
+                        if (slot.get("session") and slot["session"].kind == "runtime"):
+                            self._cancel_session(slot["session"])
+                            slot["status"] = "Idle"
                 return
             if not self._app_allows_scan():
                 self._wake.wait(0.5)
@@ -889,13 +1038,19 @@ class OcrOverlayTracker:
             from .ocr_engine import joined_text, recognize
 
             for widget_id, item, snap in jobs:
+                session = snap.get("session")
+                cancelled = lambda session=session: stop.is_set() or not self._session_current(session)
+                if cancelled():
+                    continue
                 if not self._app_allows_scan():
                     syslog.info("OBS OVERLAY OCR: scan paused (app not allowing scan)")
                     break
                 try:
                     # Keep the HUD visible during armed scans (no hide/show flash).
                     # SRCCOPY omits layered windows; a cached re-blit repairs BitBlt glitches.
-                    image = capture_for_item_sync(item, hide_overlay=False)
+                    image = capture_for_item_sync(item, hide_overlay=False, cancelled=cancelled)
+                    if cancelled():
+                        continue
                     if image is None or image.isNull():
                         syslog.warning(
                             "OBS OVERLAY OCR: capture FAILED widget=%s region=%s (null image)",
@@ -904,7 +1059,7 @@ class OcrOverlayTracker:
                         )
                         with self._lock:
                             slot = self._slots.get(widget_id)
-                            if slot:
+                            if slot and not cancelled():
                                 slot["status"] = "Capture failed"
                                 slot["last_scan"] = time.monotonic()
                                 self._consume_pulse(widget_id, slot)
@@ -913,7 +1068,10 @@ class OcrOverlayTracker:
                         image,
                         engine=snap.get("engine_pref") or "auto",
                         min_confidence=float(snap.get("confidence") or 0.70),
+                        cancelled=cancelled,
                     )
+                    if cancelled():
+                        continue
                     text = joined_text(hits)
                     preview = (text or "").replace("\n", " ").strip()
                     if len(preview) > 160:
@@ -929,7 +1087,7 @@ class OcrOverlayTracker:
                     )
                     with self._lock:
                         slot = self._slots.get(widget_id)
-                        if not slot or not slot.get("armed"):
+                        if cancelled() or not slot or not slot.get("armed"):
                             syslog.info("OBS OVERLAY OCR: scan dropped (disarmed mid-scan) widget=%s", widget_id)
                             continue
                         slot["last_scan"] = time.monotonic()
@@ -947,11 +1105,13 @@ class OcrOverlayTracker:
                         self._apply_rules(item, text, slot)
                         self._consume_pulse(widget_id, slot)
                 except Exception as err:
+                    if cancelled():
+                        continue
                     syslog.warning(f"OBS OVERLAY OCR: scan failed: {err}")
                     with self._lock:
                         slot = self._slots.get(widget_id)
-                        if slot:
+                        if slot and not cancelled():
                             slot["status"] = f"Error: {err}"
                             slot["last_scan"] = time.monotonic()
                             self._consume_pulse(widget_id, slot)
-            self._stop.wait(0.05)
+            stop.wait(0.05)

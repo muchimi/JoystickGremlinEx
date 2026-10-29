@@ -2219,6 +2219,15 @@ def is_binary_string(data):
         return False
     return isinstance(data, bytes)
 
+def getHostName() -> str:
+    """gets the current machine's host name"""
+    import socket
+
+    try:
+        return socket.getfqdn()
+    except Exception:
+        return "localhost"
+
 
 def getHostIp() -> list:
     """gets the list of the current machine's IP address"""

@@ -27,6 +27,7 @@ import threading
 
 
 import gremlin.config
+from gremlin import execution_guard
 import gremlin.event_handler
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
@@ -78,6 +79,9 @@ from gremlin.ui.ui_common import (
 
 
 syslog = logging.getLogger("system")
+
+# Only synchronous descendants share a path; independent threads start empty.
+_state_change_context = threading.local()
 
 
 class StateCategory:
@@ -662,18 +666,32 @@ class StateInputItem(InputItem):
         :param delay: delay in seconds
         """
         if delay > 0 and not self._expression:
+            if self._state_change_reentry():
+                return
             self._autorelease_trigger_mode = "latch"
             self._autorelease_mode = "latch"
             self._autorelease_delay = delay
             self.autorelease = True
             self.setValue(True)  # turn ON
 
+    @execution_guard.boundary
     def setValue(self, data: bool, force=False):
         """sets the state
 
         in latch mode, the state will ignore a retrigger while the timer is running
 
         """
+        if self._state_change_reentry():
+            return
+        path = getattr(_state_change_context, "path", ())
+        _state_change_context.path = (*path, self)
+        try:
+            self._set_value(data, force)
+        finally:
+            _state_change_context.path = path
+
+    def _set_value(self, data: bool, force=False):
+        """Apply a value while setValue owns this state's execution scope."""
         verbose = gremlin.config.Configuration().verbose_mode_state
         data = bool(self.default_value) if data is None else bool(data)
 
@@ -700,8 +718,7 @@ class StateInputItem(InputItem):
             if verbose:
                 syslog.info(f"STATE setValue(): set [{self.key}]  -> [{data}]")
 
-            self._fire_changed(data)
-            self.changed.emit(self)
+            self._dispatch_changed(data, self._last_value)
 
             if data and not self._applying_exclusive and not self._expression and self._exclusive_keys and not self._suppress_exclusive:
                 self._apply_exclusive_off()
@@ -823,13 +840,16 @@ class StateInputItem(InputItem):
 
     @default_value.setter
     def default_value(self, data):
+        if self._state_change_reentry():
+            return
         data = bool(data)
         if self._default_value != data:
             self._default_value = data
             if data != self._value:
+                previous_value = self._value
                 self._value = data
                 if self._emit:
-                    self._fire_changed(data)
+                    self._fire_changed(data, previous_value)
 
     @property
     def key(self) -> str:
@@ -866,16 +886,19 @@ class StateInputItem(InputItem):
 
     @expression.setter
     def expression(self, value: str):
+        if self._state_change_reentry():
+            return
         if self._expression != value:
             self._expression = value
             self._dirty = True
             self._expression_stack = []
             derived_value = self.evaluate()
             if derived_value != self._value:
+                previous_value = self._value
                 self._value = derived_value
                 if self._emit:
                     self.expression_changed.emit(self)
-                    self._fire_changed(derived_value)
+                    self._fire_changed(derived_value, previous_value)
 
     def stateInExpression(self, state) -> bool:
         """true if the key is found in the expression"""
@@ -1076,6 +1099,12 @@ class StateInputItem(InputItem):
 
         """
 
+        execution_guard.checkpoint()
+        if self._state_change_reentry(warn=False):
+            # Subscribers may read .value while this state is being dispatched.
+            # Return the committed value without starting another evaluation.
+            return (bool(self._value), False, None) if as_tuple else bool(self._value)
+
         if not self._expression:
             # no expression defined, return the curent state value
             return (bool(self._value), False, None) if as_tuple else bool(self._value)
@@ -1102,21 +1131,48 @@ class StateInputItem(InputItem):
             value = bool(data[0] if as_tuple else data)
             is_changed = value != self._last_expression_value
             if is_changed:
+                previous_value = self._value
                 self._value = value
                 self._last_expression_value = value
                 verbose = gremlin.config.Configuration().verbose_mode_state
                 if verbose:
                     syslog.info(f"State: {self.key} new value: {self._last_expression_value}")
-                self._fire_changed(value)
+                self._fire_changed(value, previous_value)
 
         return (self._last_expression_value, False, None) if as_tuple else self._last_expression_value
 
-    def _fire_changed(self, value: bool):
-        """called when a state changes"""
+    def _state_change_reentry(self, warn=True) -> bool:
+        """Reject changes to a state still active on this execution path."""
+        if warn:
+            execution_guard.checkpoint()
+        path = getattr(_state_change_context, "path", ())
+        if not any(state is self for state in path):
+            return False
+        if warn:
+            execution_guard.abort("STATE: re-entry blocked: " + " -> ".join(str(state.key) for state in (*path, self)))
+        return True
+
+    @execution_guard.boundary
+    def _fire_changed(self, value: bool, previous_value: bool | None = None):
+        """Notify subscribers and mappings once per state on the active path."""
+        if self._state_change_reentry():
+            return
+        path = getattr(_state_change_context, "path", ())
+        _state_change_context.path = (*path, self)
+        try:
+            self._dispatch_changed(value, previous_value)
+        finally:
+            _state_change_context.path = path
+
+    def _dispatch_changed(self, value: bool, previous_value: bool | None = None):
+        """Dispatch while setValue or _fire_changed owns the re-entry guard."""
+        execution_guard.checkpoint()
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose:
-            syslog.info(f"STATE CHANGE: [{self.key}] current value: [{self.value}] -> new value: [{value}]")
+            # Reading self.value here would evaluate expression states again.
+            syslog.info(f"STATE CHANGE: [{self.key}] current value: [{previous_value}] -> new value: [{value}]")
         self.changed.emit(self)
+        execution_guard.checkpoint()
 
         event = gremlin.event_handler.Event(
             event_type=InputType.State,
@@ -1132,15 +1188,13 @@ class StateInputItem(InputItem):
             extra_data={"input_item": self},
         )
 
-        # indicate there was a state change
         el = gremlin.event_handler.EventListener()
         el.state_event.emit(event)
+        execution_guard.checkpoint(event=event)
 
-        # handle state changes directly at design or runtime
         eh = gremlin.event_handler.EventHandler()
-        # if verbose: syslog.info(f"STATE CHANGE: [{self.key}] begin execution: {value}")
         eh.execute_event(event)
-        # if verbose: syslog.info(f"STATE CHANGE: [{self.key}] end execution: {value}")
+        execution_guard.checkpoint()
 
     def _valid_states(self):
         # remove any state named like a boolean or self

@@ -495,7 +495,7 @@ class ProcessHelper:
 
 
 
-    def processRunning(self, target_name: str) -> bool:
+    def processRunning(self, target_name: str, return_pid : bool = False) -> bool | int:
         """ checks for a running process """
         kernel32 = ctypes.windll.kernel32
 
@@ -526,12 +526,16 @@ class ProcessHelper:
 
                         # 3. Check for a match
                         if exe_name.casefold() == target_name:
+                            if return_pid:
+                                return pid
                             return True
 
                 finally:
                     kernel32.CloseHandle(hProcess)
             except Exception:
                 continue
+        if return_pid:
+            return -1
         return False
 
     # @overload

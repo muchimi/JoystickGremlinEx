@@ -244,6 +244,11 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                     # stop the profile
                     el.request_profile_stop.emit(None)
                     return True
+                case ControlAction.OCRStop:
+                    from gremlin.ui.obs_overlay.ocr_track import OcrOverlayTracker
+
+                    OcrOverlayTracker().cancel()
+                    return True
                 case ControlAction.LocalDisable:
                     # disable local output
                     if verbose:

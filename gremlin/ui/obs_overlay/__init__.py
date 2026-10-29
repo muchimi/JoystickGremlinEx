@@ -93,6 +93,9 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_shutdown_ui)
 
     def _on_shutdown_ui(self):
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().stop_runtime()
         # Overlay disk writes happen only on profile save — sync tallies in memory.
         try:
             self.scene.save_now()
@@ -140,6 +143,9 @@ class OverlayManager:
         return True
 
     def _on_profile_loaded_ui(self):
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().stop_runtime()
         # Persist previous layout only to the profile that owned it, then always
         # replace the designer scene with the newly loaded profile's overlay.
         self._flush_dirty_scene()
@@ -766,6 +772,9 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._hide_overlay_ui)
 
     def _hide_overlay_ui(self):
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().stop_runtime()
         gremlin.diagnostics.breadcrumb("overlay hide")
         for page_id in list(self._overlays):
             self._hide_page_ui(page_id)

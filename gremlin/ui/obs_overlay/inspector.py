@@ -4671,7 +4671,9 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Miss tolerance", miss)
 
         tracker = OcrOverlayTracker()
-        last = QtWidgets.QLabel(tracker.last_text(item) or tracker.status(item) or "—", self._host)
+        last_text = tracker.last_text(item)
+        scan_status = tracker.status(item)
+        last = QtWidgets.QLabel("\n".join(text for text in (scan_status, last_text) if text) or "—", self._host)
         last.setWordWrap(True)
         last.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         form.addRow("Last text", last)
@@ -4682,10 +4684,14 @@ class OverlayInspector(QtWidgets.QWidget):
         test = QDataPushButton("Test once")
         test.setToolTip("Highlights the OCR region on screen, counts down 5 seconds so you can place text, then captures that region and runs OCR.")
         test.clicked.connect(button_callback(self._ocr_test_once, item["id"]))
+        stop = QDataPushButton("Stop OCR")
+        stop.setToolTip("Cancel this widget's scan or test and discard pending detections. Release and re-arm to scan again.")
+        stop.clicked.connect(button_callback(self._ocr_stop, item["id"]))
         clear = QDataPushButton("Clear results")
         clear.setToolTip("Clear last OCR text, status, and rule match state for this widget.")
         clear.clicked.connect(button_callback(self._ocr_clear_results, item["id"]))
         btn_layout.addWidget(test)
+        btn_layout.addWidget(stop)
         btn_layout.addWidget(clear)
         btn_layout.addStretch(1)
         form.addRow(btn_row)
@@ -4707,7 +4713,17 @@ class OverlayInspector(QtWidgets.QWidget):
             return
         from .ocr_track import OcrOverlayTracker
 
-        OcrOverlayTracker().test_once(item, on_done=lambda _text: self.rebuild())
+        OcrOverlayTracker().test_once(item, on_done=self._ocr_test_done)
+        self.rebuild()
+
+    def _ocr_test_done(self, _text):
+        if self._is_alive():
+            self.rebuild()
+
+    def _ocr_stop(self, widget_id: str):
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().cancel(widget_id)
         self.rebuild()
 
     def _ocr_clear_results(self, widget_id: str):

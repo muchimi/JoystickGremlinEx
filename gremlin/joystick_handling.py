@@ -994,7 +994,7 @@ def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceS
     global _all_devices_map, _joystick_initialized
 
     if not _joystick_initialized:
-        syslog.warning("Device: devices not initialized in getDevice()")
+        syslog.warning(f"Device: devices not initialized in getDevice() - device id: [{device_guid}]")
         return None
 
 
@@ -1856,6 +1856,10 @@ def joystick_devices_initialization(force: bool = True) -> bool:
     finally:
         # turn on vjoy monitoring
         vjm.start()
+        # notify listeners that joystick initialization is complete
+        el = gremlin.event_handler.EventListener()
+        el.device_initialized.emit()
+
 
     return True
 

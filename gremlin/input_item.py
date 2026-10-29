@@ -643,6 +643,7 @@ class PaginationWidget(QtWidgets.QWidget):
 
         page_sizes = [
             ("Off", 0, "Turns pagination off (this could significantly impact UI performance and memory utilization for high count inputs)"),
+            ("8", 8, "Paginate over 8 items"),
             ("16", 16, "Paginate over 16 items"),
             ("32", 32, "Paginate over 32 items"),
             ("64", 64, "Paginate over 64 items"),

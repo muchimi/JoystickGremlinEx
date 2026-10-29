@@ -648,7 +648,7 @@ As of T183, GremlinEx, actions that support remote output can control specific G
 | Remote (any) | The profile output sends controls to all GremlinEx instances running on machines attached to the local network.  This mode was the only "remote control mode" prior to T183.  All clients receive the control data.  As of T183, the "any" client must be selected to send to all remote clients at once. This is the default remote starting configuration for T183 to maintain compatibility with older profiles. |
 | Remote (specific) | The profile sends controls to specific clients.  This mode is only available after T183.  Only the selected clients receive the control data. |
 | Combined | Local and remote modes can be combined together.  In this mode, the control data is processed by the local instance, and any selected clients or all of them depending on the remote mode selected. |
-| KVM mode | A special action called the KVM action will route all keyboard and mouse outputs to the listed clients and disable local keyboard/mouse output.  This is active while the KVM action is triggered (input on).  While active, the local instance no longer processes keyboard or mouse inputs, including profile inputs so any process running ont he local machine will not get keyboard/mouse data either.  Joystick and OSC/MIDI inputs continue to function in KVM mode, only keyboard and mouse inputs are impacted. |
+| KVM mode | The KVM action routes keyboard and mouse input according to the current remote control mode while its input is held. Local mode keeps input on the local machine, remote mode forwards input to the selected clients and suppresses local input, and combined mode allows local and remote input concurrently. Mode changes take effect while the action is active. Joystick and OSC/MIDI inputs continue to function in KVM mode. |
 
 GremlinEx offers actions to enable/disable remote control at runtime so remote control can be enabled or disabled as needed while a profile is running.  This can be toggled from any button input like a joystick button, an OSC command or a keyboard input.  A best practice is to attach the remote control mode to a physical switch on a hardware panel to enable or disable remote control of other GremlinEx clients as needed.
 
@@ -671,7 +671,7 @@ Clients can only be remote controlled if they are running an active (blank) prof
 | VJOY output | The remote clients understand VJOY output including axis, button and hats.  The local VJOY configuration must match the data received, so should match the configuration of the broadcast machine and profile being used.  It's okay for a client to have fewer VJOY devices than the broadcast machine, however the axis, hat and button count should be the same. |
 | Keyboard output | The remote clients accepts keyboard output sent via the Map to Keyboard/Mouse Ex action.  Use this for mouse button/wheel output as well. |
 | Mouse output | The remote clients accepts mouse output including motion sent via the Map to Mouse Ex action. Use the Map to Keyboard/Mouse Ex action for button/wheel output. |
-| KVM mode | The KVM action on the broadcast machine sends all keyboard/mouse on the broadcast machine directly to the client, and local keyboard/mouse is disabled in this mode.  OSC, MIDI, Joystick and State inputs are not disabled in this mode and the profile continues to process those normally. |
+| KVM mode | The KVM action forwards keyboard and mouse input to the selected clients when remote output is enabled. Local input remains enabled in combined mode and is suppressed in remote-only mode. OSC, MIDI, Joystick and State inputs continue to be processed normally. |
 
 | Not supported for remote control | Description |
 | --- | ---- |
@@ -700,7 +700,7 @@ The following actions can be configured for output:
 | Vjoy Remap | Send VJOY events (axis, button, hat) to remote clients. |
 | Map to Keyboard/Mouse Ex | Send keyboard and mouse button/wheel events to clients. |
 | Map to Mouse Ex | Send mouse button and motion events to clients.  For buttons and wheel, it is preferrable to use the Map to Keyboard/Mouse Ex action instead. |
-| KVM | This special action sends all keyboard and mouse events (including motion) to the clients and disables local keyboard/mouse events while active.  This mode is exclusive when active and disables local keyboard/mouse handling, and allows joystick, OSC, MIDI and State actions to execute as normal. |
+| KVM | Routes keyboard and mouse input (including motion) using the current local/remote output settings. Combined mode keeps local input active while forwarding to clients; remote-only mode suppresses local input. Joystick, OSC, MIDI and State actions continue to execute normally. |
 
 ![action configuration](assets/remote_control_output.png)
 

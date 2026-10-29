@@ -1173,7 +1173,7 @@ class Color:
         }}
 
 
-        #fixedTabBar {{ background-color: {background_color}; }}
+        QTabBar {{ background-color: {background_color}; }}
 
 
 
@@ -2822,6 +2822,9 @@ class QLineEdit(QtWidgets.QLineEdit):
         self.focusOut.emit()
         return super().focusOutEvent(event)
 
+# alias
+QDataLineEdit = QLineEdit
+
 
 class QFloatLineEdit(QWidget):
     """double input validator with optional range limits for input axis
@@ -3108,6 +3111,9 @@ class QFloatLineEdit(QWidget):
     def data(self, value):
         self._data = value
 
+# alias
+QDataFloatLineEdit = QFloatLineEdit
+
 
 class QFloatLineEditEx(QWidget):
     """double input validator with optional range limits for input axis
@@ -3308,6 +3314,8 @@ class QFloatLineEditEx(QWidget):
     def maximum(self):
         return self._max_range
 
+# alias
+QDataFloatLineEditEx = QFloatLineEditEx
 
 class IntValidator(QtGui.QValidator):
     def __init__(self, min_range=None, max_range=None, parent=None):
@@ -3586,6 +3594,9 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     def maximum(self):
         return self._max_range
 
+
+# alias
+QDataIntLineEdit = QIntLineEdit
 
 class DynamicDoubleSpinBox(QFloatLineEdit):
     pass
@@ -5386,7 +5397,8 @@ class QDataCheckbox(QtWidgets.QCheckBox):
             self.enabledChanged.emit(self.isEnabled())
             super().changeEvent(event)
 
-
+# alias
+QDataCheckBox = QDataCheckbox
 
 class QActionCheckbox(QWidget):
     """a checkbox that emits focus events"""
@@ -5489,6 +5501,8 @@ class QActionCheckbox(QWidget):
     def setData(self, value):
         self._checkbox.data = value
 
+# alias
+QActionCheckBox = QActionCheckbox
 
 class QDataRadioButton(QtWidgets.QRadioButton):
     """a radio button that has a data property to track an object associated with the checkbox"""
@@ -18195,21 +18209,17 @@ class QDataRepeaterWidget(QtWidgets.QWidget):
 
 
 class FixedTabBar(QTabBar):
-    """
-    fixes stylesheet drops and geometry layout caching bugs in PyQt6.
-    """
+    """A standalone tab bar whose background is painted by its stylesheet."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Give it a unique object name so you can target it reliably in CSS
         self.setObjectName("fixedTabBar")
-        # lets the stylesheet background-color paint on the bar itself
+        # The device header is renamed by Ui_Gremlin. cssTab() uses QTabBar
+        # rather than the object name so icon/layout changes keep this backdrop.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-
-    # def setStyleSheet(self, css: str):
-    #     # cssTab() only targets QTabWidget/pane, which never match a bare tab bar
-    #     bar_css = f"#fixedTabBar {{ background-color: {Color().backgroundColor()}; }}"
-    #     super().setStyleSheet(f"{css or ''}\n{bar_css}")
+        # There is no QTabWidget pane here. Its native baseline would otherwise
+        # draw native-colored lines across the themed background.
+        self.setDrawBase(False)
 
 
 class QTabHeader(FixedTabBar):
@@ -18234,6 +18244,39 @@ class QTabHeader(FixedTabBar):
         self.customContextMenuRequested.connect(self._open_context_menu)
 
         self.setStyleSheet(Color().cssTab())
+
+    def setTabIcon(self, index, icon):
+        super().setTabIcon(index, icon)
+        self._sync_header_height()
+
+    def setIconSize(self, size):
+        super().setIconSize(size)
+        self._sync_header_height()
+
+    def tabInserted(self, index):
+        super().tabInserted(index)
+        self._sync_header_height()
+
+    def tabRemoved(self, index):
+        super().tabRemoved(index)
+        self._sync_header_height()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._sync_header_height()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.StyleChange, QEvent.Type.FontChange):
+            self._sync_header_height()
+
+    def _sync_header_height(self):
+        # An empty header has no height. When a profile populates it while its
+        # parent is hidden, the surrounding layout can retain that zero-height
+        # allocation even though the tabs now have valid size hints. Constrain
+        # the widget itself and notify the layout when tabs, icons or fonts change.
+        self.setMinimumHeight(max(0, self.sizeHint().height()))
+        self.updateGeometry()
 
     @property
     def moveInProgress(self) -> bool:

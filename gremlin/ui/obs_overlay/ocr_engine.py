@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any
+from typing import Any, Callable
 
 from PySide6 import QtGui
 
@@ -296,9 +296,10 @@ def recognize(
     *,
     engine: str = "auto",
     min_confidence: float = 0.70,
+    cancelled: Callable[[], bool] | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     """Run OCR. Returns (hits, engine_used). engine_used is rapid|windows|none."""
-    if image is None or image.isNull():
+    if (cancelled is not None and cancelled()) or image is None or image.isNull():
         return [], "none"
     pref = normalize_ocr_engine(engine)
     conf = normalize_ocr_confidence(min_confidence)
@@ -310,12 +311,18 @@ def recognize(
     else:
         order = ["rapid", "windows"]
     for name in order:
+        if cancelled is not None and cancelled():
+            return [], "none"
         if name == "rapid":
             hits = _recognize_rapid(image, conf)
+            if cancelled is not None and cancelled():
+                return [], "none"
             if hits is not None:
                 return hits, "rapid"
         elif name == "windows":
             hits = _recognize_windows(image, conf)
+            if cancelled is not None and cancelled():
+                return [], "none"
             if hits is not None:
                 return hits, "windows"
     return [], "none"

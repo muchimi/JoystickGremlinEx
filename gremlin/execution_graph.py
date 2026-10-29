@@ -28,6 +28,7 @@ import gremlin.base_buttons
 import gremlin.input_item
 import gremlin.base_profile
 import gremlin.config
+from gremlin import execution_guard
 import gremlin.event_handler
 
 from gremlin.input_types import InputType
@@ -1985,6 +1986,7 @@ class ExecutionContext:
         for item in functor_list:
             syslog.info(f"\t{item}")
 
+    @execution_guard.guarded
     def process_functor(self, functor, event, value, extra_data: dict = None, manual=False) -> bool:
         """processes a single functor or a list of functors  - first one to fail fails the group"""
         if isinstance(functor, list):
@@ -1993,6 +1995,7 @@ class ExecutionContext:
                 if not result:
                     return False
         else:
+            execution_guard.checkpoint(event=event, functor=functor)
             if self.perf:
                 now = time.time()
             if functor.manual_callback:
@@ -2002,6 +2005,7 @@ class ExecutionContext:
                     return False
 
             result = functor.process_event(event, value, extra_data)
+            execution_guard.checkpoint()
             if self.perf:
                 lapsed = time.time() - now
                 stub = f"{functor.__class__.__name__}"
@@ -2032,6 +2036,7 @@ class ExecutionContext:
         if key in self.graph_input_map:
             _node = self.graph_input_map[key]
 
+    @execution_guard.guarded
     def execute_node(self, node: ExecutionGraphNode, event, value, extra_data: dict = None, manual=False, visited=None) -> bool:
         """executes a single node
 
@@ -2044,6 +2049,7 @@ class ExecutionContext:
 
         """
 
+        execution_guard.checkpoint(event=event, node=node)
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition

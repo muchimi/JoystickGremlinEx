@@ -4190,3 +4190,12 @@ class Configuration(QtCore.QObject):
     def device_label_visible(self, value: bool):
         self._set_data("device_label_visible", value)
 
+
+    @property
+    def client_name(self) -> str:
+        """returns the name of the current client if configured"""
+        return self._get_data("client_name", "")
+
+    @client_name.setter
+    def client_name(self, value: str):
+        self._set_data("client_name", value)

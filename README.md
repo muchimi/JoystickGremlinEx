@@ -49,6 +49,19 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T87):
+- New: KVM Action: (feature request): enable local and KVM output based on the current remoting mode (local or remote).  If local and remote are concurrently enabled, this will concurrently forward kbd and mouse to the client and local machine.
+- New: Input Viewer: **Select Used** button added.  This will automatically select inputs and outputs in use in the current profile based on input configuration and mapping data.
+- Change: API (State): added a re-entry guard for state changes to abort state changes resulting from a prior state change (causing a loop).
+- Change: API (Overlay): a new OCR request will cancel the prior OCR in progress to avoid a potential loop and trigger based on OCR results.
+- Change: Control Action: added a control command to stop an OCR action in progress.  This allows a mapping to stop a prior OCR if needed as part of a mapped input.
+- Change: UI (options): refactor UI to use updated widgets for consistent look/feel
+- Change: UI (inputs): add 8 input filter for lower end systems
+- Change: Input Viewer: polish to show VJOY devices sorted by the VJOY device number.
+- Fix: API (input viewer): reload device list on device re-initialization.
+- Fix: UI: Device headers could disappear on profile load.
+- Fix: API: bug fix in the profile API list_actions that could cause an exception.
+
 
 ### (m77T86):
 - Fix: API: reworked the UI thread invoker to eliminate the need for a QT object (this should reduce overhead) and removed parameter limits.

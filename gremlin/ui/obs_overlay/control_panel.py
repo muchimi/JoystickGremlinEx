@@ -374,6 +374,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
         )
         root.addWidget(self._keybinds_btn)
 
+        stop_ocr = QDataPushButton("Stop OCR", parent=self,
+                                  tooltip="Stop all OCR scans and tests, and discard pending results.", clicked=self._stop_ocr)
+        root.addWidget(stop_ocr)
+
         self._status = QtWidgets.QLabel("", self)
         self._status.setWordWrap(True)
         root.addWidget(self._status)
@@ -979,6 +983,12 @@ class OverlayControlPanel(QtWidgets.QWidget):
             self._status.setText("Reset to canvas settings.")
         else:
             self._status.setText("Nothing to reset.")
+
+    def _stop_ocr(self):
+        from .ocr_track import OcrOverlayTracker
+
+        OcrOverlayTracker().cancel()
+        self._status.setText("OCR cancelled")
 
     def _save(self):
         try:

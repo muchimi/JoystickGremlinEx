@@ -33,6 +33,7 @@ from dinput import DeviceSummary
 from gremlin.filter import EMAFilter
 
 import gremlin.base_classes
+from gremlin import execution_guard
 from gremlin.fastqueue import FastQueue
 import gremlin.shared_state
 import gremlin.threading
@@ -545,6 +546,7 @@ class EventListener(QtCore.QObject):
     ui_ready = Signal()  # tell the UI all is ready
 
     ui_initialized = Signal()  # signal to tell the UI to refresh
+    device_initialized = Signal()  # emitted when joystick initialization is complete
 
     # Signal emitted when joystick events are received
     joystick_event = Signal(Event)  # Signal(Event)
@@ -3756,6 +3758,7 @@ class EventHandler(QtCore.QObject):
         self.overlay_callbacks = {}
         self.state_callbacks = {}
 
+    @execution_guard.boundary(aborted_result=(None, None))
     def execute_event(self, event: Event, skip_execute=False):
         """main execution (runtime) event handler - queues trigger callbacks on event input
 
@@ -3774,6 +3777,7 @@ class EventHandler(QtCore.QObject):
         verbose_detailed = verbose and config.verbose_mode_extra
         # verbose = True
 
+        execution_guard.checkpoint(event=event)
         self.registry.update(event)  # record the event
 
         input_item: gremlin.input_item.InputItem = None
@@ -4160,7 +4164,10 @@ class EventHandler(QtCore.QObject):
                 self._execute_callbacks(event, m_list, f_list)
 
             return m_list, f_list
+        except execution_guard.ExecutionAborted:
+            raise
         except Exception as err:
+            execution_guard.checkpoint()
             syslog.error(f"EVENT EXECUTE: error: {err}\n{traceback.format_exc()}")
         finally:
             pass
@@ -4171,16 +4178,21 @@ class EventHandler(QtCore.QObject):
         # if event.event_type == InputType.State and event.is_pressed == False:
         # 	pass
         for cb in callbacks:
+            execution_guard.checkpoint(event=event)
             try:
                 # if verbose:
                 # 	syslog.info(f"CALLBACK: execute start")
                 cb(event)
                 # if verbose:
                 # 	syslog.info(f"CALLBACK: execute done")
+            except execution_guard.ExecutionAborted:
+                raise
             except Exception as ex:
+                execution_guard.checkpoint()
                 syslog.error(f"CALLBACK: error {ex}")
                 tb_msg = traceback.format_exc()
                 syslog.error(tb_msg)
+            execution_guard.checkpoint()
 
     def _trigger_functor_callbacks(self, functors, event: Event):
         """trigger functor callbacks"""
@@ -4188,14 +4200,20 @@ class EventHandler(QtCore.QObject):
         import gremlin.actions
 
         for functor in functors:
+            execution_guard.checkpoint(event=event, functor=functor)
             try:
                 value = gremlin.actions.Value(event.value)
                 functor.process_event(event, value)
+            except execution_guard.ExecutionAborted:
+                raise
             except Exception as ex:
+                execution_guard.checkpoint()
                 syslog.error(f"FUNCTOR CALLBACK: error {ex}")
                 tb_msg = traceback.format_exc()
                 syslog.error(tb_msg)
+            execution_guard.checkpoint()
 
+    @execution_guard.boundary
     def _execute_callbacks(self, event, m_list, f_list):
         """triggers callbacks"""
         if m_list:

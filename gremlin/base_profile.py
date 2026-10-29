@@ -4015,8 +4015,9 @@ class Profile:
                 mode = dev.modes[mode_name]
                 for input_type in mode.config:
                     for item in mode.config[input_type].values():
-                        for container in item.containers:
-                            remap_actions.extend(extract_remap_actions(container.action_sets))
+                        if item:
+                            for container in item.containers:
+                                remap_actions.extend(extract_remap_actions(container.action_sets))
 
         return remap_actions
 

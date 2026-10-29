@@ -1788,8 +1788,16 @@ class ClientData:
     """holds network client data"""
 
     def __init__(self, auto: bool = True):
+        cfg = gremlin.config.Configuration()
         self.client_id = remote_client.clientId if auto else None  # id is a unique id corresponding to the host
-        self.client_name = remote_client.clientName if auto else None  # name of the client (optional)
+
+        # client name - user specified or system default
+        client_name = cfg.client_name
+        if client_name:
+            self.client_name = client_name
+        else:
+            self.client_name = remote_client.clientName if auto else gremlin.util.getHostName()
+        
         self.custom_name = remote_client.customName if auto else None  # custom name of the client (optional)
         self.client_version = gremlin.shared_state.application_version if auto else None  # version of the client (optional)
         self.client_timestamp = gremlin.shared_state.application_start_time if auto else None  # start time of the client (optional)
@@ -1798,7 +1806,7 @@ class ClientData:
         self.video_port = 0
         if auto:
             try:
-                cfg = gremlin.config.Configuration()
+
                 self.video_enabled = bool(cfg.enable_remote_control and cfg.remote_video_enabled)
                 self.video_port = int(cfg.remote_video_port) if self.video_enabled else 0
             except Exception:
@@ -2062,8 +2070,12 @@ class RemoteControl:
 
         if self._is_local != is_local or self._is_remote != is_remote:
             # status changed
-            self.is_local = is_local
-            self.is_remote = is_remote
+            self._is_local = is_local
+            self._is_remote = is_remote
+
+            # Publish the complete routing state, including local-only changes.
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_state_change.emit()
 
             syslog.info(
                 f"REMOTE CONTROL: local [{'ENABLED' if self._is_local else 'DISABLED'}] remote [{'ENABLED' if self._is_remote and self.remoteEnabled() else 'DISABLED' if self._is_remote else 'DISABLED'}]"
@@ -2160,7 +2172,10 @@ class RemoteControl:
 
     @is_local.setter
     def is_local(self, value: bool):
-        self._is_local = value
+        if self._is_local != value:
+            self._is_local = value
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_state_change.emit()
 
     @property
     def is_remote(self):

@@ -254,6 +254,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_state_input_id = None
         self._last_state_data = {}  # holds data for axis highlight switching
 
+        self._mapped_device_list = [] # holds the list of devices with active mappings (set when UI redraws)
+
         gremlin.shared_state.application_version = gremlin.version.APPLICATION_VERSION
 
         self.config = gremlin.config.Configuration()
@@ -677,12 +679,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
         look_for_containers = True
-
-        # # get the device widget
-        # widget = self.getRegisteredWidget(device_guid)
-        # if hasattr(widget, "inputCount"):
-        #     count = widget.inputCount
-        #     return {edit_mode: True} if count > 0 else {}
 
         match device_guid:
             # case gremlin.shared_state.state_tab_guid:
@@ -2868,12 +2864,22 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if has_map:
                         color = gremlin.ui.ui_common.Color().tabUsedOtherForegroundColor()
                         icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
+
                     else:
                         color = gremlin.ui.ui_common.Color().tabForegroundColor()
                         icon = QtGui.QIcon()
 
-                # self.ui.devices_tab_header_widget.setTabTextColor(position, color)
-                # self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
+                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+                self.ui.devices_tab_header_widget.setTabIcon(position, icon)
+
+    def getMappedDeviceList(self):
+        """Returns devices with mappings in any mode, in tab order."""
+        self._mapped_device_list[:] = [
+            data.device_guid for data in self._get_tab_map().values()
+            if any(self._get_mappings(data.device_guid).values())
+        ]
+        return self._mapped_device_list
+
 
     def _handle_feature_changed(self, feature):
         """called when a feature changes"""
@@ -6541,7 +6547,7 @@ def configure_logger(config: dict):
     unlink = config.get("unlink", True)
     try:
         if unlink and os.path.isfile(log_file):
-            os.unlink(log_file)
+            os.unlink(log_file) # @IgnoreException
     except IOError as err:
         syslog.error(f"Unable to remove old log file [{log_file}] - another instance may be running")
         # syslog.error(f"{err}\n{traceback.format_exc()}")
@@ -6675,10 +6681,19 @@ if __name__ == "__main__":
         process_name = gremlin.version.APPLICATION_EXE
         prompted = False
 
+
         # ensure only one instance is running at a time - this is setup to not require admin rights as long as the process is started by the user
-        while ph.processRunning(process_name):
-            # attempt to kill it
-            # run the application so we can get a message box UI
+        while True:
+            pid = ph.processRunning(process_name, return_pid=True)
+            if pid == -1:
+                # not running
+                break
+
+            # see if the process is ours
+            if pid == os.getpid():
+                # skip the current process
+                break
+
 
             if not prompted:
                 result = gremlin.ui.ui_common.ConfirmBox(
@@ -6695,6 +6710,8 @@ if __name__ == "__main__":
                     syslog.error(f"PROC: Failed to terminate process {process_name}")
                     os._exit(1)
                 syslog.info(f"PROC: Successfully terminated process {process_name}")
+
+                break
 
             else:
                 # terminate
@@ -6831,6 +6848,10 @@ if __name__ == "__main__":
 
         # Log module options for debugging purposes
         config.logModuleOptions()
+
+        # config default client name
+        if not config.client_name:
+            config.client_name = gremlin.util.getHostName()
 
         # event listener init (after processing command line args)
         el = gremlin.event_handler.EventListener()

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Callable
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -16,6 +17,8 @@ from .model import is_onscreen_mode, normalize_ocr_region
 syslog = logging.getLogger("system")
 
 _TEST_COUNTDOWN_S = 5
+_TEST_CAPTURE_LEASES = 0
+_TEST_CAPTURE_WINDOWS = []
 _LAST_TOPMOST_ASSERT_S = 0.0
 _TOPMOST_ASSERT_MIN_INTERVAL_S = 2.0
 
@@ -324,10 +327,22 @@ def capture_for_item(
             _assert_overlays_topmost(force=False)
 
 
+def _wait_capture(done, timeout, cancelled):
+    deadline = time.monotonic() + timeout
+    while not (cancelled is not None and cancelled()):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        if done.wait(min(0.02, remaining)):
+            return not (cancelled is not None and cancelled())
+    return False
+
+
 def _capture_armed_on_worker(
     item: dict[str, Any],
     *,
     rect: QtCore.QRect | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> QtGui.QImage | None:
     """Armed-scan capture: resolve geometry on UI (fast), BitBlt on the worker.
 
@@ -340,11 +355,16 @@ def _capture_armed_on_worker(
     import gremlin.util
     from gremlin.remote_video import grab_screen_image, grab_screen_rect
 
+    external_cancelled = cancelled
+    abandoned = threading.Event()
+    cancelled = lambda: abandoned.is_set() or (external_cancelled is not None and external_cancelled())
     style = item.get("style") or {}
     region = normalize_ocr_region(style.get("ocr_region"))
     resolved: dict[str, Any] = {"rect": rect, "region": region, "error": None}
 
     def _resolve():
+        if cancelled is not None and cancelled():
+            return
         try:
             if resolved["rect"] is None:
                 resolved["rect"], resolved["region"] = resolve_capture_rect(item)
@@ -366,7 +386,11 @@ def _capture_armed_on_worker(
                     done.set()
 
             gremlin.util.InvokeUiMethod(_resolve_and_signal)
-            if not done.wait(timeout=1.0):
+            if not _wait_capture(done, 1.0, cancelled):
+                was_cancelled = cancelled()
+                abandoned.set()
+                if was_cancelled:
+                    return None
                 syslog.warning(
                     "OBS OVERLAY OCR: rect resolve timed out widget=%s",
                     item.get("id") if item else None,
@@ -374,6 +398,8 @@ def _capture_armed_on_worker(
                 return None
     except Exception as err:
         syslog.warning(f"OBS OVERLAY OCR: armed capture resolve failed: {err}")
+        return None
+    if cancelled is not None and cancelled():
         return None
     if resolved.get("error") is not None:
         syslog.warning(f"OBS OVERLAY OCR: armed capture resolve error: {resolved['error']}")
@@ -398,6 +424,7 @@ def capture_for_item_sync(
     *,
     hide_overlay: bool = False,
     rect: QtCore.QRect | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> QtGui.QImage | None:
     """Thread-safe capture for OCR.
 
@@ -409,16 +436,23 @@ def capture_for_item_sync(
 
     import gremlin.util
 
+    if cancelled is not None and cancelled():
+        return None
     if not hide_overlay:
         try:
-            return _capture_armed_on_worker(item, rect=rect)
+            return _capture_armed_on_worker(item, rect=rect, cancelled=cancelled)
         except Exception as err:
             syslog.warning(f"OBS OVERLAY OCR: armed capture failed: {err}")
             return None
 
     holder: dict[str, Any] = {"image": None, "error": None}
+    external_cancelled = cancelled
+    abandoned = threading.Event()
+    cancelled = lambda: abandoned.is_set() or (external_cancelled is not None and external_cancelled())
 
     def _run():
+        if cancelled is not None and cancelled():
+            return
         try:
             holder["image"] = capture_for_item(item, hide_overlay=True, rect=rect)
         except Exception as err:
@@ -439,7 +473,11 @@ def capture_for_item_sync(
                     done.set()
 
             gremlin.util.InvokeUiMethod(_run_and_signal)
-            if not done.wait(timeout=5.0):
+            if not _wait_capture(done, 5.0, cancelled):
+                was_cancelled = cancelled()
+                abandoned.set()
+                if was_cancelled:
+                    return None
                 syslog.warning(
                     "OBS OVERLAY OCR: capture timed out waiting for UI thread widget=%s",
                     item.get("id") if item else None,
@@ -448,7 +486,7 @@ def capture_for_item_sync(
     except Exception as err:
         syslog.warning(f"OBS OVERLAY OCR: capture_for_item_sync failed: {err}")
         return None
-    if holder.get("error") is not None:
+    if (cancelled is not None and cancelled()) or holder.get("error") is not None:
         return None
     return holder.get("image")
 
@@ -461,6 +499,7 @@ class OcrRegionCountdown(QtWidgets.QWidget):
 
     def __init__(self, rect: QtCore.QRect, seconds: int = _TEST_COUNTDOWN_S, parent=None):
         super().__init__(parent)
+        self._done = False
         self._seconds_left = max(1, int(seconds))
         self._rect = QtCore.QRect(rect)
         self.setWindowFlags(
@@ -491,14 +530,26 @@ class OcrRegionCountdown(QtWidgets.QWidget):
         self.update()
 
     def _tick(self):
+        if self._done:
+            return
         self._seconds_left -= 1
         if self._seconds_left <= 0:
+            self._done = True
             self._timer.stop()
             self.hide()
             self.finished.emit()
             self.deleteLater()
             return
         self.update()
+
+    def cancel(self):
+        if self._done:
+            return
+        self._done = True
+        self._timer.stop()
+        self.hide()
+        self.cancelled.emit()
+        self.deleteLater()
 
     def paintEvent(self, _event):
         painter = QtGui.QPainter(self)
@@ -525,7 +576,13 @@ class OcrRegionCountdown(QtWidgets.QWidget):
 
 def _hide_overlays_for_test() -> list[tuple[QtWidgets.QWidget, bool]]:
     """Hide live overlays so the countdown frame sits over real screen content."""
+    global _TEST_CAPTURE_LEASES, _TEST_CAPTURE_WINDOWS
+    if _TEST_CAPTURE_LEASES:
+        _TEST_CAPTURE_LEASES += 1
+        return _TEST_CAPTURE_WINDOWS
+    _TEST_CAPTURE_LEASES = 1
     hidden: list[tuple[QtWidgets.QWidget, bool]] = []
+    _TEST_CAPTURE_WINDOWS = hidden
     for window in _overlay_windows():
         hidden.append((window, window.isVisible()))
         try:
@@ -540,6 +597,12 @@ def _hide_overlays_for_test() -> list[tuple[QtWidgets.QWidget, bool]]:
 
 
 def _restore_overlays(hidden: list[tuple[QtWidgets.QWidget, bool]]) -> None:
+    global _TEST_CAPTURE_LEASES, _TEST_CAPTURE_WINDOWS
+    if _TEST_CAPTURE_LEASES:
+        _TEST_CAPTURE_LEASES -= 1
+        if _TEST_CAPTURE_LEASES:
+            return
+        hidden, _TEST_CAPTURE_WINDOWS = _TEST_CAPTURE_WINDOWS, []
     for window, was_visible in hidden:
         try:
             window.setAttribute(QtCore.Qt.WA_DontShowOnScreen, False)
@@ -549,46 +612,94 @@ def _restore_overlays(hidden: list[tuple[QtWidgets.QWidget, bool]]) -> None:
             pass
 
 
+class OcrTestCapture(QtCore.QObject):
+    """Owned countdown handle; completion/cancellation restores the HUD once."""
+
+    def __init__(self, item, rect, seconds, on_done, cancelled):
+        super().__init__(QtWidgets.QApplication.instance())
+        self._item = item
+        self._rect = rect
+        self._on_done = on_done
+        self._cancelled = cancelled
+        self._done = False
+        self._hidden = _hide_overlays_for_test()
+        try:
+            self._countdown = OcrRegionCountdown(rect, seconds=seconds)
+        except Exception:
+            _restore_overlays(self._hidden)
+            self.deleteLater()
+            raise
+        self._countdown.finished.connect(self._finish)
+        self._countdown.cancelled.connect(self._cancel_ui)
+
+    def start(self):
+        if self._cancelled is not None and self._cancelled():
+            self._cancel_ui()
+        else:
+            self._countdown.start()
+
+    def cancel(self):
+        import gremlin.util
+
+        gremlin.util.InvokeUiMethod(self._cancel_ui)
+
+    def _cleanup(self):
+        hidden, self._hidden = self._hidden, []
+        _restore_overlays(hidden)
+        self._countdown = None
+        self._on_done = None
+        self._item = None
+        self.deleteLater()
+
+    def _cancel_ui(self):
+        if self._done:
+            return
+        self._done = True
+        try:
+            self._countdown.cancel()
+        finally:
+            self._cleanup()
+
+    def _finish(self):
+        if self._done:
+            return
+        if self._cancelled is not None and self._cancelled():
+            self._cancel_ui()
+            return
+        self._done = True
+        callback = self._on_done
+        try:
+            image = capture_for_item(self._item, hide_overlay=False, rect=self._rect)
+        except Exception as err:
+            syslog.warning("OBS OVERLAY OCR: Test once capture failed: %s", err)
+            image = None
+        finally:
+            self._cleanup()
+        if callback is not None and not (self._cancelled is not None and self._cancelled()):
+            callback(image)
+
+
 def run_test_capture_countdown(
     item: dict[str, Any],
     *,
     seconds: int = _TEST_COUNTDOWN_S,
     on_done: Callable[[QtGui.QImage | None], None] | None = None,
-) -> bool:
+    cancelled: Callable[[], bool] | None = None,
+) -> OcrTestCapture | None:
     """Show the OCR region on screen, countdown, then capture. UI thread only.
 
-    Returns False if the region could not be resolved (no capture scheduled).
+    Returns a cancellation handle, or None if the region cannot be resolved.
     """
     # Resolve before hiding so on-screen multi-monitor mapping stays correct.
     rect, _region = resolve_capture_rect(item)
     if rect is None or rect.width() <= 0 or rect.height() <= 0:
         syslog.warning("OBS OVERLAY OCR: Test once — could not resolve capture region")
-        if on_done is not None:
-            on_done(None)
-        return False
+        return None
 
-    # Keep a strong ref so the countdown is not GC'd mid-timer.
-    holder: dict[str, Any] = {"hidden": _hide_overlays_for_test()}
-
-    def _finish():
-        # Overlays already hidden for the countdown — capture with the resolved rect.
-        try:
-            image = capture_for_item(item, hide_overlay=False, rect=rect)
-        except Exception as err:
-            syslog.warning(f"OBS OVERLAY OCR: Test once capture failed: {err}")
-            image = None
-        finally:
-            _restore_overlays(holder.pop("hidden", []))
-            holder.pop("countdown", None)
-        if on_done is not None:
-            on_done(image)
-
-    countdown = OcrRegionCountdown(rect, seconds=seconds)
-    holder["countdown"] = countdown
-    countdown.finished.connect(_finish)
-    countdown.start()
+    handle = OcrTestCapture(item, rect, seconds, on_done, cancelled)
+    handle.start()
     syslog.info(
         f"OBS OVERLAY OCR: Test once — region {rect.x()},{rect.y()} "
         f"{rect.width()}x{rect.height()}, countdown {seconds}s"
     )
-    return True
+    return handle
