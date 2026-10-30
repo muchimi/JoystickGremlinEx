@@ -522,7 +522,9 @@ class CodeRunner:
                 if not device_node.enabled or not device_node.connected:
                     continue
                 # Skip unmatched / stub virtual devices (vjoy_id defaults to -1).
-                if not (isinstance(device_node.vjoy_id, int) and 1 <= device_node.vjoy_id <= 16):
+                if device_node.device_type == DeviceType.VJoy and not (
+                    isinstance(device_node.vjoy_id, int) and 1 <= device_node.vjoy_id <= 16
+                ):
                     continue
 
                 device_id = device_node.device_id
@@ -693,7 +695,7 @@ class CodeRunner:
 
             # applies profile start data
             # this will override global settings
-            for vjoy_device in gremlin.joystick_handling.virtual_devices():
+            for vjoy_device in gremlin.joystick_handling.vjoy_devices():
                 vjoy_device_guid = vjoy_device.device_guid
                 vjoy_id = vjoy_device.vjoy_id
                 for vjoy_input_id in range(1, vjoy_device.axis_count + 1):

@@ -2197,6 +2197,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             ),
             ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", "GEX_VOICE_ENABLED"),
             ("octavi", "Octavi", "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.", "GEX_OCTAVI_ENABLED"),
+            (
+                "maestro",
+                "Maestro",
+                "When set, GremlinEx enables the Maestro bridge module for interacting with HID Maestro virtual controllers.",
+                "GEX_MAESTRO_ENABLED",
+            ),
         ]
 
         self._module_visible_map = {
@@ -2207,10 +2213,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             "osc": self.config.isDeviceVisible(gremlin.shared_state.osc_tab_guid),
             "voice": self.config.isDeviceVisible(gremlin.shared_state.voice_tab_guid),
             "octavi": self.config.isDeviceVisible(gremlin.shared_state.octavi_tab_guid),
+            "maestro": self.config.maestro_enabled,
         }
 
         widgets = []
         for data, name, description, env_var in modules:
+            enabled = True
             match data:
                 case "streamdeck":
                     value = self.config.streamdeck_enabled
@@ -2226,7 +2234,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.voice_enabled
                 case "octavi":
                     value = self.config.octavi_enabled
+                case "maestro":
+                    value = self.config.maestro_enabled
+                    enabled = False
             checkbox = QDataCheckbox(name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed)
+            checkbox.setEnabled(enabled)
             if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
                 var_widget = QtWidgets.QLabel(f"({env_var} set)")
                 widget = getHContainer([checkbox, var_widget, "||"], widget_only=True)
@@ -2277,6 +2289,23 @@ Enabled modules may not show until the device filter is updated.
                 self.config.midi_enabled = checked
                 if checked and not self._module_visible_map[data]:
                     self.config.setDeviceVisible(gremlin.shared_state.midi_tab_guid, True)
+            case "osc":
+                self.config.osc_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.osc_tab_guid, True)
+            case "voice":
+                self.config.voice_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.voice_tab_guid, True)
+            case "octavi":
+                self.config.octavi_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.octavi_tab_guid, True)
+            case "maestro":
+                self.config.maestro_enabled = checked
+                # update visibility of tool
+                self.config.maestro_enabled = checked
+                gremlin.shared_state.ui.setMaestroEnabled(checked)
             case "osc":
                 self.config.osc_enabled = checked
                 if checked and not self._module_visible_map[data]:
@@ -3548,9 +3577,7 @@ class ProcessWindow(BaseDialogUi):
         self.button_bar_layout = QtWidgets.QHBoxLayout()
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
-        self.refresh_button = QDataPushButton(
-            "Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh
-        )
+        self.refresh_button = QDataPushButton("Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh)
 
         self.main_layout.addWidget(self.list_view)
 
@@ -3672,9 +3699,7 @@ class LogWindowUi(BaseDialogUi):
         layout = QtWidgets.QVBoxLayout(page)
         log_display = QtWidgets.QTextEdit()
         log_display.setText(open(fname).read())
-        button = QDataPushButton("Clear log",
-                                 tooltip = "Clears the log",
-                                 callback = lambda f = fname: self._clear_log(f))
+        button = QDataPushButton("Clear log", tooltip="Clears the log", callback=lambda f=fname: self._clear_log(f))
 
         layout.addWidget(log_display)
         layout.addWidget(button)
@@ -3775,15 +3800,10 @@ class ModeManagerAddUI(BaseDialogUi):
 
         self.main_layout.addWidget(widget)
 
-        cancel_button_widget = QDataPushButton("Cancel", callback = self._cancel_cb)
-        ok_button_widget = QDataPushButton("Ok", callback = self._close_cb)
+        cancel_button_widget = QDataPushButton("Cancel", callback=self._cancel_cb)
+        ok_button_widget = QDataPushButton("Ok", callback=self._close_cb)
 
-        widget = getHContainer(
-            [ok_button_widget, cancel_button_widget],
-            left_stretch=True,
-            widget_only=True,
-            auto_size=True
-        )
+        widget = getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True, auto_size=True)
         button_container_widget = widget
 
         self.main_layout.addWidget(button_container_widget)
@@ -4009,17 +4029,13 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"),
-                                                     tooltip="Edit",
-                                                     callback = lambda m = mode: self._create_rename_mode_cb(m))
+            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"), tooltip="Edit", callback=lambda m=mode: self._create_rename_mode_cb(m))
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"),
-                                                     tooltip="Delete",
-                                                     callback=lambda m = mode: self._create_delete_mode_cb(m))
+            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"), tooltip="Delete", callback=lambda m=mode: self._create_delete_mode_cb(m))
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
 
@@ -4252,8 +4268,7 @@ class DeviceInformationDialog(BaseDialogUi):
         self.script_copy_button = QDataPushButton("Generate plugin script header")
         self.script_copy_button.clicked.connect(self._copy_to_script)
 
-        self.close_button = QDataPushButton("Close", callback = lambda: self.close())
-
+        self.close_button = QDataPushButton("Close", callback=lambda: self.close())
 
         widgets = [
             self.show_disconnected_widget,
@@ -4263,7 +4278,7 @@ class DeviceInformationDialog(BaseDialogUi):
             self.close_button,
         ]
 
-        widget = getHContainer(widgets, widget_only=True,auto_size=True)
+        widget = getHContainer(widgets, widget_only=True, auto_size=True)
         self.main_layout.addWidget(widget)
 
         # load the data
@@ -4547,7 +4562,6 @@ class SwapDevicesUi(BaseDialogUi):
             150,
         )
         self.input_dialog.show()
-
 
 
 class SubstituteDialog(QRememberDialog):
@@ -4948,9 +4962,7 @@ class DeviceDisplayDialog(QRememberDialog):
         save_order_widget = QDataPushButton("Save...", tooltip="Save a device device order", callback=self._handle_save_order)
         load_order_widget = QDataPushButton("Load...", tooltip="Load a saved device order", callback=self._handle_load_order)
 
-        self.last_order_widget = QDataPushButton(
-            "Load Last", tooltip="Load last saved device order", callback=self._handle_load_last_order
-        )
+        self.last_order_widget = QDataPushButton("Load Last", tooltip="Load last saved device order", callback=self._handle_load_last_order)
 
         action_container_widget = getHContainer(
             [default_order_widget, "||", save_order_widget, self.last_order_widget, load_order_widget],

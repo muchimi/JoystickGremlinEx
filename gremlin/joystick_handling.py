@@ -80,6 +80,35 @@ _config_devices_map = {}  # map of DeviceSummary objects keyed by dInput GUID (c
 _config_devices = []  # list of config devices (setings, plugins)
 _all_devices_map = gremlin.util.TriggerDict()  # all detected or loaded devices [dinput.GUID] -> device
 _device_registry_lock = threading.RLock()
+_maestro_service_devices = {}  # selected OSC service devices, keyed by stable GUID
+_maestro_replaced_devices = {}  # native registry entries covered by service metadata
+
+
+def set_maestro_devices(devices):
+    """Replace the Maestro service list and rebuild all virtual device maps."""
+    global _maestro_service_devices
+    with _device_registry_lock:
+        for guid, previous in _maestro_service_devices.items():
+            if _all_devices_map.get(guid) is previous:
+                original = _maestro_replaced_devices.pop(guid, None)
+                if original is None:
+                    _all_devices_map.pop(guid, None)
+                    _joystick_device_guid_map.pop(guid, None)
+                else:
+                    _all_devices_map[guid] = original
+                    _joystick_device_guid_map[guid] = original
+        _maestro_service_devices = {device.device_guid: device for device in devices}
+        _update_joystick_device_maps()
+
+
+def _apply_maestro_service_devices():
+    """Reapply service metadata after native hot-plug enumeration."""
+    for guid, device in _maestro_service_devices.items():
+        native = _all_devices_map.get(guid)
+        if native is not None and native is not device:
+            _maestro_replaced_devices[guid] = native
+        _all_devices_map[guid] = device
+        _joystick_device_guid_map[guid] = device
 
 
 def getAllDevicesMap():
@@ -437,7 +466,7 @@ def get_curved_axis(device_guid, axis_id):
     if not device.is_special:
         guid = device.device_guid
         eh = gremlin.event_handler.EventListener()
-        value = dinput.DILL.get_axis(guid, axis_id)
+        value = device.get_axis(axis_id)
         curved = eh.apply_transforms(guid, axis_id, value)
         if verbose:
             syslog.info(f"APPLY CURVE: {device.name} axis: [{axis_id}] input: {value:0.3f} curved: {curved:0.3f}")
@@ -465,7 +494,7 @@ def get_device(device_guid: int | str | dinput.GUID, show_error=True) -> DeviceS
 
 def get_axis(device_guid: str | dinput.GUID | int, input_id: int, normalized=True):
     """gets the value of the specified axis
-    :param device_guid: device guid
+    :param device_guid: device GUID (including Maestro targets), or a vJoy integer ID
     :param input_id: axis index (1 based), non linear
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
 
@@ -476,7 +505,7 @@ def get_axis(device_guid: str | dinput.GUID | int, input_id: int, normalized=Tru
     dev: DeviceSummary = get_device(device_guid)
     if dev and dev.axis_count:
         assert input_id in dev.axis_id_map, f"invalid axis index [{input_id}] for device {dev.name}"
-        value = dinput.DILL.get_axis(dev.device_guid, input_id)
+        value = dev.get_axis(input_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min=-32767, source_max=32767, target_min=-1, target_max=1)
         return value
@@ -486,7 +515,7 @@ def get_axis(device_guid: str | dinput.GUID | int, input_id: int, normalized=Tru
 
 def get_hat(device_guid: str | dinput.GUID | int, index) -> int:
     """gets the current hat value
-    :param device_guid: device guid or vjoy device ID (integer)
+    :param device_guid: device GUID (including Maestro targets), or a vJoy integer ID
     :param index: hat index 1 to 4
     :return: hat value
 
@@ -533,7 +562,7 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
                         vid = 0
                     # vJoy IDs are 1–16. -1 is the DeviceSummary default and is
                     # truthy in Python, so "if vjoy_id" is not a valid check.
-                    if device.is_virtual and 1 <= vid <= 16:
+                    if device.device_type == DeviceType.VJoy and 1 <= vid <= 16:
                         try:
                             button = VJoyProxy()[vid].button(input_id)
                         except Exception as exc:
@@ -635,6 +664,12 @@ def set_button(device_guid: str | dinput.GUID | int, index: int, is_pressed: boo
             syslog.info(f"VJOY SET BUTTON: {device.name} output ignored [{index}] pressed: {is_pressed}")
         return
 
+    if device.device_type == DeviceType.Maestro:
+        from gremlin.maestro import MaestroOutputDevice
+        if 0 < index <= device.button_count:
+            MaestroOutputDevice(device.virtual_id).button(index).is_pressed = is_pressed
+        return
+
     # local input
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
@@ -675,6 +710,12 @@ def set_axis(device_guid, index: int, value: float, update_remote: bool = False)
             syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
         return
 
+    if device.device_type == DeviceType.Maestro:
+        from gremlin.maestro import MaestroOutputDevice
+        if 0 < index <= device.axis_count:
+            MaestroOutputDevice(device.virtual_id).axis(index).value = value
+        return
+
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
         syslog.warning(f"VJOY SET AXIS: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
@@ -701,6 +742,11 @@ def set_hat(device_guid: str | dinput.GUID | int, index: int, direction: tuple):
         syslog.error(f"VJOY SET HAT: Don't know device [{device_guid}]")
         return
     if not device.connected or not device.is_virtual:
+        return
+    if device.device_type == DeviceType.Maestro:
+        from gremlin.maestro import MaestroOutputDevice
+        if 0 < index <= device.hat_count:
+            MaestroOutputDevice(device.virtual_id).hat(index).direction = direction
         return
     vjoy_id = device.vjoy_id
     if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
@@ -1074,7 +1120,7 @@ def getVjoyDeviceMap() -> dict:
 
 def getMaestroDeviceMap() -> dict:
     """gets a map of maestro devices keyed by the maestro id, holds a DeviceSummary"""
-    return dinput.DILL.getMaestroDeviceMap()
+    return maestro_device_map()
 
 
 def vjoy_info_from_vjoy_id(vjoy_id: int, connected_only=True):  # -> DeviceSummary:
@@ -1783,6 +1829,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                         syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
 
                 if not should_terminate:
+                    _apply_maestro_service_devices()
                     if len(_joystick_device_guid_map) == 0:
                         syslog.error("Error (fatal): no usable VJOY devices found.")
                         should_terminate = True
@@ -1895,6 +1942,7 @@ def _update_joystick_device_maps():
         _all_vjoy_devices_map
 
     with _device_registry_lock:
+        _apply_maestro_service_devices()
         _all_joystick_devices = [dev for dev in _all_devices_map.values() if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)]
         _all_joystick_devices.sort(key=lambda x: x.name.casefold())
 
@@ -1910,7 +1958,7 @@ def _update_joystick_device_maps():
         _vjoy_devices.sort(key=lambda x: x.vjoy_id)
         _disconnected_devices_map = {dev.device_guid: dev for dev in _all_devices_map.values() if not dev.connected}
         _disconnected_devices = [dev for dev in _disconnected_devices_map.values()]
-        _maestro_devices_map = {dev.device_guid: dev for dev in _all_devices_map.values() if dev.device_type == DeviceType.Maestro}
+        _maestro_devices_map = {dev.virtual_id: dev for dev in _all_devices_map.values() if dev.device_type == DeviceType.Maestro}
         _maestro_devices = [dev for dev in _maestro_devices_map.values()]
         _maestro_devices.sort(key=lambda x: x.name.casefold())
 

@@ -49,6 +49,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T88):
+- Change: Maestro: initial code check-in for the upcoming new bridge module and interface to HIDMaestro. Add GEX module/support for output to VJOY and Maestro devices using the same mapping actions.  Note: The module is currently disabled in this release and there will be more information on this later as this moves farther along.
+- Fix: Overlay: widgets may not become enabled on profile stop.
+- Fix: States: a newly filtered input may not display the corresponding mapping information if it was in the same position before the filter was applied.
+
+
 ### (m77T87):
 - New: KVM Action: (feature request): enable local and KVM output based on the current remoting mode (local or remote).  If local and remote are concurrently enabled, this will concurrently forward kbd and mouse to the client and local machine.
 - New: Input Viewer: **Select Used** button added.  This will automatically select inputs and outputs in use in the current profile based on input configuration and mapping data.

@@ -4336,8 +4336,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     self.setWarning(f"Virtual configuration has changed and GremlinEx is unable to find requested Vjoy device [{self.action_data.virtual_id}]")
                     return
 
-            if not gremlin.joystick_handling.is_vjoy_connected(self.action_data.virtual_id):
-                self.setWarning(f"VJOY device [{self.action_data.virtual_id}] is not currently connected or available.")
+            if not self.action_data.virtual_device.connected:
+                self.setWarning(f"Virtual device [{self.action_data.virtual_id}] is not currently connected or available.")
 
             device = self.action_data.virtual_device
             if action_mode in (
@@ -5255,6 +5255,44 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     """Executes a remap action when called."""
 
+    def _is_maestro_target(self):
+        device = getattr(self.action_data, "virtual_device", None)
+        return device is not None and device.device_type == DeviceType.Maestro
+
+    def _output_key(self, device_id):
+        return self.action_data.virtual_device.device_guid if self._is_maestro_target() else device_id
+
+    def _target_device(self, device_id):
+        if self._is_maestro_target():
+            device = self.action_data.virtual_device
+            return joystick_handling.getDevice(device.device_guid)
+        return joystick_handling.getDeviceFromVjoyId(device_id)
+
+    def _is_output_connected(self, device_id):
+        if self._is_maestro_target():
+            device = self._target_device(device_id)
+            return device is not None and device.connected
+        return joystick_handling.is_vjoy_connected(device_id)
+
+    def _output_device(self, device_id):
+        if self._is_maestro_target():
+            from gremlin.maestro import MaestroOutputDevice
+            return MaestroOutputDevice(device_id)
+        return joystick_handling.VJoyProxy()[device_id]
+
+    def _send_flags(self):
+        # Maestro's OSC host is its output transport. GEX's separate remote
+        # vJoy protocol cannot identify these devices by their service IDs.
+        return (True, False) if self._is_maestro_target() else self.action_data.sendFlags()
+
+    def _register_button_release(self, target, event, **options):
+        if self._is_maestro_target():
+            device_id, button_id = target
+            input_devices.CallbackActions().register_callback(
+                lambda: setattr(self._output_device(device_id).button(button_id), "is_pressed", False), event)
+        else:
+            input_devices.CallbackActions().register_button_release(target, event, **options)
+
     def findMainWindow(self):
         # Global function to find the (open) QMainWindow in application
         app = QtWidgets.QApplication.instance()
@@ -5276,7 +5314,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         input_item = action_data.input_item
 
         # check vjoy output is found
-        dev = joystick_handling.getDeviceFromVjoyId(self.vjoy_id)
+        dev = self._target_device(self.vjoy_id)
         if not dev:
             self._valid = False
             if self.verbose:
@@ -5508,19 +5546,19 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     @property
     def reverse(self):
         # axis reversed state
-        return self.usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
+        return self.usage_data.is_inverted(self._output_key(self.vjoy_id), self.vjoy_input_id)
 
     def toggle_reverse(self):
         # toggles reverse mode for the axis
-        inverted = self.usage_data.is_inverted(self.vjoy_id, self.vjoy_input_id)
-        self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, not inverted)
+        inverted = self.usage_data.is_inverted(self._output_key(self.vjoy_id), self.vjoy_input_id)
+        self.usage_data.set_inverted(self._output_key(self.vjoy_id), self.vjoy_input_id, not inverted)
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
             syslog.info(f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}")
 
     def setReverse(self, value: bool):
         """sets the axis' reverse state"""
-        self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, value)
+        self.usage_data.set_inverted(self._output_key(self.vjoy_id), self.vjoy_input_id, value)
 
     def latch_extra_inputs(self, container_condition_node=None, action_condition_node=None):
         """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id, functor)
@@ -5605,7 +5643,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.curve_actions = None
         # setup initial state
 
-        is_local, is_remote = self.action_data.sendFlags()
+        is_local, is_remote = self._send_flags()
         is_paired = gremlin.remote.remote_control.paired
         config = gremlin.config.Configuration()
         verbose = self.verbose or config.verbose_mode_outputs or config.verbose_mode_vjoy
@@ -5616,7 +5654,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.synced = False  # indicate not synchronized
         self._last_time = time.time()
         self.encoder_timer = None
-        self.device = gremlin.joystick_handling.getDeviceFromVjoyId(self.action_data.vjoy_id)
+        self.device = self._target_device(self.action_data.vjoy_id)
         key = self.getSteppedIndexDataKey()
         if key in self.device.data:
             # force a re-read of the data
@@ -5639,19 +5677,19 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # sync the start button state
-            if self.action_data.button_start_value is not None and gremlin.joystick_handling.is_vjoy_connected(self.action_data.virtual_id):
+            if self.action_data.button_start_value is not None and self._is_output_connected(self.action_data.virtual_id):
                 if verbose:
                     syslog.info(
                         f"VJOY REMAP: startup vjoy: [{self.action_data.virtual_id}] button [{self.action_data.vjoy_button_id}] set to {'pressed' if self.action_data.button_start_value else 'released'}"
                     )
 
                 vjoy_id = self.action_data.virtual_id
-                dev = joystick_handling.getDeviceFromVjoyId(vjoy_id)
+                dev = self._target_device(vjoy_id)
                 if dev:
                     # Keep hardware input_id intact for later get_button(device_guid, input_id).
                     vjoy_button_id = self.action_data.vjoy_button_id
                     if vjoy_button_id > 0 and vjoy_button_id <= dev.button_count:
-                        joystick_handling.VJoyProxy()[vjoy_id].button(vjoy_button_id).is_pressed = self.action_data.button_start_value
+                        self._output_device(vjoy_id).button(vjoy_button_id).is_pressed = self.action_data.button_start_value
                     else:
                         syslog.warning(f"VJOY: unable to set output button [{vjoy_button_id}] for vjoy [{vjoy_id}] (not found)")
                 else:
@@ -5880,8 +5918,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     # hat output
                     position = self.action_data.vjoy_hat_position if is_pressed else self.action_data.vjoy_hat_return_position
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
+                        if self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = position
                     if is_remote:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -5897,8 +5935,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     vs.setStartState(self.vjoy_id, self.vjoy_input_id, value)
                     self.action_data.button_last_value = value
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = value
+                        if self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = value
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -5942,7 +5980,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # issue vjoy button releases if needed
-            is_local, is_remote = self.action_data.sendFlags()
+            is_local, is_remote = self._send_flags()
             is_paired = gremlin.remote.remote_control.paired
             action_mode = self.action_data.action_mode
             if action_mode in (
@@ -5953,8 +5991,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # hat modes
                 position = (0, 0)  # return hat to center
                 if is_local:
-                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
+                    if self._is_output_connected(self.vjoy_id):
+                        self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = position
                 if is_remote:
                     self.remote_client.send_hat(
                         self.vjoy_id,
@@ -5972,8 +6010,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # button modes
                 is_pressed = False
                 if is_local:
-                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
+                    if self._is_output_connected(self.vjoy_id):
+                        self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
                 if is_remote or is_paired:
                     self.remote_client.send_button(
                         self.vjoy_id,
@@ -6031,8 +6069,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.info(f"pulse ON vjoy [{device_id}] button [{input_id}]")
 
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                            joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = True
+                        if self._is_output_connected(device_id):
+                            self._output_device(device_id).button(input_id).is_pressed = True
                     if is_remote:
                         self.remote_client.send_button(
                             device_id,
@@ -6045,8 +6083,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if self.verbose_extra:
                         syslog.info(f"pulse ON vjoy [{device_id}] hat [{input_id}] position: [{position}]")
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
+                        if self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = position
                     if is_remote:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -6068,8 +6106,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 if self.verbose_extra:
                     syslog.info(f"Pulse OFF vjoy [{device_id}] button {input_id}")
                 if is_local:
-                    if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                        joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = False
+                    if self._is_output_connected(device_id):
+                        self._output_device(device_id).button(input_id).is_pressed = False
                 if is_remote:
                     self.remote_client.send_button(
                         device_id,
@@ -6085,8 +6123,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 if self.verbose_extra:
                     syslog.info(f"pulse OFF vjoy [{device_id}] hat [{input_id}] position: [{position}]")
                 if is_local:
-                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
+                    if self._is_output_connected(self.vjoy_id):
+                        self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = position
                 if is_remote:
                     self.remote_client.send_hat(
                         self.vjoy_id,
@@ -6159,7 +6197,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _relative_pulse_on(self, data):
         vjoy_id, vjoy_input_id, is_local, is_remote = data
-        if not gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+        if not self._is_output_connected(self.vjoy_id):
             return
 
         with self.lock:
@@ -6170,12 +6208,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 syslog.info(f"Tick: {offset:0.3f} scale: {self.scale_factor:0.3f}")
 
             # read the current output axis value
-            value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+            value = self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value
 
             # apply the offset
             value = gremlin.util.clamp(value + offset)
             if is_local:
-                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+                self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value = value
             if is_remote:
                 self.remote_client.send_relative_axis(
                     self.vjoy_id,
@@ -6188,7 +6226,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _set_axis_value(self):
         """sets the axis value"""
-        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+        if self._is_output_connected(self.vjoy_id):
             verbose = self.verbose
             if self.action_data.target_use_last:
                 # set the output to the current value, but wiggle it so the target app detects a change
@@ -6227,7 +6265,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                 if self.action_data.use_relative_value:
                     # read the current output axis value
-                    value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+                    value = self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value
                     # apply the offset
                     value += target_value
                 else:
@@ -6363,14 +6401,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         extra_data,
     ):
         """runs when a joystick even occurs like a button press or axis movement when a profile is running"""
-        is_local, is_remote = self.action_data.sendFlags()
+        is_local, is_remote = self._send_flags()
 
         verbose = self.verbose
         # verbose = True
         verbose_extra = self.verbose_extra
 
         # syslog = logging.getLogger("system")
-        if event.force_remote:
+        if event.force_remote and not self._is_maestro_target():
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
@@ -6485,8 +6523,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
                         self.action_data.button_last_value = is_pressed
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
+                            if self._is_output_connected(self.vjoy_id):
+                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6603,8 +6641,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 release_input_id = self.pressed_hat_buttons[pressed_position]
                                 if release_input_id > 0:
                                     if is_local:
-                                        if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                                            joystick_handling.VJoyProxy()[device_id].button(release_input_id).is_pressed = False
+                                        if self._is_output_connected(device_id):
+                                            self._output_device(device_id).button(release_input_id).is_pressed = False
                                     if is_remote:
                                         self.remote_client.send_button(
                                             device_id,
@@ -6630,8 +6668,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 self.pressed_hat_buttons[position] = input_id
                 self.action_data.button_last_value = is_pressed
                 if is_local:
-                    if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                        joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = is_pressed
+                    if self._is_output_connected(device_id):
+                        self._output_device(device_id).button(input_id).is_pressed = is_pressed
                 if is_remote:
                     self.remote_client.send_button(device_id, input_id, is_pressed, client_list=self.client_list)
 
@@ -6652,8 +6690,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         if verbose:
                             syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(input_id).is_pressed = False
+                            if self._is_output_connected(self.vjoy_id):
+                                self._output_device(self.vjoy_id).button(input_id).is_pressed = False
                         if is_remote:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6688,10 +6726,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         pressed_value = not pressed_value
 
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                            if self._is_output_connected(self.vjoy_id):
                                 if verbose:
                                     syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
+                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = pressed_value
                         if is_remote or is_paired:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6720,7 +6758,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             if auto_release:
                                 if verbose:
                                     syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
-                                input_devices.CallbackActions().register_button_release(
+                                self._register_button_release(
                                     (self.vjoy_id, self.vjoy_input_id),
                                     event,
                                     is_local=is_local,
@@ -6745,10 +6783,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if trigger:
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                            if self._is_output_connected(self.vjoy_id):
                                 if verbose:
                                     syslog.info(f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]")
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
+                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = pressed_value
                         if is_remote or is_paired:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6769,8 +6807,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     else:
                         direction = self.action_data.vjoy_hat_return_position
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
+                        if self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = direction
                         if is_remote or is_paired:
                             self.remote_client.send_hat(
                                 self.vjoy_id,
@@ -6786,8 +6824,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.info(f"VJOY: set hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
                     direction = self.action_data.vjoy_hat_position
                     if is_local:
-                        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
+                        if self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = direction
                         if is_remote or is_paired:
                             self.remote_client.send_hat(
                                 self.vjoy_id,
@@ -6835,8 +6873,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if fire_event:
                         self.action_data.button_last_value = True
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = True
+                            if self._is_output_connected(self.vjoy_id):
+                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = True
                         if is_remote or is_paired:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6853,8 +6891,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if fire_event:
                         self.action_data.button_last_value = False
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = False
+                            if self._is_output_connected(self.vjoy_id):
+                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = False
                         if is_remote or is_paired:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6870,8 +6908,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if fire_event:
                         if input_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed:
                             if is_local:
-                                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                                    button = joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id)
+                                if self._is_output_connected(self.vjoy_id):
+                                    button = self._output_device(self.vjoy_id).button(self.vjoy_input_id)
                                     button.is_pressed = not button.is_pressed
                                     self.action_data.button_last_value = button.is_pressed
                                     if verbose:
@@ -6919,7 +6957,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     # changes the output range on the target device / axis
                     if fire_event:
                         self.usage_data.set_range(
-                            self.vjoy_id,
+                            self._output_key(self.vjoy_id),
                             self.vjoy_input_id,
                             self.range_low,
                             self.range_high,
@@ -7178,7 +7216,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         if is_local:
                             if verbose:
                                 syslog.info(f"VJOY: send local button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
+                            self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote:
                             if verbose:
                                 syslog.info(f"VJOY: send remote button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
@@ -7195,7 +7233,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             if is_local:
                 if self.verbose:
                     syslog.info(f"VJOY: send local hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}")
-                joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = action_value.current
+                self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = action_value.current
             if is_remote:
                 if self.verbose:
                     syslog.info(f"VJOY: send remote hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}")
@@ -7257,8 +7295,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._stop_pid_axis()
         if value is None:
             value = self.action_data.axis_last_value
-            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
+            if self._is_output_connected(self.vjoy_id):
+                value = self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value
         if value is None or not math.isfinite(value):
             value = 0.0
         with self._pid_axis_condition:
@@ -7449,13 +7487,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _set_axis(self, vid: int, axis_id: int, value: float, send_flags=None, force_remote=False):
         """Write the selected axis using routing already resolved by the caller."""
-        is_local, is_remote = self.action_data.sendFlags() if send_flags is None else send_flags
-        if force_remote:
+        is_local, is_remote = self._send_flags() if send_flags is None else send_flags
+        if self._is_maestro_target():
+            is_local, is_remote = True, False
+        elif force_remote:
             is_local, is_remote = False, True
         if is_local:
             if self.verbose:
                 syslog.info(f"VJOY: send local axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
-            joystick_handling.VJoyProxy()[vid].axis(axis_id).value = value
+            self._output_device(vid).axis(axis_id).value = value
         if is_remote:
             if self.verbose:
                 syslog.info(f"VJOY: send remote axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
@@ -7469,8 +7509,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _get_axis(self, vid: int, axis_id: int) -> float:
         """gets the axis value using the inversion factor"""
-        value = joystick_handling.VJoyProxy()[vid].axis(axis_id).value
-        inverted = self.usage_data.is_inverted(vid, axis_id)
+        value = self._output_device(vid).axis(axis_id).value
+        inverted = self.usage_data.is_inverted(self._output_key(vid), axis_id)
         if inverted:
             value = -value
         return value
@@ -7481,11 +7521,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
     def relative_axis_thread(self):
-        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+        if self._is_output_connected(self.vjoy_id):
             self.thread_running = True
-            vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_id]
+            vjoy_dev = self._output_device(self.vjoy_id)
             self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
-            is_local, is_remote = self.action_data.sendFlags()
+            is_local, is_remote = self._send_flags()
             wait_event = threading.Event()
             while self.thread_running:
                 try:

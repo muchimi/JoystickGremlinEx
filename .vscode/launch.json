@@ -12,7 +12,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/gremlinEx.py",
             "console": "integratedTerminal",
-            "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            "env": {
+                "PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}",
+                "GEX_DIAGNOSTIC_MODE": "1"
+            },
             //"justMyCode": false,
             "justMyCode": true,
             // "rules": [

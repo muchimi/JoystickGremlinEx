@@ -4239,7 +4239,7 @@ class InputItemListView(AbstractPaginatedView):
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
         if self.model is not None:
-            return self.model.itemAt(index)
+            return self.model.filteredItemAt(index, filter=self.filter)
         return None
 
     def indexOf(self, input_item: InputItem):
@@ -4668,7 +4668,9 @@ class InputItemListView(AbstractPaginatedView):
             if index is None or index == -1 and self._widget_map:
                 index = self.pageRange()[0]  # selection is not on this page - pick the first item of the page
             if index != -1:
-                if self._current_index != index:
+                # Filtering can replace the input at the same row. The mapping
+                # panel must follow the new widget even when its index is unchanged.
+                if self._current_index != index or self._last_selected_widget is not self.widget(index):
                     self.selectItemAt(index)
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
@@ -4945,7 +4947,9 @@ class InputItemListView(AbstractPaginatedView):
 
     def _handle_widget_selection_changed(self, widget: InputItemWidget):
         """Handle a widget selection change without the extra worker queue/busy-wait loop."""
-        if widget is None or not widget.selected or widget.index == self._current_index:
+        if widget is None or not widget.selected:
+            return
+        if widget.index == self._current_index and widget is self._last_selected_widget:
             return
 
         if gremlin.util.is_ui_thread():
@@ -4973,7 +4977,7 @@ class InputItemListView(AbstractPaginatedView):
             return
 
         index = widget.index
-        if self._current_index == index:
+        if self._current_index == index and widget is self._last_selected_widget:
             return
 
         old_widget = self._last_selected_widget
@@ -5068,7 +5072,7 @@ class InputItemListView(AbstractPaginatedView):
             if verbose:
                 syslog.info(f"\tindex [{index}] is already selected")
             widget: InputItemWidget = self.widget(index)
-            if widget:
+            if widget and widget is self._last_selected_widget and widget.selected:
                 widget.trigger()
                 return  # nothing to do if the current index is the same as the new index
 
@@ -5081,7 +5085,7 @@ class InputItemListView(AbstractPaginatedView):
             if widget:
                 index = widget.index  # index is 1 based, widget index is 0 based
 
-        if not model.isIndexVisible(index):
+        if self.itemAt(index) is None:
             if verbose:
                 syslog.warning(f"\tindex [{index}] is not visible")
             return
@@ -5089,24 +5093,22 @@ class InputItemListView(AbstractPaginatedView):
         self._deselect_all_ui()  # remove any current selection
         last_widget = self._last_selected_widget
 
-        if self._current_index == -1 or self._current_index != index:
-            # widget to select
-            if not widget:
-                widget = self.widget(index)
+        if widget is None:
+            widget = self.widget(index)
 
-            assert widget is not None, f"widget [{index}] not found in list - check index"
-            widget._set_selected_ui(True, emit=False)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
-            self._current_index = index
-            self._requested_selected_index = -1  # indicate no more request
-            self._last_selected_widget = widget
-            self._fireSelectionChangeCallbacks(last_widget, widget)  # trigger updates on selection change if any
-            self._ensure_visible_ui(widget)  # ensure the selected widget is visible in the scroll area
+        assert widget is not None, f"widget [{index}] not found in list - check index"
+        widget._set_selected_ui(True, emit=False)
+        self._current_index = index
+        self._requested_selected_index = -1  # indicate no more request
+        self._last_selected_widget = widget
+        self._fireSelectionChangeCallbacks(last_widget, widget)  # trigger updates on selection change if any
+        self._ensure_visible_ui(widget)  # ensure the selected widget is visible in the scroll area
 
         return (widget,)
 
     def getSelectedItem(self) -> InputItem:
         """gets the currently selected input item"""
-        return self.model.itemAt(self._current_index)
+        return self.itemAt(self._current_index)
 
     def getSelectedWidget(self) -> InputItemWidget:
         """gets the currently selected input widget"""

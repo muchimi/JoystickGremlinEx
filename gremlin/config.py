@@ -3978,14 +3978,58 @@ class Configuration(QtCore.QObject):
         self._set_data("maestro_device_count", value)
 
     @property
+    def maestro_device_map(self) -> dict | None:
+        """Selected service device IDs mapped to stable zero-based Maestro slots."""
+        return self._get_data("maestro_device_map", None)
+
+    @maestro_device_map.setter
+    def maestro_device_map(self, value: dict):
+        self._set_data("maestro_device_map", value)
+
+    @property
     def maestro_enabled(self) -> bool:
         """returns true if Maestro is enabled"""
-        # return self._get_data("maestro_enabled", False)
-        return False  # disable for now while Maestro integration is being worked on
+        return self._get_data("maestro_enabled", False)
 
     @maestro_enabled.setter
     def maestro_enabled(self, value: bool):
         self._set_data("maestro_enabled", value)
+
+    @property
+    def maestro_osc_host(self) -> str:
+        """IPv4 address of the Maestro OSC service."""
+        return self._get_data("maestro_osc_host", "127.0.0.1")
+
+    @maestro_osc_host.setter
+    def maestro_osc_host(self, value: str):
+        self._set_data("maestro_osc_host", value)
+
+    @property
+    def maestro_osc_port(self) -> int:
+        """UDP port on which the Maestro service receives commands."""
+        return self._get_data("maestro_osc_port", 8010)
+
+    @maestro_osc_port.setter
+    def maestro_osc_port(self, value: int):
+        self._set_data("maestro_osc_port", value)
+
+    @property
+    def maestro_osc_reply_host(self) -> str:
+        """Local IPv4 interface on which to receive Maestro replies."""
+        return self._get_data("maestro_osc_reply_host", "127.0.0.1")
+
+    @maestro_osc_reply_host.setter
+    def maestro_osc_reply_host(self, value: str):
+        self._set_data("maestro_osc_reply_host", value)
+
+    @property
+    def maestro_osc_reply_port(self) -> int:
+        """Local reply port; must match the service's Osc:SendPort."""
+        return self._get_data("maestro_osc_reply_port", 8011)
+
+    @maestro_osc_reply_port.setter
+    def maestro_osc_reply_port(self, value: int):
+        self._set_data("maestro_osc_reply_port", value)
 
     @property
     def maestro_dist_path(self) -> str:

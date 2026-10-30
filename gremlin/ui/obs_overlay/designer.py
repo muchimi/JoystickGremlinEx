@@ -1725,7 +1725,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             el.profile_loaded.connect(self.refresh_profile_title)
             el.profile_unloaded.connect(self.refresh_profile_title)
             el.profile_start.connect(self._on_profile_runtime_changed)
-            el.profile_stop.connect(self._on_profile_runtime_changed)
+            # profile_stop fires while is_running is still True. Unlock only
+            # after teardown has restored edit mode and cleared runtime state.
+            el.profile_stopped.connect(self._on_profile_runtime_changed)
             self._profile_hooks = True
         except Exception:
             self._profile_hooks = False
@@ -1805,7 +1807,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
                 el.profile_loaded.disconnect(self.refresh_profile_title)
                 el.profile_unloaded.disconnect(self.refresh_profile_title)
                 el.profile_start.disconnect(self._on_profile_runtime_changed)
-                el.profile_stop.disconnect(self._on_profile_runtime_changed)
+                el.profile_stopped.disconnect(self._on_profile_runtime_changed)
             except Exception:
                 pass
             self._profile_hooks = False

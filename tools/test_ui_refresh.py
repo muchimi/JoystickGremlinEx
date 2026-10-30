@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import time
 import sys
 from types import SimpleNamespace as NS
 import unittest
@@ -18,6 +19,7 @@ from unittest.mock import Mock
 
 from PySide6 import QtCore, QtWidgets
 from shiboken6 import Shiboken
+from psygnal import Signal
 
 from test_qt_marshalling import APP, UTIL, flush_deletes, invoke, pump_until
 
@@ -605,6 +607,299 @@ class IncrementalEditorTests(unittest.TestCase):
         self.assertNotIn("a", view._widget_map)
         self.assertEqual(view._container_layout.count(), 3)
         view.deleteLater()
+
+
+class StateListItem:
+    def __init__(self, key):
+        self.key = self.id = self.display_name = self.input_name = key
+        self.device_guid = self.device_name = "state-device"
+        self.device_type = self.input_type = "state"
+        self.input_id = self
+        self.is_axis = False
+        self.is_button = True
+        self.description = ""
+
+    def setInputWidget(self, widget):
+        self.widget = widget
+
+
+class StateListCard(QtWidgets.QWidget):
+    edit = QtCore.Signal(object)
+    edit_curve = QtCore.Signal()
+    delete_curve = QtCore.Signal()
+    closed = QtCore.Signal(object)
+
+    def __init__(self, item, index, parent):
+        super().__init__(parent)
+        self.input_item, self.index = item, index
+        self.selected = False
+        self.callbacks = []
+
+    def addSelectionChangeCallback(self, callback):
+        self.callbacks.append(callback)
+
+    def _set_selected_ui(self, selected, emit=True):
+        self.selected = selected
+        if emit:
+            self.trigger()
+
+    setSelected = _set_selected_ui
+
+    def trigger(self):
+        for callback in self.callbacks:
+            callback(self)
+
+    create_action_icons = setDescription = _update_container_id = lambda self, *args: None
+
+
+FilteredInputView = load_methods("gremlin/input_item.py", "InputItemListView", {
+    "create_ui", "itemAt", "indexOf", "getSelectedItem", "getSelectedWidget", "widget",
+    "selectItemAt", "selectInputItemAt", "_select_item_ui", "_deselect_all_ui",
+    "_fireSelectionChangeCallbacks", "_handle_widget_selection_changed", "_execute_widget_selection_changed",
+}, InputItem=StateListItem, InputItemWidget=StateListCard,
+    InputIdentifier=lambda *args, **kwargs: NS(**kwargs), time=time)
+FilteredInputView.model = property(lambda self: self._model)
+FilteredInputTab = load_methods("gremlin/input_item.py", "BaseDeviceTabWidget", {
+    "_handle_input_item_selected", "_handle_input_item_selected_ui", "_select_input_item_index_ui",
+})
+
+
+class FilteredStateSelectionTests(unittest.TestCase):
+    def setUp(self):
+        CONFIG.verbose_mode_inputs = CONFIG.debug_ui = False
+        SERVICES.shared_state.is_running = False
+        SERVICES.shared_state.edit_mode = "Default"
+        SERVICES.event_handler = NS(Event=type("Event", (), {}), EventListener=Mock())
+        SERVICES.joystick_handling = NS(getDevice=lambda guid: NS(name=guid))
+        self.items = [StateListItem(key) for key in ("alpha", "bravo", "charlie")]
+        self.visible = list(self.items)
+        self.view = FilteredInputView()
+        self.view._model = NS(
+            # The model deliberately keeps its unfiltered accessor distinct.
+            itemAt=lambda index: self.items[index] if 0 <= index < len(self.items) else None,
+            filteredItemAt=lambda index, filter="default": self.visible[index] if 0 <= index < len(self.visible) else None,
+            getFilteredMap=lambda filter="default": enumerate(self.visible),
+            isIndexVisible=lambda index: 0 <= index < len(self.items),
+            indexOf=lambda item, filter="default": self.visible.index(item) if item in self.visible else -1,
+        )
+        self.view._current_index = self.view._requested_selected_index = -1
+        self.view._last_selected_widget = None
+        self.view._widget_map, self.view._input_item_map = {}, {}
+        self.view._selection_change_callbacks = []
+        self.view.item_selected = Mock()
+        self.view._scroll_area = QtWidgets.QScrollArea(self.view)
+        self.view._scroll_layout = QtWidgets.QVBoxLayout(self.view)
+        self.view._scroll_spacer_widget = None
+        self.view.filter, self.view.paginated = "default", False
+        self.view.pageRange = lambda: (0, len(self.visible))
+        self.view.custom_widget_handler = lambda view, index, identifier, item, parent: StateListCard(item, index, self.view)
+        self.view.redraw = self.view.create_ui
+        self.view.showBlank = self.view.showContent = self.view._ensure_visible_ui = Mock()
+        self.view.ensureVisibleIndex = Mock()
+        for name in ("_create_edit_callback", "_create_edit_curve_callback", "_create_delete_curve_callback", "_create_closed_callback"):
+            setattr(self.view, name, lambda item: lambda *args: None)
+
+        self.tab = FilteredInputTab()
+        self.tab._input_item_list_view = self.view
+        self.tab._last_selected_input_item = None
+        self.tab.device_guid, self.tab._ui_loading = "state-device", True
+        self.mapping = QtWidgets.QLabel(self.tab)
+        self.tab._select_input_item_mapping_widget_ui = lambda item: self.mapping.setText(item.key)
+        self.tab._update_container_view_blank_message_ui = Mock()
+        self.view._selection_change_callbacks.append(self.tab._handle_input_item_selected)
+        self.view.create_ui()
+        self.assertEqual(self.mapping.text(), "alpha")
+
+    def tearDown(self):
+        self.view.deleteLater()
+        self.tab.deleteLater()
+        flush_deletes()
+
+    def test_filter_replacing_selected_row_refreshes_mapping(self):
+        self.visible[:] = self.items[1:]
+        self.view.create_ui()
+        self.assertEqual(self.mapping.text(), "bravo")
+        self.assertIs(self.view._last_selected_widget, self.view.widget(0))
+        self.assertIs(self.view.getSelectedItem(), self.items[1])
+
+    def test_programmatic_selection_uses_filtered_row(self):
+        self.visible[:] = self.items[1:]
+        self.view.create_ui()
+        self.tab._select_input_item_index_ui(1)
+        self.assertEqual(self.mapping.text(), "charlie")
+        self.assertIs(self.view.getSelectedItem(), self.items[2])
+
+    def test_click_on_replacement_at_same_row_refreshes_mapping(self):
+        old_widget = self.view.widget(0)
+        replacement = StateListCard(self.items[1], 0, self.view)
+        replacement.selected = True
+        self.view._widget_map[0] = replacement
+        self.view._handle_widget_selection_changed(replacement)
+        self.assertEqual(self.mapping.text(), "bravo")
+        self.assertFalse(old_widget.selected)
+        self.assertIs(self.view._last_selected_widget, replacement)
+
+    def test_clearing_filter_refreshes_mapping_at_same_row(self):
+        self.visible[:] = self.items[2:]
+        self.view.create_ui()
+        self.assertEqual(self.mapping.text(), "charlie")
+        self.visible[:] = self.items
+        self.view.create_ui()
+        self.assertEqual(self.mapping.text(), "alpha")
+        self.assertIs(self.view._last_selected_widget, self.view.widget(0))
+
+    def test_unchanged_redraw_preserves_selection_without_mapping_rebuild(self):
+        original = self.view.widget(0)
+        self.tab._select_input_item_mapping_widget_ui = Mock()
+        self.view.create_ui()
+        self.assertIs(self.view.widget(0), original)
+        self.assertTrue(original.selected)
+        self.tab._select_input_item_mapping_widget_ui.assert_not_called()
+
+    def test_force_reselection_keeps_current_card_selected(self):
+        self.view._select_item_ui(0, force=True)
+        self.assertTrue(self.view.widget(0).selected)
+        self.assertEqual(self.mapping.text(), "alpha")
+
+    def test_filtered_out_row_cannot_be_selected_by_source_index(self):
+        self.visible[:] = self.items[2:]
+        self.view.create_ui()
+        self.view._select_item_ui(1)
+        self.assertEqual(self.mapping.text(), "charlie")
+        self.assertIs(self.view.getSelectedItem(), self.items[2])
+
+
+class OverlayLifecycleSignals:
+    profile_loaded = Signal()
+    profile_unloaded = Signal()
+    profile_start = Signal()
+    profile_stop = Signal()
+    profile_stopped = Signal()
+
+
+def load_overlay_lifecycle():
+    guard_namespace = dict(QtCore=QtCore, Shiboken=Shiboken, gremlin=SERVICES)
+    guard = ast.parse((ROOT / "gremlin/ui/obs_overlay/qt_guard.py").read_bytes())
+    exec(compile(ast.Module(body=[node for node in guard.body if isinstance(node, ast.FunctionDef)],
+                            type_ignores=[]), "qt_guard.py", "exec"), guard_namespace)
+    designer_type = load_methods("gremlin/ui/obs_overlay/designer.py", "OverlayDesignerWidget", {
+        "_on_profile_runtime_changed", "_apply_runtime_lock", "_cleanup_ui", "showEvent", "hideEvent",
+    }, alive=guard_namespace["alive"], on_ui=guard_namespace["on_ui"])
+    # Use the constructor's actual signal wiring without constructing device,
+    # palette, inspector or profile services.
+    source = ast.parse((ROOT / "gremlin/ui/obs_overlay/designer.py").read_bytes())
+    designer = next(node for node in source.body if getattr(node, "name", None) == "OverlayDesignerWidget")
+    constructor = next(node for node in designer.body if getattr(node, "name", None) == "__init__")
+    hooks = next(node for node in constructor.body if isinstance(node, ast.Try) and any(
+        isinstance(child, ast.Attribute) and child.attr == "profile_start" for child in ast.walk(node)
+    ))
+    binder = ast.parse("def bind_profile_hooks(self):\n    pass").body[0]
+    binder.body = [hooks]
+    namespace = dict(gremlin=SERVICES)
+    exec(compile(ast.fix_missing_locations(ast.Module(body=[binder], type_ignores=[])),
+                 "designer.py", "exec"), namespace)
+    designer_type.bind_profile_hooks = namespace["bind_profile_hooks"]
+    return designer_type
+
+
+OverlayLifecycleDesigner = load_overlay_lifecycle()
+
+
+class OverlayRuntimeLockTests(unittest.TestCase):
+    def setUp(self):
+        SERVICES.shared_state.is_running = False
+        self.listener = OverlayLifecycleSignals()
+        SERVICES.event_handler = NS(EventListener=lambda: self.listener)
+        self.designer = OverlayLifecycleDesigner()
+        self.designer._overlay_manager = None
+        self.designer.scene = NS(dirty=False, changed=Mock(), selection_changed=Mock())
+        self.designer.canvas = QtWidgets.QWidget(self.designer)
+        self.designer.canvas.attach_bus = Mock()
+        self.designer.canvas.detach_bus = Mock()
+        self.designer.canvas.detach_from_scene = Mock()
+        self.controls = []
+        for attr in ("_palette_panel", "inspector", "_page_bar_widget", "_selection_pane",
+                     "_interactive_box", "_export_btn", "_import_btn", "_vars_btn", "_undo_btn", "_redo_btn"):
+            widget = QtWidgets.QPushButton("Edit", self.designer)
+            setattr(self.designer, attr, widget)
+            self.controls.append(widget)
+        self.designer.inspector._detach_scene = Mock()
+        self.designer._control_button = QtWidgets.QPushButton(self.designer)
+        self.designer._action_banner = QtWidgets.QWidget(self.designer)
+        self.designer._action_banner.set_content = Mock()
+        self.designer._hints_box = QtWidgets.QCheckBox(self.designer)
+        self.designer._hints_box.setChecked(True)
+        self.designer.refresh_profile_title = Mock()
+        self.designer._on_scene_ui = Mock()
+        self.designer._refresh_action_banner = Mock()
+        self.designer._refresh_overlay_button = Mock()
+        self.designer._initial_layout_pass = Mock()
+        self.designer.bind_profile_hooks()
+
+    def tearDown(self):
+        SERVICES.shared_state.is_running = False
+        self.designer._cleanup_ui()
+        self.designer.deleteLater()
+        flush_deletes()
+
+    def start_profile(self):
+        SERVICES.shared_state.is_running = True
+        self.listener.profile_start.emit()
+        self.assertTrue(all(not widget.isEnabled() for widget in self.controls))
+
+    def stop_profile(self, check_locked=True):
+        # Match CodeRunner.stop: the initial stop signal still has runtime
+        # callbacks active; completion follows the is_running reset.
+        self.listener.profile_stop.emit()
+        if check_locked:
+            self.assertTrue(all(not widget.isEnabled() for widget in self.controls))
+        SERVICES.shared_state.is_running = False
+        self.listener.profile_stopped.emit()
+
+    def test_visible_designer_unlocks_on_completed_stop_without_tab_switch(self):
+        self.designer.show()
+        self.start_profile()
+        self.designer.canvas.attach_bus.reset_mock()
+        self.stop_profile()
+        self.assertTrue(all(widget.isEnabled() for widget in self.controls))
+        self.designer.canvas.attach_bus.assert_called_once()
+        self.designer._refresh_action_banner.assert_called()
+
+    def test_hidden_designer_unlocks_and_resumes_preview_when_shown(self):
+        self.start_profile()
+        self.stop_profile()
+        self.assertTrue(all(widget.isEnabled() for widget in self.controls))
+        self.designer.canvas.attach_bus.assert_not_called()
+        self.designer.show()
+        self.assertTrue(self.designer.inspector.isEnabled())
+        self.designer.canvas.attach_bus.assert_called()
+
+    def test_worker_stop_delivers_unlock_on_gui_thread(self):
+        self.designer.show()
+        self.start_profile()
+        self.designer.canvas.attach_bus.reset_mock()
+        threads = []
+        self.designer.canvas.attach_bus.side_effect = lambda: threads.append(QtCore.QThread.isMainThread())
+        worker = threading.Thread(target=lambda: self.stop_profile(check_locked=False))
+        worker.start()
+        worker.join()
+        pump_until(lambda: all(widget.isEnabled() for widget in self.controls))
+        self.assertEqual(threads, [True])
+
+    def test_repeated_start_stop_restores_same_controls(self):
+        self.designer.show()
+        for _ in range(3):
+            self.start_profile()
+            self.stop_profile()
+            self.assertTrue(all(widget.isEnabled() for widget in self.controls))
+        self.assertIs(self.designer.inspector, self.controls[1])
+
+    def test_cleanup_disconnects_completion_hook(self):
+        self.designer._cleanup_ui()
+        self.designer._apply_runtime_lock = Mock()
+        self.listener.profile_start.emit()
+        self.listener.profile_stopped.emit()
+        self.designer._apply_runtime_lock.assert_not_called()
 
 
 class RunnerStopTests(unittest.TestCase):

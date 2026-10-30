@@ -254,7 +254,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._last_state_input_id = None
         self._last_state_data = {}  # holds data for axis highlight switching
 
-        self._mapped_device_list = [] # holds the list of devices with active mappings (set when UI redraws)
+        self._mapped_device_list = []  # holds the list of devices with active mappings (set when UI redraws)
 
         gremlin.shared_state.application_version = gremlin.version.APPLICATION_VERSION
 
@@ -1102,12 +1102,31 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered=self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
 
+        self._actionMaestro = QtGui.QAction("Maestro Devices...", self, triggered=self._handle_maestro_show_config)
+        self._actionMaestro.setToolTip("Configure HID Maestro virtual controllers")
+        self._actionMaestro.setEnabled(config.maestro_enabled)
+
         menuTools.addSeparator()
 
         menuTools.addAction(self._actionTabDisplayDevice)
         menuTools.addAction(self._ationTabCopyAssignments)
-
         menuTools.addAction(self._actionTabClearMap)
+        menuTools.addAction(self._actionMaestro)
+
+    def setMaestroEnabled(self, enabled: bool):
+        """controls the UI enabling of Maestro functions"""
+        if hasattr(self, "_actionMaestro"):
+            self._actionMaestro.setEnabled(enabled)
+
+    def _handle_maestro_show_config(self):
+        """Open the Maestro service and controller manager."""
+
+        gremlin.ui.ui_common.MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
+        return
+
+        dialog = gremlin.maestro.MaestroDialog(parent=self)
+        dialog.devices_changed.connect(lambda: self.setTabsDirty(True))
+        dialog.exec()
 
     def _tab_context_menu_cb(self, tab_index):
         """tab context menu"""
@@ -1625,7 +1644,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             gremlin.shared_state.profile_state = active
 
         # toolbar icon
-        checked =  self.ui.actionActivate.isChecked()
+        checked = self.ui.actionActivate.isChecked()
         if checked != active:
             with QtCore.QSignalBlocker(self.ui.actionActivate):
                 self.ui.actionActivate.setChecked(active)  # toolbar icon "off" or "on"
@@ -2874,12 +2893,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def getMappedDeviceList(self):
         """Returns devices with mappings in any mode, in tab order."""
-        self._mapped_device_list[:] = [
-            data.device_guid for data in self._get_tab_map().values()
-            if any(self._get_mappings(data.device_guid).values())
-        ]
+        self._mapped_device_list[:] = [data.device_guid for data in self._get_tab_map().values() if any(self._get_mappings(data.device_guid).values())]
         return self._mapped_device_list
-
 
     def _handle_feature_changed(self, feature):
         """called when a feature changes"""
@@ -2919,9 +2934,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not self._ui_refresh_cursor:
             return
         if (
-            self._creating_tabs or self._tabs_rebuild_pending or self._tabs_rebuild_refresh
-            or self._suspend_ui_update or gremlin.shared_state.profile_loading
-            or self.isProfileLoading() or self._startup_restore_target is not None
+            self._creating_tabs
+            or self._tabs_rebuild_pending
+            or self._tabs_rebuild_refresh
+            or self._suspend_ui_update
+            or gremlin.shared_state.profile_loading
+            or self.isProfileLoading()
+            or self._startup_restore_target is not None
         ):
             return
         self._ui_refresh_cursor = False
@@ -6547,7 +6566,7 @@ def configure_logger(config: dict):
     unlink = config.get("unlink", True)
     try:
         if unlink and os.path.isfile(log_file):
-            os.unlink(log_file) # @IgnoreException
+            os.unlink(log_file)  # @IgnoreException
     except IOError as err:
         syslog.error(f"Unable to remove old log file [{log_file}] - another instance may be running")
         # syslog.error(f"{err}\n{traceback.format_exc()}")
@@ -6681,7 +6700,6 @@ if __name__ == "__main__":
         process_name = gremlin.version.APPLICATION_EXE
         prompted = False
 
-
         # ensure only one instance is running at a time - this is setup to not require admin rights as long as the process is started by the user
         while True:
             pid = ph.processRunning(process_name, return_pid=True)
@@ -6693,7 +6711,6 @@ if __name__ == "__main__":
             if pid == os.getpid():
                 # skip the current process
                 break
-
 
             if not prompted:
                 result = gremlin.ui.ui_common.ConfirmBox(
@@ -6876,6 +6893,9 @@ if __name__ == "__main__":
         dinput.DILL.init()
         time.sleep(0.25)
 
+        # Publish saved OSC targets before input enumeration and profile load.
+        maestro = gremlin.maestro.Maestro()
+
         # instance
         # _pixmaps = gremlin.ui.ui_common.Pixmaps()
         # _widget_manager = gremlin.ui.ui_common.WidgetManager()
@@ -6891,7 +6911,7 @@ if __name__ == "__main__":
         # and terminate GremlinEx
         try:
             syslog.info("Checking vJoy installation")
-            vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.is_virtual and dev.connected])
+            vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_type == DeviceType.VJoy and dev.connected])
             vjoy_working = vjoy_count != 0
             syslog.info(f"\tFound {vjoy_count} configured vjoy device(s)")
 
@@ -6974,9 +6994,6 @@ if __name__ == "__main__":
         if config.remoteEnabled():
             gremlin.remote.remote_server.start()
             gremlin.remote.remote_client.start()
-
-        # HID maestro
-        maestro = gremlin.maestro.Maestro()
 
         # for some reason QT shows the window with a white background and ignores stylesheets/background color
         # workaround for now: show the window minimized so it doesnt' flash on the screen
