@@ -5038,8 +5038,9 @@ def MessageBoxYesNo(
     callback=None,
     parent=None,
     width=300,
+    data = None
 ):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "yesno", callback, parent, width)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "yesno", callback, parent, width, data)
 
 
 def MessageBoxOkCancel(
@@ -5074,6 +5075,7 @@ def _message_box_ui(
     callback=None,
     parent=None,
     width=300,
+    data=None
 ):
     buttons = QtWidgets.QMessageBox.StandardButton.Ok
     if parent is None:
@@ -5107,7 +5109,11 @@ def _message_box_ui(
 
     result = msgbox.exec()
     if callback:
-        callback(result)
+        arg_count = inspect.signature(callback).parameters
+        if len(arg_count) == 1:
+            callback(result)
+        else:
+            callback(result, data)
 
 
 class QHLine(QtWidgets.QFrame):
