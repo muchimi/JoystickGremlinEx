@@ -347,12 +347,12 @@ class ColorButton(QtWidgets.QPushButton):
             previous = qcolor(self._value if not is_gradient(self._value) else "#00000000")
             if not self._preserve_transparent and previous.alpha() == 0 and chosen.alpha() == 0:
                 chosen.setAlpha(255)
-            return chosen.name(QtGui.QColor().HexArgb)
+            return chosen.name(QtGui.QColor().NameFormat.HexArgb)
 
         def _on_gradient_toggled(on):
             nonlocal last_gradient
             if on:
-                seed = dialog.currentColor().name(QtGui.QColor().HexArgb)
+                seed = dialog.currentColor().name(QtGui.QColor().NameFormat.HexArgb)
                 if last_gradient is None:
                     last_gradient = default_gradient(seed)
                 _apply_value(normalize_gradient(last_gradient, seed_color=seed))
@@ -365,7 +365,7 @@ class ColorButton(QtWidgets.QPushButton):
 
         def _open_gradient():
             nonlocal last_gradient
-            seed = dialog.currentColor().name(QtGui.QColor().HexArgb)
+            seed = dialog.currentColor().name(QtGui.QColor().NameFormat.HexArgb)
             original = copy.deepcopy(self._value)
             current = self._value if is_gradient(self._value) else (last_gradient or default_gradient(seed))
             editor = GradientEditorDialog(current, seed_color=seed, parent=dialog)

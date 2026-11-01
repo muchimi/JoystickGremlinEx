@@ -1121,8 +1121,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _handle_maestro_show_config(self):
         """Open the Maestro service and controller manager."""
 
-        gremlin.ui.ui_common.MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
-        return
+        config = gremlin.config.Configuration()
+        if not config.maestro_enabled:
+            gremlin.ui.ui_common.MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
+            return
 
         dialog = gremlin.maestro.MaestroDialog(parent=self)
         dialog.devices_changed.connect(lambda: self.setTabsDirty(True))

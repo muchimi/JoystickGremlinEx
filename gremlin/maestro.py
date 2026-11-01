@@ -49,6 +49,23 @@ The GEX is able, via this module and the bridge service, to:
 This is managed from within GEX's Maestro devices option dialog so that GEX is aware of Maestro devices it can use.
 Mapping to Maestro devices is done via the usual vjoy remap and the bridge service handles all the necessary translations.
 This is designed so a Maestro device looks exactly like a Vjoy device.
+
+Firewall rules must allow the UDP traffice on the given port.
+
+To test connectivity on a different machine, use ncat (nmap) with the appropriate IP and port.
+- on the machine listening to a port (8010), run the command from a command line:
+  `ncat -lu 8010`
+
+- on the machine sending to the port (8010), run the command from a command line:
+  `ncat -u <IP_OF_LISTENING_MACHINE> 8010`
+
+- Flip the roles on the machine to test the reverse direction of communication (8011 default)
+  - on the machine listening to a port (8011), run the command from a command line:
+    `ncat -lu 8011`
+
+  - on the machine sending to the port (8011), run the command from a command line:
+    `ncat -u <IP_OF_LISTENING_MACHINE> 8011`
+
 """
 
 from dataclasses import dataclass
@@ -66,14 +83,57 @@ from types import SimpleNamespace
 import uuid
 
 from PySide6 import QtCore, QtWidgets
+from psygnal import Signal
 
 import dinput
 from dinput import GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_PRODUCT_STRING
 import gremlin.config
 from gremlin.singleton_decorator import SingletonDecorator
-from gremlin.ui import ui_common
-from gremlin.ui.ui_common import QRememberDialog
+from gremlin.util import getHostIpSingle, InvokeUiMethod
 
+
+from gremlin.ui.ui_common import (
+    BaseDialogUi,
+    Buttons,
+    clear_layout,
+    Color,
+    ConfirmBox,
+    get_mode_list,
+    get_text_width,
+    getFlowContainer,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
+    Icons,
+    InputListenerWidget,
+    MessageBox,
+    MessageBoxWarning,
+    MessageBoxYesNo,
+    QBoxFrameLayout,
+    QCustomThemeDialog,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataIPLineEdit,
+    QDataLabel,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
+    QDataRadioButtonGroup,
+    QDelayWidget,
+    QEnabledWidget,
+    QFloatLineEdit,
+    QGroupBoxV,
+    QHorizontalLine,
+    QIconLabel,
+    QInfoBox,
+    QIntLineEdit,
+    QLineEdit,
+    QPathLineItem,
+    QRememberDialog,
+    QScrollableWidget,
+    QWarningWidget,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 AXIS_NAMES = ("X", "Y", "Z", "Rx", "Ry", "Rz", "Slider", "Dial")
@@ -236,7 +296,7 @@ class MaestroOscClient:
                 deadline = time.monotonic() + (self.timeout if timeout is None else timeout)
                 while time.monotonic() < deadline:
                     try:
-                        item = replies.get(timeout=max(0.001, deadline - time.monotonic()))
+                        item = replies.get(timeout=max(0.001, deadline - time.monotonic()))  # @IgnoreException
                     except queue.Empty:
                         break
                     if item is None:
@@ -256,7 +316,7 @@ class MaestroOscClient:
                         expected = range(done[3], done[3] + done[4])
                         if all(index in rows for index in expected):
                             return [json.loads(rows[index]) for index in expected], done[2]
-            raise TimeoutError(f"No complete Maestro reply for {address} at {self.destination}")
+            raise TimeoutError(f"No complete Maestro reply for {address} at {self.destination}")  # @IgnoreException
         finally:
             with self._pending_lock:
                 self._pending.pop(request_id, None)
@@ -264,7 +324,7 @@ class MaestroOscClient:
     def list(self, address):
         result, offset = [], 0
         while True:
-            rows, total = self.request(address, offset, 100)
+            rows, total = self.request(address, offset, 100) # @IgnoreException
             result.extend(rows)
             offset += len(rows)
             if offset >= total:
@@ -275,7 +335,7 @@ class MaestroOscClient:
     def _receive(self):
         while not self._closed.is_set():
             try:
-                data, source = self._rx.recvfrom(65535)
+                data, source = self._rx.recvfrom(65535)  # @IgnoreException
             except socket.timeout:
                 continue
             except OSError:
@@ -385,6 +445,8 @@ def save_device_definition(client, definition, previous=None):
 
 @SingletonDecorator
 class Maestro:
+    connected_changed = Signal(bool)  # fires when the connection status changes (connection_state : bool)
+
     def __init__(self):
         self._controller_map = {}
         self._device_map = {}
@@ -398,12 +460,23 @@ class Maestro:
         self._initialized = False
         self._shutdown_connected = False
         self._local_service = True
+
+        # the connection data is stored in our config
         config = gremlin.config.Configuration()
+
         if not config.maestro_enabled:
             syslog.info("MAESTRO: disabled")
             return
+
+        # check defaults, use hosts where possible
+        reply_host = config.maestro_osc_reply_host
+        if reply_host == "127.0.0.1":
+            # use self
+            reply_host = getHostIpSingle()
+            config.maestro_osc_reply_host = reply_host
+
         try:
-            self.connect(config.maestro_osc_host, config.maestro_osc_port, config.maestro_osc_reply_host, config.maestro_osc_reply_port)
+            self.connect()
             self.LoadActiveControllers()
             if config.maestro_device_map is None:
                 for index in range(min(GEX_MAX_DEVICES, max(0, config.maestro_device_count))):
@@ -435,8 +508,50 @@ class Maestro:
     def enabled(self):
         return self.initialized and gremlin.config.Configuration().maestro_enabled
 
-    def connect(self, host, port, reply_host, reply_port):
+    def connected(self) -> bool:
+        """Check the existing client with a service/protocol ping (up to one second)."""
+        with self._lock:
+            if not self._initialized or self.ctx is None:
+                return False
+            try:
+                pong = self.ctx.request("/maestro_ping", timeout=1.0, attempts=1)
+                return pong[1:] == ["MaestroOscService", 1]
+            except OSError, RuntimeError:
+                return False
+
+    def testConnection(self) -> bool:
+        """Test the connection to the Maestro service."""
+        if not self.connected():
+            result = self.connect()
+            if not result:
+                return False
+        return True
+
+    def connect(self, host=None, port=None, reply_host=None, reply_port=None):
         """Connect or retest the shared transport used by output and the dialog."""
+
+        config = gremlin.config.Configuration()
+        if host is None:
+            host = config.maestro_osc_host
+        if port is None:
+            port = config.maestro_osc_port
+        if reply_host is None:
+            reply_host = config.maestro_osc_reply_host
+        if reply_port is None:
+            reply_port = config.maestro_osc_reply_port
+        if host is None:
+            syslog.error("MAESTRO: host is not specified")
+            return None
+        if port is None:
+            syslog.error("MAESTRO: port is not specified")
+            return None
+        if reply_host is None:
+            syslog.error("MAESTRO: reply host is not specified")
+            return None
+        if reply_port is None:
+            syslog.error("MAESTRO: reply port is not specified")
+            return None
+
         settings = (socket.gethostbyname(host), port, reply_host, reply_port)
         with self._lock:
             if self.ctx is not None and getattr(self, "_connection_settings", None) != settings:
@@ -450,7 +565,7 @@ class Maestro:
             if self.ctx is None:
                 self.ctx = MaestroOscClient(*settings)
             try:
-                pong = self.ctx.request("/maestro_ping", timeout=1.0, attempts=2)
+                pong = self.ctx.request("/maestro_ping", timeout=1.0, attempts=2)  # @IgnoreException
                 if pong[1:] != ["MaestroOscService", 1]:
                     raise RuntimeError(f"Unsupported Maestro service/protocol: {pong[1:]}")
             except Exception:
@@ -467,6 +582,7 @@ class Maestro:
                     pass
             self._stopping.clear()
             self._initialized = True
+            self.connected_changed.emit(True)
             if not self._shutdown_connected:
                 from gremlin import event_handler
 
@@ -491,6 +607,7 @@ class Maestro:
                 self.ctx.close()
                 self.ctx = None
                 self._initialized = False
+                self.connected_changed.emit(False)
 
     def _cache_controller(self, info, definition, index=None):
         if index is None:
@@ -660,6 +777,16 @@ class Maestro:
                 device.data["maestro_service_id"] = controller.Id
                 devices.append(device)
         joystick_handling.set_maestro_devices(devices)
+
+    def getDeviceAt(self, index: int):
+        """Return the device at the given index, if it exists."""
+        with self._lock:
+            return self._controller_map.get(index)
+
+    def hasDeviceAt(self, index: int) -> bool:
+        """Check if a device exists at the given index."""
+        with self._lock:
+            return index in self._controller_map
 
     def _read_axis_raw(self, index, axis):
         """Return the retained OSC output in DirectInput's signed axis units."""
@@ -976,6 +1103,8 @@ class MaestroDialog(QRememberDialog):
         self.setModal(True)
         self.config = gremlin.config.Configuration()
         self.maestro = Maestro()
+        self.maestro.connected_changed.connect(self._handle_maestro_connection_changed)
+
         self._busy = False
         self._tested_settings = None
         self._definitions = {}
@@ -987,15 +1116,19 @@ class MaestroDialog(QRememberDialog):
         self._signals.completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
         layout = QtWidgets.QVBoxLayout(self)
 
-        self.connection_group = ui_common.QGroupBoxV("Maestro Bridge service")
-        self.host_widget = ui_common.QDataLineEdit(self.config.maestro_osc_host, tooltip="Host name or IPv4 address of the Maestro service")
-        self.port_widget = ui_common.QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_port, chars=6)
-        self.reply_host_widget = ui_common.QDataIPLineEdit(self.config.maestro_osc_reply_host)
-        self.reply_port_widget = ui_common.QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_reply_port, chars=6)
-        self.test_button = ui_common.QDataPushButton("Test Connection", clicked=self._connect)
-        self.refresh_button = ui_common.QDataPushButton("Refresh Devices", clicked=self._connect)
+        self.enabled_widget = QEnabledWidget()
+        self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
+
+        self.connection_group = QGroupBoxV("Maestro Bridge service")
+        self.host_widget = QDataLineEdit(self.config.maestro_osc_host, tooltip="Host name or IPv4 address of the Maestro service")
+        self.port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_port, chars=6)
+        self.reply_host_widget = QDataIPLineEdit(self.config.maestro_osc_reply_host)
+        self.reply_port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_reply_port, chars=6)
+        self.test_button = QDataPushButton("Test Connection", clicked=self._connect)
+        self.refresh_button = QDataPushButton("Refresh Devices", clicked=self._connect)
+        self.host_self_widget = QDataPushButton("Set Self", clicked=self._handle_set_self_reply_host)
         self.connection_group.addWidget(
-            ui_common.getHContainer(
+            getHContainer(
                 [
                     "Host:",
                     self.host_widget,
@@ -1008,74 +1141,116 @@ class MaestroDialog(QRememberDialog):
             )
         )
         self.connection_group.addWidget(
-            ui_common.getHContainer(
+            getHContainer(
                 [
                     "Receive replies on:",
                     self.reply_host_widget,
                     "Reply port:",
                     self.reply_port_widget,
+                    self.host_self_widget,
                 ],
                 widget_only=True,
                 tooltip="Reply port must match the host service's SendPort. For another host, use a local LAN interface or 0.0.0.0.",
             )
         )
         layout.addWidget(self.connection_group)
-        self.status_widget = ui_common.QDataLabel("Enter the service address and test the connection.")
+        self.status_widget = QDataLabel("Enter the service address and test the connection.")
         self.status_widget.setWordWrap(True)
         self.status_widget.setTextFormat(QtCore.Qt.TextFormat.PlainText)
         layout.addWidget(self.status_widget)
-        self.warning_widget = ui_common.QWarningWidget(autohide=True)
+        self.warning_widget = QWarningWidget(autohide=True)
         layout.addWidget(self.warning_widget)
 
-        self.devices_group = ui_common.QGroupBoxV("Devices on host — check devices to include in Gremlin")
-        self.device_list = ui_common.QScrollableWidget(stretch=False, horizontal_scroll=False)
+        self.devices_group = QGroupBoxV("Devices on host — check devices to include in Gremlin")
+        self.device_list = QScrollableWidget(stretch=False, horizontal_scroll=False)
         self.device_list.getLayout().setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         self.device_list.setMinimumHeight(150)
         self.devices_group.addWidget(self.device_list)
-        self.new_button = ui_common.QDataPushButton("New Device", clicked=self._new_device)
-        self.devices_group.addWidget(ui_common.getHContainer([self.new_button], widget_only=True))
+        self.new_button = QDataPushButton("New Device", clicked=self._new_device)
+        self.devices_group.addWidget(getHContainer([self.new_button], widget_only=True))
         layout.addWidget(self.devices_group, 1)
 
-        self.editor_group = ui_common.QGroupBoxV("Device options")
-        self.id_widget = ui_common.QDataLineEdit()
+        self.editor_group = QGroupBoxV("Device options")
+        self.id_widget = QDataLineEdit()
         self.id_widget.setMaxLength(64)
-        self.name_widget = ui_common.QDataLineEdit()
+        self.name_widget = QDataLineEdit()
         self.name_widget.setMaxLength(128)
-        self.profile_widget = ui_common.QDataComboBox(wheel_enabled=False)
-        self.axes_widget = ui_common.QIntLineEdit(min_range=0, max_range=8, value=8, chars=3)
-        self.buttons_widget = ui_common.QIntLineEdit(min_range=0, max_range=128, value=128, chars=4)
-        self.hats_widget = ui_common.QIntLineEdit(min_range=0, max_range=4, value=4, chars=3)
-        self.active_widget = ui_common.QDataCheckbox("Active on host", checked=True)
-        self.include_widget = ui_common.QDataCheckbox("Include in Gremlin", checked=True)
-        self.save_button = ui_common.QDataPushButton("Save Device", clicked=self._save_device)
+        self.profile_widget = QDataComboBox(wheel_enabled=False)
+        self.axes_widget = QIntLineEdit(min_range=0, max_range=8, value=8, chars=3)
+        self.buttons_widget = QIntLineEdit(min_range=0, max_range=128, value=128, chars=4)
+        self.hats_widget = QIntLineEdit(min_range=0, max_range=4, value=4, chars=3)
+        self.active_widget = QDataCheckbox("Active on host", checked=True)
+        self.include_widget = QDataCheckbox("Include in Gremlin", checked=True)
+        self.save_button = QDataPushButton("Save Device", clicked=self._save_device)
         for widgets in (
             ["Device ID:", self.id_widget, "Name:", self.name_widget],
             ["Profile:", self.profile_widget],
             ["Axes:", self.axes_widget, "Buttons:", self.buttons_widget, "Hats:", self.hats_widget],
             [self.active_widget, self.include_widget, "||", self.save_button],
         ):
-            self.editor_group.addWidget(ui_common.getHContainer(widgets, widget_only=True))
-        editor_note = ui_common.QDataLabel("Saving a new layout or renaming an active device reconnects it and resets its inputs.")
+            self.editor_group.addWidget(getHContainer(widgets, widget_only=True))
+        editor_note = QDataLabel("Saving a new layout or renaming an active device reconnects it and resets its inputs.")
         editor_note.setWordWrap(True)
         self.editor_group.addWidget(editor_note)
         layout.addWidget(self.editor_group)
-       
-        self.apply_button = ui_common.QDataPushButton("Apply to Gremlin", clicked=self._apply)
-        self.close_button = ui_common.QDataPushButton("Close", clicked=self.close)
+
+        widgets = []
+        for index in range(3):
+            widget = QDataPushButton(
+                f"Auto 8/128/4 [{index + 1}]",
+                callback=self._handle_create_device_by_index,
+                data=index,
+                tooltip=f"Create device with 8 axes, 128 buttons, 4 hats [{index + 1}]",
+            )
+            widgets.append(widget)
+        layout.addWidget(getHContainer(widgets, widget_only=True, auto_size=True))
+
+        self.apply_button = QDataPushButton("Apply to Gremlin", clicked=self._apply)
+        self.close_button = QDataPushButton("Close", clicked=self.close)
         layout.addWidget(
-            ui_common.getHContainer(
+            getHContainer(
                 [
                     self.apply_button,
                     self.close_button,
                 ],
                 widget_only=True,
-                auto_size=True
+                auto_size=True,
             )
         )
         self.profile_widget.currentIndexChanged.connect(self._profile_changed)
         for widget in (self.host_widget, self.reply_host_widget, self.port_widget, self.reply_port_widget):
             widget.textChanged.connect(self._invalidate_connection)
+
+        layout.addWidget(getHContainer([self.connected_widget, self.enabled_widget], widget_only=True))
         self._update_enabled()
+
+    def _handle_set_self_reply_host(self, widget):
+        """self reply host clicked"""
+        self.reply_host_widget.setText(getHostIpSingle())
+
+    def _handle_maestro_connection_changed(self, connected: bool):
+        gremlin.util.invokeUIMethod(self._handle_maestro_connection_changed_ui)
+
+    def _handle_maestro_connection_changed_ui(self, connected: bool):
+        self._update_enabled
+
+    def _handle_create_device_by_index(self, widget, index: int):
+        # creates or replaces a Maestro device with the given index duplicating a vjoy device
+        mc = Maestro()
+        if not mc.connected():
+            mc.connect()
+
+        if mc.connected():
+            if mc.hasDeviceAt(mc, index):
+                device = mc.getDeviceAt(index)
+                result = MessageBoxYesNo(
+                    prompt=f"A device already exists at index [{index}]:<br> Device ID: [{device.device_id}]<br>Name: [{device.name}]<br>Axis: [{device.axis_count}]<br>Buttons: [{device.button_count}]<br>Hats: [{device.hat_count}].<br>Do you want to replace it?"
+                )
+                if result:
+                    mc.removeJoystickController(at_index=index)
+                else:
+                    return
+        mc.createJoystickController(axis=0, buttons=128, hats=4, at_index=index)
 
     def _settings(self):
         host, reply_host = self.host_widget.text().strip(), self.reply_host_widget.text().strip()
@@ -1096,6 +1271,7 @@ class MaestroDialog(QRememberDialog):
         self.editor_group.setEnabled(connected and not self._busy)
         self.apply_button.setEnabled(connected and not self._busy)
         self.enabled_widget.setEnabled(not self._busy)
+        self.connected_widget.setEnabled(connected)
         self.close_button.setEnabled(not self._busy)
 
     def _submit(self, operation, complete, message):
@@ -1169,16 +1345,16 @@ class MaestroDialog(QRememberDialog):
             axes = row["axes"] if custom else len(profile.get("axes", []))
             buttons = row["buttons"] if custom else profile.get("addressableButtons", 32)
             hats = row["hats"] if custom else profile.get("hatCount", 1)
-            checkbox = ui_common.QDataCheckbox(data=device_id, checked=device_id in self._selected_ids, callbackEx=self._selection_changed)
-            label = ui_common.QDataLabel(
+            checkbox = QDataCheckbox(data=device_id, checked=device_id in self._selected_ids, callbackEx=self._selection_changed)
+            label = QDataLabel(
                 f"{row['name']}  [{device_id}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if device_id in active else 'Inactive'}"
             )
             label.setTextFormat(QtCore.Qt.TextFormat.PlainText)
             label.setWordWrap(True)
-            edit = ui_common.QDataPushButton("Edit", data=device_id, callback=self._edit_clicked)
-            self.device_list.addWidget(ui_common.getHContainer([checkbox, (label, 1), edit], right_stretch=False, widget_only=True))
+            edit = QDataPushButton("Edit", data=device_id, callback=self._edit_clicked)
+            self.device_list.addWidget(getHContainer([checkbox, (label, 1), edit], right_stretch=False, widget_only=True))
         if not self._definitions:
-            self.device_list.addWidget(ui_common.QDataLabel("No saved devices on this host. Use New Device to create one."))
+            self.device_list.addWidget(QDataLabel("No saved devices on this host. Use New Device to create one."))
         with QtCore.QSignalBlocker(self.profile_widget):
             self.profile_widget.clear()
             self.profile_widget.addItem("Custom joystick", "")

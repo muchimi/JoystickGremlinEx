@@ -41,9 +41,10 @@
       "source.organizeImports": "never"
     },
     "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
   },
   "terminal.integrated.defaultProfile.windows": "Command Prompt",
   "update.mode": "default",
-  "python.terminal.useEnvFile": true
+  "python.terminal.useEnvFile": true,
+
 }

@@ -14,7 +14,8 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}",
-                "GEX_DIAGNOSTIC_MODE": "1"
+                "GEX_DIAGNOSTIC_MODE": "1",
+                "GEX_MAESTRO_ENABLED": "1"
             },
             //"justMyCode": false,
             "justMyCode": true,

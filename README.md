@@ -49,6 +49,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T89):
+- Fix: Overlay: exception on HexArgb constant
+- 
+
 ### (m77T88):
 - Change: Maestro: initial code check-in for the upcoming new bridge module and interface to HIDMaestro. Add GEX module/support for output to VJOY and Maestro devices using the same mapping actions.  Note: The module is currently disabled in this release and there will be more information on this later as this moves further along.
 - Fix: Overlay: widgets may not become enabled on profile stop.

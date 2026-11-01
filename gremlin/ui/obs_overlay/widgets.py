@@ -4200,9 +4200,9 @@ def _default_sphere_gradient(seed: str | None = None) -> dict[str, Any]:
         "scale": 130.0,
         "smoothness": 100.0,
         "stops": [
-            {"pos": 0.0, "color": highlight.name(QtGui.QColor().HexArgb)},
-            {"pos": 42.0, "color": mid.name(QtGui.QColor().HexArgb)},
-            {"pos": 100.0, "color": shadow.name(QtGui.QColor().HexArgb)},
+            {"pos": 0.0, "color": highlight.name(QtGui.QColor().NameFormat.HexArgb)},
+            {"pos": 42.0, "color": mid.name(QtGui.QColor().NameFormat.HexArgb)},
+            {"pos": 100.0, "color": shadow.name(QtGui.QColor().NameFormat.HexArgb)},
         ],
         "midpoints": [0.45, 0.55],
     }
@@ -4221,7 +4221,7 @@ def _sphere_fill_brush(style: dict[str, Any], ball: QtCore.QRectF) -> QtGui.QBru
     if color.alpha() <= 0:
         return QtCore.Qt.NoBrush
     # Auto-shade so a flat swatch still reads as a sphere.
-    return paint_value_brush(_default_sphere_gradient(color.name(QtGui.QColor().HexArgb)), ball, "#b0b0b0")
+    return paint_value_brush(_default_sphere_gradient(color.name(QtGui.QColor().NameFormat.HexArgb)), ball, "#b0b0b0")
 
 
 def _unit(vx: float, vy: float, vz: float) -> tuple[float, float, float]:

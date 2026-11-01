@@ -2822,6 +2822,7 @@ class QLineEdit(QtWidgets.QLineEdit):
         self.focusOut.emit()
         return super().focusOutEvent(event)
 
+
 # alias
 QDataLineEdit = QLineEdit
 
@@ -3111,6 +3112,7 @@ class QFloatLineEdit(QWidget):
     def data(self, value):
         self._data = value
 
+
 # alias
 QDataFloatLineEdit = QFloatLineEdit
 
@@ -3314,8 +3316,10 @@ class QFloatLineEditEx(QWidget):
     def maximum(self):
         return self._max_range
 
+
 # alias
 QDataFloatLineEditEx = QFloatLineEditEx
+
 
 class IntValidator(QtGui.QValidator):
     def __init__(self, min_range=None, max_range=None, parent=None):
@@ -3598,6 +3602,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 # alias
 QDataIntLineEdit = QIntLineEdit
 
+
 class DynamicDoubleSpinBox(QFloatLineEdit):
     pass
 
@@ -3673,7 +3678,7 @@ class DynamicDoubleSpinBox_legacy(QtWidgets.QDoubleSpinBox):
             text = value_string.replace(".", DynamicDoubleSpinBox.decimal_point)
 
             return super().validate(text, pos)
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             return super().validate(text, pos)
 
 
@@ -5304,6 +5309,7 @@ class QDataLabel(QtWidgets.QLabel):
 
 class QDataCheckbox(QtWidgets.QCheckBox):
     """a checkbox that has a data property to track an object associated with the checkbox"""
+
     enabledChanged = QtCore.Signal(bool)  # fires when the enabled state changes
 
     def __init__(
@@ -5397,8 +5403,10 @@ class QDataCheckbox(QtWidgets.QCheckBox):
             self.enabledChanged.emit(self.isEnabled())
             super().changeEvent(event)
 
+
 # alias
 QDataCheckBox = QDataCheckbox
+
 
 class QActionCheckbox(QWidget):
     """a checkbox that emits focus events"""
@@ -5501,12 +5509,16 @@ class QActionCheckbox(QWidget):
     def setData(self, value):
         self._checkbox.data = value
 
+
 # alias
 QActionCheckBox = QActionCheckbox
 
+
 class QDataRadioButton(QtWidgets.QRadioButton):
     """a radio button that has a data property to track an object associated with the checkbox"""
+
     enabledChanged = QtCore.Signal(bool)  # fires when the enabled state changes
+
     def __init__(
         self,
         label: str = None,
@@ -5544,7 +5556,6 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         if event.type() == QtCore.QEvent.EnabledChange:
             self.enabledChanged.emit(self.isEnabled())
         super().changeEvent(event)
-
 
     def _handle_callback(self):
         if self._callback:
@@ -10934,7 +10945,7 @@ class QSplitTabWidget(QDataWidget):
                 ):
                     try:
                         signal.disconnect(callback)
-                    except (RuntimeError, TypeError, ValueError):
+                    except RuntimeError, TypeError, ValueError:
                         pass
             self._tab_data = value
             if value is not None and not self._cleanup_started:
@@ -11122,7 +11133,7 @@ class QSplitTabWidget(QDataWidget):
                         syslog.info("\tremoving widget from stacked widget")
                     try:
                         widget.expired.disconnect(self._handle_expired_widget)
-                    except (RuntimeError, TypeError):
+                    except RuntimeError, TypeError:
                         pass
                     self.unregisterWidget(key, delete=False)
 
@@ -17280,7 +17291,7 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         self._size = size
         self._css = style
         self._tooltip = tooltip
-        self._visible = True # override for visibility flag
+        self._visible = True  # override for visibility flag
         widget = QtWidgets.QLabel(text)
         if self._css is not None:
             widget.setStyleSheet(self._css)
@@ -18326,3 +18337,22 @@ def AutoSize(widgets):
     max_width = max(widget.sizeHint().width() for widget in widgets)
     for widget in widgets:
         widget.setMinimumWidth(max_width)
+
+
+class QEnabledWidget(QDataPushButton):
+    """a widget that displays a status"""
+
+    def __init__(self, label: str = None, enabled=True, tooltip: str = None, data=None, callback: Callable = None, callbackEx: Callable = None, parent=None):
+        super().__init__(text=label, data=data, tooltip=tooltip, callback=callback, callbackEx=callbackEx, parent=parent)
+        self._enabled = enabled
+        self._update_icon()
+
+    def setEnabled(self, enabled: bool):
+        self._enabled = enabled
+        self._update_icon()
+
+    def _update_icon(self):
+        if self._enabled:
+            self.setIcon(Icons.validIcon())
+        else:
+            self.setIcon(Icons.invalidIcon())

@@ -75,7 +75,7 @@ def normalize_gradient(raw, seed_color: str | None = None) -> dict[str, Any]:
                 continue
             color = str(entry.get("color") or "#ffffffff")
             col = qcolor(color, "#ffffffff")
-            stops.append({"pos": pos, "color": col.name(QtGui.QColor().HexArgb)})
+            stops.append({"pos": pos, "color": col.name(QtGui.QColor().NameFormat.HexArgb)})
     if len(stops) < 2:
         stops = copy.deepcopy(base["stops"])
     stops.sort(key=lambda s: float(s["pos"]))
@@ -355,7 +355,7 @@ class _GradientBar(QtWidgets.QWidget):
         # Double-ish add: click on bar adds stop if room
         if bar.contains(QtCore.QPointF(x, y)) and len(stops) < MAX_STOPS:
             new_pos = self._x_to_pos(x)
-            color = sample_gradient_color(self._gradient, new_pos / 100.0).name(QtGui.QColor().HexArgb)
+            color = sample_gradient_color(self._gradient, new_pos / 100.0).name(QtGui.QColor().NameFormat.HexArgb)
             stops.append({"pos": new_pos, "color": color})
             stops.sort(key=lambda s: float(s["pos"]))
             stops[0]["pos"] = 0.0
@@ -579,7 +579,7 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             return
         idx = max(0, min(idx, len(stops) - 1))
         color = qcolor(stops[idx].get("color"), "#ffffff")
-        self._stop_color.setStyleSheet(f"background:{color.name(QtGui.QColor().HexArgb)}; border:1px solid #555; border-radius:3px;")
+        self._stop_color.setStyleSheet(f"background:{color.name(QtGui.QColor().NameFormat.HexArgb)}; border:1px solid #555; border-radius:3px;")
         self._stop_pos.blockSignals(True)
         self._stop_pos.setValue(float(stops[idx].get("pos") or 0))
         edge = idx in (0, len(stops) - 1)
@@ -600,7 +600,7 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             QtWidgets.QColorDialog.DontUseNativeDialog | QtWidgets.QColorDialog.ShowAlphaChannel,
         )
         if chosen.isValid():
-            self._gradient["stops"][idx]["color"] = chosen.name(QtGui.QColor().HexArgb)
+            self._gradient["stops"][idx]["color"] = chosen.name(QtGui.QColor().NameFormat.HexArgb)
             self._push()
 
     def _on_stop_pos(self, value):
