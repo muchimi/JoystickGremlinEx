@@ -293,7 +293,7 @@ device_profile_map = {}
 #device_widget_map = {}
 
 # Holds the currently active profile
-current_profile : gremlin.base_profile.Profile = None
+current_profile : "gremlin.base_profile.Profile" = None
 
 
 # holds the active (runtime) mode

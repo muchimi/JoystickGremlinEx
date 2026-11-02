@@ -26,7 +26,7 @@ import uuid
 from typing import Callable
 from unittest.mock import Mock, patch
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtTest, QtWidgets
 from shiboken6 import Shiboken
 from test_qt_marshalling import APP, pump_until, flush_deletes
 
@@ -246,6 +246,18 @@ class TransportTests(unittest.TestCase):
         endpoint = self.endpoint(reply)
         self.assertEqual(endpoint.client.request("/maestro_ping")[1:], ["MaestroOscService", 1])
 
+    def test_create_gamepad_management_reply(self):
+        def reply(endpoint, address, values):
+            endpoint.send("/maestro_created", values[0], '{"id":"gamepad","name":"gamepad"}')
+        endpoint = self.endpoint(reply)
+        self.assertEqual(
+            endpoint.client.request("/maestro_create_gamepad", "gamepad", 3, True)[1],
+            '{"id":"gamepad","name":"gamepad"}',
+        )
+        address, values = MAESTRO._decode_message(endpoint.received[0][0])
+        self.assertEqual(address, "/maestro_create_gamepad")
+        self.assertEqual(values[1:], ["gamepad", 3, True])
+
     def test_malformed_datagram_does_not_stop_listener(self):
         def reply(endpoint, address, values):
             endpoint.tx.sendto(b"bad OSC", endpoint.reply_to)
@@ -450,6 +462,32 @@ class OutputTests(unittest.TestCase):
         with patch.object(self.maestro, "_cache_controller", return_value="controller"):
             self.assertEqual(self.maestro.createJoystickController(), "controller")
         self.maestro.ctx.request.assert_called_once_with("/maestro_create_custom", "gex-1", "GEX Custom Device 1", 128, 8, 4)
+
+    def test_create_gamepad_uses_first_free_index(self):
+        client = Mock()
+        client.request.return_value = [123, json.dumps({"id": "gex-gp-2", "name": "gex-gp-2"})]
+        self.maestro.client = client
+        with patch.object(self.maestro, "_cache_controller", return_value="controller") as cache:
+            with patch.object(self.maestro, "populateDeviceList") as populate:
+                self.assertEqual(self.maestro.createGamepadController("gex-gp-2"), "controller")
+        client.request.assert_called_once_with("/maestro_create_gamepad", "gex-gp-2", 1, True)
+        cache.assert_called_once_with({"id": "gex-gp-2", "name": "gex-gp-2"}, {"kind": "gamepad"}, 1)
+        populate.assert_called_once_with()
+
+    def test_qdata_push_button_opens_assigned_menu(self):
+        button = GREMLIN.ui.ui_common.QDataPushButton("Presets")
+        self.addCleanup(button.close)
+        menu = QtWidgets.QMenu(button)
+        selected = []
+        menu.addAction("Xbox 360").triggered.connect(lambda: selected.append("Xbox 360"))
+        button.setMenu(menu)
+        button.show()
+
+        QtTest.QTest.mouseClick(button, QtCore.Qt.MouseButton.LeftButton)
+        APP.processEvents()
+        self.assertTrue(menu.isVisible())
+        menu.actions()[0].trigger()
+        self.assertEqual(selected, ["Xbox 360"])
 
     def test_disabled_startup_does_not_open_sockets(self):
         CONFIG.maestro_enabled = False

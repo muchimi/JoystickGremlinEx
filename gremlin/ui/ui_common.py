@@ -2134,7 +2134,8 @@ class Buttons:
         button = Buttons._template(
             label=label, icon_source="mdi6.delete", tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data, size=icon_size, color=color
         )
-        if size is not None:
+        if size is not None and not label:
+            # only set the size if the label is not provided or autosize
             button.setFixedSize(size, size)
         return button
 
@@ -5840,6 +5841,10 @@ class QDataPushButton(QtWidgets.QPushButton):
                     return True  # handled
                 elif button == QtCore.Qt.LeftButton:
                     self.on_press()
+                    if self.menu() is not None:
+                        self.clickedEx.emit(self, is_ctrl, is_shft, is_alt, False)
+                        self._clicked.emit(self)
+                        return False
                     if self.isCheckable():
                         self.setChecked(not self.isChecked())
 
@@ -5850,8 +5855,12 @@ class QDataPushButton(QtWidgets.QPushButton):
 
             elif t == QtCore.QEvent.Type.MouseButtonRelease:
                 self.on_release()
+                if self.menu() is not None:
+                    return False
                 return True
             elif t == QtCore.QEvent.Type.MouseButtonDblClick:
+                if self.menu() is not None:
+                    return False
                 return True
 
         return super().eventFilter(watched, event)

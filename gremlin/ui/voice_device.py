@@ -1589,6 +1589,10 @@ class VoiceData:
         """returns a list of all voice input items"""
         return list(self._data.values())
 
+    def getVoice(self, id):
+        """returns the voice input item with the given input id, or None if it does not exist"""
+        return self._id_map.get(id)
+
     @property
     def pttMode(self) -> VoicePTTMode:
         return self._ptt_mode
