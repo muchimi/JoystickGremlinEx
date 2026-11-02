@@ -21,17 +21,20 @@ RestartApplications=no
 UninstallDisplayName=Joystick GremlinEx
 [Files]
 Source: "release.ps1"; Flags: dontcopy
+Source: "ffmpeg.ps1"; Flags: dontcopy
 [Icons]
 Name: "{autoprograms}\Joystick GremlinEx"; Filename: "{app}\gremlinEx.exe"; Check: IsManaged
 [Code]
 var
-  ReleasePage: TWizardPage;
+  ReleasePage, FfmpegPage: TWizardPage;
+  FfmpegBox: TNewCheckBox;
   ReleaseList: TNewComboBox;
   RefreshButton, PortableButton: TNewButton;
   ReleaseInfo: TNewStaticText;
   InstalledVersion: String;
   SelectedAsset: String;
   PortableDone: Boolean;
+  PortableTarget: String;
 
 function IsManaged: Boolean;
 begin
@@ -54,6 +57,15 @@ begin
     ' -Action ' + Action +
     ' -Asset ' + Q(Asset) +
     ' -Destination ' + Q(Destination);
+  Result := Exec('powershell.exe', Params, '', SW_SHOW, ewWaitUntilTerminated, ExitCode) and (ExitCode = 0);
+end;
+
+function RunFfmpeg(Destination: String): Boolean;
+var Params: String; ExitCode: Integer;
+begin
+  ExtractTemporaryFile('ffmpeg.ps1');
+  Params := '-NoProfile -ExecutionPolicy Bypass -File ' +
+    Q(ExpandConstant('{tmp}\ffmpeg.ps1')) + ' -Destination ' + Q(Destination);
   Result := Exec('powershell.exe', Params, '', SW_SHOW, ewWaitUntilTerminated, ExitCode) and (ExitCode = 0);
 end;
 
@@ -92,6 +104,10 @@ begin
     MsgBox('Portable extraction failed. The destination may contain partial files.', mbError, MB_OK);
     exit;
   end;
+  if FfmpegBox.Checked then begin
+    if not RunFfmpeg(Dir) then
+      MsgBox('GremlinEx was extracted, but optional FFmpeg installation failed.', mbError, MB_OK);
+  end;
   PortableDone := True;
   MsgBox('GremlinEx was extracted to ' + Dir + '. No installer registration was created.', mbInformation, MB_OK);
   WizardForm.Close;
@@ -122,6 +138,12 @@ begin
   PortableButton.SetBounds(135, 110, 200, 27);
   PortableButton.Caption := 'Extract portable copy...';
   PortableButton.OnClick := @ExtractPortable;
+  FfmpegPage := CreateCustomPage(ReleasePage.ID, 'Optional FFmpeg', 'Download FFmpeg tools alongside GremlinEx');
+  FfmpegBox := TNewCheckBox.Create(FfmpegPage);
+  FfmpegBox.Parent := FfmpegPage.Surface;
+  FfmpegBox.SetBounds(0, 12, FfmpegPage.SurfaceWidth, 48);
+  FfmpegBox.Caption := 'Download FFmpeg (third-party) into tools\\ffmpeg';
+  FfmpegBox.Checked := False;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -143,6 +165,10 @@ begin
   if CurStep = ssInstall then begin
     if not RunHelper('managed', SelectedAsset, ExpandConstant('{app}')) then
       RaiseException('GremlinEx installation failed. Review the PowerShell output.');
+    if FfmpegBox.Checked then begin
+      if not RunFfmpeg(ExpandConstant('{app}')) then
+        MsgBox('GremlinEx installed, but optional FFmpeg download failed.', mbError, MB_OK);
+    end;
   end;
 end;
 
