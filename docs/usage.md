@@ -1,5 +1,17 @@
 # GremlinEx feature usage guide
 
+This guide covers the current m77 workflows. Use it to set up a profile, connect inputs to actions, and test the result. The linked user guides provide the detailed controls and worked examples for individual features.
+
+## Set up an m77 profile
+
+1. Open **Options → Modules** and enable the optional modules you need. Restart GremlinEx if prompted. See [Modules and themes](#modules-and-themes).
+2. Create or open a profile, select its edit mode, and select the source device and input. For configurable devices such as Keyboard/Mouse, OSC, Voice, and States, add the input first.
+3. Add a container and then an action. Start with a Basic container for a direct mapping; use [Sequence](#run-actions-in-a-sequence) when commands need separate steps and timing.
+4. Configure the destination. Examples include a vJoy control, a keyboard shortcut, a [state](devices/state_device_user_guide.md), or a [sound or speech cue](#play-sounds-and-generated-speech).
+5. Save the profile. Start it with the activation control, trigger the source, and check the destination in the input viewer or target application.
+6. Stop the profile before editing the mapping. When moving the profile to another machine, copy its XML file, companion JSON file, and referenced assets together.
+
+For additional input surfaces, follow the setup steps for [Stream Deck](#stream-deck-device), [Overlay pages and web panels](#overlay-pages-and-web-panels), or [Voice recognition](#voice-recognition-device). For visual axis processing, use the [AFCS designer](#afcs-axis-flow-designer).
 
 ## Concepts
 
@@ -19,25 +31,21 @@ To use VJoy as input devices, that must be enabled in the settings tab and Greml
 
 ### Input Filter
 
-Starting with m76T115+, joystick inputs (axis, button, hat) inputs can be filtered (hidden).  This is primarily for convenience and performance, as unused inputs clutter the UI and can result in significant memory usage depending on how many inputs need to be tracked concurrently.  An extreme example would be 16 VJOY devices defined that can total over 2000 inputs, which quickly becomes non manageable even on a very capable system.
+Use input visibility filters to show the joystick axes, buttons, and hats relevant to the profile. Hiding unused inputs reduces UI clutter and the resources needed to display large devices, especially vJoy devices used as input.
 
-GEX will filter (limit) the number of inputs shown on each joystick device to a reasonable and more manageable number.  This is directly aimed at performance by reducing the number of entities visible at anyone time.  It is also for convenience and ease of use reasons: until now, a large number of devices and inputs could significantly impact UI performance and memory at profile design time, whether relevant or not.  These could consume thousands of entities that need to be tracked with a noticeable impact on performance and responsiveness.
-
-![warning](assets/warning.png) Too many inputs can degrade GremlinEx performance by making the UI sluggish and significantly increase memory usage.  This is particularly true with VJOY used as input as these tend to have hundreds of inputs each resulting in well over a thousand inputs GEX needs to track and display, which can result in poor performance.   The filtering options are aimed at managing this excess of inputs, especially those that are not used, to maintain reasonable edit time performance and memory usage.  While GEX can easily handle on most systems 10 or more physical devices with an average input count of 40 or so inputs, where it gets into trouble is when adding hundreds of inputs from virtual devices like VJOY.  Note: this is only edit time performance.  GEX profile runtime execution is not impacted in any significant way when running a profile regardless of number of inputs due to the way the execution engine is setup.  
+Hiding an input keeps its mappings intact. Those mappings still execute when the profile is active; show the input again when you need to edit them.
 
 ![Filter](assets/input_filter_general.png)
 
-"Reasonable" varies with the number of devices, inputs and hardware capabilities. Performance is directly impacted by the number of visible inputs, so it is highly recommended to keep those to a minimum. Inputs can easily be hidden or shown via the filter dialog.  Hiding an input does not delete its mappings.  Mappings however can only be seen if the input is visible.  In practice, a UI degradation can become notiecable with 500 or more visible inputs across multiple active tabs.  This depends on the system, available memory and CPU to GEX.
+The State Device also provides search, category, and attribute filters to help manage large state lists. See [Organize states](devices/state_device_user_guide.md).
 
-The filtering does not impact profile execution.  Invisible inputs will still run their mappings if the input is mapped.
-
-Filters only apply to joystick devices (physical and virtual) as they usually represent the bulk of input counts.
-
-![warning](assets/warning.png)Please remember to save the profile to have the filters persist as the data is not saved until the profile is saved.
+Save the profile after changing its visibility filters. To reduce noisy axis events, configure the separate [axis input filter](#configure-axis-input-filtering).
 
 ### Filter Configuration
 
-The filter dialog allows you to select which inputs are visible or not.  The dialog has toggle buttons for each axis, button or hat available on the input joystick type device.  Selected (visible) inputs will be colored, unselected inputs will be gray.  Each input has an indicator that will show if the input has a mapping.  If the device is triggered while the dialog is running, the corresponding functions will highlight.
+Open the device's input filter dialog and select the axes, buttons, and hats to display. Selected inputs are colored; hidden inputs are gray. Mapping indicators help identify inputs already in use, and operating a control highlights its corresponding input.
+
+The global filter controls also let you restore default visibility or select mapped inputs across joystick devices. In the input viewer, **Select Used** selects inputs and outputs used by the current profile, making it easier to monitor a specific mapping.
 
 ![Filter Dialog](assets/input_filter_dialog.png)
 
@@ -69,39 +77,41 @@ GremlinEx monitors the Windows API for keyboard inputs.  Inputs must be defined 
 
 GrmelinEx monitors the Windows API for mouse button and wheel inputs.  GremlinEx does not monitor mouse movement.  The mouse button and mouse wheel input are also defined in the Keyboard/Mouse device as a combined input that handles both mouse and keyboard inputs.
 
-GremlinEx monitors UDP for OSC messages.  Received messages decode their parameters to either a linear trigger (if in axis/slider mode) or a momentary trigger.  OSC is used to detect inputs for devices connected to BitFocus companion which includes, for example, Elgato Streamdeck. The listen port must be defined in GremlinEx and enabled.  It is recommended to send OSC packets to the actual local IP address of the host, rather than using localhost.  Note that OSC, since it works over UDP, requires firewalls to allow this traffic.  This is normally enabled by default the first time the UDP port is opened by GremlinEx as Windows will prompt for this access to be allowed, the first time only.  If a firewall is not configured correctly, GremlinEx may not be able to see any of this UDP traffic, thus not be able to trigger.   You can validate OSC traffic via third party free utilities listed in the resources section.
+GremlinEx monitors UDP for OSC messages when the OSC module and listener are enabled. Configure the incoming address, parameters, and port in the OSC device. Use a loopback address for software on the same machine or the receiving machine's LAN address for another computer. Match the sender's destination port to GremlinEx's listen port and allow the traffic through the firewall when needed.
 
 GremlinEx monitors MIDI inputs via the midi interface.  Note that this interface can be networked using certain MIDI open source tools (see resources).  It is recommended to use OSC instead of MIDI in most cases, because it is signficantly simpler to setup than networked MIDI and OSC in general is much more advanced and has higher resolution for axes and sliders.  You can monitor MIDI traffic via third party free utilities listed in the resources section.  
 
+The direct Stream Deck bridge supplies button and dial events without Companion or OSC. The Voice module turns recognized phrases into configurable inputs. Interactive overlay controls can operate writable vJoy controls and ordinary states, and an overlay OCR widget can produce mapped input events from matching captured text. Enable and configure the corresponding module before adding these mappings.
+
 ### Outputs
 
-GremlinEx will directly send VJoy output data to the VJoy interface.  GremlinEx does not keep a lock of the VJoy device - the lock is only for the purpose of telling VJoy to expect data.  This is done to avoid conflicts with other applications that may use VJoy.
+Use [Map to vJoy](actions/map_to_vjoy_user_guide.md) for virtual joystick axes, buttons, and hats, or Map to GamePad for a virtual Xbox controller when its required driver is installed. vJoy is optional for profiles that use other output types; configure a vJoy device before selecting it as a destination.
 
-GremlinEx will send OSC data via UDP to the network using the configured host IP.  Do not use localhost for sending as the data may not be sent.  If you use VPN, be sure to use the local IP of the machine on the local network, not the VPN Tunnel virtual IP.
+Use [Map to Keyboard/Mouse Ex](actions/keyboard_ex_user_guide.md) for keyboard combinations and mouse commands. Windows can restrict input sent to an application running with higher privileges, so check the target application's privilege level if it does not receive the output.
 
-GremlinEx will send keyboard and mouse data directly via the Windows API.  Note that this may require elevated privileges as some machine security policies may disable the ability for one application to send keyboard/mouse input to another.  If this happens, the policy must be changed to allow GremlinEx to send keystrokes and mouse data to other processes, or GremlinEx must be running under an account that has these permissions.  They are enabled by default unless changed.  The default user on Windows usually is fine and does not require GremlinEx to run in Administrator mode, although it is completely dependent on User Access COntrol (UAC) and the local policies in effect on the machine running GremlinEx.
+OSC actions send UDP messages to a configured host and port. Use loopback for a local receiver or the destination computer's reachable network address for remote output. The [remote control](#remote-control) and KVM features provide additional routing between GremlinEx machines.
 
-GremlinEx will send TTS (text to speech) using the PyTsx3 library which internally talks to the Windows speech API.
+Use [Map to State](actions/map_to_state_user_guide.md) to update profile flags, Map to Stream Deck to control deck pages, or Map to Overlay to control overlay pages, widgets, and variables.
 
 GremlinEx will send MSFS commands via the Microsoft/Asobo SimConnect API, or the GremlinEx WASM module if installed to execute MSFS calculator code.  Note that many commands are not supported by the default SimConnect SDK, especially when it comes to add-on third party aircraft, and the WASM module should be installed in the simulator's Community folder before running GremlinEx or this functionality may not work.
 
-GremlinEx will play sounds using the QT multimedia library.  WAV file is recommended as the default multimedia library may not support compressed or encoded sound formats like MP3.  Output is directed to the default audio device configured for the application or Windows if no output is configured for GremlinEx.
+The [Play Sound/TTS action](actions/play_sound_user_guide.md) plays WAV/MP3 files and speech generated with local TTS or Edge-TTS. New actions follow the current Windows default audio output; each action can instead target a fixed playback device. WAV is a useful first test for low-latency sound cues. Playback can overlap or use the shared audio queue's blocking controls.
 
 Additional outputs can be added via a custom user plugin.
 
 ### Manual output to VJoy / Injector
 
-While GremlinEx mappings directly output to Vjoy, it is also possible at edit time to manually manipulate VJoy devices from GremlinEx via the Input Viewer.  As of GremlinEx m76T94 allows for for manual output/control of VJoy buttons, hats and axes to  from within Input Viewer.
+Open the input viewer to manually operate vJoy buttons, hats, and axes while testing an output device. Use **Select Used** to focus on destinations referenced by the current profile. Manual output is useful for checking a game binding before adding the full mapping logic.
 
 ### Manual output to states / Injector
 
-States can be set via the Map to State action, as well as manually from the Input Viewer.
+Ordinary states can be changed manually in the input viewer as well as through Map to State. Use the viewer's state filters to find a state by name, category, or attribute. Expression states are derived from other states; change their source states to test the expression.
 
 ### Edit vs Run (active) profile mode
 
-Mapping logic is only executed if the profile is set to "active" or runtime.  When GremlinEx is in edit mode, mappings do not get executed and no logic is evaluated.  To test conditions and logic and mappings, the profile must be in "active" mode.
+Start the profile to execute its input mappings, containers, and conditions. Live input indicators, action preview controls, and manual output tools can be used while editing, but testing an entire mapping requires an active profile.
 
-When a profile stops, it actively terminates any active output action by GremlinEx.
+Stop the profile before changing its mappings. Profile stop also ends active runtime tasks such as sequences and releases managed outputs.
 
 ### Mappings
 
@@ -181,11 +191,9 @@ All conditions have a ruleset applied to them.
 | Any | Any condition passing results in a PASS.  | Used for multiple choice conditions when one out of many is needed to succeed. |
 | All | All conditions must pass to result in a PASS. | Used when all conditions need to be met. |
 
-If a condition fails, the mapping fails and no output is generated.
+Conditions are evaluated top down. **All** stops at the first failed condition; **Any** stops at the first passing condition. If the ruleset does not pass, the affected container or action does not execute for that event.
 
-Conditions are evaluated top down.
-
-Conditions use a shortcut evaluation, meaning that the first one to fail the output fails the entire operation and no downstream conditions will be evaluated.
+Container conditions apply before the actions inside that container. Action conditions affect only their own action. When a condition can change while a button is held, check that release events still reach outputs that need them. See the [worked state-condition example](actions/map_to_state_user_guide.md#use-a-state-as-a-condition).
 
 ### Usage considerations
 
@@ -202,10 +210,13 @@ As part of the profile design, also consider reversing conditions if it means us
 
 ### Startup state
 
-It is recommended to configure profiles to set a known startup state.  The Map to Vjoy and Map to State actions both have the ability to "read" the current input, such as an axis or a physical switch or button to synchronize the profile with the hardware.  If sync is not enabled, GremlinEx allows defaults for state and VJoy to be set, although it is recommended in general to:
+Choose how outputs and states should be initialized when the profile starts:
 
-- use sync mode to ensure the current hardware configuration matches the profile start.  Be mindful that if you sync a throttle, and the lever is not set to idle, the game will get whatever throttle position you've set on GremlinEx start which may not be desireable.
-- use the profile start input in the Mode/profile device to send output to the game on profile start.  This ensures a known state on the game as well.  You can also use the Mode Entry event to send default outputs when entering a mode.
+- For a maintained switch, use Map to State's **Input** startup setting to synchronize the state with the hardware. Use a fixed On or Off setting when the profile should start with a known flag value. See [startup and stop settings](actions/map_to_state_user_guide.md#startup-and-stop-settings).
+- In Map to vJoy, choose the relevant startup synchronization or initial output value for the selected mapping mode. A synchronized throttle sends its current position when the profile starts, so check the lever position before activation.
+- Use the **Profile Start** input in the Mode/Profile device for startup commands and **Mode Enter** for commands needed when entering a mode.
+
+Test startup with switches in both positions, then stop and restart the profile. Check that states, virtual controls, and the target application agree.
 
 ## User Interface Overview
 
@@ -222,6 +233,14 @@ The menu offers typical options to create, save or load a profile, access tools 
 ![toolbar](assets/toolbar.png)
 
 The quick action toolbar below the menu offers buttons to quickly save, load or run a profile.  Quick actions also includes the input viewer dialog, which shows "live" inputs, and quick access to GremlinEx's options.
+
+### Modules and themes
+
+Open **Options → Modules** to enable optional features such as the Stream Deck bridge, Overlay, AFCS, Voice, MIDI, OSC, and Octavi support. Enable the modules used by the profile and restart when prompted. A module's device tab and configuration controls may be hidden while it is disabled.
+
+For example, enable Voice before configuring spoken commands, or Overlay before creating an on-screen panel. Keep unused modules disabled if you do not need their background services or model resources.
+
+Appearance options include **Windows**, **Light**, **Dark**, and **Custom** themes. Use **Custom Colors...** to edit the custom palette. The custom theme is experimental; restart when requested to apply appearance changes fully.
 
 ### Edit mode
 
@@ -254,16 +273,20 @@ Special devices in GremlinEx are non-joystick devices, or configuration devices.
 
 | Device     | Description |
 | ----------- | ----------- |
-| Keyboard/Mouse   | This device is for keyboard and mouse mappings - ![see Keyboard/Mouse device](#keyboard-and-mouse)|
-| Mode/Profile   | This device allows you to map actions on mode and profile change (entering or exiting a profile mode, or on profile start/stop) - ![see MODE device](#modeprofile-device) |
-| OSC   | This device allows you to map inbound OSC messages (two way communication supported via map to OSC action) - ![see OSC device](#osc-device-open-sound-control) |
-| MIDI   | This device allows you to map inbound MIDI messages - ![see MIDI device](#midi-device)|
-| States   | This device allows you to define and map GremlinEx - ![see state device](#states) |
-| Octavi IFR1  | This device allows you to map inputs from the Octavi IFR1 (two way supported via map to IFR1 action) - ![see Octavi device](#octavi-ifr1-device) |
-| Settings   | This device opens profile options specific to input settings - ![see profile settings](#profile-settings)|
-| Plugins   | This device allows you to add user plugins to the profile - plugins are loaded whenever the profile start and are written in Python - see the plugin documentation for details |
+| [Keyboard/Mouse](#keyboard-and-mouse) | Define keyboard combinations, mouse buttons, and wheel inputs. |
+| [Mode/Profile](#modeprofile-device) | Map profile start/stop and mode enter/exit events. |
+| [OSC](#osc-device-open-sound-control) | Map incoming OSC messages; OSC actions provide outgoing messages. |
+| [MIDI](#midi-device) | Map messages received from MIDI ports. |
+| [States](devices/state_device_user_guide.md) | Define ordinary states, expressions, categories, attributes, and exclusive groups. |
+| [Stream Deck](#stream-deck-device) | Map direct button and dial inputs and design virtual pages. |
+| [Overlay](#overlay-pages-and-web-panels) | Design on-screen panels, interactive controls, and browser panels. |
+| [Voice](#voice-recognition-device) | Define phrases and configure microphone recognition. |
+| [AFCS](#afcs-axis-flow-designer) | Build visual axis-processing graphs. |
+| [Octavi IFR1](#octavi-ifr1-device) | Map panel inputs and control its LEDs. |
+| [Settings](#profile-settings) | Configure profile-specific input and startup settings. |
+| [Plugins](#user-plugins) | Attach Python user plugins to the profile. |
 
-Note that the MIDI and OSC tabs only appear if MIDI and OSC are enabled in options (this is by default enabled).
+Optional device tabs depend on the enabled modules. Direct Stream Deck devices also depend on the bridge connection and the devices reported by the Elgato software.
 
 
 #### Device List
@@ -376,11 +399,11 @@ Containers and actions mapped to an input will appear in this area.  In this cas
 
 ## Profiles
 
-All mappings in GremlinEx are stored in a profile in XML format.  Profiles are stored in %user_profile%/Joystick Gremlin Ex.
+Save each profile as an XML file. The default user folder is `%USERPROFILE%\Joystick Gremlin Ex`; profiles can also be saved to a location you choose.
 
 ![profile xml](assets/profile_xml.png)
 
-The profile contains the mapping information and is stored as an XML file.  The profile contains all devices, modes, profile options and mappings for each input.  GremlinEx will not save unmapped devices or inputs to conserve space and speed up the profile load time.
+The XML stores device mappings, modes, states, and profile settings. Additional profile data, including overlay layouts, uses a companion file with the same base name and a `.json` extension. Keep both files together when copying or sharing a profile, along with referenced sound files, images, and user plugins. Generated speech also uses a managed cache; check that speech assets are available on the destination machine.
 
 The profile contents can be view in any text editor.  While possible, it is not recommended to manually edit the XML file outside of GremlinEx. If editing manually, please observe that:
 
@@ -394,7 +417,7 @@ The profile contents can be view in any text editor.  While possible, it is not 
 
 Saving a profile saves (persists) the profile data to a file.  Very few actions in GremlinEx are saved automatically so it's a good idea to save often when you make modifications.
 
-When saving a profile, if a prior profile by that name exists, GremlinEx will make an automatic backup of that profile and keep a number of copies (sequentially numbered).  How many is configured in options and defaults to five (5).  After the number of backups is exceeded, the oldest is deleted.  Profiles are also backed up by version, so each version of GremlinEx has its own backup folder.  This is a safety mechanism in case a new version of GremlinEx introduces profile file format changes (or dragons) that an earlier version may not be able to read.
+When replacing an existing profile, GremlinEx keeps backups according to the count configured in Options. Older copies are removed when that count is exceeded. Backups are also organized by GremlinEx version so a profile saved with a newer format can be recovered for use with an earlier build. Keep the companion JSON and external assets with any profile copies you maintain separately.
 
 ### Loading a profile
 
@@ -439,6 +462,10 @@ GremlinEx will only work with controllers that report through DirectInput (so no
 
 A virtual controller is a software controller that exists at the hardware driver level.  VJOY is one such example of a virtual joystick driver, with up to sixteen (16) virtual devices that can be configured in VJOY provided each is different from the other in terms of axis, hat or button count.  Another example is VIGEM, a virtual x-box 360 controller that is similar to VJOY but for a game (console) controller.
 
+Profiles that use keyboard, mouse, states, audio, or other destinations can run without a configured vJoy device. Install and configure vJoy when you need virtual joystick output.
+
+Maestro Bridge/HIDMaestro support is under development and is disabled in the current m77 release. Continue to use the released vJoy setup for virtual joystick mappings.
+
 ### Keyboard and mouse
 
 GremlinEx will display a special keyboard device that groups the functionality of a keyboard and mouse.  Note that mouse axis input (mouse movement) is not currently supported as input (it is supported as output).
@@ -451,7 +478,11 @@ While MIDI and OSC are protocols associated with musical instruments, they are a
 
 ### State device
 
-Starting with 1.0ex m74, GremlinEx supports user-defined  [states](usage.md#states).  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](actions.md#map-to-state) action anywhere in the profile, via a [macro](actions.md#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+Use the [State Device User Guide](devices/state_device_user_guide.md) to create states, expressions, categories, attributes, and mutually exclusive groups. Use [Map to State](actions/map_to_state_user_guide.md) to connect physical controls to ordinary states.
+
+Use categories to organize related states, attributes to select flags across categories, and exclusive groups when only one state in a group should be On. Map to State can target a single state, an explicit list, categories, or attributes. Expression states combine existing flags with `and`, `or`, `not`, and `xor`.
+
+To build a chain, map an input to an ordinary state, then attach another Map to State action to that state's input. To gate another command, add a state condition or use a State container. Follow the worked examples for [triggering another state](actions/map_to_state_user_guide.md#trigger-one-state-from-another) and [using a state as a condition](actions/map_to_state_user_guide.md#use-a-state-as-a-condition).
 
 Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.
 
@@ -469,10 +500,76 @@ In GremlinEx, states can be mapped via the State Device, the "map to state" acti
 
 ### Octavi IFR1 device
 
-The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion ![map to Octavi IFR1](actions.md#map-to-octavi-ifr1) action lets GremlinEx set state and LEDs on the Octavi.
+The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion [Map to Octavi IFR1](actions.md#map-to-octavi-ifr1) action lets GremlinEx set state and LEDs on the Octavi.
 
 ![image](assets/octavi_ifr1.png)
 
+
+### Stream Deck device
+
+The direct Stream Deck bridge connects GremlinEx to the Elgato Stream Deck application. Keep the Elgato software running; it manages the physical devices. Companion and OSC are optional alternatives and are not required for this connection.
+
+1. Enable the Stream Deck bridge in **Options → Modules**.
+2. In **Options → Stream Deck**, use **Install Stream Deck plugin…** to install the companion plugin.
+3. In the Elgato software, add a **JG Ex Button** or **JG Ex Dial** to the deck layout.
+4. Select the connected deck's tab in GremlinEx. Configure its virtual pages and select a button or dial input to add containers and actions.
+5. Start the profile and test the physical control. Use **Map to Stream Deck** when a mapping should change pages or return to the previous page.
+
+The bridge uses a local WebSocket connection, with port `9020` as the default. Page designs can include state-based feedback so a key reflects profile state. See the [Stream Deck guide](streamdeck.md) for installation, layout design, connection checks, and page actions.
+
+### Overlay pages and web panels
+
+Enable the Overlay module, then use the Overlay tab to create pages containing controls, labels, images, and indicators. Layouts belong to the profile and are stored in its companion JSON file. Use the overlay export/import controls when transferring layouts separately.
+
+For an on-screen panel:
+
+1. Create a page and add the required widgets in the designer.
+2. Choose an on-screen background mode for a transparent HUD, or an image/chroma background for capture in OBS. Select the display for the page.
+3. Bind indicators to the physical inputs, vJoy controls, or states you want to display.
+4. Enable the page's **Interactive** option if it should accept input, then use **Show overlay** to open the live panel. Writable vJoy and ordinary-state bindings can be operated from the live window.
+5. Start the profile to test any mappings triggered by those controls. Use **Map to Overlay** to show or hide pages, groups, and widgets, change interactivity, or update variables from an input.
+
+For a phone or tablet panel, choose the page's **Websocket** mode. Set its **Port**, or use **Suggest free port**, then show the page. Copy the displayed **LAN URL** with **Copy URL** and open it in a browser on the same LAN. Enable **Interactive** for touch controls to write to their bindings. Use that displayed URL, which includes the selected port, rather than constructing one manually.
+
+An OCR widget can capture a selected screen region and match text against rules. Map the rule's virtual-button input to actions when recognized text should trigger a command or update a state. Configure and test the capture region and matching rules before adding the final output.
+
+See the [Overlay guide](obs_overlay.md) for page design, interactive controls, OCR, and OBS capture.
+
+#### Show a remote computer in an overlay
+
+Use an overlay **Remote View** widget to display a screen or application captured by another GremlinEx machine.
+
+1. Configure [remote control](#remote-control) on both machines so the master can discover the client.
+2. On the client, open the Remote Control options. Under **Video return to master**, enable **Send video feed back to master**.
+3. Choose **Entire screen** or **Application window** as the source, then select the screen or application. Adjust **Max width**, **FPS**, **Quality**, and **Encoder** for the connection and available resources.
+4. Start a profile on the client. Video publishing runs while that profile is active and stops when it is deactivated. Allow the configured **Video port** through the client's firewall if needed; the default is TCP `6013`.
+5. On the master, add a Remote View widget to an overlay page and select **Remote client** in its inspector. Use **Refresh clients** if the client is missing, then show the overlay page.
+
+Use the KVM action and the current local/remote routing settings when you also need to forward keyboard and mouse input to that client.
+
+### Voice recognition device
+
+The Voice module uses local speech recognition to turn phrases into mapped inputs. Its recognition model is downloaded when needed; allow that first download to complete before testing commands.
+
+1. Enable Voice in **Options → Modules** and open the Voice device.
+2. Open the voice configuration controls and select the microphone and recognition model. Use **Monitor Input** and the audio meter to check the microphone level.
+3. Choose an activation mode: **Always On**, **Toggle**, **Press to Listen**, or **Press to Suspend**. Configure the controlling input for a mode that needs one. **Off** disables recognition.
+4. Add a voice input. Enter a phrase in **Voice Command(s)**; separate alternative phrases with `|`, such as `gear down|lower gear`. Recognition ignores case and punctuation when matching commands.
+5. Add a container and action to that input, save, and start the profile. Enable listening according to the selected activation mode, speak the phrase, and observe the output.
+
+Use the optional recognition and activation audio cues to hear when listening is enabled or a command matches. The Control action can enable, disable, or toggle voice recognition from another mapped input. Choose a smaller model first if recognition uses too many resources, then compare accuracy with your microphone and commands.
+
+### AFCS axis flow designer
+
+Enable AFCS in **Options → Modules** to build axis-processing graphs in the AFCS tab. Use named inputs and processing nodes to combine axes, apply curves, and send the result to an output.
+
+1. Create a graph input with a meaningful name, such as `left_brake`.
+2. Select the physical axis and add **Map to AFCS**. Set **AFCS input name** to the graph input's name.
+3. Repeat for any additional source axes.
+4. Connect the input nodes through the desired merge or curve nodes to a configured vJoy output node.
+5. Save and start the profile. Move each source separately and then together, checking the final output in the input viewer.
+
+Check that the AFCS output destination does not also receive a conflicting direct mapping. For a simpler two-axis merge, use the merge controls in [Map to vJoy](actions/map_to_vjoy_user_guide.md#merge-axes).
 
 ### Reordering of devices
 
@@ -1481,11 +1578,13 @@ The mode is defined in the table below
 
 ## States
 
+For setup instructions, see the [State Device User Guide](devices/state_device_user_guide.md) and the companion [Map to State User Guide](actions/map_to_state_user_guide.md).
+
 Starting with 1.0ex m74, GremlinEx includes a state machine.  States are used in multiple use-cases to solve simple to complex mapping scenarios.  For example states can help with latching, triggering the same mapping from multiple inputs, and conditional mapping based on boolean logic on multiple states without having to revert to a custom user plugin.
 
 ### What is a state?
 
-A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](actions.md#map-to-state) action anywhere in the profile, via a [macro](actions.md#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+A state is an internal entity that only exists in memory at runtime.  States have a unique, case-insensitive name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](actions.md#map-to-state) action anywhere in the profile, via a [macro](actions.md#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
 Attributes of a state:
 
@@ -1532,7 +1631,7 @@ GremlinEx supports standard boolean operators.  In the table below, 0 represents
 ### Evaluation order
 
 NOT takes precedence as a unary operator over all other operators.
-AND takes precedence over OR.
+AND takes precedence over OR and XOR. OR and XOR have equal precedence.
 Parenthesis can be used to change the evaluation order.
 
 ### Example of state expressions
@@ -1563,20 +1662,9 @@ Note that expressions, like states, are not case sensitive.
 
 ### State Gotchas
 
-States are designed to be flexible.  As a result of this flexibility, it is possible using expressions to create loops.
+Keep state dependencies flowing from ordinary input states to expressions and then to output mappings. Avoid expressions that refer to themselves or form a circular chain, such as A referring to B while B also refers to A.
 
-![warning](assets/warning.png) Loops are the result of one input trigger eventually causing a re-trigger of that same input.  GremlinEx makes this possible through a combination of states and expression.  If a loop occurs, the application may become sluggish or unresponsive, and in some situations will crash as it will eventually run out of memory.
-
-Example:
-
-State A is defined as not B.
-
-State B is defined as not A.
-
-This (simple) example creates a loop because both definitions reference each other.  GremlinEx includes a circuit breaker when evaluating expressions however it is not able to catch all situations.
-
-Don't create loops!
-
+Check mappings attached to states as well: an output that changes an earlier state can feed back into the same chain. Test the source states and expressions in the input viewer before adding those outputs.
 
 ### Creating a state
 
@@ -1609,11 +1697,7 @@ States are tracked internally by ID (as of m76T28) so a name change will also up
 
 ### Deleting a state
 
-Deleting a state will not delete a state if it's referenced in an expression.  The state will automatically be recreated if it is in an expression and it does not exist.
-
-Note that this could create a challenging situation if the state deleted is itself an expression.
-
-Be sure to delete all references first.
+Before deleting a state, remove or replace its references in expressions, Map to State actions, conditions, State containers, and macros. Remove it from the State Device list, save the profile, and reopen it to check the remaining selections.
 
 ### State visualization
 
@@ -1627,7 +1711,7 @@ When would you use a state?
 
 Because a state is like a virtual button, it can immediately used instead of any button condition.  However because a state can be setup as an expression using other states, it can also be used for complex latching situations when a trigger should only execute if several things are true, or only if some of them at true, or inverting that test using the NOT operator.
 
-An example would be the need to trigger a joystick button but only if two physical inputs are pressed.  In this example, we'd create two states, A and B with a default value of off.
+An example would be the need to trigger a joystick button while at least one of two physical inputs is pressed.  In this example, we'd create two states, A and B with a default value of off.
 We would define a third state, called a_or_b, defined as:
 
      A or B
@@ -1661,7 +1745,7 @@ Profile settings is a tab that lets you configure various profile options.
 - select the default profile start mode
 - set the default macro execution delay between steps
 
-Note: Profile modes are defined in the ![mode dialog](#profile-modes).
+Note: Profile modes are defined in the [mode dialog](#profile-modes).
 
 ![image](assets/profile_settings.png)
 
@@ -1797,11 +1881,11 @@ Mappings for another mode will not be displayed from another mode.
 
 The general idea is you will select one of the input tabs, selecting the hardware or virtual input device.  GremlinEx will show the detected inputs for the selected device.  If the device is a keyboard or MIDI or OSC, the input will also need to be defined.  Joystick inputs will show detected axes and buttons and hats for that input as they are reported by the hardware.
 
-VJOY devices can also be used as input devices if so configured in the settings tab. VJOY devices cannot be used in GremlinEx concurrently for input and output.  
+Enable vJoy devices as inputs in the Settings tab when another application supplies their values. Use states for internal profile flags, and check for feedback loops if a profile reads and writes the same virtual device.
 
 Once you have selected the input (or created one) on the left side of the UI, you can add one or more containers to that input.  
 
-Remember to save changes via the save button as profile changes are not saved automatically.   The profile is saved to an XML file in the default Gremlin Ex user folder.  The folder can be opened directly in Windows Explorer from the file menu so it's easier to locate.
+Remember to save changes via the save button as profile changes are not saved automatically.   Save the profile to an XML file in your chosen location, and keep its companion JSON file with it. Use **Actions → Open GremlinEx folder** to locate the default user data folder.
 
 It's possible to manually edit the XML file if you'd like, however if you do, make a backup of the original XML file in case an error occurs.
 
@@ -1813,7 +1897,9 @@ Note: plugins are reloaded every time a profile starts which allows for fast bug
 
 ## Containers
 
-Containers contain actions.  Containers are attached to an input selected on the left of the UI
+Containers are attached to the selected input and determine how its actions are triggered. Use Basic for a direct mapping, Press/Release for separate commands on each edge, Tempo/TempoEx for short and long presses, and Repeater for repeated pulses. See the [container reference](containers.md) for the full list.
+
+The [Sequence container](containers/sequence_user_guide.md) runs complete action sets as timed steps. The State container selects action sets using a state; it is useful for alternate command layers without adding a separate condition to every action. See [using the State container](devices/state_device_user_guide.md#use-the-state-container).
 
 ## Actions
 
@@ -1825,23 +1911,62 @@ Actions are aware of the type of input they are being attached to, and not all a
 
 Some actions are special - meaning - they need to occur after other prior actions in the execution sequence for a given input.   The priority is currently hardcoded in each action plugin which will be fine for all the provided actions.  For example, a joystick axis mapping action must occur after a response curve action (that changes the input to a new value), and a mode switch action occurs after all other actions.
 
+### Container priorities
+
+Use a container's priority setting to order containers attached to the same input. Lower numbers execute first; the available range is `0` to `999`. Give containers different values when their order matters, since equal priorities do not establish an order. This is separate from the action-specific priorities described above.
+
+For example, give a state-updating container an earlier priority when a later container on the same input tests that state. Use Sequence when commands need explicit steps, delays, or repetition rather than relying on container order for timing.
+
 ### General Action Types
 
-The default set of actions for GremlinEx grows all the time but includes in general:
+Choose the action for the destination or transformation you need. The [action reference](actions.md) lists the available actions and supported input types.
 
-- Map to VJOY Joystick (Ex version recommended)
-- Map to Keyboard (Ex version recommended) - the EX version does both keyboard and mouse combination (complex input trigger like holding 4 keys down concurrently to trigger) mappings and supports special output keys like F13 to F24)
-- Map to Mouse (EX version recommended)
-- Text to speech (converts text to speech)
-- Play sound (plays a sound clip)
-- Change profile mode
-- Change profile mode temporarily (while input is pressed)
-- Cycle profile mode (advance in sequence)
-- Gated Axis (lets you defined arbitrary action points based on input position)
-- Response curve (curves the input axis so it's not linear)
-- SimConnect (for MSFS output)
-- Macro (combination of various actions)
-- Pause/resume profile actions
+- [Map to vJoy](actions/map_to_vjoy_user_guide.md): virtual joystick axes, buttons, and hats, including button/encoder-to-axis controls and merged axes.
+- Map to GamePad: virtual Xbox controller output.
+- [Map to Keyboard/Mouse Ex](actions/keyboard_ex_user_guide.md) and Map to Mouse Ex: keyboard combinations, mouse buttons, wheel commands, and pointer output.
+- [Map to State](actions/map_to_state_user_guide.md): ordinary state updates, grouped targets, pulses, and startup synchronization.
+- [Gated Axis](actions/gated_axis_user_guide.md), Response Curve Ex, and Map to AFCS: axis processing and position-based commands.
+- [Play Sound/TTS](actions/play_sound_user_guide.md): audio files, local speech, Edge-TTS generation, and playback control.
+- Map to Stream Deck and Map to Overlay: page controls, feedback, and panel updates.
+- Map to OSC/OSC Ex, Map to SimConnect, and Map to Octavi IFR1: integration with external software and devices.
+- Switch Mode, Temporary Mode Switch, Cycle Modes, Control, and KVM: profile, module, and output-routing controls.
+- Macro, Run Process, and OS Action: command sequences and application or system commands.
+
+### Control an axis with buttons or an encoder
+
+Use Map to vJoy's button-to-axis controls when the source supplies presses or encoder ticks instead of an axis value.
+
+1. Select the source input, add Map to vJoy, and choose the destination device and axis.
+2. Choose the stepped-axis action mode, then select the control under **Button to Axis (step) Mode**: **Velocity**, **Stepped**, **Stepped+PID**, **Encoder**, or **PID**.
+3. Configure the increase/decrease inputs and the mode's speed, step, or controller settings. Set an initial axis value if required.
+4. Start the profile and check the destination axis while operating the controls. Verify the full travel, direction, and stopping position before binding it in a game.
+
+Presets provide starting values for the selected control mode. Use the [worked setup and mode-specific instructions](actions/map_to_vjoy_user_guide.md#control-an-axis-with-two-inputs) to choose between continuous movement, fixed steps, encoder movement, and movement toward a target. The same guide covers output curves and [axis merging](actions/map_to_vjoy_user_guide.md#merge-axes).
+
+### Run actions in a sequence
+
+Use Sequence when each step needs its own action set and timing. A Macro action can be included in a step, but Sequence also accepts other supported actions directly.
+
+1. Add a **Sequence** container to a button input.
+2. Use **Add Step** to create two steps and configure a simple output in each.
+3. Select **Normal (run once)**, enable **Execute on press**, and disable **Execute on release** for the first test.
+4. Set **Step Autorelease delay (ms)** to `125` and **Step Interval Delay (ms)** to `300` so the outputs are easy to observe. Keep **Continue on trigger reset** enabled if a tap should complete the sequence after release.
+5. Save, start the profile, and press the source once. Adjust the timing for the target application after confirming the step order.
+
+Choose **Toggle** to start and stop a loop with successive triggers, **Loop** to repeat while held, **Wiggle** for variable step selection/timing, or **Step** to advance one step per trigger. Individual steps also have repeat controls. See the [Sequence guide](containers/sequence_user_guide.md) for these modes, startup/resume settings, and worked examples.
+
+### Play sounds and generated speech
+
+Add **Play Sound/TTS** to an input for audio feedback. Select the mode before configuring its source:
+
+1. For **Audio file**, choose a WAV or MP3 file. For **TTS (local)** or **AI (Edge-TTS)**, enter text, choose a voice, and generate the speech asset.
+2. Preview the audio. Leave the destination on the current Windows default output or select a fixed playback device.
+3. Configure volume and any required trim, fade, loop, or queue options.
+4. Save, start the profile, and trigger the input. Use another action in **Stop Playback** mode when a separate control should stop audio.
+
+The shared queue can serialize playback or allow overlapping cues, including output to different audio devices. Its blocking controls apply to audio playback; they do not pause the profile or make a Sequence step wait for the sound to finish. Use explicit sequence timing when that spacing matters.
+
+Local TTS uses installed system voices. New Edge-TTS generation requires network access and FFmpeg, and generated speech is cached for playback. See the [Play Sound/TTS guide](actions/play_sound_user_guide.md) for generation, cache management, device selection, and queue options.
 
 ## Profile edit time vs runtime behavior
 
@@ -1849,13 +1974,13 @@ When the profile is activated (either manually or automatically by process for e
 
 ### Edit time
 
-GremlinEx, as of 13.40.14ex includes a hardware repeater directly into the UI to visualize the input state at design time.  This is true for axes and buttons (not hats presently).
+Use the input indicators and axis repeaters to see the current source value while configuring mappings. The input viewer provides additional input/output displays, **Select Used**, and manual vJoy/state controls. Action previews and the overlay designer help check individual settings before starting the full profile.
 
 ### Run time
 
-When a profile runs, GremlinEx will stop updating the majority of the UI for performance reasons, especially for things like mode changes and repeating input. It is thus completely possible for the run time mode to not be displayed in the UI when a profile is running - this is normal.  
+When a profile runs, the runtime engine executes mappings and most mapping editors are unavailable. Some edit-time displays stop updating to reduce UI work. Use the status bar to check the active runtime mode and local/remote routing, and the activation control to check whether the profile is running.
 
-However the status bar (bottom left) will always reflect the active run modes of GremlinEx including the remote/local state and active run time profile mode and the toolbar (top left) will always reflect the run mode (green when active).
+Live overlays, Stream Deck feedback, recognition, and other enabled runtime services continue according to their configuration. Use the input viewer or target application to verify the output, then stop the profile before making further edits.
 
 ## Profile map visualization
 
@@ -1873,6 +1998,8 @@ Make sure that if you use a press action, there is a companion release action so
 When a key is pulsed, the release will occur regardless of input state or conditions.
 
 ## Merged Axis action
+
+For new m77 mappings, use the [Map to vJoy merge controls](actions/map_to_vjoy_user_guide.md#merge-axes) or the [AFCS designer](#afcs-axis-flow-designer). The description below applies to the older Merged Axis action used by existing profiles.
 
 This action is similar to the profile wide merged-axis functionality via the menu, with some key differences:
 
@@ -2077,23 +2204,11 @@ Within each action set, the chain group entries can be re-ordered, or can be rem
 
 ## State Device
 
-The state device is a special virtual device that lets you add, remove or edit states available in a profile.  Each state can also be mapped to, which will cause the containers/actions to execute when the state changes.  This is optional because the other way to use states is as conditions so not all states need to map to actions.
+For state creation, expressions, categories, attributes, timed changes, exclusive groups, and state-triggered mappings, follow the [State Device User Guide](devices/state_device_user_guide.md).
 
 ![state device](assets/state_device.png)
 
-A state has a unique, case sensitive name.  It also has an optional description to help document what the state does.
-
-States have to be unique.  No two states with the same name (case sensitive) can exist at the same time.
-
-States are unique to a profile.   They are not shared with other profiles, so each profile needs to define its own set of states.
-
-States are not mode specific.  States are global to a profile regardless of mode, and this is by design to allow states to be accessible from any mode.  You can absolutely use states specific to modes, in which case you would use different states named differently that you only use in specific modes.  How you use states is completely up to the logic behavior you want to achieve.
-
-States can only have an on (pressed) or off (released) value.
-
-Whenever a state changes, if it is mapped to containers/actions, these will execute and look to the mapped containers/actions as a joystick button (pressed or released).  Important: when a state changes, the events are queued immediately when the change occurs, to ensure that any actions execute on state change.
-
-Warning: By design, there are no guardrails with states, so loops are possible, and this is usually not a desired outcome as it will result in endless looping in some situations.  While some state machine designs must allow loops, but it could result in an endless loop if A toggles B, B toggles C, C toggles A.  This is allowed for the time being.  As of this writing, this is a concious design decision to allow this as the runtime performance impact and logic required to catch these would be a negative impact, so use states with loops in mind to avoid this situation currently.  If you do enter into a loop inadvertently, depending on the loop, the profile would need to be stopped.  In some cases, a hard process kill via task manager may be needed.
+For physical input mappings, target selections, pulses, latching, and startup synchronization, follow the companion [Map to State User Guide](actions/map_to_state_user_guide.md).
 
 ## State Condition
 
@@ -2187,7 +2302,7 @@ The second vjoyremap will be set to *button release* and map to the same output 
 
 ## Scripting logic
 
-Any logic that depends on reading more than one hardware value is best done as a plugin.  Plugins are Python files "attached" to a GremlinEx profile and the script enhancements make it possible to run a function when a hardware event occurs.
+Use conditions, expression states, State containers, or AFCS graphs for logic that can be configured in the profile. For custom algorithms or external APIs, attach a Python user plugin and run functions from hardware events or profile lifecycle callbacks.
 
 ### Attaching a function to a hardware event
 
@@ -2229,28 +2344,20 @@ While not always applicable, the tips below will generally help maximize edit ti
 
 #### Filter inputs
 
-Use the input filter options to keep the number of visible inputs on a given device to a minimum.  The more inputs are loaded, the more resources are used.  UI performance can start to bog down after 100 or so inputs concurrently visible, however on higher end systems this degradation is not experienced until 400 inputs or so.  
+Use the input visibility filters to keep the number of displayed inputs manageable. The cost depends on the number of visible controls and the machine; hide unused inputs and devices rather than relying on a fixed input-count limit.
 
 Be particularly mindful of devices with lots of inputs, such as VJOY devices when VJOY is used as input.  Use the input filter options to keep the number of inputs to a reasonable level for your machine.
 
 ### Configure Axis input filtering
 
-Performance is impacted by noisy axis data coming from devices that "spam" copious events.  These events are handled by the GEX axis filtering function. This function determines which axis inputs should be processed versus ignored.  This generally falls in these general categories:
+m77 uses an EMA (exponential moving average) axis filter to smooth noisy input and reduce redundant updates while tracking movement and the final settled position. Tune it with a representative movement test rather than only watching an untouched control.
 
-- events received when the input has not changed values significantly.
-- events received at a high rate
-- events received when the device is not moving our touched (usually sensor noise)
+1. Open Options and find **Joystick Axis Filter**.
+2. Check **Delay (ms)**, which limits how quickly events are accepted, and **Threshold**, the minimum movement needed to trigger an update. The tooltips recommend `1 ms` and `0.001` respectively as starting values; `0` disables the corresponding limit.
+3. Observe the axis at rest, make slow small movements, then move it quickly through its range and stop at several positions.
+4. Adjust the settings only as needed. A larger threshold can suppress noise but also hide intentional small changes. Recheck the destination axis with the profile active.
 
-GEX has configurable parameters to modify the filtering to address talkative devices that spam axis update data when the data sent is not particularly relevant to the profile.  The default settings are suitable for most devices in one of the above categories.
-
-Devices particularly prone to noisy axis (linear) data are:
-
-- devices using a potentiometer (resistor based) 'POT' sensor insteald of 'HAL' (magnetic potential difference or hall effect) or optical (contact less) sensors.  Potentiometer based devices are usually found on older or cheaper gaming devices, or devices that are well used.
-- devices that are bulky/large such as rudder pedals - even with the high precision of a hall effect sensor, the bulk of the mechanism can lead to an axis trigger.
-- devices with limited travel, such as thumbsticks - the smaller they are - the worse they tend to be.
-- sensitive devices such as touch screens (these can trigger axis input into GEX over OSC/MIDI).
-
-Note that input filtering is different from deadzone settings where, for example, a deadzone is applied on an axis that does not return to a center position or has issues hitting min/max values at travel extremes.  For these situation, the deadzone mechanism should be used to correct the input data.
+Use calibration and deadzones to correct center or travel problems. Use visibility filters to hide UI rows. Those controls address different needs from filtering incoming axis events.
 
 #### Input Viewer for diagnostics / testing only
 
@@ -2282,11 +2389,11 @@ GremlinEx is designed to run from [Visual Studio Code](https://code.visualstudio
 
 ### Python requirements
 
-GremlinEx is curently built on Python x64 3.13 or above.   Additional dependencies are listed in the requirements.txt file.
+The current m77 build uses 64-bit Python 3.14 and Qt 6/PySide6. Use the Python version and dependencies specified by the checkout and its `requirements.txt` when setting up a source environment.
 
 ### Primary entry point
 
-The file joystick_gremlin.py is the primary script to execute from Python or Visual Studio Code.  
+Run `gremlinEx.py` from the repository root using the configured Python environment. It is the primary entry point for a source checkout or a Visual Studio Code launch configuration.
 
 ### Debug mode caveats
 
@@ -2294,7 +2401,7 @@ Please note that when running GremlinEx from script with a debugger attached, th
 
 ## Location of key files
 
-GremlinEx expects all content file to be in the following folder:  %user_profile%/Joystick Gremlin Ex
+The default user data folder is `%USERPROFILE%\Joystick Gremlin Ex`. Use **Actions → Open GremlinEx folder** to open the folder used by your configuration, particularly when version-specific storage is enabled. Profiles and external assets can also be stored in locations you choose.
 
 ### Log file
 
@@ -2304,7 +2411,7 @@ The log file will be requested if an issue occurs.
 
 ### Profile files
 
-All profile files are saved to XML, and profile options, if relevant, are saved to the same file as the profile but with a JSON extension.
+The profile's XML file stores mappings and states. A companion file with the same base name and a `.json` extension stores additional profile data, including overlay layouts. Copy both when moving a profile, and include any referenced audio, images, or Python plugins. Use the speech generation and WAV export controls in Play Sound/TTS to prepare audio for the destination machine.
 
 #### Backups
 
@@ -2316,11 +2423,7 @@ GremlinEx stores its configuration to a file called config.json.   There is not 
 
 ## Limitations
 
-GremlinEx is generally only limited by creativity, memory and disk space.  There are no set limits to how complex a profile can be, or how many input devices can be mapped, or how many OSC messages can be listenned to.
+Practical profile capacity depends on available CPU, memory, input event rates, and the work performed by mappings and optional modules. Large visible input lists, frequent OCR capture, voice recognition, and complex repeated actions can increase resource use.
 
-GremlinEx uses a different architecture and logic model from the original Joystick Gremlin 2019 implementation.  GremlinEx's architecture will remain performant regardless of the complexity of a profile because the core execution engine uses an execution graph model to determine how triggers are handled which has a linear O(n) model for execution, meaning it is not dependant on the complexity for input mappings.
-
-This said, performance will be impacted by the complexity of the mapped output and number of conditions that need to be evaluated, although in practice there is no perceptible difference.  
-
-GremlinEx is heavily dependent on the Python environment as well as the QT library so is subject to the constraints and performance models associated with executing these enviroments.  However there are no known limitations at this time.
+Enable the modules you need, filter unused UI inputs, and test the complete profile with representative hardware activity. Use the input viewer and targeted logging to investigate a problem, then close diagnostic views and disable verbose logging when they are no longer needed.
 

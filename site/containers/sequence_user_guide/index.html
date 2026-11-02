@@ -1,0 +1,1478 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/containers/sequence_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Sequence Container — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sequence-container-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sequence Container — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../actions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first sequence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-and-arrange-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add and arrange steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-an-execution-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose an execution mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose an execution mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#normal-run-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normal: run once
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-start-and-stop-a-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle: start and stop a loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loop-run-while-pressed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loop: run while pressed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-vary-the-steps-and-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiggle: vary the steps and timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-advance-once-per-trigger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step: advance once per trigger
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-triggering-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the triggering event
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-step-timing-and-repetition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set step timing and repetition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Set step timing and repetition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sequence-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequence timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-step-repeat-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-step repeat options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-startup-and-resume-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set startup and resume behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conditions-and-action-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditions and action behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#send-two-virtual-button-commands-in-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send two virtual button commands in order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-a-repeating-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle a repeating sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-one-random-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose one random command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cycle-commands-one-press-at-a-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle commands one press at a time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="sequence-container-user-guide">Sequence Container — User Guide<a class="headerlink" href="#sequence-container-user-guide" title="Permanent link">¶</a></h1>
+<p>The <strong>Sequence</strong> container runs groups of GremlinEx actions as a series of steps. Use it for a command sequence, a loop, one step per trigger, or a random choice of commands. Each step can contain one or more actions, including a Macro action.</p>
+<p>The container controls when steps receive press and release events. The actions inside each step determine the actual output, such as a keyboard shortcut, a virtual joystick button, an OSC message, or a sound.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#create-your-first-sequence">Create your first sequence</a></li>
+<li><a href="#add-and-arrange-steps">Add and arrange steps</a></li>
+<li><a href="#choose-an-execution-mode">Choose an execution mode</a></li>
+<li><a href="#normal-run-once">Normal: run once</a></li>
+<li><a href="#toggle-start-and-stop-a-loop">Toggle: start and stop a loop</a></li>
+<li><a href="#loop-run-while-pressed">Loop: run while pressed</a></li>
+<li><a href="#wiggle-vary-the-steps-and-timing">Wiggle: vary the steps and timing</a></li>
+<li><a href="#step-advance-once-per-trigger">Step: advance once per trigger</a></li>
+<li><a href="#choose-the-triggering-event">Choose the triggering event</a></li>
+<li><a href="#set-step-timing-and-repetition">Set step timing and repetition</a></li>
+<li><a href="#sequence-timing">Sequence timing</a></li>
+<li><a href="#per-step-repeat-options">Per-step repeat options</a></li>
+<li><a href="#set-startup-and-resume-behavior">Set startup and resume behavior</a></li>
+<li><a href="#conditions-and-action-behavior">Conditions and action behavior</a></li>
+<li><a href="#runtime-settings">Runtime settings</a></li>
+<li><a href="#worked-examples">Worked examples</a></li>
+<li><a href="#send-two-virtual-button-commands-in-order">Send two virtual button commands in order</a></li>
+<li><a href="#toggle-a-repeating-sequence">Toggle a repeating sequence</a></li>
+<li><a href="#choose-one-random-command">Choose one random command</a></li>
+<li><a href="#cycle-commands-one-press-at-a-time">Cycle commands one press at a time</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">¶</a></h2>
+<p>Have a profile containing the source input and a way to observe the output. For virtual joystick output, use the input viewer or a joystick monitor before testing in a game.</p>
+<p>The container declares support for <strong>joystick buttons and hats</strong>. Configure a hat's virtual-button activation directions so it supplies a pressed/released state. Other input types depend on how the surrounding input configuration presents them; do not assume Sequence can be added directly to a raw axis.</p>
+<p>For the first test, use a button, two simple actions, execution on press only, and <strong>Normal (run once)</strong> mode. Keep mode-changing actions outside the sequence: runtime settings can delay a mode change or terminate the running sequence.</p>
+<h2 id="create-your-first-sequence">Create your first sequence<a class="headerlink" href="#create-your-first-sequence" title="Permanent link">¶</a></h2>
+<ol>
+<li>Select the profile mode and source input.</li>
+<li>Choose <strong>Sequence</strong> in the <strong>Container</strong> selector and add it.</li>
+<li>Select an action in the container's action selector and click <strong>Add Step</strong>. Configure its output.</li>
+<li>Add a second step with another easy-to-observe output.</li>
+<li>Select <strong>Normal (run once)</strong> under <strong>Execution mode</strong>.</li>
+<li>Enable <strong>Execute on press</strong>, disable <strong>Execute on release</strong>, and leave <strong>Continue on trigger reset</strong> enabled.</li>
+<li>Set <strong>Step Autorelease delay (ms)</strong> to <code>125</code> and <strong>Step Interval Delay (ms)</strong> to <code>300</code> for the initial test.</li>
+<li>Save and start the profile. Press the source once and observe the two outputs in order.</li>
+</ol>
+<p>These timing values are examples. They give the target application time to detect each command and make the step order easy to see.</p>
+<h2 id="add-and-arrange-steps">Add and arrange steps<a class="headerlink" href="#add-and-arrange-steps" title="Permanent link">¶</a></h2>
+<p>A step is an action set, displayed as <strong>Step 1</strong>, <strong>Step 2</strong>, and so on.</p>
+<ul>
+<li><strong>Add Step</strong> creates a new step containing the selected action.</li>
+<li>Use a step's own action controls to add more actions to that step.</li>
+<li>Use the up, down, top, and bottom controls to change the step order.</li>
+<li>Use the step's delete control to remove it.</li>
+<li>Configure each step's <strong>Repeat Mode</strong> and timing options separately.</li>
+</ul>
+<p>Put commands in separate steps when their order or spacing matters. Actions grouped in one step receive the same synthetic press/release cycle; the normal action execution rules still apply within that group.</p>
+<p>Recheck repeat counts and timing after reordering or deleting steps. The current implementation stores these options by step position. Empty action sets are omitted from the runnable step list, so give every intended step an action and remove unused empty steps.</p>
+<h2 id="choose-an-execution-mode">Choose an execution mode<a class="headerlink" href="#choose-an-execution-mode" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Execution mode</th>
+<th>What starts it</th>
+<th>What it runs</th>
+<th>What stops it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal (run once)</td>
+<td>A selected press or release event.</td>
+<td>All steps once, in order.</td>
+<td>End of the sequence, or trigger reset if continuation is disabled.</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>A selected trigger event.</td>
+<td>All steps repeatedly, in order.</td>
+<td>The next selected trigger event.</td>
+</tr>
+<tr>
+<td>Loop (while pressed)</td>
+<td>The selected trigger becomes active.</td>
+<td>All steps repeatedly, in order.</td>
+<td>The trigger resets. With press-only execution, this is the source release.</td>
+</tr>
+<tr>
+<td>Wiggle (random)</td>
+<td>A selected trigger event.</td>
+<td>Ordered or randomly selected steps, with optional random timing and a step-count limit.</td>
+<td>The count limit, or trigger reset if continuation is disabled.</td>
+</tr>
+<tr>
+<td>Step</td>
+<td>Each selected trigger event.</td>
+<td>One step, including that step's repeats.</td>
+<td>Completion of that step, or trigger reset. The next trigger advances to the following step.</td>
+</tr>
+</tbody>
+</table>
+<p>Stopping the profile stops any active sequence. Mode changes can also affect execution; see <a href="#runtime-settings">Runtime settings</a>.</p>
+<h3 id="normal-run-once">Normal: run once<a class="headerlink" href="#normal-run-once" title="Permanent link">¶</a></h3>
+<p>Normal starts at Step 1 and runs through the list once. Triggers received while the sequence is already running are ignored rather than queued.</p>
+<p><strong>Continue on trigger reset</strong> is enabled for new containers. With press-only execution, this allows a quick tap to start the sequence and releasing the source does not interrupt it. Disable continuation when releasing the source should cancel the remaining steps.</p>
+<h3 id="toggle-start-and-stop-a-loop">Toggle: start and stop a loop<a class="headerlink" href="#toggle-start-and-stop-a-loop" title="Permanent link">¶</a></h3>
+<p>The first qualifying trigger starts the loop. The next qualifying trigger stops it. With execution on press only, press once to start and press again to stop; releases do not toggle the loop.</p>
+<p>Enable <strong>Resume at last step</strong> to resume from the stored step position on the next activation. Leave it off to restart at Step 1.</p>
+<h3 id="loop-run-while-pressed">Loop: run while pressed<a class="headerlink" href="#loop-run-while-pressed" title="Permanent link">¶</a></h3>
+<p>With <strong>Execute on press</strong> enabled and <strong>Execute on release</strong> disabled, the sequence loops while the source is held and stops on release. Enable <strong>Resume at last step</strong> if the next hold should continue from the stored position.</p>
+<p>Use this mode for an ordered repeating sequence controlled by a held button or maintained switch. The container does not expose <strong>Continue on trigger reset</strong> in this mode.</p>
+<h3 id="wiggle-vary-the-steps-and-timing">Wiggle: vary the steps and timing<a class="headerlink" href="#wiggle-vary-the-steps-and-timing" title="Permanent link">¶</a></h3>
+<p>Wiggle can vary the order, interval, and number of selected steps independently.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Randomize Steps</td>
+<td>Picks a step independently for each selection. A step can be selected again immediately; this is not a shuffle that uses every step once.</td>
+</tr>
+<tr>
+<td>Random Delay</td>
+<td>Chooses the interval between step selections using Min Delay and Max Delay when the bounds differ.</td>
+</tr>
+<tr>
+<td>Min Delay (ms) / Max Delay (ms)</td>
+<td>Bounds for the random interval.</td>
+</tr>
+<tr>
+<td>Step Interval Delay (ms)</td>
+<td>Fixed interval when random delay is off or its bounds are equal.</td>
+</tr>
+<tr>
+<td>Step Autorelease Delay (ms)</td>
+<td>Default time between a step's press and release.</td>
+</tr>
+<tr>
+<td>Random Step Count</td>
+<td>Limits one run to a selected number of step visits.</td>
+</tr>
+<tr>
+<td>Wiggle Step Count Min / Max</td>
+<td>Bounds for the number of step visits in a limited run.</td>
+</tr>
+<tr>
+<td>Continue on trigger reset</td>
+<td>Allows the current run to continue after the source changes state.</td>
+</tr>
+<tr>
+<td>Resume at last step</td>
+<td>Reuses the stored step position when restarting an ordered run. Randomize Steps picks a new random starting step.</td>
+</tr>
+</tbody>
+</table>
+<p>To run only while held, disable <strong>Continue on trigger reset</strong> and use press-only execution. With continuation enabled and no step-count limit, releasing the source does not stop Wiggle; stop the profile to end it.</p>
+<p>With <strong>Randomize Steps</strong> off, steps run in their displayed order and wrap to Step 1. With <strong>Random Step Count</strong> off, there is no count-based stop.</p>
+<p>For a fixed number of selections, enable Random Step Count and set Min and Max to the same positive value. For example, <code>3</code> and <code>3</code> select three steps before stopping. Each selected step still applies its own repeat options: one step visit can produce several output pulses, or none when its random repeat count is zero.</p>
+<p>In this implementation, unequal Wiggle delay and step-count bounds use an <strong>exclusive maximum</strong>. A count range of <code>2</code> to <code>5</code> selects 2, 3, or 4 visits. Equal count bounds select that exact count. Equal delay bounds use <strong>Step Interval Delay</strong>, so set that field explicitly when you want a fixed interval.</p>
+<h3 id="step-advance-once-per-trigger">Step: advance once per trigger<a class="headerlink" href="#step-advance-once-per-trigger" title="Permanent link">¶</a></h3>
+<p>Step mode runs one step on each qualifying trigger. After the final step, the next trigger wraps to Step 1. Any repeats configured on that step run before it finishes.</p>
+<p><strong>Reset step execution on profile start</strong> resets the current position to Step 1. It is enabled for new containers. When disabled, the current runtime position can be retained across profile stop/start; it is not a saved progress marker for reopening the profile or application.</p>
+<p>A new trigger does not queue another step while the current step is still running. With press-only execution, releasing the source can interrupt the active step's remaining repeats. Test complete press/release cycles at the speed you intend to use.</p>
+<h2 id="choose-the-triggering-event">Choose the triggering event<a class="headerlink" href="#choose-the-triggering-event" title="Permanent link">¶</a></h2>
+<p><strong>Execute on press</strong> and <strong>Execute on release</strong> choose which source events count as active triggers. New containers use press only.</p>
+<table>
+<thead>
+<tr>
+<th>Selection</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Press only</td>
+<td>Normal choice for a button: press starts or advances; release resets the trigger.</td>
+</tr>
+<tr>
+<td>Release only</td>
+<td>Source release starts or advances. The next source press is a trigger reset.</td>
+</tr>
+<tr>
+<td>Both</td>
+<td>Both edges qualify. Step can advance twice per physical cycle; Toggle can start on press and stop on release. Loop does not get its usual release reset.</td>
+</tr>
+<tr>
+<td>Neither</td>
+<td>Source events do not start the sequence.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Continue on trigger reset</strong> is shown in Normal and Wiggle modes. It suppresses further source state changes while that run is active. It does not enable simultaneous runs of the same container, override profile stop, or change mode-affinity settings.</p>
+<p>The trigger settings on an action inside a step are separate from the container's trigger settings. The container can start on source release while still sending a synthetic press followed by a release to each step.</p>
+<h2 id="set-step-timing-and-repetition">Set step timing and repetition<a class="headerlink" href="#set-step-timing-and-repetition" title="Permanent link">¶</a></h2>
+<p>All delay fields use <strong>milliseconds</strong>: <code>1000 ms</code> is one second.</p>
+<h3 id="sequence-timing">Sequence timing<a class="headerlink" href="#sequence-timing" title="Permanent link">¶</a></h3>
+<p>The standard step cycle is:</p>
+<ol>
+<li>Send a press to the step's actions.</li>
+<li>Wait for the autorelease delay.</li>
+<li>Send a release to the step's actions.</li>
+<li>Repeat the same step if configured, waiting its repeat delay between repetitions.</li>
+<li>Wait the sequence's interval before the next step.</li>
+</ol>
+<p>In Normal mode, the container does not add a trailing interval after the final step. Toggle and Loop apply the interval when wrapping to Step 1. Wiggle applies its interval after each selected step, including the final selection of a count-limited run.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>New-container default</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal Step Interval Delay</td>
+<td><code>0 ms</code></td>
+<td>Gap after one step's release and before the next step's press.</td>
+</tr>
+<tr>
+<td>Normal Step Autorelease delay</td>
+<td><code>250 ms</code></td>
+<td>Time between a step's press and release when its Repeat Mode is No Repeat.</td>
+</tr>
+<tr>
+<td>Wiggle Step Interval Delay</td>
+<td><code>250 ms</code></td>
+<td>Fixed gap between selected steps.</td>
+</tr>
+<tr>
+<td>Wiggle Step Autorelease Delay</td>
+<td><code>250 ms</code></td>
+<td>Default press duration for a selected step.</td>
+</tr>
+<tr>
+<td>Wiggle Random Delay</td>
+<td>Enabled; <code>250</code> to <code>5000 ms</code></td>
+<td>Random gap instead of the fixed Wiggle interval when the bounds differ.</td>
+</tr>
+</tbody>
+</table>
+<p>The standard timing controls are displayed in <strong>Normal</strong> mode. <strong>Toggle</strong>, <strong>Loop</strong>, and <strong>Step</strong> reuse those stored values even though the controls are hidden. Select Normal to adjust them, then switch back to the intended mode. Step uses the autorelease duration and repeat settings; it does not wait an additional interval for another source trigger.</p>
+<p>For example, an autorelease delay of <code>125 ms</code> and interval of <code>300 ms</code> place the second step's press about <code>425 ms</code> after the first step's press, plus action execution time. These are scheduled delays, not a guarantee of exact timing in the target application.</p>
+<h3 id="per-step-repeat-options">Per-step repeat options<a class="headerlink" href="#per-step-repeat-options" title="Permanent link">¶</a></h3>
+<p>Each step has its own <strong>Repeat Mode</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Repeat Mode</th>
+<th>Number of press/release cycles per visit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No Repeat</td>
+<td>One. Uses the sequence mode's default timing.</td>
+</tr>
+<tr>
+<td>Repeat (roundrobin)</td>
+<td>Exactly Count cycles of this same step. Count includes the first execution.</td>
+</tr>
+<tr>
+<td>Repeat (random)</td>
+<td>A random number from zero through Count, inclusive. Zero skips the step's normal press/release cycles.</td>
+</tr>
+</tbody>
+</table>
+<p>The repeat modes expose these additional controls:</p>
+<ul>
+<li><strong>Count</strong>: total fixed count or maximum random count. The editor starts at <code>2</code>.</li>
+<li><strong>Repeat delay (ms)</strong>: gap between one repetition's release and the next repetition's press.</li>
+<li><strong>Autorelease delay (ms)</strong>: time between each repetition's press and release.</li>
+<li><strong>Randomize</strong> beside either delay: uses that delay's Min and Max fields. These per-step random bounds include both endpoints.</li>
+</ul>
+<p>New per-step repeat and autorelease delays are <code>250 ms</code>. Enabling a repeat mode uses those per-step values instead of the sequence's default duration. Keep each Min less than or equal to its Max.</p>
+<p>Repeating a step repeats all actions in that step. <strong>Repeat (roundrobin)</strong> does not alternate between different steps. Use separate steps and Toggle or Loop for that behavior.</p>
+<h2 id="set-startup-and-resume-behavior">Set startup and resume behavior<a class="headerlink" href="#set-startup-and-resume-behavior" title="Permanent link">¶</a></h2>
+<p><strong>State on profile start</strong> offers two choices:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ignore</td>
+<td>Waits for a new source event. This is the default.</td>
+</tr>
+<tr>
+<td>Input</td>
+<td>For a joystick button, reads its current state when the profile starts and processes it using the container's trigger settings.</td>
+</tr>
+</tbody>
+</table>
+<p>With Input and press-only execution, a switch already on can start the sequence immediately. With release-only execution, a button already released can trigger startup execution. Hat startup synchronization is not implemented in this container; do not rely on Input to start from a held hat direction.</p>
+<p><strong>Resume at last step</strong> is available in Toggle, Loop, and Wiggle. It resumes from a stored step position, rather than from the middle of a press or repeat delay. It is not progress saved into the profile file, and a profile mode change clears the stored resume position. Random step selection can choose a different step regardless of that position.</p>
+<p>In Step mode, use <strong>Reset step execution on profile start</strong> to control the step cursor. After switching execution modes or changing the step list, restart and test the first step to confirm the desired startup behavior.</p>
+<h2 id="conditions-and-action-behavior">Conditions and action behavior<a class="headerlink" href="#conditions-and-action-behavior" title="Permanent link">¶</a></h2>
+<p>Container conditions determine whether a source event reaches the Sequence container. Step/action conditions and each action's own execution settings also affect the output when a step is visited. A step that produces no output can still consume timing and a step-count visit.</p>
+<p>Keep trigger-reset events able to reach a running Loop or cancellable sequence. A condition that allows the initiating press but blocks its release can prevent the expected stop event from reaching the container.</p>
+<p>The events sent to steps are synthetic <strong>button press and release</strong> events. Actions should be configured for that behavior. For example, a normal Hold mapping can use the synthetic release, while an explicit Press, Toggle, or timed Pulse action manages its output differently. See the <a href="../../actions/map_to_vjoy_user_guide/">Map to vJoy guide</a> and <a href="../../actions/keyboard_ex_user_guide/">Keyboard Ex guide</a> for their output modes.</p>
+<p>Sequence controls step dispatch and timing. An action that starts its own background work, such as a macro or sound, may continue after its step has been dispatched. Allow enough time for the intended output and check that action's stop behavior; step order alone does not guarantee that every background effect has finished before the next step begins.</p>
+<p>When stopped during an autorelease wait, the container still sends the active step its release event. Normal, Toggle, and Loop also send end-of-sequence release notifications to the steps. Outputs deliberately latched by Press or Toggle actions still need the matching action behavior to clear them.</p>
+<h2 id="runtime-settings">Runtime settings<a class="headerlink" href="#runtime-settings" title="Permanent link">¶</a></h2>
+<p>The application's <strong>Runtime Options</strong> affect all Sequence containers:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Concurrent sequence limit</td>
+<td>Maximum number of Sequence runners active at once. <code>0</code> means no global limit. A start rejected by the limit is not queued.</td>
+</tr>
+<tr>
+<td>Mode change aborts running macros/sequences</td>
+<td>Allows a mode change immediately rather than waiting for active sequences to finish.</td>
+</tr>
+<tr>
+<td>Sequence/Macro mode affinity</td>
+<td>Stops a running sequence when the runtime profile mode changes.</td>
+</tr>
+</tbody>
+</table>
+<p>Each individual Sequence container can have only one active runner regardless of the global limit. If mode changes wait for sequences to finish, an indefinite Toggle, Loop, or Wiggle run must stop before a waiting mode change can proceed. Keep mode changes outside the sequence and test the chosen runtime settings together.</p>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="send-two-virtual-button-commands-in-order">Send two virtual button commands in order<a class="headerlink" href="#send-two-virtual-button-commands-in-order" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add Sequence to a joystick button and select Normal.</li>
+<li>Add a Map to vJoy action in Step 1, targeting virtual button 1 with normal Hold behavior.</li>
+<li>Add another in Step 2, targeting virtual button 2 with Hold behavior.</li>
+<li>Leave both steps on No Repeat. Set autorelease to <code>125 ms</code> and interval to <code>300 ms</code>.</li>
+<li>Use press-only execution with Continue on trigger reset enabled.</li>
+<li>Start the profile and tap the source once.</li>
+</ol>
+<p>Button 1 turns on, releases, and then button 2 turns on and releases. Bind the two virtual buttons in the target application after verifying the order in a monitor.</p>
+<h3 id="toggle-a-repeating-sequence">Toggle a repeating sequence<a class="headerlink" href="#toggle-a-repeating-sequence" title="Permanent link">¶</a></h3>
+<ol>
+<li>Configure the two steps above.</li>
+<li>In Normal mode, set autorelease to <code>125 ms</code> and interval to <code>500 ms</code>.</li>
+<li>Switch to Toggle, use press-only execution, and leave Resume at last step off.</li>
+<li>Start the profile. Press once to repeat the two commands and press again to stop.</li>
+</ol>
+<p>The next activation starts at Step 1. Enable Resume at last step if continuing from the stored step position is preferable.</p>
+<h3 id="choose-one-random-command">Choose one random command<a class="headerlink" href="#choose-one-random-command" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create one step per possible command and leave each on No Repeat.</li>
+<li>Select Wiggle and enable Randomize Steps.</li>
+<li>Enable Random Step Count and set both Min and Max to <code>1</code>.</li>
+<li>Disable Random Delay and set Step Interval Delay to <code>0 ms</code>.</li>
+<li>Set Step Autorelease Delay to <code>125 ms</code>.</li>
+<li>Use press-only execution and enable Continue on trigger reset so a quick tap can finish the selected command.</li>
+</ol>
+<p>Each trigger runs one randomly chosen step and stops. Consecutive triggers may choose the same step.</p>
+<h3 id="cycle-commands-one-press-at-a-time">Cycle commands one press at a time<a class="headerlink" href="#cycle-commands-one-press-at-a-time" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add three steps with different outputs and leave each on No Repeat.</li>
+<li>In Normal mode, set the desired autorelease duration, such as <code>125 ms</code>.</li>
+<li>Select Step and enable Reset step execution on profile start.</li>
+<li>Use press-only execution, start the profile, and test three presses followed by a fourth.</li>
+</ol>
+<p>The first three triggers run Steps 1, 2, and 3. The fourth wraps to Step 1. Test the source's release timing as well, since releasing can shorten the active pulse.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sequence is unavailable for the selected input</td>
+<td>Use a supported button or hat input and check its input-type configuration.</td>
+</tr>
+<tr>
+<td>Nothing happens</td>
+<td>Profile running; correct profile mode; enabled container/actions; trigger selection; conditions; nonempty steps; valid output target.</td>
+</tr>
+<tr>
+<td>Only the first command runs after a quick tap</td>
+<td>Enable Continue on trigger reset in Normal or Wiggle if release should not cancel the run.</td>
+</tr>
+<tr>
+<td>Wiggle continues after release</td>
+<td>Disable Continue on trigger reset for held operation, or use Random Step Count for a bounded run.</td>
+</tr>
+<tr>
+<td>Toggle starts and stops during one press/release cycle</td>
+<td>Select only one trigger edge.</td>
+</tr>
+<tr>
+<td>Step advances twice</td>
+<td>Both Execute on press and Execute on release may be enabled.</td>
+</tr>
+<tr>
+<td>Rapid triggers are missed</td>
+<td>The same container is still running its current step or sequence; triggers are not queued. Review autorelease, repeats, and intervals.</td>
+</tr>
+<tr>
+<td>Repeated step is skipped occasionally</td>
+<td>Repeat (random) can choose zero. Use No Repeat or Repeat (roundrobin) when it must execute.</td>
+</tr>
+<tr>
+<td>A random command occurs twice in succession</td>
+<td>Expected: Randomize Steps selects independently each time.</td>
+</tr>
+<tr>
+<td>Wiggle never uses the displayed maximum count</td>
+<td>Unequal Wiggle count bounds exclude Max. Use equal bounds for an exact count.</td>
+</tr>
+<tr>
+<td>Equal Wiggle delay bounds do not give the desired delay</td>
+<td>Set Step Interval Delay; equal bounds use that fixed interval.</td>
+</tr>
+<tr>
+<td>Timing controls disappear</td>
+<td>Normal timing controls are hidden in Toggle, Loop, and Step. Switch to Normal to edit the stored values.</td>
+</tr>
+<tr>
+<td>A command activates unexpectedly at startup</td>
+<td>Set State on profile start to Ignore, or review Input synchronization and the trigger edge.</td>
+</tr>
+<tr>
+<td>A mode change waits indefinitely</td>
+<td>Stop the active loop and review Mode change aborts running macros/sequences and mode affinity.</td>
+</tr>
+<tr>
+<td>A sequence does not start while others run</td>
+<td>Review Concurrent sequence limit. The log reports <code>SEQUENCE: exceeded concurrent sequence limit</code> when a start is rejected.</td>
+</tr>
+<tr>
+<td>Output stays pressed or background work overlaps</td>
+<td>Review the action's Hold/Press/Toggle/Pulse behavior, its release handling, and any independent macro or sound timing.</td>
+</tr>
+<tr>
+<td>Timing changes after rearranging steps</td>
+<td>Review repeat and delay options at each step position and remove empty action sets.</td>
+</tr>
+</tbody>
+</table>
+<p>For diagnosis, start with Normal mode, two simple steps, No Repeat, and visible delays. Verify the source event, then the step output, and then the target application's binding. Add repetition, conditions, and randomization after that test works.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

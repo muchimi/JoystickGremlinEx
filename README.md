@@ -53,8 +53,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T90):
 - Fix: UI: delete widget button auto size
 - Fix: UI: exception if a profile is recalled and the last device was the voice recognition device
-- WIP: Maestro: ongoing work on HID Maestro interface and bridge service.
+- WIP: Maestro: ongoing work on HID Maestro interface and bridge service.  Note features are currently disabled as development and testing continue.
 - Legal: update third party licensing and project information
+- DOC: additional updated documentation and usage guides for m77 (WIP)
 
 ### (m77T89):
 - Fix: Overlay: exception on HexArgb constant

@@ -1,8 +1,8 @@
 # GremlinEx Overview
 
-GremlinEx or GEX is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Source Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.
+GremlinEx (GEX) combines inputs from joysticks, gamepads, keyboards, mice, hardware panels, and networked controls into mappings for games and other applications. Outputs include vJoy, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.
 
-GremlinEx is oriented towards simpits and hardware vendor integration, without the need to run individual vendor's software.  
+This overview covers the **m77 development series**, including its Overlay, Stream Deck, Voice, and AFCS modules. Enable the modules you need in **Options → Modules**; availability can depend on the build and installed dependencies.
 
 The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.
 
@@ -12,7 +12,7 @@ The project has a dedicated [Discord server](https://discord.com/channels/127946
 
 ## Key Features: What can GremlinEx do?
 
-This is a summary of some of the feature set in GremlinEx.
+Choose the inputs, outputs, and optional modules needed by your profile.
 
 ### Mapping and transforms
 
@@ -24,7 +24,7 @@ Axis (linear) input can be curved and calibrated.  In fact, multiple curves can 
 
 GremlinEx handles multiple inputs and outputs concurrently.  Routing can change mappings based on conditions, modes and states, and this can be changed dynamically on the fly.
 
-As of M76T68, GEX supports using vJoy as an input and output device simultaneously.  This enables scenarios where an input in GremlinEx triggers map to a vJoy device, and when that vJoy device changes, it triggers an input back into GremlinEx to trigger more actions.  This can create loops, so care should be excercised to not build a loop regardless of the sequence of events.  GremlinEx does not check for loops as they are too expensive performance wise to detect and guard against at runtime.
+GEX supports using vJoy as an input and output in the same profile. This lets a virtual device feed another mapping, including values written by a different application. Keep the routing directed so an output does not repeatedly trigger its own input. Use ordinary states and expression states for internal On/Off logic when no virtual joystick output is needed.
 
 ### Agreggation of multiple devices
 
@@ -40,7 +40,9 @@ Because GremlinEx has conditions and modes and states, you can "route" the input
 
 ### VJoy output
 
-The main purpose of GremlinEx is to map inputs from various devices to VJoy virtual joystick devices.  The idea is while the actual joystick hardware connected to the machine is hidden from an application or game via HidHide, the application or game can then map its inputs to the virtual VJoy devices.  This allows much simpler mapping in a game when multiple hardware devices are available, as well as very complex mapping scenarios using conditions, modes, combination of inputs, tracking of state applied to the logic controlling the VJoy devices.   This feature, when combined with mouse and keyboard management done by GremlinEx allows for a highly customized experience with application and game control.
+The [Map to vJoy action](actions/map_to_vjoy_user_guide.md) maps controls to virtual axes, buttons, and hats. It includes output curves, scaling, axis merging, axis-to-button ranges, pulses, and toggles. A game can bind these virtual outputs while HidHide keeps the original hardware out of its input list.
+
+m77 also expands button-to-axis control with presets, accelerated encoder input, and smooth PID transitions. These controls can adjust trim, flap positions, or a speed limiter without requiring another physical axis.
 
 ### VJoy as input
 
@@ -54,7 +56,11 @@ By design a mapping that triggers a VJoy output will also trigger that VJoy's in
 
 ### VJoy manual control
 
-GremlinEx's Input Viewer, as of m76T95, can be used to manually set buttons, hats and axes on any VJoy device interactively via the Input Viewer.  This can be helpful to assist with profile design and testing.
+GremlinEx's Input Viewer can manually set vJoy buttons, hats, and axes to help design and test mappings. The m77 viewer also offers **Select Used** to select inputs and outputs referenced by the current profile. Its state display supports category and attribute filters, including saved state-filter selections.
+
+### HIDMaestro development
+
+m77 includes initial work on a Maestro Bridge and HIDMaestro virtual-controller support through the same mapping actions used for vJoy. **The current version of m77 disable this feature** as it is still under devleopment and testing.  It is not a replacement for the released vJoy setup at this stage; check the release notes for the build you install before planning to use Maestro.
 
 ### In-game mapper augmentation
 
@@ -70,33 +76,39 @@ It is generally recommended to use GremlinEx to map to default settings in a gam
 
 ### Input and output from/to glass surface panels (touchscreens)
 
-GremlinEx map input from/to glass surfaces (touch screens) and hardware panels like Streamdeck using the OSC protocol using open source software.  Using OSC open source software like Open Stage Control, you can design custom glass surface input screens and map them over the network to GremlinEx.   GremlinEx supports both message triggers, and axis including multi-axis data inboud from a glass surface, such as a slider or an XY pad.
+GremlinEx exchanges OSC messages with external touchscreen surfaces and panels, including button triggers and linear controls such as sliders or XY pads. m77 also provides built-in Overlay controls and a direct Stream Deck plugin bridge, giving these integrations their own designers and mappings.
 
-For a joystick visualization overlay in OBS (chromakey window capture) or as an on-screen HUD, see the [overlay designer](obs_overlay.md).  
+For a joystick visualization overlay in OBS (chromakey window capture) or as an on-screen HUD, see the [overlay designer](obs_overlay.md).
 
-#### Networked devices support
+### Overlays and browser-based panels
+
+The m77 **Overlay** module adds a graphical designer for live input displays and interactive controls. A profile can contain several overlay pages, each with its own widgets and live window. Bind widgets to physical inputs, vJoy outputs, profile states, and keyboard or mouse activity, then use a chromakey window for OBS or a transparent on-screen HUD.
+
+Interactive pages can supply buttons, hats, axes, switches, and state controls through mouse or touch input. The web overlay serves a panel to a browser on the local network, so a phone or tablet can display and operate controls while GremlinEx runs on the Windows host.
+
+The designer includes images, shapes, groups, guides, variables, graphs, counters, and live application or Stream Deck displays. **Map to Overlay** controls page/group/widget visibility, interactive mode, and overlay variables from a mapping.
+
+Optional OCR widgets scan selected screen regions and expose text-match rules as mappable inputs. A rule can trigger actions or contribute a detection label to an overlay variable. See the [Overlay guide](obs_overlay.md) for page setup, interactive controls, display bindings, and OCR.
+
+### Networked devices support
 
 GremlinEx has a built-in capabilityu to use controllers attached to one computer to control another and deliver the output to a game over the local network.
 
-#### Direct support for Microsoft Flight Simulator
+### Direct support for Microsoft Flight Simulator
 
 GremlinEx has built-in support to directly control Microsoft Flight Simulator without using the internal MSFS mapper.  It uses the SimConnect interface to do this, and a custom WASM module to access internal variables not supported via SimConnect (as of this writing).
 
 ### Profiles
 
-In GremlinEx, a set of device mappings is saved as a profile.  The profile contains all the configuration and mapping information from an input to an output.  Profiles are usually associated with a particular target application.  GremlinEx has a mapping feature that lets you attach a profile to one or more Windows processes.  GremlinEx can switch to the associated profile when the process becomes active automatically.
+A profile stores the input mappings and logic for an application or control setup. GremlinEx can associate profiles with Windows processes and automatically select a profile when the associated process becomes active.
 
-Profiles are saved as XML files.  Because they contain specific hardware information that is unique to the machine, profiles cannot usually be shared from one  machine to the other.  GremlinEx does include some simple mapping when you attempt to load data for a device it cannot find.  In this case the profile will load and show devices it cannot find as disconnected.  Their mappings can be copied to devices that do exist.
+Mappings and state definitions are stored in XML. Designers such as Overlay also use a companion JSON file beside the profile. Keep the XML and companion files together when copying or sharing a setup. Audio files referenced by path and the generated-speech repository are separate from those profile files.
 
-Important: device IDs can often change in Windows when new firmware is applied to a device, or the device is connected to a different port.  The same device connected to different machines will typically have a different ID specific to that machine as well.  
-
-For this reason it is highly recommended to minimize connecting/disconnecting hardware devices, to avoid potential ID changes as these can be quite time consuming to resolve.
-
-Note: GremlinEx uses the ID of the hardware, not the index of order of appearance so the order the devices appear in Windows is not relevant to GremlinEx's operation.
+Profiles identify hardware by GUID rather than its order in Windows. A device missing on the current computer can appear disconnected while its mappings remain available for remapping or copying. Check device references when moving profiles between computers or after hardware/firmware changes.
 
 ### Joystick and game controller integration
 
-GremlinEx accepts inputs from any number of HID game devices and maps this input, apply a number of transformations and filters, and creates output virtual joystick (Vjoy) device, a virtual gamepad controller (via Vigem), keyboard and mouse output, OSC network messages and others.  GremlinEx supports input from Arduino and Rasberry Pi when those devices are in HID "game controller" mode. 
+GremlinEx accepts inputs from any number of HID game devices and maps this input, apply a number of transformations and filters, and creates output virtual joystick (Vjoy) device, a virtual gamepad controller (via Vigem), keyboard and mouse output, OSC network messages and others.  GremlinEx supports input from Arduino and Rasberry Pi when those devices are in HID "game controller" mode.
 
 GremlinEx supports HID devices that report as game devices, and the supported inputs for each includes linear input (axis), momentary input (button) and four or eight way hats.  HID devices under Windows are limited to 8 axes, 128 buttons and four hats per device.
 
@@ -104,7 +116,7 @@ GremlinEx also has a loopback mode where VJOY devices can be used as inputs.  In
 
 ### HIDHide support
 
-GremlinEx is designed to function with [HIDHide](resources.md#hidhide).  HID Hide enables "hiding" of HID inputs that could conflict in a game with the mapping done by GremlinEx when detecting inputs. Many games also only support a finite number of HID devices, and many cannot handle more than three.  
+GremlinEx is designed to function with [HIDHide](resources.md#hidhide).  HID Hide enables "hiding" of HID inputs that could conflict in a game with the mapping done by GremlinEx when detecting inputs. Many games also only support a finite number of HID devices, and many cannot handle more than three.
 
 HIDHide solves both these problems: the idea is to "hide" the raw hardware inputs used by GremlinEx from the game so they are only visible to GremlinEx.  This way, the game only sees the GremlinEx output devices (VJOY and VIGEM) when doing the in-game mapping, and does not see the devices actually connected to the machine.  There are thus no conflicts and no confusion with the in-game mapper as to "which device am I reading from".
 
@@ -122,9 +134,9 @@ Profile modes, states and condition let you control how and when curves are appl
 
 ### Axis calibration
 
-GremlinEx can apply calibrations to noisy joystick inputs to dampen the input received.  The calibration can automatically detect the range of inputs and normalize it to min/max values, and adjust the center position as well.  Calibrations apply to the device, and thus to all profiles.
+GremlinEx calibrates joystick axes by recording their endpoints and center, then normalizing the input. Calibration applies to the device across profiles. Use output curves and ranges for a particular mapping's response.
 
-Rare: If you need to apply different calibrations to each device on a per profile basis, please use the response curve ex action.
+m77 adds an **EMA (exponential moving average) axis filter** to smooth noisy input and reduce redundant events from devices that send frequent axis updates. Filtering helps control input traffic; calibration defines the usable travel. Check both the displayed input and final output when adjusting a filter.
 
 ### Axis gating and splitting
 
@@ -148,13 +160,29 @@ Because each gate or range has its own separate triggers, it allows for very det
 
 ### Axis merging
 
-GremlinEx's vjoy mapper can merge multiple input axes (two or more) from the same or different devices.  Each merge can apply a specific calculation such as min, max, average and sum operations to the merged data.  Scaling of one axis with another is also supported.
+The [Map to vJoy action](actions/map_to_vjoy_user_guide.md#merge-axes) combines two or more axes from the same or different controllers. Merge entries support arithmetic, minimum/maximum, scaling, and trim operations, with curves and output-range controls.
 
-A use-case for this feature is the need to combine two inputs into a single output, such as brake pedal toe-brakes to a single linear axis (used in Star Citizen staffe for example).
+Use it to combine two toe brakes into one output, scale one axis with another, or add trim to a primary control. Live previews help check the individual sources and combined result. Modes, states, and conditions can select different mappings when needed.
 
-Another use case is to scale one axis with another.
+### Button and encoder control of axes
 
-Mergine of axes is helpful in many output scenarios, and the merging can also be controlled on the fly using profile modes, conditions and profile states to, at runtime, control how merging occurs.
+Map to vJoy's button-to-axis controls offer **Velocity**, **Stepped**, **Stepped+PID**, **Encoder**, and **PID** modes. Velocity adjusts while held; Stepped selects preset positions; Stepped+PID moves smoothly between those presets. Encoder supports pulse-based adjustments and acceleration, while PID moves toward a target changed by momentary inputs.
+
+m77 adds preset lists and step markers to the editor alongside startup-axis controls. These options suit trim, continuous flaps, throttle limits, and other controls that should move an axis without a dedicated physical axis. See the [button-to-axis instructions](actions/map_to_vjoy_user_guide.md#control-an-axis-with-two-inputs) for configuration.
+
+### Visual axis processing with AFCS
+
+The optional **AFCS** module provides a graphical axis-flow designer. **Map to AFCS** sends a physical axis into the graph as a named input. On the AFCS tab, connect inputs through merge and curve nodes to vJoy output nodes.
+
+Use the graph when a connected visual layout makes a multi-axis setup easier to inspect. Enable AFCS in Options → Modules and configure the graph in the same profile as its input mappings.
+
+### Direct Stream Deck integration
+
+The m77 [Stream Deck bridge](streamdeck.md) connects the Elgato plugin to GremlinEx through a local WebSocket connection. Keep Elgato Stream Deck software running; Companion and OSC are not required for this connection.
+
+Each connected deck gets a device tab. The designer provides virtual pages, separate pressed/released or state-driven appearances, icons and titles, and normal GremlinEx containers and actions on its controls. Stream Deck + includes dial controls. **Map to Stream Deck** changes pages, returns to a previous page, and supports timed auto-return.
+
+The bridge also supports multiple decks and state-linked feedback. The [Stream Deck guide](streamdeck.md) covers plugin installation, enabling the bridge, page design, and mappings.
 
 ### Integrates with Elgato (R) Streamdeck, LoupeDeck and any support panels by BitFocus Companion
 
@@ -168,59 +196,36 @@ Examples of this include:
 - modify panel buttons or messages from GremlinEx
 - use Bitfocus Companion and GremlinEx only (no need for custom software from each vendor specific to their panel and worry about protocols or plugins).
 
-Click [here to see the extensive list of supported hardware devices](https://bitfocus.io/connections) through Bitfocus Companion. 
+Click [here to see the extensive list of supported hardware devices](https://bitfocus.io/connections) through Bitfocus Companion.
 
 ### Supports glass surface input from touch screens, tablets and phones
 
-GremlinEx uses the OSC protocol to get input and send data back to glass surfaces via applications such as [Open Stage Control (open source)](https://openstagecontrol.ammd.net/), [Hexler Touch/OSC (payware)](https://hexler.net/touchosc) and [OSC/Pilot (payware)](https://oscpilot.com/).  These applications let you design any control surface on a touch panel, including buttons, knobs, faders, XY pads.
+GremlinEx supports two-way OSC communication with external panel software such as [Open Stage Control](https://openstagecontrol.ammd.net/), [TouchOSC](https://hexler.net/touchosc), and [OSC/Pilot](https://oscpilot.com/). These panels can send button and axis messages and receive feedback from GremlinEx.
 
-The recommended application for Windows touch screens is Open Stage Control: it is open source and it supports javascript scripting, CSS based graphics and animations including strips, and custom CSS based widgets.  Open Stage Control is currently supported on some flavors of Linux as well.
+m77 also offers its own interactive Overlay controls and browser-based panels. Use a local touch display or a networked phone/tablet according to the setup. For a browser panel, GremlinEx remains on the Windows host while the other device connects over the local network.
 
-The recommended application for iOS and Android is Touch/OSC, althoug as of this writing, Touch/OSC is incapable of using images but has good scripting via LUA.
-OSC/Pilot supports graphics and works on iOS as well. OSC/Pilot as of this writing does not support scripting.
-
-This enables any networked touch screen to be used with GremlinEx as a two-way control surface.
-
-Note: Windows is currently not able to support input from a touch screen without changing the focus to the touch screen window away from the game, which can cause some challenges with process focus and window pops and input capture, even on multiple monitors.  To use a touch screen, it's recommended to run the touch screen from a separate network device.  Because OSC is a network protocol, GremlinEx can easily communicate with these tools on different devices on the network.
+Test application focus and input capture with a local interactive panel. A panel on a separate device can keep its interaction away from the game's Windows desktop.
 
 ### Supports MIDI inputs
 
 GremlinEx can accept input from older MIDI controllers.  These controllers like the Korg Mini include buttons and faders that can be used to map to a game.  Many MIDI control surfaces, while using an older protocol, can still be effective in a simpit due to the number of knobs, faders and buttons typically available on a MIDI controller.  It's also possible to network MIDI via [RTP-MIDI](https://www.tobias-erichsen.de/software/rtpmidi.html).
 
-To use local MIDI devices, a [MIDI loopback tool](https://www.tobias-erichsen.de/software/loopmidi.html) will typically be needed to make the necessary ports available.  
+To use local MIDI devices, a [MIDI loopback tool](https://www.tobias-erichsen.de/software/loopmidi.html) will typically be needed to make the necessary ports available.
 
 ### State machine
 
-GremlinEx implements a state machine.  A state is a binary entity that has either an on/pressed state, or an off/released state.  A state can be seen as a virtual button, or a boolean (on/off) variable inside a profile.
+The [State Device](devices/state_device_user_guide.md) defines named On/Off values for profile logic. Ordinary states can follow inputs or be set, cleared, toggled, pulsed, and latched. Expression states combine other states with `and`, `or`, `not`, and `xor`.
 
-States can be set or cleared via any GremlinEx input using the Map to State action.
+States can trigger their own mappings, serve as conditions, or select actions in a **State** container. Their values are available across profile modes, so a command layer or hardware switch status can be shared without changing modes.
 
-The value of a state can also be defined using other states using boolean expressions.  In this mode, a state gets its value from a computation of the dependent states in the expression.  This value is updated whenevever one of the states in the expression changes values. 
-
-States look like input buttons to containers and actions, so any mapping that can be attached to a button can be attached to a state as well.  
-
-States can also be used as conditions.
-
-States are mode agnostic - so they exist all the time in a profile, and can be accessed by any mode, or set by any mode.
-
-This feature allows simple, yet interesting grammar based control schemes, such as conditions and compound mappings.  States generally simplify complex mapping scenarios.
-
-States can be set from any input via the "map to state" action or from a macro.
-
-States auto-update if the state is an expression and a dependent state changes.
-
-States trigger both a press and release event, so to actions look like any joystick button and no different from pressing and releasing a physical button.
-
-Because there is no limit to the number of states a profile can have, states can be also viewed as virtual button pads.
-
+m77 adds **mutually exclusive groups**, category and attribute selections, and richer state filtering. [Map to State](actions/map_to_state_user_guide.md) can target a single state, an explicit list, categories, or attributes. Use these selections to choose a control bank or update related flags together.
 
 #### Examples of state usage
 
-- A state can be set by multiple inputs, enabling shared used of mappings between devices.  This avoids having a copy of the same mapping for differentt inputs, and reduces the maintenance load if the mapping needs to change.
-- States can be used as a condition that itself is based on multiple other states using the expression capability.
-- Setup a simple [state machine grammar](https://en.wikipedia.org/wiki/Finite-state_machine) implementation
-- States can often replace modes, or be used as sub-modes within a mode.
-- States replace the need to use VJOY as input which is far more performing and flexible than using VJOY as both output and input into a profile to add virtual buttons.
+- [Combine two controls into one output](devices/state_device_user_guide.md#combine-two-controls-into-one-output) with an expression that stays On while either source is held.
+- [Trigger one state from another](actions/map_to_state_user_guide.md#trigger-one-state-from-another) by attaching Map to State to a source state's mapping.
+- [Use a state as a condition](actions/map_to_state_user_guide.md#use-a-state-as-a-condition) to enable a command and preserve its release handling.
+- [Choose one control bank](devices/state_device_user_guide.md#choose-one-control-bank) using mutually exclusive ordinary states.
 
 ### Modes
 
@@ -239,17 +244,17 @@ A profile must have one mode defined at all times.
 
 ### Remote control and KVM support
 
-GremlinEx can control another GremlinEx instance running on the local network.  This is useful if you have HID devices on one machine, but need to send that output to another machine on the network.  GremlinEx sends the same output to network clients, and buttons can be mapped to enable or disable the feature on the fly.
+GremlinEx can send mapped axis, hat, button, keyboard, and mouse output to other GremlinEx instances on the local network. Routing controls select local output, remote output, or both, allowing panels and controllers on one computer to operate applications on another.
 
-This particular feature is used to use inputs from one machine to control outputs on another on the fly.  This was created specifically to support simpits with multiple computers accepting inputs either for performance reasons, hardware needs, or for convenience.  This is a good use of older hardware as well.
+The **KVM** action forwards keyboard and mouse input to a chosen client without requiring individual mappings for every key. In m77 it can follow the current local/remote routing selection, including concurrent local and remote forwarding.
 
-A special action, called KVM, lets you take over a specific client and send all local keyboard and mouse to that client without any mapping needed.
+Configure the participating clients and output devices, then test the route with a simple mapping before adding profile-wide switching.
 
 ### Conditions
 
-Conditions can be applied to filter output based on state and input button/axis values.  Conditions can be based on specific input ranges or pressed/released state, and can also be based on a state value.  Conditions must be met for a trigger to execute a mapping.
+Conditions check input values, profile states, and other context before a container or action executes. Apply a condition to a whole container or to one action, and combine conditions using the available activation rules.
 
-Conditions can be applied to a container, or a single action.  Conditions are cummulative, meaning that each mapping can have one or more conditions applied.
+An expression state can combine several requirements into one reusable check. The [state-condition example](devices/state_device_user_guide.md#enable-a-command-only-when-ready) shows how to gate a command while still allowing its release. m77 improves condition branching and reuse in the execution graph to reduce redundant evaluation.
 
 ### Support of complex latching of keyboard triggers
 
@@ -271,24 +276,37 @@ Some outputs can only be momentary (example, SimConnect), and thus only have a p
 
 ### Macros
 
-GremlinEx supports macros in a couple of ways.  The first is the macro mapper, which allows for delays, keyboard, mouse and joystick output to occur in sequence whenever an input is triggered.
-The other is the sequential container which allows for actions that are not directly supported by the macro. 
+The **Macro** action sequences keyboard, mouse, joystick, state, and delay operations. m77 reworks the macro execution engine to improve response and scheduling.
 
-In both cases, the order of output is always top to bottom, so the execution order is predictable.
+The [Sequence container](containers/sequence_user_guide.md) sequences full GremlinEx action sets, including actions that a simple macro cannot represent. It offers **Normal**, **Toggle**, **Loop**, **Wiggle**, and **Step** execution, with per-step repetition, press/release timing, random selection, and resume options.
+
+Use separate steps when dispatch order and spacing matter. Actions that start their own background work, including audio, can continue independently; configure their timing and stop handling as part of the mapping.
 
 ### Audio playback support for .WAV and .MP3 with fader/speed controls
 
-GremlinEx can playback audio files in the .WAV and .MP3 format (.WAV recommended for performance).  The playback action can play random sounds from a specific folder, and it can play multiple sounds concurrently on the same or multiple audio devices.  The action can also fade the sound in or out, and adjust the playback rate in a pitch controlled manner (the pitch will not change based on the playback speed).
+[Play Sound/TTS](actions/play_sound_user_guide.md) plays WAV and MP3 files through the selected audio output. m77's audio engine supports concurrent streams on the same or different devices, loops, volume, fades, and silence trimming.
 
-This action can be use to output audio cues for specific actions.
+New actions follow the current Windows default playback device, or can target a fixed endpoint. **Stop previous audio** replaces active shared audio when its request is processed. **Block playback** orders requests in the shared sound queue while other profile mappings continue running.
+
+The action can choose a sample from a folder for varied cues. WAV is a useful starting format for a short confirmation sound; preview the sample and device route before testing the input mapping.
 
 ### Text to speech
 
-GremlinEx supports TTS (text to speech) using the internal Windows TTS API and can leverage multiple languages based on installed language packs.  This said, with the /available AI tools online, it is recommended that the TTS action be replaced by the playback of .WAV files instead which is more performant at runtime than the older TTS Windows API with often a significant quality improvement in audio as well.
+Play Sound/TTS includes **TTS (local)** for installed operating-system voices and **AI (Edge-TTS)** for online speech generation. Speech is generated into cached WAV files for reuse. New Edge-TTS synthesis requires a connection and FFmpeg conversion; exported audio can be used in Audio file mode when no new synthesis is needed.
+
+Text can include alternate phrases, selected in Round Robin, Random, or Timed Random order. The action also offers duplicate-speech suppression and generation-rate settings. See the [Play Sound/TTS guide](actions/play_sound_user_guide.md) for generation, caching, export, and playback setup. The separate legacy Text to Speech action remains available for older profiles.
+
+### Voice recognition input
+
+The optional **Voice** module turns recognized phrases into mappable inputs without requiring any special training.  m77 uses local OpenAI Whisper-based recognition, with a selected microphone and AI model. The model is automatically downloaded on first use; recognition then runs on the host computer.  The more complex the models, the larger the memory and disk footprint, but the more accurate the recognition.  The recommended model is small.
+
+Add commands on the Voice device, attach containers and actions, and configure recognition or push-to-talk controls. Voice matching can use alternate phrases and latched input/state requirements. The Control action can enable, disable, or toggle recognition, and audio cues can indicate recognition state or a command match.
+
+Voice recognition is experimental and uses additional processing and memory. Enable it when needed and test phrase recognition with the intended microphone and background audio.
 
 ### Random execution
 
-GremlinEx can, via the sequence container, output randomized actions, either in a loop or not, with varied timings called "wiggle" mode.  This enables randomized output to be selected from a list of actions to execute, in round robin fashion or not.
+The [Sequence container's Wiggle mode](containers/sequence_user_guide.md#wiggle-vary-the-steps-and-timing) can select random action steps, vary intervals, and limit a run by a step count. Each selected step can also have its own repeats and timing. Configure a bounded selection for one random command, or a loop for repeated activity.
 
 ### Concurrent output and input
 
@@ -312,7 +330,7 @@ GremlinEx has a rich set of mapping actions aimed at simulation and game output.
 
 The most basic container is called "basic" and is the default container for any action added to an input.
 
-The table below shows the list of delivered containers:
+The table below lists the delivered containers. See the [container guides](containers.md) for setup instructions.
 
 
 | Container | Input Requirements | Description |
@@ -324,59 +342,58 @@ The table below shows the list of delivered containers:
 | Hat Buttons | Hat | A container that maps hat input to buttons (nine possible actions, one for each hat position, and the hat center). |
 | Range | Axis | A container that triggers when the input is in a given range. For more sophisticated mapping of an axis, use the gated axis action instead. |
 | Repeater | Button | A container that repeats (pulses) the contained actions.  The container has an initial optional delay before auto-repeating if needed.  This container mimics the firmware keyboard autorepeat function.  The input is initially pressed, and if still pressed after the initial delay, continues repeating while the input is pressed.  The initial delay can be set to 0 to immediately start repeating. |
-| Sequence | Button | A container that runs steps like a macro. Unlike a macro, steps are full actions which adds more functionality, and the container can randomize in "wiggle" mode the step order, the time between steps, and the duration of each step (duration defined as the time between a "press" and a "release" for each step), and can execute a range of steps picked at random.  This container is a superset of the macro action. |
+| [Sequence](containers/sequence_user_guide.md) | Button/Hat | Runs full action sets once, in a toggle/held loop, one step per trigger, or as randomized Wiggle selections. Includes per-step repeats, timing, and resume controls. |
 | Smart Toggle | Button | If the input is held down the action will perform as a typical remap action would, i.e. staying active as long as the input is pressed.  However, when a short button press is detected, specified by the Toggle time then the first such press toggles the down state, i.e. holding the action down, and the second short press releases the action again. |
+| [State](devices/state_device_user_guide.md#use-the-state-container) | Any | Groups actions with a state requirement: On/Pressed, Off/Released, or Any value. Supports ordinary and expression states. |
 | Switch | Button | This container triggers defined actions based on the input value.  It can trigger on press, release or whenever the input state changes. |
 | Tempo | Button | This container performs actions based on short tor long press.  Legacy container preserved for legacy profiles. |
 | TempoEx | Button | This container is an enhanced version of the legacy Tempo container and adds the ability to trigger on double click, along with various other new options not in Tempo. |
 | Tick | Axis  | This container triggers actions at defined ticks on the input axis. For more sophisticated mapping of an axis, use the gated axis action instead. |
-| Trigger | Button | This container triggers actions in the future.  When the delay lapses, the container evaluates an optional set of conditions to determine if the actions should run or not.  The conditions evaluated are different from the regular container conditions.  Trigger conditions are tested at the time the delayed actions run, whereas the regular conditions are evaluated to determine if the container should trigger in the first place. |
+| Delay Trigger | Button | Schedules actions for later execution, with conditions evaluated when the delay expires. Retriggering restarts the delay. |
 
 ### Available Actions
 
-GEX has a number of custom actions that perform the actual mapping of inputs to outputs.  Actions are contained by containers.
+Actions perform the mapping work inside containers. The table includes optional integrations; their availability depends on enabled modules and the required output devices. See the [action guides](actions.md) for setup instructions.
 
 | Action | Input Requirements | Description |
 | ----- | ---- | ---- |
-| Control | Button | This action can set various runtime options for GEX and are aimed at changing profile behavior at runtime. |
+| Control | Button | This action can set various runtime options for GEX and are aimed at changing profile behavior at runtime. Example of control modes include enabling voice recognition, enabling or disabling remote control of GEX clients, toggling overlays and more. |
 | Cycle Modes | Button | This action steps through the defined list of profile modes.  Every trigger advances the step.  When the last step is selected, it loops back to the first step. |
 | Description | Any | This action does nothing outside of adding a description to a container or action. |
-| Gated Axis | Axis | This action defines gates (positions on an axis) and ranges (space between two gates) and lets you map other actions based on the current axis position.  Gates can trigger a different set of actions based on how the gate is crossed: any direction, crossing down, or crossing up. Gates support button actions.  Ranges trigger different action sets based on entry, exit, any change while the input is in-range, or any change if the output is outside the range.  Ranges can also re-scale the value or invert it, or send a fixed value, or send no value.  Ranges support axis actions.  Gated Axis is designed to split up an axis and is used heavily in flight simulation and throttle mapping or whenever specific actions need to run at specific intervals or positions of travel for a given input axis.  |
-| Macro | Button | This action defines stepped macros including joystick, keyboard, mouse and state.  The big brother version of macros is the Sequence container that has even more options for macro-like functionality. |
-| Map to Gamepad | Any | This action maps to game controller output via VIGEM. |
-| Map to Keyboard | Button | This action is the legacy keyboard mapper. Its purpose is to output a key. |
-| Map to Keyboard/Mouse Ex | Button | This action maps to one or more keys, including extended keys and media keys, and mouse buttons and mouse wheel. Supports repeat, pulse, press, release, toggle and other modes. |
+| [Gated Axis](actions/gated_axis_user_guide.md) | Axis | Advanced axis to button and axis to range mapping.  Trigger actions at specific gate crossings based on movement direction, perform actions on range entry/exit, and in-range values. Split the axis into other axis with ranges that can can scale, curve, invert, hold a fixed value, or suppress axis output. |
+| Macro | Button | Legacy macro feature.  Sequences keyboard, mouse, joystick, state, and delay operations. For full action sets with step timing and repeats, [use the Sequence container](containers/sequence_user_guide.md). |
+| KVM | Button | Controls forwarding of keyboard and mouse input to a remote GEX client, including the current local/remote routing selection. |
+| Map to AFCS | Axis | Supplies a named input to the optional visual AFCS axis-processing graph. |
+| Map to GamePad | Any | This legacy action maps to a virtual gamepad through the ViGEm output integration. |
+| Map to Keyboard | Button | This legacy action is the legacy keyboard mapper. Its purpose is to output a key. |
+| [Map to Keyboard/Mouse Ex](actions/keyboard_ex_user_guide.md) | Button | Sends key combinations, extended/media keys, mouse buttons, and wheel events, with Hold, Press, Release, Pulse, AutoRepeat, and Toggle options. |
 | Map to Mouse | Button or Axis | This action maps to mouse output, including mouse axes or mous ebutton.  This is a legacy action to be compatible with older profiles. |
-| Map to MouseEx | Button or Axis | This action maps to mouse output, including mouse axes or mous ebutton.  This is the new version although for mouse button output, consider using Map to Keyboard/Mouse Ex. |
+| Map to Mouse EX | Button or Axis | Maps mouse motion and button output, with extended trigger and wiggle options. |
 | Map to Octavi IFR1 | Button | This action is specific to controlling the Octavi IFR1 device. |
 | Map to OSC | Button | This action sends OSC messages to the network.  This allows GEX to update glass surfaces and panels via OSC. |
-| Map tp OSC Ex | Button | This action sends OSC messages to the network.  This allows GEX to update glass surfaces and panels via OSC.  More advanced version. |
-| Map to Simconnect | Button or Axis | This action sends commands to Microsoft Flight Simulator 2020 or 2024. Includes support for calculator expressions to control add-ons via the GEX WASM module.  This allows GEX to control axes and functions in the simulator without having to use the internal Flight Simulator mapper.  Requires MSFS to be running on the same machine as GEX. |
-| Map to State | Button | This action manages GremlinEx's state machine.  It can be used to set or clear states. |
-| Map to Trigger | Button | This action issues a "fake input" to the profile for any supported device.  This action mimics the input being triggered on the real device. |
-| Map to Vjoy (Vjoy Remap) | Any | This is the updated action to map to VJOY devices. Supports various modes, including axis merging and output curves for axes.  |
+| Map to OSC Ex | Button | Sends OSC messages to networked control surfaces and other OSC receivers. |
+| [Map to Overlay](obs_overlay.md) | Button | Controls overlay visibility, interactive mode, runtime controls, and variables. |
+| Map to SimConnect | Button or Axis | Sends Microsoft Flight Simulator commands, including calculator expressions through the GEX WASM module for controls outside the standard SimConnect interface. |
+| [Map to State](actions/map_to_state_user_guide.md) | Button | Changes states selected by name, list, category, or attribute. See the [State Device guide](devices/state_device_user_guide.md) to create the targets. |
+| [Map to Stream Deck](streamdeck.md#map-to-stream-deck) | Button | Selects a virtual Stream Deck page, moves between pages, or returns to the previous page, with optional auto-return. |
+| Trigger (Joystick) | Button | Generates a virtual joystick input event that can trigger another mapping in the profile. |
+| [Map to Vjoy (Vjoy Remap)](actions/map_to_vjoy_user_guide.md) | Any | Maps axes, buttons, and hats; includes curves, scaling, merging, axis-to-button ranges, presets, accelerated encoder adjustment, PID, and Stepped+PID. |
 | Noop | Any | This is a no-op (do nothing) action.  This is used when you use a container that requires an action, but you do not want anything to happen. |
+| OS Action | Button | Starts or focuses a selected application. |
 | Pause | Any | This pauses the profile execution.  See Resume. |
-| Play Sound | Button | This action plays an audio file (.wav or .mp3).  Wav is recommended.  This action can also be used to generate AI voices from text if KTTS is installed and GremlinEx runs as a script (not a package). Once the audio files are generated, KTTS is not needed and the regular small form factor packaged version of GEX can be used. |
-| Previouse Mode | Button | Changes to the prior profile mode. |
-| Remap | Any | This is the legacy VJOY mapper and is there to maintain compatibility with legacy profiles.  Use Map to Vjoy (Vjoy Remap) instead. |
+| [Play Sound/TTS](actions/play_sound_user_guide.md) | Button | Plays WAV/MP3 files or generated local or AI Edge-TTS speech, with device routing, alternate samples, loops, fades, and audio-queue controls. |
+| Switch to previous Mode | Button | Returns to the previously active profile mode. |
+| (legacy) Remap | Any | Preserves older vJoy mappings. Use Map to Vjoy for new mappings. |
 | Response Curve | Axis | This is a legacy curve adjuster that applies the curve to the other actions.  This is legacy action to maintain compatibility with legacy profiles and the functionality is completely integrated with Map to Vjoy. Use Map to Vjoy (Vjoy remap) instead. |
 | Response Curve Ex  | Axis | More advanced version of Response curve, from an early version of GEX.  Use Map to Vjoy (Vjoy remap) instead. |
 | Resume | Button | This resumes execution of a profile suspended with the Pause action. |
 | Run Process | Button | This action runs an external process (.exe) from the profile. |
 | Split Axis | Axis | Legacy action to maintain compatibility with legacy profiles.  Please use Gated Axis instead. |
 | Switch Mode | Button | This action changes the profile mode. |
-| System | Button | This action is similar to Control. |
 | Temporary Mode Switch | Button | This action will cause a mode switch when the input is pressed, and change it back to the current mode when released. |
-| Text to Speech | Button | This action will generate an audio message using the legacy WIndows TTS API in real time.  Play Sound is recommended and this legacy API is known to conflict with the audio layer and voice quality and choices are limited.  It is also much slower and uses more resources than playing a .wav file. |
-| Toggle Pause | Button | This action toggles a profile execution.  See Pause and Resume. |
-
-
-
-
-
-
-
+| (legacy) Text to Speech | Button | This legacy action speaks through the local operating-system TTS engine. Play Sound/TTS also provides generated, cached speech and selectable playback devices.  This is very old technology today and you should use the [newer play sound action](actions/play_sound_user_guide.md) instead. |
+| Toggle Pause & Resume | Button | Toggles profile execution between paused and resumed. |
+| Virpil LED | Button | Controls LEDs on supported VIRPIL hardware. |
 
 ### Custom plugins (advanced)
 
@@ -394,11 +411,21 @@ As of m76T85, GremlinEx can create a graphical view of a profile leveraging the 
 
 ## Supported environments
 
-GremlinEx supports Windows x64.   The [resource section](resources.md) covers the recommended versions and software.
+The main GremlinEx application runs on **Windows x64**. m77 uses **Python 3.14** and **Qt 6 / PySide6**. The [resource section](resources.md) covers the platform and external components used by the project.
+
+Networked browser panels can run on phones and tablets while the Windows host performs the mappings and device output.
 
 ## Installation
 
-GremlinEx comes as a pre-packaged Python 3.x executable.  There is no need to install Python or dependent libraries as all the needed files are included in the package.
+The packaged application includes its Python 3.14 runtime and application libraries, so a separate Python installation is not needed to use that package. Extract the distribution to an application folder and retain its supporting files.
+
+Configure the external components required by the outputs you intend to use, such as a virtual-controller driver, HidHide, or a simulator bridge. Optional speech/OCR features can also need models or tools downloaded on first use.
+
+### Optional modules
+
+Use **Options → Modules** to enable the integrations needed by the profile, including Overlay, AFCS, Stream Deck Bridge, Voice, MIDI, OSC, and Octavi. Restart when prompted after changing module settings. Individual modules can also have their own connection or input settings.
+
+Keep unused modules disabled when you want a smaller working set. Maestro remains a development integration in the current m77 test build, as noted above.
 
 ### Microsoft Flight Simulator SimConnect SDK support
 
@@ -418,7 +445,7 @@ Each VJOY device defined must be different from the other in terms of total axis
 
 VJOY devices should be configured with consecutive axes, and axes should not be duplicated.  It is highly recommended to setup the VJOY devices to use regular DINPUT axes such as X, Y, Z, RX, RY, RZ, S1, S2.
 
-At least one VJOY device must be setup for GremlinEx to load, and this limitation has to do with the current architecture as Gremlin started as its primary purpose to program VJOY devices.  This requirement will be evaluated down the road to be removed.
+Configure at least one vJoy device when the profile needs virtual joystick output. If no configured vJoy devices are found, m77 disables vJoy output and logs the result; it can still load for other mapping uses.
 
 It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.
 
@@ -426,7 +453,7 @@ It is recommended to have no more than three or four output VJOY devices, the pr
 
 ## General structure of GremlinEx
 
-GremlinEx is written almost entirely in Python 3.1x, with a pair of exceptions: the Python to DirectInput interface is in C++ and the WASM module for Microsoft Flight Simulator is also in C++ as it is a module loaded by MSFS.  All are open source on GitHub, and some are either direct forks or inspired by existing open source samples:
+GremlinEx is written primarily in Python 3.14, with a pair of exceptions: the Python to DirectInput interface is in C++ and the WASM module for Microsoft Flight Simulator is also in C++ as it is a module loaded by MSFS.  All are open source on GitHub, and some are either direct forks or inspired by existing open source samples:
 
 - [GremlinEx](https://github.com/muchimi/JoystickGremlinEx)
 - [DILL module](https://github.com/muchimi/dinput)
@@ -446,12 +473,9 @@ GremlinEx also uses this data folder to store its options as a JSON file, as wel
 
 ### Inputs
 
-An input in GremlinEx is either a hardware input (from a connected device like a joystick or throttle for example), a keyboard/mouse input ("when I press these keys or these mouse buttons I want this to happen..."), OSC input to accept inbound OSC messages, MIDI messages for MIDI input messages, and States for mappings that shouldl trigger when a state changes.
+Inputs include hardware controller axes/buttons/hats, keyboard and mouse combinations, OSC and MIDI messages, states, and the controls supplied by optional modules. m77 adds direct Stream Deck inputs, recognized Voice commands, and interactive Overlay controls.
 
-There are two types of inputs:  
-
-- linear (such as an axis)
-- momentary (such as a button, including hats)
+Linear inputs provide positions, such as an axis or fader value. Momentary inputs provide press/release events, including ordinary states and recognized commands represented as buttons. Choose actions and containers appropriate to the input type.
 
 ### Mappings
 
@@ -487,11 +511,9 @@ HIDHide should be configured to white list the GremlinEx process so GremlinEx ca
 
 ### Hardware Output
 
-GremlinEx sends VJOY (virtual joystick) and VIGEM (virtual game controller) via their respective APIs.
+GremlinEx sends vJoy joystick and ViGEm gamepad output through their respective interfaces, and keyboard/mouse commands through Windows. Configure the corresponding device or driver for the output you use.
 
-GremlinEx sends keyboard and mouse output via the Windows API.
-
-Custom plugins can send data using the GremlinEx or Python APIs.
+Audio uses the Play Sound/TTS action and selected playback endpoint. Network and simulator actions provide additional output paths. Custom plugins can use GremlinEx and Python APIs for supported integrations.
 
 ### Network
 
@@ -513,13 +535,15 @@ GremlinEx sends UDP traffic over a broadcast UDP which is not routable (by desig
 
 ### MIDI input
 
-GremlinEx uses the MIDO Python libray to handle MIDI 
+GremlinEx uses the MIDO Python libray to handle MIDI
 
 ### Graphical interface
 
-GremlinEx uses the QT library for the user interface.  Specifically is uses the Pyside 6 library for QT.  QT is quite elaborate as a user interface library, however has a pair of limitations encountered "the hard way" due to the highly dependent nature of GremlinEx to asynchronous inputs and multi-threaded approaches: the first has to do with QT Events that, currently, do not scale particularly well in performance tests to handle non UI related events. The other has to do with QT having its own garbage collection mechanism in C++ to manage its memory allocation which is entirely separate from Python's Pyside implementation.  As a result, the experience has been that both memory managers/garbage collectors often gets out of sync, even with references enforced on the Python side, the primary issue being the C++ side removes objects still referenced by Python: this has led through GremlinEx's development to numerous bugs and issues ranging from hard exceptions, to race conditions, to memory allocation and unexpected null references.
+m77 includes a more consistent editor layout, improved input-viewer repeaters, and filtering for large input lists. State search can use categories and attributes, with saved filter selections. Input Viewer Select Used helps focus a test on controls referenced by the profile.
 
-Both are mitigated by not using the QT Event model.  The second directly leverages the Shiboken API to validate the state of C++ objects on the QT side in case they are no longer valid, but still valid on the Python side.
+The interface offers Windows, Light, Dark, and experimental **Custom** themes. Use **Custom Colors...** in the UI options to edit and save a custom palette, and restart when required for theme changes to take effect.
+
+Optional modules add their own designers and device tabs. Overlay and Stream Deck provide graphical control layouts, while AFCS provides a connected axis-processing canvas.
 
 ## General architecture and profile setup
 
@@ -531,7 +555,7 @@ GremlinEx has the concept of triggers.   A trigger is an event that occurs whene
 
 Some triggers are press only, for example, most rotary encoders and indeed some three way switches only send a "press" but no "release.  GremlinEx has a mechanism to automatically configure a release, called an auto-release, if the situation calls for it.  This is because most mappings require both a press and a release, so a "fake" release is created if the situation demands it.  This makes rotary encoders function like normal buttons.
 
-Action mappings and containers are generally aware of two triggers for momentary inputs.  As such, most provide the ability to do different things if the input is pressed, or released.  Most actions can execute only when the input is released.  
+Action mappings and containers are generally aware of two triggers for momentary inputs.  As such, most provide the ability to do different things if the input is pressed, or released.  Most actions can execute only when the input is released.
 
 So some actions can be set to respond only on an input press, and others only on an input release.  Some do both and automatically generate a release depending on the input and required behavior.
 
@@ -539,26 +563,11 @@ Some actions or containers can consume the event and not pass it along.  This is
 
 ### General execution logic
 
-GremlinEx differs significantly from the original Joystick Gremlin project in its execution method.  When a profile starts, GremlinEx builds a precompiled execution graph (known as a DAG - directed acyclic graph), that includes all possible event paths for each possible event, condition, device used and mapping.  Each node in the tree keep stores the data and logic needed to evaluate a go/no go or execute decision without the need to search for data, and nodes are duplicated for speed where required if branching is involved.  The DAG is constructed so the execution path includes part of the path all dependencies.  This allows for very quick evaluations at each level of the tree is a dependency to the next level, so short-cut evaluations become possible as if a node fails the "go/no-go" test, the rest of the path in that branch is just ignored and the event is passed on to to the next branch that hasn't been evaluated yet.
+When a profile starts, GremlinEx builds an execution graph and lookup data for its inputs, conditions, containers, and actions. Incoming events follow the relevant paths; branches whose conditions fail can be skipped. m77 improves condition branching, event dispatch, caching, and axis filtering to reduce repeated work.
 
-The tree also uses priorities of each mapping to establish the execution order.  For example, if a curve is applied to an input, that curve node is executed first so dependent mappings get the curve values, even if the curve node appears after the mappings.  The priority is hard coded in each plugin.
+Containers have configurable execution priorities: lower values execute before higher values. Actions also have priorities supplied by their plugins. Use the Sequence container when a set of full actions needs explicit step order and timing.
 
-When an input arrives in the form of an event, it is fed to the tree recursively to all paths until one of four things happen:
-
-- the tree evaluation for that node/level is a "no-go", so consumes the event (example a False condition) in which case subsequent child actions are just skipped and never get evaluated (shortcut evaluation).
-- the evaluation is a decision node and receives a "go" - it moves along to each child in the path for further evaluation
-- the evaluation is an execution node and "triggers" the mapping - it is consumed but results in one or more executed actions.
-- the event is ignored completely (the event doesn't match anything the profile cares about - and that decision is made close to the root of the tree to avoid evaluating leaf nodes)
-
-Executed actions can trigger their own events as a result of being executed, and each generated event gets fed back into the tree for evaluation as it if was a standard input.  This is used, for example, for auto-releases and to trigger multiple virtual inputs (so one event can end up creating multiple other events).  This is also what enables GremlinEx to implement a state machine, as the execution handles "real hardware" and "virtual hardware" or events exactly the same way.
-
-This architecture is a loose implementation of the shortest path algorithm - meaning that events are executed as fast as possible in a branch relevant to that event and any dependencies with as few decision points as possible.  The execution tree is pre-built at profile start and includes all possible paths an event can take, based on the profile configuration.
-
-GremlinEx supplements the execution graph by using pre-compiled lookup tables extensively to rapidly locate necessary information rather than have to go hunt for it at runtime.  Most data searches are expensive to do at runtime, especially with large profiles or profiles with many states and conditions.  The lookup tables become extremely important at runtime to access references to various information the runtime environment needs, and the concept, as with the execution tree, is to build once, use many times.
-
-This also explains why GremlinEx uses a lot of GUIDs (globally unique identifiers) to represent all logical items in a profile, from an input to an event to a container to an action to a device.  These IDs are used as an index in the lookup data.
-
-As a result, most processing of events in GremlinEx is measured in milliseconds, including complex ones like Gated Axis, and the execution speed is usually not dependent on the complexity of the profile.  Most events are processed in under 10 milliseconds (speed of course is dependent on the hardware used) and the number of execution nodes evaluated is usually quite small as events are discarded as quickly as possible.
+State changes, generated releases, and other virtual inputs use the same mapping infrastructure as hardware events. Keep dependencies directed and test the resulting outputs with the input viewer. Actual response depends on the input rate, filtering, selected actions, background work, and the host system.
 
 ## Security related concerns
 
@@ -600,13 +609,13 @@ When GremlinEx attempts to open a port, Windows will prompt the first time to al
 | Do I need to run my joystick hardware manufacturer's software like T.A.R.G.E.T or Virpil? | No.  The device should function as a basic game controller without any software just by plugging it in.  Some devices however need to be configured to look to Windows like a gamecontroller to enable different features such as axes and buttons and hats.  This is programmed in their firmware by the manufacturer's software and not done by GremlinEx and should be done only once to enable all the features if it does not come factory set like this.  In most cases this step is not necessary.  GremlinEx handles all of the input mapping for all these devices regardless of the manufacturer.  The requirement is the device must shows up as a DINPUT device. |
 | How do I get started? | Download the software, run it, and do a simple mapping.  This documentation should get you started, however if you need help, visit the [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) and ask questions!  There is a forum on bindings, one on how-tos, and a general support/testing channel. |
 | What's HIDHide and why do I need it? | HIDHide is a tool that "hides" the real game controllers mapped by GremlinEx to VJOY virtual joysticks.  You whitelist the GremlinEx process in HIDHide, and other processes including Windows won't see the raw hardware.  This makes sure that games so it will not be confused with multiple concurrent inputs and only see the VJOY devices. |
-| How do I use a Streamdeck with GremlinEx? | GremlinEx uses the OSC protocol to communicate with devices supported by Bitfocus Companion including the Elgato devices and devices by other manufacturers such as a Loupedeck. Bitfocus (also free) replaces the Elgato control software and lets you map on theser hardware panels buttons and rotary buttons to OSC messages sent to GremlinEx.  If you need help configuring Bitfocus and GremlinEx for OSC, please head over to the [Discord channel](https://discord.com/channels/1279461873317707827/1341211588404842547). |
-| What is remote control? | GremlinEx is able to control other GremlinEx instances over the local network. This can be a single client, or multiple clients at once. This allows you to route output to these clients and that routing can be enabled / disabled by the profile.  This helps when running games on multiple machines.  Each client does need to have HIDHide and VJOY installed, and GremlinEx must be running on each, be configured for remote control (option enabled), and a blank profile should be executing. You can also have hardware on different clients send messages to the primary computer running GremlinEx such as over OSC so you can send axis, hat and button data that way as well.  GremlinEx clients can send and receive data at the same time so they can all talk to each other in real time. |
-| What about performance? | In most cases GremlinEx can process inputs and convert them to outputs at runtime in under one millisecond, and certainly all under ten milliseconds even on network connections. |
+| How do I use a Stream Deck with GremlinEx? | Use the m77 [Stream Deck plugin bridge](streamdeck.md) with Elgato Stream Deck software running. It provides GEX pages, mappings, dial controls, and live feedback without requiring OSC or Companion. The OSC/Bitfocus Companion integration remains available for other panel setups. |
+| What is remote control? | GremlinEx can route mapped output to one or more GEX clients on the local network. Configure each receiving client for the required output type and enable remote control. A client receiving virtual joystick output needs a configured vJoy device; keyboard/mouse routing uses its corresponding output path. Local and remote routing can be enabled together or selected separately. |
+| What about performance? | m77 improves event dispatch, condition branching, input-viewer updates, and axis filtering. Response depends on hardware, input rate, filters, and the actions involved; speech generation and other background tasks can add work. Test with a small profile and the input viewer before adding complexity. |
 | Can GremlinEx generate keystrokes? | Yes. Use the map to keyboard/mouse EX action to generate keystrokes, mouse buttons, mouse wheel events, and access even special keys like F13 to F24 and volume control keys. |
 | Can GremlinEx generate mouse output? | Yes.  For motion, use the Map to mouse/Ex action.  For buttons including wheel, use the map to keyboard/mouse EX action. |
 | Can GremlinEx split up axes into buttons or sub-axes? | Yes.  Use the gated axis action attached to an axis to split up an axis into button triggers (which can be directional), or range (linear) triggers to rescale an axis, create deadzones or special "gates" on an axis. |
-| Can GremlinEx work with touchscreens like GameGlass? | Yes.  The touchscreen has to be on a separate machine (Windows limitation), and run someting like Open Stage Control to send OSC messages for axis and buttons to GremlinEx. Open Stage Control is a free app that lets you design input panels exactly like Gameglass. You can also use OSC output from GremlinEx back to the touchscreen panel to control its state?  OSC is a network protocol developed for hardware and software stage control (so things like lighting systems, musical instruments, network connected actuators) and used here to communicate easily with various hardware and touchscreen (interactive) components.  |
+| Can GremlinEx work with touchscreens like GameGlass? | Yes. Use the m77 [interactive Overlay](obs_overlay.md) or its networked browser panel, or connect an external control-surface application over OSC. GremlinEx performs the mappings on the Windows host; a phone or tablet can operate a browser panel over the local network. |
 | Can GremlinEx work with MIDI control systems? | Yes.  GremlinEx supports MIDI in the box and can accept axis (linear) and buttons from a MIDI controller attached to the local machine, or via the network using things like RPTMidi.  While MIDI is an old protocol for musical instruments, its use here is to be able to use controllers with faders, rotary encorders and buttons as input systems for games. |
 | Does GremlinEx work with Microsoft Flight Simulator? | Yes.  GremlinEx includes a WASM module for MSFS 2024 and you can send axis and buttons directly to MSFS via its API, including run calculator expressions for special add-ons that have variables and controls not available via the Simconnect API. |
 | Is GremlinEx hard to use? | No, but that's up to you and the level of complexity you want to have in your profile. The basic mapping functions are very simple.  You pick a device, you pick an input from the list, you add an action to that input, and tell GremlinEx what you want to happen.  Save, run the profile and that's it. GremlinEx also has many advanced features such as advanced curving of inputs and outputs, calibrations, profile modes, profile states, axis merging, key latching, conditions, sequences, macros, axis splitting and gating, remote control, a KVM function, input and output from/to network devices and hardware panels like a Streamdeck and touchscreens.  The most advanced is the custom plugin that requires knowledge of Python and the GremlinEx API.  Just because the features are there doesn't mean they need to be used.  No, you do not need to create five profile modes and ten states to manage your avatar's walking profile! You can if you want to, that's the point. Advanced features vary in learning curve, with a heavy emphasis on, usually not needed for basic usage although not difficult to use.  The [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) is available to help so ask questions and has a lot of screenshots and examples of typical how-to.  Each situation is different so please, ask a question! |

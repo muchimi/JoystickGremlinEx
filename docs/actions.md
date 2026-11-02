@@ -25,12 +25,12 @@ Actions are contained in [containers](containers.md#containers).
 | Map to OSC | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is the original GremlinEx OSC mapper |
 | Map to OSC Ex | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is a more advanced version of the GremlinEx OSC mapper.  This is often used to change states on Bitfocus controlled devices such as the ELgato Streamdeck, LoupeDeck or OSC glass surfaces like Open Stage Control or TouchOSC - this enables two way communication between GremlinEx and these hardware panels or control surfaces via the OSC protocol over the network. |
 | Map to Simconnect | Sends commands and inputs to Microsoft Flight Simulator using the Simconnect SDK.  Works with the GremlinEx WASM module for MSFS to process internal calculator code, which mostly lets you control add-on software for MSFS not exposed via the usual SDK.  This lets you use GremlinEx to completely bypass the MSFS internal mapper. |
-| Map to State | This action modifies states at runtime.  This action lets you toggle a state on/off, pulse, repeat or set a state and otherwise modify the state based on the input. | Use this to set states used as a condition or a mode replacement, to track input status such as mechanical switch positions. This can also be used to enable or disable containers via the State Container, and perform sophisticated profile logic actions when used on conjunction with expression based states (states that are based on other states using boolean logic). |
+| [Map to State](actions/map_to_state_user_guide.md) | Changes ordinary states selected by name, list, category, or attribute. | Track switches, select command layers, pulse flags, or update related states used by expressions and conditions. |
 | Map to trigger | This action sends a virtual trigger to the profile as if the input hardware was triggered.  This can send any joystick event such as a button, hat or axis change, and looks to the profile as if the actual hardware was touched. | Use this to trigger other parts of the profile that are already mapped. This enables one input to trigger other inputs. |
 | [Map to Vjoy (Vjoy Remap)](actions/map_to_vjoy_user_guide.md) | This action lets you do advanced mapping to VJOY devices, including applying curves or merging axes. | Use this when you need to map to a vjoy device. |
 | Noop | This action is a placeholder action if a container requires an action and you want nothing to happen yet while using the other functionality from the container. | Use this to fill required action slots you want ignored. |
 | Pause | This action adds a delay or pauses profile execution.  | Use this as a pause/delay in sequence or chained containers.  See the Resume action to re-enable a suspended profile if used in that mode. |
-| Play Sound | This action plays an audio file.  Optionally let you play a random audio file from a folder at every trigger for variety.  Supports audio output to multiple concurrent audio devices, and supports concurrent audio on the same device.  Supports faders to manage clip duration, ramp up and ramp down, volume, and pitch corrected playback rate. | Use this to play WAV or MP3 audio (WAV recommended for low latency). |
+| [Play Sound/TTS](actions/play_sound_user_guide.md) | Plays WAV/MP3 files or speech generated with local TTS or Edge-TTS. Supports output-device selection, alternate phrases and folder samples, loops, fades, silence trimming, and shared audio-queue controls. | Use this for confirmation sounds, spoken announcements, and varied audio cues. |
 | Previous Mode | Returns the profile to the last mode before the most recent mode switch.  | Use this to revert to a prior mode. |
 | Remap (legacy) | This is the legacy remap for VJOY from the original Joystick Gremlin (with minor modifications) to maintain compatibility with older profiles | Use the Map to VJoy action instead. |
 | Response Curve | This is a legacy action to add a curve to an input to maintain compatibility with older profiles. | Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead. |
@@ -355,9 +355,7 @@ This action lets you send an audio prompt via TTS (text to speech).
 
 ### Map to State
 
-This action lets you set or clear a state defined in the profile.  States are defined in the state device tab.
-
-If a state's value is changed and that state is used in an expression in another state, that state is also updated.
+See the [Map to State User Guide](actions/map_to_state_user_guide.md) for setup instructions and examples. Create and organize its targets with the [State Device User Guide](devices/state_device_user_guide.md).
 
 ### Map to Octavi IFR1
 
@@ -371,30 +369,13 @@ This action lets you send complex sequences of outputs (joystick, keyboard, mous
 
 ### Play Sound
 
-This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.
-
-As of m76T111, the action includes a number of additional features:
-
-- Ability to playback multiple sounds concurrently
-- Ability to trigger the same sound multiple times via repeated triggers
-- Playback is non-blocking (the profile continues to run)
-- Ability to change timing on how the sample is played back
-- Ability to loop the sample multiple times (default count is one)
-- Ability to randomize playback by selecting a sound to play from a list of files in a folder.
-
-![warning](assets/warning.png) The play sound action also has the ability to use AI if CoquiTTS if available.  This feature is not available with the packaged distribution as the AI model cannot be packaged.
-
-It is recommended to use an online text to speech model to create an audio file from text, as this will likely provide the best experience.  The desired output format is a WAV file, although MP3 can also be used.  MP3 playback is not recommended as it introduces latency and takes longer to process over the WAV file format, which is why WAV is recommended for game output use-cases.
+The action is listed as **Play Sound/TTS**. It plays an existing WAV/MP3 file or generates reusable speech with **TTS (local)** or **AI (Edge-TTS)**. It can choose alternate phrases or folder samples, repeat clips, apply fades and silence trimming, and route different actions to different playback devices.
 
 ![play sound](assets/action_play_sound.png)
 
-If control-click is used on the default button, the default device is set for all instances of Play Sound in the profile.
+New actions follow the current Windows default output device. Disable **Use system default playback device** to select a fixed endpoint. Playback is normally asynchronous; **Block playback** orders the shared audio queue without pausing other profile mappings, while **Stop previous audio** replaces active audio when its request is processed.
 
-The default playback device is the Windows default playback device at the time the action is created.
-
-Volume can be adjusted from 0 to 100 percent.  The play button will play the audio with the currently selected options.
-
-The action supports .WAV files, and .MP3 files.  Note that playback of .MP3 may not work on all systems due to the need for CODECs to be installed.  .WAV format is recommended.
+See the [Play Sound User Guide](actions/play_sound_user_guide.md) for file and speech setup, generation and caching, device routing, timing, duplicate suppression, examples, and current implementation limitations.
 
 ### Trigger (Joystick)
 
@@ -489,32 +470,11 @@ The default keyboard output behavior in Windows is to send keys to the process t
 
 ## Map to State Action
 
-This feature is only available in 1.0ex m74 and above.  For more information on states, consult the [state device section](usage.md#states) of the documentation.
-
-The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:
+Follow the [Map to State User Guide](actions/map_to_state_user_guide.md) to choose targets, configure switch tracking or commands, map hats, and set startup synchronization.
 
 ![action state](assets/action_state.png)
 
-### Operation modes
-
-| Operation | Description |
-| ----------- | ----------- |
-| Hold | The state turns on while the input is pressed and held pressed, and turns off when the input is released |
-| Press (On) | Turns the state on |
-| Release (Off) | Turns the state off |
-| Pulse | Toggles the state, waits delay milliseconds, and restores the previous state.  Can optionally repeat the pulse while the input is held. |
-| Toggle | Toggles the state.  If it was off, turns it on, if it was on, turns it off |
-| Invert | Turns the state on if the input is released, and off if the input is pressed |
-
-### New state
-
-A new state can be created directly from the action by pressing the add button.
-
-![action state add](assets/action_state_add.png)
-
-### Input synchronization
-
-The action can synchronize the state value on profile start with the input.  This ensures the state value is set to the value matching the input's state on start.  This is helpful to match hardware panel switch positions for example.
+For state creation, expressions, categories, attributes, exclusive groups, conditions, and state-triggered outputs, use the [State Device User Guide](devices/state_device_user_guide.md).
 
 
 

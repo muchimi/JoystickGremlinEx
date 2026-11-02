@@ -21,9 +21,9 @@
 The GEX Maestro Bridge Service is a background Windows service that lets GEX communicate with HIDMaestro devices without
 requiring direct administrator privileges.  The Bridge Service is a separate open source project on GitHub written in C#.
 
-Details on the HIDMaestro open source project: https://github.com/hifihedgehog/HIDMaestro
+Details on the Maestro Bridge Service: https://github.com/muchimi/GEXMaestroBridgeService
 
-Note: HIDMaestro is NOT included with GEX and must be separately installed along with the GEX Bridge Service.
+Details on the HIDMaestro open source project: https://github.com/hifihedgehog/HIDMaestro
 
 In order to use HIDMaestro devices with GEX, the bridge service must be installed and running on the machine that will use Maestro virtual devices.
 This can be the same machine as GEX, or a different machine on the same network.

@@ -1,7 +1,5 @@
 # Joystick Gremlin Ex (GEX) THIRD-PARTY LICENSE REFERENCES
 
-
-
 ## Third-Party Open-Source Software and License Notice
 
 GremlinEx utilizes third-party software, libraries, frameworks, tools, and other components developed and maintained by independent projects and contributors.

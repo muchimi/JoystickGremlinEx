@@ -1,0 +1,1465 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/play_sound_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Play Sound — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#play-sound-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Play Sound — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-sound-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first sound mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-a-source-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a source mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose a source mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audio-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audio file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tts-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TTS (local)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai-edge-tts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI (Edge-TTS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generate-cache-and-save-speech" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generate, cache, and save speech
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-alternate-phrases-and-folder-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use alternate phrases and folder samples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Use alternate phrases and folder samples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#alternate-spoken-phrases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternate spoken phrases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samples-from-a-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Samples from a folder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic text
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-playback-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the playback device
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adjust-volume-loops-fades-and-trimming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adjust volume, loops, fades, and trimming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-when-the-action-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose when the action runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-overlapping-and-queued-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control overlapping and queued audio
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suppress-duplicate-speech" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppress duplicate speech
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apply-settings-across-the-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Apply settings across the profile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#play-a-confirmation-sound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Play a confirmation sound
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#speak-one-of-several-acknowledgements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Speak one of several acknowledgements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-announcements-to-a-headset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send announcements to a headset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#play-two-announcements-in-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Play two announcements in order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="play-sound-user-guide">Play Sound — User Guide<a class="headerlink" href="#play-sound-user-guide" title="Permanent link">¶</a></h1>
+<p><strong>Play Sound/TTS</strong> plays an audio file or generates speech from text and plays the resulting audio. Use it for button feedback, spoken status messages, alternate announcements, or a repeating sound cue. The documentation also refers to this action as <strong>Play Sound</strong>.</p>
+<p>The current action offers <strong>Audio file</strong>, <strong>TTS (local)</strong>, <strong>AI (Edge-TTS)</strong>, and <strong>Stop Playback</strong> modes. Playback uses a shared audio queue, with options for device selection, overlap, repetition, fades, silence trimming, and duplicate suppression.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#play-sound--user-guide">Play Sound — User Guide</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#create-your-first-sound-mapping">Create your first sound mapping</a></li>
+<li><a href="#choose-a-source-mode">Choose a source mode</a><ul>
+<li><a href="#audio-file">Audio file</a></li>
+<li><a href="#tts-local">TTS (local)</a></li>
+<li><a href="#ai-edge-tts">AI (Edge-TTS)</a></li>
+</ul>
+</li>
+<li><a href="#generate-cache-and-save-speech">Generate, cache, and save speech</a></li>
+<li><a href="#use-alternate-phrases-and-folder-samples">Use alternate phrases and folder samples</a><ul>
+<li><a href="#alternate-spoken-phrases">Alternate spoken phrases</a></li>
+<li><a href="#samples-from-a-folder">Samples from a folder</a></li>
+<li><a href="#dynamic-text">Dynamic text</a></li>
+</ul>
+</li>
+<li><a href="#choose-the-playback-device">Choose the playback device</a></li>
+<li><a href="#adjust-volume-loops-fades-and-trimming">Adjust volume, loops, fades, and trimming</a></li>
+<li><a href="#choose-when-the-action-runs">Choose when the action runs</a></li>
+<li><a href="#control-overlapping-and-queued-audio">Control overlapping and queued audio</a></li>
+<li><a href="#suppress-duplicate-speech">Suppress duplicate speech</a></li>
+<li><a href="#apply-settings-across-the-profile">Apply settings across the profile</a></li>
+<li><a href="#worked-examples">Worked examples</a><ul>
+<li><a href="#play-a-confirmation-sound">Play a confirmation sound</a></li>
+<li><a href="#speak-one-of-several-acknowledgements">Speak one of several acknowledgements</a></li>
+<li><a href="#send-announcements-to-a-headset">Send announcements to a headset</a></li>
+<li><a href="#play-two-announcements-in-order">Play two announcements in order</a></li>
+</ul>
+</li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+<h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Permanent link">¶</a></h2>
+<p>Have a profile containing the source input and an available audio output device. For Audio file mode, start with a short, known-good <strong>WAV</strong> file. The file picker also accepts <strong>MP3</strong>; WAV avoids a compressed-file decoding step and is a useful first test when playback fails or starts slowly.</p>
+<p>The action declares support for <strong>joystick buttons and hats</strong>. Hat inputs need virtual-button activation directions so the action receives a pressed/released state. Other input types depend on the surrounding input configuration; do not assume the action can be added directly to every raw axis.</p>
+<p>For an initial test, use one button, one WAV file, one playback loop, and execution on press only. Leave maximum playback duration and fades at <code>0</code>, and keep <strong>Stop previous audio</strong> and <strong>Block playback</strong> off.</p>
+<h2 id="create-your-first-sound-mapping">Create your first sound mapping<a class="headerlink" href="#create-your-first-sound-mapping" title="Permanent link">¶</a></h2>
+<ol>
+<li>Select the profile mode and source input.</li>
+<li>Add <strong>Play Sound/TTS</strong> to the input's action container.</li>
+<li>Select <strong>Audio file</strong>.</li>
+<li>Use the folder control beside <strong>Sound file</strong> to select a WAV file.</li>
+<li>Enable <strong>Use system default playback device</strong>, or select a specific output as described below.</li>
+<li>Set <strong>Volume</strong> to a comfortable level and <strong>Loops</strong> to <code>1</code>.</li>
+<li>Use the play control to preview the configured audio. Its tooltip is <strong>Generate &amp; Play</strong> in the speech controls.</li>
+<li>Enable <strong>Execute on press</strong> and disable <strong>Execute on release</strong>.</li>
+<li>Save and start the profile, then press the source button.</li>
+</ol>
+<p>The preview tests the sound configuration. Runtime playback also depends on the active profile mode, enabled actions, and container/action conditions.</p>
+<h2 id="choose-a-source-mode">Choose a source mode<a class="headerlink" href="#choose-a-source-mode" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Source</th>
+<th>Main requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Audio file</td>
+<td>An existing WAV or MP3 file.</td>
+<td>The file remains accessible on disk.</td>
+</tr>
+<tr>
+<td>TTS (local)</td>
+<td>Text generated using an installed operating-system voice.</td>
+<td>A working local voice; no online synthesis service is used.</td>
+</tr>
+<tr>
+<td>AI (Edge-TTS)</td>
+<td>Text generated through Edge-TTS, then converted to WAV.</td>
+<td>A connection for new speech generation and a working FFmpeg conversion.</td>
+</tr>
+<tr>
+<td>Stop Playback</td>
+<td>Stops shared playback and clears pending audio.</td>
+<td>No audio file. Saving/reloading this mode has a current limitation; see the behavior notes.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="audio-file">Audio file<a class="headerlink" href="#audio-file" title="Permanent link">¶</a></h3>
+<p>Select an actual audio file in <strong>Sound file</strong>, rather than a directory. You can type a path or browse for one. The adjacent delete control clears the action's file selection; it does not delete that source file from disk.  The default file format is .WAV to minimize overhead and reduce playback latency.</p>
+<p>The profile stores the file path, not an embedded copy of the audio. If you move or share the profile, make the referenced files available on the destination computer and update their paths where needed.</p>
+<p>Enable <strong>Randomize from folder</strong> to choose samples from the selected file's containing folder. See <a href="#samples-from-a-folder">Samples from a folder</a> for its selection behavior.</p>
+<h3 id="tts-local">TTS (local)<a class="headerlink" href="#tts-local" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select <strong>TTS (local)</strong>.</li>
+<li>Enter the announcement in <strong>Text</strong>.</li>
+<li>Choose a <strong>Voice</strong> under <strong>pytts Generation Options</strong>. Use the refresh control if the available voice list has changed.</li>
+<li>Set <strong>Rate (wpm)</strong>. New actions use <code>100</code>; the editor accepts <code>50</code> to <code>300</code> words per minute.</li>
+<li>Select <strong>Generate</strong>, then use the play control to preview the result.</li>
+</ol>
+<p>This mode generates a reusable WAV file using the local speech engine. The voices depend on what is installed on the computer. Change the main <strong>Volume</strong> control to adjust how loudly the generated sample plays; generation-volume controls have a limitation described in the behavior notes.  This mode is provided for legacy compatibility reasons and is not recommended.  Please use the AI mode instead for high sound quality and rich voice options.</p>
+<h3 id="ai-edge-tts">AI (Edge-TTS)<a class="headerlink" href="#ai-edge-tts" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select <strong>AI (Edge-TTS)</strong>.</li>
+<li>Enter the text.</li>
+<li>Under <strong>ETTS Generation Options</strong>, filter by <strong>Locale</strong> and <strong>Gender</strong>, then choose a <strong>Voice</strong>. Use refresh to update the voice list.</li>
+<li>Leave <strong>Rate% (gen)</strong> and <strong>Pitch Offset (Hz)</strong> at <code>0</code> for the first test.</li>
+<li>Select <strong>Generate</strong>, wait for the result, and preview it.</li>
+</ol>
+<p><strong>Rate% (gen)</strong> changes speech speed during generation: <code>0</code> is the normal rate, <code>+100</code> requests twice the rate, and <code>-50</code> requests half the rate. <strong>Pitch Offset (Hz)</strong> adjusts the generated voice pitch. These are generation settings, separate from playback volume and timing. Retest after saving and reopening the profile; pitch persistence has a current limitation.</p>
+<p>New Edge-TTS synthesis uses a free cloud service. GremlinEx converts all audio to the .WAV file format and caches this data so generation only occurs once if the audio is not cached for the current playback parameters.  This ensures that the cloud service is only used to generate audio once, and the audio is cross-profile, meaning that other profiles with the same TTS parameters will be shared between projects.</p>
+<p>For an announcement that must work without new synthesis, export its generated WAV and use <strong>Audio file</strong> mode.</p>
+<h2 id="generate-cache-and-save-speech">Generate, cache, and save speech<a class="headerlink" href="#generate-cache-and-save-speech" title="Permanent link">¶</a></h2>
+<p>Text, engine, voice, rate, pitch, and generation-volume settings identify a cached phrase. Reusing that phrase can reuse its generated audio. Changing those settings or the translated text can require generation again.</p>
+<ul>
+<li><strong>Generate</strong> forces regeneration of the configured phrases.</li>
+<li>The play control generates missing audio as needed and previews the selected phrase with the playback settings.</li>
+<li>The save control, with tooltip <strong>Save the audio file(s)</strong>, exports generated WAV files. One phrase opens a file-save dialog; multiple phrases open a destination-folder dialog.</li>
+<li>The status area reports the result and can offer a control to open the saved file's folder.</li>
+</ul>
+<p>Generated audio is kept in GremlinEx's managed sounds repository, under <code>sounds/managed</code> in its user-profile folder, with a phrase index named <code>phrases.xml</code>. It is separate from the mapping profile. Saving the profile is not the same as exporting or transferring its generated audio.</p>
+<p>The action attempts to prepare local and Edge-TTS audio at profile activation. The application also offers <strong>Generate TTS on load</strong> in its <strong>Voice (TTS)</strong> options; enabling it can increase profile load time when speech needs generating.</p>
+<p><strong>Auto Generate</strong> is shown for speech modes, but the current activation/playback paths can generate missing audio regardless of that checkbox. Generate and preview important phrases before starting the profile when predictable trigger timing matters.</p>
+<h2 id="use-alternate-phrases-and-folder-samples">Use alternate phrases and folder samples<a class="headerlink" href="#use-alternate-phrases-and-folder-samples" title="Permanent link">¶</a></h2>
+<h3 id="alternate-spoken-phrases">Alternate spoken phrases<a class="headerlink" href="#alternate-spoken-phrases" title="Permanent link">¶</a></h3>
+<p>Separate alternatives with vertical bars in <strong>Text</strong>, for example:</p>
+<pre><code class="language-text">Gear down.|Landing gear extended.|Gear is down.
+</code></pre>
+<p>Each nonempty segment becomes a separate phrase. A trigger chooses one phrase; it does not speak the whole list. Newlines alone are not the phrase separator used by this action.</p>
+<p><strong>Multi mode</strong> selects how speech alternatives are chosen:</p>
+<table>
+<thead>
+<tr>
+<th>Multi mode</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Round Robin</td>
+<td>Cycles through the available phrases in order.</td>
+</tr>
+<tr>
+<td>Random</td>
+<td>Makes an independent random choice on each trigger. Immediate repeats are possible.</td>
+</tr>
+<tr>
+<td>Timed Random</td>
+<td>Prefers choices not used during the randomizer's cooldown. When all choices are in cooldown, it can reuse one.</td>
+</tr>
+</tbody>
+</table>
+<p>Timed Random does not start a timer that speaks automatically. It still needs input triggers. The action creates its selection randomizer with a <code>10-second</code> cooldown; this is separate from <strong>Suppress Duplicate Playback</strong>.</p>
+<h3 id="samples-from-a-folder">Samples from a folder<a class="headerlink" href="#samples-from-a-folder" title="Permanent link">¶</a></h3>
+<p>In Audio file mode, enable <strong>Randomize from folder</strong> after selecting a sample in the desired folder. The scan includes WAV and MP3 entries in that folder and does not descend into subfolders. Restart the profile after changing the folder contents to refresh the runtime list.</p>
+<p>Folder selection uses the action's timed randomizer, preferring recently unused files where possible. The <strong>Multi mode</strong> radio buttons control speech alternatives; they do not change the folder-selection algorithm in this version. A trigger chooses one file, then <strong>Loops</strong> repeats that chosen sample rather than choosing another file for each loop.</p>
+<h3 id="dynamic-text">Dynamic text<a class="headerlink" href="#dynamic-text" title="Permanent link">¶</a></h3>
+<p>The action substitutes <code>${current_mode}</code> with the active profile mode name before generating speech:</p>
+<pre><code class="language-text">Current mode is ${current_mode}.
+</code></pre>
+<p>A mode name that has not been generated before can require a new cached phrase. Test the expected modes before relying on immediate speech output.</p>
+<p>Text is also sanitized: parenthesized content and backtick-delimited text are removed, and characters outside Windows-1252 can be replaced. Preview announcements containing non-Latin text or special symbols. Use a prepared audio file when that processing would alter the required wording.</p>
+<h2 id="choose-the-playback-device">Choose the playback device<a class="headerlink" href="#choose-the-playback-device" title="Permanent link">¶</a></h2>
+<p><strong>Use system default playback device</strong> is enabled for new actions. It follows the Windows default output when playback is requested, which is useful when switching between speakers and a headset.</p>
+<p>To use a fixed endpoint:</p>
+<ol>
+<li>Disable Use system default playback device.</li>
+<li>Choose the endpoint in <strong>Playback device</strong>.</li>
+<li>Preview the sound and confirm the correct device is audible.</li>
+</ol>
+<p>The <strong>Default</strong> button selects the currently detected default endpoint. Use the checkbox when you want to keep following later Windows default-device changes. If a fixed endpoint cannot be found, playback can fall back to the default device; check the log and test again after reconnecting audio hardware.</p>
+<p><strong>Sync All</strong> copies the selected device setting to Play Sound actions throughout the profile. Control-clicking Default similarly applies the current default endpoint across the profile. These operations do not disable each action's follow-default checkbox, so review that checkbox on actions that must use a fixed device.</p>
+<p>Different actions can target different endpoints. Concurrent sounds can also play through the same endpoint.</p>
+<h2 id="adjust-volume-loops-fades-and-trimming">Adjust volume, loops, fades, and trimming<a class="headerlink" href="#adjust-volume-loops-fades-and-trimming" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>New-action value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Volume</td>
+<td><code>100</code></td>
+<td>Playback level from <code>0</code> to <code>100</code> percent. <code>0</code> is silent.</td>
+</tr>
+<tr>
+<td>Loops</td>
+<td><code>1</code></td>
+<td>Total number of sample plays, from <code>1</code> to <code>100</code>. <code>1</code> means play once.</td>
+</tr>
+<tr>
+<td>Max playback (s)</td>
+<td><code>0</code></td>
+<td>Intended duration limit; <code>0</code> disables it. The current editor has a unit-conversion issue, so verify nonzero values before use.</td>
+</tr>
+<tr>
+<td>Fade-in (ms)</td>
+<td><code>0</code></td>
+<td>Ramp from silence at the start of the processed sample. <code>0</code> disables the fade.</td>
+</tr>
+<tr>
+<td>Fade-out (ms)</td>
+<td><code>0</code></td>
+<td>Ramp to silence at the end of the processed sample. <code>0</code> disables the fade.</td>
+</tr>
+<tr>
+<td>Silence Trim</td>
+<td>All</td>
+<td>Remove eligible silence at both ends of the sample.</td>
+</tr>
+<tr>
+<td>Threshold (dB)</td>
+<td><code>-55</code></td>
+<td>Audio below this level is considered silence.</td>
+</tr>
+</tbody>
+</table>
+<p>Fades are applied to the sample used for each loop. A fade longer than a short sample can affect its entire duration. These options process playback data; they do not rewrite the source audio file.</p>
+<p><strong>Silence Trim</strong> offers <strong>None</strong>, <strong>All</strong>, and <strong>End</strong>. None preserves the audio, All trims both ends, and End trims only trailing silence. Lower thresholds, such as <code>-60 dB</code>, preserve quieter material; a higher threshold can remove a quiet start or ending. If a sound disappears or loses part of a word, test with None and adjust the threshold.</p>
+<p>The playback engine also supports a pitch-preserving playback-rate setting, separate from speech-generation rate. Its editor control is not currently placed in the visible layout; see the behavior notes rather than assuming a visible rate control is available.</p>
+<h2 id="choose-when-the-action-runs">Choose when the action runs<a class="headerlink" href="#choose-when-the-action-runs" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Trigger selection</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execute on press only</td>
+<td>Starts playback when the source becomes pressed. This is the default.</td>
+</tr>
+<tr>
+<td>Execute on release only</td>
+<td>Starts playback when the source is released.</td>
+</tr>
+<tr>
+<td>Both</td>
+<td>A physical press/release cycle can request playback twice.</td>
+</tr>
+<tr>
+<td>Neither</td>
+<td>Input events do not request playback.</td>
+</tr>
+</tbody>
+</table>
+<p>Releasing the source does not normally stop a clip started on press. <strong>Loops</strong> controls a fixed repeat count, not repetition for as long as the source remains held. Use a suitable container for repeated triggering, and account for the shared queue and stop behavior below.</p>
+<h2 id="control-overlapping-and-queued-audio">Control overlapping and queued audio<a class="headerlink" href="#control-overlapping-and-queued-audio" title="Permanent link">¶</a></h2>
+<p>By default, playback is asynchronous and accepted requests can overlap. Repeated triggers can play multiple instances of the same sample, and the profile continues processing other mappings.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stop previous audio</td>
+<td>Stops active shared audio before this queued sample starts. It can interrupt sounds started by other Play Sound actions.</td>
+</tr>
+<tr>
+<td>Block playback</td>
+<td>Waits for this sample, including its loops, to finish before the shared audio queue processes the next request.</td>
+</tr>
+<tr>
+<td>Blocking delay (ms)</td>
+<td>Displayed as an extra pause after a blocking sound. The current playback path does not apply it.</td>
+</tr>
+<tr>
+<td>Stop Playback mode</td>
+<td>Clears pending sound events and requests a stop of active shared audio. It is not limited to one action or device.</td>
+</tr>
+</tbody>
+</table>
+<p>Block playback controls the audio queue; it does <strong>not</strong> make the rest of the profile wait. It also does not retroactively wait for earlier sounds that were started without blocking. A queued Stop previous audio request waits behind any blocking playback already being processed.</p>
+<p>Stopping the profile stops shared playback. Inside a <a href="../../containers/sequence_user_guide/">Sequence container</a>, the action also requests a shared stop when it receives an end-of-sequence notification. Give the sequence enough duration for its clips to finish; reaching a Play Sound step alone does not wait for the audio.</p>
+<p>Stop Playback uses the action's trigger settings, but hides the detailed options panel. Configure the trigger edge before switching to Stop Playback if you need something other than the default press trigger, and review its saving limitation below.</p>
+<h2 id="suppress-duplicate-speech">Suppress duplicate speech<a class="headerlink" href="#suppress-duplicate-speech" title="Permanent link">¶</a></h2>
+<p><strong>Suppress Duplicate Playback</strong> skips a TTS request when its phrase matches the immediately preceding accepted phrase and the cooldown has not expired. New actions inherit the application's suppression defaults; the configuration defaults are enabled with a <code>5-second</code> cooldown.</p>
+<p>The cooldown control displays seconds, despite the adjacent <strong>Delay (ms)</strong> label in the current layout. Suppression is separate from Timed Random: randomization chooses a phrase, then duplicate suppression can reject it. It does not prevent the repetitions within one accepted Loops request, and a different intervening phrase changes which phrase counts as the last one.</p>
+<p>Disable suppression when every trigger must be heard. For an alternate-phrase test, leave it off until selection works as expected. Audio-file requests use temporary phrase identities, so do not rely on this option as a cooldown for repeatedly triggering the same WAV file.</p>
+<h2 id="apply-settings-across-the-profile">Apply settings across the profile<a class="headerlink" href="#apply-settings-across-the-profile" title="Permanent link">¶</a></h2>
+<p>The device <strong>Sync All</strong> control and the <strong>Sync</strong> buttons beside blocking, trimming, and duplicate suppression affect multiple Play Sound actions. Review the destination actions after using them.</p>
+<p>The current implementation copies these fields:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>What is copied to existing actions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Device Sync All</td>
+<td>Stored playback-device name; the follow-default checkbox remains unchanged.</td>
+</tr>
+<tr>
+<td>Blocking Sync</td>
+<td>Blocking-delay value; the Block playback checkbox is not copied.</td>
+</tr>
+<tr>
+<td>Silence Trim Sync</td>
+<td>All/End trim flags; each action's threshold remains unchanged.</td>
+</tr>
+<tr>
+<td>Duplicate-suppression Sync</td>
+<td>Suppression enabled flag. The intended cooldown copy uses a different property, so verify and set each action's actual cooldown.</td>
+</tr>
+</tbody>
+</table>
+<p>Some Sync operations also update application defaults. Save the profile after applying changes you want to retain.</p>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="play-a-confirmation-sound">Play a confirmation sound<a class="headerlink" href="#play-a-confirmation-sound" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add Play Sound/TTS to the confirmation button and select Audio file.</li>
+<li>Select a short WAV file, set Volume to <code>60</code>, and Loops to <code>1</code>.</li>
+<li>Use system-default output and press-only execution.</li>
+<li>Leave maximum playback and fades at <code>0</code>, and leave blocking and Stop previous audio off.</li>
+<li>Preview, then start the profile and test one press followed by several rapid presses.</li>
+</ol>
+<p>Each accepted press requests a sound. Enable Stop previous audio if a new confirmation should replace one still playing.</p>
+<h3 id="speak-one-of-several-acknowledgements">Speak one of several acknowledgements<a class="headerlink" href="#speak-one-of-several-acknowledgements" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select TTS (local) or AI (Edge-TTS), then choose a voice.</li>
+<li>Enter <code>Confirmed.|Acknowledged.|Done.</code> in Text.</li>
+<li>Select Generate and verify that three phrases are generated.</li>
+<li>Select Random under Multi mode and disable Suppress Duplicate Playback for the first test.</li>
+<li>Use press-only execution and trigger several times.</li>
+</ol>
+<p>One phrase plays per trigger. Choose Round Robin for an ordered cycle or Timed Random to prefer recently unused alternatives.</p>
+<h3 id="send-announcements-to-a-headset">Send announcements to a headset<a class="headerlink" href="#send-announcements-to-a-headset" title="Permanent link">¶</a></h3>
+<ol>
+<li>Disable Use system default playback device.</li>
+<li>Select the headset in Playback device.</li>
+<li>Preview the sound, then change the Windows default device and preview again.</li>
+<li>Keep ordinary feedback actions on the system default if they should use another output.</li>
+</ol>
+<p>Check the headset connection before relying on the route: a missing fixed device can cause fallback to the default output.</p>
+<h3 id="play-two-announcements-in-order">Play two announcements in order<a class="headerlink" href="#play-two-announcements-in-order" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create two Play Sound/TTS actions with short clips or generated phrases.</li>
+<li>Enable Block playback on the first action and keep Stop previous audio off on the second.</li>
+<li>Trigger the first action, then the second.</li>
+</ol>
+<p>The second queued sound waits for the first blocking clip to finish. Other profile mappings continue running. If these actions are in a Sequence container, allow enough sequence time for the audio, since the sequence's end notification can stop shared playback. Blocking delay is not currently an added pause between them.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No sound in preview</td>
+<td>File exists; selected output available; action and Windows volume; Loops at least 1; maximum playback at 0; Silence Trim set to None for diagnosis.</td>
+</tr>
+<tr>
+<td>Preview works but the input does not</td>
+<td>Profile running; correct mode; enabled action/container; trigger edge; conditions; hat virtual-button directions.</td>
+</tr>
+<tr>
+<td>Sound plays twice per button cycle</td>
+<td>Both trigger edges enabled, duplicate mappings, or a container generating repeated events.</td>
+</tr>
+<tr>
+<td>Source release does not stop the sound</td>
+<td>Expected for a press-triggered request; playback is not tied to the source hold duration.</td>
+</tr>
+<tr>
+<td>New sounds overlap</td>
+<td>Disable overlapping through the appropriate Block playback or Stop previous audio behavior.</td>
+</tr>
+<tr>
+<td>Later sound requests are delayed</td>
+<td>A blocking clip or its loops is still running; generation or conversion may also be pending.</td>
+</tr>
+<tr>
+<td>Repeated speech is missing</td>
+<td>Suppress Duplicate Playback and its cooldown.</td>
+</tr>
+<tr>
+<td>A folder sample repeats</td>
+<td>The selection pool may be exhausted within its cooldown; reuse is then allowed.</td>
+</tr>
+<tr>
+<td>Speech generation fails</td>
+<td>Nonempty text; installed local voice, or Edge voice/network connection; FFmpeg availability/conversion; writable managed sounds folder; log details.</td>
+</tr>
+<tr>
+<td>First trigger is slow</td>
+<td>Generate and preview the phrases ahead of use, or export a static WAV. Dynamic text can require a new phrase.</td>
+</tr>
+<tr>
+<td>Speech wording changes or characters disappear</td>
+<td>Text sanitation removes parenthesized/backtick content and replaces unsupported characters. Preview the final audio.</td>
+</tr>
+<tr>
+<td>Sound goes to another device</td>
+<td>Follow-default checkbox, fixed endpoint availability, Windows default output, and fallback warning in the log.</td>
+</tr>
+<tr>
+<td>A quiet sound or syllable is missing</td>
+<td>Disable Silence Trim, then lower its threshold if trimming is needed.</td>
+</tr>
+<tr>
+<td>Nonzero maximum playback cuts off too soon</td>
+<td>The current editor has a seconds/milliseconds conversion issue. Leave it at 0 and use a prepared shorter clip.</td>
+</tr>
+<tr>
+<td>Audio stops when a sequence ends</td>
+<td>Play Sound reacts to end-of-sequence notifications by requesting a shared stop. Review sequence duration and overlapping actions.</td>
+</tr>
+<tr>
+<td>A synced setting differs on another action</td>
+<td>Review the fields actually copied by each Sync control.</td>
+</tr>
+</tbody>
+</table>
+<p>Start diagnosis with Audio file mode, a known-good WAV, default output, one loop, no fades, no duration limit, no trim, and press-only execution. Add speech generation, randomization, and queue controls after that test works.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

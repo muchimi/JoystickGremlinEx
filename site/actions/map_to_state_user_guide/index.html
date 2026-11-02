@@ -1,0 +1,1269 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/map_to_state_user_guide/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Map to State — User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#map-to-state-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Map to State — User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-your-first-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create your first mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-target-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the target states
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose the target states">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-explicit-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An explicit list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Categories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-a-switch-or-held-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow a switch or held button
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#set-or-clear-a-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set or clear a state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toggle-a-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle a state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pulse-a-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pulse a state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#latch-a-state-for-a-fixed-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latch a state for a fixed interval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-triggering-event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the triggering event
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apply-an-operation-to-other-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Apply an operation to other states
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-a-hat-to-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Map a hat to states
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-randomized-state-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use randomized state changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-and-stop-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup and stop settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Worked examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#track-a-panel-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Track a panel switch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trigger-one-state-from-another" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trigger one state from another
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-a-state-as-a-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use a state as a condition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-an-alternate-command-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle an alternate command layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clear-a-group-of-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clear a group of flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select-one-state-in-a-category" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select one state in a category
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-the-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test the mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="map-to-state-user-guide">Map to State — User Guide<a class="headerlink" href="#map-to-state-user-guide" title="Permanent link">¶</a></h1>
+<p><strong>Map to State</strong> changes the profile's ordinary on/off states from an input. Use it to follow a physical switch, toggle a flag, send a pulse, select a control bank, or update a set of related states.</p>
+<p>Create and organize states in the <a href="../../devices/state_device_user_guide/">State Device</a>. Map inputs to ordinary states, then use those states or derived expression states in conditions, State containers, and output mappings.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="#create-your-first-mapping">Create your first mapping</a></li>
+<li><a href="#choose-the-target-states">Choose the target states</a></li>
+<li><a href="#one-state">One state</a></li>
+<li><a href="#an-explicit-list">An explicit list</a></li>
+<li><a href="#categories">Categories</a></li>
+<li><a href="#attributes">Attributes</a></li>
+<li><a href="#follow-a-switch-or-held-button">Follow a switch or held button</a></li>
+<li><a href="#set-or-clear-a-state">Set or clear a state</a></li>
+<li><a href="#toggle-a-state">Toggle a state</a></li>
+<li><a href="#pulse-a-state">Pulse a state</a></li>
+<li><a href="#latch-a-state-for-a-fixed-interval">Latch a state for a fixed interval</a></li>
+<li><a href="#choose-the-triggering-event">Choose the triggering event</a></li>
+<li><a href="#apply-an-operation-to-other-states">Apply an operation to other states</a></li>
+<li><a href="#map-a-hat-to-states">Map a hat to states</a></li>
+<li><a href="#use-randomized-state-changes">Use randomized state changes</a></li>
+<li><a href="#startup-and-stop-settings">Startup and stop settings</a></li>
+<li><a href="#worked-examples">Worked examples</a></li>
+<li><a href="#track-a-panel-switch">Track a panel switch</a></li>
+<li><a href="#trigger-one-state-from-another">Trigger one state from another</a></li>
+<li><a href="#use-a-state-as-a-condition">Use a state as a condition</a></li>
+<li><a href="#toggle-an-alternate-command-layer">Toggle an alternate command layer</a></li>
+<li><a href="#clear-a-group-of-flags">Clear a group of flags</a></li>
+<li><a href="#select-one-state-in-a-category">Select one state in a category</a></li>
+<li><a href="#test-the-mapping">Test the mapping</a></li>
+</ul>
+<h2 id="create-your-first-mapping">Create your first mapping<a class="headerlink" href="#create-your-first-mapping" title="Permanent link">¶</a></h2>
+<ol>
+<li>Create an ordinary state named <code>shift_held</code> in the State Device, with Default State set to Off.</li>
+<li>Select a physical button and add <strong>Map to State</strong> to its action container.</li>
+<li>Under <strong>Apply to</strong>, choose <strong>State (single)</strong>.</li>
+<li>Select <code>shift_held</code> in <strong>State</strong>.</li>
+<li>Select <strong>Hold</strong> under Mode.</li>
+<li>Leave <strong>Other State Mode</strong> on NoOp and Randomize disabled.</li>
+<li>Save and start the profile.</li>
+<li>Watch <code>shift_held</code> in the input viewer while pressing and releasing the source.</li>
+</ol>
+<p>Hold sends the source's pressed/released value to the state. The state should be On while the button is held and Off after release.</p>
+<p>The action offers button, hat, and keyboard input types according to the surrounding input configuration. Start with a joystick button when testing a new state setup. A raw hat uses the direction table described below.</p>
+<h2 id="choose-the-target-states">Choose the target states<a class="headerlink" href="#choose-the-target-states" title="Permanent link">¶</a></h2>
+<p><strong>Apply to</strong> selects the states changed by the action's main Mode. Use ordinary states for these targets. Expression states should get their values from their source states.</p>
+<h3 id="one-state">One state<a class="headerlink" href="#one-state" title="Permanent link">¶</a></h3>
+<p>Choose State (single), then select the state by name. The Description field helps identify its purpose.</p>
+<p>The adjacent add control creates a state without leaving the action. In <strong>Add State</strong>, enter a unique name, optional description, and an On or Off default. Confirm, then check the action's selected state. Use the full State Editor for expressions, categories, attributes, autorelease, or exclusive groups.</p>
+<h3 id="an-explicit-list">An explicit list<a class="headerlink" href="#an-explicit-list" title="Permanent link">¶</a></h3>
+<p>Choose <strong>States (multi)</strong>. Click <strong>Pick…</strong> in the States list and select the names to include. Select list entries and click <strong>Remove</strong> to remove them from this action's target list.</p>
+<p>The main operation applies to every listed target. For example, Release (off) can clear a fixed list of flags with one input.</p>
+<h3 id="categories">Categories<a class="headerlink" href="#categories" title="Permanent link">¶</a></h3>
+<p>Choose <strong>Category</strong>, click Pick… beside Categories, and select one or more categories. The action matches states in any of the selected categories.</p>
+<p>Review <strong>Impacted states</strong> before testing. Assigning another state to a selected category adds it to that selection without adding its name to an explicit list.</p>
+<h3 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">¶</a></h3>
+<p>Choose <strong>Attributes</strong>, then use Pick… to choose labels defined on states. A state matches if it has <strong>any</strong> of the selected attributes; it does not need all of them.</p>
+<p>Use exact attribute spelling and case. Check Impacted states after changing the selection or editing state labels. For example, attach <code>reset_on_command</code> to flags in several categories, then target that attribute from one reset action.</p>
+<p>For Category and Attributes, keep expression states out of the writable selection by choosing suitable categories or labels. Use an expression when the requirement is a logical combination of state values.</p>
+<h2 id="follow-a-switch-or-held-button">Follow a switch or held button<a class="headerlink" href="#follow-a-switch-or-held-button" title="Permanent link">¶</a></h2>
+<p>Select <strong>Hold</strong> when the state should follow the physical input. Hold handles the source's On and Off values, so it is appropriate for a maintained switch or a temporary shift button.</p>
+<p>Select <strong>Invert</strong> when a pressed source should set the state Off and a released source should set it On. Start with Execute on press enabled and verify both edges in the viewer.</p>
+<p>Ensure the surrounding container and conditions let release events reach the mapping. For a maintained switch, also set startup synchronization to Input so an already-on switch is read when the profile starts.</p>
+<h2 id="set-or-clear-a-state">Set or clear a state<a class="headerlink" href="#set-or-clear-a-state" title="Permanent link">¶</a></h2>
+<p>Use <strong>Press (on)</strong> to set the targets On when the selected event triggers. Use <strong>Release (off)</strong> to set them Off. These names describe the requested state value; Execute on press/release selects the physical event that performs the operation.</p>
+<p>For separate On and Off controls:</p>
+<ol>
+<li>Add Map to State to the On input, select the target, and choose Press (on).</li>
+<li>Add another to the Off input, select the same target, and choose Release (off).</li>
+<li>Use execution on press only for both actions.</li>
+<li>Test the two controls in either order.</li>
+</ol>
+<p>Setting an ordinary state to its existing value normally does not create a new state transition. Use Pulse for a momentary event or change the state deliberately when its attached actions need another press/release cycle.</p>
+<h2 id="toggle-a-state">Toggle a state<a class="headerlink" href="#toggle-a-state" title="Permanent link">¶</a></h2>
+<p>Select <strong>Toggle</strong> to change Off to On or On to Off on each qualifying event. New actions use Toggle with execution on press only.</p>
+<p>For a one-button switch, keep Execute on press enabled and Execute on release disabled. Test two complete press/release cycles: the first press should set the state and the second should clear it.</p>
+<p>Use one ordinary state per independently held source when inputs can overlap. Combine those source states with an expression instead of writing several Hold mappings to the same destination.</p>
+<h2 id="pulse-a-state">Pulse a state<a class="headerlink" href="#pulse-a-state" title="Permanent link">¶</a></h2>
+<ol>
+<li>Select <strong>Pulse</strong>.</li>
+<li>Under <strong>Pulse Options</strong>, set the pulse duration in milliseconds.</li>
+<li>Choose whether <strong>Pulse inverts state</strong> is enabled.</li>
+<li>Leave <strong>Pulse repeat</strong> off for the first test.</li>
+<li>Start the profile and observe the state through one complete pulse.</li>
+</ol>
+<p>With Pulse inverts state enabled, the pulse toggles the state at its start and again at its end. This is useful when a pulse should temporarily invert an existing value. With it disabled, the pulse sets On and then Off. Avoid another mapping writing that state during the pulse when the original value matters.</p>
+<p>New actions use a pulse duration of <code>250 ms</code>, Pulse inverts state enabled, and repetition disabled. <strong>Pulse repeat</strong> adds repeated cycles with a separate repeat-delay field, also initially <code>250 ms</code>. Test the full source press/release cycle and any profile mode change before using repeated pulses in a larger mapping.</p>
+<p>Pulse duration and repeat delay are separate from the state's own Autorelease settings. Keep state-level Autorelease disabled for a simple action-controlled pulse.</p>
+<h2 id="latch-a-state-for-a-fixed-interval">Latch a state for a fixed interval<a class="headerlink" href="#latch-a-state-for-a-fixed-interval" title="Permanent link">¶</a></h2>
+<p>Select <strong>Latch</strong> to turn an Off state On for <strong>Latch delay (ms)</strong>. Repeated On requests during the active latch interval are ignored; they do not keep extending that interval. The state returns Off when the timer expires, and clearing it earlier ends the active latch.</p>
+<ol>
+<li>Select an ordinary Off state.</li>
+<li>Choose Latch and enter a positive delay, such as <code>1000 ms</code>.</li>
+<li>Use press-only execution.</li>
+<li>Trigger it repeatedly during the first second, then wait for Off.</li>
+</ol>
+<p>Use the <a href="../../devices/state_device_user_guide/#configure-automatic-state-changes">State Editor's Autorelease controls</a> when the timer rule should belong to the state itself. Use Latch when this mapping should initiate the timed On interval.</p>
+<h2 id="choose-the-triggering-event">Choose the triggering event<a class="headerlink" href="#choose-the-triggering-event" title="Permanent link">¶</a></h2>
+<p>Use <strong>Execute on press</strong> for operations such as Press (on), Release (off), Toggle, or Latch when the command should run as a button is pressed. Use <strong>Execute on release</strong> when it should run as the source is released.</p>
+<p>Enabling both can apply a one-shot operation twice during one physical press/release cycle. In particular, Toggle can turn On at the press and Off at the release.</p>
+<p>Hold follows both values of the source. Pulse has its own cycle, so test it as a complete operation rather than using the trigger checkboxes as a pulse-duration control. <strong>Other State Mode</strong> uses the selected trigger events separately from the main operation.</p>
+<h2 id="apply-an-operation-to-other-states">Apply an operation to other states<a class="headerlink" href="#apply-an-operation-to-other-states" title="Permanent link">¶</a></h2>
+<p><strong>Other State Mode</strong> performs an additional operation on states outside the main target selection. Leave it on <strong>NoOp</strong> when only the selected targets should change.</p>
+<p>To clear peers after selecting a state:</p>
+<ol>
+<li>Put the related ordinary states in one category.</li>
+<li>Choose the selected state's main operation, such as Press (on).</li>
+<li>Set Other State Mode to Release (off).</li>
+<li>Enable <strong>Category Only</strong>.</li>
+<li>Test each selection while watching all states in that category.</li>
+</ol>
+<p>Category Only limits the additional operation to categories represented by the main targets. With it disabled, the additional operation reaches the profile's other states across categories. For a multi-target selection, the main targets are excluded from the additional operation.</p>
+<p>Other State Mode also offers Press (on), Toggle, XOR, AND, and OR. For the Boolean operations, each target's value after the main operation is combined with each other state's current value:</p>
+<ul>
+<li><strong>XOR</strong> sets the other state On when its value differs from the target's value.</li>
+<li><strong>AND</strong> keeps the other state On only when both values are On.</li>
+<li><strong>OR</strong> sets the other state On when either value is On.</li>
+</ul>
+<p>With several main targets, these combinations are applied successively for each target. Begin with a single target and a small category when configuring them.</p>
+<p>Select main Mode <strong>NoOp</strong> when only the Other State Mode operation is needed. The main targets are still used to identify the excluded states, categories, and Boolean values.</p>
+<p>For a group-wide selection rule that should apply whenever any mapping sets a member On, configure <a href="../../devices/state_device_user_guide/#make-states-mutually-exclusive">Mutually exclusive</a> in the State Editor. Other State Mode is an operation attached to this particular action.</p>
+<h2 id="map-a-hat-to-states">Map a hat to states<a class="headerlink" href="#map-a-hat-to-states" title="Permanent link">¶</a></h2>
+<p>On a raw hat input, assign states in the direction table rather than using the single button-mode selector:</p>
+<ol>
+<li>Add Map to State to the hat input.</li>
+<li>Select a state for each direction you need, including diagonals where appropriate.</li>
+<li>Choose <strong>Hold</strong>, <strong>Pulse</strong>, <strong>Press</strong>, <strong>Release</strong>, or <strong>NoOp</strong> for each position.</li>
+<li>Leave center unmapped or use NoOp unless centering should issue a command.</li>
+<li>Test each direction, adjacent transitions, diagonals, and return to center.</li>
+</ol>
+<p>Use <strong>All Hold</strong>, <strong>All Pulse</strong>, <strong>All Press</strong>, <strong>All Release</strong>, or <strong>All NoOp</strong> to set the table's operation across positions. <strong>Clear Buttons</strong> clears its assignments; assign the required state names manually afterward.</p>
+<p>When Apply to selects more than a single state, a position can also affect the additional selected targets. Test with State (single) and one mapped direction before adding a broader target selection.</p>
+<h2 id="use-randomized-state-changes">Use randomized state changes<a class="headerlink" href="#use-randomized-state-changes" title="Permanent link">¶</a></h2>
+<p>Enable <strong>Randomize</strong> when an input should produce probabilistic state changes, such as a varied sequence or wiggle setup. The panel exposes <strong>Skip Chance %</strong> for adjusting the gate, and Pulse uses its own timing controls instead.</p>
+<p>Keep Randomize off for switch tracking, bank selection, and command-enable states that must respond to every input. For a randomized setup, use a dedicated test state and watch many triggers in the viewer while adjusting the percentage. Add the randomized state to the final mapping after the observed result matches the intended use.</p>
+<h2 id="startup-and-stop-settings">Startup and stop settings<a class="headerlink" href="#startup-and-stop-settings" title="Permanent link">¶</a></h2>
+<p>Use <strong>State on profile start</strong> to select initialization for the targets:</p>
+<ul>
+<li><strong>Ignore</strong> leaves this action out of startup synchronization. The State Device still applies the state's default initialization.</li>
+<li><strong>Default</strong> applies each target's Default State.</li>
+<li><strong>Input</strong> reads the source position. Use it with Hold for a maintained joystick switch; Invert reverses the sampled input.</li>
+<li><strong>LastOrInput</strong> requests the retained last value, using the source when no last value is available.</li>
+<li><strong>LastOrDefault</strong> requests the retained last value, using the configured default when none is available.</li>
+</ul>
+<p>For a predictable switch setup, begin with Hold and Input. Test startup with the switch both On and Off, particularly when other actions also target the same state. Check the hat directions as well when synchronizing a raw hat mapping.</p>
+<p><strong>Reset to Default on stop</strong> returns the action's targets to their configured defaults when the profile stops. It is enabled for new actions. Save the profile after changing these choices; runtime On/Off values are separate from the saved state definitions.</p>
+<h2 id="worked-examples">Worked examples<a class="headerlink" href="#worked-examples" title="Permanent link">¶</a></h2>
+<h3 id="track-a-panel-switch">Track a panel switch<a class="headerlink" href="#track-a-panel-switch" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create <code>panel_power</code> with Default State Off.</li>
+<li>Add Map to State to the switch input.</li>
+<li>Select panel_power, choose Hold, and set State on profile start to Input.</li>
+<li>Leave Other State Mode on NoOp and Randomize off.</li>
+<li>Start with the switch Off, then repeat the test with it already On.</li>
+</ol>
+<p>Use panel_power in a condition or State container to enable the panel's commands.</p>
+<h3 id="trigger-one-state-from-another">Trigger one state from another<a class="headerlink" href="#trigger-one-state-from-another" title="Permanent link">¶</a></h3>
+<p>Use one state as the input that changes a second state. In this example, a physical button holds <code>light_request</code> On, and each transition of light_request to On toggles <code>aux_lights</code>.</p>
+<ol>
+<li>In the State Device, create two ordinary states, <code>light_request</code> and <code>aux_lights</code>, both with Default State Off. Leave Autorelease and Mutually exclusive disabled.</li>
+<li>On a physical button, add Map to State. Select State (single), target light_request, and choose Hold.</li>
+<li>In the <strong>State Device tab</strong>, select <strong>light_request</strong> and add a <strong>Basic</strong> container to that state's mapping.</li>
+<li>Inside that container, add a second Map to State action. Set its target to <strong>aux_lights</strong>, choose <strong>Toggle</strong>, enable Execute on press, and disable Execute on release.</li>
+<li>Leave Other State Mode on NoOp and Randomize off on both actions. Use State on profile start: Ignore for this test.</li>
+<li>Save and start the profile. Display both states in the input viewer.</li>
+<li>Press the physical button. Light_request turns On, and its mapped action toggles aux_lights On.</li>
+<li>Release the physical button. Light_request turns Off; aux_lights stays On because its Toggle action executes only on the source state's press.</li>
+<li>Press again. Light_request turns On again and toggles aux_lights Off. Release to return light_request to Off.</li>
+</ol>
+<p>The second Map to State action belongs to <strong>light_request's State Device mapping</strong>, with aux_lights selected as its target. This placement makes the state transition trigger the next action in the chain.</p>
+<p>To observe a virtual output too, select aux_lights in the State Device and add a normal Hold-style Map to vJoy button action. The virtual button follows aux_lights and stays pressed between the first and second requests.</p>
+<p>For a second state that should follow light_request On and Off instead of toggling independently, change the second Map to State action to Hold. Keep the chain directed from light_request to aux_lights; do not add a return mapping that changes light_request from aux_lights.</p>
+<h3 id="use-a-state-as-a-condition">Use a state as a condition<a class="headerlink" href="#use-a-state-as-a-condition" title="Permanent link">¶</a></h3>
+<p>Use an enabling state to decide whether another input may set a command state. Here, <code>commands_enabled</code> gates a second button that holds <code>command_active</code> On.</p>
+<ol>
+<li>Create two ordinary states, commands_enabled and command_active, both with Default State Off.</li>
+<li>Map an enable button to commands_enabled using Toggle and execution on press only.</li>
+<li>On a separate command button, add a Basic container with Map to State targeting command_active. Choose Hold, Other State Mode NoOp, and Randomize off.</li>
+<li>Open the <strong>conditions for that Map to State action</strong> and add a <strong>State condition</strong>.</li>
+<li>Select <strong>commands_enabled</strong>, choose <strong>Pressed</strong> to require On, and enable <strong>Apply condition on press only</strong> so the command's release can still pass through.</li>
+<li>Save and start the profile, then watch both states in the input viewer.</li>
+<li>With commands_enabled Off, press and release the command button. Command_active remains Off.</li>
+<li>Press the enable button to turn commands_enabled On. Hold the command button: command_active turns On. Release it: command_active turns Off.</li>
+<li>Test release handling by holding the command button, turning commands_enabled Off with the enable button, and then releasing the command button. Command_active must return Off.</li>
+</ol>
+<p>Changing commands_enabled alone does not press command_active. The condition is checked when the command button's event arrives. The state-triggered mapping in the previous example is the setup to use when a state transition should initiate another action directly.</p>
+<p>You can place the same condition on another action, such as a virtual button or keyboard mapping, or select an expression state when several requirements must be met. See the <a href="../../devices/state_device_user_guide/#enable-a-command-only-when-ready">State Device condition example</a> for a compound condition.</p>
+<h3 id="toggle-an-alternate-command-layer">Toggle an alternate command layer<a class="headerlink" href="#toggle-an-alternate-command-layer" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create <code>alternate_layer</code> with Default State Off.</li>
+<li>Map the layer button to it using Toggle and execution on press only.</li>
+<li>Put alternate commands in State containers requiring alternate_layer On/Pressed.</li>
+<li>Put ordinary commands in containers requiring alternate_layer Off/Released.</li>
+<li>Test switching layers with all command buttons released, then test the release handling needed by any held outputs.</li>
+</ol>
+<h3 id="clear-a-group-of-flags">Clear a group of flags<a class="headerlink" href="#clear-a-group-of-flags" title="Permanent link">¶</a></h3>
+<ol>
+<li>Add the attribute <code>reset_on_command</code> to the ordinary states that should be cleared together.</li>
+<li>Add Map to State to the reset button and choose Apply to: Attributes.</li>
+<li>Pick reset_on_command and inspect the matched names.</li>
+<li>Choose Release (off), press-only execution, Other State Mode NoOp, and Randomize off.</li>
+<li>Turn several flags On in the viewer and press reset.</li>
+</ol>
+<p>Use Category instead when every ordinary state in one or more complete categories should be cleared.</p>
+<h3 id="select-one-state-in-a-category">Select one state in a category<a class="headerlink" href="#select-one-state-in-a-category" title="Permanent link">¶</a></h3>
+<ol>
+<li>Create <code>radio_1</code>, <code>radio_2</code>, and <code>radio_3</code> in a <code>radios</code> category.</li>
+<li>Map each selection button to its own state using Press (on).</li>
+<li>On each action, choose Other State Mode Release (off) and enable Category Only.</li>
+<li>Use press-only execution.</li>
+<li>Test that selecting one radio clears its peers while states in other categories remain as configured.</li>
+</ol>
+<p>Use the State Editor's Mutually exclusive group instead when every writer of these states should apply the same peer-clearing rule.</p>
+<h2 id="test-the-mapping">Test the mapping<a class="headerlink" href="#test-the-mapping" title="Permanent link">¶</a></h2>
+<p>Use the input viewer to inspect the target values before binding their outputs in a game:</p>
+<ol>
+<li>Check the source event and the main target selection.</li>
+<li>Test press and release separately.</li>
+<li>For Category or Attributes, inspect every matched state.</li>
+<li>Check any additional Other State Mode targets.</li>
+<li>Observe dependent expression states and their output mappings.</li>
+<li>Repeat from a fresh profile start with the hardware in different positions.</li>
+</ol>
+<p>If the result is unclear, reduce the setup to one ordinary state, one physical button, Hold or Toggle, Other State Mode NoOp, and Randomize off. Add expressions, group operations, and timers after that mapping works.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
