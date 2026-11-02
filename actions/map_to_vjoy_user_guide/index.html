@@ -360,25 +360,6 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../ktts/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  AI and DevOps
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
       <a href="../../credits/" class="md-tabs__link">
         
   
@@ -654,33 +635,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ktts/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AI and DevOps
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../credits/" class="md-nav__link">
         
   
@@ -749,6 +703,17 @@
   
     <nav class="md-nav" aria-label="Before you start">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-virtual-output-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a virtual output device
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#axis-values" class="md-nav__link">
@@ -984,6 +949,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#set-the-startup-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set the startup position
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#velocity-move-while-held" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -999,6 +975,17 @@
     <span class="md-ellipsis">
       
         Stepped: move between presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#steppedpid-move-smoothly-between-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stepped+PID: move smoothly between presets
       
     </span>
   </a>
@@ -1128,6 +1115,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#smooth-flap-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smooth flap transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#smooth-trim-adjustment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1183,13 +1181,15 @@
 
 
 <h1 id="map-to-vjoy-user-guide">Map to vJoy — User Guide<a class="headerlink" href="#map-to-vjoy-user-guide" title="Permanent link">¶</a></h1>
-<p>Map to vJoy sends an input to a virtual joystick output. Use it to map a physical control to a virtual axis, button, or hat; turn an axis range into a button; combine axes; or move an axis with buttons or an encoder.</p>
+<p>Map to vJoy sends an input to a virtual joystick output. It supports <strong>vJoy</strong> and <strong>HIDMaestro</strong> output devices. Use it to map a physical control to a virtual axis, button, or hat; turn an axis range into a button; combine axes; or move an axis with buttons or an encoder.</p>
+<p>The action supersedes the legacy <strong>remap</strong> action.</p>
 <p>The action is also identified as <strong>Vjoy Remap</strong> and <strong>Map to Vjoy</strong>. This guide describes the supplied GremlinEx implementation. Available controls depend on the source input and the selected action mode. Mode descriptions below describe their behavior; the wording in the Mode list may vary by build.</p>
 <h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">¶</a></h2>
 <ul>
 <li><a href="#map-to-vjoy--user-guide">Map to vJoy — User Guide</a></li>
 <li><a href="#contents">Contents</a></li>
 <li><a href="#before-you-start">Before you start</a><ul>
+<li><a href="#choose-a-virtual-output-device">Choose a virtual output device</a></li>
 <li><a href="#axis-values">Axis values</a></li>
 </ul>
 </li>
@@ -1217,8 +1217,10 @@
 <li><a href="#set-an-axis-with-a-button">Set an axis with a button</a></li>
 <li><a href="#control-an-axis-with-two-inputs">Control an axis with two inputs</a><ul>
 <li><a href="#set-the-reverse-input">Set the reverse input</a></li>
+<li><a href="#set-the-startup-position">Set the startup position</a></li>
 <li><a href="#velocity-move-while-held">Velocity: move while held</a></li>
 <li><a href="#stepped-move-between-presets">Stepped: move between presets</a></li>
+<li><a href="#steppedpid-move-smoothly-between-presets">Stepped+PID: move smoothly between presets</a></li>
 <li><a href="#encoder-adjust-with-pulses">Encoder: adjust with pulses</a></li>
 <li><a href="#pid-move-a-target-and-follow-it-smoothly">PID: move a target and follow it smoothly</a></li>
 </ul>
@@ -1233,6 +1235,7 @@
 <li><a href="#worked-examples">Worked examples</a><ul>
 <li><a href="#a-throttle-with-a-high-end-detent-button">A throttle with a high-end detent button</a></li>
 <li><a href="#five-discrete-flap-positions">Five discrete flap positions</a></li>
+<li><a href="#smooth-flap-transitions">Smooth flap transitions</a></li>
 <li><a href="#smooth-trim-adjustment">Smooth trim adjustment</a></li>
 <li><a href="#one-hat-separate-command-buttons">One hat, separate command buttons</a></li>
 </ul>
@@ -1248,7 +1251,20 @@
 </ul>
 <p>Configure the target game or application to use the virtual output you select. A physical input and its virtual output are separate controls; verify which one the target application has bound.</p>
 <p>For the first test, use one source input and one virtual output. Add curves, merging, or remote output after the basic mapping works.</p>
-<p>You can test output values in the GEX <strong>input viewer</strong> or you can also view VJOY output in the <strong>VJOY Monitor</strong> utility included with your VJOY installation.  This is often much faster and easier than to test things in the game directly.</p>
+<p>You can test output values in the GEX <strong>input viewer</strong>. For vJoy devices, you can also use the <strong>vJoy Monitor</strong> utility included with your vJoy installation. For HIDMaestro, use a joystick monitor on the computer hosting the controller. This is often faster and easier than testing in the game directly.</p>
+<h3 id="choose-a-virtual-output-device">Choose a virtual output device<a class="headerlink" href="#choose-a-virtual-output-device" title="Permanent link">¶</a></h3>
+<p>The <strong>Device</strong> list includes available vJoy devices and HIDMaestro devices included in GremlinEx. Select the device by name, then choose an output that it actually exposes. Devices with different axis, button, or hat counts offer different output choices.</p>
+<p>For <strong>vJoy</strong>, configure and enable the virtual controller with your vJoy installation before selecting it in the action.</p>
+<p>For <strong>HIDMaestro</strong>:</p>
+<ol>
+<li>Run the Maestro Bridge service on the computer that will host the virtual controller.</li>
+<li>Enable the <strong>Maestro</strong> module in GremlinEx's module configuration if needed.</li>
+<li>Open <strong>Tools → Maestro Devices...</strong> and enter the service <strong>Host</strong> and <strong>Port</strong>, plus the local reply address and <strong>Reply port</strong>. The reply port must match the service's <strong>SendPort</strong>.</li>
+<li>Use <strong>Refresh Devices</strong> to load the host's devices. Select an existing device, or create one with <strong>New Device</strong> or <strong>Presets...</strong>.</li>
+<li>Ensure the device is <strong>Active on host</strong>, check <strong>Include in Gremlin</strong>, and select <strong>Apply to Gremlin</strong>.</li>
+<li>Select that controller in the action's <strong>Device</strong> list, choose the output, and test it.</li>
+</ol>
+<p>Maestro output uses the configured bridge connection, including when the bridge runs on another computer. The virtual controller is available to games on the host computer. The action's separate remote-vJoy routing controls do not select the Maestro host; see <a href="#local-and-remote-output">Local and remote output</a>.</p>
 <h3 id="axis-values">Axis values<a class="headerlink" href="#axis-values" title="Permanent link">¶</a></h3>
 <p>Axis settings generally use a normalized range:</p>
 <table>
@@ -1537,7 +1553,44 @@
 <li><strong>Change axis range</strong> changes the range used for the selected output axis. It does not itself move a physical input.</li>
 </ul>
 <h2 id="control-an-axis-with-two-inputs">Control an axis with two inputs<a class="headerlink" href="#control-an-axis-with-two-inputs" title="Permanent link">¶</a></h2>
-<p>Choose the stepped-axis action mode to use <strong>Velocity</strong>, <strong>Stepped</strong>, <strong>Encoder</strong>, or <strong>PID</strong> behavior. All four modes expose <strong>Initial axis value</strong>, which is applied when the profile starts.</p>
+<p>Choose the stepped-axis action mode, then select a behavior under <strong>Button to Axis (step) Mode</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>How the axis moves</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Velocity</td>
+<td>Moves continuously while the input is held.</td>
+<td>Hold a button to adjust trim.</td>
+</tr>
+<tr>
+<td>Stepped</td>
+<td>Jumps directly to the next configured preset.</td>
+<td>Discrete flap positions.</td>
+</tr>
+<tr>
+<td>Stepped+PID</td>
+<td>Moves smoothly toward the next configured preset.</td>
+<td>Flaps that travel gradually between detents.</td>
+</tr>
+<tr>
+<td>Encoder</td>
+<td>Accumulates pulses, with optional speed-based acceleration or return to center.</td>
+<td>Rotary encoder adjustment.</td>
+</tr>
+<tr>
+<td>PID</td>
+<td>Changes a target by a configured amount and follows it smoothly.</td>
+<td>Fine trim adjustment with momentary inputs.</td>
+</tr>
+</tbody>
+</table>
+<p>All five modes share <strong>Initial axis value</strong> and the secondary reverse-input configuration. See <a href="#set-the-startup-position">Set the startup position</a> for fixed and automatic initialization.</p>
 <h3 id="set-the-reverse-input">Set the reverse input<a class="headerlink" href="#set-the-reverse-input" title="Permanent link">¶</a></h3>
 <p>The source input is the primary control. To add a control for the opposite direction:</p>
 <ol>
@@ -1548,6 +1601,11 @@
 <li>Test each input separately.</li>
 </ol>
 <p>Here, “secondary” or “latched” input is a reverse-direction trigger. It is not an instruction to hold the primary and secondary controls together. A keyboard sequence assigned to the secondary trigger can itself require multiple simultaneous keys.</p>
+<p>Use a distinct control or key combination for each direction. Begin with execution on press only and test both controls, including their releases. See <a href="#behavior-notes-for-this-version">Behavior notes for this version</a> for the current direction-selector limitation in Stepped, Stepped+PID, and PID modes.</p>
+<h3 id="set-the-startup-position">Set the startup position<a class="headerlink" href="#set-the-startup-position" title="Permanent link">¶</a></h3>
+<p>For a fixed startup position, choose a numbered step preset so <strong>Initial axis value</strong> is editable, then enter a value or move its slider. The configured value is sent immediately when the profile starts; the mode's movement state starts from the same position. Even Stepped+PID and PID initialize immediately rather than easing from the previous output.</p>
+<p>In <strong>Stepped</strong> and <strong>Stepped+PID</strong>, <strong>Use step preset: Start Index</strong> and the selection beside an individual step copy that preset into <strong>Initial axis value</strong>. The start index is numbered from <strong>1</strong>. The slider shows the configured step positions as tick marks, and <strong>Preset value</strong> shows the selected preset.</p>
+<p><strong>Auto</strong> requests initialization from the current virtual output axis position instead of the configured initial value. It reads the virtual output, not the physical source control. When Auto is active, the fixed startup controls are disabled. The current editor has an Auto-selection limitation; check <a href="#behavior-notes-for-this-version">Behavior notes for this version</a> before relying on it.</p>
 <h3 id="velocity-move-while-held">Velocity: move while held<a class="headerlink" href="#velocity-move-while-held" title="Permanent link">¶</a></h3>
 <p>Use Velocity for continuous adjustment while a button is held.</p>
 <table>
@@ -1577,11 +1635,12 @@
 <p>Use Stepped for a fixed set of positions, such as flap or mixture presets.</p>
 <ol>
 <li>Define the step values, keeping them in ascending order within <code>-1.0</code> to <code>+1.0</code>.</li>
-<li>Adjust <strong>Steps</strong>, use <strong>Add Step</strong>, or edit the individual values.</li>
-<li>Set <strong>Step direction</strong>.</li>
-<li>Choose a preset where needed and verify the displayed <strong>Preset value</strong>.</li>
-<li>Set <strong>Initial axis value</strong> explicitly and test from a fresh profile start.</li>
+<li>Adjust <strong>Steps</strong>, use <strong>Add Step</strong>, edit the comma-separated list or individual values, or choose a list from <strong>Presets...</strong>. Use the delete control beside a value to remove it.</li>
+<li>Check <strong>Step direction</strong> and test which input increases or decreases the output; see the current <a href="#behavior-notes-for-this-version">direction-selector limitation</a>.</li>
+<li>Choose <strong>Use step preset: Start Index</strong> or select an individual step to set the startup value. Verify <strong>Preset value</strong> and <strong>Initial axis value</strong>.</li>
+<li>Start the profile and test each direction from the configured startup position.</li>
 </ol>
+<p><strong>Presets...</strong> replaces the step list with a supplied distribution, including evenly spaced lists, <strong>Ends + Quarters + Center (9)</strong>, and geometric low/high lists. Review the resulting values and count before running the profile.</p>
 <p>Distribution controls help generate values:</p>
 <table>
 <thead>
@@ -1609,8 +1668,18 @@
 </tr>
 </tbody>
 </table>
-<p>The step sequence stops at its endpoints rather than wrapping. From an initial value between presets, the first step selects the next preset in the requested direction.</p>
-<p><strong>Initial axis value</strong> determines the immediate startup output in this implementation. Do not assume that selecting <strong>Use step preset</strong> alone changes that startup output.</p>
+<p>The step sequence stops at its endpoints rather than wrapping. Keep the list nonempty and verify the first trigger in each direction, especially if <strong>Initial axis value</strong> lies between presets.</p>
+<h3 id="steppedpid-move-smoothly-between-presets">Stepped+PID: move smoothly between presets<a class="headerlink" href="#steppedpid-move-smoothly-between-presets" title="Permanent link">¶</a></h3>
+<p>Use <strong>Stepped+PID</strong> when you want the same discrete target positions as Stepped, with gradual movement between them.</p>
+<ol>
+<li>Select <strong>Stepped+PID</strong> under <strong>Button to Axis (step) Mode</strong>.</li>
+<li>Define the step values with the same preset, list-editing, and distribution controls used by Stepped.</li>
+<li>Select a startup preset and check <strong>Initial axis value</strong>.</li>
+<li>Configure the secondary reverse input and use execution on press only for the first test.</li>
+<li>Start the profile and observe the output during single presses, rapid presses, and a direction change.</li>
+</ol>
+<p>Each trigger requests the next preset. The axis moves faster at first and eases into that target, continuing after the button is released. Further triggers choose presets from the commanded target while the output is still moving. For example, with presets <code>-1.0</code>, <code>-0.5</code>, <code>0.0</code>, <code>0.5</code>, and <code>1.0</code>, two increase triggers from <code>0.0</code> request <code>0.5</code> and then <code>1.0</code> without waiting for the first transition to finish. The sequence stops at its endpoints.</p>
+<p>Stepped+PID uses the exact preset values as targets. PID's <strong>Setpoint change per press</strong> and faster-input acceleration do not enlarge these preset steps. The current Stepped+PID panel shows the stepped controls; response-time editing and saving have a limitation described in <a href="#behavior-notes-for-this-version">Behavior notes for this version</a>.</p>
 <h3 id="encoder-adjust-with-pulses">Encoder: adjust with pulses<a class="headerlink" href="#encoder-adjust-with-pulses" title="Permanent link">¶</a></h3>
 <p>Use Encoder when a rotary control generates momentary events in each direction.</p>
 <p>Bind one direction as the primary input and the other as the secondary reverse input. Then choose:</p>
@@ -1664,7 +1733,7 @@
 <li>Set <strong>Initial axis value</strong>.</li>
 <li>Set <strong>Setpoint change per press</strong>.</li>
 <li>Set <strong>Response time (s)</strong>.</li>
-<li>Choose <strong>Primary increases</strong> or <strong>Primary decreases</strong>.</li>
+<li>Assign the increase control as primary and the decrease control as secondary; see the current <a href="#behavior-notes-for-this-version">direction-selector limitation</a>.</li>
 <li>Configure the secondary reverse input if needed.</li>
 <li>Test single presses before enabling acceleration.</li>
 </ol>
@@ -1689,7 +1758,8 @@
 </tr>
 </tbody>
 </table>
-<p>Holding a button is not the same as Velocity mode. PID changes the target on incoming press events; it continues following the target after release. If the input source produces repeated press events while held, those events can produce additional target changes.</p>
+<p>With execution on press only, PID changes the target on incoming press events; it continues following the target after release. If the input source produces repeated press events while held, those events can produce additional target changes. Use Velocity for continuous movement while held. Additional qualifying triggers adjust the commanded target while the axis is still moving, and an opposite trigger can redirect it before it settles.</p>
+<p><strong>Response time (s)</strong> accepts <code>0.05</code> to <code>120.0</code> seconds. It scales the whole curved transition; it is not a constant movement speed or an exact arrival deadline. Use <strong>Stepped+PID</strong> when targets must come from a fixed list of presets.</p>
 <p>Enable <strong>Accelerate setpoint steps with faster input</strong> to make rapid presses change the target by larger amounts.</p>
 <table>
 <thead>
@@ -1780,14 +1850,16 @@
 </table>
 <p>Scaling and range processing also affect the final output. For scale and trim variants, watch the live values while moving B through both ends and center rather than assuming the variant matches your device's rest position.</p>
 <p>Use <strong>Reverse Axis</strong> to invert the primary input before merging. Use <strong>Invert Merged Output</strong> to reverse the final combined result.</p>
+<p>When axis repeaters are enabled, each merge entry shows a <strong>Step Output</strong> value for its selected source axis. The main <strong>Output</strong> preview reflects the combined result and updates when either the primary axis or an additional merge axis moves. Use both displays to check which input changes the result before testing in the target application.</p>
 <h2 id="startup-and-output-options">Startup and output options<a class="headerlink" href="#startup-and-output-options" title="Permanent link">¶</a></h2>
 <h3 id="startup-state">Startup state<a class="headerlink" href="#startup-state" title="Permanent link">¶</a></h3>
 <p>Where displayed, the startup synchronization controls let you initialize an output from a configured default or the source input. Test startup with the source in more than one position to confirm that the initial output is appropriate.</p>
-<p>For the four stepped-axis modes, <strong>Initial axis value</strong> is applied immediately at profile start. These modes initialize their own movement state from that value.</p>
+<p>The five button-to-axis modes initialize separately from the general synchronization controls: they apply <strong>Initial axis value</strong>, or reuse the virtual output position when Auto is active. See <a href="#set-the-startup-position">Set the startup position</a>.</p>
 <h3 id="local-and-remote-output">Local and remote output<a class="headerlink" href="#local-and-remote-output" title="Permanent link">¶</a></h3>
-<p>The action includes output routing through its remote-client controls. Check the routing when a mapping works remotely but not locally, or vice versa.</p>
+<p>For <strong>vJoy</strong> destinations, the action includes output routing through its remote-client controls. Check the routing when a mapping works remotely but not locally, or vice versa.</p>
 <p>Button-like inputs can also select command modes that enable or disable local output, enable or disable remote output, choose local-only or remote-only output, enable both, toggle remote output, or control paired remote behavior. These commands change routing state; they are not ordinary button mappings.</p>
 <p>Configure remote clients through the application's remote-output features before using remote routing. Leave <strong>Paired Group Member</strong> unchanged unless the mapping is part of an intentionally paired setup.</p>
+<p>For <strong>HIDMaestro</strong> destinations, axis, button, and hat output goes through the configured Maestro Bridge connection. Remote-vJoy client selection and local/remote-vJoy switches do not redirect that output. Change the host in <strong>Tools → Maestro Devices...</strong> when the controller is provided by a different Maestro service.</p>
 <h3 id="release-and-display-options">Release and display options<a class="headerlink" href="#release-and-display-options" title="Permanent link">¶</a></h3>
 <table>
 <thead>
@@ -1827,11 +1899,20 @@
 <ol>
 <li>Add the stepped-axis action to the increase control.</li>
 <li>Select <strong>Stepped</strong> and the virtual flap axis.</li>
-<li>Set presets to <code>-1.0</code>, <code>-0.5</code>, <code>0.0</code>, <code>0.5</code>, and <code>1.0</code>.</li>
-<li>Set <strong>Initial axis value</strong> to the desired startup position, such as <code>-1.0</code>.</li>
+<li>Choose <strong>Presets... → 5 steps</strong>, giving <code>-1.0</code>, <code>-0.5</code>, <code>0.0</code>, <code>0.5</code>, and <code>1.0</code>.</li>
+<li>Set <strong>Use step preset: Start Index</strong> to <strong>1</strong> and verify that <strong>Initial axis value</strong> is <code>-1.0</code>.</li>
 <li>Configure a secondary reverse control.</li>
 <li>Start the profile and verify that each trigger moves to the adjacent preset and stops at the ends.</li>
 </ol>
+<h3 id="smooth-flap-transitions">Smooth flap transitions<a class="headerlink" href="#smooth-flap-transitions" title="Permanent link">¶</a></h3>
+<ol>
+<li>Configure the five flap presets from the previous example.</li>
+<li>Change the mode from <strong>Stepped</strong> to <strong>Stepped+PID</strong>.</li>
+<li>Verify <strong>Initial axis value</strong> and the secondary reverse control.</li>
+<li>Start the profile and press the increase control once. The output should travel smoothly toward <code>-0.5</code>.</li>
+<li>Press again during that movement to request <code>0.0</code>, then test the reverse control while the axis is moving.</li>
+</ol>
+<p>The target positions remain the configured detents, while the virtual axis travels through intermediate values. Bind this output to a game control that accepts an axis. Reload the saved profile and retest the transition timing; see the <a href="#behavior-notes-for-this-version">Stepped+PID settings limitation</a>.</p>
 <h3 id="smooth-trim-adjustment">Smooth trim adjustment<a class="headerlink" href="#smooth-trim-adjustment" title="Permanent link">¶</a></h3>
 <ol>
 <li>Add the stepped-axis action to the trim-increase control.</li>
@@ -1904,15 +1985,27 @@
 </tr>
 <tr>
 <td>Stepped axis starts at an unexpected value</td>
-<td>Check Initial axis value; the preset selector alone does not determine startup output here.</td>
+<td>Check Initial axis value, the selected Start Index, and whether Auto is active. Preset selection now copies the preset into Initial axis value.</td>
 </tr>
 <tr>
 <td>Stepped axis stops changing</td>
 <td>It may have reached the first or last preset.</td>
 </tr>
 <tr>
+<td>Stepped+PID jumps immediately on profile start</td>
+<td>Expected for a fixed startup value. Smoothing applies to subsequent target changes.</td>
+</tr>
+<tr>
+<td>Stepped+PID timing changes after reloading</td>
+<td>The current profile writer does not save its PID response-time setting; see the behavior notes below.</td>
+</tr>
+<tr>
 <td>PID output continues after release</td>
 <td>Expected: it is finishing the move to the target. Increase/decrease Response time to change the transition speed.</td>
+</tr>
+<tr>
+<td>Direction selector does not reverse PID or preset stepping</td>
+<td>The current handlers use primary for increase and secondary for decrease; swap the assigned controls and see the behavior notes below.</td>
 </tr>
 <tr>
 <td>Encoder feels too fast or too slow</td>
@@ -1921,6 +2014,14 @@
 <tr>
 <td>Merged axis jumps or disagrees with expectations</td>
 <td>Source rest positions, curves, operation order, conflicting writers to the same output, and final inversion.</td>
+</tr>
+<tr>
+<td>Maestro device is missing from Device</td>
+<td>Maestro module enabled; bridge running; correct host, service port, and reply settings; device active on host and included in Gremlin; Apply to Gremlin completed.</td>
+</tr>
+<tr>
+<td>Maestro output goes to the wrong computer</td>
+<td>Check the Maestro Bridge host. Remote-vJoy routing does not choose the Maestro host.</td>
 </tr>
 </tbody>
 </table>
