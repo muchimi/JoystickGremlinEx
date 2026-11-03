@@ -50,6 +50,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T90A):
+- Fix: API: axis inversion in map to vjoy
+
+
 ### (m77T90):
 - Fix: UI: delete widget button auto size
 - Fix: UI: exception if a profile is recalled and the last device was the voice recognition device

@@ -7492,6 +7492,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             is_local, is_remote = True, False
         elif force_remote:
             is_local, is_remote = False, True
+        if self.usage_data.is_inverted(self._output_key(vid), axis_id):
+            value = -value
         if is_local:
             if self.verbose:
                 syslog.info(f"VJOY: send local axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")

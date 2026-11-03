@@ -2245,14 +2245,11 @@ class VirtualDeviceUsageState:
         assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
         device = gremlin.joystick_handling.getDevice(device_guid)
         device_type = device.device_type  # assuming device_guid has a device_type attribute
-        if device_type in self._axis_invert_map:
-            invert_map = self._axis_invert_map[device_type]
-            virtual_id = device.virtual_id
-            if device.virtual_id in invert_map:
-                if input_id in invert_map[virtual_id]:
-                    invert_map[virtual_id][input_id] = inverted
-                    return
         self._ensure_maps(device_guid, input_id)
+        virtual_id = device.virtual_id
+        invert_map = self._axis_invert_map.get(device_type)
+        if invert_map is not None and virtual_id in invert_map:
+            invert_map[virtual_id][input_id] = inverted
 
     def is_inverted(self, device_guid, input_id):
         """returns true if the specified device/axis is inverted"""
