@@ -25,7 +25,7 @@ import json
 
 import dinput
 
-import gremlin
+
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
@@ -109,7 +109,6 @@ class CodeRunner:
         :returns: True on success, False if the profile did not start (various reasons)
         """
 
-
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
 
@@ -145,6 +144,8 @@ class CodeRunner:
 
         # indicate we're in run mode
         gremlin.shared_state.is_running = True
+        from gremlin.maestro import Maestro
+        Maestro().resetOutputUsage()
         gremlin.windows_event_hook.setRunning(True)
 
         # Reset states to their default values

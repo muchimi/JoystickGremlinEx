@@ -208,7 +208,7 @@ class TransportTests(unittest.TestCase):
                 endpoint.send("/maestro_pong", values[0], "MaestroOscService", 1)
         endpoint = self.endpoint(reply)
         result = endpoint.client.request("/maestro_ping")
-        self.assertEqual(result[1:], ["MaestroOscService", 1])
+        self.assertEqual(list(result.args), ["MaestroOscService", 1])
         self.assertEqual(endpoint.received[0], endpoint.received[1])
 
     def test_list_collects_rows_after_done_and_recovers_missing_row_on_retry(self):
@@ -235,8 +235,11 @@ class TransportTests(unittest.TestCase):
 
     def test_service_errors_are_reported(self):
         endpoint = self.endpoint(lambda e, a, v: e.send("/maestro_error", v[0], a, "not_found", "Missing device"))
+        result = endpoint.client.request("/maestro_state", "missing")
+        self.assertFalse(result)
+        self.assertEqual((result.code, result.message), ("not_found", "Missing device"))
         with self.assertRaisesRegex(MAESTRO.MaestroServiceError, "not_found: Missing device"):
-            endpoint.client.request("/maestro_state", "missing")
+            result.raise_for_error()
 
     def test_control_echo_does_not_satisfy_management_request(self):
         def reply(endpoint, address, values):
@@ -244,15 +247,15 @@ class TransportTests(unittest.TestCase):
             endpoint.send("/maestro_pong", values[0] - 1, "Wrong request", 1)
             endpoint.send("/maestro_pong", values[0], "MaestroOscService", 1)
         endpoint = self.endpoint(reply)
-        self.assertEqual(endpoint.client.request("/maestro_ping")[1:], ["MaestroOscService", 1])
+        self.assertEqual(list(endpoint.client.request("/maestro_ping").args), ["MaestroOscService", 1])
 
     def test_create_gamepad_management_reply(self):
         def reply(endpoint, address, values):
             endpoint.send("/maestro_created", values[0], '{"id":"gamepad","name":"gamepad"}')
         endpoint = self.endpoint(reply)
         self.assertEqual(
-            endpoint.client.request("/maestro_create_gamepad", "gamepad", 3, True)[1],
-            '{"id":"gamepad","name":"gamepad"}',
+            endpoint.client.request("/maestro_create_gamepad", "gamepad", 3, True).data,
+            {"id": "gamepad", "name": "gamepad"},
         )
         address, values = MAESTRO._decode_message(endpoint.received[0][0])
         self.assertEqual(address, "/maestro_create_gamepad")
@@ -264,12 +267,15 @@ class TransportTests(unittest.TestCase):
             endpoint.send("/maestro_pong", values[0], "MaestroOscService", 1)
         endpoint = self.endpoint(reply)
         with self.assertLogs("system", logging.WARNING):
-            self.assertEqual(endpoint.client.request("/maestro_ping")[2], 1)
+            self.assertEqual(endpoint.client.request("/maestro_ping").args[1], 1)
 
     def test_timeout_and_close_stop_receiver(self):
         endpoint = self.endpoint(lambda *args: None)
+        result = endpoint.client.request("/maestro_ping", timeout=0.01, attempts=1)
+        self.assertFalse(result)
+        self.assertEqual(result.code, "timeout")
         with self.assertRaises(TimeoutError):
-            endpoint.client.request("/maestro_ping", timeout=0.01, attempts=1)
+            result.raise_for_error()
         endpoint.client.close()
         self.assertFalse(endpoint.client._receiver.is_alive())
         with self.assertRaises(OSError):
@@ -630,14 +636,10 @@ class CSharpIntegrationTests(unittest.TestCase):
             client = MAESTRO.MaestroOscClient(port=cls.port, reply_port=cls.reply_port, timeout=0.2, attempts=1)
             try:
                 deadline = time.monotonic() + 15
-                while True:
-                    try:
-                        client.request("/maestro_ping")
-                        break
-                    except OSError:
-                        if cls.process.poll() is not None or time.monotonic() > deadline:
-                            cls.log.seek(0)
-                            raise RuntimeError(cls.log.read())
+                while not client.request("/maestro_ping"):
+                    if cls.process.poll() is not None or time.monotonic() > deadline:
+                        cls.log.seek(0)
+                        raise RuntimeError(cls.log.read())
             finally:
                 client.close()
 
@@ -668,7 +670,7 @@ class CSharpIntegrationTests(unittest.TestCase):
         self.maestro._handle_shutdown()
 
     def state(self, device_id="gex-0"):
-        return json.loads(self.maestro.ctx.request("/maestro_state", device_id)[-1])
+        return self.maestro.ctx.request("/maestro_state", device_id).raise_for_error().data
 
     def test_full_controller_lifecycle_against_csharp(self):
         controller = self.maestro.createJoystickController(at_index=0)
@@ -695,7 +697,7 @@ class CSharpIntegrationTests(unittest.TestCase):
         self.assertEqual(self.state()["pressedButtons"], [])
         self.assertEqual(self.state()["hats"], [0, 0, 0, 0])
         with self.assertRaises(MAESTRO.MaestroServiceError):
-            self.maestro.ctx.request("/maestro_state", "missing")
+            self.maestro.ctx.request("/maestro_state", "missing").raise_for_error()
 
     def test_odd_layout_and_shutdown_reset_against_csharp(self):
         self.assertIsNotNone(self.maestro.createJoystickController(axis_count=1, button_count=9, hat_count=1))

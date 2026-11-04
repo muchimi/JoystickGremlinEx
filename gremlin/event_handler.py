@@ -859,7 +859,7 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = not config.mouse_hook_disabled  # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = config.mouse_hook_enabled  # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
 
         self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
@@ -4645,12 +4645,13 @@ class JoystickState:
         import gremlin.joystick_handling
         vjoy_devices = gremlin.joystick_handling.all_vjoy_devices()
         profile = gremlin.shared_state.current_profile
-        vid_list = profile.settings.getVjoyAsInputList()
-        for dev in vjoy_devices:
-            # vjoy input is enabled, disable output to it
-            device_id = dev.device_id
-            input_enabled = dev.vjoy_id in vid_list
-            self.setInputEnabled(device_id, input_enabled)
+        if profile:
+            vid_list = profile.settings.getVjoyAsInputList()
+            for dev in vjoy_devices:
+                # vjoy input is enabled, disable output to it
+                device_id = dev.device_id
+                input_enabled = dev.vjoy_id in vid_list
+                self.setInputEnabled(device_id, input_enabled)
 
 
 class AxisValues:

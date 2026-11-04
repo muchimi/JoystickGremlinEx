@@ -64,6 +64,7 @@ from shiboken6 import Shiboken
 import gremlin.tabstate
 import win32api
 import win32con
+import gremlin.startup
 import gremlin.joystick_handling
 import gremlin.util
 import gremlin.input_types
@@ -407,9 +408,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 profile_to_load = config.profile_to_load
             elif self.config.last_profile and os.path.isfile(self.config.last_profile):
                 # check if this was a profile swap that we load the profile from the current user folder
-                profile_to_load = self.config.last_profile
-
-            if profile_to_load:
                 current_profile_folder = gremlin.shared_state.data_path.casefold()
                 last_profile = self.config.last_profile.lower()
                 if current_profile_folder not in last_profile:
@@ -417,7 +415,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     located_profile = find_file(base_file, current_profile_folder)
                     if located_profile:
                         self.config.last_profile = located_profile
-            profile_to_load = self.config.last_profile
+                profile_to_load = self.config.last_profile
 
         if profile_to_load:
             self._autostart_target_name = os.path.splitext(os.path.basename(profile_to_load))[0]
@@ -1115,8 +1113,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def setMaestroEnabled(self, enabled: bool):
         """controls the UI enabling of Maestro functions"""
+
+        # enable/disable Maestro menu
         if hasattr(self, "_actionMaestro"):
             self._actionMaestro.setEnabled(enabled)
+
+        # show/hide status bar widget
+        if hasattr(self, "status_bar_maestro_widget"):
+            self.status_bar_maestro_widget.setVisible(enabled)
 
     def _handle_maestro_show_config(self):
         """Open the Maestro service and controller manager."""
@@ -2225,6 +2229,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tooltip="Profile remote state",
         )
 
+        self.status_bar_maestro_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+            on_icon="mdi6.gamepad-variant",
+            off_icon="mdi6.gamepad-variant",
+            icon_size=20,
+            tooltip="Maestro bridge state",
+        )
+
+        maestro = gremlin.maestro.Maestro()
+        maestro.service_state_changed.connect(self._maestro_service_state_changed)
+        maestro.connected_changed.connect(self._maestro_service_state_changed)
+
         self.status_bar_highlight_tabswitch_widget = QtWidgets.QPushButton()
         self.status_bar_highlight_tabswitch_widget.setStyleSheet("border: none")
         self.status_bar_highlight_tabswitch_widget.clicked.connect(self._toggle_tabswitch_highlight)
@@ -2262,6 +2277,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.status_bar_server_widget,
             self.status_bar_client_widget,
             self.status_bar_remote_widget,
+            self.status_bar_maestro_widget,
         ]
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -5486,6 +5502,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         with QtCore.QSignalBlocker(self.ui.actionToggleRemoteControl):
             self.ui.actionToggleRemoteControl.setChecked(enabled)
 
+    def _maestro_service_state_changed(self, *args):
+        self._update_status_bar()
+
     def _update_status_bar(self, event=None):
         # updates the status bar
         gremlin.util.InvokeUiMethod(self._update_status_bar_ui, event)
@@ -5530,6 +5549,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.status_bar_remote_widget.setState(remote_state)
             self.status_bar_remote_widget.setToolTip(f"Profile remote mode is currently {'active.' if remote_state else 'inactive.'}")
 
+            maestro_state = gremlin.maestro.Maestro().service_running
+            self.status_bar_maestro_widget.setState(maestro_state)
+            self.status_bar_maestro_widget.setToolTip(
+                "Maestro bridge service is running." if maestro_state else "Maestro bridge service is stopped or not connected."
+            )
             # if event.is_local:
             #     local_msg = f"<font color=\"{Color().activeColor()}\">Active</font>"
             # else:
@@ -6651,6 +6675,10 @@ if __name__ == "__main__":
     except Exception:
         pass
 
+    # command line parser - setup configuration based on command line arguments
+    parser = gremlin.startup.CommandLineProcessor()
+    parser.process()
+
     theme = config.theme
     match theme:
         case "light":
@@ -6821,50 +6849,6 @@ if __name__ == "__main__":
         hg = gremlin.hid_guardian.HidGuardian()
         hg.add_process(os.getpid())
 
-        # command line parser
-        parser = QtCore.QCommandLineParser()
-        parser.addOption(QtCore.QCommandLineOption(["noprofile", "np"], "Do not load a profile on start (--r and --p will be ignored)"))
-        parser.addOption(QtCore.QCommandLineOption(["run", "r"], "Automatically run the last profile, or specified profile via --p on start"))
-        parser.addOption(
-            QtCore.QCommandLineOption(
-                ["profile", "p"],
-                "Profile to load, requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder.",
-            )
-        )
-        parser.addOption(QtCore.QCommandLineOption(["nomousehook", "nmh"], "Disables mouse hook (prevents mouse output) - diagnostics use only"))
-        parser.addHelpOption()
-
-        parser.process(app.arguments())
-
-        config.mouse_hook_disabled = parser.isSet("nomousehook")
-
-        config.auto_load_disabled = parser.isSet("noprofile")
-        if config.auto_load_disabled:
-            # start with a new profile
-            config.run_on_start = False
-            config.profile_to_load = False
-        else:
-            config.run_on_start = parser.isSet("run")
-            profile_specified = parser.isSet("profile")
-            args = parser.positionalArguments() if profile_specified else None
-            if args:
-                profile_to_load = args[0]
-                if not os.path.isfile(profile_to_load):
-                    profile_to_load = os.path.join(app_path, profile_to_load)
-                    if not os.path.isfile(profile_to_load):
-                        msg = f"Profile file not found: {args[0]}"
-                        gremlin.ui.ui_common.MessageBoxWarning(msg)
-                        syslog.error(msg)
-                        os._exit(1)
-            else:
-                if profile_specified:
-                    msg = "Missing argument: Profile file not specified"
-                    gremlin.ui.ui_common.MessageBoxWarning(msg)
-                    syslog.error(msg)
-                    os._exit(1)
-
-            config.profile_to_load = profile_to_load if args else None
-
         # Log module options for debugging purposes
         config.logModuleOptions()
 
@@ -7032,6 +7016,9 @@ if __name__ == "__main__":
         syslog.info("GremlinEx UI terminated")
 
         gremlin.shared_state.terminating = True
+
+        # stop the config file watcher
+        config.stop()
 
         # Terminate potentially running EventListener loop
         gremlin.joystick_handling.VJoyProxy.reset()

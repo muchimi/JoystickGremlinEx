@@ -42,7 +42,7 @@ syslog = logging.getLogger("system")
 
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
-PACKAGED = not GEX_DEV_ENABLED and hasattr(sys, '_MEIPASS')
+PACKAGED = not GEX_DEV_ENABLED and hasattr(sys, "_MEIPASS")
 DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNOSTIC_MODE"].lower() in ("1", "true", "yes")
 
 
@@ -61,6 +61,7 @@ STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.envir
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
 GEX_MAESTRO_ENABLED = "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
@@ -108,6 +109,7 @@ class Configuration(QtCore.QObject):
         self._visuals_hidden_map = None
         self._last_version = None  # version string of the last version that ran
         self._last_version_path = None  # path to last used version
+        self._run_on_start = False # true if the profile auto-runs on start if a profile is loaded
 
         self._midi_enabled = None
         self._osc_enabled = None
@@ -163,6 +165,15 @@ class Configuration(QtCore.QObject):
             fname = self.get_config()
             self.watcher = QtCore.QFileSystemWatcher([fname])
             self.watcher.fileChanged.connect(self.reload)
+
+    def stop(self):
+        """stops the file watcher"""
+        if self._started:
+            self._started = False
+            if hasattr(self, "watcher"):
+                self.watcher.fileChanged.disconnect(self.reload)
+                self.watcher.removePaths(self.watcher.files())
+                del self.watcher
 
     def setup_userprofile(self):
         """Initializes the data folder in the user's profile folder."""
@@ -1200,6 +1211,25 @@ class Configuration(QtCore.QObject):
             el.process_monitor_changed.emit()  # tell the UI the parameter changed
 
     @property
+    def run_on_start(self):
+        """Returns whether or not the profile should auto-run on start.
+
+        :return True if the profile auto-runs on start, False otherwise
+        """
+        return self._get_data("run_on_start", False)
+
+    @run_on_start.setter
+    def run_on_start(self, value):
+        """Sets whether or not the profile should auto-run on start.
+
+        :param value Flag indicating whether or not to enable / disable the
+            feature
+        """
+        if isinstance(value, bool):
+            self._data["run_on_start"] = value
+            self.save()
+
+    @property
     def keep_profile_active_on_focus_loss(self):
         return self._get_data("keep_active_on_focus_loss", True)
 
@@ -1418,7 +1448,7 @@ class Configuration(QtCore.QObject):
     def remote_video_port(self, value):
         try:
             port = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         if 4096 <= port <= 65535:
             self._set_data("remote_video_port", port)
@@ -1437,14 +1467,14 @@ class Configuration(QtCore.QObject):
     def remote_video_monitor_index(self) -> int:
         try:
             return max(0, int(self._get_data("remote_video_monitor_index", 0) or 0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0
 
     @remote_video_monitor_index.setter
     def remote_video_monitor_index(self, value):
         try:
             self._set_data("remote_video_monitor_index", max(0, int(value)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
 
     @property
@@ -1459,28 +1489,28 @@ class Configuration(QtCore.QObject):
     def remote_video_max_width(self) -> int:
         try:
             return max(320, min(3840, int(self._get_data("remote_video_max_width", 960) or 960)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 960
 
     @remote_video_max_width.setter
     def remote_video_max_width(self, value):
         try:
             self._set_data("remote_video_max_width", max(320, min(3840, int(value))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
 
     @property
     def remote_video_fps(self) -> int:
         try:
             return max(1, min(30, int(self._get_data("remote_video_fps", 12) or 12)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 12
 
     @remote_video_fps.setter
     def remote_video_fps(self, value):
         try:
             self._set_data("remote_video_fps", max(1, min(30, int(value))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
 
     @property
@@ -1488,14 +1518,14 @@ class Configuration(QtCore.QObject):
         """JPEG quality 1–100 (also used as quality hint for future codecs)."""
         try:
             return max(1, min(100, int(self._get_data("remote_video_quality", 55) or 55)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 55
 
     @remote_video_quality.setter
     def remote_video_quality(self, value):
         try:
             self._set_data("remote_video_quality", max(1, min(100, int(value))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
 
     @property
@@ -2161,6 +2191,12 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.Voice in self.verbose_mode
 
     @property
+    def verbose_mode_maestro(self):
+        """true if verbose mode for maestro"""
+        return True
+        return self.verbose and VerboseMode.Maestro in self.verbose_mode
+
+    @property
     def osc_input_port(self):
         """OSC listen port"""
         port = self._get_data("osc_port", 8000)
@@ -2313,7 +2349,7 @@ class Configuration(QtCore.QObject):
             self.save()
 
     def isDeviceVisible(self, device_guid) -> bool:
-        """ true if the device filter allows the device to be visible """
+        """true if the device filter allows the device to be visible"""
         device_id = gremlin.util.normalize_guid(device_guid)
         return self.device_visible_map.get(device_id, True)
 
@@ -2522,10 +2558,7 @@ class Configuration(QtCore.QObject):
             syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             return
 
-
         input_type = InputType.convert(input_type)
-
-
 
         data[device_key] = (input_type, input_id)
 
@@ -2624,7 +2657,6 @@ class Configuration(QtCore.QObject):
                             if item:
                                 input_id = item
                                 save_input_id = input_id.guid
-
 
             case DeviceType.ModeControl:
                 save_input_id = input_id
@@ -3127,7 +3159,7 @@ class Configuration(QtCore.QObject):
     def theme(self, value: str):
         if value:
             value = value.casefold()
-            if value in ("auto", "light", "dark","custom"):
+            if value in ("auto", "light", "dark", "custom"):
                 self._data["theme"] = value
                 self.save()
 
@@ -4234,7 +4266,6 @@ class Configuration(QtCore.QObject):
     def device_label_visible(self, value: bool):
         self._set_data("device_label_visible", value)
 
-
     @property
     def client_name(self) -> str:
         """returns the name of the current client if configured"""
@@ -4243,3 +4274,32 @@ class Configuration(QtCore.QObject):
     @client_name.setter
     def client_name(self, value: str):
         self._set_data("client_name", value)
+
+    @property
+    def mouse_hook_enabled(self) -> bool:
+        """returns whether the mouse hook is enabled"""
+        return self._get_data("mouse_hook_enabled", True)  # on by default
+
+    @mouse_hook_enabled.setter
+    def mouse_hook_enabled(self, value: bool):
+        self._set_data("mouse_hook_enabled", value)
+
+    @property
+    def mouse_hook_disabled(self) -> bool:
+        """returns whether the mouse hook is disabled"""
+        return not self.mouse_hook_enabled
+
+    @mouse_hook_disabled.setter
+    def mouse_hook_disabled(self, value: bool):
+        self.mouse_hook_enabled = not value
+
+
+    @property
+    def profile_to_load(self) -> str:
+        # not persisted
+        return self._profile_fname
+
+    @profile_to_load.setter
+    def profile_to_load(self, value: str):
+        # not persisted
+        self._profile_fname = value

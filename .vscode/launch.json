@@ -26,21 +26,11 @@
             //     }
             // ],
             "subProcess": false,
-            "args": ["--nmh"],
+            "args": ["/r"],
             //"args": ["--np"],
             //"args": ["--h"],
             //"args" : ["--p","sc ex.xml","--r"]
 
-        },
-        // {
-        //     "name": "Python: Current File with profiler",
-        //     "type": "python",
-        //     "request": "launch",
-        //     "module": "cProfile",
-        //     "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
-        //     "args": [
-        //         "-o", "/tmp/tmp.prof", "${workspaceFolder}/joystick_gremlin.py"
-        //     ]
-        // }
+        }
     ]
 }

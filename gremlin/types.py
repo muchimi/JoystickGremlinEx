@@ -1084,6 +1084,7 @@ class VerboseMode(IntFlag):
     L3 = auto()
     Plugin = auto()
     Voice = auto()
+    Maestro = auto()  # maestro mode
 
     All = (
         Keyboard
@@ -1130,6 +1131,7 @@ class VerboseMode(IntFlag):
         | L3
         | Plugin
         | Voice
+        | Maestro
     )
 
     def __contains__(self, item):

@@ -872,6 +872,9 @@ class DeviceSummary:
                             return None
                         if am.axis_index == index:
                             return am.getName() + stub
+                    if not self.axismap_list and index in self.axis_names:
+                        # special devices (ex: Maestro) have no DirectInput axis map: use the names they supply
+                        return f"{self.axis_names[index]} ({index})"
                 else:
                     return f"(disc. device) axis {index}"
         except Exception as e:
