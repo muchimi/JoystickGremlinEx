@@ -550,6 +550,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#command-line-switches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line switches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3264,6 +3275,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#command-line-switches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line switches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5799,6 +5821,8 @@
 <li>Stop the profile before editing the mapping. When moving the profile to another machine, copy its XML file, companion JSON file, and referenced assets together.</li>
 </ol>
 <p>For additional input surfaces, follow the setup steps for <a href="#stream-deck-device">Stream Deck</a>, <a href="#overlay-pages-and-web-panels">Overlay pages and web panels</a>, or <a href="#voice-recognition-device">Voice recognition</a>. For visual axis processing, use the <a href="#afcs-axis-flow-designer">AFCS designer</a>.</p>
+<h2 id="command-line-switches">Command line switches<a class="headerlink" href="#command-line-switches" title="Permanent link">¶</a></h2>
+<p>GremlinEx (GEX) can be started with a number of options.  See <a href="../command_line/">Command-line options</a>.</p>
 <h2 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">¶</a></h2>
 <h3 id="devices">Devices<a class="headerlink" href="#devices" title="Permanent link">¶</a></h3>
 <p>A device in GremlinEx is a hardware or virtual device used as input.  It can be a joystick or game controller.  A device can also be a state list, a keyboard/mouse, MIDI or OSC input mapper, and special devices.  They appear as tabs in the user interface below the toolbar.  There is one device per compatible input detected by GremlinEx based on what you have connected to the computer, along with any referenced but nor currently connected device, and special devices like settings or plugins.</p>
@@ -5832,7 +5856,7 @@
 <p>GremlinEx monitors the Windows API for keyboard inputs.  Inputs must be defined in the Keyboard/Mouse device for GremlinEx to actually respond to keystrokes.  GremlinEx handles all keys Windows can recognize, including keys that are not typically visible on a standard keyboard like F13 to F24.  GremlinEx can trigger on latched keys (any number of keys that are pressed together) which goes beyond the modifier keys.  For example it is possible to map non standard key combinations like left-alt + F1 + F2 + F3 together to trigger a specific mapping.   GremlinEx uses scan codes and extended codes.  GremlinEx is not localized for any software but usually expects the QWERTY US English keyboard layout.</p>
 <p>GrmelinEx monitors the Windows API for mouse button and wheel inputs.  GremlinEx does not monitor mouse movement.  The mouse button and mouse wheel input are also defined in the Keyboard/Mouse device as a combined input that handles both mouse and keyboard inputs.</p>
 <p>GremlinEx monitors UDP for OSC messages when the OSC module and listener are enabled. Configure the incoming address, parameters, and port in the OSC device. Use a loopback address for software on the same machine or the receiving machine's LAN address for another computer. Match the sender's destination port to GremlinEx's listen port and allow the traffic through the firewall when needed.</p>
-<p>GremlinEx monitors MIDI inputs via the midi interface.  Note that this interface can be networked using certain MIDI open source tools (see resources).  It is recommended to use OSC instead of MIDI in most cases, because it is signficantly simpler to setup than networked MIDI and OSC in general is much more advanced and has higher resolution for axes and sliders.  You can monitor MIDI traffic via third party free utilities listed in the resources section.  </p>
+<p>GremlinEx monitors MIDI inputs via the midi interface.  Note that this interface can be networked using certain MIDI open source tools (see resources).  It is recommended to use OSC instead of MIDI in most cases, because it is signficantly simpler to setup than networked MIDI and OSC in general is much more advanced and has higher resolution for axes and sliders.  You can monitor MIDI traffic via third party free utilities listed in the resources section.</p>
 <p>The direct Stream Deck bridge supplies button and dial events without Companion or OSC. The Voice module turns recognized phrases into configurable inputs. Interactive overlay controls can operate writable vJoy controls and ordinary states, and an overlay OCR widget can produce mapped input events from matching captured text. Enable and configure the corresponding module before adding these mappings.</p>
 <h3 id="outputs">Outputs<a class="headerlink" href="#outputs" title="Permanent link">¶</a></h3>
 <p>Use <a href="../actions/map_to_vjoy_user_guide/">Map to vJoy</a> for virtual joystick axes, buttons, and hats, or Map to GamePad for a virtual Xbox controller when its required driver is installed. vJoy is optional for profiles that use other output types; configure a vJoy device before selecting it as a destination.</p>
@@ -5853,7 +5877,7 @@
 <p>A mapping represents a set of containers and actions to execute whenever the input is triggered.  There is one mapping for each profile mode, so you can have each input do different things depending on the current profile runtime mode.</p>
 <p>A mapping contains one or more containers.</p>
 <h3 id="containers">Containers<a class="headerlink" href="#containers" title="Permanent link">¶</a></h3>
-<p>Once an input is defined (manually or automatically depending on the type of device it is), you can select that input and add a <a href="../containers/#containers">container</a> to it.  A <a href="../containers/#containers">container</a> is an entity that contains one or more <a href="../actions/#actions">actions</a>.  There are multiple <a href="../containers/#available-containers">container</a> types, each with unique capabilities and options that control how the mapping happens.  </p>
+<p>Once an input is defined (manually or automatically depending on the type of device it is), you can select that input and add a <a href="../containers/#containers">container</a> to it.  A <a href="../containers/#containers">container</a> is an entity that contains one or more <a href="../actions/#actions">actions</a>.  There are multiple <a href="../containers/#available-containers">container</a> types, each with unique capabilities and options that control how the mapping happens.</p>
 <h3 id="actions">Actions<a class="headerlink" href="#actions" title="Permanent link">¶</a></h3>
 <p>Actions are specific entities that actually produce output.  <a href="../actions/#actions">Actions</a> are contained by <a href="../containers/#containers">containers</a>.</p>
 <p>GremlinEx actions typically fall in two categories:</p>
@@ -5973,7 +5997,7 @@
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/ui_overview.png" data-desc-position="bottom"><img alt="user_interface" src="../assets/ui_overview.png"></a></p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/ui_overview_2.png" data-desc-position="bottom"><img alt="user_interface" src="../assets/ui_overview_2.png"></a></p>
 <h3 id="menu">Menu<a class="headerlink" href="#menu" title="Permanent link">¶</a></h3>
-<p>The menu offers typical options to create, save or load a profile, access tools and options available in GremlinEx.  </p>
+<p>The menu offers typical options to create, save or load a profile, access tools and options available in GremlinEx.</p>
 <h3 id="toolbar">Toolbar<a class="headerlink" href="#toolbar" title="Permanent link">¶</a></h3>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/toolbar.png" data-desc-position="bottom"><img alt="toolbar" src="../assets/toolbar.png"></a></p>
 <p>The quick action toolbar below the menu offers buttons to quickly save, load or run a profile.  Quick actions also includes the input viewer dialog, which shows "live" inputs, and quick access to GremlinEx's options.</p>
@@ -6064,7 +6088,7 @@ GremlinEx names the VJOY devices using their axis/button/hat count and the VJOY 
 <p>Device visibility is persisted by profile.   Save the profile after making changes.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/device_visible_dialog.png" data-desc-position="bottom"><img alt="device visibiliy dialog" src="../assets/device_visible_dialog.png"></a></p>
 <h4 id="device-appearance">Device appearance<a class="headerlink" href="#device-appearance" title="Permanent link">¶</a></h4>
-<p>Each device tab will include an icon if the device is mapped.  The icon will be solid if the device has a mapping in the current profile edit mode.  The icon will be hollow if the device has a mapping in a different profile mode.  </p>
+<p>Each device tab will include an icon if the device is mapped.  The icon will be solid if the device has a mapping in the current profile edit mode.  The icon will be hollow if the device has a mapping in a different profile mode.</p>
 <p>Disconnected devices will show with a disconnect plug icon.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/device_appearance.png" data-desc-position="bottom"><img alt="device appearance" src="../assets/device_appearance.png"></a></p>
 <h4 id="disconnected-devices">Disconnected devices<a class="headerlink" href="#disconnected-devices" title="Permanent link">¶</a></h4>
@@ -6087,7 +6111,7 @@ GremlinEx names the VJOY devices using their axis/button/hat count and the VJOY 
 <p>GremlinEx can display a repeater bar graph that shows the current state of the input, and in some cases, transformations applied to that input.  This lets you visualize in real-time the inputs.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/axis_repeaters.png" data-desc-position="bottom"><img alt="input locksl" src="../assets/axis_repeaters.png"></a></p>
 <h3 id="momentary-inputs">Momentary inputs<a class="headerlink" href="#momentary-inputs" title="Permanent link">¶</a></h3>
-<p>A momentary input is an input that typically has two states - pressed or released such as a key or a button.   A momentary input can also be held in which case it will keep its pressed state until it is released. </p>
+<p>A momentary input is an input that typically has two states - pressed or released such as a key or a button.   A momentary input can also be held in which case it will keep its pressed state until it is released.</p>
 <p>Encoders are also typically momentary but they have multiple positions.  In GremlinEx, an encoder will typically show as two inputs, one to increase, one to decrease.</p>
 <h3 id="hats">Hats<a class="headerlink" href="#hats" title="Permanent link">¶</a></h3>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/hat_input.png" data-desc-position="bottom"><img alt="hat input" src="../assets/hat_input.png"></a></p>
@@ -6250,10 +6274,10 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <p>The input widget corresponds to an input for the device currently selected. For controllers, GremlinEx displays "live" inputs (when the option is enabled, which it is by default).  The repeaters will show the current axis or button state for controllers.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/input_linear.png" data-desc-position="bottom"><img alt="input widget linear" src="../assets/input_linear.png"></a></p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/input_button.png" data-desc-position="bottom"><img alt="input widget button" src="../assets/input_button.png"></a></p>
-<p>Input widgets will show an icon for each action map found in the containers attached to the input for a quick visual review of all actions mapped to the input.  </p>
+<p>Input widgets will show an icon for each action map found in the containers attached to the input for a quick visual review of all actions mapped to the input.</p>
 <p>Input widgets will also have a calibration button to calibrate the input axis (global), or for setting up a curve for the input.</p>
 <p>If the input can be configured, for example, OSC or Keyboard devices, a configuration button is also visible.</p>
-<p>In the example below, two keystrokes are defined as input. Alt-C and F5.  While Alt-C is not selected, the icon in the input widget indicates it is mapped to button #1.  The input box for F5 shows that it has two actions, button #1 and another joystick action.  </p>
+<p>In the example below, two keystrokes are defined as input. Alt-C and F5.  While Alt-C is not selected, the icon in the input widget indicates it is mapped to button #1.  The input box for F5 shows that it has two actions, button #1 and another joystick action.</p>
 <p>Because the action is complex, it won't show the details but from the action configuration we can see it's setup to toggle button #2 whenever the F5 key is pressed, and to pulse button #1.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/input_example.png" data-desc-position="bottom"><img alt="input example" src="../assets/input_example.png"></a></p>
 <p>The bottom of the input panel has two buttons, one to add a new input, one to remove it.   These buttons are only displayed on inputs that are configurable, such as the Keyboard, OSC, or MIDI devices.</p>
@@ -6270,12 +6294,12 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <li>Disabled: automatic highlighting is turned off.</li>
 <li>Button: automatic highlighting switches to the pressed button.</li>
 <li>Axis: automatic highlighting switches to the moved axis.</li>
-<li>Device: automatic highlighting switches the device.  </li>
+<li>Device: automatic highlighting switches the device.</li>
 </ul>
 <p>These options are also available in the Gremlin options panel.</p>
 <p>It it not advised to have the axis or device modes enabled if you have a noisy input as the UI will constantly thrash because it will detect constant inputs.</p>
 <h2 id="conditions_1">Conditions<a class="headerlink" href="#conditions_1" title="Permanent link">¶</a></h2>
-<p>GremlinEx can apply conditions to triggers to modify what should happen when an input trigger happens. </p>
+<p>GremlinEx can apply conditions to triggers to modify what should happen when an input trigger happens.</p>
 <p>Conditions can be used to:</p>
 <ul>
 <li>only trigger a mapping if another condition is true (or false), such as an key or button is pressed, released, or another axis is within a certain range.</li>
@@ -6358,7 +6382,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p>As of 13.40.14ex, GremlinEx also has an option to display input repeaters as well for all joystick hardware inputs showing live axis position as well as button state.</p>
 <p>As of 13.40.16ex, GremlinEx has an input options bar at the bottom right of the main window to easily toggle highlighting options without going to the options dialog or using the hotkeys.</p>
 <h2 id="button-detect-only-overrides">Button detect only overrides<a class="headerlink" href="#button-detect-only-overrides" title="Permanent link">¶</a></h2>
-<p>A pair of modifiers can be used to modify how input is detected.  </p>
+<p>A pair of modifiers can be used to modify how input is detected.</p>
 <table>
 <thead>
 <tr>
@@ -6557,7 +6581,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 </tbody>
 </table>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/remote_control_output.png" data-desc-position="bottom"><img alt="action configuration" src="../assets/remote_control_output.png"></a></p>
-<p>By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.  </p>
+<p>By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.</p>
 <p>Not all actions support remote control.  The current actions that do are</p>
 <ul>
 <li>Vjoy Remap</li>
@@ -6574,7 +6598,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 <li>clients must have a blank, running profile to be remotely controlled.</li>
 <li>the firewall must allow the configured port.</li>
 </ul>
-<p>This said, GremlinEx is not designed to handle sensitive data given its purpose as a gaming hardware integrator.  </p>
+<p>This said, GremlinEx is not designed to handle sensitive data given its purpose as a gaming hardware integrator.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> Do not use GremlinEx to transmit secure or PII data as transmitted data is not encrypted (by design for speed) as the scope of GremlinEx is game control</p>
 <h3 id="master-machine-setup">Master machine setup<a class="headerlink" href="#master-machine-setup" title="Permanent link">¶</a></h3>
 <p>The master machine is the machine responsible for broadcasting control events to clients on the local network.  Thus it will typically be the primary system with all the physical hardware managed by GremlinEx.</p>
@@ -6655,7 +6679,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 <h4 id="action-remote-control-configuration">Action remote control configuration<a class="headerlink" href="#action-remote-control-configuration" title="Permanent link">¶</a></h4>
 <p>Certain actions support output to remote instances (clients) on the network.  The following options can be set to configure this behavior:</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/action_remote_control_configuration.png" data-desc-position="bottom"><img alt="remote action configuration" src="../assets/action_remote_control_configuration.png"></a>
-GremlinEx can send to the local and remote clients at the same time by selecting in the actions that support remote control local and remote modes.  When remote is enabled in the action, the </p>
+GremlinEx can send to the local and remote clients at the same time by selecting in the actions that support remote control local and remote modes.  When remote is enabled in the action, the</p>
 <h3 id="override-mode">Override mode<a class="headerlink" href="#override-mode" title="Permanent link">¶</a></h3>
 <p>As of T176, the Vjoy Remap and Map to Keyboard/Mouse Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.</p>
 <p>The override mode is meant to simplify some mapping tasks independently of the global profile setting.</p>
@@ -6691,7 +6715,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p>In addition to this, the profile itself provides actions that can switch modes.</p>
 <h3 id="mode-change-event-mappings">Mode change event mappings<a class="headerlink" href="#mode-change-event-mappings" title="Permanent link">¶</a></h3>
 <p>The <em>Mode/Profile</em> device tab lets you define actions to occur when a mode is entered or exited.   This includes when the default mode is activated on profile start.</p>
-<p>There is one set of mappings possible for each defined mode.  </p>
+<p>There is one set of mappings possible for each defined mode.</p>
 <p>Actions mapped to mode start and stop will behave as a joystick button with a press and release.  The delay between press and release is defined in options as the default auto-release delay, and defaults to 250 milliseconds.</p>
 <p>Note: if you delete a mode, any associated mappings linked to mode enter/exit will be deleted.</p>
 <h3 id="profile-device-substitution-and-input-order">Profile device substitution and input order<a class="headerlink" href="#profile-device-substitution-and-input-order" title="Permanent link">¶</a></h3>
@@ -6751,7 +6775,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <h2 id="joystick-axis-device">Joystick (axis) device<a class="headerlink" href="#joystick-axis-device" title="Permanent link">¶</a></h2>
 <p>GremlinEx can map detected joystick devices to actions.  New with 13.40.15ex is the ability to apply a response curve the input directly before the value is processed by a mapping action.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/gremlin_ex_curve_input.png" data-desc-position="bottom"><img alt="curve input" src="../assets/gremlin_ex_curve_input.png"></a></p>
-<p>If no curve is provided, the input is used as is, matching the behavior of prior releases for GremlinEx.  </p>
+<p>If no curve is provided, the input is used as is, matching the behavior of prior releases for GremlinEx.</p>
 <p>If a curve is provided, the input value will be modified based on the provided curve before being sent to a mapping action.</p>
 <p>Curves are mode specific so each mode can have its own input response curve.</p>
 <p>The curve button is used to add, or edit an existing curve.  It will show blue if a curve is already defined.</p>
@@ -6765,7 +6789,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <li>Invert the input which is part of calibration.  Inverted data just reverses the input before downstream actions are executed so this can be seen as a "global" setting for the axis.</li>
 </ul>
 <p>Starting with GremlinEx 13.40.16, calibration is done individually for each input axis as needed.</p>
-<p>Starting with GEX m76T121, calibration data can be saved on a per profile basis, or global, or both.   The way this works is if calibration data is saved on a profile, it will be used instead of any global calibration.  </p>
+<p>Starting with GEX m76T121, calibration data can be saved on a per profile basis, or global, or both.   The way this works is if calibration data is saved on a profile, it will be used instead of any global calibration.</p>
 <p>The calibration button shows in the input axis toolbar for axis devices only as indicated below.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/calibration_button.png" data-desc-position="bottom"><img alt="calibration" src="../assets/calibration_button.png"></a></p>
 <p>The calibration button brings up a dialog to setup calibration for that specific input, which will be listed at the top of the dialog.</p>
@@ -6775,7 +6799,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/calibration_dialog.png" data-desc-position="bottom"><img alt="calibration" src="../assets/calibration_dialog.png"></a></p>
 <h4 id="global-scope">Global scope<a class="headerlink" href="#global-scope" title="Permanent link">¶</a></h4>
 <p>Any calibration options apply to the input globally across all profiles.  GremlinEx provides alternative ways, at the profile level, to setup deadzones and inversion and response curve that are profile specific.  The global calibration makes particular sense with noisy inputs so that can be setup once for each hardware input without having to repeat the configuration for each profile.</p>
-<p>Understanding the processing order is important to diagnose unexpected behaviors, or to craft the profile in a way to achieve the desired behavior. </p>
+<p>Understanding the processing order is important to diagnose unexpected behaviors, or to craft the profile in a way to achieve the desired behavior.</p>
 <p>The GremlinEx processing order is listed here in the order of execution:</p>
 <ul>
 <li>Global scope<ul>
@@ -6787,7 +6811,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <li>Input curve (if any)</li>
 <li>Containers (most are pass-through)<ul>
 <li>Actions<ul>
-<li>Curved response </li>
+<li>Curved response</li>
 <li>Individual actions</li>
 </ul>
 </li>
@@ -6838,7 +6862,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <h3 id="calibration-tips">Calibration Tips<a class="headerlink" href="#calibration-tips" title="Permanent link">¶</a></h3>
 <p>Calibration is global, so lets you define setting that apply to all profiles at once.  The main one there will probably be the inversion setting.</p>
 <p>Calibration and deadzones usually only apply to devices that tend to have noisy inputs, but you can also use the calibration data to "scale" the input globally.</p>
-<p>For example, by shifting the center point to an offset, you can scale the response of an input's lower and upper half easily.  A use case for this may be a throttle input for a space game, or for reversers:  You may want a more sensitive upper range value than you want for the lower range so you have more forward resolution than you do going back.  </p>
+<p>For example, by shifting the center point to an offset, you can scale the response of an input's lower and upper half easily.  A use case for this may be a throttle input for a space game, or for reversers:  You may want a more sensitive upper range value than you want for the lower range so you have more forward resolution than you do going back.</p>
 <p>You can also match the center position to the physical detent position of your input if it has one, as those may not be the exact center as the input reports.</p>
 <h3 id="curve-editor">Curve Editor<a class="headerlink" href="#curve-editor" title="Permanent link">¶</a></h3>
 <p>The curve editor dialog is used to add or edit a curve when applied to an input, the VJoy Remap action, or the standalone Response Curve Ex action.   The legacy curve mapper does not use this new editor to maintain compatibility with earlier profiles.</p>
@@ -6857,7 +6881,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p>You can move a control point by selecting it with the mouse, or with the control point selector buttons.  The control point will be shown in red.</p>
 <p>and left-dragging it with the mouse, or by changing the selected control point's coordinates in the input boxes for very precise positioning.   The coordinates can also be changed when the mouse hovers over the input using the wheel, and if shift is held while the wheel is moved, this toggles between coarse/fine modes.</p>
 <p>A control point can be deleted by selecting it, then clicking the delete button.  Again the points at -1.0 and +1.0 in X (input) cannot be deleted.</p>
-<p>In general you should use the least number of control points that yield the desired result. </p>
+<p>In general you should use the least number of control points that yield the desired result.</p>
 <h4 id="live-input">Live input<a class="headerlink" href="#live-input" title="Permanent link">¶</a></h4>
 <p>The curve dialog will show a tracker where the current input is located, and will move along the curve based on the live position of the input axis.  The tracker is only visible if trackers are enabled in options to show live inputs in the UI.</p>
 <p>When live input is enabled, the dialog editor also shows the current value, and the computed output value live.</p>
@@ -6887,15 +6911,15 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p>Curves stack, meaning that if more than one curve is defined on an input, the value will be cumulative, which may not be completely helpful but can be in some use-cases.</p>
 <p>The curve on the input axis is applied first, followed by the curve dedicated plugins (in the order in which they appear but before other actions), and finally the curves defined in the actual action itself.</p>
 <h2 id="keyboardmouse-device">Keyboard/Mouse device<a class="headerlink" href="#keyboardmouse-device" title="Permanent link">¶</a></h2>
-<p>GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers. </p>
+<p>GremlinEx has an updated special Keyboard device that allows you to map keyboard and mouse button as inputs to trigger actions and containers.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/gremlin_ex_keyboard.png" data-desc-position="bottom"><img alt="keyboard" src="../assets/gremlin_ex_keyboard.png"></a></p>
-<p>GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions. </p>
+<p>GremlinEx allows you to map unusual function keys F13 to F24 and any QWERTY keyboard layouts (no support for other layouts as of yet), as well as mouse input buttons including mouse wheel actions.</p>
 <h4 id="keyboard-inputs">Keyboard inputs<a class="headerlink" href="#keyboard-inputs" title="Permanent link">¶</a></h4>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/keyboard_input.png" data-desc-position="bottom"><img alt="keyboard input" src="../assets/keyboard_input.png"></a></p>
 <p>Keyboard inputs, as with joystick inputs are shown on the left panel in GremlinEx in the keyboard tab.  Inputs can be added, removed and edited (configured).  If an input is removed, it will remove any associated mappings.  A confirmation box will pop up if an input with content will be deleted.</p>
 <p>Use the action and container copy/paste feature to duplicate actions between inputs.</p>
 <h4 id="scan-codes">Scan Codes<a class="headerlink" href="#scan-codes" title="Permanent link">¶</a></h4>
-<p>Gremlin Ex has an option to display keyboard scan codes that will be heard by GremlinEx to help troubleshoot the more complex key latching use cases.  The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.  </p>
+<p>Gremlin Ex has an option to display keyboard scan codes that will be heard by GremlinEx to help troubleshoot the more complex key latching use cases.  The scan codes are the keyboard scan codes in hexadecimal that will be listened to to trigger this action.  The "_EX" means the scan code is extended.  This list is important because GremlinEx will only be able to trigger the actions if it "hears" these scan codes in pressed state at the same time.</p>
 <p>Many keys are special - such as the Right Alt key or the numpad keys. For example, the numpad numbers change scan codes based on the state of the numlock key and shift states.</p>
 <h3 id="numlock-state">Numlock state<a class="headerlink" href="#numlock-state" title="Permanent link">¶</a></h3>
 <p>The keyboard's numlock state alters the hardware codes sent by the numeric keypad (numpad) keys and can in fact caused the keyboard to return the same low level key presses for different physical keys. This happens for example with arrow keys. When this happens, there is no current way in the low level API used to tell which key was pressed because the codes are the same at the hardware level. Because this is usually enabled by the numlock state, Gremlin Ex offers an option as of 13.40.14ex to turn off numlock if it was on when a profile starts.</p>
@@ -6986,8 +7010,8 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p>Unlike joystick devices and most hardwired HID inputs, OSC inputs must be user defined and added to tell GremlinEx what to listen to. GremlinEx supports any OSC message, although in the current version, limits are imposed on parameter types for ease of processing/mapping to a VJOY device:</p>
 <p>OSC messages must consist of a text part, example  /this_is_my_test_fader followed by a numeric value (float or int).   Extra parameters are currently ignored, but can be provided without error.</p>
 <p>Important: all OSC commands must start with a forward slash or they will be ignored.  OSC commands also accept one or two numeric parameters, floating point or integer.  It is customary for faders and axes to use a value of 0.0 to 1.0 for a range of values, and for momentary buttons to use a value of 1.0 when pressed, and 0.0 when released.</p>
-<p>OSC messages that do not include parameters can be treated as an input trigger (press) if the option is selected in the OSC input configuration box.  In this mode, GremlinEx will automatically issue an internal release trigger after the set delay has lapsed.  This is often necessary because many actions in GremlinEx require both a press and release triggers, although that depends on the desired behavior. </p>
-<p>The general case for switches or buttons on panels is for the OSC device to send two messages to GremlinEx.  The message should have a single numeric parameter (others are ignored).  The parameter is decoded as a release for a value of zero (0), and a press for any value not zero (!= 0).  To make things consistent with most OSC control tablets, the convention is to use a value of 1.0 for button presses, and 0.0 for button releases. Note that GremlinEx will use the first parameter either as an integer or a floating point value, either will work.  </p>
+<p>OSC messages that do not include parameters can be treated as an input trigger (press) if the option is selected in the OSC input configuration box.  In this mode, GremlinEx will automatically issue an internal release trigger after the set delay has lapsed.  This is often necessary because many actions in GremlinEx require both a press and release triggers, although that depends on the desired behavior.</p>
+<p>The general case for switches or buttons on panels is for the OSC device to send two messages to GremlinEx.  The message should have a single numeric parameter (others are ignored).  The parameter is decoded as a release for a value of zero (0), and a press for any value not zero (!= 0).  To make things consistent with most OSC control tablets, the convention is to use a value of 1.0 for button presses, and 0.0 for button releases. Note that GremlinEx will use the first parameter either as an integer or a floating point value, either will work.</p>
 <p>The general case for rotary encoders is different as these typically can only send rotation pulses, and no release.  For these inputs, configure GremlinEx to auto-trigger the release using the "trigger on press" checkbox and set the delay in milliseconds.  The delay is the time between the OSC message is received, and the internal release is triggered.  Most games require at least 100ms to capture the input, many require 250ms.  This varies with the game however testing most games prefer 250ms which is why the default is set at 250ms (quarter second).</p>
 <h3 id="osc-ports">OSC ports<a class="headerlink" href="#osc-ports" title="Permanent link">¶</a></h3>
 <p>OSC is a protocol running over UDP, so requires not only an IP address but a port port to listen to, or send to OSC messages.  GremlinEx includes an internal OSC server to listen to incoming OSC traffic.  The default GremlinEx server (listen) port is 8000.  GremlinEx usually uses port 8001 for sending.</p>
@@ -7416,7 +7440,7 @@ Parenthesis can be used to change the evaluation order.</p>
 <p>States must have a unique name in a given profile.</p>
 <p>Names may not include any spaces.  Separate words using the underscore character.</p>
 <p>Names are not case sensitive (so my_State is the same as my_state).</p>
-<p>States are tracked internally by ID (as of m76T28) so a name change will also update all expressions automatically.  </p>
+<p>States are tracked internally by ID (as of m76T28) so a name change will also update all expressions automatically.</p>
 <h3 id="deleting-a-state">Deleting a state<a class="headerlink" href="#deleting-a-state" title="Permanent link">¶</a></h3>
 <p>Before deleting a state, remove or replace its references in expressions, Map to State actions, conditions, State containers, and macros. Remove it from the State Device list, save the profile, and reopen it to check the remaining selections.</p>
 <h3 id="state-visualization">State visualization<a class="headerlink" href="#state-visualization" title="Permanent link">¶</a></h3>
@@ -7513,10 +7537,10 @@ We would define a third state, called a_or_b, defined as:</p>
 <p>Once installed, GremlinEx will automatically detect the VIGEM Bus driver, and will create a single device to start (unless this was previously changed in options).  The necessary DLL is included with GremlinEx and loaded automatically, no additional Python library is needed.  To detect the new virtual gamepad support, GremlinEx will need to be restarted.</p>
 <p>IMPORTANT: no device will show in control panel or HIDHide until GremlinEx runs, as GremlinEx creates the device at runtime.  GremlinEX creates the devices when it starts, and removes them when it exists, regardless of what profile is running or not.</p>
 <h3 id="hidhide-interaction">HIDHide interaction<a class="headerlink" href="#hidhide-interaction" title="Permanent link">¶</a></h3>
-<p>There is nothing special to do with HIDHide.  Because GremlinEx creates the virtual gamepad devices at runtime, they are visible to the game automatically by default, even if other devices are hidden.   </p>
+<p>There is nothing special to do with HIDHide.  Because GremlinEx creates the virtual gamepad devices at runtime, they are visible to the game automatically by default, even if other devices are hidden.</p>
 <p>The devices will go away when GremlinEx is not running.</p>
 <h3 id="number-of-devices-and-device-lifecycle">Number of devices and device lifecycle<a class="headerlink" href="#number-of-devices-and-device-lifecycle" title="Permanent link">¶</a></h3>
-<p>GremlinEX supports up to four virtual X-box controllers. The number of devices created  is configured in the options dialog, which can be set from 0 to 4.  0 means no device output. </p>
+<p>GremlinEX supports up to four virtual X-box controllers. The number of devices created  is configured in the options dialog, which can be set from 0 to 4.  0 means no device output.</p>
 <p>GremlinEx will create the devices when it runs (no profile needs to be active).  The devices will go away when GremlinEx exits.</p>
 <p>VIGEM devices will not show in GremlinEx's device bar because there are no configuration items to set so while the devices exist, they are not displayed.</p>
 <h3 id="mapping-to-a-gamepad-device">Mapping to a gamepad device<a class="headerlink" href="#mapping-to-a-gamepad-device" title="Permanent link">¶</a></h3>
@@ -7527,7 +7551,7 @@ We would define a third state, called a_or_b, defined as:</p>
 <h3 id="gamepad-input">Gamepad input<a class="headerlink" href="#gamepad-input" title="Permanent link">¶</a></h3>
 <p>Unlike VJOY, GremlinEx does not currently support a virtual gamepad used as input.  However a hardware gamepad (such as an X-Box One controller for example) will show up in GremlinEx as a regular joystick input in the device tabs and can be mapped like any other Joystick controller.</p>
 <h2 id="profile">Profile<a class="headerlink" href="#profile" title="Permanent link">¶</a></h2>
-<p>A profile holds a mapping of inputs to action. </p>
+<p>A profile holds a mapping of inputs to action.</p>
 <h3 id="profile-association">Profile association<a class="headerlink" href="#profile-association" title="Permanent link">¶</a></h3>
 <p>A profile can be associated with an executable in options, and GremlinEx can automatically switch to that profile when the associated process receives the focus.  By default this is not enabled as loading processes automatically can create a bit of lag while the process is loaded, especially if a large / complex profile, but the feature is available.   The other recommendation is to not automate this while setting up or tweaking a profile to simplify the editing process especially if you constantly switch focus between processes.</p>
 <h3 id="profile-modes">Profile modes<a class="headerlink" href="#profile-modes" title="Permanent link">¶</a></h3>
@@ -7556,17 +7580,17 @@ We would define a third state, called a_or_b, defined as:</p>
 <p>Examples of how mode entry/exit mapping can help solve common mapping problems, because they always execute regardless of physical input state.</p>
 <ul>
 <li>every mode can initialize a known setup as actions like Map to Vjoy can set specific values on axes or activate/deactivate buttons.  If the device enabling is turned on in options, the Control action can also enable/disable specific inputs.</li>
-<li>Text to speech will correctly execute on mode change.  Note however that the special variable ${current_mode} will reflect the current mode, which may not be the mode the trigger is defined in because of how the wiring works.  </li>
+<li>Text to speech will correctly execute on mode change.  Note however that the special variable ${current_mode} will reflect the current mode, which may not be the mode the trigger is defined in because of how the wiring works.</li>
 <li>Mode exit can be used to "clean up" or reset a state when the mode changes to a different mode, or execute actions to re-enable a device for example.</li>
 </ul>
 <h2 id="general-mapping-process">General mapping process<a class="headerlink" href="#general-mapping-process" title="Permanent link">¶</a></h2>
 <p>GremlinEx shows near the top of the UI a tabbed list of all detected HID hardware, including non-hardware input items like MIDI and OSC which also function as inputs.</p>
 <p>For complex profiles, the first order of business is typically to setup the modes for the profile if you have complex mappings to do, typically if you need to have multiple mappings for the same inputs - this can be for example a "flight" vs a "walking" mode, or a "turret" mode vs a "cockpit" mode.  You create modes in the mode configuration dialog.   There is however no requirement to do modes first as modes can be added later if need be.</p>
-<p>Select the editing mode at the top right of the UI from the drop down which will select the profile mode being edited.  All mappings will be attached to this mapping.  </p>
+<p>Select the editing mode at the top right of the UI from the drop down which will select the profile mode being edited.  All mappings will be attached to this mapping.</p>
 <p>Mappings for another mode will not be displayed from another mode.</p>
 <p>The general idea is you will select one of the input tabs, selecting the hardware or virtual input device.  GremlinEx will show the detected inputs for the selected device.  If the device is a keyboard or MIDI or OSC, the input will also need to be defined.  Joystick inputs will show detected axes and buttons and hats for that input as they are reported by the hardware.</p>
 <p>Enable vJoy devices as inputs in the Settings tab when another application supplies their values. Use states for internal profile flags, and check for feedback loops if a profile reads and writes the same virtual device.</p>
-<p>Once you have selected the input (or created one) on the left side of the UI, you can add one or more containers to that input.  </p>
+<p>Once you have selected the input (or created one) on the left side of the UI, you can add one or more containers to that input.</p>
 <p>Remember to save changes via the save button as profile changes are not saved automatically.   Save the profile to an XML file in your chosen location, and keep its companion JSON file with it. Use <strong>Actions → Open GremlinEx folder</strong> to locate the default user data folder.</p>
 <p>It's possible to manually edit the XML file if you'd like, however if you do, make a backup of the original XML file in case an error occurs.</p>
 <h2 id="user-plugins">User plugins<a class="headerlink" href="#user-plugins" title="Permanent link">¶</a></h2>
@@ -7707,7 +7731,7 @@ We would define a third state, called a_or_b, defined as:</p>
 <h3 id="general-flow-and-connectivity">General flow and connectivity<a class="headerlink" href="#general-flow-and-connectivity" title="Permanent link">¶</a></h3>
 <p>It's recommended that you run MSFS first before you activate a GremlinEx profile: GremlinEx will immediately attempt to connect to MSFS via Simconnect when the profile starts, or when in the configuration window.   GremlinEx will enter a retry mode if it cannot connect, and eventually give up. To re-attempt the connection, you will need to stop the profile, and start it again, or close the configuration dialog and open it again.</p>
 <p>Attempts can time-out and fail for many reasons, first and foremost is that Simconnect is not available immediately when MSFS runs.  It can take several minutes after the simulator is started before Simconnect is available.  A rule of thumb is that Simconnect is only available when the simulator's interface is available and loading has completed. MSFS can take a very long time to load.</p>
-<p>For the automatic mode switching to happen, two requirements must be met: 
+<p>For the automatic mode switching to happen, two requirements must be met:
 (1) an entry (case insensitive) must exist in the configuration dialog that maps the specific aircraft variant to a mode you wish to use.  The aircraft variant name is unique across all aircraft in the simulator and is specified by the add-on's configuration and is unique for each variant.  That name can be very cryptic.
 (2) a corresponding mode must exist in the profile.   The mode can be anything you want, and indeed, can be re-used by multiple aircraft where it makes sense.</p>
 <p>In the GremlinEx configuration options, you can enable verbose Simconnect mode that will add detailed entries in the log file of the interactions with Simconnect - including status, what aircraft is detected and when it is detected, and data GremlinEx is sending via Simconnect.</p>
@@ -7717,7 +7741,7 @@ We would define a third state, called a_or_b, defined as:</p>
 <p>The other issue is that the data sent to MSFS isn't used by the aircraft being flown, or the data is out of range/invalid.</p>
 <p>The mode lock features in GremlinEx's Simconnect options will freeze the mode to a specific mapping and will disable any mode change (switch mode, cycle mode) in GremlinEx to prevent inadvertent mode changes.</p>
 <h2 id="range-container">Range container<a class="headerlink" href="#range-container" title="Permanent link">¶</a></h2>
-<p>The range container is a container designed to break up an axis input ranges into  one or more actions tied to a particular range.  While something like this can be done with conditions, the range container is much easier to setup than using conditions. </p>
+<p>The range container is a container designed to break up an axis input ranges into  one or more actions tied to a particular range.  While something like this can be done with conditions, the range container is much easier to setup than using conditions.</p>
 <p>The idea of a range container is to setup a range of axis values that will trigger one or more actions.   As many actions as needed can be added.  An example of this is mapping a flaps axis to distinct keys, or setting up button presses based on the value of an input axis, which is helpful for example, for throttle setups on some flight simulators to setup detents.</p>
 <p>The range container has a minimum and a maximum and each boundary and be included or excluded to define the range.</p>
 <p>There is a convenience button that will create automatic ranges to an axis: you specify how many axis "brackets" you need, and you can give it a default action.  This will create range containers for the axis automatically and compute the correct bracket values for the count provided.</p>
@@ -7791,7 +7815,7 @@ This value resets at every input press.  The initial trigger is not included in 
 <p>Called when the state information is changed (local, remote or broadcast mode). The event properties is_local, is_remote and is_broadcast are flags that contain the current state of GremlinEx.</p>
 <h2 id="recipes">Recipes<a class="headerlink" href="#recipes" title="Permanent link">¶</a></h2>
 <h3 id="one-way-or-two-way-switch-to-two-way-switch-three-way-switch">One way or two way switch to two way switch / three way switch<a class="headerlink" href="#one-way-or-two-way-switch-to-two-way-switch-three-way-switch" title="Permanent link">¶</a></h3>
-<p>Some hardware controllers only have a trigger on one (two) positions out of two (three).  Usually the center doesn't have a button mapped.  </p>
+<p>Some hardware controllers only have a trigger on one (two) positions out of two (three).  Usually the center doesn't have a button mapped.</p>
 <p>In GremlinEx VjoyRemap a button trigger can easily be output for each position of a switch by adding a release mapping to the hardware positions that do trigger on.  The trigger occurs then when the switch leaves the position and turns off.</p>
 <p>One responds to button presses on the raw hardware, the other responds to a button release on the raw hardware.</p>
 <table>
