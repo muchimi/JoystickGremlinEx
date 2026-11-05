@@ -88,7 +88,6 @@ class CodeRunner:
         """
         return gremlin.shared_state.is_running
 
-
     def disableUi(self):
         """disables UI"""
         if not gremlin.config.Configuration().runtime_ui_active:
@@ -118,6 +117,12 @@ class CodeRunner:
 
         el.profile_before_start.emit()  # tell components the profile is about to start
 
+        # automatic failover for virtual output devices
+        # build a cache of resolved failovers based on current configuration
+        # this enables missing vjoy devices to output to maestro devices if they exist
+        # mapping is done by the name of the output device to vjoy id
+        gremlin.joystick_handling.resolve_output_targets()
+
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild=True)  # rebuild the execution tree
 
@@ -126,8 +131,6 @@ class CodeRunner:
             syslog.error("Error building execution tree - aborting start.")
             self.stop()
             return False
-
-
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_exec
@@ -145,6 +148,7 @@ class CodeRunner:
         # indicate we're in run mode
         gremlin.shared_state.is_running = True
         from gremlin.maestro import Maestro
+
         Maestro().resetOutputUsage()
         gremlin.windows_event_hook.setRunning(True)
 
@@ -257,7 +261,6 @@ class CodeRunner:
                 graph_mode_node = gremlin.execution_graph.ExecutionGraphModeNode(mode)
                 graph_mode_node.parent = ec.graph
                 graph_mode_nodes[mode] = graph_mode_node
-
 
             device_node: gremlin.base_profile.ProfileDeviceNode
             for device_node in profile.devices.values():
@@ -423,7 +426,7 @@ class CodeRunner:
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
 
             # voice recognition callback setup
-            if config.voice_enabled:
+            if config.startup_voice_enabled:
                 vd = gremlin.ui.voice_device.VoiceData()
                 input_item = vd.getVoiceInputItem()  # latch input
                 vd.ptt_input_item = input_item
@@ -456,20 +459,13 @@ class CodeRunner:
                         input_type = input_item.input_type
 
                         event = gremlin.event_handler.Event(
-                            event_type=input_type,
-                            device_guid=device_guid,
-                            identifier=identifier,
-                            extra_data={"input_item": input_item}
+                            event_type=input_type, device_guid=device_guid, identifier=identifier, extra_data={"input_item": input_item}
                         )
                         # callback to execute when that input event occurs
                         callback = vd.execute_callback  # what to call on the hook
                         magic = eh.getMagic(event)
                         self.event_handler.registerMappedInput(
-                            device_guid = device_guid,
-                            mode =  master_mode,
-                            input_type = input_type,
-                            magic = magic,
-                            input_item = input_item
+                            device_guid=device_guid, mode=master_mode, input_type=input_type, magic=magic, input_item=input_item
                         )
 
                         self.event_handler.addCallback(
@@ -523,9 +519,7 @@ class CodeRunner:
                 if not device_node.enabled or not device_node.connected:
                     continue
                 # Skip unmatched / stub virtual devices (vjoy_id defaults to -1).
-                if device_node.device_type == DeviceType.VJoy and not (
-                    isinstance(device_node.vjoy_id, int) and 1 <= device_node.vjoy_id <= 16
-                ):
+                if device_node.device_type == DeviceType.VJoy and not (isinstance(device_node.vjoy_id, int) and 1 <= device_node.vjoy_id <= 16):
                     continue
 
                 device_id = device_node.device_id
@@ -567,15 +561,15 @@ class CodeRunner:
             evt_listener.virtual_event.connect(self.event_handler.execute_event)
 
             # hook midi events
-            if config.midi_enabled:
+            if config.startup_midi_enabled:
                 evt_listener.midi_event.connect(self.event_handler.execute_event)
 
             # hook osc events
-            if config.osc_enabled:
+            if config.startup_osc_enabled:
                 evt_listener.osc_event.connect(self.event_handler.execute_event)
 
             # hook stream deck plugin bridge events
-            if config.streamdeck_enabled:
+            if config.startup_streamdeck_enabled:
                 evt_listener.streamdeck_event.connect(self.event_handler.execute_event)
 
             # overlay HUD / OCR rule-as-button events (always available with overlay)
@@ -634,15 +628,15 @@ class CodeRunner:
                 pass
 
             # listen to MIDI
-            if config.midi_enabled:
+            if config.startup_midi_enabled:
                 evt_listener.request_midi.emit(True)
 
             # listen to OSC
-            if config.osc_enabled:
+            if config.startup_osc_enabled:
                 evt_listener.request_osc.emit(True)
 
             # Stream Deck plugin bridge
-            if config.streamdeck_enabled:
+            if config.startup_streamdeck_enabled:
                 from gremlin.ui import streamdeck_device as streamdeck_ui
 
                 streamdeck_ui.ensure_bridge_started()
@@ -850,7 +844,6 @@ class CodeRunner:
         # Notify the UI after runtime state and callbacks have been restored.
         # Stopping does not require rebuilding every device tab.
         el.profile_stopped.emit()
-
 
     def _reset_state(self):
         """Resets all states to their default values."""

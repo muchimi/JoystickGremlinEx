@@ -109,13 +109,10 @@ class Configuration(QtCore.QObject):
         self._visuals_hidden_map = None
         self._last_version = None  # version string of the last version that ran
         self._last_version_path = None  # path to last used version
-        self._run_on_start = False # true if the profile auto-runs on start if a profile is loaded
+        self._startup_options = {}
 
         self._midi_enabled = None
         self._osc_enabled = None
-
-        # commandline options
-        self._auto_load_disabled = False
 
         fname = self.get_config()
         basedir = os.path.dirname(fname)
@@ -1211,6 +1208,31 @@ class Configuration(QtCore.QObject):
             el.process_monitor_changed.emit()  # tell the UI the parameter changed
 
     @property
+    def startup_autoload_profiles(self) -> bool:
+        return self._startup_options.get("autoload_profiles", self.autoload_profiles)
+
+    @startup_autoload_profiles.setter
+    def startup_autoload_profiles(self, value: bool | None):
+        self._set_startup_option("autoload_profiles", value)
+
+    @property
+    def autoload_last_profile(self) -> bool:
+        return self._get_data("autoload_last_profile", True)
+
+    @autoload_last_profile.setter
+    def autoload_last_profile(self, value: bool):
+        if isinstance(value, bool):
+            self._set_data("autoload_last_profile", value)
+
+    @property
+    def startup_autoload_last_profile(self) -> bool:
+        return self._startup_options.get("autoload_last_profile", self.autoload_last_profile)
+
+    @startup_autoload_last_profile.setter
+    def startup_autoload_last_profile(self, value: bool | None):
+        self._set_startup_option("autoload_last_profile", value)
+
+    @property
     def run_on_start(self):
         """Returns whether or not the profile should auto-run on start.
 
@@ -1228,6 +1250,14 @@ class Configuration(QtCore.QObject):
         if isinstance(value, bool):
             self._data["run_on_start"] = value
             self.save()
+
+    @property
+    def startup_run_on_start(self) -> bool:
+        return self._startup_options.get("run_on_start", self.run_on_start)
+
+    @startup_run_on_start.setter
+    def startup_run_on_start(self, value: bool | None):
+        self._set_startup_option("run_on_start", value)
 
     @property
     def keep_profile_active_on_focus_loss(self):
@@ -1652,6 +1682,14 @@ class Configuration(QtCore.QObject):
         """
         self._data["start_minimized"] = bool(value)
         self.save()
+
+    @property
+    def startup_start_minimized(self) -> bool:
+        return self._startup_options.get("start_minimized", self.start_minimized)
+
+    @startup_start_minimized.setter
+    def startup_start_minimized(self, value: bool | None):
+        self._set_startup_option("start_minimized", value)
 
     @property
     def default_action(self):
@@ -2912,6 +2950,15 @@ class Configuration(QtCore.QObject):
         self.save()  # save the change
 
     @property
+    def startup_midi_enabled(self) -> bool:
+        value = self._startup_options.get("midi_enabled")
+        return self.midi_enabled if value is None else MIDI_ENABLED and value
+
+    @startup_midi_enabled.setter
+    def startup_midi_enabled(self, value: bool | None):
+        self._set_startup_option("midi_enabled", value)
+
+    @property
     def osc_enabled(self) -> bool:
         """True if OSC support is enabled"""
         if self._osc_enabled is None:
@@ -2923,6 +2970,15 @@ class Configuration(QtCore.QObject):
         self._data["osc_enabled"] = value
         self._osc_enabled = None  # force a re-read
         self.save()  # save the change
+
+    @property
+    def startup_osc_enabled(self) -> bool:
+        value = self._startup_options.get("osc_enabled")
+        return self.osc_enabled if value is None else OSC_ENABLED and value
+
+    @startup_osc_enabled.setter
+    def startup_osc_enabled(self, value: bool | None):
+        self._set_startup_option("osc_enabled", value)
 
     def setOscEnabled(self, value: bool):
         self._data["osc_enabled"] = value
@@ -2948,6 +3004,15 @@ class Configuration(QtCore.QObject):
         self._set_data("overlay_enabled", value)
 
     @property
+    def startup_overlay_enabled(self) -> bool:
+        value = self._startup_options.get("overlay_enabled")
+        return self.overlay_enabled if value is None else OVERLAY_ENABLED and value
+
+    @startup_overlay_enabled.setter
+    def startup_overlay_enabled(self, value: bool | None):
+        self._set_startup_option("overlay_enabled", value)
+
+    @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
         return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
@@ -2955,6 +3020,15 @@ class Configuration(QtCore.QObject):
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
         self._set_data("streamdeck_enabled", value)
+
+    @property
+    def startup_streamdeck_enabled(self) -> bool:
+        value = self._startup_options.get("streamdeck_enabled")
+        return self.streamdeck_enabled if value is None else STREAMDECK_ENABLED and value
+
+    @startup_streamdeck_enabled.setter
+    def startup_streamdeck_enabled(self, value: bool | None):
+        self._set_startup_option("streamdeck_enabled", value)
 
     @property
     def streamdeck_bridge_port(self) -> int:
@@ -3162,6 +3236,15 @@ class Configuration(QtCore.QObject):
             if value in ("auto", "light", "dark", "custom"):
                 self._data["theme"] = value
                 self.save()
+
+    @property
+    def startup_theme(self) -> str:
+        return self._startup_options.get("theme", self.theme)
+
+    @startup_theme.setter
+    def startup_theme(self, value: str | None):
+        if value is None or value in ("auto", "light", "dark", "custom"):
+            self._set_startup_option("theme", value)
 
     @property
     def keySize(self) -> int:
@@ -3440,12 +3523,12 @@ class Configuration(QtCore.QObject):
         self.save()
 
     @property
-    def auto_load_disabled(self) -> bool:
-        return self._auto_load_disabled
+    def startup_auto_load_disabled(self) -> bool:
+        return self._startup_options.get("auto_load_disabled", False)
 
-    @auto_load_disabled.setter
-    def auto_load_disabled(self, value):
-        self._auto_load_disabled = value
+    @startup_auto_load_disabled.setter
+    def startup_auto_load_disabled(self, value: bool | None):
+        self._set_startup_option("auto_load_disabled", value)
 
     @property
     def show_simconnect_options_on_toolbar(self) -> bool:
@@ -4073,6 +4156,15 @@ class Configuration(QtCore.QObject):
         self._set_data("maestro_dist_path", value)
 
     @property
+    def virtual_output_failover(self) -> bool:
+        """returns true if virtual output failover is enabled - when set this enables a missing VJOY device to use the Maestro device as a fallback, and vice versa."""
+        return self._get_data("virtual_output_failover", True)
+
+    @virtual_output_failover.setter
+    def virtual_output_failover(self, value: bool):
+        self._set_data("virtual_output_failover", value)
+
+    @property
     def last_save_path(self) -> str:
         """returns the last save path used for audio files"""
         return self._get_data("last_save_path", "")
@@ -4107,6 +4199,15 @@ class Configuration(QtCore.QObject):
     @voice_enabled.setter
     def voice_enabled(self, value: bool):
         self._set_data("voice_enabled", value)
+
+    @property
+    def startup_voice_enabled(self) -> bool:
+        value = self._startup_options.get("voice_enabled")
+        return self.voice_enabled if value is None else VOICE_ENABLED and value
+
+    @startup_voice_enabled.setter
+    def startup_voice_enabled(self, value: bool | None):
+        self._set_startup_option("voice_enabled", value)
 
     @property
     def octavi_enabled(self) -> bool:
@@ -4293,13 +4394,25 @@ class Configuration(QtCore.QObject):
     def mouse_hook_disabled(self, value: bool):
         self.mouse_hook_enabled = not value
 
+    @property
+    def startup_mouse_hook_disabled(self) -> bool:
+        value = self._startup_options.get("mouse_hook_disabled")
+        return self.mouse_hook_disabled if value is None else value
+
+    @startup_mouse_hook_disabled.setter
+    def startup_mouse_hook_disabled(self, value: bool | None):
+        self._set_startup_option("mouse_hook_disabled", value)
 
     @property
-    def profile_to_load(self) -> str:
-        # not persisted
-        return self._profile_fname
+    def startup_profile_to_load(self) -> str | None:
+        return self._startup_options.get("profile_to_load")
 
-    @profile_to_load.setter
-    def profile_to_load(self, value: str):
-        # not persisted
-        self._profile_fname = value
+    @startup_profile_to_load.setter
+    def startup_profile_to_load(self, value: str | None):
+        self._set_startup_option("profile_to_load", value)
+
+    def _set_startup_option(self, name: str, value):
+        if value is None:
+            self._startup_options.pop(name, None)
+        else:
+            self._startup_options[name] = value

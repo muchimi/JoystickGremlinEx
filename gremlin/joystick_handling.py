@@ -632,6 +632,92 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
     return False
 
 
+class OutputTarget:
+    """Resolved virtual output for a requested vjoy id or device GUID.
+
+    kind is "vjoy" or "maestro"; out_id is the vjoy id or the maestro index that is written to.
+    remote_id is the id the request was made for - it is what is sent to remote machines
+    so the remote machine can apply its own failover.
+    """
+
+    __slots__ = ("device", "kind", "out_id", "remote_id", "_maestro")
+
+    def __init__(self, device: DeviceSummary, kind: str, out_id: int, remote_id: int):
+        self.device = device
+        self.kind = kind
+        self.out_id = out_id
+        self.remote_id = remote_id
+        self._maestro = None
+
+    @property
+    def maestro(self):
+        """maestro output device (created on first use)"""
+        if self._maestro is None:
+            from gremlin.maestro import MaestroOutputDevice
+
+            self._maestro = MaestroOutputDevice(self.out_id)
+        return self._maestro
+
+
+_output_targets: dict = {}  # requested vjoy id (int) or device guid -> OutputTarget | None
+_OUTPUT_MISSING = object()
+
+
+def _find_output_target(key) -> OutputTarget | None:
+    """resolves the output target for a vjoy id or device GUID, applying failover if enabled"""
+    failover = gremlin.config.Configuration().virtual_output_failover
+    if isinstance(key, int):
+        device = next((dev for dev in vjoy_devices() if dev.vjoy_id == key), None)
+        requested_id = key
+        requested_kind = DeviceType.VJoy
+    else:
+        device = getDevice(key, show_error=False)
+        if not device or not device.is_virtual:
+            return None
+        requested_kind = device.device_type
+        requested_id = device.vjoy_id if requested_kind == DeviceType.VJoy else device.virtual_id
+
+    if device and device.connected and device.is_virtual:
+        if device.device_type == DeviceType.Maestro:
+            return OutputTarget(device, "maestro", device.virtual_id, requested_id)
+        if isinstance(device.vjoy_id, int) and 1 <= device.vjoy_id <= 16:
+            return OutputTarget(device, "vjoy", device.vjoy_id, requested_id)
+        return None
+
+    if not failover or not isinstance(requested_id, int):
+        return None
+
+    # the requested device is not available - use the counterpart with the same index
+    if requested_kind == DeviceType.Maestro:
+        alt = next((dev for dev in vjoy_devices() if dev.vjoy_id == requested_id), None)
+        if alt and alt.connected:
+            return OutputTarget(alt, "vjoy", alt.vjoy_id, requested_id)
+    else:
+        alt = next((dev for dev in maestro_devices() if dev.virtual_id == requested_id and dev.connected), None)
+        if alt:
+            return OutputTarget(alt, "maestro", alt.virtual_id, requested_id)
+    return None
+
+
+def get_output_target(key) -> OutputTarget | None:
+    """gets the cached output target for a vjoy id or device GUID (dictionary lookup on the hot path)"""
+    target = _output_targets.get(key, _OUTPUT_MISSING)
+    if target is _OUTPUT_MISSING:
+        target = _find_output_target(key)
+        _output_targets[key] = target
+    return target
+
+
+def resolve_output_targets():
+    """rebuilds the virtual device output failover cache - called at profile start and whenever devices change"""
+    _output_targets.clear()
+    for vid in range(1, 17):
+        get_output_target(vid)
+    for dev in list(_all_devices_map.values()):
+        if dev.is_virtual and dev.device_type in (DeviceType.VJoy, DeviceType.Maestro):
+            get_output_target(dev.device_guid)
+
+
 def set_button(device_guid: str | dinput.GUID | int, index: int, is_pressed: bool, update_remote: bool = False):
     """sets a vjoy device button if the index and guid exists
 
@@ -644,117 +730,69 @@ def set_button(device_guid: str | dinput.GUID | int, index: int, is_pressed: boo
     import gremlin.event_handler
     import gremlin.remote
 
-    sd = gremlin.event_handler.JoystickState()
-    if isinstance(device_guid, int):
-        # convert to guid from vjoy ID
-        device = getDeviceFromVjoyId(device_guid)
-    else:
-        device = getDevice(device_guid)
-    if not device:
-        syslog.error(f"VJOY SET BUTTON: Don't know device [{device_guid}]")
+    target = get_output_target(device_guid)
+    if target is None:
         return
-    if not device.connected or not device.is_virtual:
-        return
+    device = target.device
 
-    if sd.outputIgnored(device_guid):
+    if gremlin.event_handler.JoystickState().outputIgnored(device_guid):
         # output ignored
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
-            device = getDevice(device_guid)
             syslog.info(f"VJOY SET BUTTON: {device.name} output ignored [{index}] pressed: {is_pressed}")
         return
 
-    if device.device_type == DeviceType.Maestro:
-        from gremlin.maestro import MaestroOutputDevice
-        if 0 < index <= device.button_count:
-            MaestroOutputDevice(device.virtual_id).button(index).is_pressed = is_pressed
-        return
-
-    # local input
-    vjoy_id = device.vjoy_id
-    if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(f"VJOY SET BUTTON: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
-        return
     if 0 < index <= device.button_count:
-        proxy = gremlin.joystick_handling.VJoyProxy()
-        proxy[vjoy_id].button(index).is_pressed = is_pressed
+        if target.kind == "maestro":
+            target.maestro.button(index).is_pressed = is_pressed
+        else:
+            VJoyProxy()[target.out_id].button(index).is_pressed = is_pressed
 
-        if update_remote:
-            (_, is_remote) = gremlin.remote.remote_control.state
-            if is_remote:
-                remote_client = gremlin.remote.remote_client
-                remote_client.send_button(vjoy_id, index, is_pressed)
+    if update_remote:
+        (_, is_remote) = gremlin.remote.remote_control.state
+        if is_remote:
+            gremlin.remote.remote_client.send_button(target.remote_id, index, is_pressed)
 
 
 def set_axis(device_guid, index: int, value: float, update_remote: bool = False):
     """sets a vjoy axis"""
     import gremlin.event_handler
+    import gremlin.remote
 
-    if isinstance(device_guid, int):
-        # convert to guid from vjoy ID
-        device = getDeviceFromVjoyId(device_guid)
-    else:
-        device = getDevice(device_guid)
-    if not device:
-        syslog.error(f"VJOY SET AXIS: Don't know device [{device_guid}]")
+    target = get_output_target(device_guid)
+    if target is None:
         return
-    if not device.connected or not device.is_virtual:
-        return
+    device = target.device
 
-    sd = gremlin.event_handler.JoystickState()
-
-    if sd.outputIgnored(device_guid):
+    if gremlin.event_handler.JoystickState().outputIgnored(device_guid):
         # output ignored
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
             syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
         return
 
-    if device.device_type == DeviceType.Maestro:
-        from gremlin.maestro import MaestroOutputDevice
-        if 0 < index <= device.axis_count:
-            MaestroOutputDevice(device.virtual_id).axis(index).value = value
-        return
-
-    vjoy_id = device.vjoy_id
-    if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(f"VJOY SET AXIS: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
-        return
     if 0 < index <= device.axis_count:
-        proxy = gremlin.joystick_handling.VJoyProxy()
-        proxy[vjoy_id].axis(index).value = value
+        if target.kind == "maestro":
+            target.maestro.axis(index).value = value
+        else:
+            VJoyProxy()[target.out_id].axis(index).value = value
 
-        if update_remote:
-            (_, is_remote) = gremlin.remote.remote_control.state
-            if is_remote:
-                remote_client = gremlin.remote.remote_client
-                remote_client.send_axis(vjoy_id, index, value)
+    if update_remote:
+        (_, is_remote) = gremlin.remote.remote_control.state
+        if is_remote:
+            gremlin.remote.remote_client.send_axis(target.remote_id, index, value)
 
 
 def set_hat(device_guid: str | dinput.GUID | int, index: int, direction: tuple):
     """sets the device hat"""
-    if isinstance(device_guid, int):
-        # convert to guid from vjoy ID
-        device = getDeviceFromVjoyId(device_guid)
-    else:
-        device = getDevice(device_guid)
-    if not device:
-        syslog.error(f"VJOY SET HAT: Don't know device [{device_guid}]")
+    target = get_output_target(device_guid)
+    if target is None:
         return
-    if not device.connected or not device.is_virtual:
-        return
-    if device.device_type == DeviceType.Maestro:
-        from gremlin.maestro import MaestroOutputDevice
-        if 0 < index <= device.hat_count:
-            MaestroOutputDevice(device.virtual_id).hat(index).direction = direction
-        return
-    vjoy_id = device.vjoy_id
-    if not (isinstance(vjoy_id, int) and 1 <= vjoy_id <= 16):
-        syslog.warning(f"VJOY SET HAT: device [{device.name}] has invalid vjoy_id [{vjoy_id}] — skipping")
-        return
-    if 0 < index < device.hat_count:
-        proxy = gremlin.joystick_handling.VJoyProxy()
-        proxy[vjoy_id].hat(index).direction = direction
+    if 0 < index <= target.device.hat_count:
+        if target.kind == "maestro":
+            target.maestro.hat(index).direction = direction
+        else:
+            VJoyProxy()[target.out_id].hat(index).direction = direction
 
 
 def physical_devices():
@@ -1299,7 +1337,7 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # OSC
-    if config.osc_enabled:
+    if config.startup_osc_enabled:
         device = DeviceSummary()
         device.name = "OSC"
         device.device_guid = gremlin.shared_state.osc_tab_guid
@@ -1308,7 +1346,7 @@ def registerSpecialDevices():
         registerSpecialDevice(device)
 
     # MIDI
-    if config.midi_enabled:
+    if config.startup_midi_enabled:
         device = DeviceSummary()
         device.name = "MIDI"
         device.device_guid = gremlin.shared_state.midi_tab_guid
@@ -1330,7 +1368,7 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # Stream Deck legacy tab GUID (old profiles). Live decks register per deviceId.
-    if config.streamdeck_enabled:
+    if config.startup_streamdeck_enabled:
         device = DeviceSummary()
         device.name = "Stream Deck (legacy)"
         device.device_guid = gremlin.shared_state.streamdeck_tab_guid
@@ -1347,7 +1385,7 @@ def registerSpecialDevices():
             pass
 
     # voice
-    if config.voice_enabled:
+    if config.startup_voice_enabled:
         device = DeviceSummary()
         device.name = "Voice"
         device.device_guid = gremlin.shared_state.voice_tab_guid
@@ -1364,7 +1402,7 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # overlay designer
-    if config.overlay_enabled:
+    if config.startup_overlay_enabled:
         device = DeviceSummary()
         device.name = "Overlay"
         device.device_guid = gremlin.shared_state.overlay_tab_guid
@@ -1963,6 +2001,7 @@ def _update_joystick_device_maps():
         _maestro_devices.sort(key=lambda x: x.name.casefold())
 
         _update_virtual_map()
+        _output_targets.clear()  # device set changed - failover targets are resolved again
 
 
 def _update_virtual_map():

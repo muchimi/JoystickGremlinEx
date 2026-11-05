@@ -1,11 +1,15 @@
 # -*- mode: python -*-
 
 import os
+import runpy
 import sys
 
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 block_cipher = None
+
+# Refresh the EXE version resource from gremlin/version.py for every build.
+version_file = runpy.run_path(os.path.join(SPECPATH, "create_version.py"))["create_version_file"]()
 
 # Properly enumerate all files required for the action_plugins and
 # container_plugins system
@@ -45,6 +49,7 @@ for root, _, files in os.walk("sounds"):
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
+    (os.path.join("docs", "command_line.md"), "."),
     ("icons","icons"),
     ("gremlin/ui/streamdeck_icon_library", "gremlin/ui/streamdeck_icon_library"),
 ]
@@ -281,6 +286,7 @@ exe = EXE(
     upx=True,
     upx_exclude=_OCR_UPX_EXCLUDE,
     console=False,
+    version=str(version_file),
     icon="icons\\gex.ico"
 )
 

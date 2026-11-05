@@ -321,9 +321,9 @@ class ActionPlugins:
         tag = str(getattr(entry, "tag", "") or "").casefold()
         name = str(getattr(entry, "name", "") or "").casefold()
         key = f"{tag} {name}"
-        if "streamdeck" in key and not config.streamdeck_enabled:
+        if "streamdeck" in key and not config.startup_streamdeck_enabled:
             return False
-        if ("map-to-osc" in key or "map_to_osc" in key) and not config.osc_enabled:
+        if ("map-to-osc" in key or "map_to_osc" in key) and not config.startup_osc_enabled:
             return False
         if "simconnect" in key and not config.simconnect_enabled:
             return False

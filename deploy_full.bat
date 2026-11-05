@@ -1,5 +1,4 @@
-@echo "Starting to build GremlinEx..."
+@echo "Starting to build GremlinEx with repository push..."
 cd /d %0\..
 
-deploy.bat
-deploy_ai.bat
+deploy.bat --push

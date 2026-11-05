@@ -740,7 +740,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _start_client(self):
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             # ignore if OSC is not enabled
             return False
 
@@ -1086,7 +1086,7 @@ class MapToOsc(gremlin.input_item.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         config = gremlin.config.Configuration()
-        return config.osc_enabled
+        return config.startup_osc_enabled
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""

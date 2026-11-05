@@ -859,7 +859,7 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = config.mouse_hook_enabled  # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = not config.startup_mouse_hook_disabled  # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
 
         self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
@@ -4031,7 +4031,7 @@ class EventHandler(QtCore.QObject):
                                 m_list = self._matching_latched_callbacks(event, latch_key, input_item=input_item)
 
                             # check voice latching if latching on keyboard
-                            if config.voice_enabled:
+                            if config.startup_voice_enabled:
                                 v_list = self._matching_voice_callbacks(event, latch_key, input_item)
                                 if v_list:
                                     m_list.extend(v_list)
@@ -4154,7 +4154,7 @@ class EventHandler(QtCore.QObject):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
 
             # check for matching voice recognition trigger
-            if config.voice_enabled and not v_list:
+            if config.startup_voice_enabled and not v_list:
                 v_list = self._matching_voice_callbacks(event, None, input_item)
                 if v_list:
                     m_list.extend(v_list)

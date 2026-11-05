@@ -1785,7 +1785,7 @@ class OscServer:
 
         config = gremlin.config.Configuration()
         _verbose = config.verbose_mode_osc
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             # disabled
             return
         if self._running and self._server_thread is not None:
@@ -1882,7 +1882,7 @@ class OscInterface(QtCore.QObject):
     def ensureStarted(self):
         """ensures the OSC interface is started"""
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             return
         if not self._started:
             self.start()
@@ -1890,7 +1890,7 @@ class OscInterface(QtCore.QObject):
     def start(self):
         """starts OSC"""
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             # disabled
             return
 
@@ -2023,7 +2023,7 @@ class OscInterface(QtCore.QObject):
     def getClient(self, client_id: str, server: str, port: int, name: str = None) -> OscClient:
         """gets the client for that server/port"""
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             # disabled
             syslog.info("OSC: osc is disabled, client will not start.")
             return None
@@ -4503,7 +4503,7 @@ class InputOscClient(QtCore.QObject):
     def _options_changed(self):
 
         config = gremlin.config.Configuration()
-        osc_enabled = config.osc_enabled
+        osc_enabled = config.startup_osc_enabled
         # if osc_enabled:
         #     self.start()
         # else:
@@ -4522,7 +4522,7 @@ class InputOscClient(QtCore.QObject):
         import gremlin.execution_graph
 
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             return
 
         self.start()  # start if not started
@@ -4595,7 +4595,7 @@ class InputOscClient(QtCore.QObject):
 
         # build a list of messages configured for input
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             return
 
         # build a list of input items to OSC messages
@@ -4609,7 +4609,7 @@ class InputOscClient(QtCore.QObject):
         import gremlin.shared_state
 
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             return
 
         if self._started:

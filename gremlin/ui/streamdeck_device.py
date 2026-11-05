@@ -1352,7 +1352,7 @@ class StreamDeckBridge(QtCore.QObject):
     def status_text(self) -> str:
         """Human-readable bridge/plugin status for the device tab."""
         config = gremlin.config.Configuration()
-        if not config.streamdeck_enabled:
+        if not config.startup_streamdeck_enabled:
             return "Bridge: disabled (enable Stream Deck bridge in Options → Stream Deck)"
         port = config.streamdeck_bridge_port or DEFAULT_BRIDGE_PORT
         if not self._started:
@@ -1410,7 +1410,7 @@ class StreamDeckBridge(QtCore.QObject):
 
     def start(self, port: int = None):
         config = gremlin.config.Configuration()
-        if not config.streamdeck_enabled:
+        if not config.startup_streamdeck_enabled:
             return
         if port is None:
             port = config.streamdeck_bridge_port or DEFAULT_BRIDGE_PORT
@@ -1453,7 +1453,7 @@ class StreamDeckBridge(QtCore.QObject):
             self.status_message.emit(self.status_text())
 
     def _profile_start(self):
-        if gremlin.config.Configuration().streamdeck_enabled:
+        if gremlin.config.Configuration().startup_streamdeck_enabled:
             self.start()
         self._load_page_metadata(emit=False)
 
@@ -3594,7 +3594,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 def ensure_bridge_started():
     """Start the bridge if Stream Deck support is enabled."""
     config = gremlin.config.Configuration()
-    if config.streamdeck_enabled:
+    if config.startup_streamdeck_enabled:
         StreamDeckBridge().start()
         try:
             from gremlin.ui.streamdeck_surface import (

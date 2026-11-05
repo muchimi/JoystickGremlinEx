@@ -25,8 +25,9 @@ processes command line parameters
 # # ruff: disable[E401]
 from __future__ import annotations
 import argparse
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtWidgets
 import os
+from pathlib import Path
 import sys
 import gremlin.util
 from gremlin.ui.ui_common import MessageBoxWarning
@@ -50,6 +51,41 @@ class _MessageParser(argparse.ArgumentParser):
         is_error = file is sys.stderr
         ctypes.windll.user32.MessageBoxW(0, message, "GremlinEx command line", 0x10 if is_error else 0x40)
 
+    def show_command_line_help(self):
+        help_path = Path(__file__).resolve().parent.parent / "command_line.md"
+        try:
+            help_text = help_path.read_text(encoding="utf-8")
+        except OSError as err:
+            syslog.error(f"Unable to read command-line help file '{help_path}': {err}")
+            self.exit(1, f"Unable to read command-line help file: {err}\n")
+
+        if sys.stdout is not None:
+            sys.stdout.write(help_text)
+            return
+
+        app = QtWidgets.QApplication.instance()
+        if app is None:
+            app = QtWidgets.QApplication(sys.argv)
+
+        dialog = QtWidgets.QDialog()
+        dialog.setWindowTitle("GremlinEx Command-line Help")
+        dialog.resize(760, 600)
+        layout = QtWidgets.QVBoxLayout(dialog)
+        help_view = QtWidgets.QTextBrowser(dialog)
+        help_view.setMarkdown(help_text)
+        layout.addWidget(help_view)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.exec()
+
+
+class _CommandLineHelpAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser.show_command_line_help()
+        parser.exit()
+
 
 class CommandLineProcessor:
 
@@ -61,66 +97,63 @@ class CommandLineProcessor:
         parser = _MessageParser(prefix_chars='-/')
         app_path = gremlin.shared_state.data_path
 
-        parser.add_argument("/no-profile", "/np", dest="no_profile", action=argparse.BooleanOptionalAction, help="Do not load a profile on start (--r and --p will be ignored)")
+        parser.add_argument("/no-profile", "/np", dest="no_profile", action="store_true", default=None, help="Do not load a profile on start (--r and --p will be ignored)")
         parser.add_argument("/profile", "/p", dest="profile_file_name", default=None, help="Optional profile XML to load. Requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder.")
-        parser.add_argument("/mousehook", "/mh", dest="mousehook", action=argparse.BooleanOptionalAction, help="Toggle mouse hook - diagnostics use only")
-        parser.add_argument("/as", "/autoswitch", dest="switch", action=argparse.BooleanOptionalAction, help="Toggle automatic profile switching by process (if processes are mapped to profiles)")
-        parser.add_argument("/autoload", "/al", dest = "load", action=argparse.BooleanOptionalAction, default=True, help="Toggle profile auto-load.  Enabled by default, loads the last used profile into GEX.")
-        parser.add_argument("/r", "/run", dest="run", action=argparse.BooleanOptionalAction, help="Automatically start the last profile on launch if a profile is available.")
-        parser.add_argument("/nr", dest="run", action="store_const", const=False, help="Do not automatically start the last profile on launch")
-        parser.add_argument("/voice", "/v", dest="voice", action=argparse.BooleanOptionalAction, help="Toggle voice recognition module")
-        parser.add_argument("/overlay", "/ov", dest="overlay", action=argparse.BooleanOptionalAction, help="Toggle overlay module")
-        parser.add_argument("/streamdeck", "/sd", dest="streamdeck", action=argparse.BooleanOptionalAction, help="Toggle streamdeck module")
-        parser.add_argument("/osc", dest="osc", action=argparse.BooleanOptionalAction, help="Toggle OSC (open stage control protocol) module")
-        parser.add_argument("/midi", dest="midi", action=argparse.BooleanOptionalAction, help="Toggle MIDI module")
+        parser.add_argument("/mousehook", "/mh", dest="mousehook", action="store_true", default=None, help="Enable mouse hook - diagnostics use only (disable with /no-mousehook)")
+        parser.add_argument("/no-mousehook", "/no-mh", "--no-mousehook", dest="mousehook", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/as", "/autoswitch", dest="switch", action="store_true", default=None, help="Enable automatic profile switching by process (disable with /no-as)")
+        parser.add_argument("/no-as", "/no-autoswitch", "--no-as", "--no-autoswitch", dest="switch", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/autoload", "/al", dest="load", action="store_true", default=None, help="Load the last used profile on startup (disable with /no-autoload)")
+        parser.add_argument("/no-autoload", "/no-al", "--no-autoload", dest="load", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/r", "/run", dest="run", action="store_true", default=None, help="Automatically start the last profile on launch if a profile is available.")
+        parser.add_argument("/nr", "/no-r", "/no-run", "--no-r", "--no-run", dest="run", action="store_false", default=None, help="Do not automatically start the last profile on launch")
+        parser.add_argument("/voice", "/v", dest="voice", action="store_true", default=None, help="Enable voice recognition module (disable with /no-voice)")
+        parser.add_argument("/no-voice", "/no-v", "--no-voice", dest="voice", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/overlay", "/ov", dest="overlay", action="store_true", default=None, help="Enable overlay module (disable with /no-overlay)")
+        parser.add_argument("/no-overlay", "/no-ov", "--no-overlay", dest="overlay", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/streamdeck", "/sd", dest="streamdeck", action="store_true", default=None, help="Enable streamdeck module (disable with /no-streamdeck)")
+        parser.add_argument("/no-streamdeck", "/no-sd", "--no-streamdeck", dest="streamdeck", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/osc", dest="osc", action="store_true", default=None, help="Enable OSC (open stage control protocol) module (disable with /no-osc)")
+        parser.add_argument("/no-osc", "--no-osc", dest="osc", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/midi", dest="midi", action="store_true", default=None, help="Enable MIDI module (disable with /no-midi)")
+        parser.add_argument("/no-midi", "--no-midi", dest="midi", action="store_false", default=None, help=argparse.SUPPRESS)
         parser.add_argument("/theme", dest="theme", choices=["dark", "light", "auto"], help="Set the application theme to dark, light or automatic mode")
-        parser.add_argument("/help", "/h", "/?", action="help", help="Show this help message and exit")
+        parser.add_argument("/help", "/h", "/?", action=_CommandLineHelpAction, nargs=0, help="Show command-line documentation and exit")
+        parser.add_argument("/min", "/m", dest="minimize", action="store_true", default=None, help="Start minimized to tray (override with /no-min)")
+        parser.add_argument("/no-min", "--no-min", dest="minimize", action="store_false", default=None, help=argparse.SUPPRESS)
+        parser.add_argument("/persist", dest="persist", action="store_true", help="Persist command line options as default for future launches")
         args, unknown_args = parser.parse_known_args()
 
-        # hook mouse on/off
-        if args.mousehook is not None:
-            config.mouse_hook_disabled = not args.mousehook
+        def set_option(name, value, startup_name=None):
+            # depending on the persistent flag, set the global options or the temporary startup options
+            if value is not None:
+                setattr(config, name if args.persist else startup_name or f"startup_{name}", value)
 
-        # voice module
-        if args.voice is not None:
-            config.voice_enabled = args.voice
-
-        # overlay module
-        if args.overlay is not None:
-            config.overlay_enabled = args.overlay
-
-        # streamdeck module
-        if args.streamdeck is not None:
-            config.streamdeck_enabled = args.streamdeck
-
-        # osc module
-        if args.osc is not None:
-            config.osc_enabled = args.osc
-
-        # midi module
-        if args.midi is not None:
-            config.midi_enabled = args.midi
-
-        # start with a blank profile
-        if args.no_profile is not None:
-            config.no_profile = args.no_profile
+        set_option("mouse_hook_disabled", None if args.mousehook is None else not args.mousehook)
+        set_option("voice_enabled", args.voice)
+        set_option("overlay_enabled", args.overlay)
+        set_option("streamdeck_enabled", args.streamdeck)
+        set_option("osc_enabled", args.osc)
+        set_option("midi_enabled", args.midi)
+        set_option("autoload_profiles", args.switch, "startup_autoload_profiles")
 
         # auto start a profile (if a profile is available)
         if args.run is not None:
-            # set automatic profile start based on --run argument
-            config.run_on_start = bool(args.run)
+            set_option("run_on_start", bool(args.run), "startup_run_on_start")
 
-        # autoload last profile
+        # Auto-load the last profile is a separate startup behavior from process switching.
         if args.load is not None:
-            config.auto_load_disabled = not args.load
+            set_option("autoload_last_profile", args.load, "startup_autoload_last_profile")
 
-        if args.no_profile:
-            config.auto_load_disabled = True
+        if args.no_profile is not None:
+            if args.persist:
+                config.autoload_last_profile = not args.no_profile
+            config.startup_auto_load_disabled = args.no_profile
 
-        if config.auto_load_disabled:
-            # tell GEX to stasrt with a new blank profile
-            config.run_on_start = False
-            config.profile_to_load = False
+        if not args.persist and (config.startup_auto_load_disabled or args.load is False):
+            config.startup_run_on_start = False
+
+        set_option("start_minimized", args.minimize)
 
         profile_to_load = args.profile_file_name
         if not profile_to_load:
@@ -142,8 +175,9 @@ class CommandLineProcessor:
                 os._exit(1)
 
         if profile_specified and not args.no_profile:
-            config.profile_to_load = profile_to_load
+            config.startup_profile_to_load = profile_to_load
+            if args.persist:
+                config.last_profile = profile_to_load
 
         # theme
-        if args.theme is not None:
-            config.theme = args.theme
+        set_option("theme", args.theme)

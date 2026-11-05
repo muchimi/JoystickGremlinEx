@@ -204,7 +204,7 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis
         self.setInputIdCallback(self._handle_input_id_callback)
         self._interface = MidiInterface()  # initialize the MIDI interface
-        midi_enabled = gremlin.config.Configuration().midi_enabled
+        midi_enabled = gremlin.config.Configuration().startup_midi_enabled
         if midi_enabled and not self._interface.started:
             self._interface.start()
 
@@ -652,7 +652,7 @@ class MidiInterface(QtCore.QObject):
         self._port_count = 0
         self._initialized = False
         config = gremlin.config.Configuration()
-        self.midi_enabled = config.midi_enabled  # if enabled
+        self.midi_enabled = config.startup_midi_enabled  # if enabled
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._on_config_changed)
@@ -660,7 +660,7 @@ class MidiInterface(QtCore.QObject):
 
     def _on_config_changed(self):
         config = gremlin.config.Configuration()
-        self.midi_enabled = config.midi_enabled  # update MIDI enabled status based on configuration
+        self.midi_enabled = config.startup_midi_enabled  # update MIDI enabled status based on configuration
         if not self.midi_enabled:
             self.stop()
         self.verbose = config.verbose_mode_midi
@@ -2253,7 +2253,7 @@ class MidiClient(QtCore.QObject):
     @QtCore.Slot()
     def _options_changed(self):
         config = gremlin.config.Configuration()
-        midi_enabled = config.midi_enabled
+        midi_enabled = config.startup_midi_enabled
         if midi_enabled:
             self.start()
         else:

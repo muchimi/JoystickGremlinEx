@@ -1490,6 +1490,16 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
 
         box.addWidget(widget)
 
+        # fail over mode
+        widget = QDataCheckbox(
+            "Enable Virtual Output Failover",
+            value=self.config.virtual_output_failover,
+            callback=self._handle_virtual_output_failover_changed,
+            tooltip="When set, enables a missing VJOY device to use the Maestro device as a fallback, and vice versa.",
+        )
+
+        box.addWidget(widget)
+
         page_layout.addWidget(box)
 
         content_widget = QScrollableWidget(page_widget)
@@ -1509,7 +1519,9 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
 
     def _handle_use_v2_macro_mode_changed(self, checked: bool):
         self.config.use_v2_macro_mode = checked
-
+        
+    def _handle_virtual_output_failover_changed(self, checked: bool):
+        self.config.virtual_output_failover = checked
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
         page_widget, page_layout = getVContainer()

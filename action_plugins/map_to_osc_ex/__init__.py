@@ -1459,7 +1459,7 @@ class MapToOscEx(gremlin.input_item.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         config = gremlin.config.Configuration()
-        return config.osc_enabled
+        return config.startup_osc_enabled
 
     def _get_args(self, is_pressed, value):
         """gets OSC parameter list"""
@@ -1539,7 +1539,7 @@ class MapToOscEx(gremlin.input_item.AbstractAction):
 
     def _start_client(self):
         config = gremlin.config.Configuration()
-        if not config.osc_enabled:
+        if not config.startup_osc_enabled:
             # ignore if OSC is not enabled
             return False
         if not self.client_started or self.osc_client is None:

@@ -207,7 +207,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             "Description": MacroActionEditor.ActionTypeData("Description", self._description_ui, gremlin.macro.MacroDescriptionAction),
         }
 
-        if self.config.streamdeck_enabled:
+        if self.config.startup_streamdeck_enabled:
             self.action_types["Stream Deck"] = MacroActionEditor.ActionTypeData("Stream Deck", self._streamdeck_ui, gremlin.macro.StreamDeckAction)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -316,7 +316,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
         elif value == "State":
             self.model.set_entry(gremlin.macro.StateAction(), self.index.row())
-        elif value == "Stream Deck" and config.streamdeck_enabled:
+        elif value == "Stream Deck" and config.startup_streamdeck_enabled:
             self.model.set_entry(gremlin.macro.StreamDeckAction(), self.index.row())
         elif value == "Description":
             self.model.set_entry(gremlin.macro.MacroDescriptionAction(), self.index.row())
@@ -781,7 +781,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         self.config = gremlin.config.Configuration()
 
         def _connected_devices():
-            if self.config.streamdeck_enabled:
+            if self.config.startup_streamdeck_enabled:
                 try:
                     from gremlin.ui.streamdeck_device import StreamDeckBridge
 
@@ -799,7 +799,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             return []
 
         def _page_choices(device_id: str):
-            if self.config.streamdeck_enabled:
+            if self.config.startup_streamdeck_enabled:
                 try:
                     from gremlin.ui.streamdeck_device import StreamDeckBridge
 

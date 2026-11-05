@@ -90,7 +90,7 @@ class ProcessMonitor(QtCore.QObject):
     def _check_monitor(self):
         """executes when process monitoring related actions change"""
         config = gremlin.config.Configuration()
-        option_auto_load = config.autoload_profiles
+        option_auto_load = config.startup_autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
         self.enabled = option_auto_load or option_auto_load_on_focus
 
@@ -101,7 +101,7 @@ class ProcessMonitor(QtCore.QObject):
     def start(self):
         """Starts monitoring the current process."""
         config = gremlin.config.Configuration()
-        option_auto_load = config.autoload_profiles
+        option_auto_load = config.startup_autoload_profiles
         option_auto_load_on_focus = config.activate_on_process_focus
         syslog = logging.getLogger("system")
 

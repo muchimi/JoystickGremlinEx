@@ -400,12 +400,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # disable autoload if ctrl key is held
         if win32api.GetKeyState(win32con.VK_CONTROL) < 0:
             syslog.info("START: autoload profile disabled (ctrl key detected)")
-            self.config.auto_load_disabled = True
+            self.config.startup_auto_load_disabled = True
 
         profile_to_load = None
-        if not self.config.auto_load_disabled:
-            if config.profile_to_load and os.path.isfile(config.profile_to_load):
-                profile_to_load = config.profile_to_load
+        if not self.config.startup_auto_load_disabled and self.config.startup_autoload_last_profile:
+            if config.startup_profile_to_load and os.path.isfile(config.startup_profile_to_load):
+                profile_to_load = config.startup_profile_to_load
             elif self.config.last_profile and os.path.isfile(self.config.last_profile):
                 # check if this was a profile swap that we load the profile from the current user folder
                 current_profile_folder = gremlin.shared_state.data_path.casefold()
@@ -462,7 +462,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.ui_initialized.emit()
 
         # handle auto start
-        if self.config.run_on_start and profile_to_load:
+        run_on_start = self.config.startup_run_on_start
+        if run_on_start and profile_to_load:
             # register a startup call
             el.profile_loaded.connect(self._handle_auto_start_on_load)
 
@@ -1617,6 +1618,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def setUIState(self, enabled: bool):
         """enables/disables UI elements for run/edit modes"""
         if self.ui_enabled == enabled:
+            # Runtime state can change while the requested UI state stays enabled.
+            # Reapply it so stopping an autostarted profile restores the menus.
+            self.setUiMode(enabled)
             return
         ui = self.ui
         ui.devices_tab_header_widget.setEnabled(enabled)  # tab header
@@ -3599,7 +3603,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         case DeviceType.Midi:
                             # =======================================================
                             # Create MIDI tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
-                            if config.midi_enabled:
+                            if config.startup_midi_enabled:
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.midi_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
 
@@ -3627,7 +3631,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # =======================================================
                             # Create OSC tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
 
-                            if config.osc_enabled:
+                            if config.startup_osc_enabled:
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.osc_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
@@ -3681,7 +3685,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     index += 1
 
                         case DeviceType.StreamDeck:
-                            if config.streamdeck_enabled:
+                            if config.startup_streamdeck_enabled:
                                 # =======================================================
                                 # Stream Deck via Elgato plugin bridge — one tab per
                                 # connected physical deck; legacy shared tab only if needed.
@@ -3750,7 +3754,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 index += 1
 
                         case DeviceType.Voice:
-                            if config.voice_enabled:
+                            if config.startup_voice_enabled:
                                 device_guid = gremlin.util.normalize_guid(gremlin.shared_state.voice_tab_guid)
                                 device = gremlin.joystick_handling.getDevice(device_guid)
                                 widget = self.getRegisteredWidget(device_guid)
@@ -3768,7 +3772,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         case DeviceType.Overlay:
                             # =======================================================
                             # Add overlay device
-                            overlay_enabled = config.overlay_enabled
+                            overlay_enabled = config.startup_overlay_enabled
                             if overlay_enabled:
                                 try:
                                     device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
@@ -5003,13 +5007,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         guid_list.append(self._find_tab_data_guid(gremlin.shared_state.keyboard_tab_guid))
 
-        if self.config.midi_enabled:
+        if self.config.startup_midi_enabled:
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.midi_tab_guid))
 
-        if self.config.osc_enabled:
+        if self.config.startup_osc_enabled:
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.osc_tab_guid))
 
-        if self.config.streamdeck_enabled:
+        if self.config.startup_streamdeck_enabled:
             # One tab per connected Stream Deck (+ legacy tab only when still needed)
             from gremlin.ui import streamdeck_device as streamdeck_ui
 
@@ -5030,7 +5034,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # add the user plugin tab
         guid_list.append(self._find_tab_data_guid(gremlin.shared_state.plugins_tab_guid))
 
-        if self.config.overlay_enabled:
+        if self.config.startup_overlay_enabled:
             overlay_tab = self._find_tab_data_guid(gremlin.shared_state.overlay_tab_guid)
             if overlay_tab:
                 guid_list.append(overlay_tab)
@@ -5184,7 +5188,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionOverlayControl.setCheckable(True)
         self.ui.actionOverlayControl.setIcon(overlay_icon)
         try:
-            self.ui.actionOverlayControl.setVisible(bool(self.config.overlay_enabled))
+            self.ui.actionOverlayControl.setVisible(bool(self.config.startup_overlay_enabled))
         except Exception:
             pass
 
@@ -5366,7 +5370,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         #  get auto load options
         option_auto_load = (
-            config.autoload_profiles
+            config.startup_autoload_profiles
         )  # if true, change the profile if a process is mapped to one, do not activate unless gremlin was already activated
         option_auto_load_on_focus = config.activate_on_process_focus  # if true, also activate the mapped profile if not activated
         process_base = os.path.basename(new_process_path)
@@ -5698,8 +5702,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._set_joystick_input_highlighting(self.config.highlight_enabled)
         self._set_joystick_input_axis_highlighting(self.config.highlight_input_axis)
         self._set_joystick_input_buttons_highlighting(self.config.highlight_input_buttons)
-        if not ignore_minimize and self.config.start_minimized:
-            self.setHidden(self.config.start_minimized)
+        if not ignore_minimize and self.config.startup_start_minimized:
+            self.setHidden(self.config.startup_start_minimized)
 
         if auto_start:
             config = gremlin.config.Configuration()
@@ -6679,7 +6683,7 @@ if __name__ == "__main__":
     parser = gremlin.startup.CommandLineProcessor()
     parser.process()
 
-    theme = config.theme
+    theme = config.startup_theme
     match theme:
         case "light":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
@@ -7000,7 +7004,7 @@ if __name__ == "__main__":
         # identify self to the network on start
         gremlin.remote.remote_client.requestIdentify()
 
-        if not config.start_minimized:
+        if not config.startup_start_minimized:
             ui.showNormal()
 
         syslog.info("GremlinEx UI launching...")

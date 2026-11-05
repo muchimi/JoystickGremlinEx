@@ -70,9 +70,11 @@ def _hat_direction(value):
 
 
 def _open_remote_vjoy(device_id):
-    """Acquire a vJoy device for remote output (opens on demand if needed).
+    """Acquire a virtual output device for remote output (opens on demand if needed).
 
-    Returns (vjoy_id, vjoy_device) or (None, None).
+    Applies vJoy/Maestro failover (resolved once and cached) when enabled on this machine.
+    Returns (vjoy_id, device) or (None, None). The device is a vJoy device or a
+    Maestro output device; both expose the same button/axis/hat interface.
 
     Membership checks against VJoyProxy.vjoy_devices fail after profile stop
     (reset) or on receive-only clients that never wrote locally — silently
@@ -97,9 +99,12 @@ def _open_remote_vjoy(device_id):
         syslog.warning(f"REMOTE: vJoy device id out of range [{vid}]")
         return None, None
     try:
+        target = gremlin.joystick_handling.get_output_target(vid)
+        if target is not None and target.kind == "maestro":
+            return vid, target.maestro
         return vid, gremlin.joystick_handling.VJoyProxy()[vid]
     except Exception as err:
-        syslog.warning(f"REMOTE: cannot open vJoy [{vid}]: {err}")
+        syslog.warning(f"REMOTE: cannot open output device [{vid}]: {err}")
         return None, None
 
 

@@ -2992,7 +2992,7 @@ class Profile:
         self.devices[device_guid] = new_device
 
         # MIDI
-        if config.midi_enabled:
+        if config.startup_midi_enabled:
             device_guid = gremlin.shared_state.midi_tab_guid
             device_type = DeviceType.Midi
             new_device = ProfileDeviceNode(self)
@@ -3004,7 +3004,7 @@ class Profile:
             self.devices[device_guid] = new_device
 
         # OSC
-        if config.osc_enabled:
+        if config.startup_osc_enabled:
             device_guid = gremlin.shared_state.osc_tab_guid
             device_type = DeviceType.Osc
             new_device = ProfileDeviceNode(self)
@@ -3028,7 +3028,7 @@ class Profile:
         self.devices[device_guid] = new_device
 
         # voice data
-        if config.voice_enabled:
+        if config.startup_voice_enabled:
             self.voice = gremlin.ui.voice_device.VoiceData()
 
             device_guid = gremlin.shared_state.voice_tab_guid

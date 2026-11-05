@@ -16,6 +16,8 @@ GremlinEx can be expanded using custom plugins written in Python.
 
 The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentation](https://muchimi.github.io/JoystickGremlinEx)
 
+For command-line switches, see [Command-line options](command_line.md).
+
 # Discord
 
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
@@ -48,6 +50,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+
+### (m77T92)
+- New: DIST: (experimental) New installer option. This new deployment method is a traditional setup program to install GremlinEx and thus easier to use that the ZIP archive method.  The installer lets you install GremlinEx to a folder of your choosing, defaults to a different sub folders based on version, supports uninstall.
+- New: DIST: packaged EXE is now versioned (for installer support).
+- New: API: Virtual device fail-over mode.  Allows missing VJOY devices to use corresponding Maestro devices (if installed).  This enables joystick output to map to whichever virtual device exists on the target machine without a profile re-do for any new devices if Maestro is used (Maestro is exclusive and does not work along with VJOY/VIGEM). This option is enabled by default and can be changed from the runtime options.  Note: Maestro is currently disabled until testing finishes although it is completely functional in the test environments.
+- Change: command line parameters are now temporary and do not change the main options unless the /persist flag is also set on the command line.  Persisting these options may cause issues when not using command lines without new parameters that disable these options.
+- Change: BUILD: automate build process and versioning for packaging and installer creation.
+- Fix: API: /r option can prevent the UI from re-enabling itself on profile stop.
+- Fix: API: built-in argument parser does not handle negative parameters using Windows style command line parameters.
+
+
 
 ### (m77T91)
 - Change: command line parameters were updated for new features, and our menu options may have changed to please read carefully.
@@ -203,4 +217,3 @@ Command line parameters use - or / as the prefix - example `/help` or `-help` fo
 
 
 [Older change logs](archive_change_log.md)
-

@@ -1686,7 +1686,7 @@ class VoiceData:
 
         # if voice is disabled, skip
         config = gremlin.config.Configuration()
-        if not config.voice_enabled:
+        if not config.startup_voice_enabled:
             return
 
         for node in root:
