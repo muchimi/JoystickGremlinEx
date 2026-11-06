@@ -88,6 +88,18 @@ def install_bridge(parent=None):
     return result[0]
 
 
+def show_startup_ui(ui, config, maestro, vjoy_working):
+    """Show the editor before reporting missing virtual output providers."""
+    output_unavailable = not (vjoy_working or (maestro.enabled and maestro.service_running))
+    ui.apply_user_settings(ignore_minimize=output_unavailable)
+    if output_unavailable or not config.startup_start_minimized:
+        ui.showNormal()
+    if output_unavailable:
+        # Run after the main event loop starts, with a visible parent. A missing
+        # driver must not leave startup at a standalone warning or in the tray.
+        QtCore.QTimer.singleShot(0, ui, lambda: check_virtual_output(config, maestro, vjoy_working, parent=ui))
+
+
 def check_virtual_output(config, maestro, vjoy_working, parent=None):
     """Warn or offer setup when no provider is available; always allow startup."""
     if vjoy_working or (maestro.enabled and maestro.service_running):

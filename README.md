@@ -58,6 +58,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: UI: changing a profile with the input viewer visible could cause a model exception if the state visualizer is active.
 - Fix: API: capped the maximum number of gamepad devices GEX can create via Maestro to 4 as that is the maximum supported by the XINPUT API.
 - Fix: DIST: build tools can push an old version of the setup program.
+- Fix: API (sound): exception if the system has no defined audio output devices.
+- Fix: API (voice): allow voice device to be enabled when no input audio device is found.
+- Fix: UI: UI not visible if VJOY is not installed.
 
 ### (m77T92)
 

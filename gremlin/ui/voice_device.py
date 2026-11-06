@@ -568,8 +568,9 @@ class VoiceSettingsDialog(QRememberDialog):
     def _update_ui(self):
         visible = self._input_selector.currentData() == DEFAULT_AUDIO_DEVICE_INDEX
         if visible:
-            self._default_name_widget.setText(VoiceData().getDefaultAudioDevice())
+            self._default_name_widget.setText(self.voice_data.getDefaultAudioDevice() or "No audio capture device available")
         self._default_name_widget.setVisible(visible)
+        self._monitor_button.setEnabled(bool(self.voice_data.getAudioDevices()))
 
         # only show input selector if the mode is not off
         visible = self._mode not in (VoicePTTMode.Off, VoicePTTMode.Toggle)
@@ -807,6 +808,7 @@ class VoiceSettingsDialog(QRememberDialog):
             self._voice.audioMonitor.disconnect(self._update_view_meter)
             if self._monitored_input:
                 self._monitored_input.volumeChanged.disconnect(self._handle_system_volume_changed)
+                self._monitored_input.deleteLater()
                 self._monitored_input = None
             self._voice.popRecognize()
             self._started = False
@@ -821,11 +823,14 @@ class VoiceSettingsDialog(QRememberDialog):
         if self._started:
             return
         self._voice.pushRecognize()
+        if not self._voice.start():
+            self._voice.popRecognize()
+            with QtCore.QSignalBlocker(self._monitor_button):
+                self._monitor_button.setChecked(False)
+            return
         self._voice.setListen(True)
         self._voice.audioMonitor.connect(self._update_view_meter)
-        self._voice.start()
-        if self._monitored_input:
-            self._monitored_input.volumeChanged.connect(self._handle_system_volume_changed)
+        self._update_volume_monitor()
         self._started = True
 
     def closeEvent(self, event):
@@ -861,19 +866,21 @@ class VoiceSettingsDialog(QRememberDialog):
 
     def _update_volume_monitor(self):
 
-        target_name = self._get_target_device().casefold()
-        if self._last_monitored_device is None or self._last_monitored_device != target_name:
-            self._last_monitored_device = target_name
+        target_name = self._get_target_device()
+        target_name = target_name.casefold() if target_name else None
+        if target_name == self._last_monitored_device and self._monitored_input is not None:
+            return
+        self._last_monitored_device = target_name
 
-            monitored_device = None
-            for device in QMediaDevices.audioInputs():
-                if target_name in device.description().casefold():
-                    monitored_device = device
-                    break
+        if self._monitored_input:
+            self._monitored_input.volumeChanged.disconnect(self._handle_system_volume_changed)
+            self._monitored_input.deleteLater()
+            self._monitored_input = None
 
-            if self._monitored_input:
-                self._monitored_input.volumeChanged.disconnect(self.on_volume_changed)
-
+        if target_name is None:
+            return
+        monitored_device = next((device for device in QMediaDevices.audioInputs() if target_name in device.description().casefold()), None)
+        if monitored_device is not None:
             self._monitored_input = QAudioInput(monitored_device, self)
             self._monitored_input.volumeChanged.connect(self._handle_system_volume_changed)
 
@@ -896,7 +903,8 @@ class VoiceSettingsDialog(QRememberDialog):
         """gets the current device input volume as set in the operating system"""
         target_name = self._get_target_device()
         volume = self._voice.getVolume(target_name=target_name)
-        self._volume_widget.setValue(volume)
+        self._volume_widget.setEnabled(volume >= 0)
+        self._volume_widget.setValue(max(0, volume))
 
     def _get_target_device(self) -> str:
         index = self._input_selector.currentData()
@@ -1252,7 +1260,8 @@ class VoiceData:
         """gets the default input device"""
         if self._device_name is None:
             self._device_name = self._sound.getDefaultInputDevice()
-            self._device_index = self._sound.getDefaultInputDeviceIndex()
+            index = self._sound.getDefaultInputDeviceIndex()
+            self._device_index = index if index is not None else DEFAULT_AUDIO_DEVICE_INDEX
         return self._device_name
 
     def getAudioDevices(self):
@@ -1337,7 +1346,7 @@ class VoiceData:
             if validate:
                 # validate the device exists in the current system input devices
                 name = device_name.casefold()
-                device_name_found = next((d for d in self._sound.input_device_map.values() if d.description().casefold().startswith(name)), None)
+                device_name_found = next((d for d in self._sound.input_device_map.values() if d.casefold().startswith(name)), None)
                 if device_name_found is None:
                     syslog.warning(f"Audio device '{device_name}' not found, using default")
                     self._device_name = None

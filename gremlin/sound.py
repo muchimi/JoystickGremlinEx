@@ -881,6 +881,8 @@ class Sound:
                 self.device_map.clear()
                 self.device_name_to_id_map.clear()
                 self.device_sample_rate_map.clear()
+                self.input_device_map.clear()
+                self.input_device_name_to_id_map.clear()
 
             device_list = sd.query_devices()
 
@@ -1078,19 +1080,26 @@ class Sound:
         index = next((i for i, d in self.device_map.items() if d.isDefault()), None)
         return index
 
-    def getDefaultAudioDeviceName(self) -> str:
-        """gets the name of the default audio device"""
+    def getDefaultAudioDeviceName(self) -> str | None:
+        """gets the default output device name, or None when unavailable"""
 
         if USE_SD:
-            # self._update_devices()
-            _, index = sd.default.device
             # match by name because the host API may be different and we're looking for WASAPI devices specifically
-            default_device_name = sd.query_devices(index).get("name")
+            try:
+                default_device_name = sd.query_devices(kind="output")["name"]
+            except (sd.PortAudioError, ValueError) as err:
+                # No output device, or the configured device was disconnected.
+                syslog.warning(f"SOUND: No default audio output device available: {err}")
+                return None
             device_name = self._ensure_device(default_device_name)
             return device_name
         else:
-            default_device = QtMultimedia.QMediaDevices.defaultAudioOutput()
-            return default_device.description()
+            try:
+                default_device = QtMultimedia.QMediaDevices.defaultAudioOutput()
+                return default_device.description()
+            except Exception as err:
+                syslog.warning(f"SOUND: No default audio output device available: {err}")
+                return None
 
     def getAudioDeviceIndex(self):
         """gets the index of the selected device"""
@@ -1140,7 +1149,11 @@ class Sound:
             default_device = QtMultimedia.QMediaDevices.defaultAudioInput()
             return default_device.description()
         if USE_SD:
-            device = sd.query_devices(kind="input")
+            try:
+                device = sd.query_devices(kind="input")
+            except (sd.PortAudioError, ValueError) as err:
+                syslog.warning("SOUND: No default audio input device available: %s", err)
+                return None
             if device:
                 return device["name"]
             return None

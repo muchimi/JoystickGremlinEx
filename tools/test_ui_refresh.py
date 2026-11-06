@@ -398,10 +398,11 @@ class MainRefreshTests(unittest.TestCase):
         for name in ("push_redraw", "pop_redraw", "push_suspend_save_input", "pop_suspend_save_input"):
             setattr(SERVICES.shared_state, name, Mock())
         CONFIG.get_profile_last_edit_mode = lambda: "Default"
+        CONFIG.vjoy_installed = False
         profile_data = NS(
             from_xml=Mock(return_value=False), to_xml=Mock(), get_modes=lambda: ["Default"],
             get_default_start_mode=lambda: "Default", getMappingHash=lambda: "profile-hash",
-            setLoaded=Mock(), settings=NS(input_visible_map=True), unload=Mock(),
+            setLoaded=Mock(), settings=NS(input_visible_map=True), unload=Mock(), list_vjoy_mappings=lambda: {},
         )
         SERVICES.base_profile = NS(Profile=lambda: profile_data, ProfileImportData=lambda: NS(used_ids=set()))
         self.ui.profile = profile_data

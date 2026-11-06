@@ -1849,27 +1849,35 @@ class Voice:
 
         self.start()  # start to listen to audio
 
-    def start(self):
+    def start(self) -> bool:
         """start listening for voice input"""
         if self._listening:
-            return  # already listening
+            return True  # already listening
 
         if not gremlin.config.Configuration().startup_voice_enabled:
             # disabled
-            return
+            return False
+
+        # Capture hardware is optional. Check before loading the recognition
+        # model or starting worker threads, and allow a later start to retry.
+        try:
+            sd.query_devices(kind="input")
+        except (sd.PortAudioError, ValueError) as err:
+            syslog.warning("VOICE: No audio capture device available; voice input will not start: %s", err)
+            return False
 
         # ensure model is ok
         self.ensureModel()
 
         if not self._model_valid:
             syslog.error("Voice: cannot start listening because the voice recognition model is not valid.")
-            return
+            return False
 
         commands = self.getCommands()
         if not commands:
             # no commands to process - do not start listener
             syslog.info("Voice: No commands to process - listener will not start.")
-            return
+            return False
 
         syslog.info("VOICE: Starting voice input...")
 
@@ -1922,6 +1930,7 @@ class Voice:
 
             else:
                 self._listening = False
+        return self._listening
 
     def _on_recognized(self, words: list[str]):
         """callback when speech is recognized"""
@@ -1945,6 +1954,18 @@ class Voice:
 
     def _listen_runner(self, abort_event: threading.Event):
         """Internal method run in a separate thread to handle listening."""
+        try:
+            self._capture_audio(abort_event)
+        except (sd.PortAudioError, ValueError) as err:
+            # The microphone can disappear after the startup check.
+            syslog.warning("VOICE: Audio capture is unavailable; stopping voice input: %s", err)
+            abort_event.set()
+            self.recognizer.stop()
+            self._rolling_matcher.stop()
+            self._listening = False
+
+    def _capture_audio(self, abort_event: threading.Event):
+        """Capture microphone input until stopped."""
 
         if self.verbose:
             syslog.info("Voice listen runner started...")
@@ -2035,7 +2056,7 @@ class Voice:
         else:
             device = QMediaDevices.defaultAudioInput()
 
-        return device
+        return device if device is not None and not device.isNull() else None
 
     def getDefaultDeviceName(self) -> str:
         """gets the name of the default input device (microphone)"""

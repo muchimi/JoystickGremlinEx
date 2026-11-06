@@ -9,6 +9,7 @@ import threading
 from types import ModuleType, SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
+from shiboken6 import Shiboken
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -180,6 +181,103 @@ class StartupProviderChecks(unittest.TestCase):
         self.install.side_effect = OSError('UAC cancelled')
         self.assertFalse(self.check())
         self.box.warning.assert_called_once()
+
+
+class StartupWindowChecks(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = STARTUP.QtWidgets.QApplication.instance() or STARTUP.QtWidgets.QApplication([
+            'startup-window-checks', '-platform', 'offscreen'])
+        cls.app.setQuitOnLastWindowClosed(False)
+
+    def setUp(self):
+        self.config = NS(vjoy_installed=False, startup_start_minimized=False)
+        self.maestro = NS(enabled=False, service_running=False)
+        self.applied_settings = []
+
+        class Window(STARTUP.QtWidgets.QMainWindow):
+            def apply_user_settings(window, ignore_minimize=False):
+                self.applied_settings.append(ignore_minimize)
+                if self.config.startup_start_minimized and not ignore_minimize:
+                    window.hide()
+
+        self.window = Window()
+        self.window.showMinimized()
+        self.addCleanup(self.cleanup_window)
+
+    def cleanup_window(self):
+        if Shiboken.isValid(self.window):
+            self.window.close()
+            self.window.deleteLater()
+        STARTUP.QtCore.QCoreApplication.sendPostedEvents(None, STARTUP.QtCore.QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+
+    def dismiss_startup_dialog(self, installed):
+        observed = []
+        timer = STARTUP.QtCore.QTimer()
+
+        def dismiss():
+            dialog = self.app.activeModalWidget()
+            if isinstance(dialog, STARTUP.QtWidgets.QMessageBox):
+                observed.append((dialog.parentWidget(), self.window.isVisible(), self.window.isMinimized()))
+                buttons = STARTUP.QtWidgets.QMessageBox.StandardButton
+                dialog.done(buttons.Ok if installed else buttons.No)
+
+        timer.timeout.connect(dismiss)
+        with (
+            patch.object(STARTUP, '_machine_key_exists', return_value=False),
+            patch.object(STARTUP, 'bridge_installed', return_value=installed),
+            patch.object(STARTUP, 'install_bridge') as install,
+            patch.object(STARTUP, 'syslog', Mock()),
+        ):
+            STARTUP.show_startup_ui(self.window, self.config, self.maestro, False)
+            self.assertEqual(observed, [])  # the prompt waits for the event loop
+            self.assertTrue(self.window.isVisible())
+            timer.start(0)
+            self.app.processEvents()
+            timer.stop()
+            install.assert_not_called()
+        self.assertEqual(observed, [(self.window, True, False)])
+        self.assertTrue(self.window.isVisible())
+        self.assertFalse(self.window.isMinimized())
+        self.assertEqual(self.applied_settings, [True])
+
+    def test_missing_vjoy_warning_leaves_editor_visible_after_dismissal(self):
+        self.dismiss_startup_dialog(installed=True)
+
+    def test_declining_bridge_setup_leaves_editor_visible(self):
+        self.dismiss_startup_dialog(installed=False)
+
+    def test_unavailable_output_overrides_saved_start_minimized(self):
+        self.config.startup_start_minimized = True
+        self.dismiss_startup_dialog(installed=True)
+
+    def test_working_provider_preserves_saved_minimized_preference(self):
+        self.config.startup_start_minimized = True
+        with patch.object(STARTUP, 'check_virtual_output') as check:
+            STARTUP.show_startup_ui(self.window, self.config, self.maestro, True)
+            self.app.processEvents()
+            check.assert_not_called()
+        self.assertFalse(self.window.isVisible())
+        self.assertEqual(self.applied_settings, [False])
+
+    def test_working_maestro_shows_editor_normally_without_warning(self):
+        self.maestro.enabled = self.maestro.service_running = True
+        with patch.object(STARTUP, 'check_virtual_output') as check:
+            STARTUP.show_startup_ui(self.window, self.config, self.maestro, False)
+            self.app.processEvents()
+            check.assert_not_called()
+        self.assertTrue(self.window.isVisible())
+        self.assertFalse(self.window.isMinimized())
+        self.assertEqual(self.applied_settings, [False])
+
+    def test_destroying_window_cancels_pending_provider_prompt(self):
+        with patch.object(STARTUP, 'check_virtual_output') as check:
+            STARTUP.show_startup_ui(self.window, self.config, self.maestro, False)
+            self.window.deleteLater()
+            STARTUP.QtCore.QCoreApplication.sendPostedEvents(None, STARTUP.QtCore.QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+            check.assert_not_called()
 
 
 class EnumerationChecks(unittest.TestCase):

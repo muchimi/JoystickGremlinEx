@@ -6917,7 +6917,6 @@ if __name__ == "__main__":
         vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_type == DeviceType.VJoy and dev.connected])
         gremlin.shared_state.vjoy_enabled = bool(config.vjoy_installed and vjoy_count)
         syslog.info(f"Found {vjoy_count} configured vJoy device(s)")
-        gremlin.virtual_output_startup.check_virtual_output(config, maestro, gremlin.shared_state.vjoy_enabled)
 
         gremlin.shared_state.reload_device_map()
 
@@ -6992,13 +6991,10 @@ if __name__ == "__main__":
         el.ui_ready.emit()
 
         syslog.info("Apply settings...")
-        ui.apply_user_settings()
+        gremlin.virtual_output_startup.show_startup_ui(ui, config, maestro, gremlin.shared_state.vjoy_enabled)
 
         # identify self to the network on start
         gremlin.remote.remote_client.requestIdentify()
-
-        if not config.startup_start_minimized:
-            ui.showNormal()
 
         syslog.info("GremlinEx UI launching...")
 
