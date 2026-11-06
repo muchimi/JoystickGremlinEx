@@ -20,7 +20,6 @@ import ctypes
 import enum
 import os
 import logging
-import atexit
 import threading
 import ctypes.wintypes as wintypes
 
@@ -42,6 +41,7 @@ class VJoyInterface:
 
     vjoy_dll = None
     valid = False
+    initialization_error = None
 
     # Declare argument and return types for all the functions
     # exposed by the dll
@@ -115,11 +115,7 @@ class VJoyInterface:
             return self._call_on_ui_thread(self.initialize)
 
         from pathlib import Path
-        from gremlin.util import (
-            display_error,
-            get_dll_version,
-            version_valid,
-        )  # , get_vjoy_driver_version
+        from gremlin.util import get_dll_version, version_valid
 
         if VJoyInterface.vjoy_dll is None:
             dll_folder = os.path.dirname(__file__)
@@ -130,10 +126,7 @@ class VJoyInterface:
                 parent = Path(dll_folder).parent
                 _dll_path = os.path.join(parent, dll_file)
                 if not os.path.isfile(_dll_path):
-                    msg = f"Unable to continue - missing dll: {_dll_path}"
-                    display_error(msg)
-                    syslog.critical(msg)
-                    os._exit(1)
+                    return self._unavailable(f"Missing vJoy interface DLL: {_dll_path}")
 
             # check DLL version
             min_version = "2.1.9.1"
@@ -141,35 +134,52 @@ class VJoyInterface:
                 dll_version = get_dll_version(_dll_path)
 
                 if not version_valid(dll_version, min_version):
-                    msg = f"Invalid version dll: {_dll_path}\nVersion {min_version} required, found {dll_version}"
-                    display_error(msg)
-                    syslog.critical(msg)
-                    os._exit(1)
-            except Exception:
-                msg = "Error: VJOY is not installed or not configured."
-                display_error(msg)
-                syslog.critical(msg)
-                os._exit(1)
+                    return self._unavailable(f"vJoy interface requires version {min_version}, found {dll_version}: {_dll_path}")
+            except Exception as error:
+                return self._unavailable(f"Unable to read vJoy interface version: {error}")
 
             syslog.info(f"Found VJOY DLL version {dll_version}")
 
             try:
                 VJoyInterface.vjoy_dll = ctypes.cdll.LoadLibrary(_dll_path)
             except Exception as error:
-                msg = f"vjoy_interface.dll load error, unable to continue:\n{error}"
-                display_error(msg)
-                syslog.critical(msg)
-                os._exit(1)
+                return self._unavailable(f"Unable to load vJoy interface DLL: {error}")
 
-        for fn_name, params in self.api_functions.items():
-            dll_fn = getattr(self.vjoy_dll, fn_name)
-            if "arguments" in params:
+        try:
+            functions = {}
+            for fn_name, params in self.api_functions.items():
+                dll_fn = getattr(self.vjoy_dll, fn_name)
                 dll_fn.argtypes = params["arguments"]
-            if "returns" in params:
                 dll_fn.restype = params["returns"]
-            setattr(self, fn_name, staticmethod(self._wrap_ui_thread_call(dll_fn)))
+                functions[fn_name] = self._wrap_ui_thread_call(dll_fn)
+            for fn_name, function in functions.items():
+                setattr(self, fn_name, staticmethod(function))
+        except Exception as error:
+            return self._unavailable(f"Unable to initialize vJoy interface: {error}")
 
         self.valid = True
+        self.initialization_error = None
+        return True
+
+    @classmethod
+    def _reset_api(cls):
+        """Keep optional-driver queries safe when the DLL cannot be used."""
+        cls.valid = False
+        for name, params in cls.api_functions.items():
+            if name == 'GetVJDStatus':
+                result = VJoyState.Missing.value
+            elif params['returns'] in (None, ctypes.c_wchar_p):
+                result = None
+            else:
+                result = 0
+            setattr(cls, name, staticmethod(lambda *args, result=result: result))
+
+    @classmethod
+    def _unavailable(cls, reason):
+        cls._reset_api()
+        cls.initialization_error = reason
+        syslog.warning("VJOY: %s. Native vJoy output is unavailable.", reason)
+        return False
 
     @classmethod
     def _is_ui_thread(cls):
@@ -220,9 +230,8 @@ class VJoyInterface:
             kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
             kernel32.FreeLibrary.argtypes = [wintypes.HMODULE]
             kernel32.FreeLibrary(dll_handle)
-            del self.vjoy_dll
-            self.valid = False
             self.vjoy_dll = None
             syslog.info("VJOY: interface shutdown")
+        self._reset_api()
 
 

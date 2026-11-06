@@ -65,6 +65,7 @@ import gremlin.tabstate
 import win32api
 import win32con
 import gremlin.startup
+import gremlin.virtual_output_startup
 import gremlin.joystick_handling
 import gremlin.util
 import gremlin.input_types
@@ -6068,6 +6069,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # default to mapped mode for older profiles without data
                 new_profile.settings.setAllVisible("mapped")
 
+
+            # setup failover modes if needed but only if no configured vjoy devices exist
+            config = gremlin.config.Configuration()
+            if not config.vjoy_installed:
+                vjoy_map = new_profile.list_vjoy_mappings()
+                failover = bool(vjoy_map)
+                config.vjoy_failover = failover
+                if failover:
+                    # configure the fail over devices so they are available for use
+                    gremlin.joystick_handling.configure_failover(vjoy_map)
+            else:
+                config.vjoy_failover = False
+
+
             # reload the calibration data if the profile has custom calibration
             mgr = gremlin.ui.axis_calibration.CalibrationManager()
             mgr.reload()
@@ -6897,34 +6912,12 @@ if __name__ == "__main__":
         # update device list
         gremlin.joystick_handling.joystick_devices_initialization()
 
-        # Check if vJoy is properly setup and if not display an error
-        # and terminate GremlinEx
-        try:
-            syslog.info("Checking vJoy installation")
-            vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_type == DeviceType.VJoy and dev.connected])
-            vjoy_working = vjoy_count != 0
-            syslog.info(f"\tFound {vjoy_count} configured vjoy device(s)")
-
-            gremlin.shared_state.vjoy_enabled = vjoy_working
-
-            if not vjoy_working:
-                msg = "No configured VJOY devices were found.  VJOY output will be disabled.  This is normal if VJOY is not installed or not configured."
-                syslog.warning(msg)
-                # gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
-                # raise gremlin.error.GremlinError(msg)
-
-        except (gremlin.error.GremlinError, dinput.DILLError) as e:
-            error_display = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, "Error", e.value, QtWidgets.QMessageBox.Ok)
-            error_display.move
-            error_display.show()
-
-            app.exec_()
-
-            gremlin.joystick_handling.VJoyProxy.reset()
-            el = gremlin.event_handler.EventListener()
-            el.terminate()  # terminates and sends the relevant shutdown triggers
-            fl.close()
-            sys.exit(0)
+        # Either virtual output provider can be used; absent drivers do not
+        # prevent profile editing or the use of non-joystick outputs.
+        vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_type == DeviceType.VJoy and dev.connected])
+        gremlin.shared_state.vjoy_enabled = bool(config.vjoy_installed and vjoy_count)
+        syslog.info(f"Found {vjoy_count} configured vJoy device(s)")
+        gremlin.virtual_output_startup.check_virtual_output(config, maestro, gremlin.shared_state.vjoy_enabled)
 
         gremlin.shared_state.reload_device_map()
 
@@ -7029,9 +7022,8 @@ if __name__ == "__main__":
         el = gremlin.event_handler.EventListener()
         el.terminate()  # terminates and sends the relevant shutdown triggers
 
-        if vjoy_working:
-            # Properly terminate the runner instance should it be running
-            ui.runner.stop()
+        # Stop active profiles using either vJoy or Maestro output.
+        ui.runner.stop()
 
         # Relinquish control over all VJoy devices used
         gremlin.joystick_handling.VJoyProxy.reset()

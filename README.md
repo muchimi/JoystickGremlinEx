@@ -51,8 +51,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T93)
+
+
+- Change: API: Continued work on provisioning of temporary VJOY devices to allow profiles configured for VJOY to load when VJOY is not configured or installed. Undefined VJOY outputs will attempt to use Maestro defined devices instead if available.  The failover is determined at profile start.  The mechanism is meant to allow profiles designed for VJOY to run as-is with Maestro virtual devices (provided they exist).
+- Fix: UI: changing a profile with the input viewer visible could cause a model exception if the state visualizer is active.
+- Fix: API: capped the maximum number of gamepad devices GEX can create via Maestro to 4 as that is the maximum supported by the XINPUT API.
+- Fix: DIST: build tools can push an old version of the setup program.
 
 ### (m77T92)
+
 - New: DIST: (experimental) New installer option. This new deployment method is a traditional setup program to install GremlinEx and thus easier to use that the ZIP archive method.  The installer lets you install GremlinEx to a folder of your choosing, defaults to a different sub folders based on version, supports uninstall.
 - New: DIST: packaged EXE is now versioned (for installer support).
 - New: API: Virtual device fail-over mode.  Allows missing VJOY devices to use corresponding Maestro devices (if installed).  This enables joystick output to map to whichever virtual device exists on the target machine without a profile re-do for any new devices if Maestro is used (Maestro is exclusive and does not work along with VJOY/VIGEM). This option is enabled by default and can be changed from the runtime options.  Note: Maestro is currently disabled until testing finishes although it is completely functional in the test environments.

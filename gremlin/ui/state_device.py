@@ -42,6 +42,7 @@ import gremlin.util
 from gremlin.util import safe_format, safe_read, write_guid, read_guid
 
 import gremlin.base_profile
+from gremlin.base_classes import AbstractCallbackModel
 from psygnal import Signal
 import gremlin.input_item
 from gremlin.input_item import (
@@ -3722,13 +3723,13 @@ class StateVisualizerWidget(QWidget):
 
         count_widget = StateFilterCountWidget(filter=self.VISUALIZER_FILTER, suffix="states")
 
-        ui = gremlin.shared_state.ui
-        device_widget = ui.getRegisteredWidget(StateDeviceTabWidget.device_guid)
-        self.model = device_widget.model if device_widget else None
+        # The States tab may be hidden or still rebuilding when the viewer opens.
+        # Keep the viewer's model independent of the tab and its lifetime.
+        profile = gremlin.shared_state.current_profile
+        self.model = StateInputItemModel(profile, custom_load_handler=self._load_states)
         self.model.registerFilter(self.VISUALIZER_FILTER)  # new filter type for the model
         self.model.addCallback(self._handle_model_changed)
 
-        profile = gremlin.shared_state.current_profile
         self._state_filter_widget = StateFilterWidget(model=self.model, profile=profile, count_widget=count_widget, filter=self.VISUALIZER_FILTER)
         self._state_filter_widget.changed.connect(self._populateState_ui)  # update on filter change
 
@@ -3739,8 +3740,6 @@ class StateVisualizerWidget(QWidget):
         self._widget_list.append(container)
         self.main_layout.addWidget(container)
 
-        config = gremlin.config.Configuration()
-        config.changed.connect(self._config_changed)
         current_size = config.input_viewer_button_size
         font_sizes = (("small", 12), ("medium", 16), ("large", 20))
         widgets = [count_widget, "|", "Button size:"]
@@ -3772,25 +3771,37 @@ class StateVisualizerWidget(QWidget):
         self.model.applyFilter(filter=self.VISUALIZER_FILTER, emit=True)
         self._state_filter_widget.updateFilter()
 
+        StateData().crud.connect(self._state_crud)
+
+    def _load_states(self, model):
+        """Load profile states without requiring the States configuration tab."""
+        # Reset this view's data without announcing deletion of profile inputs.
+        AbstractCallbackModel.clear(model, emit=False)
+        states = StateData().getStates()
+        for index, key in enumerate(sorted(states)):
+            model.setItemAt(index, states[key], emit=False)
+        model.applyFilter(emit=False)
+
     def _handle_model_changed(self, data, force):
         # update the data
         if self.initialized:
-            self.reloadStates()
+            gremlin.util.InvokeUiMethod(self._populateState_ui)
 
     def _cleanup_ui(self):
+        self.initialized = False
         self.unhook()
-        if self.model:
-            self.model.unregisterFilter(self.VISUALIZER_FILTER)  # also clears any callbacks for that filter
-
         self._state_filter_widget.changed.disconnect(self._populateState_ui)  # disconnect filter change signal
-
-        for btn in self._state_buttons.values():
-            gremlin.util.delete_widget(btn)
-        self._state_buttons.clear()
-        sd = gremlin.ui.state_device.StateData()
-        sd.crud.disconnect(self._state_crud)
+        self._clear_state_buttons()
+        self.model.dispose()
+        StateData().crud.disconnect(self._state_crud)
         config = gremlin.config.Configuration()
         config.changed.disconnect(self._config_changed)
+
+    def _clear_state_buttons(self):
+        for btn in self._state_buttons.values():
+            btn.data.changed.disconnect(self._state_changed)
+        self._state_buttons.clear()
+        gremlin.util.clear_layout(self._button_layout)
 
     @QtCore.Slot()
     def _font_size_cb(self):
@@ -3813,7 +3824,14 @@ class StateVisualizerWidget(QWidget):
 
     def reloadStates(self):
         """reloads profile state data in the UI"""
-        gremlin.util.InvokeUiMethod(self._populateState_ui)
+        gremlin.util.InvokeUiMethod(self._reload_states_ui)
+
+    def _reload_states_ui(self):
+        if not self.initialized or not Shiboken.isValid(self):
+            return
+        self.model.refresh()
+        self.model.applyFilter(filter=self.VISUALIZER_FILTER)
+        self._state_filter_widget.updateFilter(force=True)
 
     def _filter_data(self, input_item, filter) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -3849,14 +3867,12 @@ class StateVisualizerWidget(QWidget):
 
         items = self.model.getFilteredItems(self.VISUALIZER_FILTER)
 
-        gremlin.util.clear_layout(layout)
+        self._clear_state_buttons()
 
         state_count = self.model.unfilteredCount()
         has_states = state_count > 0  # has states
 
         self._state_filter_widget.setVisible(has_states)
-        self._state_buttons.clear()
-
         if verbose:
             syslog.info(f"viewer state: {len(items)} items to display, total states: {state_count}")
 
@@ -3949,9 +3965,6 @@ class StateVisualizerWidget(QWidget):
                 el.joystick_event.disconnect(self._state_update)
 
         self._hooked = False
-
-    def _cleanup_ui(self):
-        self.unhook()
 
 
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):

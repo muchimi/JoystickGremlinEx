@@ -463,6 +463,10 @@ class DeviceSummary:
         ==========
         data : _DeviceSummary
             The data received from DILL and to be held by this instance
+
+
+
+
         """
         import gremlin.util
         import gremlin.types
@@ -663,6 +667,9 @@ class DeviceSummary:
     @property
     def device_name(self) -> str:
         return self.name
+
+    def setDeviceName(self, name: str):
+        self.name = name
 
     @device_type.setter
     def device_type(self, value):

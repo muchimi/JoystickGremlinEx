@@ -17,6 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import re
+
 # import sys
 import collections
 import os
@@ -2086,6 +2087,7 @@ def extract_remap_actions(action_sets):
             #     remap_actions.append(action)
     return remap_actions
 
+
 def getMasterModeObject():
     """gets the master mode object"""
     master_mode = gremlin.shared_state.master_mode
@@ -2444,13 +2446,13 @@ class Profile:
         self._mode_tree = None  # holds the mode tree (anytree, m73 and later) - this holds the profile's mode hiarchy
         self.devices = TriggerDict(name="profile devices")  # holds devices for this profile keyed by guid -> Device
         self.devices.addCallback(self._handle_device_node_changed)
-        self.vjoy_devices = {}
+        self.vjoy_devices = {}  # holds the list of vjoy devices found in the profile
         self.merge_axes = []
         self.plugins = []
         self._profile_fname = None  # the file name of this profile (xml)
         self.settings = Settings(self)
         self.parent = parent
-        self._configuration_data : dict = None # holds the last input (device_guid, input_type, input_id) for the profile
+        self._configuration_data: dict = None  # holds the last input (device_guid, input_type, input_id) for the profile
 
         self._profile_config_fname = None  # the configuration file name of this profile (json)
         self._profile_name = None  # the friendly name of this profile
@@ -3439,7 +3441,6 @@ class Profile:
         elif device_guid == gremlin.shared_state.voice_tab_guid:
             look_for_containers = False
 
-
         if device_guid in devices:
             device_data = devices[device_guid]
             mode_list = [mode for mode in device_data.modes] if any_mode else ([edit_mode] if edit_mode in device_data.modes else [])
@@ -3916,11 +3917,7 @@ class Profile:
 
     def find_input(self, device_guid, input_id, input_type: InputType = None):
         """finds the input item for the given device_guid, input_id, and optional input_type"""
-        if (
-            isinstance(input_id, str)
-            and input_id.isnumeric()
-            and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
-        ):
+        if isinstance(input_id, str) and input_id.isnumeric() and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
             input_id = int(input_id)
 
         device_guid = gremlin.util.normalize_guid(device_guid)
@@ -4020,6 +4017,49 @@ class Profile:
                                 remap_actions.extend(extract_remap_actions(container.action_sets))
 
         return remap_actions
+
+    def hasVjoyMappings(self) -> bool:
+        """true if the profile has any vjoy mappings of if vjoy is used as an input"""
+        return bool(self.list_vjoy_mappings())
+
+    def list_vjoy_mappings(self) -> dict:
+        """returns a map of vjoy mappings for the current profile
+
+        :return dictionary of vjoy mappings for each virtual device and input type
+                 {virtual_id: {"axis": [input_id], "button": [input_id], "hat": [input_id]}}
+
+        virtual_id = 1 to 16
+
+        """
+
+        # Create a list of all used remap actions
+        remap_actions = self.list_actions()
+
+        vjoy = {}  # map of inputs
+
+        # Remove all remap actions from the list of available inputs
+        for act in remap_actions:
+            # Skip remap actions that have invalid configuration
+            if act.input_type is None or act.input_type not in (
+                InputType.JoystickAxis,
+                InputType.JoystickButton,
+                InputType.JoystickHat,
+            ):
+                continue
+
+            type_name = InputType.to_string(act.input_type)
+            virtual_id = act.virtual_id
+
+            if not virtual_id in vjoy:
+                vjoy[virtual_id] = {}
+
+            if type_name not in vjoy[virtual_id]:
+                vjoy[virtual_id][type_name] = []
+
+            if act.vjoy_input_id not in [0, None]:
+                vjoy[virtual_id][type_name].append(act.vjoy_input_id)
+
+        return vjoy
 
     def list_unused_vjoy_inputs(self):
         """Returns a list of unused vjoy inputs for the given profile.
@@ -4173,12 +4213,70 @@ class Profile:
         # removed devices
         self._removed_devices.clear()
 
+        # setup failover devices if the profile uses vjoy references but vjoy is not available
+
+        if not config.vjoy_installed:
+            # see if the profile references vjoy devices anywhere
+            device_nodes = root.xpath("/profile/devices//device")
+            unique_vjoy_ids = set()
+            vjoy_guid_map = {} # map of id to discovered GUID
+            warning_issued = False
+
+            # clear prior profile fake vJoy devices
+            gremlin.joystick_handling.clearVjoyDevices()
+
+
+            # new profiles have the device entry under settings
+            for child in root.xpath("//device[contains(@name, 'VJoy')]"):
+                name = child.get("name")
+                match = re.search(r"\((\d+)\)", name)
+                vjoy_id = int(match.group(1)) if match else None
+                if vjoy_id is None:
+                    continue
+                unique_vjoy_ids.add(vjoy_id)
+                vjoy_guid_map[vjoy_id] = gremlin.util.parse_guid(child.get("device"))
+
+            for child in device_nodes:
+                if "type" in child.attrib and DeviceType.to_enum(child.get("type")) == DeviceType.VJoy:
+                    name = child.get("name")
+                    match = re.search(r"\((\d+)\)", name)
+                    vjoy_id = int(match.group(1)) if match else None
+                    if vjoy_id is None:
+                        continue
+                    unique_vjoy_ids.add(vjoy_id)
+
+                # check mappings for vjoyremap
+                for node in root.findall(".//vjoyremap"):
+                    # Get the 'virtual-id' attribute value
+                    device_id = gremlin.util.safe_read(node, "virtual-id", int, 0)
+                    unique_vjoy_ids.add(device_id)
+
+                # check mappings for legacy remap
+                for node in root.findall(".//remap"):
+                    unique_vjoy_ids.add(gremlin.util.safe_read(node, "vjoy", int, 0))
+
+            for vjoy_id in unique_vjoy_ids:
+                if vjoy_id < 1 or vjoy_id > 16:
+                    # skip not found in case the xml is malformed
+                    continue
+                if not warning_issued:
+                    syslog.warning(f"VJOY: Profile references Vjoy device ID [{vjoy_id}] but Vjoy is not installed - setting up failover mode")
+                    warning_issued = True
+                # create the fake device and register
+                gremlin.joystick_handling.configure_vjoy_failover(vjoy_id, vjoy_guid_map.get(vjoy_id))
+
+
+
+
+
+
         # Parse each device into separate DeviceConfiguration objects
         device_nodes = root.xpath("/profile/devices//device")
         # verbose = True
         for child in device_nodes:
             if verbose:
                 syslog.info(f"XML: parsing device [{child.get('name')}] type: [{child.get('type')}] line : {child.sourceline}")
+
             if "type" in child.attrib:
                 device_type = DeviceType.to_enum(child.get("type"))
                 if device_type == DeviceType.OctaviIFR1:
@@ -4917,8 +5015,7 @@ class Profile:
         """returns a list of sidecar files for the current profile"""
         return gremlin.util.getSidecarFiles(self._profile_fname)
 
-
-    def _readConfig(self, force: bool = False, timeout : int = 10) -> dict:
+    def _readConfig(self, force: bool = False, timeout: int = 10) -> dict:
         """reads the profile config, ensuring it is done on the UI thread
 
         :param force: when True, ignore the in-memory cache and re-read the sidecar
@@ -5043,15 +5140,11 @@ class Profile:
     def saveConfigEnabled(self, value: bool):
         self._save_config_enabled = value
 
-    def setLastInput(self, device_guid : dinput.GUID, input_type : InputType, input_id : Any):
+    def setLastInput(self, device_guid: dinput.GUID, input_type: InputType, input_id: Any):
         """sets the last profile input"""
-
-
-
 
         if __debug__:
             device = gremlin.joystick_handling.getDevice(device_guid)
-
 
             # validate matches of device GUID to possible input types
             if input_type is not None:
@@ -5078,7 +5171,7 @@ class Profile:
                         syslog.warning(f"Unhandled input type: {input_type} {input_type.name}")
                         pass
 
-        device_id = gremlin.util.normalize_guid(device_guid) # to string
+        device_id = gremlin.util.normalize_guid(device_guid)  # to string
         data = self._configuration_data
         if not data:
             # not read yet
@@ -5174,9 +5267,7 @@ class Profile:
             data = self._readConfig()  # get the profile config
             self._configuration_data = data
 
-        assert isinstance(data, dict),"unable to get default configuration data"
-
-
+        assert isinstance(data, dict), "unable to get default configuration data"
 
         if device_guid is None:
             # get current last input for the profile (as opposed to a different device)
@@ -5225,18 +5316,15 @@ class Profile:
                 if not gremlin.util.compare_guid(read_device_guid, current_device_guid):
                     syslog.warning(f"Profile last input device GUID mismatch: read [{read_device_guid}], using [{current_device_guid}]")
                     if verbose:
-
                         device = gremlin.joystick_handling.getDevice(current_device_guid)
                         syslog.info(f"Updating last input for device [{device.name}] input type [{current_input_type}] input ID [{current_input_id}]")
                     self.setLastInput(current_device_guid, current_input_type, current_input_id)
-
 
             if current_device_guid is not None and current_input_id is not None and current_input_type is not None:
                 if verbose:
                     device = gremlin.joystick_handling.getDevice(current_device_guid)
                     syslog.info(f"get profile last input {device.name} {current_input_type} {current_input_id}")
                 return (current_device_guid, current_input_type, current_input_id)
-
 
         # get a specific last input
 
@@ -5263,11 +5351,10 @@ class Profile:
 
             return (device_guid, input_type, input_id)
 
-
         if verbose:
             device = gremlin.joystick_handling.getDevice(device_guid)
             syslog.info(f"No last input found for device [{device.name}]")
-        return (None, None, None) # no entry found
+        return (None, None, None)  # no entry found
 
     def copy_devices(self, source_guid, target_guid):
         """copies data between two devices"""

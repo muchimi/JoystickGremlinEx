@@ -27,15 +27,8 @@ import sys
 ROOT = Path(__file__).resolve().parent
 
 
-def create_version_file(
-    output_file: Path = ROOT / "version.txt",
-    version_file: Path = ROOT / "gremlin" / "version.py",
-) -> Path:
-    """Write a UTF-8 VSVersionInfo expression and return its path.
-
-    Windows needs four 16-bit integers: 1.0ex (m77T92) becomes (1, 0, 77, 92).
-    Both string version fields retain APPLICATION_VERSION, including suffixes.
-    """
+def read_version_metadata(version_file: Path = ROOT / "gremlin" / "version.py") -> dict[str, str]:
+    """Read the source version without importing Gremlin or its startup hooks."""
     version_tree = ast.parse(version_file.read_text(encoding="utf-8-sig"), filename=str(version_file))
     # Evaluate only the constants, including APPLICATION_VERSION's f-string,
     # without importing gremlin and applying its application startup hooks.
@@ -53,6 +46,19 @@ def create_version_file(
     for name in ("APPLICATION_NAME", "APPLICATION_MAIN", "APPLICATION_BASE", "APPLICATION_EXE", "APPLICATION_VERSION"):
         if not isinstance(metadata.get(name), str) or not metadata[name]:
             raise ValueError(f"Missing or invalid {name} in {version_file}")
+    return metadata
+
+
+def create_version_file(
+    output_file: Path = ROOT / "version.txt",
+    version_file: Path = ROOT / "gremlin" / "version.py",
+) -> Path:
+    """Write a UTF-8 VSVersionInfo expression and return its path.
+
+    Windows needs four 16-bit integers: 1.0ex (m77T92) becomes (1, 0, 77, 92).
+    Both string version fields retain APPLICATION_VERSION, including suffixes.
+    """
+    metadata = read_version_metadata(version_file)
 
     main = re.fullmatch(r"([0-9]+)\.([0-9]+)(?:ex)?", metadata["APPLICATION_MAIN"], re.IGNORECASE)
     build = re.fullmatch(r"m([0-9]+)(?:T([0-9]+))?[A-Za-z]*", metadata["APPLICATION_BASE"], re.IGNORECASE)

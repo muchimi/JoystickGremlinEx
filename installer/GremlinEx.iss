@@ -41,8 +41,13 @@ Compression=lzma2
 DisableProgramGroupPage=yes
 CloseApplications=yes
 RestartApplications=no
+UsePreviousTasks=no
 UninstallDisplayName={#AppName} {#AppVersion}
+[Tasks]
+Name: "hidhide"; Description: "Download and install HidHide (hide physical controllers from games)"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: NeedsHidHide
+Name: "maestrobridge"; Description: "Install GEX Maestro Bridge for HIDMaestro virtual controllers (vJoy is absent)"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: NeedsMaestroBridge
 [Files]
+Source: "dependencies.ps1"; Flags: dontcopy
 #ifdef BundledBuild
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
@@ -63,12 +68,20 @@ Name: "{autoprograms}\GremlinEx Documentation"; Filename: "{#DocumentationUrl}"
 [UninstallDelete]
 Type: files; Name: "{app}\.gremlinex-installed-version"
 [Code]
+#include "dependencies.iss"
+
+procedure InitializeWizard;
+begin
+  InitializeDependencies;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then begin
     if not SaveStringToFile(ExpandConstant('{app}\.gremlinex-installed-version'),
       '{#AppVersion}' + #13#10, False) then
       RaiseException('Unable to record the installed GremlinEx version.');
+    InstallQueuedDependencies;
   end;
 end;
 
@@ -90,6 +103,8 @@ var
   SelectedAsset: String;
   PortableDone: Boolean;
   PortableTarget: String;
+
+#include "dependencies.iss"
 
 function IsManaged: Boolean;
 begin
@@ -170,6 +185,7 @@ end;
 
 procedure InitializeWizard;
 begin
+  InitializeDependencies;
   InstalledVersion := GetPreviousData('GremlinExAsset', '');
   ReleasePage := CreateCustomPage(wpSelectDir, 'GitHub release', 'Select a GremlinEx package or extract a portable copy');
   ReleaseInfo := TNewStaticText.Create(ReleasePage);
@@ -225,6 +241,7 @@ begin
         MsgBox('GremlinEx installed, but optional FFmpeg download failed.', mbError, MB_OK);
     end;
   end;
+  if CurStep = ssPostInstall then InstallQueuedDependencies;
 end;
 
 procedure RegisterPreviousData(PreviousDataKey: Integer);

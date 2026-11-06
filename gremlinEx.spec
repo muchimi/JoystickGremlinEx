@@ -50,6 +50,7 @@ added_files = [
     ("about", "about"),
     ("doc", "doc"),
     (os.path.join("docs", "command_line.md"), "."),
+    ("installer/dependencies.ps1", "installer"),
     ("icons","icons"),
     ("gremlin/ui/streamdeck_icon_library", "gremlin/ui/streamdeck_icon_library"),
 ]

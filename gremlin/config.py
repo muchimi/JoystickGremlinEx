@@ -61,6 +61,7 @@ STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.envir
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
 GEX_MAESTRO_ENABLED = "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
+VJOY_ENABLED = True  # "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -4163,6 +4164,29 @@ class Configuration(QtCore.QObject):
     @virtual_output_failover.setter
     def virtual_output_failover(self, value: bool):
         self._set_data("virtual_output_failover", value)
+
+    @property
+    def vjoy_failover(self) -> bool:
+        """returns true if vjoy failover is enabled
+        this flag is set at profile load time when no VJOY installation is detected to create fake vjoy devices as needed and use
+        the failover capability to maestro devices.
+
+        """
+        return self._vjoy_failover if hasattr(self, "_vjoy_failover") else False
+
+    @vjoy_failover.setter
+    def vjoy_failover(self, value: bool):
+        self._vjoy_failover = value
+
+    @property
+    def vjoy_installed(self) -> bool:
+        """returns true if VJOY is installed (this is set on GEX startup and not persisted)"""
+        # force off for some configurations (diagnostics mode)
+        return VJOY_ENABLED and self._vjoy_installed if hasattr(self, "_vjoy_installed") else False
+
+    @vjoy_installed.setter
+    def vjoy_installed(self, value: bool):
+        self._vjoy_installed = value
 
     @property
     def last_save_path(self) -> str:

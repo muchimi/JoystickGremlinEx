@@ -11,6 +11,8 @@ import subprocess
 import sys
 from urllib.parse import quote, urlencode
 
+from create_version import read_version_metadata
+
 
 ROOT = Path(__file__).resolve().parent
 REPOSITORY = "muchimi/JoystickGremlinEx"
@@ -115,21 +117,8 @@ class GitHubRelease:
 
 
 def build_assets(root: Path = ROOT) -> tuple[Path, Path]:
-    """Select just this build's artifacts using the packaged EXE's version."""
-    from PyInstaller.utils.win32.versioninfo import read_version_info_from_executable
-
-    info = read_version_info_from_executable(str(root / "dist" / "gremlinEx" / "gremlinEx.exe"))
-    versions = []
-    if info is not None:
-        versions = [
-            entry.val
-            for group in info.kids
-            if group.name == "StringFileInfo"
-            for table in group.kids
-            for entry in table.kids
-            if entry.name == "ProductVersion"
-        ]
-    version = versions[0] if versions else ""
+    """Select the source version's artifacts, even when the unpacked EXE is older."""
+    version = read_version_metadata(root / "gremlin" / "version.py")["APPLICATION_VERSION"]
     match = re.fullmatch(r"([0-9]+)\.([0-9]+)ex \((m77T[0-9]+[A-Za-z]*)\)", version, re.IGNORECASE)
     if match is None:
         raise ValueError(f"Expected an M77 test build like '1.0ex (m77T92)', found {version!r}")
@@ -139,19 +128,29 @@ def build_assets(root: Path = ROOT) -> tuple[Path, Path]:
         root / "dist" / f"gremlinEx_{major}_{minor}_{build}.zip",
         root / "dist" / "installer" / f"GremlinEx-Setup-{filename_version}.exe",
     )
-    for asset in assets:
-        if not asset.is_file() or asset.stat().st_size == 0:
-            raise FileNotFoundError(f"Build artifact missing or empty: {asset}")
+    missing = [str(asset) for asset in assets if not asset.is_file() or asset.stat().st_size == 0]
+    if missing:
+        raise FileNotFoundError(
+            f"Build artifacts for {version} are missing or empty: {', '.join(missing)}. "
+            "Run deploy.bat to build this version before using --push-only."
+        )
     return assets
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="Check credentials and the target release without uploading")
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument("--check", action="store_true", help="Check credentials and the target release without uploading")
+    checks.add_argument("--check-assets", action="store_true", help="Check the source version's local artifacts without contacting GitHub")
     args = parser.parse_args()
     try:
         # Validate both artifacts before replacing anything on GitHub.
         assets = None if args.check else build_assets()
+        if assets is not None:
+            for asset in assets:
+                print(f"Selected artifact: {asset}", flush=True)
+        if args.check_assets:
+            return 0
         github = GitHubRelease(github_token())
         release = github.release()
         if args.check:
@@ -159,7 +158,7 @@ def main() -> int:
         else:
             github.publish(release, assets)
             print(f"Published both build artifacts: {RELEASE_URL}")
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, http.client.HTTPException) as err:
+    except (OSError, SyntaxError, NameError, ValueError, RuntimeError, subprocess.SubprocessError, http.client.HTTPException) as err:
         print(f"Unable to publish GremlinEx build: {err}", file=sys.stderr)
         return 1
     return 0

@@ -68,6 +68,12 @@ To test connectivity on a different machine, use ncat (nmap) with the appropriat
     `ncat -u <IP_OF_LISTENING_MACHINE> 8011`
 
 
+LIMITATIONS:
+- The Maestro bridge currently only supports UDP communication.
+- Firewall rules must allow UDP traffic on the specified ports.
+- Max number of joystick devices for Maestro has no published limit and was tested with up to 16 by GEX.
+  That number will far exceed in most cases the number of devices supported by a game although XPlane supports 256.
+- Max number of gamepads is 4 because that is an XINPUT maximum spec (player 1 to 4).
 
 
 HIDMaestro - Default Embedded Profile Catalog
@@ -531,6 +537,7 @@ _SINGLE_REPLIES = {
 
 GEX_VENDOR_ID = 0x0001  # fake vendor ID
 GEX_PRODUCT_ID = 0x0001  # fake product ID
+MAX_GAMEPADS = 4 # this a hard limit imposed by XINPUT for players 1 to 4
 
 
 def _osc_string(value):
@@ -653,8 +660,7 @@ class MaestroResult:
     def from_error(cls, address, error):
         """Builds an error result from an exception raised by MaestroOscClient.request()."""
         if isinstance(error, MaestroServiceError):
-            return cls(False, error.address or address, "/maestro_error", (), None,
-                       error.code, error.description, error)
+            return cls(False, error.address or address, "/maestro_error", (), None, error.code, error.description, error)
         code = "timeout" if isinstance(error, TimeoutError) else "transport_error"
         return cls(False, address, None, (), None, code, str(error), error)
 
@@ -875,7 +881,6 @@ def service_snapshot(client):
     return dict(definitions=definitions, devices=devices, profiles=client.list("/maestro_profiles"))
 
 
-
 def save_device_definition(client, definition, previous=None):
     """Save the editor's definition using the service's version 1 commands.
 
@@ -1044,7 +1049,7 @@ class Maestro:
             return None
         try:
             return MaestroProfileInfo.from_dict(result.data, device_id)
-        except (RuntimeError, ValueError, KeyError):
+        except RuntimeError, ValueError, KeyError:
             syslog.exception("MAESTRO: invalid capabilities for %s", device_id)
             return None
 
@@ -1056,7 +1061,7 @@ class Maestro:
         try:
             ids = {d["id"] for d in self.client.list("/maestro_devices")}
             ids.update(d["id"] for d in self.client.list("/maestro_definitions"))
-        except (OSError, RuntimeError, ValueError, TimeoutError):
+        except OSError, RuntimeError, ValueError, TimeoutError:
             syslog.exception("MAESTRO: unable to list devices for capabilities")
             return result
         for device_id in sorted(ids):
@@ -1066,6 +1071,56 @@ class Maestro:
             if caps is not None:
                 result[device_id] = caps
         return result
+
+    def getJoystickCount(self, force=False) -> int:
+        """Return the number of currently connected joystick devices.
+        :param force: If True, force a fresh count instead of using the cached controller map.
+        """
+
+        if self._controller_map and not force:
+            # get number of currently assigned gamepad controllers - that could be Maestro joysticks or our custom joysticks
+            return sum(1 for c in self._controller_map.values() if c.kind in ("joystick","custom"))
+
+        if not self.initialized or self.client is None:
+            return 0
+        try:
+            ids = {d["id"] for d in self.client.list("/maestro_devices")}
+        except OSError, RuntimeError, ValueError, TimeoutError:
+            syslog.exception("MAESTRO: unable to list devices for joystick count")
+            return 0
+        count = 0
+        for device_id in sorted(ids):
+            if not is_valid_gex_id(device_id):
+                continue
+            caps = self.getCapabilities(device_id)
+            if caps is not None and caps.kind in ("joystick", "custom"):
+                count += 1
+        return count
+
+    def getGamepadCount(self, force=False) -> int:
+        """Return the number of currently connected gamepad devices.
+        :param force: If True, force a fresh count instead of using the cached controller map.
+        """
+
+        if self._controller_map and not force:
+            # get number of currently assigned gamepad controllers
+            return sum(1 for c in self._controller_map.values() if c.kind == "gamepad")
+
+        if not self.initialized or self.client is None:
+            return 0
+        try:
+            ids = {d["id"] for d in self.client.list("/maestro_devices")}
+        except OSError, RuntimeError, ValueError, TimeoutError:
+            syslog.exception("MAESTRO: unable to list devices for gamepad count")
+            return 0
+        count = 0
+        for device_id in sorted(ids):
+            if not is_valid_gex_id(device_id):
+                continue
+            caps = self.getCapabilities(device_id)
+            if caps is not None and caps.kind == "gamepad":
+                count += 1
+        return count
 
     def connected(self) -> bool:
         """Check the existing client with a service/protocol ping (up to one second)."""
@@ -1548,6 +1603,9 @@ class Maestro:
             syslog.error(f"MAESTRO: failed to create controller {index}: {error}")
             return None
 
+
+
+
     def createGamepadController(self, name: str, definition: str, at_index=None) -> None | MaestroController:
         """Create a service-owned Xbox 360 gamepad controller.
 
@@ -1555,11 +1613,21 @@ class Maestro:
         :param definition: The definition string for the gamepad controller (see list above in comment header)
         :param at_index: The index at which to create the controller, use None or -1 to auto-assign.
 
+        There is a max of MAX_GAMEPADS gamepad controllers supported by XINPUT (players 1 to 4).
+
 
         """
         if not self.ensureConnected():
             return None
         index = at_index
+
+        # get number of currently assigned gamepad controllers
+        assigned_gamepads = self.getGamepadCount()
+        if assigned_gamepads >= MAX_GAMEPADS:
+            syslog.warning(f"MAESTRO: createGamepadController() failed: The maximum number of gamepad controllers ({MAX_GAMEPADS}) has been reached.")
+            return None
+
+        # grab the next available device index
         if index is None:
             index = next((i for i in range(GEX_MAX_DEVICES) if i not in self._controller_map), GEX_MAX_DEVICES)
         if type(index) is not int or not 0 <= index < GEX_MAX_DEVICES:
@@ -1606,8 +1674,6 @@ class Maestro:
         else:
             self.refreshDevices()
         return result
-
-
 
     def pidToIndex(self, pid: int) -> int:
         """Convert a legacy GEX logical PID; service hardware PIDs are shared."""
@@ -1831,28 +1897,29 @@ class MaestroOutputDevice:
 class _MaestroDialogSignals(QtCore.QObject):
     completed = QtCore.Signal(object, object)
 
+
 @dataclass
 class MaestroProfileInfo:
     """Python equivalent of ProfileInfo in the Maestro service (/maestro_capabilities_result)."""
 
-    id: str = "" # Maestro device ID
-    name: str = "" # Maestro device name
-    type: str = "" # Maestro device type - e.g., "joystick", "wheel", etc. or "custom" for custom joystick device
-    vendor_id: int = 0 # USB vendor ID
-    product_id: int = 0 # USB product ID
-    deployable: bool = False # Whether the device is deployable in Maestro
-    axis_names: tuple = () # Names of the axes
+    id: str = ""  # Maestro device ID
+    name: str = ""  # Maestro device name
+    type: str = ""  # Maestro device type - e.g., "joystick", "wheel", etc. or "custom" for custom joystick device
+    vendor_id: int = 0  # USB vendor ID
+    product_id: int = 0  # USB product ID
+    deployable: bool = False  # Whether the device is deployable in Maestro
+    axis_names: tuple = ()  # Names of the axes
     button_count: int = 0  # physical buttons (ButtonCount)
-    addressable_buttons: int = 0 # Number of addressable buttons
-    hat_count: int = 0 # Number of hats
-    has_hat: bool = False # Whether the device has a hat
-    hat_logical_min: int | None = None # Logical minimum value for the hat
-    hat_logical_max: int | None = None # Logical maximum value for the hat
-    button_map: tuple | None = None # Mapping of buttons
-    kind: str = "profile" # Kind of the profile
-    used_profile_name: str | None = None # Name of the used profile to build the device in Maestro (if one was used from an emulation)
-    profile_id : str = "" # Profile ID
-    device_id: str = "" # Service device ID the capabilities were requested for
+    addressable_buttons: int = 0  # Number of addressable buttons
+    hat_count: int = 0  # Number of hats
+    has_hat: bool = False  # Whether the device has a hat
+    hat_logical_min: int | None = None  # Logical minimum value for the hat
+    hat_logical_max: int | None = None  # Logical maximum value for the hat
+    button_map: tuple | None = None  # Mapping of buttons
+    kind: str = "profile"  # Kind of the profile
+    used_profile_name: str | None = None  # Name of the used profile to build the device in Maestro (if one was used from an emulation)
+    profile_id: str = ""  # Profile ID
+    device_id: str = ""  # Service device ID the capabilities were requested for
 
     @property
     def axis_count(self) -> int:
@@ -1882,7 +1949,6 @@ class MaestroProfileInfo:
             profile_id=data.get("profileId", ""),
             device_id=device_id,
         )
-
 
 
 class MaestroNewDeviceDialog(QRememberDialog):
@@ -1999,7 +2065,7 @@ class MaestroDialog(QRememberDialog):
         self._signals = _MaestroDialogSignals(self)
         self._signals.completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
         layout = QtWidgets.QVBoxLayout(self)
-        self._select_widget_map = {} # map of device ID to the selection box in the table
+        self._select_widget_map = {}  # map of device ID to the selection box in the table
 
         self.enabled_widget = QEnabledWidget()
         self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
@@ -2030,8 +2096,6 @@ class MaestroDialog(QRememberDialog):
                 widget_only=True,
             )
         )
-
-
 
         self.connection_group.addWidget(
             getHContainer(
@@ -2213,8 +2277,6 @@ class MaestroDialog(QRememberDialog):
             return
         self.maestro.ping()
 
-
-
     @Slot()
     def _handle_select_none(self):
         """select none clicked"""
@@ -2238,7 +2300,7 @@ class MaestroDialog(QRememberDialog):
         MessageBoxYesNo(prompt="Are you sure you want to delete all devices?", callback=self._delete_all_callback)
 
     def _delete_all_callback(self, result):
-        """ deletes all device after confirmation box is confirmed"""
+        """deletes all device after confirmation box is confirmed"""
         if result:
             result = self.maestro.deleteAll()
             if result.ok:
@@ -2310,7 +2372,6 @@ class MaestroDialog(QRememberDialog):
         self.delete_all_button.setEnabled(has_devices)
         self.new_button.setEnabled(connected)
         self.presets_widget.setEnabled(connected)
-
 
     def _submit(self, operation, complete, message):
         if self._busy:
@@ -2395,9 +2456,8 @@ class MaestroDialog(QRememberDialog):
             if self.verbose:
                 syslog.info("Maestro snapshot summary:")
                 syslog.info(f"\tAttached devices: {len(self._definitions)}")
-            cap : MaestroProfileInfo
+            cap: MaestroProfileInfo
             for cap in capabilities.values():
-
                 device_id = cap.device_id
                 axes = cap.axis_count
                 buttons = cap.addressable_buttons
@@ -2414,11 +2474,9 @@ class MaestroDialog(QRememberDialog):
                 delete = Buttons.getDeleteWidget(data=device_id, callback=self._delete_clicked)
                 self.device_list.addWidget(getHContainer([checkbox, (label, 1), delete], right_stretch=False, widget_only=True))
                 if self.verbose:
-                    syslog.info(f"\tDevice: {cap.name} [{device_id}] — kind: [{cap.kind}] Maestro build profile: [{cap.used_profile_name}] — type: [{cap.type}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if device_id in active else 'Inactive'}")
-
-
-
-
+                    syslog.info(
+                        f"\tDevice: {cap.name} [{device_id}] — kind: [{cap.kind}] Maestro build profile: [{cap.used_profile_name}] — type: [{cap.type}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if device_id in active else 'Inactive'}"
+                    )
 
         else:
             self.device_list.addWidget(QDataLabel("No devices were found. Use New Device or presets to create some."))

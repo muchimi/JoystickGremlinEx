@@ -87,7 +87,8 @@ if errorlevel 1 goto :build_failed
 if "%PUSH_TO_GITHUB%"=="0" goto :build_complete
 
 :publish
-echo Uploading portable ZIP and installer to the M77 test release...
+REM Select the version in gremlin\version.py, never an older unpacked EXE.
+echo Uploading current source version's ZIP and installer to the M77 test release...
 "%PYTHON_EXE%" upload_release.py
 if errorlevel 1 goto :publish_failed
 echo Upload complete.
@@ -113,5 +114,5 @@ exit /b 1
 :usage
 echo Usage: %~nx0 [--push ^| --push-only]
 echo   --push       Build and upload, overwriting assets with matching names.
-echo   --push-only  Upload existing ZIP and installer files without rebuilding.
+echo   --push-only  Upload current source version's ZIP and installer without rebuilding.
 exit /b 2
