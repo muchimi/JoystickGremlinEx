@@ -12,13 +12,13 @@ HID Maestro is a virtual device driver that runs in user mode, and lets you crea
 
 ### Why does it matter
 
-It matters to GEX because at this point, VJOY and VIGEM are officially no longer supported by their initial developer. Both managed to survive the Windows 11 security requirements by having a brave soul sign the drivers and make them work under Windows 11.  The drop in support however means that bug fixes and new features are not in the cards, and that's primarily related to the new requirement to obtain a driver signing certificate, which is prohibitively expensive, and out of reach of open source software projects unless you have access to one.  
+It matters to GEX because at this point, VJOY and VIGEM are officially no longer supported by their initial developer. Both managed to survive the Windows 11 security requirements by having a brave soul sign the drivers and make them work under Windows 11.  The drop in support however means that bug fixes and new features are not in the cards, and that's primarily related to the new requirement to obtain a driver signing certificate, which is prohibitively expensive, and out of reach of open source software projects unless you have access to one.
 
 HID Maestro does away with this requirement because it uses a different approach to virtual drivers in Windows that run in user-mode instead of kernel-mode, so the only requirement is elevated priviledges, not a very expensive signed certificate.  HID Maestro is also actively supported, although it is not specific to joysticks or gamepads.
 
 ### Two problems for GEX
 
-The first problem is HID Maestro is written in C# and is thus dependent on the .NET platform.  This platform is a challenge for GEX because the Python/C++ environment GEX is built does not easily integrate with .NET. There are integration mechanisms, such as the excellent [PythonNet](https://pythonnet.github.io/).  However testing earlier this year showed that this route is not practical: CPU/Memory utilization was terrible (by GEX norms) and latency was also a disaster due to the translation overhead.  GEX must maintain low latency to keep mappings responsive.
+The first problem is HID Maestro is written in C# and is thus dependent on the .NET platform.  This platform is a challenge for GEX because the Python/C++ environment GEX is built upon does not easily integrate with .NET. There are integration mechanisms, such as the excellent [PythonNet](https://pythonnet.github.io/).  However testing earlier this year showed that this route is not practical: CPU/Memory utilization was terrible (by GEX norms) and latency was also a disaster due to the translation overhead.  GEX must maintain low latency to keep mappings responsive.
 
 The second problem is that HID Maestro and VJOY/VIGEM cannot co-exist on the same system. During testing, it was discovered that HID Maestro is destructive to VJOY (joystick) and VIGEM (gamepad) - it breaks both and is not easy to recover from short of a complete re-install/reconfig.  This presents a testing challenge.
 
@@ -39,7 +39,7 @@ The bridge component performs these duties:
 - runs locally as a Windows service to start/stop automatically with Windows, or runs as a console application (manual start/diagnostics).
 - supports all the features VJOY and VIGEM provide, and in particular solves the VJOY naming issues.
 - adds XINPUT support to GEX
-- Games can't tell the difference - they see joysticks or gamepads  
+- Games can't tell the difference - they see joysticks or gamepads
 - Entirely compatible with HID HIDE.
 
 
@@ -65,28 +65,27 @@ The drawbacks:
 
 As this is a destructive test, in that HID Maestro will break VJOY and VIGEM, it is not the time to test this on your "production" gaming box.
 
-The best environment to try this out is either in a VM or a separate machine.  For the VM, you will need a setup that lets the guest OS see your host's hardware controllers.   
+The best environment to try this out is either in a VM or a separate machine.  For the VM, you will need a setup that lets the guest OS see your host's hardware controllers.
 
 
 
 ## Installation process
 
 The installation will involve a pair of installs. I am working on making this as simple as possible by using traditional installers (in addition to the more manual portable install archive method).
- 
+
 Please note that the GEX support for the GEX Bridge module and Maestro is only available with the most current test releases of m77.
- 
-### GEX Installer (new as of m77T93) 
 
-The new installer provides uninstall data to Windows, supports versioning during install, and importantly, check your system for what is installed.  This then offers up optional installations (via their own installers) for HID Hide and the GEX Bridge.  
+### GEX Installer (new as of m77T93)
 
-The GEX installers [can be found here](https://github.com/muchimi/JoystickGremlinEx/releases/tag/m77_series).
+The new installer provides uninstall data to Windows, supports versioning during install, and importantly, check your system for what is installed.  This then offers up optional installations (via their own installers) for HID Hide and the GEX Bridge.
+
+The [GEX installer can be found here](https://github.com/muchimi/JoystickGremlinEx/releases/tag/m77_series).
 
 ### GEX Bridge Installer (new as of m77T92)
 
-The setup program will install the GEX bridge module which encapsulates the HID Maestro functionality and enables GEX (as well as other apps) to manage HID Maestro devices.  This includes all you need.   
+The setup program will install the GEX bridge module which encapsulates the HID Maestro functionality and enables GEX (as well as other apps) to manage HID Maestro devices.  This includes all you need.
 
-The [GEX Bridge project is found here](https://github.com/muchimi/GEXMaestroBridgeService)
-
+The [GEX Bridge project is found here](https://github.com/muchimi/GEXMaestroBridgeService).
 
 ## Setup
 
@@ -121,9 +120,10 @@ If on a physical machine, connect at least one input controller to that system.
 ## Limitations
 
 - You can only create up to four gamepads - that is an XINPUT limit, not a GEX limit.
-- You will break your VJOY/VIGEM setup if you run the bridge on your machine where VJOY/VIGEM is installed, and recovery is not simple (recommend path - save the operating system snapshot as you would before a major Windows patch install).  
-- VJOY as input is not supported in a Maestro setup.  You can however use a Maestro device as input in theory (more testing is needed on this).
-- This is a test.  Things may break.
+- Gamepads will be named gex-gp-n where n is 1 to 4.  This is true of any gamepad profile used to create the gamepad.
+- You **will break your VJOY/VIGEM setup if you run the bridge on the same machine where VJOY/VIGEM is installed**.  Recovery is not simple (recommend path - save the operating system snapshot as you would before a major Windows patch install).
+- VJOY as input is not supported in a Maestro setup currently (although you can use a Maestro device as input outside fo the vjoy as input mechanism).
+- This is a test. Things may break as this is an experimental feature and needs more testing.
 
 ## Recommendations
 
@@ -134,13 +134,13 @@ Based on internal testing, what I would recommend:
 - GEX should automatically failover your VJOY devices as configured in a profile, so, in theory, should work as-is.  The failover creates "fake" VJOY devices so the profile is not confused but maps them to the Maestro devices at runtime if the VJOY ID matches the name of the Maestro device.   The mapping table is
 
 	`vjoy 1 -> gex-1`
-	
+
 	`vjoy 2 -> gex-2`
-	
+
 	`...`
-	
+
 	`vjoy n -> gex-n`
-	
+
 The list of vjoy devices is based on the profile data.
 
 
@@ -169,7 +169,7 @@ None. The devices created by the GEX Bridge should remain white listed in HID Hi
 
 HID Hide may need to be reconfigured if you are using white listing (hide all except white listed mode).
 
-### What about non joysticks or gamepads? 
+### What about non joysticks or gamepads?
 
 Keyboard and mouse, and remote control are not impacted.
 
@@ -211,4 +211,3 @@ Usage is subject the terms of these licenses that you agree to by installing or 
 
 
 
-	
