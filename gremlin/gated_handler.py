@@ -559,20 +559,7 @@ class GateInfo:
 
     @property
     def display_value(self) -> float:
-        mode = self.parent.display_mode if self.parent is not None else DisplayMode.Normal
-        if mode == DisplayMode.Normal:
-            value = gremlin.util.scale_to_range(
-                self.value,
-                self.parent.range_min,
-                self.parent.range_max,
-                self.parent.display_range_min,
-                self.parent.display_range_max,
-            )
-        elif mode == DisplayMode.Percent:
-            value = (self.value + 1) / 2.0 * 100.0
-        elif mode == DisplayMode.OneOne:
-            value = gremlin.util.scale_to_range(self.value, self.parent.range_min, self.parent.range_max, -1.0, 1.0)
-        return value
+        return self.parent.to_display(self.value) if self.parent is not None else self.value
 
     def gate_display(self) -> str:
         mode = self.parent.display_mode if self.parent is not None else DisplayMode.Normal
@@ -738,7 +725,7 @@ class RangeInfo:
                 return True
         return False
 
-    def copy_from(self, other: RangeInfo):  # noqa: F821
+    def copy_from(self, other: RangeInfo, copy_gates=True):  # noqa: F821
         """copies data from another range object"""
 
         self._condition = other._condition
@@ -746,11 +733,12 @@ class RangeInfo:
         self._fixed_value = other._fixed_value
         self._output_range_min = other._output_range_min
         self._output_range_max = other._output_range_max
-        self.g1 = other.g1
-        self.g2 = other.g2
+        if copy_gates:
+            self.g1 = other.g1
+            self.g2 = other.g2
         self.item_data_map = other.item_data_map
         self.description = other.description
-        self._last_condition = other._last_condition
+        self.autorelease_map = other.autorelease_map.copy()
         self.delay = other.delay
 
     @property
@@ -2023,6 +2011,22 @@ class GateData:
         self.display_range_min = range_min
         self.display_range_max = range_max
 
+    def to_display(self, value):
+        """convert a normalized gate value into the selected display units"""
+        if self.display_mode == DisplayMode.Percent:
+            return (value + 1.0) * 50.0
+        if self.display_mode == DisplayMode.OneOne:
+            return gremlin.util.scale_to_range(value, self.range_min, self.range_max, -1.0, 1.0)
+        return gremlin.util.scale_to_range(value, self.range_min, self.range_max, self.display_range_min, self.display_range_max)
+
+    def from_display(self, value):
+        """convert an edited display value back into a normalized gate value"""
+        if self.display_mode == DisplayMode.Percent:
+            return value / 50.0 - 1.0
+        if self.display_mode == DisplayMode.OneOne:
+            return gremlin.util.scale_to_range(value, -1.0, 1.0, self.range_min, self.range_max)
+        return gremlin.util.scale_to_range(value, self.display_range_min, self.display_range_max, self.range_min, self.range_max)
+
     @property
     def steps(self) -> int:
         """current number of (non default) gates"""
@@ -2591,12 +2595,15 @@ class GateData:
         for index, gate in enumerate(gates):
             if verbose:
                 syslog.info(f"\tGate [{index}] value: {current:0.{_decimals}f}")
-            gate.setValue(current, emit=False)  # don't update the UI
+            # Apply all positions before notifying the UI. Sequential setValue
+            # calls can reject a position against a neighbor that has not moved yet.
+            gate._value = current
             current += interval
 
             if current > max_value:
                 current = max_value  # clamp for rounding errors
 
+        self._update_ranges()
         eh = GateEventHandler()
         eh.gates_changed.emit()
 
@@ -2609,9 +2616,7 @@ class GateData:
         return None
 
     def _update_ranges(self):
-        """updates the list of ranges with updated gate configuration - this should be called whenever a gate is added or removed
-        Range data is copied from prior ranges to prevent data loss
-        """
+        """keep range objects and their settings attached to their gate boundaries"""
 
         gates = self.getUsedGates()  # gets used gates in ascending order
         gate_pairs = list(pairwise(gates))  # pairwise list of gates - there is a range between each pair
@@ -2620,26 +2625,27 @@ class GateData:
         rng: RangeInfo
         range_list = []  # holds the new range objects
 
-        # current ranges that exist in the current gate sequence
-        current_range_map = {index: rng for index, rng in enumerate(self._ranges)}
+        current_range_map = {(rng.g1.id, rng.g2.id): rng for rng in self._ranges}
+        required_pairs = {(g1.id, g2.id) for g1, g2 in gate_pairs}
+        # Reserve unchanged intervals first. On a split or merge, retain the
+        # lower interval's settings; additional split intervals start empty.
+        changed_ranges = {rng.g1.id: rng for key, rng in current_range_map.items() if key not in required_pairs}
 
         # remaining gate pairs are gates that were changed
-        for index, (g1, g2) in enumerate(gate_pairs):
-            # add any needed ranges
-            rng = RangeInfo(g1, g2, parent=self, used=True)
-            if index in current_range_map:
-                current = current_range_map[index]
-                rng.item_data_map = current.item_data_map
-                rng.mode = current.mode
-                rng.output_range_min = current.output_range_min
-                rng.output_range_max = current.output_range_max
-                rng.fixed_value = current.fixed_value
-                rng.description = current.description
-                rng.delay = current.delay
-
+        for g1, g2 in gate_pairs:
+            rng = current_range_map.get((g1.id, g2.id))
+            if rng is None:
+                current = changed_ranges.pop(g1.id, None)
+                rng = RangeInfo(g1, g2, parent=self, used=True)
+                if current is not None:
+                    rng.copy_from(current, copy_gates=False)
+            else:
+                rng.g1, rng.g2 = g1, g2
+                rng.setUsed(True)
             range_list.append(rng)
 
         self._ranges = range_list
+        self._range_item_map = {rng.id: rng for rng in range_list}
 
         # verbose =  gremlin.config.Configuration().verbose_mode_gate
         # if verbose:
@@ -3348,6 +3354,8 @@ class GateData:
             child.set("id", gate_info.id)
             child.set("index", gremlin.util.safe_format(gate_info.slider_index, int))
             child.set("delay", gremlin.util.safe_format(gate_info.delay, int))
+            for condition, enabled in gate_info.autorelease_map.items():
+                child.set(f"autorelease_{GateConditionType.to_string(condition)}", str(enabled))
 
             # description
             if gate_info.description:
@@ -3386,6 +3394,8 @@ class GateData:
 
             # delay
             child.set("delay", safe_format(range_info.delay, int))
+            for condition, enabled in range_info.autorelease_map.items():
+                child.set(f"autorelease_{GateConditionType.to_string(condition)}", str(enabled))
 
             # description
             if range_info.description:
@@ -3511,6 +3521,8 @@ class GateData:
                 gate_info.setLastCondition(gate_condition)
 
             gate_info.delay = gate_delay
+            for condition, enabled in gate_info.autorelease_map.items():
+                gate_info.autorelease_map[condition] = safe_read(node_range, f"autorelease_{GateConditionType.to_string(condition)}", bool, enabled)
 
             description = None
             if "description" in node_range.attrib:
@@ -3607,6 +3619,8 @@ class GateData:
             range_info.id = range_id
             range_pairs[key] = range_info
             range_info.delay = safe_read(node_range, "delay", int, 250)
+            for condition, enabled in range_info.autorelease_map.items():
+                range_info.autorelease_map[condition] = safe_read(node_range, f"autorelease_{GateConditionType.to_string(condition)}", bool, enabled)
 
             description = safe_read(node_range, "description", str, "")
             range_info.description = html.unescape(description)
@@ -3811,6 +3825,7 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
     """holds the data for a single gate"""
 
     valueChanged = QtCore.Signal(object)  # fires when a gate value is changed - sends the gate
+    valueChanging = QtCore.Signal(object)  # fires before a manual edit for undo
     # requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the gate
     deleteConfirm = QtCore.Signal(object)  # fires the delete confirm event - sends the gate
     requestGrab = QtCore.Signal(object)  # fires the grab request confirm event - sends the gate
@@ -3838,6 +3853,7 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         self.warning_visible = False  # flag for warning label/icon
         self._lock = threading.Lock()
         self._set_value_lock = threading.Lock()
+        self._range_min, self._range_max = -1.0, 1.0
 
         self._create_widget(gate, delete_enabled, parent=self)
 
@@ -3854,14 +3870,16 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
 
     def setRange(self, v1: float, v2: float):
         """sets the range of the edit box"""
-        self.value_widget.setRange(v1, v2)
+        self._range_min, self._range_max = v1, v2
+        with QtCore.QSignalBlocker(self.value_widget):
+            self.value_widget.setRange(self.gate.parent.to_display(v1), self.gate.parent.to_display(v2))
         self._update_tooltip()
 
     def setMaximum(self, value: float):
-        self.value_widget.setMaximum(value)
+        self.setRange(self._range_min, value)
 
     def setMinimum(self, value: float):
-        self.value_widget.setMinimum(value)
+        self.setRange(value, self._range_max)
 
     def _update_tooltip(self):
         v1 = self.value_widget.minimum()
@@ -3919,14 +3937,13 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         """updates the display gate value on UI thread"""
         if Shiboken.isValid(self):
             with QtCore.QSignalBlocker(self.value_widget):
-                # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
-                self.value_widget.setValue(value)
+                self.value_widget.setDecimals(self.gate.parent.decimals)
+                self.value_widget.setValue(self.gate.parent.to_display(value))
 
     def update_display(self):
         if Shiboken.isValid(self):
-            with QtCore.QSignalBlocker(self.value_widget):
-                # syslog.info(f"GWI: gate {self.gate.index} update display value {value}")
-                self.value_widget.setValue(self.gate.display_value)
+            self.setRange(self._range_min, self._range_max)
+            self.update_value_ui(self.gate.value)
 
     @property
     def id(self):
@@ -3964,8 +3981,10 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         self.label_warning.setMinimumWidth(20)
         # self.label_warning.setVisible(False)
 
-        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(gate, range_min, range_max)
-        self.value_widget.setValue(gate.value)
+        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            gate, gate.parent.to_display(range_min), gate.parent.to_display(range_max), decimals=gate.parent.decimals
+        )
+        self.value_widget.setValue(gate.display_value)
         self.value_widget.valueChanged.connect(self._value_changed_cb)  # hook manual changes made to the widget
 
         self.grab_widget = gremlin.ui.ui_common.QDataPushButton()
@@ -4026,10 +4045,8 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         if not self._set_value_lock.acquire(blocking=False):
             return
         try:
-            if value != self.value_widget.value():
-                with QtCore.QSignalBlocker(self.value_widget):
-                    self.value_widget.setValue(value)
             self.gate.setValue(value, emit=False)
+            self.update_display()
         finally:
             self._set_value_lock.release()
 
@@ -4040,12 +4057,12 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
 
     def _value_changed_cb(self, value):
         """called to record a value changed when the gate value widget is manually changed"""
-        # value = gremlin.util.scale_to_range(value, self.value_widget.minimum(), self.value_widget.maximum(), -1.0, 1.0)
-        # syslog.info(f"value: {value:0.3f} min: {self.value_widget.minimum():0.3f} max: {self.value_widget.maximum():0.3f}")
-        self.gate.setValue(value, emit=False)
-        gh = GateEventHandler()
-        gh.gate_value_changed.emit(self.gate)
-        self.valueChanged.emit(self.gate)
+        value = self.gate.parent.from_display(value)
+        if self._range_min <= value <= self._range_max and not gremlin.util.is_close(value, self.gate.value):
+            self.valueChanging.emit(self.gate)
+            self.gate.setValue(value, emit=True)
+            self.valueChanged.emit(self.gate)
+        self.update_display()
 
     def setIcon(self, icon, color=None):
         """sets the icon, pass a None value to clear it"""

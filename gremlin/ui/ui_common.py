@@ -6116,11 +6116,12 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     """a checkbox that has a data property to track an object associated with the checkbox"""
 
     valueChanged = QtCore.Signal()  # fires when the text has changed AND we lost the focus if that option is selected
+    textChanged = QtCore.Signal(str)  # fires when the text has changed (includes the text)
     lostFocus = QtCore.Signal()  # fires when the input looses focus
     enterPressed = QtCore.Signal()  # indicates the enter key was pressed
     escPressed = QtCore.Signal()  # indicates the esc key was pressed
 
-    def __init__(self, text: str = None, data=None, parent=None, width: int = 200, callbackEx: Callable = None, tooltip: str = None):
+    def __init__(self, text: str = None, data=None, parent=None, width: int = 200, callback : Callable = None, callbackEx: Callable = None, tooltip: str = None):
         super().__init__(parent=parent)
         assert callbackEx is None or isinstance(callbackEx, Callable), "callbackEx must be callable"
         self.setText(text)
@@ -6132,7 +6133,8 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         self.setMinimumWidth(width)
         self._trigger_on_focus_loss = True
 
-        self.callback_ex = callbackEx
+        self._callback = callback
+        self._callback_ex = callbackEx
 
         if tooltip:
             self.setToolTip(tooltip)
@@ -6163,13 +6165,17 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         if not self._trigger_on_focus_loss:
             # trigger on any text change
             self.valueChanged.emit()
-        if self.callback_ex:
-            self.callback_ex(self, self.text())
+            self.textChanged.emit(self.text())
+        if self._callback:
+            self._callback(self.text())
+        if self._callback_ex:
+            self._callback_ex(self, self.text())
 
     def focusOutEvent(self, event):
         if self._text_changed:
             self.lostFocus.emit()
             self.valueChanged.emit()
+            self.textChanged.emit(self.text())
         return super().focusOutEvent(event)
 
     def setText(self, value):
@@ -6194,11 +6200,13 @@ class QDataLineEdit(QtWidgets.QLineEdit):
 class QDataIPLineEdit(QDataLineEdit):
     """IP input text box"""
 
-    def __init__(self, text=None, data=None, parent=None):
-        super().__init__(text, data, parent)
+    def __init__(self, text=None, data=None, tooltip: str = None, callback : Callable = None, parent=None):
+        super().__init__(text=text, data=data, tooltip=tooltip, callback=callback, parent=parent)
         regex = r"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]).){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
         validator = QtGui.QRegularExpressionValidator(regex)
         self.setValidator(validator)
+        if callback:
+            self._callback_ex = callback
 
 
 class QDataComboBox(QComboBox):

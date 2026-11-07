@@ -859,7 +859,10 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = not config.startup_mouse_hook_disabled  # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        if __debug__:
+            # disable to prevent anomalies and input delay during debug sessions
+            self.enable_mouse_hook = False
+        self.enable_mouse_hook = not config.startup_mouse_hook_disabled
         self.enableMouse()
 
         self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()

@@ -3,6 +3,13 @@
 `deploy.bat` builds the portable package and bundled Inno Setup installer.
 Compile `GremlinEx.iss` without `/DBundledBuild` for the online release selector.
 
+Run `deploy_installer.bat` from the repository root to build only the bundled
+installer using the existing `dist\gremlinEx` package. It writes the installer
+to `dist\installer`; its version comes from `dist\gremlinEx\gremlinEx.exe`.
+Build the application package with `deploy.bat` first when it needs updating.
+The script finds Inno Setup 6 or 7 automatically, or uses the compiler selected
+with `set "ISCC_EXE=C:\path\to\ISCC.exe"`.
+
 `deploy.bat --push` builds and uploads both artifacts. `deploy.bat --push-only`
 uploads the existing artifacts for the version in `gremlin/version.py`; it fails
 if that version's ZIP or installer is missing, even when older builds exist.

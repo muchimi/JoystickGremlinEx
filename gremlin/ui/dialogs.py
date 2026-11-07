@@ -3935,6 +3935,7 @@ class ModeManagerDialog(BaseDialogUi):
         close_button_widget.clicked.connect(self._close_cb)
 
         self.mode_default_selector = QDataComboBox()
+        self.mode_default_selector.currentIndexChanged.connect(self._change_default_mode_cb)
         self.mode_default_selector.setToolTip(
             "Specifies the default startup mode for this profile when it is loaded. This setting can be overriden if the restore last active mode option is set."
         )
@@ -3997,7 +3998,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
     def _get_mode_list(self):
         """gets the mode list as a map keyed by mode name map[mode] = parent_mode (none if no parent)"""
-        modes = gremlin.shared_state.current_profile.get_mode_map()
+        modes = self._profile.get_mode_map()
         master_mode = gremlin.shared_state.master_mode
         if master_mode in modes:
             del modes[master_mode]
@@ -4017,6 +4018,10 @@ The setting can be overriden by the global mode reload option set in Options for
 
         # Obtain mode names and the mode they inherit from
         mode_list = self._get_mode_list()
+        with QtCore.QSignalBlocker(self.mode_default_selector):
+            self.mode_default_selector.clear()
+            self.mode_default_selector.addItems(sorted(mode_list))
+            self.mode_default_selector.setCurrentText(self._profile.get_start_mode())
 
         # Create UI element for each mode
 
@@ -4031,7 +4036,6 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode] = QDataComboBox()
             self.mode_dropdowns[mode].addItem("None")
             self.mode_dropdowns[mode].setMinimumContentsLength(20)
-            self.mode_default_selector.addItem(mode)
             for name in sorted(mode_list.keys()):
                 if name != mode:
                     self.mode_dropdowns[mode].addItem(name)
@@ -4041,13 +4045,14 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"), tooltip="Edit", callback=lambda m=mode: self._create_rename_mode_cb(m))
+            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"), tooltip="Edit", callback=self._create_rename_mode_cb(mode))
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"), tooltip="Delete", callback=lambda m=mode: self._create_delete_mode_cb(m))
+            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"), tooltip="Delete", callback=self._create_delete_mode_cb(mode))
+            self.mode_delete[mode].setEnabled(len(mode_list) > 1)
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
 
@@ -4064,10 +4069,6 @@ The setting can be overriden by the global mode reload option set in Options for
         self.container_default_layout = QtWidgets.QHBoxLayout()
         self.container_default_layout.setContentsMargins(0, 0, 0, 0)
         self.container_default_widget.setLayout(self.container_default_layout)
-
-        mode = gremlin.shared_state.current_profile.get_start_mode()
-        self.mode_default_selector.setCurrentText(mode)
-        self.mode_default_selector.currentIndexChanged.connect(self._change_default_mode_cb)
 
     @QtCore.Slot(bool)
     def _profile_restore_flag_cb(self, checked: bool):
@@ -4146,10 +4147,12 @@ The setting can be overriden by the global mode reload option set in Options for
 
         if user_input:
             if self._profile.rename_mode(current_name, new_name, emit=False):
+                if self.selected_mode == current_name:
+                    self.selected_mode = new_name
                 self._populate_mode_layout()
 
     def _delete_mode(self, mode_name):
-        if ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?"):
+        if ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?", parent=self):
             self._delete_mode_confirm(mode_name)
 
     def _delete_mode_confirm(self, mode_name):
@@ -4163,14 +4166,21 @@ The setting can be overriden by the global mode reload option set in Options for
         # Obtain mode from which the mode we want to delete inherits
 
         if self._profile.remove_mode(mode_name, emit=False):
-            default_mode = gremlin.shared_state.current_profile.get_root_mode()
-            if gremlin.shared_state.edit_mode == mode_name:
+            default_mode = self._profile.get_root_mode()
+            edit_mode_changed = gremlin.shared_state.edit_mode == mode_name
+            if edit_mode_changed:
                 gremlin.shared_state.edit_mode = default_mode
             if gremlin.shared_state.runtime_mode == mode_name:
                 gremlin.shared_state.runtime_mode = default_mode
+            if self.selected_mode == mode_name:
+                self.selected_mode = default_mode
 
             # Update the ui
             self._populate_mode_layout()
+            el = gremlin.event_handler.EventListener()
+            el.profile_modes_changed.emit()
+            if edit_mode_changed:
+                el.edit_mode_changed.emit(default_mode)
 
     @QtCore.Slot()
     def _add_mode_cb(self):
@@ -4200,7 +4210,7 @@ The setting can be overriden by the global mode reload option set in Options for
     def _change_default_mode_cb(self, index):
         """occurs when the default mode is changed"""
         mode = self.mode_default_selector.currentText()
-        gremlin.shared_state.current_profile.set_start_mode(mode)
+        self._profile.set_start_mode(mode)
 
 
 class DeviceInformationDialog(BaseDialogUi):

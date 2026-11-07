@@ -5837,6 +5837,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if emit and gremlin.shared_state.is_running:
             self._activate_ui(False)
         self.setUIState(False)
+        gremlin.maestro.Maestro().offerDefaultJoysticks(parent=self)
         # Clear the old Qt objects on their owning thread, before parsing on a
         # worker. The worker must not poll QTabBar or destroy cached widgets.
         self._startup_restore_target = None
@@ -6900,6 +6901,7 @@ if __name__ == "__main__":
 
         # Publish saved OSC targets before input enumeration and profile load.
         maestro = gremlin.maestro.Maestro()
+        maestro.offerDefaultJoysticks()
 
         # instance
         # _pixmaps = gremlin.ui.ui_common.Pixmaps()

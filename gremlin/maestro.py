@@ -537,7 +537,7 @@ _SINGLE_REPLIES = {
 
 GEX_VENDOR_ID = 0x0001  # fake vendor ID
 GEX_PRODUCT_ID = 0x0001  # fake product ID
-MAX_GAMEPADS = 4 # this a hard limit imposed by XINPUT for players 1 to 4
+MAX_GAMEPADS = 4  # this a hard limit imposed by XINPUT for players 1 to 4
 
 
 def _osc_string(value):
@@ -972,10 +972,12 @@ class Maestro:
         self._sync_worker = None
         self._stopping = threading.Event()
         self._dirty = False
-        self.client = None
+        self._client = None
         self._initialized = False
         self._shutdown_connected = False
         self._local_service = True
+        self._default_devices_prompted = False
+        self._port_scanned = False  # true if a port scan was run already
 
         # the connection data is stored in our config
         config = gremlin.config.Configuration()
@@ -994,10 +996,6 @@ class Maestro:
         try:
             self.connect()
             self.LoadActiveControllers()
-            if config.maestro_device_map is None:
-                for index in range(min(GEX_MAX_DEVICES, max(0, config.maestro_device_count))):
-                    if index not in self._controller_map:
-                        self.createJoystickController(at_index=index)
             self.populateDeviceList()
             self.sync(force=True)
             syslog.info(f"MAESTRO: connected to Maestro Bridge service {len(self._controller_map)} managed controllers")
@@ -1005,8 +1003,13 @@ class Maestro:
             syslog.error("MAESTRO: could not initialize Maestro Bridge service: %s", error)
             if self.client is not None:
                 self.client.close()
-                self.client = None
+                self._client = None
             self._initialized = False
+
+    @property
+    def client(self):
+        """mastro client interface"""
+        return self._client
 
     @staticmethod
     def _joystick_id(index):
@@ -1032,12 +1035,9 @@ class Maestro:
     def enabled(self):
         return self.initialized and gremlin.config.Configuration().maestro_enabled
 
-    def ping(self):
-        """Send a ping message to the Maestro service."""
-        self.connect()
-        if self.connected():
-            self.client._send(_encode_message("/maestro_ping", []))
-        return
+    def ping(self) -> bool:
+        """Ping through the connection handshake, which supplies a request ID."""
+        return bool(self.connect())
 
     def getCapabilities(self, device_id: str) -> "MaestroProfileInfo | None":
         """Query /maestro_capabilities for one device and return it as a MaestroProfileInfo."""
@@ -1079,7 +1079,7 @@ class Maestro:
 
         if self._controller_map and not force:
             # get number of currently assigned gamepad controllers - that could be Maestro joysticks or our custom joysticks
-            return sum(1 for c in self._controller_map.values() if c.kind in ("joystick","custom"))
+            return sum(1 for c in self._controller_map.values() if c.kind in ("joystick", "custom"))
 
         if not self.initialized or self.client is None:
             return 0
@@ -1138,7 +1138,49 @@ class Maestro:
                 return False
         return True
 
+    def scan(self, network_str, port, max_threads=100):
+        """Scan the specified network for Maestro services on the given port."""
+        import gremlin.network as network
+
+        if self._port_scanned:
+            return None
+        self._port_scanned = True
+        possible_hosts = network.scan_local_network(port, max_threads)
+        # see if the host is a maestro port host
+        for host in possible_hosts:
+            # A failed candidate must not recursively launch another scan.
+            result = self._connect(host=host, port=port)
+            if result:
+                syslog.error(f"MAESTRO: Found Maestro service on {host}:{port}")
+                return host
+        return None
+
     def connect(self, host=None, port=None, reply_host=None, reply_port=None, throw_on_error=False):
+        # Resolve defaults here as well as in _connect: its local assignments
+        # do not update the arguments used by the fallback scan below.
+        if port is None:
+            port = gremlin.config.Configuration().maestro_osc_port
+        if type(port) is not int or not 1 <= port <= 65535:
+            message = f"Maestro port must be an integer from 1 to 65535, got {port!r}"
+            if throw_on_error:
+                raise ValueError(message)
+            syslog.error(f"MAESTRO: {message}")
+            return None
+        result = self._connect(host, port, reply_host, reply_port, throw_on_error)
+        if not result and not self._port_scanned:
+            # attempt to scan the local subnet to find the instance
+            if port is None:
+                port = gremlin.config.Configuration().maestro_osc_port
+                if port is None:
+                    syslog.error("MAESTRO: port is not specified in configuration - cannot scan local network for Maestro service")
+                    return None
+            host = self.scan(network_str="0.0.0.0/0", port=port)
+            if host:
+                # found it
+                result = self._connect(host, port, reply_host, reply_port, throw_on_error)
+        return result
+
+    def _connect(self, host=None, port=None, reply_host=None, reply_port=None, throw_on_error=False):
         """Connect or retest the shared transport used by output and the dialog."""
 
         config = gremlin.config.Configuration()
@@ -1163,7 +1205,13 @@ class Maestro:
             syslog.error("MAESTRO: reply port is not specified")
             return None
 
-        settings = (socket.gethostbyname(host), port, reply_host, reply_port)
+        try:
+            settings = (socket.gethostbyname(host), port, reply_host, reply_port)
+        except socket.error as e:
+            syslog.error(f"MAESTRO: Failed to resolve host {host}: {e}")
+            if throw_on_error:
+                raise
+            return None
         with self._lock:
             if self.client is not None and getattr(self, "_connection_settings", None) != settings:
                 self._handle_shutdown()
@@ -1173,16 +1221,16 @@ class Maestro:
                 from gremlin import joystick_handling
 
                 joystick_handling.set_maestro_devices([])
-            if self.client is None:
-                self.client = MaestroOscClient(*settings)
-                self.client.service_callback = self._handle_service_state
+            if self._client is None:
+                self._client = MaestroOscClient(*settings)
+                self._client.service_callback = self._handle_service_state
             try:
-                pong = self.client.request("/maestro_ping", timeout=1.0, attempts=2).raise_for_error()  # @IgnoreException
+                pong = self._client.request("/maestro_ping", timeout=1.0, attempts=2).raise_for_error()  # @IgnoreException
                 if list(pong.args) != ["MaestroOscService", 1]:
                     raise RuntimeError(f"Unsupported Maestro service/protocol: {list(pong.args)}")
             except Exception:
-                self.client.close()
-                self.client = None
+                self._client.close()
+                self._client = None
                 self._initialized = False
                 if throw_on_error:
                     raise
@@ -1259,7 +1307,7 @@ class Maestro:
                         syslog.warning("MAESTRO: reset on shutdown failed: %s", result.message)
             finally:
                 self.client.close()
-                self.client = None
+                self._client = None
                 self._initialized = False
                 self._service_running = False
                 self.connected_changed.emit(False)
@@ -1332,6 +1380,81 @@ class Maestro:
         with self._lock:
             name = name.casefold()
             return any(c.name.casefold() == name for c in self._controller_map.values())
+
+    def offerDefaultJoysticks(self, parent=None) -> bool:
+        """Offer initial devices on the UI thread, before a profile is loaded."""
+        config = gremlin.config.Configuration()
+        if not config.maestro_enabled or self._default_devices_prompted:
+            return False
+        try:
+            if not self.ensureConnected():
+                return False
+            existing_ids = {row["id"] for address in ("/maestro_definitions", "/maestro_devices") for row in self.client.list(address)}
+        except OSError, RuntimeError, ValueError, TimeoutError:
+            syslog.exception("MAESTRO: unable to check default joystick devices")
+            return False
+        if any(self._joystick_id(index) in existing_ids for index in range(4)):
+            return False
+
+        # A cancelled offer should not interrupt subsequent profile loads.
+        self._default_devices_prompted = True
+        dialog = MaestroDefaultDevicesDialog(parent=parent)
+        try:
+            if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                return False
+            self.createDefaultJoysticks(dialog.device_count)
+            return True
+        except (OSError, RuntimeError, ValueError, TimeoutError) as error:
+            syslog.exception("MAESTRO: unable to create default joysticks")
+            MessageBoxWarning(
+                title="Maestro device creation failed",
+                prompt=str(error),
+                informative_text="You can manage Maestro devices later from Tools > Maestro Devices.",
+                parent=parent,
+            )
+            return False
+        finally:
+            dialog.deleteLater()
+
+    def createDefaultJoysticks(self, count: int) -> int:
+        """Create missing gex-1..gex-N joysticks, preserving definitions and slots."""
+        if type(count) is not int or not 1 <= count <= GEX_MAX_DEVICES:
+            raise ValueError(f"Choose between 1 and {GEX_MAX_DEVICES} joysticks.")
+        if not self.ensureConnected():
+            raise RuntimeError("The Maestro bridge is not connected.")
+        self.LoadActiveControllers()
+        existing_ids = {row["id"] for address in ("/maestro_definitions", "/maestro_devices") for row in self.client.list(address)}
+        missing_ids = [self._joystick_id(index) for index in range(count) if self._joystick_id(index) not in existing_ids]
+        config = gremlin.config.Configuration()
+        previous_map = config.maestro_device_map
+        device_map = previous_map if previous_map is not None else {c.id: c.index for c in self._controller_map.values()}
+        occupied = set(device_map.values()) | set(self._controller_map)
+        free_slots = [index for index in range(GEX_MAX_DEVICES) if index not in occupied]
+        if len(missing_ids) > len(free_slots):
+            raise RuntimeError(f"Only {len(free_slots)} Maestro slots are available. Choose fewer devices or change the selection in Tools > Maestro Devices.")
+        if not missing_ids:
+            return 0
+
+        config.maestro_device_map = dict(device_map)
+        created = 0
+        try:
+            for device_id in missing_ids:
+                preferred_slot = self._service_index(device_id)
+                slot = preferred_slot if preferred_slot in free_slots else free_slots[0]
+                free_slots.remove(slot)
+                controller = self.createJoystickController(name=device_id, axis_count=8, button_count=128, hat_count=4, at_index=slot)
+                if controller is None:
+                    raise RuntimeError(f"Could not create {device_id}. Created {created} of {len(missing_ids)} missing joysticks.")
+                created += 1
+            return created
+        finally:
+            if created:
+                config.maestro_device_count = count
+            else:
+                config.maestro_device_map = previous_map
+            config.save()
+            # Publish even a partially successful batch before profile parsing.
+            self.refreshDevices()
 
     def reset(self):
         """Reconnect saved active controllers and refresh DirectInput discovery."""
@@ -1602,9 +1725,6 @@ class Maestro:
         except (OSError, RuntimeError, ValueError) as error:
             syslog.error(f"MAESTRO: failed to create controller {index}: {error}")
             return None
-
-
-
 
     def createGamepadController(self, name: str, definition: str, at_index=None) -> None | MaestroController:
         """Create a service-owned Xbox 360 gamepad controller.
@@ -1951,6 +2071,44 @@ class MaestroProfileInfo:
         )
 
 
+class MaestroDefaultDevicesDialog(QRememberDialog):
+    """Offer a bounded number of standard GEX joysticks before loading profiles."""
+
+    def __init__(self, parent=None):
+        super().__init__("MaestroDefaultDevicesDialog", width=480, height=230, parent=parent)
+        self.setWindowTitle("Create default Maestro joysticks?")
+        self.setModal(True)
+        # Startup can show this dialog before the main window exists.
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_QuitOnClose, False)
+        layout = QtWidgets.QVBoxLayout(self)
+        description = QDataLabel(
+            "No default Maestro joysticks (gex-1 to gex-4) were found. "
+            "Create default joysticks before loading the profile?\n\n"
+            "Each joystick has 8 axes, 128 buttons, and 4 hats."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        self.count_widget = QIntLineEdit(min_range=1, max_range=GEX_MAX_DEVICES, value=4, chars=3)
+        layout.addWidget(getHContainer([f"Number of joysticks (1–{GEX_MAX_DEVICES}):", self.count_widget], widget_only=True))
+        self.warning_widget = QWarningWidget(autohide=True)
+        layout.addWidget(self.warning_widget)
+        layout.addStretch()
+        self.create_button = QDataPushButton("Create devices", clicked=self._accept)
+        self.cancel_button = QDataPushButton("Not now", clicked=self.reject)
+        layout.addWidget(getHContainer(["||", self.create_button, self.cancel_button], widget_only=True, auto_size=True))
+
+    @property
+    def device_count(self) -> int:
+        return self.count_widget.value()
+
+    def _accept(self):
+        count = self.device_count
+        if type(count) is not int or not 1 <= count <= GEX_MAX_DEVICES:
+            self.warning_widget.setText(f"Choose between 1 and {GEX_MAX_DEVICES} joysticks.")
+            return
+        self.accept()
+
+
 class MaestroNewDeviceDialog(QRememberDialog):
     """Collects all parameters needed to create a Maestro device: a custom joystick or a Maestro profile."""
 
@@ -2072,9 +2230,12 @@ class MaestroDialog(QRememberDialog):
 
         self.connection_group = QGroupBoxV("Maestro Bridge service")
         self.host_widget = QDataLineEdit(self.config.maestro_osc_host, tooltip="Host name or IPv4 address of the Maestro service")
-        self.port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_port, chars=6)
-        self.reply_host_widget = QDataIPLineEdit(self.config.maestro_osc_reply_host)
-        self.reply_port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_reply_port, chars=6)
+        self.host_widget.textChanged.connect(self._handle_host_changed)
+        self.port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_port, chars=6, callback=self._handle_port_changed)
+        self.reply_host_widget = QDataIPLineEdit(self.config.maestro_osc_reply_host, callback=self._handle_reply_host_changed)
+        self.reply_port_widget = QIntLineEdit(
+            min_range=1, max_range=65535, value=self.config.maestro_osc_reply_port, chars=6, callback=self._handle_reply_port_changed
+        )
         self.refresh_button = Buttons.getRefreshWidget(
             "Refresh Devices", callback=self._refresh_devices, tooltip="Refresh the list of connected Maestro devices"
         )
@@ -2202,6 +2363,25 @@ class MaestroDialog(QRememberDialog):
         # refresh on start if the bridge is connectable
         self._refresh_devices()
 
+    def _handle_host_changed(self, value: str):
+        # validate the host value
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(value)
+            self.config.maestro_osc_host = value
+        except ValueError:
+            MessageBoxWarning("Invalid Host", f"The host value '{value}' is not a valid IP address.")
+
+    def _handle_port_changed(self, value: int):
+        self.config.maestro_osc_port = value
+
+    def _handle_reply_host_changed(self, value: str):
+        self.config.maestro_osc_reply_host = value
+
+    def _handle_reply_port_changed(self, value: int):
+        self.config.maestro_osc_reply_port = value
+
     def _handle_preset_selected(self, preset_name: str, preset_data: dict):
         """handle preset selected"""
         mc = Maestro()
@@ -2220,7 +2400,12 @@ class MaestroDialog(QRememberDialog):
             # index -1 means automatically choose an available index
             axis_count, button_count, hat_count, index, definition = data
             self.maestro.createJoystickController(
-                name=f"gex-{index + 1}", axis=axis_count, buttons=button_count, hats=hat_count, at_index=index if index != -1 else None, definition=definition
+                name=f"gex-{index + 1}",
+                axis_count=axis_count,
+                button_count=button_count,
+                hat_count=hat_count,
+                at_index=index if index != -1 else None,
+                definition=definition,
             )
 
         def createGamepad(result: bool, data: tuple):
@@ -2343,7 +2528,7 @@ class MaestroDialog(QRememberDialog):
         mc = Maestro()
         if not mc.ensureConnected():
             return
-        mc.createJoystickController(axis=8, buttons=128, hats=4, at_index=index)
+        mc.createJoystickController(axis_count=8, button_count=128, hat_count=4, at_index=index)
         self._refresh_devices()
 
     def _settings(self):
@@ -2361,12 +2546,13 @@ class MaestroDialog(QRememberDialog):
     def _update_enabled(self):
         """updates dialog widget state based on connection status and device availability"""
         connected = self._tested_settings is not None
-        self.connection_group.setEnabled(not self._busy)
-        self.devices_group.setEnabled(connected and not self._busy)
-        self.apply_button.setEnabled(connected and not self._busy)
-        self.enabled_widget.setEnabled(not self._busy)
+        idle = not self._busy
+        self.connection_group.setEnabled(idle)
+        self.devices_group.setEnabled(connected and idle)
+        self.apply_button.setEnabled(connected and idle)
+        self.enabled_widget.setEnabled(idle)
         self.connected_widget.setEnabled(connected)
-        self.close_button.setEnabled(not self._busy)
+        self.close_button.setEnabled(idle)
         has_devices = bool(self._select_widget_map)
         self.select_all_button.setEnabled(has_devices)
         self.delete_all_button.setEnabled(has_devices)
@@ -2405,6 +2591,17 @@ class MaestroDialog(QRememberDialog):
             complete(result)
         self._update_enabled()
 
+    def _read_snapshot(self):
+        """Read the device inventory and row capabilities on the request worker."""
+        snapshot = service_snapshot(self.maestro.client)
+        capabilities = {}
+        for definition in snapshot["definitions"]:
+            caps = self.maestro.getCapabilities(definition["id"])
+            if caps is not None:
+                capabilities[definition["id"]] = caps
+        snapshot["capabilities"] = capabilities
+        return snapshot
+
     def _refresh_devices(self):
         try:
             settings = self._settings()
@@ -2415,17 +2612,18 @@ class MaestroDialog(QRememberDialog):
         self._tested_settings = None
 
         def operation():
+            if not self.maestro.connected():
+                self.maestro.connect()
+            if not self.maestro.connected():
+                syslog.warning("MAESTRO: device refresh failed - not connected")
+                return None
             self.maestro.connect(*settings)
-            snapshot = service_snapshot(self.maestro.client)
-            capabilities = {}
-            for definition in snapshot["definitions"]:
-                caps = self.maestro.getCapabilities(definition["id"])
-                if caps is not None:
-                    capabilities[definition["id"]] = caps
-            snapshot["capabilities"] = capabilities
-            return snapshot
+            return self._read_snapshot()
 
         def complete(snapshot):
+            if not snapshot:
+                # no data available (can happen if the bridge is not connected)
+                return
             self._tested_settings = settings
             if not retain_selection:
                 same_host = settings[:2] == (self.config.maestro_osc_host, self.config.maestro_osc_port)
@@ -2442,23 +2640,37 @@ class MaestroDialog(QRememberDialog):
         self._submit(operation, complete, "Testing the connection and reading devices…")
 
     def _load_snapshot(self, snapshot, select_id=None):
+        if not snapshot:
+            # no data available (can happen if the bridge is not connected)
+            return
         self._definitions = {d["id"]: d for d in snapshot["definitions"]}
         self._profiles = {p["id"]: p for p in snapshot["profiles"]}
         active = {d["id"] for d in snapshot["devices"]}
         self._selected_ids.intersection_update(self._definitions)
-        self.device_list.clear()
-        capabilities = snapshot.get("capabilities", {})
+        capabilities = snapshot.get("capabilities") or {}
         # clear the UI
         self.device_list.clear()
         self._select_widget_map.clear()
 
-        if capabilities:
+        if self._definitions:
             if self.verbose:
                 syslog.info("Maestro snapshot summary:")
                 syslog.info(f"\tAttached devices: {len(self._definitions)}")
             cap: MaestroProfileInfo
-            for cap in capabilities.values():
-                device_id = cap.device_id
+            for device_id, definition in self._definitions.items():
+                cap = capabilities.get(device_id)
+                if cap is None:
+                    # Saved devices remain manageable even when inactive or
+                    # temporarily missing a capabilities response.
+                    profile = dict(self._profiles.get(definition.get("profileId"), {}))
+                    profile.update(name=definition.get("name", device_id), kind=definition.get("kind", "profile"))
+                    if definition.get("kind") == "custom":
+                        profile.update(
+                            axes=AXIS_NAMES[: definition.get("axes", 0)],
+                            addressableButtons=definition.get("buttons", 0),
+                            hatCount=definition.get("hats", 0),
+                        )
+                    cap = MaestroProfileInfo.from_dict(profile, device_id)
                 axes = cap.axis_count
                 buttons = cap.addressable_buttons
                 hats = cap.hat_count
@@ -2539,16 +2751,17 @@ class MaestroDialog(QRememberDialog):
             include = False
 
         def operation():
-            save_device_definition(self.maestro.client, definition, None)
-            snapshot = service_snapshot(self.maestro.client)
-            snapshot["capabilities"] = {}
-            for row in snapshot["definitions"]:
-                caps = self.maestro.getCapabilities(row["id"])
-                if caps is not None:
-                    snapshot["capabilities"][row["id"]] = caps
-            return snapshot
+            if not self.maestro.connected():
+                syslog.warning("MAESTRO: device creation failed - no client available")
+                return
+            if not save_device_definition(self.maestro.client, definition, None):
+                raise RuntimeError(f"The Maestro service could not create {device_id}. Refresh to read its current devices.")
+            return self._read_snapshot()
 
         def complete(snapshot):
+            if not snapshot:
+                # no data available (can happen if the bridge is not connected)
+                return
             if include:
                 self._selected_ids.add(device_id)
             self._load_snapshot(snapshot, device_id)
@@ -2584,6 +2797,9 @@ class MaestroDialog(QRememberDialog):
 
         def operation():
             # A previous Apply may have disabled/closed the output transport.
+            if not self.maestro.connected():
+                syslog.warning("MAESTRO: cannot apply settings - no client available")
+                return
             self.maestro.connect(*settings)
             if enabled:
                 self.maestro.LoadActiveControllers(device_map)
@@ -2603,7 +2819,7 @@ class MaestroDialog(QRememberDialog):
                 from gremlin import joystick_handling
 
                 joystick_handling.set_maestro_devices([])
-            return service_snapshot(self.maestro.client) if self.maestro.client is not None else None
+            return self._read_snapshot() if self.maestro.client is not None else None
 
         def complete(snapshot):
             (self.config.maestro_osc_host, self.config.maestro_osc_port, self.config.maestro_osc_reply_host, self.config.maestro_osc_reply_port) = settings

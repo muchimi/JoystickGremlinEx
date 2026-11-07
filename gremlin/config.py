@@ -60,7 +60,7 @@ AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS
 STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
 OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
-GEX_MAESTRO_ENABLED = "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
+GEX_MAESTRO_ENABLED =  True # "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
 VJOY_ENABLED = True  # "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
 
 

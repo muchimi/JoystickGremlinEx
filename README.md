@@ -51,6 +51,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T94)
+- New: Bridge: (experimental) Maestro bridge support enabled by default. **potential for undiscovered dragons ahead as this is experimental.**.  See the [bridge testing manual](https://github.com/muchimi/JoystickGremlinEx/blob/develop/maestro%20testing.md) on what to do, how to test.
+- New: UI: if the bridge is detected and no gex joystick devices are found, will offer to create standard output joystick devices defaulting to 4.
+- Fix: UI: remote Maestro IP does not update the configuration when manually edited.
+- Fix: UI: adding a Maestro device manually via the new device button clears the device list.
+- Fix: API: Maestro ping command sends duplicate request.
+- Fix: UI: mode delete does not update the list of modes after deletion.
+- Fix: Gated Axis Action: gate widgets do not update correctly when a gate is deleted.
+- Fix: BUILD: exception in bridge installer, remove device creation option (moved to GEX  app).
+- DOC: more documentation updates.
+
 ### (m77T93)
 
 
