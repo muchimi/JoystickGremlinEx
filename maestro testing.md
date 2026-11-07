@@ -6,7 +6,7 @@ Those of you interested in testing the Maestro bridge, here's some prep info.
 
 ### What is HID Maestro
 
-I'll paraphrase here because the details are on the project's home page.
+I'll paraphrase here because the details are on the [HID Maestro project's GitHub page](https://github.com/hifihedgehog/HIDMaestro).
 
 HID Maestro is a virtual device driver that runs in user mode, and lets you create any HID input device without a kernel mode signed driver. GEX focuses on joysticks and gamepads in this case as a replacement to VJOY/VIGEM.  The clear advantage here is that it only needs elevated privileges to run, and installs no hardware drivers in kernel mode.  VJOY and VIGEM are no longer actively supported, one reason is the high cost of a kernel mode driver certificate which is unaffordable in the context of an open source project, and with the updated requirements, significantly more expensive than a development certificate.
 
