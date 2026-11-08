@@ -450,6 +450,7 @@ from shiboken6 import Shiboken
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Slot
 from psygnal import Signal
+from gremlin.worker import WorkManager, with_wait_cursor
 
 import dinput
 from dinput import GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_PRODUCT_STRING, DeviceSummary
@@ -500,6 +501,8 @@ from gremlin.ui.ui_common import (
     QWarningWidget,
     synchronize_grids,
 )
+
+from PySide6.QtCore import QSignalBlocker
 
 syslog = logging.getLogger("system")
 AXIS_NAMES = ("X", "Y", "Z", "Rx", "Ry", "Rz", "Slider", "Dial")
@@ -733,6 +736,8 @@ class MaestroOscClient:
         try:
             values = self._request(address, *arguments, timeout=timeout, attempts=attempts)  # @IgnoreException
         except (MaestroServiceError, TimeoutError, OSError) as error:
+            if __debug__:
+                syslog.error(f"MAESTRO: command error: [{address}] {error}")
             return MaestroResult.from_error(address, error)
         if address in _LIST_REPLIES:
             rows, total = values
@@ -977,7 +982,6 @@ class Maestro:
         self._shutdown_connected = False
         self._local_service = True
         self._default_devices_prompted = False
-        self._port_scanned = False  # true if a port scan was run already
 
         # the connection data is stored in our config
         config = gremlin.config.Configuration()
@@ -986,12 +990,9 @@ class Maestro:
             syslog.info("MAESTRO: disabled")
             return
 
-        # check defaults, use hosts where possible
-        reply_host = config.maestro_osc_reply_host
-        if reply_host == "127.0.0.1":
-            # use self
-            reply_host = getHostIpSingle()
-            config.maestro_osc_reply_host = reply_host
+        if not config.maestro_configured:
+            config.maestro_configured = self.discover()
+
 
         try:
             self.connect()
@@ -1005,6 +1006,67 @@ class Maestro:
                 self.client.close()
                 self._client = None
             self._initialized = False
+
+    def discover(self) -> bool:
+        """discover maestro service
+
+        Returns:
+            bool: True if the Maestro service was discovered, False otherwise.
+            The data will be in the config for maestro objects
+
+        """
+        self.disconnect()
+        found = False
+        syslog.info("MAESTRO: automatic connection lookup...")
+        result = self._check_localhost_connect()
+        config = gremlin.config.Configuration()
+        if result:
+            # connected on local host
+            found = True
+            syslog.info("MAESTRO: connected on localhost")
+            config.maestro_use_localhost = True
+
+        else:
+            # check other connections
+
+            config.maestro_use_localhost = False
+            port = config.maestro_osc_port  # send port
+            if port:
+                # attempt to scan the local subnet to find the instance
+                host = self.scan(network_str="0.0.0.0/0", port=port)
+                if host:
+                    # found it
+                    reply_host = config.maestro_osc_reply_host
+                    reply_port = config.maestro_osc_reply_port
+                    result = self._connect(host, port, reply_host, reply_port, False)
+                    if result:
+                        syslog.info(f"MAESTRO: connected to Maestro service at {host}:{port}")
+                        config.maestro_osc_host = host
+                        found = True
+        if found:
+            # reconnect
+            self.connect()
+        return found
+
+
+
+    def _check_localhost_connect(self) -> bool:
+        """Check localhost and release temporary reply sockets before discovery."""
+        localhost = "127.0.0.1"
+        client = self.client
+        temporary = client is None
+        try:
+            if temporary:
+                config = gremlin.config.Configuration()
+                client = MaestroOscClient(localhost, port=config.maestro_osc_port, reply_host=localhost, reply_port=config.maestro_osc_reply_port)
+            # send a ping
+            result = client.request("/maestro_ping", timeout=1.0, attempts=1)
+            return bool(result) and list(result.args) == ["MaestroOscService", 1]
+        except OSError, RuntimeError, ValueError, TimeoutError:
+            return False
+        finally:
+            if temporary and client is not None:
+                client.close()
 
     @property
     def client(self):
@@ -1142,10 +1204,8 @@ class Maestro:
         """Scan the specified network for Maestro services on the given port."""
         import gremlin.network as network
 
-        if self._port_scanned:
-            return None
-        self._port_scanned = True
-        possible_hosts = network.scan_local_network(port, max_threads)
+        config = gremlin.config.Configuration()
+        possible_hosts = network.scan_local_network(port, max_threads, reply_port=config.maestro_osc_reply_port)
         # see if the host is a maestro port host
         for host in possible_hosts:
             # A failed candidate must not recursively launch another scan.
@@ -1167,17 +1227,7 @@ class Maestro:
             syslog.error(f"MAESTRO: {message}")
             return None
         result = self._connect(host, port, reply_host, reply_port, throw_on_error)
-        if not result and not self._port_scanned:
-            # attempt to scan the local subnet to find the instance
-            if port is None:
-                port = gremlin.config.Configuration().maestro_osc_port
-                if port is None:
-                    syslog.error("MAESTRO: port is not specified in configuration - cannot scan local network for Maestro service")
-                    return None
-            host = self.scan(network_str="0.0.0.0/0", port=port)
-            if host:
-                # found it
-                result = self._connect(host, port, reply_host, reply_port, throw_on_error)
+
         return result
 
     def _connect(self, host=None, port=None, reply_host=None, reply_port=None, throw_on_error=False):
@@ -2228,49 +2278,82 @@ class MaestroDialog(QRememberDialog):
         self.enabled_widget = QEnabledWidget()
         self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
 
+        self.localhost_widget = QDataCheckbox(
+            "LocalHost",
+            tooltip="Use localhost for Maestro connection. Use this when the Maestro service is running on the same machine as GEX.",
+            callback=self._handle_localhost_mode_changed,
+            value=self.config.maestro_use_localhost,
+        )
+
         self.connection_group = QGroupBoxV("Maestro Bridge service")
         self.host_widget = QDataLineEdit(self.config.maestro_osc_host, tooltip="Host name or IPv4 address of the Maestro service")
         self.host_widget.textChanged.connect(self._handle_host_changed)
-        self.port_widget = QIntLineEdit(min_range=1, max_range=65535, value=self.config.maestro_osc_port, chars=6, callback=self._handle_port_changed)
-        self.reply_host_widget = QDataIPLineEdit(self.config.maestro_osc_reply_host, callback=self._handle_reply_host_changed)
+        self.port_widget = QIntLineEdit(
+            min_range=1,
+            max_range=65535,
+            value=self.config.maestro_osc_port,
+            chars=6,
+            callback=self._handle_port_changed,
+        )
+        self.reply_host_widget = QDataIPLineEdit(self.config.maestro_osc_reply_host)
+        self.reply_host_widget.textChanged.connect(self._handle_reply_host_changed)
         self.reply_port_widget = QIntLineEdit(
-            min_range=1, max_range=65535, value=self.config.maestro_osc_reply_port, chars=6, callback=self._handle_reply_port_changed
+            min_range=1,
+            max_range=65535,
+            value=self.config.maestro_osc_reply_port,
+            chars=6,
+            callback=self._handle_reply_port_changed,
         )
         self.refresh_button = Buttons.getRefreshWidget(
             "Refresh Devices", callback=self._refresh_devices, tooltip="Refresh the list of connected Maestro devices"
         )
-        self.host_self_widget = QDataPushButton("Set Self", clicked=self._handle_set_self_reply_host)
+        self.host_self_widget = QDataPushButton("Self", clicked=self._handle_set_self_reply_host)
         self.ping_button = QDataPushButton("Ping Maestro", clicked=self._handle_ping_maestro)
+        self.discover_widget = QDataPushButton("Scan", clicked=self._handle_discover_maestro, tooltip="Discover GEX Bridge Service host")
+        self.discover_widget.setIcon(Icons.scanIcon())
         self.select_none_button = QDataPushButton("Select None", clicked=self._handle_select_none, tooltip="Deselect all devices")
         self.select_all_button = QDataPushButton("Select All", clicked=self._handle_select_all, tooltip="Select all devices")
-        self.delete_all_button = QDataPushButton("Delete All Devices", clicked=self._handle_delete_all_devices, tooltip="Delete all connected Maestro devices")
-        self.connection_group.addWidget(
-            getHContainer(
-                [
-                    "Host:",
-                    self.host_widget,
-                    "Port:",
-                    self.port_widget,
-                    self.refresh_button,
-                    self.ping_button,
-                ],
-                widget_only=True,
-            )
+        self.delete_all_button = QDataPushButton(
+            "Delete All Devices",
+            clicked=self._handle_delete_all_devices,
+            tooltip="Delete all connected Maestro devices",
+        )
+
+        self.host_container = getHContainer(
+            [
+                "Host:",
+                self.host_widget,
+            ],
+            widget_only=True,
+        )
+
+        self.reply_host_container = getHContainer(
+            [
+                "Reply Host:",
+                self.reply_host_widget,
+                "Reply Port:",
+                self.reply_port_widget,
+            ],
+            widget_only=True,
         )
 
         self.connection_group.addWidget(
             getHContainer(
                 [
-                    "Receive replies on:",
-                    self.reply_host_widget,
-                    "Reply port:",
-                    self.reply_port_widget,
-                    self.host_self_widget,
+                    self.localhost_widget,
+                    self.host_container,
+                    "Port:",
+                    self.port_widget,
+                    self.refresh_button,
+                    # self.ping_button,
+                    self.discover_widget,
                 ],
                 widget_only=True,
-                tooltip="Reply port must match the host service's SendPort. For another host, use a local LAN interface or 0.0.0.0.",
             )
         )
+
+        self.connection_group.addWidget(self.reply_host_container)
+
         layout.addWidget(self.connection_group)
         self.status_widget = QDataLabel("Enter the service address and test the connection.")
         self.status_widget.setWordWrap(True)
@@ -2285,6 +2368,7 @@ class MaestroDialog(QRememberDialog):
         self.device_list.setMinimumHeight(150)
         self.devices_group.addWidget(self.device_list)
         self.new_button = QDataPushButton("New Device", clicked=self._create_new_joystick, tooltip="Creates a new Maestro virtual device")
+
 
         # presets
         presets = {
@@ -2373,15 +2457,6 @@ class MaestroDialog(QRememberDialog):
         except ValueError:
             MessageBoxWarning("Invalid Host", f"The host value '{value}' is not a valid IP address.")
 
-    def _handle_port_changed(self, value: int):
-        self.config.maestro_osc_port = value
-
-    def _handle_reply_host_changed(self, value: str):
-        self.config.maestro_osc_reply_host = value
-
-    def _handle_reply_port_changed(self, value: int):
-        self.config.maestro_osc_reply_port = value
-
     def _handle_preset_selected(self, preset_name: str, preset_data: dict):
         """handle preset selected"""
         mc = Maestro()
@@ -2448,6 +2523,20 @@ class MaestroDialog(QRememberDialog):
     def _handle_create_device_by_preset(self, preset_name: str, preset_data: dict):
         pass
 
+    def _handle_port_changed(self, value: int):
+        self.config.maestro_osc_port = value
+
+    def _handle_reply_host_changed(self, value: str):
+        self.config.maestro_osc_reply_host = value
+
+    def _handle_reply_port_changed(self, value: int):
+        self.config.maestro_osc_reply_port = value
+
+    def _handle_localhost_mode_changed(self, checked: bool):
+        """connection mode changed"""
+        self.config.maestro_use_localhost = checked
+        self._update_enabled()
+
     def _handle_set_self_reply_host(self, widget):
         """self reply host clicked"""
         self.reply_host_widget.setText(getHostIpSingle())
@@ -2461,6 +2550,45 @@ class MaestroDialog(QRememberDialog):
         if not self.maestro.ensureConnected():
             return
         self.maestro.ping()
+
+
+    def _handle_discover_maestro(self, widget = None):
+        """discover maestro clicked"""
+
+        WorkManager().pushCursor()
+        changed = False
+        current_host = self.config.maestro_osc_host
+        current_reply_host = self.config.maestro_osc_reply_host
+        current_port = self.config.maestro_osc_port
+        current_reply_port = self.config.maestro_osc_reply_port
+
+        try:
+            # discovery can take a while
+            if self.maestro.discover():
+                # update the ui
+
+
+                config = gremlin.config.Configuration()
+                changed = current_host != config.maestro_osc_host or current_reply_host != config.maestro_osc_reply_host or current_port != config.maestro_osc_port or current_reply_port != config.maestro_osc_reply_port
+
+                if changed:
+                    with QSignalBlocker(self.localhost_widget), QSignalBlocker(self.host_widget), QSignalBlocker(self.reply_host_widget), QSignalBlocker(self.reply_port_widget), QSignalBlocker(self.port_widget):
+                        self.localhost_widget.setChecked(config.maestro_use_localhost)
+                        self.host_widget.setText(config.maestro_osc_host)
+                        self.reply_host_widget.setText(config.maestro_osc_reply_host)
+                        self.reply_port_widget.setValue(config.maestro_osc_reply_port)
+                        self.port_widget.setValue(config.maestro_osc_port)
+                self._update_enabled()
+                self._refresh_devices()
+        finally:
+            WorkManager().popCursor()
+            if changed:
+                MessageBox(prompt="Maestro configuration has been updated.")
+            else:
+                MessageBox(prompt="No new host was discovered.")
+
+
+
 
     @Slot()
     def _handle_select_none(self):
@@ -2546,6 +2674,12 @@ class MaestroDialog(QRememberDialog):
     def _update_enabled(self):
         """updates dialog widget state based on connection status and device availability"""
         connected = self._tested_settings is not None
+        not_localhost_mode = not self.config.maestro_use_localhost
+
+        # make IP config visible only when not in local host
+        self.host_container.setVisible(not_localhost_mode)
+        self.reply_host_container.setVisible(not_localhost_mode)
+
         idle = not self._busy
         self.connection_group.setEnabled(idle)
         self.devices_group.setEnabled(connected and idle)
@@ -2822,7 +2956,12 @@ class MaestroDialog(QRememberDialog):
             return self._read_snapshot() if self.maestro.client is not None else None
 
         def complete(snapshot):
-            (self.config.maestro_osc_host, self.config.maestro_osc_port, self.config.maestro_osc_reply_host, self.config.maestro_osc_reply_port) = settings
+            (
+                self.config.maestro_osc_host,
+                self.config.maestro_osc_port,
+                self.config.maestro_osc_reply_host,
+                self.config.maestro_osc_reply_port,
+            ) = settings
             self.config.maestro_device_map = device_map
             self.config.maestro_device_count = len(device_map)
             self.config.maestro_enabled = enabled

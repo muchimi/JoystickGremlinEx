@@ -12,6 +12,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/gremlinEx.py",
             "console": "integratedTerminal",
+            "args": ["/no-mousehook"],
             "env": {
                 "PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}",
                 "GEX_DIAGNOSTIC_MODE": "1",

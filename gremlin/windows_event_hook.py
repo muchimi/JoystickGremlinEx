@@ -691,6 +691,11 @@ class MouseHook:
 
     def start(self):
         with self._lifecycle_lock:
+            import gremlin.config
+
+            # Registration and input dialogs can start the hook without EventListener.
+            if gremlin.config.Configuration().startup_mouse_hook_disabled:
+                return
             _ensure_wheel_worker()
             try:
                 _start_listener(self, "mouse hook")

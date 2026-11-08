@@ -21,6 +21,9 @@ import socket
 import concurrent.futures
 import ipaddress
 import logging
+import secrets
+import struct
+import time
 
 syslog = logging.getLogger("system")
 
@@ -70,7 +73,7 @@ def scan_network(network_str, port, max_threads=100):
         return []
 
     open_hosts = []
-    syslog.error(f"NET: Scanning {network_str} on port {port} using {max_threads} threads...\n")
+    syslog.info(f"NET: Scanning {network_str} on TCP port {port} using {max_threads} threads...")
 
     # Use ThreadPoolExecutor to run connection attempts concurrently
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
@@ -80,16 +83,76 @@ def scan_network(network_str, port, max_threads=100):
         for future in concurrent.futures.as_completed(futures):
             result = future.result()
             if result:
-                syslog.error(f"NET: [+] Active service found on: {result}:{port}")
+                syslog.info(f"NET: [+] Active TCP service found on: {result}:{port}")
                 open_hosts.append(result)
 
-    syslog.info(f"\nNET: Scan complete. Found {len(open_hosts)} active host(s) on port {port}.")
+    syslog.info("NET: TCP scan complete. Found %s active host(s) on port %s.", len(open_hosts), port)
     return open_hosts
 
-def scan_local_network(port, max_threads=100):
-    """Scan the local machine's /24 subnet for an open port."""
+def _osc_string(value):
+    data = value.encode("utf-8") + b"\0"
+    return data + b"\0" * (-len(data) % 4)
+
+
+def _scan_maestro_network(network_str, port, reply_port, timeout):
+    """Confirm UDP listeners with Maestro's read-only OSC ping/pong exchange."""
+    targets = {str(ip) for ip in ipaddress.ip_network(network_str, strict=False).hosts()}
+    hosts = set()
+    request_id = struct.pack(">i", secrets.randbits(31))
+    ping = _osc_string("/maestro_ping") + _osc_string(",i") + request_id
+    pong = (_osc_string("/maestro_pong") + _osc_string(",isi") + request_id
+            + _osc_string("MaestroOscService") + struct.pack(">i", 1))
+    try:
+        with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver,
+              socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender):
+            # Maestro replies to a fixed port, from an ephemeral source port.
+            # Do not share a live client's reply socket or consume its replies.
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                receiver.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            receiver.bind(("0.0.0.0", reply_port))
+            for _ in range(2):
+                pending = targets - hosts
+                if not pending:
+                    break
+                for host in pending:
+                    try:
+                        sender.sendto(ping, (host, port))
+                    except OSError:
+                        continue
+                deadline = time.monotonic() + timeout
+                while (remaining := deadline - time.monotonic()) > 0:
+                    receiver.settimeout(remaining)
+                    try:
+                        data, source = receiver.recvfrom(4096) # @IgnoreException
+                    except socket.timeout:
+                        break
+                    except ConnectionResetError:
+                        continue
+                    if source[0] in targets and data == pong:
+                        if source[0] not in hosts:
+                            syslog.info("NET: Active Maestro UDP service found on %s:%s", source[0], port)
+                        hosts.add(source[0])
+    except OSError as error:
+        syslog.warning("NET: Maestro UDP discovery on reply port %s failed: %s", reply_port, error)
+    return hosts
+
+
+def scan_local_network(port=8010, max_threads=100, *, reply_port=8011, timeout=1.0):
+    """Return local /24 hosts with a TCP listener or confirmed Maestro UDP service.
+
+    Maestro listens on UDP 8010 and replies to UDP 8011 by default. A UDP send
+    alone cannot establish availability, so only matching pong replies count.
+    ``reply_port`` must match the service's configured OSC send port and be free.
+    """
     if type(port) is not int or not 1 <= port <= 65535:
         syslog.error("NET: Invalid scan port %r; expected an integer from 1 to 65535", port)
         return []
+    if type(reply_port) is not int or not 1 <= reply_port <= 65535:
+        raise ValueError("Reply port must be an integer from 1 to 65535")
+    if timeout <= 0:
+        raise ValueError("Scan timeout must be positive")
     network_str, local_ip = get_local_subnet()
-    return scan_network(network_str, port, max_threads)
+    hosts = _scan_maestro_network(network_str, port, reply_port, timeout)
+    hosts.update(scan_network(network_str, port, max_threads))
+    syslog.info("NET: Local scan complete. Found %s active host(s) on port %s.", len(hosts), port)
+    return sorted(hosts, key=ipaddress.ip_address)

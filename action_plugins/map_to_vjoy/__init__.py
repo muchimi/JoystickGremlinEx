@@ -1083,9 +1083,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_virtual_button_usage_changed(self, device_type: DeviceType, virtual_id: int):
         """called when a virtual button assignment changes in the profile"""
-        if device_type != self.action_data.virtual_device.device_type:
+        device = self.action_data.virtual_device
+        if device is None:
+            return
+        if device_type != device.device_type:
             return  # not ours
-        if virtual_id != self.action_data.virtual_device.virtual_id:
+        if virtual_id != device.virtual_id:
             return  # not ours
         gremlin.util.InvokeUiMethod(self._populate_grid)
 
@@ -2738,6 +2741,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             for dev in device_list:
                 self.virtual_device_selector_widget.addItem(dev.name, dev)
 
+            if not device_list:
+                # Keep the saved target while outputs are unavailable or filtered out.
+                self._update_device_input_list()
+                return
+
             virtual_device = self.action_data.virtual_device
 
             # DeviceSummary has no __eq__ and is recreated on every device init, so match by GUID rather than findData(object)
@@ -4325,6 +4333,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """loads a list of valid outputs for the current vjoy device based on the mode"""
         with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
             self.virtual_output_selector_widget.clear()
+            if not self.virtual_device_selector_widget.count():
+                self.setWarning("No virtual output devices are currently available.")
+                return
             input_type = self._get_selector_input_type()
             action_mode = self.action_data.action_mode
 
@@ -5230,7 +5241,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        if not self.action_data.grid_visible:
+        if not self.action_data.grid_visible or self.action_data.virtual_device is None:
             # nothing to do
             return
 

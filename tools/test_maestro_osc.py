@@ -33,7 +33,8 @@ from test_qt_marshalling import APP, pump_until, flush_deletes
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = NS(maestro_enabled=True, maestro_device_count=0, maestro_device_map=None, maestro_osc_host="127.0.0.1",
-            maestro_osc_port=8010, maestro_osc_reply_host="127.0.0.1", maestro_osc_reply_port=8011)
+            maestro_osc_port=8010, maestro_osc_reply_host="127.0.0.1", maestro_osc_reply_port=8011,
+            verbose_mode_maestro=False)
 CONFIG.getWindowSize = CONFIG.getWindowLocation = lambda *args: None
 CONFIG.setWindowSize = CONFIG.setWindowLocation = CONFIG.save = Mock()
 CONFIG.dropdown_use_mouse_wheel = False
@@ -49,6 +50,7 @@ GREMLIN.joystick_handling = ModuleType("gremlin.joystick_handling")
 GREMLIN.joystick_handling.set_maestro_devices = Mock()
 GREMLIN.util = ModuleType("gremlin.util")
 GREMLIN.util.InvokeUiMethod = lambda callback, *args: callback(*args)
+GREMLIN.util.getHostIpSingle = lambda: "127.0.0.1"
 GREMLIN.util.valid_integer_string = lambda value: value.lstrip("-").isdigit()
 GREMLIN.util.clamp = lambda value, low, high: max(low, min(high, value))
 GREMLIN.types = ModuleType("gremlin.types")
@@ -100,6 +102,11 @@ class WarningFixture(QtWidgets.QLabel):
 
 
 GREMLIN.ui.ui_common.QWarningWidget = WarningFixture
+# These additional UI imports are unused by the transport and probe tests.
+for node in ast.parse((ROOT / "gremlin/maestro.py").read_bytes()).body:
+    if isinstance(node, ast.ImportFrom) and node.module == "gremlin.ui.ui_common":
+        for alias in node.names:
+            common_namespace.setdefault(alias.name, Mock(name=alias.name))
 DINPUT = ModuleType("dinput")
 
 
@@ -285,6 +292,75 @@ class TransportTests(unittest.TestCase):
         endpoint = self.endpoint(lambda *args: None)
         with self.assertRaises(OSError):
             MAESTRO.MaestroOscClient(reply_port=endpoint.reply_to[1])
+
+
+class LocalhostProbeTests(unittest.TestCase):
+    def setUp(self):
+        with patch.object(CONFIG, "maestro_enabled", False):
+            self.maestro = MAESTRO.Maestro.klass()
+        self.client = Mock()
+        self.client.request.return_value = NS(args=("MaestroOscService", 1))
+        self.factory = patch.object(MAESTRO, "MaestroOscClient", return_value=self.client)
+        self.create_client = self.factory.start()
+        self.addCleanup(self.factory.stop)
+
+    def test_successful_temporary_probe_closes_its_transport(self):
+        self.assertTrue(self.maestro._check_localhost_connect())
+        self.client.close.assert_called_once()
+        self.assertIsNone(self.maestro.client)
+
+    def test_unsuccessful_temporary_probe_closes_its_transport(self):
+        for result in (False, NS(args=("UnexpectedService", 1))):
+            with self.subTest(result=result):
+                self.client.close.reset_mock()
+                self.client.request.return_value = result
+                self.assertFalse(self.maestro._check_localhost_connect())
+                self.client.close.assert_called_once()
+
+    def test_probe_exception_still_closes_its_transport(self):
+        self.client.request.side_effect = TimeoutError("no localhost reply")
+        self.assertFalse(self.maestro._check_localhost_connect())
+        self.client.close.assert_called_once()
+
+    def test_unavailable_reply_port_returns_a_failed_probe(self):
+        self.create_client.side_effect = OSError(10048, "reply port already in use")
+        self.assertFalse(self.maestro._check_localhost_connect())
+        self.assertIsNone(self.maestro.client)
+
+    def test_existing_transport_is_not_closed(self):
+        self.maestro._client = self.client
+        self.assertTrue(self.maestro._check_localhost_connect())
+        self.create_client.assert_not_called()
+        self.client.close.assert_not_called()
+
+    def test_probe_uses_configured_command_and_reply_ports(self):
+        with (patch.object(CONFIG, "maestro_osc_port", 9123),
+              patch.object(CONFIG, "maestro_osc_reply_port", 9124)):
+            self.assertTrue(self.maestro._check_localhost_connect())
+        self.create_client.assert_called_once_with("127.0.0.1", port=9123,
+                                                  reply_host="127.0.0.1", reply_port=9124)
+
+    def test_real_reply_port_can_be_rebound_for_discovery_after_probe(self):
+        # Open the real transport without sending traffic or using port 8011.
+        self.factory.stop()
+        client = MAESTRO.MaestroOscClient(reply_port=0)
+        self.addCleanup(client.close)
+        reply_port = client._rx.getsockname()[1]
+        client.request = Mock(return_value=False)
+        with patch.object(MAESTRO, "MaestroOscClient", return_value=client):
+            self.assertFalse(self.maestro._check_localhost_connect())
+        self.assertFalse(client._receiver.is_alive())
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as discovery:
+            discovery.bind(("0.0.0.0", reply_port))
+
+    def test_scan_uses_the_configured_reply_port(self):
+        network = ModuleType("gremlin.network")
+        network.scan_local_network = Mock(return_value=[])
+        with (patch.dict(sys.modules, {**MODULES, "gremlin.network": network}),
+              patch.object(GREMLIN, "network", network, create=True),
+              patch.object(CONFIG, "maestro_osc_reply_port", 9124)):
+            self.assertIsNone(self.maestro.scan("0.0.0.0/0", 8010))
+        network.scan_local_network.assert_called_once_with(8010, 100, reply_port=9124)
 
 
 class OutputTests(unittest.TestCase):

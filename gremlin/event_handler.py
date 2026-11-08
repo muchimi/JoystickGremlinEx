@@ -859,9 +859,6 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        if __debug__:
-            # disable to prevent anomalies and input delay during debug sessions
-            self.enable_mouse_hook = False
         self.enable_mouse_hook = not config.startup_mouse_hook_disabled
         self.enableMouse()
 
@@ -1534,6 +1531,11 @@ class EventListener(QtCore.QObject):
 
     def enableMouse(self, force=False):
         """pushes the mouse hook stack - mouse hook is enabled the first time this is called (if options for that allow it)"""
+        import gremlin.config
+
+        # A startup disable also applies to forced requests from profile activation.
+        if gremlin.config.Configuration().startup_mouse_hook_disabled:
+            return
         if self.enable_mouse_hook or force:
             if not self._mouse_hook_stack:
                 import gremlin.windows_event_hook
@@ -1545,7 +1547,7 @@ class EventListener(QtCore.QObject):
                     self.mouse_hook.start()
             self._mouse_hook_stack += 1
         else:
-            syslog.warning("MOUSE HOOK: ************ DEBUG MODE: disabled")
+            syslog.warning("MOUSE HOOK: disabled")
 
     def disableMouse(self, reset=False):
         """pops the mouse hook stack"""

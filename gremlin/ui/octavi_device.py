@@ -448,7 +448,7 @@ class OctaviInterface:
                 for button in self._buttons:
                     self._last_buttons[button] = self._buttons[button]
 
-            #time.sleep(0.2)
+            # time.sleep(0.2)
 
         # done running
 
@@ -580,14 +580,14 @@ class OctaviInterface:
         vid = 0x4D8  # vendor ID
         pid = 0xE6D6  # product ID
         try:
-            device = hid.Device(vid, pid)
+            device = hid.Device(vid, pid)  # @IgnoreException
             if device:
                 self._device_found = True
                 self._device = hid.Device(vid, pid)
                 self._device.nonblocking = 1
                 syslog.info("IFR1: detected")
                 return True
-        except Exception:
+        except Exception as ex:
             pass
 
         self._device_found = False
@@ -720,7 +720,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el = gremlin.event_handler.EventListener()
         for signal, slot in (
             (el.lock_inputs, self._handle_lock_inputs),
-            (el.unlock_inputs, self._handle_unlock_inputs)
+            (el.unlock_inputs, self._handle_unlock_inputs),
         ):
             try:
                 signal.disconnect(slot)

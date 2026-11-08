@@ -52,6 +52,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T95)
+- Change: UI (Maestro): added host scan button to scan for hosts.
+- Change: UI (Maestro): added localhost mode to simplify the bridge configuration setup.
+- Change: API (Maestro): attempt automatic host discovery on initial start starting with localhost.
+- Fix: UI: Device visualizer widget exception on teardown.
+- Change: Maestro: simplify localhost usage and detection on initial start.  Default in localhost mode to match service default configuration (assume the bridge is on the same machine as GEX).
+- Fix: API: ffmeg default location scan.
+- Fix: UI (Maestro): exception when changing host IP addresses in Maestro configuration window.
+- Fix: API (Maestro): automatic bridge discovery only scans TCP, not UDP and does not start by scanning localhost.
+
 ### (m77T94)
 - New: Bridge: (experimental) Maestro bridge support enabled by default. **potential for undiscovered dragons ahead as this is experimental.**.  See the [bridge testing manual](https://github.com/muchimi/JoystickGremlinEx/blob/develop/maestro%20testing.md) on what to do, how to test.
 - New: UI: if the bridge is detected and no gex joystick devices are found, will offer to create standard output joystick devices defaulting to 4.

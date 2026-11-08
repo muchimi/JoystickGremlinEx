@@ -195,7 +195,7 @@ class SoundEvent:
         blocking: bool = False,
         blocking_delay_ms: int = 0,
     ):
-        """ parameters to play a single sound
+        """parameters to play a single sound
         :param key: unique identifier for the sound
         :param sound_file: path to the sound file
         :param device: playback device
@@ -896,7 +896,9 @@ class Sound:
                     samplerate = device["default_samplerate"]
 
                     if verbose:
-                        syslog.info(f"API: audio output index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                        syslog.info(
+                            f"API: audio output index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] "
+                        )
                     if api_name == "Windows WASAPI":
                         # only use wasapi as that has the lowest latency
                         # other choices are 'MME'
@@ -914,7 +916,9 @@ class Sound:
                     samplerate = device["default_samplerate"]
 
                     if verbose:
-                        syslog.info(f"API: audio input index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                        syslog.info(
+                            f"API: audio input index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] "
+                        )
                     if api_name == "Windows WASAPI":
                         # only use wasapi as that has the lowest latency
                         self.input_device_map[index] = name
@@ -1050,7 +1054,9 @@ class Sound:
         default_audio_device = self.getDefaultAudioDevice()
 
         if self.audio_device:
-            device = next((d for d in self.device_map.values() if d.description() == self.audio_device), default_audio_device)
+            device = next(
+                (d for d in self.device_map.values() if d.description() == self.audio_device), default_audio_device
+            )
         else:
             device = default_audio_device
         return device
@@ -1241,7 +1247,9 @@ class Sound:
             matched_device = next((name for name in self.device_name_to_id_map if name.startswith(device_name)), None)
             if matched_device:
                 device_id = self.device_name_to_id_map[matched_device]
-                self.device_name_to_id_map[device_name] = device_id  # add the partial name to the device list if truncated
+                self.device_name_to_id_map[device_name] = (
+                    device_id  # add the partial name to the device list if truncated
+                )
                 return matched_device
         return device_name  # unchanged
 
@@ -1264,11 +1272,15 @@ class Sound:
                     device_samplerate = self.device_sample_rate_map[device_id]
                 else:
                     # partial match
-                    matched_device = next((name for name in self.device_name_to_id_map if name.startswith(device_name)), None)
+                    matched_device = next(
+                        (name for name in self.device_name_to_id_map if name.startswith(device_name)), None
+                    )
                     if matched_device:
                         device_id = self.device_name_to_id_map[matched_device]
                         device_samplerate = self.device_sample_rate_map[device_id]
-                        self.device_name_to_id_map[device_name] = device_id  # add the partial name to the device list if truncated
+                        self.device_name_to_id_map[device_name] = (
+                            device_id  # add the partial name to the device list if truncated
+                        )
                     else:
                         # grab the default device
                         syslog.warning(f"SOUND: Device '{device_name}' not found, using default device")
@@ -1779,7 +1791,13 @@ class Sound:
                         event.set()
                     current_frame += chunksize
 
-                stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim, dtype=data.dtype)
+                stream = sd.OutputStream(
+                    callback=callback,
+                    device=device_id,
+                    finished_callback=event.set,
+                    channels=data.ndim,
+                    dtype=data.dtype,
+                )
                 with stream:
                     event.wait()  # wait until playback is finished
 
@@ -1884,7 +1902,7 @@ class Sound:
 
                             # PortAudio plays already-buffered frames, then
                             # calls finished_callback.
-                            raise sd.CallbackStop # @IgnoreException
+                            raise sd.CallbackStop  # @IgnoreException
 
                         current_frame = 0
 
@@ -1918,10 +1936,19 @@ class Sound:
         return self.pm.get_phrase(key)
 
     def registerPhrase(
-        self, text: str, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: float = 1.0, sound_file: str = None, temporary: bool = False
+        self,
+        text: str,
+        voice: str = None,
+        rate: float = 1.0,
+        pitch: int = 0,
+        volume: float = 1.0,
+        sound_file: str = None,
+        temporary: bool = False,
     ) -> dict:
         """returns a map of key -> PhraseData for the given text, new phrases are registered as needed"""
-        return self.getPhraseMap(text, voice=voice, rate=rate, pitch=pitch, volume=volume, sound_file=sound_file, temporary=temporary)
+        return self.getPhraseMap(
+            text, voice=voice, rate=rate, pitch=pitch, volume=volume, sound_file=sound_file, temporary=temporary
+        )
 
     def saveConfig(self):
         """saves the current configuration of the phrase manager"""
@@ -1961,7 +1988,15 @@ class Sound:
                 text = text.strip()
                 if text:
                     text = self.sanitizeText(text)  # also translates as needed
-                    phrase = PhraseData(text=text, engine=engine, voice=voice, rate=rate, pitch=pitch, volume=volume, temporary=temporary)
+                    phrase = PhraseData(
+                        text=text,
+                        engine=engine,
+                        voice=voice,
+                        rate=rate,
+                        pitch=pitch,
+                        volume=volume,
+                        temporary=temporary,
+                    )
                     phrase = self.addPhrase(phrase)  # add or get cached phrase
                     phrase_map[phrase.key] = phrase
 
@@ -2138,7 +2173,9 @@ class Sound:
             # ensure the sound file is registered
             if key not in self.sound_audio_file_map:
                 if not os.path.isfile(sound_file):
-                    syslog.warning(f"PLAY: warning, generated sound file not found on disk for key [{key}]: [{gremlin.util.toUrl(sound_file)}]")
+                    syslog.warning(
+                        f"PLAY: warning, generated sound file not found on disk for key [{key}]: [{gremlin.util.toUrl(sound_file)}]"
+                    )
                 self.sound_audio_file_map[key] = sound_file
 
         if generated:
@@ -2163,7 +2200,13 @@ class Sound:
                     sound_files.append(os.path.join(folder_path, entry).casefold())
         return sound_files
 
-    def pickPhrase(self, phrase_map: dict, mode: PlayMode, playback_mode: PlaybackMode = PlaybackMode.RoundRobin, timed_random: TimedRandomInt = None):
+    def pickPhrase(
+        self,
+        phrase_map: dict,
+        mode: PlayMode,
+        playback_mode: PlaybackMode = PlaybackMode.RoundRobin,
+        timed_random: TimedRandomInt = None,
+    ):
         """picks a phrase to play based on the playback mode"""
         if not phrase_map:
             self._last_phrase = None
@@ -2270,7 +2313,9 @@ class Sound:
 
             event: SoundEvent = self._event_queue.get()
             if verbose:
-                syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")
+                syslog.info(
+                    f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}"
+                )
             if USE_PG:
                 if pygame.mixer.get_init() is None:
                     if self._playback_device_name:
@@ -2409,6 +2454,11 @@ class Sound:
                 current_dir = os.path.dirname(sys.executable)
                 candidates.append(os.path.join(current_dir, "_internal", "ffmpeg.exe"))
                 candidates.append(os.path.join(current_dir, "ffmpeg", "ffmpeg.exe"))
+                # look for the usual ffmpeg installation folders
+                folders = ["c:\\ffmpeg", "C:\\ffmpeg\\bin", "C:\\Program Files\\ffmpeg\\bin"]
+                for folder in folders:
+                    if os.path.isdir(folder):
+                        candidates.append(os.path.join(folder, "ffmpeg.exe"))
             else:
                 # Script mode: look next to gremlinEx.py
                 main_module = sys.modules.get("__main__")
@@ -2984,7 +3034,9 @@ class EdgeTTS:
     def is_speed_available(self):
         return True
 
-    def generateActionWav(self, phrase: PhraseData, voice: str = None, rate: int = 0, pitch: int = 0, volume: int = 0) -> bool:
+    def generateActionWav(
+        self, phrase: PhraseData, voice: str = None, rate: int = 0, pitch: int = 0, volume: int = 0
+    ) -> bool:
         """generates a wave file for the given action
         :param phrase: the phrase data containing text, rate, pitch, and sound file
         :param voice: the speaker voice to use, optional
@@ -3001,9 +3053,19 @@ class EdgeTTS:
         # edge_volume = f"{int(volume):+}%"
         edge_volume = "+0%"  # change volume on playback
 
-        return self.generateWav(tts_file=tts_file, text=phrase.text, voice=voice, rate=edge_rate, pitch=edge_pitch, volume=edge_volume)
+        return self.generateWav(
+            tts_file=tts_file, text=phrase.text, voice=voice, rate=edge_rate, pitch=edge_pitch, volume=edge_volume
+        )
 
-    def generateWav(self, tts_file: str, text: str, voice: EdgeTTSVoice | str = None, rate: str = "+0%", pitch: str = "+0Hz", volume: str = "+0%") -> bool:
+    def generateWav(
+        self,
+        tts_file: str,
+        text: str,
+        voice: EdgeTTSVoice | str = None,
+        rate: str = "+0%",
+        pitch: str = "+0Hz",
+        volume: str = "+0%",
+    ) -> bool:
         """gets the wave file for the given options
 
         :param tts_file: the path to create
@@ -3094,8 +3156,12 @@ class EdgeTTS:
     def loadDefaultVoices(self):
         """setup default voices"""
         self._voices_list.clear()
-        self._voices_list["en-US-AriaNeural".casefold()] = EdgeTTSVoice({"short_name": "en-US-AriaNeural", "gender": "Female", "locale": "en-US"})
-        self._voices_list["en-US-GuyNeural".casefold()] = EdgeTTSVoice({"short_name": "en-US-GuyNeural", "gender": "Male", "locale": "en-US"})
+        self._voices_list["en-US-AriaNeural".casefold()] = EdgeTTSVoice(
+            {"short_name": "en-US-AriaNeural", "gender": "Female", "locale": "en-US"}
+        )
+        self._voices_list["en-US-GuyNeural".casefold()] = EdgeTTSVoice(
+            {"short_name": "en-US-GuyNeural", "gender": "Male", "locale": "en-US"}
+        )
 
     def defaultVoice(self) -> EdgeTTSVoice:
         """returns the default voice"""

@@ -1662,6 +1662,12 @@ class Icons:
     """general UI icon handling"""
 
     @staticmethod
+    def scanIcon(qta_color=None) -> QtGui.QIcon:
+        if not qta_color:
+            qta_color = Color().blueColor()
+        return Icons._icon("mdi.scan-helper", qta_color)
+
+    @staticmethod
     def containerIcon(qta_color=None) -> QtGui.QIcon:
         return Icons._icon("mdi.alpha-c-box-outline", qta_color)
 
@@ -11031,6 +11037,8 @@ class QSplitTabWidget(QDataWidget):
 
     def _apply_splitter_sizes(self, width: int = None):
         """Apply remembered split (or a left-biased default). Keeps H-scroll intact."""
+        if self._cleanup_started or self._splitter is None or not Shiboken.isValid(self._splitter):
+            return
         if width is None or width <= 0:
             width = self._content_widget.frameGeometry().width()
         if width <= 0:
@@ -11041,6 +11049,8 @@ class QSplitTabWidget(QDataWidget):
 
     @QtCore.Slot(int, int)
     def _splitter_moved(self, pos, index):
+        if self._cleanup_started or self._splitter is None or not Shiboken.isValid(self._splitter):
+            return
         sizes = self._splitter.sizes()
         if pos < 0:
             # QT bug - position should never be negative
@@ -11053,6 +11063,9 @@ class QSplitTabWidget(QDataWidget):
 
     @QtCore.Slot(int, int)
     def _handle_content_resized(self, width: int, height: int):
+        # Queued resize events can outlive cleanup and the Qt splitter itself.
+        if self._cleanup_started or self._splitter is None or not Shiboken.isValid(self._splitter):
+            return
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
         if width <= 0 or height <= 0:
             return
@@ -11085,6 +11098,10 @@ class QSplitTabWidget(QDataWidget):
         if self._cleanup_started:
             return
         self._cleanup_started = True
+        if self._content_widget is not None and Shiboken.isValid(self._content_widget):
+            self._content_widget.resized.disconnect(self._handle_content_resized)
+        if self._splitter is not None and Shiboken.isValid(self._splitter):
+            self._splitter.splitterMoved.disconnect(self._splitter_moved)
         self.tabData = None
         self.unregisterAllWidgets()
         gremlin.util.clear_layout(self._left_container_layout)
