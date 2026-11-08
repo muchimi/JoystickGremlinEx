@@ -53,7 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T95)
-- Change: UI (Maestro): added host scan button to scan for hosts.
+- Change: UI (Maestro): added host scan button to scan for the GEX bridge host.
 - Change: UI (Maestro): added localhost mode to simplify the bridge configuration setup.
 - Change: API (Maestro): attempt automatic host discovery on initial start starting with localhost.
 - Fix: UI: Device visualizer widget exception on teardown.

@@ -446,6 +446,7 @@ import threading
 import time
 from types import SimpleNamespace
 import uuid
+
 from shiboken6 import Shiboken
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Slot
@@ -2307,7 +2308,7 @@ class MaestroDialog(QRememberDialog):
         self.refresh_button = Buttons.getRefreshWidget(
             "Refresh Devices", callback=self._refresh_devices, tooltip="Refresh the list of connected Maestro devices"
         )
-        self.host_self_widget = QDataPushButton("Self", clicked=self._handle_set_self_reply_host)
+        self.reply_host_self_widget = QDataPushButton("Self", clicked=self._handle_set_self_reply_host)
         self.ping_button = QDataPushButton("Ping Maestro", clicked=self._handle_ping_maestro)
         self.discover_widget = QDataPushButton("Scan", clicked=self._handle_discover_maestro, tooltip="Discover GEX Bridge Service host")
         self.discover_widget.setIcon(Icons.scanIcon())
@@ -2333,6 +2334,7 @@ class MaestroDialog(QRememberDialog):
                 self.reply_host_widget,
                 "Reply Port:",
                 self.reply_port_widget,
+                self.reply_host_self_widget
             ],
             widget_only=True,
         )
@@ -2539,7 +2541,13 @@ class MaestroDialog(QRememberDialog):
 
     def _handle_set_self_reply_host(self, widget):
         """self reply host clicked"""
-        self.reply_host_widget.setText(getHostIpSingle())
+        if self.config.maestro_use_localhost:
+            # use localhost
+            self.config.maestro_osc_reply_host = "127.0.0.1"
+        else:
+            # use current host IP
+            self.config.maestro_osc_reply_host = getHostIpSingle()
+        self.reply_host_widget.setText(self.config.maestro_osc_reply_host)
 
     def _handle_disconnect(self):
         self.maestro.disconnect()
