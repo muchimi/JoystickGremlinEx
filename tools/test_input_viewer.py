@@ -153,7 +153,7 @@ load("gremlin/ui/input_viewer.py", {"VisualizerWidget", "VisualizationSelector"}
 load("gremlin/ui/input_viewer.py", {"InputViewerDialog"}, {
     "closeSystemWidget", "_add_widget", "_add_remove_visualization_widget", "_visualizer_count", "_update_ui",
     "_clear_all", "_clear", "_clear_joystick_visualizers", "_delete_widget", "_cleanup_joystick_widgets",
-    "load_viewer_widgets", "showKeyboard", "hideKeyboard", "showState", "hideState",
+    "load_viewer_widgets", "_update_virtual_selector", "showKeyboard", "hideKeyboard", "showState", "hideState",
     "saveKeyboardState", "saveStateState", "_select_used",
 }, base="QWidget")
 load("gremlinEx.py", {"GremlinUi"}, {"_get_tab_map", "getMappedDeviceList"}, base="object")
@@ -306,8 +306,10 @@ class SelectUsedTests(unittest.TestCase):
 
         for target, values in (
             (SERVICES.joystick_handling, dict(all_joystick_devices=lambda: self.devices,
+                                            virtual_devices=lambda: [dev for dev in self.devices if dev.is_virtual],
                                             getDevice=lambda guid: device_map.get(str(guid)),
                                             getDeviceName=lambda guid: device_map[str(guid)].name,
+                                            get_virtual_device=lambda vid: self.vjoy if vid == self.vjoy.vjoy_id else None,
                                             getDeviceFromVjoyId=lambda vid: self.vjoy if vid == self.vjoy.vjoy_id else None)),
             (SERVICES.shared_state, dict(keyboard_tab_id="Keyboard", keyboard_tab_guid="Keyboard",
                                         state_tab_id="State", state_tab_guid="State",
@@ -322,6 +324,9 @@ class SelectUsedTests(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
         self.viewer = NAMESPACE["InputViewerDialog"]()
+        self.viewer.virtual_device_selector = QtWidgets.QComboBox(self.viewer)
+        self.viewer.virtual_device_selector.autoSize = self.viewer.virtual_device_selector.adjustSize
+        self.viewer.select_virtual_widget = QtWidgets.QPushButton(self.viewer)
         self.viewer._viewer_widget_map = {}
         self.viewer._device_key_map = {}
         self.viewer._visualizer_widgets = {}

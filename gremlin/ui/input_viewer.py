@@ -295,11 +295,6 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.unfocus_icon = unfocus_icon or gremlin.ui.ui_common.Icons.circleArrowLeft()
         self.focus_icon_size = focus_icon_size
 
-        devices = gremlin.joystick_handling.all_joystick_devices()
-        # joystick visualizers
-        # filter disconnected/disabled
-        devices = [device for device in devices if device.connected and not device.disabled]
-
         self.viewer = viewer
         self._selector_widgets = {}  # created input checkbox widgets by key - if not in this list or None, not created
         self._selector_callbacks = {}  # maps (device_id, VisualizationType) to callback
@@ -307,27 +302,20 @@ class VisualizationSelector(QtWidgets.QWidget):
         self._callbacks = {}  # list of registered callbacks in the selector
         self._view_map = {}  # list of visualizations by key
 
-        # get the order of the devices as set by the user for the physical devices
-        tab_map = gremlin.shared_state.ui._get_tab_map()
-        tab_ids = list(tab_map.keys())
-        d_list = []
-        max_index = len(devices)
-        dev: dinput.DeviceSummary
-        for dev in devices:
-            if dev.disabled:
-                continue
-            if dev.device_id in tab_ids:
-                index = tab_ids.index(dev.device_id)
-                d_list.append((index, dev))
-            else:
-                # add to the end (vjoy devices)
-                d_list.append((max_index, dev))
-
-        d_list.sort(key=lambda x: (x[0], x[1].virtual_id, x[1].name))
-        self._devices = [dev for _, dev in d_list]
+        self._devices = self._available_devices()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
+
+    def _available_devices(self):
+        """Include connected inputs and outputs, retaining the user's tab order."""
+        devices = [device for device in gremlin.joystick_handling.all_joystick_devices()
+                   if device.connected and not device.disabled]
+        tab_ids = list(gremlin.shared_state.ui._get_tab_map())
+        return sorted(devices, key=lambda dev: (
+            tab_ids.index(dev.device_id) if dev.device_id in tab_ids else len(tab_ids),
+            dev.is_virtual, dev.virtual_id, dev.name.casefold(), str(dev.device_guid),
+        ))
 
     def getCallback(self, key):
         """gets callback associated with the key"""
@@ -344,7 +332,11 @@ class VisualizationSelector(QtWidgets.QWidget):
             return None
 
     def updateSelector(self):
-        gremlin.util.InvokeUiMethod(self._update_selector_ui)  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._reload_selector_ui)
+
+    def _reload_selector_ui(self):
+        self._devices = self._available_devices()
+        self._update_selector_ui()
 
     @with_wait_cursor
     def _update_selector_ui(self):
@@ -353,7 +345,6 @@ class VisualizationSelector(QtWidgets.QWidget):
             return
 
         combine_button_hats = gremlin.config.Configuration().input_viewer_combine_buttonhats
-        self._devices.sort(key=lambda device: device.vjoy_id)
 
         for widget in gremlin.util.get_layout_widgets(self.main_layout):
             self.main_layout.removeWidget(widget)
@@ -562,17 +553,21 @@ class VisualizationSelector(QtWidgets.QWidget):
         widget = self.sender()
         if not Shiboken.isValid(widget):
             return
-        id = widget.data
-        device = gremlin.joystick_handling.getDeviceFromVjoyId(id)
-        if device:
-            keys = [(device.key, visualization) for visualization in VisualizationType]
-            for key, widget in self._selector_widgets.items():
-                if key in keys and Shiboken.isValid(widget):
-                    _, visualization = key  # key (device, visualization)
-                    if visualization != VisualizationType.AxisTemporal and device.is_virtual and device.vjoy_id == id:
-                        with QtCore.QSignalBlocker(widget):
-                            widget.setChecked(True)
-                        self._create_callback(device, visualization, widget)()
+        self.selectVirtualDevice(widget.data)
+
+    def selectVirtualDevice(self, device_id):
+        """Select current axes, buttons and hats for any virtual joystick provider."""
+        device = gremlin.joystick_handling.get_virtual_device(device_id)
+        if device is None or not device.connected or device.disabled:
+            return
+        for key, widget in self._selector_widgets.items():
+            if key[0] != device.key or not Shiboken.isValid(widget):
+                continue
+            _, visualization = key
+            if visualization != VisualizationType.AxisTemporal:
+                with QtCore.QSignalBlocker(widget):
+                    widget.setChecked(True)
+                self._create_callback(device, visualization, widget)()
 
     @QtCore.Slot()
     @with_wait_cursor
@@ -612,13 +607,14 @@ class VisualizationSelector(QtWidgets.QWidget):
             if device:
                 mapped_devices[device.key] = device
 
-        # Output vJoy devices need not be configured as profile inputs.
+        # Virtual outputs need not be configured as profile inputs.
         profile = gremlin.shared_state.current_profile
         if profile:
             for action in profile.list_actions():
-                device = action.virtual_device
-                if device is None and action.vjoy_id:
-                    device = gremlin.joystick_handling.getDeviceFromVjoyId(action.vjoy_id)
+                device = getattr(action, 'virtual_device', None)
+                output_id = getattr(action, 'vjoy_id', None)
+                if device is None and output_id:
+                    device = gremlin.joystick_handling.get_virtual_device(output_id)
                 if device:
                     mapped_devices[device.key] = device
 
@@ -1011,13 +1007,11 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         widgets = [clear_widget, used_widget, select_real_widget, select_all_widget]
 
-        vjoy_ids = [dev.vjoy_id for dev in gremlin.joystick_handling.virtual_devices()]
-        vjoy_ids = vjoy_ids[:3]
-        for i in vjoy_ids:
-            widget = QDataPushButton(f"Select VJOY #{i}", data=i)
-            widget.setToolTip(f"Select VJOY #{i} axis and buttons")
-            widget.clicked.connect(self.vis_selector._select_vjoy)
-            widgets.append(widget)
+        self.virtual_device_selector = QDataComboBox()
+        self.select_virtual_widget = QDataPushButton("Select Virtual Device")
+        self.select_virtual_widget.setToolTip("Select current axes, buttons and hats for the chosen virtual device")
+        self.select_virtual_widget.clicked.connect(lambda: self.vis_selector.selectVirtualDevice(self.virtual_device_selector.currentData()))
+        widgets.extend(["|", self.virtual_device_selector, self.select_virtual_widget])
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
@@ -1085,6 +1079,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.refresh)
         el.profile_unhook.connect(self.reload)
+        el.device_initialized.connect(self.refresh)
 
     @property
     def visualizerWidth(self) -> int:
@@ -1166,6 +1161,21 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if device is not None:
                     self._add_remove_visualization_widget(device, visualization_type, False)
 
+    def _update_virtual_selector(self):
+        """Refresh all virtual providers while retaining the selected GUID."""
+        previous = self.virtual_device_selector.currentData()
+        with QtCore.QSignalBlocker(self.virtual_device_selector):
+            self.virtual_device_selector.clear()
+            devices = gremlin.joystick_handling.virtual_devices()
+            for device in sorted(devices, key=lambda dev: (dev.name.casefold(), str(dev.device_guid))):
+                if device.connected and not device.disabled:
+                    self.virtual_device_selector.addItem(device.name, device.device_guid)
+            index = self.virtual_device_selector.findData(previous)
+            if index >= 0:
+                self.virtual_device_selector.setCurrentIndex(index)
+            self.virtual_device_selector.autoSize()
+        self.select_virtual_widget.setEnabled(self.virtual_device_selector.count() > 0)
+
     @with_wait_cursor
     def load_viewer_widgets(self):
         """loads the view widgets for all device inputs"""
@@ -1174,6 +1184,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.views.clear()
         self._viewer_widget_map = {}
         self._device_key_map = {}
+        self._update_virtual_selector()
 
         # state visualizer
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.state_tab_guid)
@@ -1188,7 +1199,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         # filter disconnected/disabled
         devices = [device for device in devices if device.connected and not device.disabled]
-        devices.sort(key=lambda device: device.vjoy_id)
+        devices.sort(key=lambda device: (device.is_virtual, device.name.casefold(), str(device.device_guid)))
         verbose = False
 
         device: DeviceSummary
@@ -1348,7 +1359,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         """clean up"""
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.disconnect(self.refresh)
-        el.profile_unhook.disconnect(self.refresh)
+        el.profile_unhook.disconnect(self.reload)
+        el.device_initialized.disconnect(self.refresh)
 
         self._cleanup_joystick_widgets()
 

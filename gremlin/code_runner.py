@@ -392,8 +392,7 @@ class CodeRunner:
 
             # Create merge axis callbacks
             try:
-                if profile.merge_axes:
-                    syslog.warning("CodeRunner: MERGE AXIS: detected legacy merge axis in profile - use merge feature in Vjoy remap instead.  ")
+                self._register_merge_axes(profile, master_mode)
 
             except Exception as err:
                 syslog.error("Error occured in CodeRunner MergeAxis - legacy merge axis disabled")
@@ -525,7 +524,7 @@ class CodeRunner:
                 device_id = device_node.device_id
 
                 # set axes
-                for id in range(1, device_node.axis_count + 1):
+                for id in (device_node.axis_sequence_to_input_id(i) for i in range(device_node.axis_count)):
                     enabled = profile.getStartAxisEnabled(device_id, id)
                     if enabled:
                         value = profile.getStartAxisValue(device_id, id)
@@ -736,6 +735,24 @@ class CodeRunner:
             gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")
             return False
 
+    def _register_merge_axes(self, profile, master_mode):
+        """Register each merge through normal mode-aware event dispatch."""
+        self._merge_axes.clear()
+        for entry in profile.merge_axes:
+            try:
+                merger = MergeAxis(entry["vjoy"]["vjoy_id"], entry["vjoy"]["axis_id"], entry["operation"])
+                callbacks = []
+                for name, callback in (("lower", merger.update_axis1), ("upper", merger.update_axis2)):
+                    source = entry[name]
+                    event = gremlin.event_handler.Event(event_type=InputType.JoystickAxis,
+                        device_guid=source["device_guid"], identifier=source["axis_id"], is_axis=True)
+                    callbacks.append((source["device_guid"], event, callback))
+                for guid, event, callback in callbacks:
+                    self.event_handler.addCallback(guid, entry.get("mode") or master_mode, event, callback, False)
+                self._merge_axes.append(merger)
+            except (KeyError, TypeError, ValueError):
+                syslog.exception("Unable to register an incomplete merged-axis mapping")
+
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
 
@@ -906,7 +923,7 @@ class MergeAxis:
         else:
             raise gremlin.error.GremlinError(f'Invalid merge axis operation detected, "{str(self.operation)}"')
 
-        gremlin.joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.input_id).value = value
+        gremlin.joystick_handling.set_axis(self.vjoy_id, self.input_id, value)
 
     def update_axis1(self, event: gremlin.event_handler.Event):
         """Updates information for the first axis.

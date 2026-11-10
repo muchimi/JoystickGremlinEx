@@ -142,7 +142,9 @@ class ChainContainerWidget(AbstractContainerWidget):
         """pastes an action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()

@@ -201,7 +201,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             "Mouse Button": MacroActionEditor.ActionTypeData("Mouse Button", self._mouse_button_ui, gremlin.macro.MouseButtonAction),
             "Mouse Motion": MacroActionEditor.ActionTypeData("Mouse Motion", self._mouse_motion_ui, gremlin.macro.MouseMotionAction),
             "Pause": MacroActionEditor.ActionTypeData("Pause", self._pause_ui, gremlin.macro.PauseAction),
-            "vJoy": MacroActionEditor.ActionTypeData("vJoy", self._vjoy_ui, gremlin.macro.VJoyMacroAction),
+            "Virtual Device": MacroActionEditor.ActionTypeData("Virtual Device", self._vjoy_ui, gremlin.macro.VJoyMacroAction),
             "Remote Control": MacroActionEditor.ActionTypeData("Remote Control", self._remote_control_ui, gremlin.macro.RemoteControlAction),
             "State": MacroActionEditor.ActionTypeData("State", self._state_ui, gremlin.macro.StateAction),
             "Description": MacroActionEditor.ActionTypeData("Description", self._description_ui, gremlin.macro.MacroDescriptionAction),
@@ -310,8 +310,19 @@ class MacroActionEditor(QtWidgets.QWidget):
             self.model.set_entry(gremlin.macro.MouseMotionAction(0, 0), self.index.row())
         elif value == "Pause":
             self.model.set_entry(gremlin.macro.PauseAction(0.2), self.index.row())
-        elif value == "vJoy":
-            self.model.set_entry(gremlin.macro.VJoyMacroAction(1, InputType.JoystickButton, 1, True), self.index.row())
+        elif value == "Virtual Device":
+            devices = [dev for dev in gremlin.joystick_handling.virtual_devices(connected_only=False)
+                       if not dev.disabled and (dev.axis_count or dev.button_count or dev.hat_count)]
+            device = devices[0] if devices else None
+            input_type, input_id, initial_value = InputType.JoystickButton, 1, True
+            if device is not None and not device.button_count:
+                if device.axis_count:
+                    input_type, input_id, initial_value = InputType.JoystickAxis, device.axis_sequence_to_input_id(0), 0.0
+                else:
+                    input_type, initial_value = InputType.JoystickHat, (0, 0)
+            device_id = (device.vjoy_id if device.device_type == gremlin.types.DeviceType.VJoy else device.virtual_id) if device else 1
+            self.model.set_entry(gremlin.macro.VJoyMacroAction(device_id, input_type, input_id, initial_value,
+                                 device_guid=device.device_guid if device else None), self.index.row())
         elif value == "Remote Control":
             self.model.set_entry(gremlin.macro.RemoteControlAction(), self.index.row())
         elif value == "State":
@@ -529,39 +540,28 @@ class MacroActionEditor(QtWidgets.QWidget):
         # self._update_pause(delay)
 
     def _vjoy_ui(self):
-        """Creates and populates the vJoyAction editor UI."""
-
-        if MacroActionEditor.locked:
+        """Create the editor for any virtual joystick output."""
+        if MacroActionEditor.locked or not Shiboken.isValid(self):
             return
-
         action = self.model.get_entry(self.index.row())
         if action is None:
             return
-
         try:
             MacroActionEditor.locked = True
-
-            if "vjoy_selector" not in self.ui_elements:
-                # vJoy input selection
-                self.ui_elements["vjoy_selector"] = gremlin.ui.ui_common.VJoySelector(
-                    change_cb=self._modify_vjoy, valid_types=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], show_connected_only=True
-                )
-
-            self.action_layout.addWidget(self.ui_elements["vjoy_selector"])
-
-            self.ui_elements["vjoy_selector"].set_selection(action.input_type, action.vjoy_id, action.input_id)
-
+            gremlin.ui.ui_common.clear_layout(self.action_layout)
+            self.ui_elements = {}
+            selector = gremlin.ui.ui_common.VirtualDeviceSelector(
+                change_cb=self._modify_vjoy,
+                valid_types=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+            )
+            self.ui_elements["vjoy_selector"] = selector
+            self.action_layout.addWidget(selector)
+            key = action.device_guid if action.device_guid is not None else action.vjoy_id
+            selector.set_selection(action.input_type, key, action.input_id)
             self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-
             self._create_joystick_inputs_ui(action)
-
             self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-
-            # listen button
-            listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._handle_listen_request)
-
-            self.action_layout.addWidget(listen_widget)
-
+            self.action_layout.addWidget(gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._handle_listen_request))
         finally:
             MacroActionEditor.locked = False
 
@@ -583,92 +583,64 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _handle_listen_selection_ui(self, event):
         dev = gremlin.joystick_handling.getDevice(event.device_guid)
-        if not dev.is_virtual:
+        if dev is None or not dev.is_virtual:
             return
-        self._modify_joystick(event)
+        if isinstance(self.model.get_entry(self.index.row()), gremlin.macro.VJoyMacroAction):
+            self._modify_vjoy({"device_id": dev.device_guid, "input_type": event.event_type, "input_id": event.identifier})
+        else:
+            self._modify_joystick(event)
 
     def _create_joystick_inputs_ui(self, action):
-        """creates the joystick macro UI when joystick is the selected type"""
-        import gremlin.joystick_handling
-
-        if hasattr(action, "device_guid"):
+        """Edit output values without changing the stored value during setup."""
+        if isinstance(action, gremlin.macro.VJoyMacroAction):
+            device = action.device
+            device_name = action.device_name
+        else:
             device = gremlin.joystick_handling.getDevice(action.device_guid)
-        elif hasattr(action, "vjoy_id"):
-            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(action.vjoy_id)
+            device_name = device.name if device is not None else "Unavailable joystick"
 
-        if device:
-            if action.input_type == InputType.JoystickAxis:
-                self.ui_elements["axis_reverse"] = QtWidgets.QCheckBox("Reverse")
-                self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
-                self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
-
-                if action.axis_type == "absolute":
-                    self.ui_elements["axis_absolute"].setChecked(True)
-                    self.ui_elements["axis_relative"].setChecked(False)
-                elif action.axis_type == "relative":
-                    self.ui_elements["axis_absolute"].setChecked(False)
-                    self.ui_elements["axis_relative"].setChecked(True)
-
-                self.ui_elements["axis_absolute"].clicked.connect(self._modify_vjoy_axis)
-                self.ui_elements["axis_relative"].clicked.connect(self._modify_vjoy_axis)
-
-                self.ui_elements["axis_value"] = gremlin.ui.ui_common.QFloatLineEdit()
-                self.ui_elements["axis_value"].valueChanged.connect(self._modify_axis_state)
-                self.ui_elements["axis_value"].setValue(action.value)
-
-                axis_name = gremlin.joystick_handling.get_axis_name(action.input_id)
-                widget = QtWidgets.QLabel(f"{device.name} Axis {action.input_id} {axis_name}")
-                self.action_layout.addWidget(widget)
-
-                self.action_layout.addWidget(self.ui_elements["axis_reverse"])
-
-                widget, _ = gremlin.ui.ui_common.getHContainer([self.ui_elements["axis_absolute"], self.ui_elements["axis_relative"]], "Type:")
-
-                self.action_layout.addWidget(widget)
-
-                widget = gremlin.ui.ui_common.getHContainer(self.ui_elements["axis_value"], "Set Value:", widget_only=True)
-                self.action_layout.addWidget(widget)
-
-            elif action.input_type == InputType.JoystickButton:
-                if "button_press" not in self.ui_elements.keys():
-                    self.ui_elements["button_press"] = gremlin.ui.ui_common.QDataRadioButton("Press", data="press", callbackEx=self._modify_button_state)
-                    self.ui_elements["button_release"] = gremlin.ui.ui_common.QDataRadioButton("Release", data="release", callbackEx=self._modify_button_state)
-                    self.ui_elements["button_toggle"] = gremlin.ui.ui_common.QDataRadioButton("Toggle", data="toggle", callbackEx=self._modify_button_state)
-                    if isinstance(action.value, bool):
-                        action.value = "press" if action.value else "release"
-
-                    match action.value:
-                        case "press":
-                            self.ui_elements["button_press"].setChecked(True)
-                        case "release":
-                            self.ui_elements["button_release"].setChecked(True)
-                        case "toggle":
-                            self.ui_elements["button_toggle"].setChecked(True)
-                        case _:
-                            # default if changing from a different value type
-                            action.value = "press"
-                            self.ui_elements["button_press"].setChecked(True)
-
-                    widget = QtWidgets.QLabel(f"{device.name} Button [{action.input_id}]")
-                    self.action_layout.addWidget(widget)
-                    self.action_layout.addWidget(self.ui_elements["button_press"])
-                    self.action_layout.addWidget(self.ui_elements["button_release"])
-                    self.action_layout.addWidget(self.ui_elements["button_toggle"])
-
-            elif action.input_type == InputType.JoystickHat:
-                if "hat_direction" not in self.ui_elements.keys():
-                    self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QDataComboBox()
-                    directions = ["Center", "North", "North East", "East", "South East", "South", "South West", "West", "North West"]
-                    for val in directions:
-                        self.ui_elements["hat_direction"].addItem(val)
-                    self.ui_elements["hat_direction"].currentTextChanged.connect(self._modify_hat_state)
-                    hat_direction = (0, 0)
-                    if isinstance(action.value, tuple):
-                        hat_direction = action.value
-                    self.ui_elements["hat_direction"].setCurrentText(gremlin.common.direction_tuple_lookup[hat_direction])
-                    widget = QtWidgets.QLabel(f"{device.name} Hat [{action.input_id}]")
-                    self.action_layout.addWidget(widget)
-                    self.action_layout.addWidget(self.ui_elements["hat_direction"])
+        if action.input_type == InputType.JoystickAxis:
+            self.ui_elements["axis_absolute"] = QtWidgets.QRadioButton("Absolute")
+            self.ui_elements["axis_relative"] = QtWidgets.QRadioButton("Relative")
+            self.ui_elements["axis_absolute"].setChecked(action.axis_type != "relative")
+            self.ui_elements["axis_relative"].setChecked(action.axis_type == "relative")
+            self.ui_elements["axis_absolute"].clicked.connect(self._modify_vjoy_axis)
+            self.ui_elements["axis_relative"].clicked.connect(self._modify_vjoy_axis)
+            value_editor = gremlin.ui.ui_common.QFloatLineEdit()
+            value_editor.setRange(-1.0, 1.0)
+            value_editor.setValue(action.value, emit=False)
+            self.ui_elements["axis_value"] = value_editor
+            value_editor.valueChanged.connect(self._modify_axis_state)
+            reverse = QtWidgets.QPushButton("Reverse value")
+            reverse.clicked.connect(lambda checked=False: value_editor.setValue(-value_editor.value()))
+            self.ui_elements["axis_reverse"] = reverse
+            axis_name = device.get_axis_name(action.input_id) if device is not None else str(action.input_id)
+            self.action_layout.addWidget(QtWidgets.QLabel(f"{device_name} Axis {action.input_id} {axis_name}"))
+            self.action_layout.addWidget(reverse)
+            widget, _ = gremlin.ui.ui_common.getHContainer(
+                [self.ui_elements["axis_absolute"], self.ui_elements["axis_relative"]], "Type:")
+            self.action_layout.addWidget(widget)
+            self.action_layout.addWidget(gremlin.ui.ui_common.getHContainer(value_editor, "Set Value:", widget_only=True))
+        elif action.input_type == InputType.JoystickButton:
+            self.action_layout.addWidget(QtWidgets.QLabel(f"{device_name} Button [{action.input_id}]"))
+            value = "press" if action.value is True else "release" if action.value is False else action.value
+            if value == "pressed":
+                value = "press"
+            for name, caption in (("press", "Press"), ("release", "Release"), ("toggle", "Toggle")):
+                radio = gremlin.ui.ui_common.QDataRadioButton(caption, data=name, callbackEx=self._modify_button_state)
+                with QtCore.QSignalBlocker(radio):
+                    radio.setChecked(value == name)
+                self.ui_elements[f"button_{name}"] = radio
+                self.action_layout.addWidget(radio)
+        elif action.input_type == InputType.JoystickHat:
+            direction = action.value if isinstance(action.value, tuple) else (0, 0)
+            selector = gremlin.ui.ui_common.QDataComboBox()
+            selector.addItems(["Center", "North", "North East", "East", "South East", "South", "South West", "West", "North West"])
+            selector.setCurrentText(gremlin.common.direction_tuple_lookup.get(direction, "Center"))
+            selector.currentTextChanged.connect(self._modify_hat_state)
+            self.ui_elements["hat_direction"] = selector
+            self.action_layout.addWidget(QtWidgets.QLabel(f"{device_name} Hat [{action.input_id}]"))
+            self.action_layout.addWidget(selector)
 
     def _remote_control_ui(self):
         self.ui_elements["remote_control_cb_label"] = QtWidgets.QLabel("Remote control command:")
@@ -1065,19 +1037,23 @@ class MacroActionEditor(QtWidgets.QWidget):
             syslog.info(f"MACRO: set state [{state.key}] for entry [{action.id}]")
         self._update_model()
 
-    @QtCore.Slot(bool)
+    @QtCore.Slot(object, bool)
     def _modify_button_state(self, widget, state):
+        if not state:
+            return
         action = self.model.get_entry(self.index.row())
         action.value = widget.data
         self._update_model()
 
-    @QtCore.Slot(bool)
+    @QtCore.Slot(float)
     def _modify_axis_state(self, state):
         action = self.model.get_entry(self.index.row())
+        if action is None or action.input_type != InputType.JoystickAxis or "axis_value" not in self.ui_elements:
+            return
         action.value = self.ui_elements["axis_value"].value()
         self._update_model()
 
-    @QtCore.Slot(bool)
+    @QtCore.Slot(str)
     def _modify_hat_state(self, state):
         action = self.model.get_entry(self.index.row())
         action.value = gremlin.common.direction_tuple_lookup[state]
@@ -1196,6 +1172,9 @@ class MacroActionEditor(QtWidgets.QWidget):
         if dialog.selectedData:
             dev, input_type, input_id = dialog.selectedData
             if dev is not None and input_type is not None and input_id is not None:
+                if isinstance(self.model.get_entry(self.index.row()), gremlin.macro.VJoyMacroAction):
+                    self._modify_vjoy({"device_id": dev.device_guid, "input_type": input_type, "input_id": input_id})
+                    return
                 self.model.set_entry(gremlin.macro.JoystickAction(dev.device_guid, input_type, input_id, 0.0), self.index.row())
 
                 self._update_model()
@@ -1297,21 +1276,20 @@ class MacroActionEditor(QtWidgets.QWidget):
         self._mouse_button_ui()
 
     def _modify_vjoy(self, data):
+        if not data or any(data.get(key) is None for key in ("device_id", "input_type", "input_id")):
+            return
+        device = gremlin.joystick_handling.getDevice(data["device_id"])
+        if device is None or not device.is_virtual:
+            return
         action = self.model.get_entry(self.index.row())
-        action.vjoy_id = data["device_id"]
+        previous_type = action.input_type
+        action.device_guid = device.device_guid
+        action.vjoy_id = device.vjoy_id if device.device_type == gremlin.types.DeviceType.VJoy else device.virtual_id
         action.input_type = data["input_type"]
         action.input_id = data["input_id"]
-
-        if action.input_type == InputType.JoystickAxis:
-            action.value = 0.0
-        elif action.input_type == InputType.JoystickButton:
-            action.value = True
-        elif action.input_type == InputType.JoystickHat:
-            action.value = (0, 0)
-
+        if action.input_type != previous_type:
+            action.value = {InputType.JoystickAxis: 0.0, InputType.JoystickButton: True, InputType.JoystickHat: (0, 0)}[action.input_type]
         self._update_model()
-        gremlin.ui.ui_common.clear_layout(self.action_layout)
-        self.ui_elements = {}
         self._vjoy_ui()
 
     @QtCore.Slot(object)
@@ -1325,7 +1303,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     @QtCore.Slot()
     def _modify_vjoy_value(self):
         action = self.model.get_entry(self.index.row())
-        action.value = self.ui_elements["axis_value"]
+        action.value = self.ui_elements["axis_value"].value()
         self._update_model()
 
 
@@ -2151,6 +2129,7 @@ To send complex sequences, please look at the sequence container."""
                     safe_read(child, "input-id", int, 1),
                     safe_read(child, "value", str, ""),
                     safe_read(child, "axis-type", str, "absolute"),
+                    device_guid=parse_guid(child.get("device-guid")) if child.get("device-guid") else None,
                 )
                 self._str_to_joy_value(vjoy_action)
                 self.sequence.append(vjoy_action)
@@ -2288,6 +2267,8 @@ To send complex sequences, please look at the sequence container."""
             elif isinstance(entry, gremlin.macro.VJoyMacroAction):
                 vjoy_node = ElementTree.Element("vjoy")
                 vjoy_node.set("vjoy-id", str(entry.vjoy_id))
+                if entry.device_guid is not None:
+                    vjoy_node.set("device-guid", write_guid(entry.device_guid))
                 vjoy_node.set("input-type", InputType.to_string(entry.input_type))
                 vjoy_node.set("input-id", str(entry.input_id))
                 vjoy_node.set("value", self._joy_value_to_str(entry))
@@ -2382,7 +2363,7 @@ To send complex sequences, please look at the sequence container."""
                 table.addField("Pause", f"Duration: {entry.duration:0.2f}{random_stub}")
 
             elif isinstance(entry, gremlin.macro.VJoyMacroAction):
-                table.addField("VJoy", f"Vjoy ID: {entry.vjoy_id}] Input Type: {entry.input_type.name} Value: {self._joy_value_to_str(entry)}")
+                table.addField("Virtual Device", f"{entry.device_name} Input Type: {entry.input_type.name} Value: {self._joy_value_to_str(entry)}")
 
             elif isinstance(entry, gremlin.macro.RemoteControlAction):
                 table.addField("Control", entry.command.name)

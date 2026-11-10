@@ -65,7 +65,7 @@ def graph_series_label(series: dict[str, Any] | None) -> str:
             vjoy_id = int(series.get("vjoy_id") or 0)
         except (TypeError, ValueError):
             vjoy_id = 0
-        device = f"vJoy {vjoy_id}" if vjoy_id else "vJoy"
+        device = str(series.get("device_name") or "").strip() or (f"vJoy {vjoy_id}" if vjoy_id > 0 else "Virtual Device")
     else:
         device = str(series.get("device_name") or "").strip() or "Physical"
     if axis_name:

@@ -22,6 +22,7 @@ import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.ui.ui_common import Buttons, Color, QDataComboBox, QDataPushButton, QDataRadioButtonGroup, QTabHeader
 from gremlin.ui.obs_overlay.bindings import (
+    overlay_virtual_key,
     find_overlay_state,
     overlay_mode_combo_fields,
     overlay_state_combo_fields,
@@ -558,10 +559,10 @@ def _condition_phrase(cond: dict) -> str:
     device = str(cond.get("device_name") or "").strip()
     if kind == "vjoy":
         try:
-            vjoy_id = int(cond.get("vjoy_id") or 0)
+            vjoy_id = overlay_virtual_key(cond)
         except (TypeError, ValueError):
             vjoy_id = 0
-        source = f"vJoy {vjoy_id}" if vjoy_id else (device or "vJoy")
+        source = device or (f"vJoy {vjoy_id}" if isinstance(vjoy_id, int) and vjoy_id else "Virtual Device")
     else:
         source = device or "physical"
     button = f"button {input_id}" if input_id else "button (not set)"
@@ -587,20 +588,9 @@ def _physical_joystick_devices():
 def _device_from_combo(device_box: QtWidgets.QComboBox, kind: str):
     data = device_box.currentData()
     if kind == "vjoy":
-        try:
-            vjoy_id = int(data or 0)
-        except (TypeError, ValueError):
-            return None
-        if vjoy_id <= 0:
-            return None
-        for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-            if int(getattr(dev, "vjoy_id", 0) or 0) == vjoy_id:
-                return dev
-        return None
+        return gremlin.joystick_handling.get_virtual_device(data)
     guid = str(data or "").strip()
-    if not guid:
-        return None
-    return gremlin.joystick_handling.getDevice(guid, show_error=False)
+    return gremlin.joystick_handling.getDevice(guid, show_error=False) if guid else None
 
 
 def _button_choices(device) -> list[tuple[int, str]]:
@@ -818,14 +808,21 @@ class NodeConditionWidget(QtWidgets.QWidget):
         kind = str(cond.get("kind") or "physical").casefold()
         cond_id = str(cond.get("id") or "")
         device_box = QDataComboBox()
+        device_box.addItem("(none)", 0 if kind == "vjoy" else "")
         if kind == "vjoy":
-            for dev in gremlin.joystick_handling.vjoy_devices(connected_only=False) or []:
-                device_box.addItem(f"vJoy {dev.vjoy_id} ({dev.name})", int(dev.vjoy_id))
-            current = int(cond.get("vjoy_id") or 0)
+            for dev in gremlin.joystick_handling.virtual_devices(connected_only=False) or []:
+                if dev.disabled or not dev.button_count:
+                    continue
+                device_box.addItem(dev.name, gremlin.joystick_handling.virtual_device_key(dev))
+            current = overlay_virtual_key(cond)
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current:
+                if overlay_virtual_key(device_box.itemData(i) or 0) == current:
                     device_box.setCurrentIndex(i)
                     break
+            else:
+                if current:
+                    device_box.addItem(f"{cond.get('device_name') or current} (missing)", current)
+                    device_box.setCurrentIndex(device_box.count() - 1)
         else:
             for dev in _physical_joystick_devices():
                 device_box.addItem(dev.name, str(dev.device_guid))
@@ -839,19 +836,22 @@ class NodeConditionWidget(QtWidgets.QWidget):
         def _device_changed():
             if not self._is_alive():
                 return
+            if not device_box.currentData():
+                self._set_condition(cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
+                return
             dev = _device_from_combo(device_box, kind)
             if not dev:
                 return
             payload = {"device_name": dev.name, "device_guid": str(dev.device_guid)}
             if kind == "vjoy":
-                payload["vjoy_id"] = int(dev.vjoy_id)
+                payload["vjoy_id"] = gremlin.joystick_handling.virtual_device_key(dev)
             self._set_condition(cond_id, rebuild=True, **payload)
 
         device_box.currentIndexChanged.connect(_device_changed)
         form.addRow("Device", device_box)
         listen = Buttons.getListenWidget(
             label="Listen...",
-            tooltip="Assign from the next physical or vJoy button press",
+            tooltip="Assign from the next physical or virtual button press",
             callback=lambda cid=cond_id: self._listen(cid),
         )
         form.addRow("", listen)
@@ -915,22 +915,14 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
 
 def _vjoy_output_devices() -> list:
-
-    devices = [
-        device
-        for device in gremlin.joystick_handling.vjoy_devices(connected_only=False)
-        if device is not None and int(getattr(device, "axis_count", 0) or 0) > 0
-    ]
-    devices.sort(key=lambda device: int(device.vjoy_id or 0))
-    return devices
+    devices = [device for device in gremlin.joystick_handling.virtual_devices(connected_only=False)
+               if device is not None and not device.disabled and device.axis_count > 0]
+    return sorted(devices, key=lambda device: (device.name, str(device.device_guid)))
 
 
 def _vjoy_device_label(device) -> str:
-    vid = int(device.vjoy_id or 0)
-    name = gremlin.joystick_handling.getDeviceName(device.device_guid) or f"VJoy ({vid})"
-    if not getattr(device, "connected", True):
-        return f"{name} (disconnected)"
-    return name
+    name = device.name or "Virtual output"
+    return name if device.connected else f"{name} (disconnected)"
 
 
 def _vjoy_axis_ids(device) -> list[int]:
@@ -955,12 +947,12 @@ def _vjoy_axis_label(device, axis_id: int) -> str:
     return f"Axis {gremlin.joystick_handling.get_axis_name(int(axis_id))}"
 
 
-def _output_target_label(vjoy_id: int, axis_id: int) -> str:
-    device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(int(vjoy_id), connected_only=False)
+def _output_target_label(vjoy_id, axis_id: int) -> str:
+    device = gremlin.joystick_handling.get_virtual_device(vjoy_id)
     axis = _vjoy_axis_label(device, axis_id)
     if device is not None:
-        return f"VJoy {int(device.vjoy_id)} {axis}"
-    return f"VJoy {int(vjoy_id)} {axis}"
+        return f"{_vjoy_device_label(device)} {axis}"
+    return f"Virtual output {vjoy_id} {axis}"
 
 
 _NODE_SECTION = {
@@ -1979,7 +1971,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 if kind == "output":
                     props = new_spec.setdefault("props", {})
                     try:
-                        vid = int(props.get("vjoy_id") or 1)
+                        vid = gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1)
                         aid = int(props.get("axis_id") or 1)
                     except (TypeError, ValueError):
                         vid, aid = 1, 1
@@ -2123,7 +2115,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._assign_spec_property(graph_node, "lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0))
             self._assign_spec_property(graph_node, "lead_ms", float(props.get("lead_ms") or 0.0))
         elif kind == "output":
-            vjoy_id = int(props.get("vjoy_id") or 1)
+            vjoy_id = gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1)
             axis_id = int(props.get("axis_id") or 1)
             self._assign_spec_property(graph_node, "vjoy_id", vjoy_id)
             self._assign_spec_property(graph_node, "axis_id", axis_id)
@@ -2244,7 +2236,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             props["lag_ms"] = float(graph_node.get_property("lag_ms") or 0.0)
             props["lead_ms"] = float(graph_node.get_property("lead_ms") or 0.0)
         elif kind == "output":
-            props["vjoy_id"] = int(graph_node.get_property("vjoy_id") or 1)
+            props["vjoy_id"] = gremlin.joystick_handling.parse_virtual_device_key(graph_node.get_property("vjoy_id") or 1)
             props["axis_id"] = int(graph_node.get_property("axis_id") or 1)
         props["when"] = decode_when(graph_node.get_property("when_json"))
         return spec
@@ -2546,29 +2538,27 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         box.valueChanged.connect(callback)
         return box
 
-    def _vjoy_output_used(self, mode: dict, skip_id: str | None = None) -> set[tuple[int, int]]:
+    def _vjoy_output_used(self, mode: dict, skip_id: str | None = None) -> set:
         used = set()
         for spec in mode.get("nodes") or []:
-            if spec.get("kind") != "output":
-                continue
-            if skip_id and spec.get("id") == skip_id:
+            if spec.get("kind") != "output" or (skip_id and spec.get("id") == skip_id):
                 continue
             props = spec.get("props") or {}
             try:
-                used.add((int(props.get("vjoy_id") or 0), int(props.get("axis_id") or 0)))
+                used.add((gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1), int(props.get("axis_id") or 0)))
             except (TypeError, ValueError):
                 continue
         return used
 
-    def _next_free_output(self, used: set[tuple[int, int]]) -> tuple[int, int]:
-        for device in _vjoy_output_devices():
-            vid = int(device.vjoy_id or 0)
-            for axis_id in _vjoy_axis_ids(device):
-                if (vid, axis_id) not in used:
-                    return vid, axis_id
+    def _next_free_output(self, used: set) -> tuple:
         devices = _vjoy_output_devices()
+        for device in devices:
+            key = gremlin.joystick_handling.virtual_device_key(device)
+            for axis_id in _vjoy_axis_ids(device):
+                if (key, axis_id) not in used:
+                    return key, axis_id
         if devices:
-            return int(devices[0].vjoy_id or 1), (_vjoy_axis_ids(devices[0]) or [1])[0]
+            return gremlin.joystick_handling.virtual_device_key(devices[0]), _vjoy_axis_ids(devices[0])[0]
         return 1, 1
 
     def _next_output_target(self, mode: dict) -> tuple[int, int]:
@@ -2577,57 +2567,51 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
     def _build_output_pickers(self, node) -> None:
         devices = _vjoy_output_devices()
         if not devices:
-            self._inspector_form.addRow(QtWidgets.QLabel("No vJoy devices are configured."))
+            self._inspector_form.addRow(QtWidgets.QLabel("No virtual output devices are configured."))
             return
-        current_vid = int(node.get_property("vjoy_id") or devices[0].vjoy_id or 1)
+        current_key = gremlin.joystick_handling.parse_virtual_device_key(node.get_property("vjoy_id") or 1)
         current_axis = int(node.get_property("axis_id") or 1)
-        device_combo = QDataComboBox()
+        device_combo, axis_combo = QDataComboBox(), QDataComboBox()
         for device in devices:
-            device_combo.addItem(_vjoy_device_label(device), int(device.vjoy_id))
-        index = device_combo.findData(current_vid)
+            device_combo.addItem(_vjoy_device_label(device), gremlin.joystick_handling.virtual_device_key(device))
+        index = device_combo.findData(current_key)
         if index < 0:
-            current_vid = int(devices[0].vjoy_id or 1)
-            index = 0
-        with QtCore.QSignalBlocker(device_combo):
-            device_combo.setCurrentIndex(index)
-        axis_combo = QDataComboBox()
-
-        def fill_axes(vjoy_id: int, selected_axis: int) -> None:
-            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(int(vjoy_id), connected_only=False)
+            device_combo.addItem(f"Virtual output {current_key} (missing)", current_key)
+            index = device_combo.count() - 1
+        device_combo.setCurrentIndex(index)
+        def fill_axes(key, selected_axis, preserve_missing=False):
+            device = gremlin.joystick_handling.get_virtual_device(key)
             with QtCore.QSignalBlocker(axis_combo):
                 axis_combo.clear()
-                axis_ids = _vjoy_axis_ids(device) if device is not None else [1]
-                for axis_id in axis_ids:
+                for axis_id in _vjoy_axis_ids(device) if device is not None else [selected_axis]:
                     axis_combo.addItem(_vjoy_axis_label(device, axis_id), axis_id)
-                axis_index = axis_combo.findData(selected_axis)
-                axis_combo.setCurrentIndex(axis_index if axis_index >= 0 else 0)
-
-        fill_axes(current_vid, current_axis)
-        device_combo.setMaxVisibleItems(20)
-        axis_combo.setMaxVisibleItems(20)
-        device_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
-        axis_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
-
-        def on_device() -> None:
-            vjoy_id = int(device_combo.currentData() or 1)
-            fill_axes(vjoy_id, int(axis_combo.currentData() or 1))
-            self._set_output_target(node, vjoy_id, int(axis_combo.currentData() or 1))
-
-        def on_axis() -> None:
-            self._set_output_target(node, int(device_combo.currentData() or 1), int(axis_combo.currentData() or 1))
-
-        device_combo.currentIndexChanged.connect(lambda _i: on_device())
-        axis_combo.currentIndexChanged.connect(lambda _i: on_axis())
-        self._inspector_form.addRow("vJoy", device_combo)
+                index = axis_combo.findData(selected_axis)
+                if index < 0 and preserve_missing:
+                    axis_combo.addItem(f"Axis {selected_axis} (missing)", selected_axis)
+                    index = axis_combo.count() - 1
+                axis_combo.setCurrentIndex(index if index >= 0 else 0)
+        fill_axes(current_key, current_axis, preserve_missing=True)
+        def on_device():
+            key = device_combo.currentData()
+            if key is None:
+                return
+            fill_axes(key, int(axis_combo.currentData() or 1))
+            self._set_output_target(node, key, int(axis_combo.currentData() or 1))
+        device_combo.currentIndexChanged.connect(lambda _index: on_device())
+        axis_combo.currentIndexChanged.connect(lambda _index: self._set_output_target(
+            node, device_combo.currentData(), int(axis_combo.currentData() or 1)))
+        self._inspector_form.addRow("Virtual Device", device_combo)
         self._inspector_form.addRow("Axis", axis_combo)
 
-    def _set_output_target(self, node, vjoy_id: int, axis_id: int) -> None:
-        previous = _output_target_label(int(node.get_property("vjoy_id") or 1), int(node.get_property("axis_id") or 1))
-        node.set_property("vjoy_id", int(vjoy_id))
+    def _set_output_target(self, node, vjoy_id, axis_id: int) -> None:
+        key = gremlin.joystick_handling.parse_virtual_device_key(vjoy_id)
+        if key is None:
+            return
+        previous = _output_target_label(node.get_property("vjoy_id") or 1, int(node.get_property("axis_id") or 1))
+        node.set_property("vjoy_id", key)
         node.set_property("axis_id", int(axis_id))
-        label = _output_target_label(int(vjoy_id), int(axis_id))
-        current_name = str(node.name() or "")
-        if current_name in ("", "Output", previous):
+        label = _output_target_label(key, axis_id)
+        if str(node.name() or "") in ("", "Output", previous):
             node.set_name(label)
         self._capture_graph()
 

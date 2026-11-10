@@ -1675,23 +1675,29 @@ class GraphAction(MacroAbstractAction):
 
 
 class VJoyMacroAction(MacroAbstractAction):
-    """VJoy input action for a macro."""
+    """Virtual joystick output step; legacy vJoy IDs remain supported."""
 
-    def __init__(self, vjoy_id, input_type, input_id, value, axis_type="absolute"):
-        """Creates a new JoystickAction instance for use in a macro.
-
-        :param vjoy_id id of the vjoy device which is to be modified
-        :param input_type type of input being generated
-        :param input_id id of the input being generated
-        :param value the value of the generated input
-        :param axis_type if an axis is used, how to interpret the value
-        """
+    def __init__(self, vjoy_id, input_type, input_id, value, axis_type="absolute", device_guid=None):
         super().__init__()
         self.vjoy_id = vjoy_id
+        self.device_guid = device_guid
         self.input_type = input_type
         self.input_id = input_id
         self.value = value
         self.axis_type = axis_type
+
+    @property
+    def device(self):
+        if self.device_guid is not None:
+            return gremlin.joystick_handling.getDevice(self.device_guid)
+        return gremlin.joystick_handling.getDeviceFromVjoyId(self.vjoy_id)
+
+    @property
+    def device_name(self):
+        device = self.device
+        if device is not None:
+            return device.name
+        return f"Virtual device {self.device_guid}" if self.device_guid is not None else f"vJoy {self.vjoy_id}"
 
     @property
     def value(self):
@@ -1700,99 +1706,87 @@ class VJoyMacroAction(MacroAbstractAction):
     @value.setter
     def value(self, new_value):
         if self.input_type == InputType.JoystickButton:
-            # convert boolean if provided
             if isinstance(new_value, bool):
                 self._value = "press" if new_value else "release"
                 return
-            # handle case values
-            new_value = new_value.casefold()
-            match new_value:
-                case "press":
-                    self._value = "press"
-                case "release":
-                    self._value = "release"
-                case "true":
-                    self._value = "press"
-                case "false":
-                    self._value = "release"
-                case "toggle":
-                    self._value = "toggle"
-                case _:
-                    syslog.error(f"VJOY MACRO ACTION: don't know how to handle value: [{new_value}]")
+            value = str(new_value).casefold()
+            aliases = {"true": "press", "pressed": "press", "1": "press", "false": "release", "0": "release"}
+            value = aliases.get(value, value)
+            if value not in ("press", "release", "toggle"):
+                raise ValueError(f"Invalid macro button value: {new_value!r}")
+            self._value = value
+        elif self.input_type == InputType.JoystickAxis:
+            self._value = float(new_value)
         else:
             self._value = new_value
 
     def __getstate__(self):
-        """serialize"""
         state = super().__getstate__()
-        # state['device_guid'] = self.device_guid
-        state["vjoy_id"] = self.vjoy_id
-        state["input_type"] = self.input_type
-        state["input_id"] = self.input_id
-        state["axis_type"] = self.axis_type
-        state["value"] = self.value
+        state.update(vjoy_id=self.vjoy_id, device_guid=self.device_guid, input_type=self.input_type,
+                     input_id=self.input_id, axis_type=self.axis_type, value=self.value)
         return state
 
     def __setstate__(self, state):
-        """deserialize"""
         super().__setstate__(state)
-        # self.device_guid = state["device_guid"]
         self.vjoy_id = state["vjoy_id"]
+        self.device_guid = state.get("device_guid")
         self.input_type = state["input_type"]
         self.input_id = state["input_id"]
         self.axis_type = state["axis_type"]
         self.value = state["value"]
 
     def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
-        # ignore passed local/remote states
-        verbose = gremlin.config.Configuration().verbose_mode_macro
+        import gremlin.joystick_handling
+
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
-        vjoy = gremlin.joystick_handling.VJoyProxy()[self.vjoy_id]
+        key = self.device_guid if self.device_guid is not None else self.vjoy_id
+        target = gremlin.joystick_handling.get_output_target(key) if is_local else None
+        if is_local and target is None:
+            syslog.warning("MACRO: virtual output device unavailable: %s", key)
+            is_local = False
+        if is_local:
+            device = target.device
+            if self.input_type == InputType.JoystickAxis:
+                axis_ids = getattr(device, "axis_id_map", None)
+                valid = self.input_id in axis_ids if axis_ids else 0 < self.input_id <= device.axis_count
+            else:
+                count = device.button_count if self.input_type == InputType.JoystickButton else device.hat_count
+                valid = 0 < self.input_id <= count
+            if not valid:
+                syslog.warning("MACRO: invalid virtual output input: %s %s", key, self.input_id)
+                is_local = False
+
         if self.input_type == InputType.JoystickAxis:
-            if self.axis_type == "absolute":
-                if is_local:
-                    vjoy.axis(self.input_id).value = self.value
-                if is_remote:
-                    gremlin.remote.remote_client.send_axis(
-                        self.vjoy_id,
-                        self.input_id,
-                        self.value,
-                        client_list,
-                        force_remote,
-                    )
-
-            elif self.axis_type == "relative":
-                if is_local:
-                    vjoy.axis(self.input_id).value = max(-1.0, min(1.0, vjoy.axis(self.input_id).value + self.value))
-                if is_remote:
-                    gremlin.remote.remote_client.send_relative_axis(
-                        self.vjoy_id,
-                        self.input_id,
-                        self.value,
-                        client_list,
-                        force_remote,
-                    )
-        elif self.input_type == InputType.JoystickButton:
+            value = max(-1.0, min(1.0, float(self.value)))
+            if self.axis_type not in ("absolute", "relative"):
+                syslog.error("MACRO: invalid axis mode: %s", self.axis_type)
+                return
             if is_local:
-                if verbose:
-                    syslog.info(f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}")
-                match self.value:
-                    case "press":
-                        is_pressed = True
-                    case "release":
-                        is_pressed = False
-                    case "toggle":
-                        is_pressed = not vjoy.button(self.input_id).is_pressed
-                    case _:
-                        syslog.error(f"VJOY MACRO BUTTON ACTION: don't know how to handle: [{self.value}]")
-                        return
-
-            vjoy.button(self.input_id).is_pressed = is_pressed
+                local_value = value
+                if self.axis_type == "relative":
+                    output = target.maestro if target.kind == "maestro" else gremlin.joystick_handling.VJoyProxy()[target.out_id]
+                    local_value = max(-1.0, min(1.0, output.axis(self.input_id).value + value))
+                gremlin.joystick_handling.set_axis(key, self.input_id, local_value)
             if is_remote:
-                gremlin.remote.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, client_list, force_remote)
+                send = (gremlin.remote.remote_client.send_relative_axis if self.axis_type == "relative"
+                        else gremlin.remote.remote_client.send_axis)
+                send(self.vjoy_id, self.input_id, value, client_list, force_remote)
+        elif self.input_type == InputType.JoystickButton:
+            if self.value == "toggle":
+                if is_local:
+                    output = target.maestro if target.kind == "maestro" else gremlin.joystick_handling.VJoyProxy()[target.out_id]
+                    gremlin.joystick_handling.set_button(key, self.input_id, not output.button(self.input_id).is_pressed)
+                if is_remote:
+                    gremlin.remote.remote_client.toggle_button(self.vjoy_id, self.input_id, client_list, force_remote)
+            else:
+                is_pressed = self.value == "press"
+                if is_local:
+                    gremlin.joystick_handling.set_button(key, self.input_id, is_pressed)
+                if is_remote:
+                    gremlin.remote.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, client_list, force_remote)
         elif self.input_type == InputType.JoystickHat:
             if is_local:
-                vjoy.hat(self.input_id).direction = self.value
+                gremlin.joystick_handling.set_hat(key, self.input_id, self.value)
             if is_remote:
                 gremlin.remote.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, client_list, force_remote)
 

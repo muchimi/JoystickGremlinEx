@@ -21,11 +21,16 @@
 import logging
 import os
 from pathlib import Path
+import re
 import winreg
 
+import psutil
 from PySide6 import QtCore, QtWidgets
 
 syslog = logging.getLogger('system')
+_BRIDGE_SERVICE = 'GEXMaestroBridgeService'
+_BRIDGE_SERVICE_KEY = rf'SYSTEM\CurrentControlSet\Services\{_BRIDGE_SERVICE}'
+_BRIDGE_UNINSTALL_KEY = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{D26DA10A-73A7-482A-A711-6B7E04C8D8A0}_is1'
 
 
 def _machine_key_exists(path):
@@ -38,14 +43,41 @@ def _machine_key_exists(path):
     return False
 
 
-def bridge_installed():
-    """Include service and console installations at custom install locations."""
-    if _machine_key_exists(r'SYSTEM\CurrentControlSet\Services\GEXMaestroBridgeService'):
+def vjoy_installed(config):
+    """Include installed drivers that are currently disabled or unavailable."""
+    return bool(config.vjoy_installed or _machine_key_exists(r'SYSTEM\CurrentControlSet\Services\vjoy'))
+
+
+def _machine_registry_value(path, name):
+    for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_READ | view) as key:
+                value, kind = winreg.QueryValueEx(key, name)
+                if kind in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) and isinstance(value, str) and value.strip():
+                    return os.path.expandvars(value.strip())
+        except OSError:
+            pass
+    return ''
+
+
+def bridge_installed(require_running=False):
+    """Find a registered bridge, optionally requiring a running Windows service. """
+    try:
+        service = psutil.win_service_get(_BRIDGE_SERVICE)
+        if require_running:
+            return service.status() == 'running'
         return True
-    if _machine_key_exists(r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{D26DA10A-73A7-482A-A711-6B7E04C8D8A0}_is1'):
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+        if require_running:
+            return False
+
+    # Service ImagePath can contain a quoted executable followed by arguments.
+    image_path = _machine_registry_value(_BRIDGE_SERVICE_KEY, 'ImagePath')
+    match = re.match(r'^\s*(?:"([^"]+\.exe)"|(.+?\.exe)(?:\s|$))', image_path, re.IGNORECASE)
+    if match and Path(match.group(1) or match.group(2)).is_file():
         return True
-    program_files = os.environ.get('ProgramW6432') or os.environ.get('ProgramFiles')
-    return bool(program_files and (Path(program_files) / 'GEXMaestroBridge' / 'GEXMaestroBridgeService.exe').is_file())
+    location = _machine_registry_value(_BRIDGE_UNINSTALL_KEY, 'InstallLocation')
+    return bool(location and (Path(location) / f'{_BRIDGE_SERVICE}.exe').is_file())
 
 
 def install_bridge(parent=None):
@@ -90,7 +122,7 @@ def install_bridge(parent=None):
 
 def show_startup_ui(ui, config, maestro, vjoy_working):
     """Show the editor before reporting missing virtual output providers."""
-    output_unavailable = not (vjoy_working or (maestro.enabled and maestro.service_running))
+    output_unavailable = not (vjoy_working or (not vjoy_installed(config) and maestro.enabled and maestro.service_running))
     ui.apply_user_settings(ignore_minimize=output_unavailable)
     if output_unavailable or not config.startup_start_minimized:
         ui.showNormal()
@@ -100,19 +132,48 @@ def show_startup_ui(ui, config, maestro, vjoy_working):
         QtCore.QTimer.singleShot(0, ui, lambda: check_virtual_output(config, maestro, vjoy_working, parent=ui))
 
 
+def _connect_maestro(config, maestro):
+    """Retest the configured OSC endpoint instead of relying on startup flags."""
+    try:
+        if maestro.connect(throw_on_error=True) is not None:
+            if not config.maestro_enabled:
+                config.maestro_enabled = True
+                syslog.info('MAESTRO: enabled automatically after a successful startup handshake')
+            maestro.refreshDevices()
+            return maestro.enabled and maestro.service_running
+    except (OSError, RuntimeError, ValueError):
+        syslog.exception('Unable to connect to the configured Maestro bridge during startup')
+    return False
+
+
 def check_virtual_output(config, maestro, vjoy_working, parent=None):
     """Warn or offer setup when no provider is available; always allow startup."""
-    if vjoy_working or (maestro.enabled and maestro.service_running):
+    if vjoy_working:
+        return True
+    if vjoy_installed(config):
+        message = ('vJoy is installed, but no usable vJoy output was found. '
+                   'Enable the vJoy driver and configure its devices, then restart GEX. '
+                   'You can still edit profiles and use other outputs.')
+        syslog.warning(message)
+        QtWidgets.QMessageBox.warning(parent, 'Virtual joystick output unavailable', message)
+        return False
+    if maestro.enabled and maestro.service_running:
+        return True
+
+    # The constructor may have run before the bridge was ready, or closed its
+    # client after an inventory error. Confirm availability before warning.
+    if _connect_maestro(config, maestro):
         return True
 
     message = ('No usable vJoy output or connected Maestro bridge was found. '
                'Virtual joystick output is unavailable; you can still edit profiles and use other outputs.')
     syslog.warning(message)
-    if not config.vjoy_installed and not _machine_key_exists(r'SYSTEM\CurrentControlSet\Services\vjoy') and not bridge_installed():
+    bridge_present = bridge_installed()
+    if not bridge_present:
         answer = QtWidgets.QMessageBox.question(
             parent, 'Install GEX Maestro Bridge?',
             message + '\n\nDownload and install GEX Maestro Bridge for HIDMaestro virtual controllers? '
-            'An Internet connection and administrator approval are required.',
+            'An Internet connection and elevated administrator rights are required for the Bridge installation.',
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
             QtWidgets.QMessageBox.StandardButton.No,
         )
@@ -131,16 +192,23 @@ def check_virtual_output(config, maestro, vjoy_working, parent=None):
             elif code != 0:
                 message = f'Bridge installation failed (exit code {code}). You can install it later from the project releases.'
             else:
-                if maestro.connect() is not None:
-                    maestro.refreshDevices()
-                    if maestro.enabled and maestro.service_running:
-                        return True
+                if _connect_maestro(config, maestro):
+                    return True
                 message = ('Bridge setup finished, but the bridge is not connected. Start the bridge service and '
                            'check the connection and devices in Tools > Maestro Devices.')
         except (OSError, RuntimeError, ValueError) as error:
             syslog.exception('Unable to install or connect to GEX Maestro Bridge')
             message = f'Unable to install or connect to GEX Maestro Bridge: {error}'
     else:
-        message += '\n\nConfigure vJoy devices, or enable Maestro and check the bridge connection in Tools > Maestro Devices.'
+        if bridge_present and config.maestro_use_localhost:
+            if bridge_installed(require_running=True):
+                message += ('\n\nThe local GEX Maestro Bridge Windows service is running. '
+                            'Enable Maestro and check the localhost address and service/reply ports in Tools > Maestro Devices.')
+            else:
+                message += ('\n\nThe bridge is installed, but no running Windows service could be confirmed. '
+                            'Start GEXMaestroBridgeService in Windows Services, or start the bridge in console mode. '
+                            'Then test the connection in Tools > Maestro Devices.')
+        else:
+            message += '\n\nConfigure vJoy devices, or enable Maestro and check the bridge connection in Tools > Maestro Devices.'
     QtWidgets.QMessageBox.warning(parent, 'Virtual joystick output unavailable', message)
     return False

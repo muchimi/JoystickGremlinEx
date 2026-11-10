@@ -6831,6 +6831,8 @@ if __name__ == "__main__":
         time.sleep(0.25)
 
         # Publish saved OSC targets before input enumeration and profile load.
+        # Detect even an unavailable vJoy driver before Maestro can connect.
+        config.vjoy_installed = gremlin.virtual_output_startup.vjoy_installed(config)
         maestro = gremlin.maestro.Maestro()
         maestro.offerDefaultJoysticks()
 

@@ -161,7 +161,7 @@ class MacroListModel(QtCore.QAbstractListModel):
 
 
             elif isinstance(action, gremlin.macro.VJoyMacroAction):
-                display =  f"vJoy {action.vjoy_id} {InputType.to_string(action.input_type).capitalize()} {action.input_id} - {MacroListModel.value_format[action.input_type](action)}"
+                display = f"{action.device_name} {InputType.to_string(action.input_type).capitalize()} {action.input_id} - {MacroListModel.value_format[action.input_type](action)}"
 
             elif isinstance(action, gremlin.macro.RemoteControlAction):
                 display = f"Remote control: {VjoyAction.to_name(action.command)}"

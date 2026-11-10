@@ -110,21 +110,11 @@ def overlay_physical_devices(input_kind: str | None = None):
 
 
 def overlay_vjoy_devices(input_kind: str | None = None):
-    """Connected, enabled vJoy devices only."""
+    """Connected virtual joystick outputs from all supported providers."""
     valid_types = overlay_input_types_for_kind(input_kind)
-    devices = []
-    for dev in sorted(
-        gremlin.joystick_handling.vjoy_devices(connected_only=True) or [],
-        key=lambda x: int(getattr(x, "vjoy_id", 0) or 0),
-    ):
-        if getattr(dev, "disabled", False):
-            continue
-        if not getattr(dev, "connected", True):
-            continue
-        if not _device_has_input_types(dev, valid_types):
-            continue
-        devices.append(dev)
-    return devices
+    devices = gremlin.joystick_handling.virtual_devices(connected_only=True) or []
+    return [device for device in sorted(devices, key=lambda dev: ((dev.name or "").casefold(), str(dev.device_guid)))
+            if not device.disabled and device.connected and _device_has_input_types(device, valid_types)]
 
 
 def overlay_device_label(device) -> str:
@@ -418,18 +408,10 @@ def _guid_key(value) -> str:
 
 
 def _device_for_binding(binding: dict[str, Any]):
-    source = (binding.get("source") or "physical").casefold()
-    if source == "vjoy":
-        vjoy_id = int(binding.get("vjoy_id") or 0)
-        if vjoy_id:
-            return gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+    if (binding.get("source") or "physical").casefold() == "vjoy":
+        return _vjoy_target(binding)[1]
     guid = binding.get("device_guid")
-    if not guid:
-        return None
-    try:
-        return gremlin.joystick_handling.getDevice(guid, show_error=False)
-    except Exception:
-        return None
+    return gremlin.joystick_handling.getDevice(guid, show_error=False) if guid else None
 
 
 def _invert(value: float, enabled: bool) -> float:
@@ -441,7 +423,8 @@ def _invert(value: float, enabled: bool) -> float:
 def _proxy_axis_value(vjoy_id: int, axis_id: int) -> float | None:
     """vJoy output cache. DirectInput does not echo our own SetAxis writes."""
     try:
-        axis = gremlin.joystick_handling.VJoyProxy()[int(vjoy_id)].axis(int(axis_id))
+        device = gremlin.joystick_handling.get_output_device(vjoy_id)
+        axis = device.axis(int(axis_id)) if device is not None else None
         if axis is None:
             return None
         return float(axis.value)
@@ -451,7 +434,8 @@ def _proxy_axis_value(vjoy_id: int, axis_id: int) -> float | None:
 
 def _proxy_hat_direction(vjoy_id: int, input_id: int) -> tuple[int, int] | None:
     try:
-        hat = gremlin.joystick_handling.VJoyProxy()[int(vjoy_id)].hat(int(input_id))
+        device = gremlin.joystick_handling.get_output_device(vjoy_id)
+        hat = device.hat(int(input_id)) if device is not None else None
         if hat is None:
             return None
         direction = hat.direction
@@ -515,10 +499,11 @@ def read_button(binding: dict[str, Any]) -> bool:
         return False
     try:
         if source == "vjoy":
-            vjoy_id = int(binding.get("vjoy_id") or 0)
+            vjoy_id, _device = _vjoy_target(binding)
             if not vjoy_id:
                 return False
-            return bool(gremlin.joystick_handling.get_button(vjoy_id, input_id))
+            output = gremlin.joystick_handling.get_output_device(vjoy_id)
+            return bool(output.button(input_id).is_pressed) if output is not None else False
         guid = binding.get("device_guid")
         if not guid:
             return False
@@ -685,50 +670,28 @@ def binding_is_configured(binding: dict[str, Any] | None) -> bool:
     return bool(str(binding.get("device_guid") or "").strip())
 
 
-def _vjoy_target(binding: dict[str, Any] | None) -> tuple[int, Any]:
-    """Resolve a vJoy device from source=vjoy or a virtual device GUID."""
+def overlay_virtual_key(value):
+    """Stable combo-box key for legacy indices and GUID-backed bindings."""
+    if isinstance(value, dict):
+        guid = value.get("device_guid")
+        device = gremlin.joystick_handling.get_virtual_device(guid) if guid else None
+        if device is not None:
+            return gremlin.joystick_handling.virtual_device_key(device)
+        value = guid or value.get("vjoy_id") or 0
+    key = gremlin.joystick_handling.parse_virtual_device_key(value)
+    return key if key and (not isinstance(key, int) or key > 0) else 0
+
+
+def _vjoy_target(binding: dict[str, Any] | None):
+    """Resolve explicit GUIDs before legacy indices; never retarget a missing device."""
     binding = binding or {}
-    try:
-        vjoy_id = int(binding.get("vjoy_id") or 0)
-    except (TypeError, ValueError):
-        vjoy_id = 0
-    device = None
-    if vjoy_id:
-        try:
-            device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
-        except Exception:
-            device = None
+    key = overlay_virtual_key(binding)
+    if not key:
+        return 0, None
+    device = gremlin.joystick_handling.get_virtual_device(key)
     if device is None:
-        guid = binding.get("device_guid")
-        if guid:
-            try:
-                device = gremlin.joystick_handling.getDevice(guid, show_error=False)
-            except Exception:
-                device = None
-    if vjoy_id > 0:
-        return vjoy_id, device
-    if device is not None:
-        try:
-            vjoy_id = int(getattr(device, "vjoy_id", 0) or 0)
-        except (TypeError, ValueError):
-            vjoy_id = 0
-        if vjoy_id > 0 and getattr(device, "is_virtual", False):
-            return vjoy_id, device
-    if (binding.get("source") or "").casefold() == "vjoy":
-        try:
-            devices = gremlin.joystick_handling.vjoy_devices(connected_only=True) or []
-        except Exception:
-            devices = []
-        devices = [dev for dev in devices if not getattr(dev, "disabled", False) and getattr(dev, "connected", True)]
-        if devices:
-            device = devices[0]
-            try:
-                vjoy_id = int(getattr(device, "vjoy_id", 0) or 0)
-            except (TypeError, ValueError):
-                vjoy_id = 0
-            if vjoy_id > 0:
-                return vjoy_id, device
-    return 0, None
+        return 0, None
+    return key, device
 
 
 def binding_is_writable(binding: dict[str, Any] | None) -> bool:
@@ -750,7 +713,7 @@ def vjoy_binding_writable(binding: dict[str, Any] | None) -> bool:
     if binding_source(binding) in ("state", "mode"):
         return False
     vjoy_id, _device = _vjoy_target(binding)
-    return vjoy_id > 0
+    return bool(vjoy_id)
 
 
 def visibility_binding(condition: dict[str, Any] | None) -> dict[str, Any]:
@@ -1006,13 +969,16 @@ def write_axis(binding: dict[str, Any] | None, value: float) -> bool:
     except (TypeError, ValueError):
         axis_id = 0
     vjoy_id, _device = _vjoy_target(binding)
-    if axis_id <= 0 or vjoy_id <= 0:
+    if axis_id <= 0 or not vjoy_id:
         return False
     raw = _clamp_axis(value)
     if binding.get("invert"):
         raw = -raw
     try:
-        gremlin.joystick_handling.VJoyProxy()[vjoy_id].axis(axis_id).value = raw
+        device = gremlin.joystick_handling.get_output_device(vjoy_id)
+        if device is None:
+            return False
+        device.axis(axis_id).value = raw
         return True
     except Exception as err:
         _warn_once(f"write-axis:{vjoy_id}:{axis_id}", f"OBS OVERLAY: axis write failed: {err}")
@@ -1065,10 +1031,13 @@ def write_button(binding: dict[str, Any] | None, pressed: bool) -> bool:
     except (TypeError, ValueError):
         input_id = 0
     vjoy_id, _device = _vjoy_target(binding)
-    if vjoy_id <= 0 or input_id <= 0:
+    if not vjoy_id or input_id <= 0:
         return False
     try:
-        gremlin.joystick_handling.VJoyProxy()[vjoy_id].button(input_id).is_pressed = bool(pressed)
+        device = gremlin.joystick_handling.get_output_device(vjoy_id)
+        if device is None:
+            return False
+        device.button(input_id).is_pressed = bool(pressed)
         return True
     except Exception as err:
         _warn_once(f"write-button:{vjoy_id}:{input_id}", f"OBS OVERLAY: button write failed: {err}")
@@ -1185,7 +1154,7 @@ def write_hat(binding: dict[str, Any] | None, direction: tuple[int, int]) -> boo
     except (TypeError, ValueError):
         input_id = 0
     vjoy_id, device = _vjoy_target(binding)
-    if vjoy_id <= 0 or input_id <= 0:
+    if not vjoy_id or input_id <= 0:
         return False
     nx, ny = int(direction[0]), int(direction[1])
     if binding.get("invert"):
@@ -1196,7 +1165,10 @@ def write_hat(binding: dict[str, Any] | None, direction: tuple[int, int]) -> boo
         hat_count = int(getattr(device, "hat_count", 0) or 0) if device is not None else 4
         if hat_count and not (0 < input_id <= hat_count):
             return False
-        gremlin.joystick_handling.VJoyProxy()[vjoy_id].hat(input_id).direction = (nx, ny)
+        output = gremlin.joystick_handling.get_output_device(vjoy_id)
+        if output is None:
+            return False
+        output.hat(input_id).direction = (nx, ny)
         return True
     except Exception as err:
         _warn_once(f"write-hat:{vjoy_id}:{input_id}", f"OBS OVERLAY: hat write failed: {err}")

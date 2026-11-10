@@ -447,6 +447,7 @@ import time
 from types import SimpleNamespace
 import uuid
 
+import psutil
 from shiboken6 import Shiboken
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Slot
@@ -456,6 +457,7 @@ from gremlin.worker import WorkManager, with_wait_cursor
 import dinput
 from dinput import GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_PRODUCT_STRING, DeviceSummary
 import gremlin.config
+from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.util import getHostIpSingle, InvokeUiMethod
 
@@ -501,6 +503,7 @@ from gremlin.ui.ui_common import (
     QScrollableWidget,
     QWarningWidget,
     synchronize_grids,
+    QOnOffStatusfWidget,
 )
 
 from PySide6.QtCore import QSignalBlocker
@@ -986,12 +989,18 @@ class Maestro:
 
         # the connection data is stored in our config
         config = gremlin.config.Configuration()
+        self._vjoy_installed_on_start = getattr(config, 'vjoy_installed', False)
+        if self._vjoy_installed_on_start:
+            syslog.info("MAESTRO: skipping startup connection because vJoy is installed")
+            return
 
         if not config.maestro_enabled:
             syslog.info("MAESTRO: disabled")
             return
 
         if not config.maestro_configured:
+            # assume local host
+            config.maestro_use_localhost = True
             config.maestro_configured = self.discover()
 
 
@@ -1030,7 +1039,7 @@ class Maestro:
         else:
             # check other connections
 
-            config.maestro_use_localhost = False
+
             port = config.maestro_osc_port  # send port
             if port:
                 # attempt to scan the local subnet to find the instance
@@ -1044,12 +1053,22 @@ class Maestro:
                         syslog.info(f"MAESTRO: connected to Maestro service at {host}:{port}")
                         config.maestro_osc_host = host
                         found = True
+                        config.maestro_use_localhost = False # indicate not in local host mode if a remote client was found
         if found:
             # reconnect
             self.connect()
         return found
 
+    def isServiceRunning(self) -> bool:
+        """Check if the local Windows Maestro bridge service is running.
 
+        Returns:
+            bool: True if the Maestro service is running, False otherwise.
+        """
+        try:
+            return psutil.win_service_get("GEXMaestroBridgeService").status() == "running"
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            return False
 
     def _check_localhost_connect(self) -> bool:
         """Check localhost and release temporary reply sockets before discovery."""
@@ -1483,7 +1502,7 @@ class Maestro:
     def offerDefaultJoysticks(self, parent=None) -> bool:
         """Offer initial devices on the UI thread, before a profile is loaded."""
         config = gremlin.config.Configuration()
-        if not config.maestro_enabled or self._default_devices_prompted:
+        if self._vjoy_installed_on_start or not config.maestro_enabled or self._default_devices_prompted:
             return False
         try:
             if not self.ensureConnected():
@@ -1925,6 +1944,36 @@ class Maestro:
             raise ValueError(f"Maestro {kind} index must be 1..{count}")
         return controller
 
+    def _notify_output(self, device_index, input_type, input_id, value):
+        """Publish retained outputs to UI listeners without injecting joystick inputs."""
+        import gremlin.event_handler
+        from gremlin import joystick_handling
+        from gremlin.types import EventSourceType
+
+        with self._lock:
+            controller = self._controller_map.get(device_index)
+            if controller is None:
+                return
+            # syncDinput replaces the temporary native match map, including
+            # clearing it for remote bridges or unmatched local HID devices.
+            # UI listeners use the identity published in the device registry.
+            device = next((device for device in joystick_handling.maestro_devices()
+                           if device.virtual_id == device_index and device.data.get("maestro_key") == controller.key), None)
+            if device is None:
+                return
+            if input_type == InputType.JoystickAxis:
+                input_id = device.axis_sequence_to_input_id(input_id - 1)
+            device_guid = device.device_guid
+        event = gremlin.event_handler.Event(
+            device_guid=device_guid, event_type=input_type, identifier=input_id,
+            value=value, is_axis=input_type == InputType.JoystickAxis,
+            is_pressed=bool(value) if input_type == InputType.JoystickButton else None,
+            source=EventSourceType.Virtual,
+        )
+        el = gremlin.event_handler.EventListener()
+        el.vjoy_output_event.emit(event)
+        el.vjoy_output_event_ui.emit(event)
+
     def _set_axis(self, device_index, axis_index, value):
         controller = self._control(device_index, axis_index, "axis")
         if controller is None:
@@ -1950,6 +1999,7 @@ class Maestro:
             value = max(-1.0, min(1.0, value))
             self.client.write(f"/maestro_axis/{controller.id}/{controller.axis_names[axis_index - 1]}", (value + 1) / 2)
             self._set_axis(device_index, axis_index, value)
+        self._notify_output(device_index, InputType.JoystickAxis, axis_index, value)
 
     def _set_button(self, device_index, button_index, is_pressed):
         if self._control(device_index, button_index, "button") is None:
@@ -1971,6 +2021,7 @@ class Maestro:
                 return
             self.client.write(f"/maestro_button/{controller.id}/{button_index}", int(bool(is_pressed)))
             self._set_button(device_index, button_index, is_pressed)
+        self._notify_output(device_index, InputType.JoystickButton, button_index, bool(is_pressed))
 
     def _set_hat(self, device_index, hat_index, value):
         controller = self._control(device_index, hat_index, "hat")
@@ -1990,6 +2041,8 @@ class Maestro:
             value = HAT_POSITIONS.get(position, 0)
             self.client.write(f"/maestro_hat/{controller.id}/{hat_index}", value)
             self._set_hat(device_index, hat_index, value)
+        direction = next(direction for direction, code in HAT_POSITIONS.items() if code == value)
+        self._notify_output(device_index, InputType.JoystickHat, hat_index, direction)
 
     def syncBuffer(self, device_index: int):
         """Refresh the local snapshot from DirectInput without sending outputs."""
@@ -2326,8 +2379,8 @@ class MaestroDialog(QRememberDialog):
         layout = QtWidgets.QVBoxLayout(self)
         self._select_widget_map = {}  # map of device ID to the selection box in the table
 
-        self.enabled_widget = QEnabledWidget()
-        self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
+        # self.enabled_widget = QEnabledWidget()
+        # self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
 
         self.localhost_widget = QDataCheckbox(
             "LocalHost",
@@ -2382,9 +2435,16 @@ class MaestroDialog(QRememberDialog):
             [
                 "Reply Host:",
                 self.reply_host_widget,
+                self.reply_host_self_widget
+            ],
+            widget_only=True,
+        )
+
+        self.reply_container = getHContainer(
+            [
+                self.reply_host_container,
                 "Reply Port:",
                 self.reply_port_widget,
-                self.reply_host_self_widget
             ],
             widget_only=True,
         )
@@ -2404,7 +2464,7 @@ class MaestroDialog(QRememberDialog):
             )
         )
 
-        self.connection_group.addWidget(self.reply_host_container)
+        self.connection_group.addWidget(self.reply_container)
 
         layout.addWidget(self.connection_group)
         self.status_widget = QDataLabel("Enter the service address and test the connection.")
@@ -2493,8 +2553,18 @@ class MaestroDialog(QRememberDialog):
         for widget in (self.host_widget, self.reply_host_widget, self.port_widget, self.reply_port_widget):
             widget.textChanged.connect(self._invalidate_connection)
 
-        layout.addWidget(getHContainer([self.connected_widget, self.enabled_widget], widget_only=True))
-        self._update_enabled()
+        #layout.addWidget(getHContainer([self.connected_widget, self.enabled_widget], widget_only=True))
+
+        self.status_bar_maestro_widget = QOnOffStatusfWidget(
+            on_icon="mdi6.gamepad-variant",
+            off_icon="mdi6.gamepad-variant",
+            icon_size=20,
+            tooltip="Maestro bridge state",
+        )
+
+        layout.addWidget(getHContainer([self.status_bar_maestro_widget], widget_only=True))
+
+        self._update_ui()
 
         # refresh on start if the bridge is connectable
         self._refresh_devices()
@@ -2587,7 +2657,7 @@ class MaestroDialog(QRememberDialog):
     def _handle_localhost_mode_changed(self, checked: bool):
         """connection mode changed"""
         self.config.maestro_use_localhost = checked
-        self._update_enabled()
+        self._update_ui()
 
     def _handle_set_self_reply_host(self, widget):
         """self reply host clicked"""
@@ -2601,7 +2671,7 @@ class MaestroDialog(QRememberDialog):
 
     def _handle_disconnect(self):
         self.maestro.disconnect()
-        self._update_enabled()
+        self._update_ui()
 
     def _handle_ping_maestro(self, widget):
         """ping maestro clicked"""
@@ -2636,7 +2706,7 @@ class MaestroDialog(QRememberDialog):
                         self.reply_host_widget.setText(config.maestro_osc_reply_host)
                         self.reply_port_widget.setValue(config.maestro_osc_reply_port)
                         self.port_widget.setValue(config.maestro_osc_port)
-                self._update_enabled()
+                self._update_ui()
                 self._refresh_devices()
         finally:
             WorkManager().popCursor()
@@ -2682,7 +2752,7 @@ class MaestroDialog(QRememberDialog):
 
     def _handle_maestro_connection_changed_ui(self, connected: bool):
         # runs on UI thread to update the UI on a new valid connection
-        self._update_enabled()
+        self._update_ui()
 
     def _handle_create_device_by_index(self, widget, index: int):
         # creates or replaces a Maestro device with the given index duplicating a vjoy device
@@ -2726,10 +2796,10 @@ class MaestroDialog(QRememberDialog):
 
     def _invalidate_connection(self, *args):
         self._tested_settings = None
-        self._update_enabled()
+        self._update_ui()
         self.status_widget.setText("Connection settings changed. Test the connection to load this host's devices.")
 
-    def _update_enabled(self):
+    def _update_ui(self):
         """updates dialog widget state based on connection status and device availability"""
         connected = self._tested_settings is not None
         not_localhost_mode = not self.config.maestro_use_localhost
@@ -2742,14 +2812,19 @@ class MaestroDialog(QRememberDialog):
         self.connection_group.setEnabled(idle)
         self.devices_group.setEnabled(connected and idle)
         self.apply_button.setEnabled(connected and idle)
-        self.enabled_widget.setEnabled(idle)
-        self.connected_widget.setEnabled(connected)
+        # self.enabled_widget.setEnabled(idle)
+        # self.connected_widget.setEnabled(connected)
         self.close_button.setEnabled(idle)
         has_devices = bool(self._select_widget_map)
         self.select_all_button.setEnabled(has_devices)
         self.delete_all_button.setEnabled(has_devices)
         self.new_button.setEnabled(connected)
         self.presets_widget.setEnabled(connected)
+
+        self.status_bar_maestro_widget.setState(connected)
+        self.status_bar_maestro_widget.setToolTip(
+            "Maestro bridge service is running." if connected else "Maestro bridge service is stopped or not connected."
+        )
 
     def _submit(self, operation, complete, message):
         if self._busy:
@@ -2758,7 +2833,7 @@ class MaestroDialog(QRememberDialog):
         self._completion = complete
         self.warning_widget.setText("")
         self.status_widget.setText(message)
-        self._update_enabled()
+        self._update_ui()
         signals = self._signals
 
         def run():
@@ -2781,7 +2856,7 @@ class MaestroDialog(QRememberDialog):
             self.status_widget.setText("The operation did not complete. Refresh to read the host's current devices.")
         else:
             complete(result)
-        self._update_enabled()
+        self._update_ui()
 
     def _read_snapshot(self):
         """Read the device inventory and row capabilities on the request worker."""

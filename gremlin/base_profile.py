@@ -4034,84 +4034,42 @@ class Profile:
         return bool(self.list_vjoy_mappings())
 
     def list_vjoy_mappings(self) -> dict:
-        """returns a map of vjoy mappings for the current profile
-
-        :return dictionary of vjoy mappings for each virtual device and input type
-                 {virtual_id: {"axis": [input_id], "button": [input_id], "hat": [input_id]}}
-
-        virtual_id = 1 to 16
-
-        """
-
-        # Create a list of all used remap actions
-        remap_actions = self.list_actions()
-
-        vjoy = {}  # map of inputs
-
-        # Remove all remap actions from the list of available inputs
-        for act in remap_actions:
-            # Skip remap actions that have invalid configuration
-            if act.input_type is None or act.input_type not in (
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat,
-            ):
+        """Configured virtual outputs keyed independently for each provider."""
+        outputs = {}
+        for action in self.list_actions():
+            kind = getattr(action, "input_type", None)
+            if kind not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                 continue
-
-            type_name = InputType.to_string(act.input_type)
-            virtual_id = act.virtual_id
-
-            if not virtual_id in vjoy:
-                vjoy[virtual_id] = {}
-
-            if type_name not in vjoy[virtual_id]:
-                vjoy[virtual_id][type_name] = []
-
-            if act.vjoy_input_id not in [0, None]:
-                vjoy[virtual_id][type_name].append(act.vjoy_input_id)
-
-        return vjoy
+            device = getattr(action, "virtual_device", None)
+            key = gremlin.joystick_handling.virtual_device_key(device) if device is not None else getattr(action, "vjoy_id", None)
+            input_id = getattr(action, "vjoy_input_id", None)
+            if key is not None and input_id:
+                outputs.setdefault(key, {}).setdefault(InputType.to_string(kind), []).append(input_id)
+        return outputs
 
     def list_unused_vjoy_inputs(self):
-        """Returns a list of unused vjoy inputs for the given profile.
-
-        :return dictionary of unused inputs for each input type  [vjoy_dev_id: int]["axis" | "button" | "hat"] = list[input_id : int]
-        """
-        vjoy_devices = gremlin.joystick_handling.virtual_devices()
-
-        # Create list of all inputs provided by the vjoy devices
-        vjoy = {}
-        for entry in vjoy_devices:
-            vjoy[entry.vjoy_id] = {"axis": [], "button": [], "hat": []}
-            for i in range(entry.axis_count):
-                vjoy[entry.vjoy_id]["axis"].append(entry.axismap_list[i].axis_index)
-            for i in range(entry.button_count):
-                vjoy[entry.vjoy_id]["button"].append(i + 1)
-            for i in range(entry.hat_count):
-                vjoy[entry.vjoy_id]["hat"].append(i + 1)
-
-        # Create a list of all used remap actions
-        remap_actions = self.list_actions()
-
-        # Remove all remap actions from the list of available inputs
-        for act in remap_actions:
-            # Skip remap actions that have invalid configuration
-            if act.input_type is None or act.input_type not in (
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat,
-            ):
+        """Available virtual outputs, keyed by legacy vJoy index or Maestro GUID."""
+        outputs = {}
+        for device in gremlin.joystick_handling.virtual_devices():
+            if device.disabled:
                 continue
-
-            type_name = InputType.to_string(act.input_type)
-            virtual_id = act.virtual_id
-            if virtual_id not in vjoy or act.vjoy_input_id in [0, None] or virtual_id in [0, None] or act.vjoy_input_id not in vjoy[virtual_id][type_name]:
+            key = gremlin.joystick_handling.virtual_device_key(device)
+            outputs[key] = {
+                "axis": [device.axis_sequence_to_input_id(index) for index in range(device.axis_count)],
+                "button": list(range(1, device.button_count + 1)),
+                "hat": list(range(1, device.hat_count + 1)),
+            }
+        for action in self.list_actions():
+            kind = getattr(action, "input_type", None)
+            if kind not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                 continue
-
-            idx = vjoy[virtual_id][type_name].index(act.vjoy_input_id)
-            del vjoy[virtual_id][type_name][idx]
-
-        return vjoy
+            device = getattr(action, "virtual_device", None)
+            key = gremlin.joystick_handling.virtual_device_key(device) if device is not None else getattr(action, "vjoy_id", None)
+            input_id = getattr(action, "vjoy_input_id", None)
+            name = InputType.to_string(kind)
+            if key in outputs and input_id in outputs[key][name]:
+                outputs[key][name].remove(input_id)
+        return outputs
 
     @property
     def profile_file(self):
@@ -4657,7 +4615,7 @@ class Profile:
             for tag in ["vjoy"]:
                 if tag in entry:
                     sub_node = etree.Element(tag)
-                    sub_node.set("vjoy-id", safe_format(entry[tag]["vjoy_id"], int))
+                    sub_node.set("vjoy-id", str(entry[tag]["vjoy_id"]))
                     sub_node.set("axis-id", safe_format(entry[tag]["axis_id"], int))
                     node.append(sub_node)
             for tag in ["lower", "upper"]:
@@ -4823,17 +4781,17 @@ class Profile:
         # TODO: apply safe reading to these
         tag = "vjoy"
         n = node.find(tag)
-        if n is not None and "vjoy_id" in n.attrib and "axis_id" in n.attrib:
+        if n is not None and ("vjoy-id" in n.attrib or "vjoy_id" in n.attrib):
             entry[tag] = {
-                "vjoy_id": safe_read(n, "vjoy-id", int, 1),
-                "axis_id": safe_read(n, "axis-id", int, 1),
+                "vjoy_id": gremlin.joystick_handling.parse_virtual_device_key(n.get("vjoy-id", n.get("vjoy_id", "1"))),
+                "axis_id": int(n.get("axis-id", n.get("axis_id", "1"))),
             }
         for tag in ["lower", "upper"]:
             n = node.find(tag)
-            if n is not None and "device_guid" in n.attrib and "axis_id" in n.attrib:
+            if n is not None and ("device-guid" in n.attrib or "device_guid" in n.attrib):
                 entry[tag] = {
-                    "device_guid": parse_guid(safe_read(n, "device-guid", str, "")),
-                    "axis_id": safe_read(n, "axis-id", int, 1),
+                    "device_guid": parse_guid(n.get("device-guid", n.get("device_guid", ""))),
+                    "axis_id": int(n.get("axis-id", n.get("axis_id", "1"))),
                 }
 
         return entry
@@ -5399,9 +5357,9 @@ class Profile:
                                 if source_input_item.containers:
                                     # source has mappings
                                     target_input_item = target_mode_object.config[input_type][input_id]
-                                    source_input_item.save_container_to_template(tmp_file)
-                                    target_input_item.load_container_from_template(tmp_file)
-                                    updated = True
+                                    if source_input_item.save_container_to_template(tmp_file):
+                                        if target_input_item.load_container_from_template(tmp_file):
+                                            updated = True
 
         # cleanup after ourselves
         if os.path.isfile(tmp_file):
@@ -6484,7 +6442,7 @@ class PluginVariable:
                 self.value = {"device_id": None, "input_id": None, "input_type": None}
             else:
                 self.value = {
-                    "device_id": safe_read(node, "vjoy-id", int, 1),
+                    "device_id": gremlin.joystick_handling.parse_virtual_device_key(node.get("vjoy-id", "1")),
                     "input_id": safe_read(node, "input-id", int, 1),
                     "input_type": InputType.to_enum(safe_read(node, "input-type", str, "")),
                 }
@@ -6524,7 +6482,7 @@ class PluginVariable:
                     node.set("input-type", InputType.to_string(self.value["input_type"]))
         elif self.type == PluginVariableType.VirtualInput:
             if self.value is not None:
-                node.set("vjoy-id", safe_format(self.value["device_id"], int))
+                node.set("vjoy-id", str(self.value["device_id"]))
                 node.set("input-id", safe_format(self.value["input_id"], int))
                 node.set("input-type", InputType.to_string(self.value["input_type"]))
 

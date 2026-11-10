@@ -847,24 +847,16 @@ class CallbackActions:
             )
         )
 
-    def _release_callback_prototype(self, vjoy_input: int, is_local=False, is_remote=False, force_remote=False) -> None:
-        """Prototype of a button release callback, used with lambdas.
-
-        Args:
-            vjoy_input: the vjoy input data to use in the release
-        """
-
-        # Check if the button is valid otherwise we cause Gremlin to crash
-        vjoy = gremlin.joystick_handling.VJoyProxy()
-        if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
-            if is_local:
-                vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
-
-            if is_remote or force_remote:
-                gremlin.remote.remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote=force_remote)
-
-        else:
-            syslog.warning("Attempted to use non existent button: " + f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}")
+    def _release_callback_prototype(self, vjoy_input, is_local=False, is_remote=False, force_remote=False) -> None:
+        key, button_id = vjoy_input
+        device = gremlin.joystick_handling.get_virtual_device(key)
+        if device is None or not 0 < button_id <= device.button_count:
+            syslog.warning("Attempted to release a missing virtual output button: %s %s", key, button_id)
+            return
+        if is_local:
+            gremlin.joystick_handling.set_button(key, button_id, False)
+        if is_remote or force_remote:
+            gremlin.remote.remote_client.send_button(device.virtual_id, button_id, False, force_remote=force_remote)
 
     def _input_event_cb(self, event):
         """Runs callbacks associated with the given event.

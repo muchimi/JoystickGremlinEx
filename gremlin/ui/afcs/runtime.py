@@ -162,29 +162,23 @@ def _read_input(node: dict[str, Any], bus: AfcsBus, enrollments=None) -> float:
     return apply_input_display_range(value, props, _input_display_names(props, enrollments))
 
 
-def _write_output(
-    vjoy_id: int,
-    axis_id: int,
-    value: float,
-    is_local: bool = True,
-    is_remote: bool = False,
-    client_list: list | None = None,
-) -> None:
-    vid = int(vjoy_id)
-    aid = int(axis_id)
-    current = float(value)
+def _write_output(vjoy_id, axis_id: int, value: float, is_local: bool = True,
+                  is_remote: bool = False, client_list: list | None = None) -> None:
+    key = gremlin.joystick_handling.parse_virtual_device_key(vjoy_id)
+    aid, current = int(axis_id), float(value)
     if is_local:
         try:
-            axis = gremlin.joystick_handling.VJoyProxy()[vid].axis(aid)
-            if axis is not None:
-                axis.value = current
-        except Exception as err:
-            syslog.debug(f"AFCS: vJoy write failed {vid}:{aid}: {err}")
+            gremlin.joystick_handling.set_axis(key, aid, current)
+        except Exception as error:
+            syslog.debug("AFCS: virtual output write failed %s:%s: %s", key, aid, error)
     if is_remote:
         try:
-            gremlin.remote.remote_client.send_axis(vid, aid, current, client_list=client_list)
-        except Exception as err:
-            syslog.debug(f"AFCS: remote vJoy write failed {vid}:{aid}: {err}")
+            device = gremlin.joystick_handling.get_virtual_device(key)
+            index = device.virtual_id if device is not None else key
+            if isinstance(index, int) and index > 0:
+                gremlin.remote.remote_client.send_axis(index, aid, current, client_list=client_list)
+        except Exception as error:
+            syslog.debug("AFCS: remote output write failed %s:%s: %s", key, aid, error)
 
 
 def resolve_active_mode(document: AfcsDocument) -> dict[str, Any] | None:
@@ -303,7 +297,7 @@ class AfcsRuntime:
                 props = node.get("props") or {}
                 try:
                     _write_output(
-                        int(props.get("vjoy_id") or 1),
+                        props.get("vjoy_id") or 1,
                         int(props.get("axis_id") or 1),
                         0.0,
                         is_local=is_local,
@@ -456,7 +450,7 @@ class AfcsRuntime:
                 if write_outputs:
                     is_local, is_remote, client_list = routing
                     _write_output(
-                        int(props.get("vjoy_id") or 1),
+                        props.get("vjoy_id") or 1,
                         int(props.get("axis_id") or 1),
                         value,
                         is_local=is_local,

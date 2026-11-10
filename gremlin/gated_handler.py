@@ -3447,6 +3447,8 @@ class GateData:
         else:
             paste_mode = False
 
+        regenerate_ids = paste_mode and not (extra_data and extra_data.get("ids_regenerated"))
+
         verbose = gremlin.config.Configuration().verbose_mode_gate
 
         # default mode to use, for paste
@@ -3497,15 +3499,13 @@ class GateData:
             gate_delay = safe_read(node_range, "delay", int, 250)
 
             gate_info = self.addGate(value=gate_value)  # just add, no range update until all gates are in
-            gate_info.id = gate_id
-
-            if paste_mode:
+            if regenerate_ids:
                 # paste mode = keep new gate ID
                 gate_id_map[gate_id] = gate_info.id
             else:
                 # keep XML gate ID
-                gate_id_map[gate_id] = gate_info.id
                 gate_info.id = gate_id
+                gate_id_map[gate_id] = gate_info.id
 
             gate_info.setUsed(True)  # indicate the gate is used
             gate_info.value = gate_value
@@ -3544,13 +3544,12 @@ class GateData:
                     new_input_item = self._new_input_item(input_item)
                     new_input_type = self.getOverrideInputType(condition)
                     new_input_item.setOverrideInputType(new_input_type)
-                    if extra_data is None:
-                        extra_data = {}
-                    extra_data["override_input_type"] = new_input_type
+                    input_context = dict(extra_data or {})
+                    input_context["override_input_type"] = new_input_type
 
                     item_node.tag = item_node.get("type")
-                    new_input_item.from_xml(item_node, data, extra_data=extra_data)
-                    if paste_mode:
+                    new_input_item.from_xml(item_node, data, extra_data=input_context)
+                    if regenerate_ids:
                         new_input_item.generateGuids()
 
                     gate_info.item_data_map[condition] = new_input_item
@@ -3576,7 +3575,7 @@ class GateData:
         node_ranged = node.xpath("./range")
         for node_range in node_ranged:
             range_id = safe_read(node_range, "id", str, "")
-            if paste_mode:
+            if regenerate_ids:
                 new_guid = gremlin.util.get_guid()
                 guid_map[range_id] = new_guid
                 range_id = new_guid
@@ -3590,6 +3589,8 @@ class GateData:
 
             min_id = safe_read(node_range, "min_id", str, "")
             max_id = safe_read(node_range, "max_id", str, "")
+            min_id = gate_id_map.get(min_id, min_id)
+            max_id = gate_id_map.get(max_id, max_id)
             g1: GateInfo = next((g for g in gate_list if g.id == min_id), None)
             g2: GateInfo = next((g for g in gate_list if g.id == max_id), None)
 
@@ -3673,8 +3674,10 @@ class GateData:
                     input_type = (
                         InputType.JoystickAxis if condition in (GateConditionType.InRange, GateConditionType.OutsideRange) else InputType.JoystickButton
                     )
-                    new_input_item.input_type = input_type
-                    new_input_item.from_xml(item_node, data, extra_data)
+                    new_input_item.setOverrideInputType(input_type)
+                    input_context = dict(extra_data or {})
+                    input_context["override_input_type"] = input_type
+                    new_input_item.from_xml(item_node, data, input_context)
                     range_info.item_data_map[condition] = new_input_item
 
             # remember the created range
@@ -4519,6 +4522,14 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
     def unhook(self):
         # release tab widgets tracking items and widgets
         if self._hooked:
+            # Commit pending text before focus loss during widget teardown.
+            if self._is_range:
+                self._range_description_changed()
+                self.range_description_widget.textChanged.disconnect(self._range_description_changed)
+            else:
+                self._gate_description_changed()
+                self.gate_description_widget.textChanged.disconnect(self._gate_description_changed)
+
             self._condition_pages.clear()
 
             _el = gremlin.event_handler.EventListener()
@@ -4646,12 +4657,14 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @QtCore.Slot()
     def _range_description_changed(self):
-        self._range_info.description = self.range_description_widget.text()
+        if self._range_info is not None:
+            self._range_info.description = self.range_description_widget.text()
         # syslog.info(f"range description changed to: {self._range_info.description}")
 
     @QtCore.Slot()
     def _gate_description_changed(self):
-        self._gate_info.description = self.gate_description_widget.text()
+        if self._gate_info is not None:
+            self._gate_info.description = self.gate_description_widget.text()
 
     @QtCore.Slot(int)
     def _condition_changed_cb(self, index):

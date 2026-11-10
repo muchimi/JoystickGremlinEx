@@ -1572,6 +1572,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.ui.keyboard_device
         import gremlin.ui.state_device
 
+        extra_data = dict(extra_data or {})
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         if extra_data and "input_type" in extra_data:
@@ -1674,7 +1675,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             if mode_object:
                 extra_data["mode_object"] = mode_object
             extra_data["input_item"] = self
-            entry.from_xml(child, data, extra_data)
+            entry.from_xml(child, self, extra_data)
             # verify the entry has data
             self._containers.add(entry)
 
@@ -1821,78 +1822,33 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return stub
 
     def save_container_to_template(self, fname: str):
-        if fname:
-            root = etree.Element("container_template")
-            # get the xml for every container in the mapping
-            for container in self.containers:
-                node = container.to_xml()
-                root.append(node)
-            # save the xml
-            tree = etree.ElementTree(root)
-            try:
-                if os.path.isfile(fname):
-                    # blitz existing file
-                    os.unlink(fname)
-                tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
-            except Exception as err:
-                syslog.error(f"Error writing template to: [{fname}]")
-                syslog.error(f"{err}\n{traceback.format_exc()}")
-                return False
-            return True
-
-        return False
+        """Save this input's mappings without replacing a good file on failure."""
+        if not fname:
+            return False
+        try:
+            return gremlin.plugin_manager.ContainerPlugins().save_template(fname, self.containers)
+        except Exception:
+            syslog.exception("Error writing template to: [%s]", fname)
+            return False
 
     def load_container_from_template(self, fname, extra_data=None):
-        """loads new containers from a template - returns a list of containers"""
-        if fname and os.path.isfile(fname):
-            container_list = []
+        """Append validated template mappings and notify model observers once."""
+        if not fname:
+            return []
+        try:
             plugin_manager = gremlin.plugin_manager.ContainerPlugins()
-            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            msg_list = []
-            try:
-                tree = etree.parse(fname, parser=parser)
-                root = tree.getroot()
-                if root.tag == "container_template":
-                    # get root containers only
-                    nodes = root.xpath("//container[not(ancestor::container)]")
-                    for node in nodes:
-                        container_type = node.get("type")
-                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
-                        container_tag_map = container_plugins.tag_map
-
-                        # verify the container is valid for the input type
-                        valid_containers_names = self.get_valid_container_list()
-                        if container_type in container_tag_map:
-                            container_name = container_tag_map[container_type].name
-                            if container_name in valid_containers_names:
-                                new_container = container_tag_map[container_type](self)
-                                new_container.from_xml(node, self, extra_data)
-                                new_container.generateGuids()  # replace IDs to avoid conflicts
-                                container_list.append(new_container)
-                        else:
-                            msg = f"Container {container_type.name} is not valid for the current input"
-                            msg_list.append(msg)
-                            syslog.warning(msg)
-
-                if msg_list:
-                    prompt = "".join((msg + "\n" for msg in msg_list))
-                    gremlin.ui.ui_common.MessageBox(title="Load Template", prompt=prompt)
-
-            except Exception as err:
-                syslog.error(f"Error loading template: [{fname}]:")
-                syslog.error(f"{err}\n{traceback.format_exc()}")
-
-            if container_list:
-                for new_container in container_list:
-                    if hasattr(new_container, "action_model"):
-                        # new_container.action_model = self.action_model
-
-                        plugin_manager.set_container_data(self, new_container)
-                        # new_container.action_model.add_container(new_container)
-
-            self.containers.extend(container_list)
-
-            return container_list
+            containers = plugin_manager.load_template(fname, self, extra_data)
+        except Exception:
+            syslog.exception("Error loading template: [%s]", fname)
+            return []
+        self.containers.pushSuspend()
+        try:
+            for container in containers:
+                plugin_manager.set_container_data(self, container)
+                self.containers.addContainer(container)
+        finally:
+            self.containers.popSuspend(emit=True)
+        return containers
 
     def generateGuids(self):
         """generate a set of new GUIDs for mapped items"""
@@ -5935,7 +5891,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 if "set-guid" in child.attrib:
                     self.action_sets.id = read_guid(child, "set-guid")
                 if "set-description" in child.attrib:
-                    self.action_sets.description = html.unescape(node.get("description"))
+                    self.action_sets.description = html.unescape(child.get("set-description"))
 
             index += 1
 
@@ -5960,9 +5916,13 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         config = gremlin.config.Configuration()
 
         # get the id of the action set
-        if "set-guid" in node.attrib:
+        if "guid" in node.attrib:
             action_set.id = read_guid(node, "guid")
-        if "set-description" in node.attrib:
+        elif "set-guid" in node.attrib:
+            action_set.id = read_guid(node, "set-guid")
+        if "description" in node.attrib:
+            action_set.description = html.unescape(node.get("description"))
+        elif "set-description" in node.attrib:
             action_set.description = html.unescape(node.get("set-description"))
 
         action_set.pushSuspend()  # stop notifications while we're adding
@@ -6391,10 +6351,9 @@ class AbstractAction(BaseProfileData):
         _import_data = gremlin.base_profile.ProfileImportData()
 
         if "action_id" in node.attrib:
-            # Paste/import clones keep the ctor GUID until generateGuids().
-            # Adopting the source action_id would unregister the live source
-            # when GUIDs are regenerated (shared key in VirtualDeviceUsageState).
-            if not (extra_data and extra_data.get("paste")):
+            # Cloned XML already has fresh IDs, including references to them.
+            # Legacy paste callers retain the ctor ID until generateGuids().
+            if not (extra_data and extra_data.get("paste")) or extra_data.get("ids_regenerated"):
                 self.id = node.get("action_id")
 
         if "send-mode" in node.attrib:
@@ -6432,7 +6391,7 @@ class AbstractAction(BaseProfileData):
         for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
             if cond_node is not None:
-                self.activation_condition.from_xml(cond_node, data, extra_data)
+                self.activation_condition.from_xml(cond_node, (self.input_item, self), extra_data)
 
         # record the type of this action
         self._action_name = node.tag
@@ -6825,12 +6784,20 @@ class ConditionTracker:
                 data = self._cache[mode][id]
                 del self._cache[mode][id]
                 del self._owner_map[id]
+                self._data_map.pop(id, None)
                 # (input_item, mode, condition)
                 el = gremlin.event_handler.EventListener()
                 el.condition_removed.emit(data.input_item, data.mode, data.condition)
                 if Shiboken.isValid(data.container):
                     el.condition_state_changed.emit(data.container)
                 return
+
+    def discardConditionIds(self, condition_ids):
+        """Remove conditions registered while reading a paste that failed."""
+        for condition_id in condition_ids:
+            data = self._data_map.get(condition_id)
+            if data is not None:
+                self.unregisterCondition(data.condition)
 
     def count(self):
         """gets a count of registered conditions"""
@@ -7059,7 +7026,7 @@ class BaseVJoyCondition(BaseAbstractCondition):
         self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
 
         input_id = safe_read(node, "id", int, 0)
-        vjoy_id = safe_read(node, "vjoy-id", int, 0)
+        vjoy_id = gremlin.joystick_handling.parse_virtual_device_key(node.get("vjoy-id", "0"))
 
         if input_id == 0 or vjoy_id == 0:
             syslog.error(f"VJOY XML: invalid input in XML: device: {vjoy_id}  input: {input_id}")
@@ -7100,18 +7067,24 @@ class BaseVJoyCondition(BaseAbstractCondition):
         if not is_error:
             node.set("input", InputType.to_string(self.input_type))
             node.set("id", safe_format(self.input_id, int))
-            node.set("vjoy-id", write_guid(self.vjoy_id))
+            node.set("vjoy-id", str(self.vjoy_id))
             node.set("range-low", safe_format(self.range[0], float))
             node.set("range-high", safe_format(self.range[1], float))
             node.set("ignore-release", safe_format(self.ignore_release, bool))
         return node
+
+    @property
+    def device_name(self):
+        device = gremlin.joystick_handling.get_virtual_device(self.vjoy_id)
+        return device.name if device is not None else f"Virtual output {self.vjoy_id}"
 
     def is_valid(self):
         """Returns whether or not a condition is fully specified.
 
         :return True if the condition is properly specified, False otherwise
         """
-        return super().is_valid() and self.input_type is not None and self.vjoy_id > 0 and self.input_id > 0
+        valid_key = bool(self.vjoy_id) and (not isinstance(self.vjoy_id, int) or self.vjoy_id > 0)
+        return super().is_valid() and self.input_type is not None and valid_key and self.input_id > 0
 
     def __str__(self):
         return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[1]:0.3f}]"
@@ -7121,7 +7094,7 @@ class BaseVJoyCondition(BaseAbstractCondition):
         from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
-        table.addField("Condition", "VJoy")
+        table.addField("Condition", "Virtual Device")
         table.addField("Comparison", self.comparison)
         table.addField("Vjoy Device", self.vjoy_id)
         table.addField("Type", self.input_type.name)
@@ -7231,6 +7204,7 @@ class ConditionModel(AbstractCallbackModel):
 
     def setContainer(self, container: AbstractContainer | AbstractAction | ConditionContainer):
         """Sets the container for this condition model."""
+        self.target = container  # retain the action owner as well as its enclosing container
         if isinstance(container, AbstractContainer):
             self.container = container
         elif isinstance(container, AbstractAction):
@@ -7626,21 +7600,22 @@ class ActionSetsView(AbstractView):
 
     def _paste_action(self, action: AbstractAction | str, container: AbstractContainer, target_actionset: ActionSet = None):
         """paste action"""
-        wm = WorkManager()
-        wm.submit(callback=self._paste_action_worker, args=(action, container, target_actionset))
+        gremlin.util.InvokeUiMethod(self._paste_action_worker, (action, container, target_actionset))
 
     def _paste_action_worker(self, args):
+        if not Shiboken.isValid(self):
+            return
         action, container, target_actionset = args
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action = plugin_manager.duplicate(action, self.container)
-
-        if target_actionset is not None:
-            action_set: ActionSet = target_actionset
+        action = plugin_manager.duplicate_for_paste(action, self.container)
+        if action is None:
+            return
+        if target_actionset is None:
+            self.container.add_action(action)
         else:
-            action_set = self.model[0]  # first action set
-
-        action_set.add(action)
-        # container.add_action(action_item)
+            target_actionset.add(action)
+            self.container.create_or_delete_virtual_button()
+        self.redraw(force=True)
 
     def _add_action_worker(self, args):
         """worker object for adding actions"""
@@ -8151,20 +8126,12 @@ class ActionSetView(AbstractView):
         """handles action paste operation"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        if isinstance(action, ObjectEncoder):
-            oc = action
-            if oc.encoder_type == EncoderType.Action:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                action_tag = node.tag
-                action_tag_map = plugin_manager.tag_map
-                new_action = action_tag_map[action_tag](self.container)
-                new_action.from_xml(node)
-                new_action.setId(get_guid())
-                self.model.add_action(new_action)
-        else:
-            action_item = plugin_manager.duplicate(action, self.container)
-            self.model.add(action_item)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
+        self.model.add(action_item)
+        self.container.create_or_delete_virtual_button()
+        self.redraw(force=True)
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -8517,7 +8484,9 @@ class ActionSelector(QtWidgets.QWidget):
             container_tag_map = container_plugins.tag_map
             container = container_tag_map["basic"](self.inputItem)
 
-        action_list = gremlin.plugin_manager.ActionPlugins().fromClipboard(container, self.inputItem)
+        # Defer object creation until the final paste handler knows its target.
+        # Parsing twice would register unused action/condition copies.
+        action_list = gremlin.plugin_manager.ActionPlugins().fromClipboard(container, self.inputItem, decode=False)
         if not action_list:
             return
 
@@ -8627,15 +8596,29 @@ class ContainerSelector(QtWidgets.QWidget):
         eh = gremlin.event_handler.EventHandler()
         eh.last_container_changed.connect(self._last_container_changed)
 
+        model = self.data.containers
+        callback = self._containers_changed
+        model.addCallback(callback)
+        self.destroyed.connect(lambda *_: model.removeCallback(callback))
+
+    def _containers_changed(self, data=None, force=False):
+        gremlin.util.InvokeUiMethod(self._update_template_controls_ui)
+
+    def _update_template_controls_ui(self):
+        if not Shiboken.isValid(self) or self.data is None:
+            return
+        self.save_template_widget.setEnabled(bool(self.data.containers))
+        self.load_template_widget.setEnabled(not self.data.locked)
+
     def _handle_lock_changed(self, input_item):
         gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item)  # ensure on UI thread
 
     def _handle_lock_changed_ui(self, input_item):
         if Shiboken.isValid(self):
             unlocked = not input_item.locked
-            self.load_template_widget.setEnabled(unlocked)
+            self._update_template_controls_ui()
             self.add_container_widget.setEnabled(unlocked)
-            self.paste_button_widget.setEnabled(unlocked)
+            self.paste_button_widget.setEnabled(unlocked and Clipboard().is_container)
             self.delete_button.setEnabled(unlocked)
 
     def refresh(self, input_item):
@@ -8648,8 +8631,7 @@ class ContainerSelector(QtWidgets.QWidget):
             config = gremlin.config.Configuration()
             self.container_dropdown.setCurrentText(config.last_container)
 
-        enabled = self.data and len(self.data.containers) > 0
-        self.save_template_widget.setEnabled(enabled)
+        self._update_template_controls_ui()
 
     def _last_container_changed(self, widget, name):
         gremlin.util.InvokeUiMethod(self._last_container_changed_ui, widget, name)  # ensure on UI thread
@@ -8719,7 +8701,7 @@ class ContainerSelector(QtWidgets.QWidget):
 
     def _clipboard_changed(self, clipboard):
         """handles paste button state based on clipboard data"""
-        self.paste_button_widget.setEnabled(clipboard.is_container)
+        self.paste_button_widget.setEnabled(not self.data.locked and clipboard.is_container)
         """ updates the paste button tooltip with the current clipboard contents"""
         if clipboard.is_container:
             self.paste_button_widget.setToolTip(f"Paste container ({clipboard.data.name})")
@@ -9231,66 +9213,55 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @QtCore.Slot()
     def _open_template(self):
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None,
-            "Container template",
-            gremlin.shared_state.data_path,
-            "XML files (*.xml)",
-        )
-        if fname and os.path.isfile(fname):
-            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            try:
-                tree = etree.parse(fname, parser=parser)
-                root = tree.getRoot()
-                if root.tag == "container_template":
-                    # get root containers only
-                    nodes = root.xpath("//container[not(ancestor::container)]")
-                    for node in nodes:
-                        container_type = node.get("type")
-                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
-                        container_tag_map = container_plugins.tag_map
-                        valid_containers_names = self.container.get_valid_container_list()
-
-                        # verify the container is valid for the input
-                        if container_type in container_tag_map:
-                            container_name = container_tag_map[container_type].name
-                            if container_name in valid_containers_names:
-                                new_container = container_tag_map[container_type](self.item_data)
-                                new_container.from_xml(node, self.container)
-                                new_container.generateGuids()
-                                self.container = new_container
-                                if Shiboken.isValid(self):
-                                    self.container_modified.emit()
-
-            except Exception:
-                pass
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._open_template)
+            return
+        if not Shiboken.isValid(self) or self.container is None:
+            return []
+        input_item = self.container.input_item
+        if input_item.locked:
+            return []
+        # Use the mapping editor's batching when this container is displayed.
+        parent = self.parent()
+        while parent is not None:
+            if isinstance(parent, InputItemMappingWidget):
+                return parent._load_container_from_template()
+            parent = parent.parent()
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Container template", gremlin.shared_state.data_path, "XML files (*.xml)")
+        if not fname:
+            return []
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        try:
+            containers = plugin_manager.load_template(fname, input_item)
+        except Exception as error:
+            syslog.exception("Error loading template: [%s]", fname)
+            gremlin.ui.ui_common.MessageBox(title="Load Template", prompt=f"Unable to load template:\n{fname}\n\n{error}")
+            return []
+        input_item.containers.pushSuspend()
+        try:
+            for container in containers:
+                plugin_manager.set_container_data(input_item, container)
+                input_item.containers.addContainer(container)
+        finally:
+            input_item.containers.popSuspend(emit=True)
+        return containers
 
     @QtCore.Slot()
     def _save_template(self):
-        if not self.container:
-            # no container to save
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._save_template)
             return
-        fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-            None,
-            "Container template",
-            gremlin.shared_state.data_path,
-            "XML files (*.xml)",
-        )
-        if fname:
-            # get the container nodes
-            node = self.container.to_xml()
-            root = etree.Element("container_template")
-            root.append(node)
-            tree = etree.ElementTree(root)
-            try:
-                if os.path.isfile(fname):
-                    # blitz existing file
-                    os.unlink(fname)
-                tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
-            except Exception:
-                syslog.error(f"Error writing template to: {fname}")
-                return False
-            return True
+        if not Shiboken.isValid(self) or self.container is None:
+            return False
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Container template", gremlin.shared_state.data_path, "XML files (*.xml)")
+        if not fname:
+            return False
+        try:
+            return gremlin.plugin_manager.ContainerPlugins().save_template(fname, [self.container])
+        except Exception as error:
+            syslog.exception("Error writing template to: [%s]", fname)
+            gremlin.ui.ui_common.MessageBox(title="Save Template", prompt=f"Unable to save template:\n{fname}\n\n{error}")
+            return False
 
     def _update_container(self, container):
         if not Shiboken.isValid(self):
@@ -11043,41 +11014,14 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                 return
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_tag_map = plugin_manager.tag_map
-
-        if isinstance(data_or_action, ObjectEncoder):
-            oc = data_or_action
-            if oc.encoder_type == EncoderType.Action:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                action_tag = node.tag
-                if action_tag in action_tag_map:
-                    action_name = action_tag_map[action_tag]
-                    container = container_plugins.basic.BasicContainer(self._input_item)
-                    action_item = action_name(container)
-                    action_item.setId(gremlin.util.get_guid())
-            else:
-                # not an action type, ignore
-                return
-
-        elif isinstance(data_or_action, gremlin.base_profile.AbstractAction):
-            action = data_or_action
+        try:
             container = container_plugins.basic.BasicContainer(self._input_item)
-            action_item = plugin_manager.duplicate(action, container)
-        else:
-            # nothing to do
+            action_item = plugin_manager.duplicate(data_or_action, container, self._input_item)
+        except Exception:
+            syslog.exception("Unable to paste an action into the input mapping")
             return
-
-        # remap inputs
-        action_item.update_inputs(self._input_item)
         container.add_action(action_item)
-
-        if len(container.action_sets) > 0:
-            self._container_model.addContainer(container)
-        self._container_model.data_changed.emit()
-
-        _eh = gremlin.event_handler.EventListener()
-        # eh.mapping_changed.emit(self._input_item)
+        self._add_containers_batched([container])
         self.notify_changed()
 
     def _add_container(self, container_name):
@@ -11121,77 +11065,44 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             syslog.info("multi container copied to clipboard")
 
     def _save_container_to_template(self, item):
-        input_item: InputItem = item
-        """ saves a mapping set to a template """
-        fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save template", gremlin.util.userprofile_path(), "XML files (*.xml)")
-
-        if fname:
-            root = etree.Element("container_template")
-            # get the xml for every container in the mapping
-            for container in input_item.containers:
-                node = container.to_xml()
-                root.append(node)
-            # save the xml
-            tree = etree.ElementTree(root)
-            try:
-                if os.path.isfile(fname):
-                    # blitz existing file
-                    os.unlink(fname)
-                tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
-            except Exception:
-                syslog.error(f"Error writing template to: {fname}")
-                return False
-            return True
-
-        return False
+        """Save a complete mapping set to a template."""
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._save_container_to_template, item)
+            return
+        if not Shiboken.isValid(self) or item is None:
+            return False
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save template", gremlin.util.userprofile_path(), "XML files (*.xml)")
+        if not fname:
+            return False
+        try:
+            return gremlin.plugin_manager.ContainerPlugins().save_template(fname, item.containers)
+        except Exception as error:
+            syslog.exception("Error writing template to: [%s]", fname)
+            gremlin.ui.ui_common.MessageBox(title="Save Template", prompt=f"Unable to save template:\n{fname}\n\n{error}")
+            return False
 
     def _load_container_from_template(self, extra_data=None):
-        """loads a container from a template"""
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None,
-            "Container template",
-            gremlin.util.userprofile_path(),
-            "XML files (*.xml)",
-        )
-        if fname and os.path.isfile(fname):
-            container_list = []
-            plugin_manager = gremlin.plugin_manager.ContainerPlugins()
-            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            msg_list = []
-            try:
-                tree = etree.parse(fname, parser=parser)
-                root = tree.getroot()
-                if root.tag == "container_template":
-                    # get root containers only
-                    nodes = root.xpath("//container[not(ancestor::container)]")
-                    for node in nodes:
-                        container_type = node.get("type")
-                        container_plugins = gremlin.plugin_manager.ContainerPlugins()
-                        container_tag_map = container_plugins.tag_map
-
-                        # verify the container is valid for the input type
-                        valid_containers_names = self._input_item.get_valid_container_list()
-                        if container_type in container_tag_map:
-                            container_name = container_tag_map[container_type].name
-                            if container_name in valid_containers_names:
-                                new_container = container_tag_map[container_type](self._input_item)
-                                new_container.from_xml(node, self._input_item, extra_data)
-                                new_container.generateGuids()  # replace IDs to avoid conflicts
-                                container_list.append(new_container)
-                        else:
-                            msg = f"Container {container_type.name} is not valid for the current input"
-                            msg_list.append(msg)
-                            syslog.warning(msg)
-
-                if msg_list:
-                    prompt = "".join((msg + "\n" for msg in msg_list))
-                    gremlin.ui.ui_common.MessageBox(title="Load Template", prompt=prompt)
-
-            except Exception:
-                pass
-            if container_list:
-                self._add_containers_batched(container_list, plugin_manager)
-                self.notify_changed()
+        """Load new mappings with one rebuild of the existing container view."""
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._load_container_from_template, extra_data)
+            return
+        if not Shiboken.isValid(self) or self._input_item is None or self._input_item.locked:
+            return []
+        input_item = self._input_item
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Container template", gremlin.util.userprofile_path(), "XML files (*.xml)")
+        if not fname or not Shiboken.isValid(self) or self._input_item is not input_item:
+            return []
+        plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+        try:
+            containers = plugin_manager.load_template(fname, input_item, extra_data)
+        except Exception as error:
+            syslog.exception("Error loading template: [%s]", fname)
+            gremlin.ui.ui_common.MessageBox(title="Load Template", prompt=f"Unable to load template:\n{fname}\n\n{error}")
+            return []
+        if containers:
+            self._add_containers_batched(containers, plugin_manager)
+            self.notify_changed()
+        return containers
 
     def _add_containers_batched(self, container_list, plugin_manager=None):
         """Add multiple containers with a single UI rebuild (avoids Qt UAF on paste)."""
@@ -11231,79 +11142,45 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         :param container container to be added
         """
-        import gremlin.base_profile
-
-        _el = gremlin.event_handler.EventListener()
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._paste_container, container, extra_data)
+            return
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
         _trace("paste container")
-
-        # tracker = ConditionTracker()
-        import_data = gremlin.base_profile.ProfileImportData()
-        verbose = gremlin.config.Configuration().verbose
-
-        if not extra_data:
-            extra_data = {}
+        extra_data = dict(extra_data or {})
         extra_data["paste"] = True  # indicate paste mode for xml readers
-
-        if isinstance(container, ObjectEncoder):
-            oc = container
-            valid_containers_names = self._input_item.get_valid_container_list()
-            container_tag_map = plugin_manager.tag_map
-            if oc.encoder_type == EncoderType.Container:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                container_type = node.get("type")
-                # verify the container is valid for the input
-                if container_type in container_tag_map:
-                    container_name = container_tag_map[container_type].name
-                    if container_name in valid_containers_names:
-                        new_container = container_tag_map[container_type](self._input_item)
-                        new_container.from_xml(node, data=self._input_item, extra_data=extra_data)
-                        new_container.generateGuids()
-                        if new_container.id in import_data.used_ids:
-                            new_id = gremlin.util.get_guid()
-                            if verbose:
-                                syslog.warning(f"PASTE: DUPLICATE ID:container {new_container.id} -> {new_id}")
-                            new_container._id = new_id
-                        import_data.used_ids[new_container.id] = new_container
-
-                        container_list.append(new_container)
-
-            elif oc.encoder_type == EncoderType.MultiContainer:
-                xml = oc.data
-
-                root = etree.fromstring(xml)
-
-                for node in root:
-                    container_type = node.get("type")
-
-                    if container_type in container_tag_map:
-                        container_name = container_tag_map[container_type].name
-                        if container_name in valid_containers_names:
-                            new_container = container_tag_map[container_type](self._input_item)
-                            new_container.from_xml(node, data=self._input_item, extra_data=extra_data)
-                            new_container.generateGuids()  #  get a new set of ids for the container and its children
-                            if new_container.id in import_data.used_ids:
-                                new_id = gremlin.util.get_guid()
-                                if verbose:
-                                    syslog.warning(f"PASTE: DUPLICATE ID:container {new_container.id} -> {new_id}")
-                                new_container._id = new_id
-                            import_data.used_ids[new_container.id] = new_container
-
-                            container_list.append(new_container)
-
-                            # debug
-                            root = lxml.etree.Element("generate-guid-containers")
-                            node = new_container.to_xml()
-                            root.append(node)
-                            # filename = gremlin.util.save_xml("container_new_id.xml", root)
-                            # gremlin.util.display_file(filename)
-
-        else:
-            new_container = plugin_manager.duplicate(container, self._input_item)
-            new_container.generateGuids()  #  get a new set of ids for the container and its children
-            container_list.append(new_container)
+        extra_data["ids_regenerated"] = True
+        nodes = []
+        try:
+            if isinstance(container, ObjectEncoder):
+                if container.encoder_type not in (EncoderType.Container, EncoderType.MultiContainer):
+                    return []
+                root = gremlin.plugin_manager.clone_xml_for_paste(container.data)
+                expected = "container" if container.encoder_type == EncoderType.Container else "multi_containers"
+                if root.tag != expected:
+                    raise ValueError(f"Expected {expected}, found {root.tag}")
+                nodes = [root] if expected == "container" else [
+                    gremlin.plugin_manager.clone_xml_for_paste(node) for node in root
+                ]
+            elif isinstance(container, AbstractContainer):
+                nodes = [gremlin.plugin_manager.clone_xml_for_paste(container.to_xml())]
+            else:
+                return []
+            valid_names = self._input_item.get_valid_container_list()
+            for node in nodes:
+                factory = plugin_manager.tag_map.get(node.get("type"))
+                if node.tag != "container" or factory is None or factory.name not in valid_names:
+                    syslog.warning("Skipping an unsupported container in the clipboard: %s", node.get("type"))
+                    continue
+                new_container = factory(self._input_item)
+                new_container.from_xml(node, data=self._input_item, extra_data=extra_data)
+                container_list.append(new_container)
+        except Exception:
+            for node in nodes:
+                gremlin.plugin_manager.discard_pasted_conditions(node)
+            syslog.exception("Unable to paste containers from the clipboard")
+            return []
 
         if container_list:
             self._add_containers_batched(container_list, plugin_manager)
@@ -11524,59 +11401,58 @@ class ConditionHelper:
         """
         from gremlin.clipboard import ObjectEncoder, EncoderType
 
-        if isinstance(container, gremlin.base_profile.AbstractAction):
-            input_item = container.parent.parent
-        elif isinstance(container, AbstractContainer):
-            input_item = container.parent
-        else:
-            assert False, "Pasted container is not a valid container type - expected AbstractContainer or AbstractAction"
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self.paste_condition, container, oc)
+            return
+        if isinstance(container, ConditionModel):
+            container = getattr(container, "target", container.container)
+        if not isinstance(container, (AbstractContainer, AbstractAction)):
+            syslog.warning("Unable to paste conditions: invalid destination %s", type(container).__name__)
+            return False
+        input_item = container.input_item
+        if input_item is None or not isinstance(oc, ObjectEncoder):
+            return False
+        expected_tag = {EncoderType.Condition: "condition", EncoderType.ActivationCondition: "activation-condition"}.get(oc.encoder_type)
+        if expected_tag is None:
+            return False
 
-        if isinstance(oc, ObjectEncoder):
-            data = (input_item, container)  # (input item, container)
-            tracker = ConditionTracker()
-            mode = gremlin.shared_state.edit_mode
+        try:
+            node = gremlin.plugin_manager.clone_xml_for_paste(oc.data)
+            if node.tag != expected_tag:
+                raise ValueError(f"Expected {expected_tag}, found {node.tag}")
+            activation = container.activation_condition
+            if activation is None:
+                activation = BaseActivationCondition(container, ActivationRule.All)
+            nodes = [node] if expected_tag == "condition" else node.findall("condition")
+            conditions = []
+            for condition_node in nodes:
+                condition_type = safe_read(condition_node, "condition-type", str, "").casefold()
+                factory = activation.condition_lookup.get(condition_type)
+                if factory is None:
+                    raise ValueError(f"Unknown condition type: {condition_type}")
+                condition = factory(target=container)
+                condition.from_xml(condition_node, (input_item, container))
+                condition.target = container
+                conditions.append(condition)
+        except Exception:
+            syslog.exception("Unable to paste conditions from the clipboard")
+            return False
 
-            if oc.encoder_type == EncoderType.ActivationCondition:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                if node.tag == "activation-condition":
-                    # temporary activation condition
-                    activation_condition = BaseActivationCondition(self, ActivationRule.All)
-                    rule = container.activation_condition.rule
-                    activation_condition.from_xml(node, data)
-                    for condition in activation_condition.conditions:
-                        condition.setId(gremlin.util.get_guid())
-                        # add the condition to the existing container
-                        container.activation_condition.conditions.append(condition)
-                        item = ConditionTrackerData(mode, input_item, container, condition, rule)
-                        tracker.registerCondition(item)
-                if isinstance(container, gremlin.base_profile.AbstractAction):
-                    # we need to send the main container, not the action container for the update
-                    self.update_condition_ui(container.parent)
-                elif isinstance(container, AbstractContainer):
-                    self.update_condition_ui(container)
-
-            elif oc.encoder_type == EncoderType.Condition:
-                xml = oc.data
-                node = lxml.etree.fromstring(xml)
-                if node.tag == "condition":
-                    condition_type = safe_read(node, "condition-type", str, "")
-                    condition = self.condition_lookup[condition_type](target=container)
-                    condition.from_xml(node, data)
-                    condition.setId(gremlin.util.get_guid())
-
-                    container.condition_view._add_condition(condition)
-                    # container.activation_condition.conditions.append(condition)
-                    condition.setOwner(container.activation_condition)
-                    rule = container.activation_condition.rule
-                    input_item = container.parent
-                    item = ConditionTrackerData(mode, input_item, container, condition, rule)
-                    tracker.registerCondition(item)
-                    if isinstance(container, gremlin.base_profile.AbstractAction):
-                        # we need to send the main container, not the action container for the update
-                        self.update_condition_ui(container.parent)
-                    elif isinstance(container, AbstractContainer):
-                        self.update_condition_ui(container)
+        if not conditions:
+            return False
+        container.activation_condition = activation
+        model = activation.conditions
+        tracker = ConditionTracker()
+        model.pushSuspend()
+        try:
+            for condition in conditions:
+                model.add(condition)
+                tracker.registerCondition(ConditionTrackerData(gremlin.shared_state.edit_mode, input_item,
+                                                               container, condition, activation.rule))
+        finally:
+            model.popSuspend()
+        self.update_condition_ui(container.get_container() if isinstance(container, AbstractAction) else container)
+        return True
 
     def update_condition_ui(self, container):
         """asks the container UI to update"""
@@ -11590,13 +11466,16 @@ class ConditionHelper:
         from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 
         clipboard = Clipboard()
-        if isinstance(condition, gremlin.input_item.BaseActivationCondition):
+        if isinstance(condition, ConditionModel):
+            target = getattr(condition, "target", condition.container)
+            condition = target.activation_condition if target is not None else None
+        if isinstance(condition, BaseActivationCondition):
             node = condition.to_xml()
             xml = lxml.etree.tostring(node)
             encoded = ObjectEncoder(condition, xml, "activation-condition", EncoderType.ActivationCondition)
             clipboard.data = encoded
             syslog.info("activation condition copied to clipboard")
-        elif isinstance(condition, AbstractCondition):
+        elif isinstance(condition, (BaseAbstractCondition, AbstractCondition)):
             # regular condition
             node = condition.to_xml()
             xml = lxml.etree.tostring(node)
@@ -11654,7 +11533,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     def _paste_condition(self):
         clipboard = gremlin.clipboard.Clipboard()
         helper = ConditionHelper()
-        helper.paste_condition(self.condition.owner.container, clipboard.data)
+        helper.paste_condition(self.condition.target, clipboard.data)
 
     def handle_remove(self):
         if self._remove_callback:
@@ -11742,13 +11621,13 @@ class ModeConditionWidget(AbstractConditionWidget):
 
 
 class VJoyConditionWidget(AbstractConditionWidget):
-    """Widget allowing the configuration of a vJoy based condition."""
+    """Widget allowing the configuration of a virtual device condition."""
 
     def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
 
         self.input_event = None
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
-        self.setTitle("vJoy Condition")
+        self.setTitle("Virtual Device Condition")
 
         # Initialize UI fully
         self._modify_vjoy(self.vjoy_selector.get_selection())
@@ -11867,6 +11746,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         :param event the input event to process
         """
+        device = gremlin.joystick_handling.getDevice(event.device_guid)
+        if device is None or not device.is_virtual:
+            return
+        self.condition.vjoy_id = gremlin.joystick_handling.virtual_device_key(device)
         self.condition.device_guid = event.device_guid
         self.condition.input_type = event.event_type
         self.condition.input_id = event.identifier
@@ -11910,7 +11793,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         range_layout.addWidget(self.upper_widget)
         range_layout.addStretch()
 
-        input_label = QtWidgets.QLabel(f"<b>vJoy {self.condition.vjoy_id:d} Axis {self.condition.input_id:d}</b>")
+        input_label = QtWidgets.QLabel(f"<b>{self.condition.device_name} Axis {self.condition.input_id:d}</b>")
         input_label.setWordWrap(True)
 
         layout = QtWidgets.QHBoxLayout()
@@ -11933,7 +11816,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.comparison_widget.currentTextChanged.connect(self._comparison_changed_cb)
 
         layout = QtWidgets.QHBoxLayout()
-        layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition.vjoy_id:d} Button {self.condition.input_id:d}</b>"))
+        layout.addWidget(QtWidgets.QLabel(f"<b>{self.condition.device_name} Button {self.condition.input_id:d}</b>"))
         layout.addWidget(QtWidgets.QLabel("is"))
         layout.addWidget(self.comparison_widget)
         layout.addStretch()
@@ -11961,7 +11844,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         layout = QtWidgets.QHBoxLayout()
 
-        layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition.vjoy_id:d} Hat {self.condition.input_id:d}</b>"))
+        layout.addWidget(QtWidgets.QLabel(f"<b>{self.condition.device_name} Hat {self.condition.input_id:d}</b>"))
         layout.addWidget(QtWidgets.QLabel("is"))
         layout.addWidget(self.comparison_widget)
         layout.addStretch()
@@ -11969,6 +11852,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.ui_container_layout.addLayout(layout, 0, 1)
 
     def _modify_vjoy(self, data):
+        if not data or data.get("device_id") is None or data.get("input_id") is None:
+            return
         # fix: 5/29/24 EMCS don't override prior value if already a valid value to prevent a condition reset
         self.condition.vjoy_id = data["device_id"]
         self.condition.input_type = data["input_type"]
@@ -12112,7 +11997,7 @@ class ConditionView(AbstractView):
         self.condition_map = {
             "Keyboard": [BaseKeyboardCondition, KeyboardConditionWidget],
             "Joystick": [BaseJoystickCondition, JoystickConditionWidget],
-            "vJoy": [BaseVJoyCondition, VJoyConditionWidget],
+            "Virtual Device": [BaseVJoyCondition, VJoyConditionWidget],
             "Action": [BaseInputActionCondition, InputActionConditionWidget],
             "State": [BaseStateCondition, StateConditionWidget],
             "Mode": [BaseModeCondition, ModeConditionWidget],
@@ -12211,13 +12096,13 @@ class ConditionView(AbstractView):
     @QtCore.Slot()
     def _copy_condition(self):
         helper = ConditionHelper()
-        helper.copy_condition(self._model)
+        helper.copy_condition(self._container.activation_condition)
 
     @QtCore.Slot()
     def _paste_condition(self):
         clipboard = gremlin.clipboard.Clipboard()
         helper = ConditionHelper()
-        helper.paste_condition(self._model, clipboard.data)
+        helper.paste_condition(self._container, clipboard.data)
 
     @QtCore.Slot()
     def _handle_condition_selector_changed(self, data):

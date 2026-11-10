@@ -184,6 +184,8 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
     def _input_changed(self):
         """called when the input changed"""
         vjoy_data = self.vjoy_selector.get_selection()
+        if not vjoy_data or vjoy_data.get("device_id") is None or vjoy_data.get("input_id") is None:
+            return
         input_type = vjoy_data["input_type"]
         if input_type != self._last_input_type:
             self._last_input_type = input_type
@@ -219,8 +221,8 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
 
             input_name = self.type_to_name_map[input_type].lower()
             input_type = self.name_to_type_map[input_name.capitalize()]
-            if vjoy_dev_id == 0:
-                vjoy_dev_id = sorted(free_inputs.keys())[0]
+            if vjoy_dev_id not in free_inputs:
+                vjoy_dev_id = next(iter(free_inputs), 0)
             if vjoy_dev_id in free_inputs and input_name in free_inputs[vjoy_dev_id]:
                 input_list = free_inputs[vjoy_dev_id][input_name]
             else:
@@ -261,6 +263,8 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
         # Store remap data
         try:
             vjoy_data = self.vjoy_selector.get_selection()
+            if not vjoy_data or vjoy_data.get("device_id") is None or vjoy_data.get("input_id") is None:
+                return
             # input_type_changed = \
             #     self.action_data.input_type != vjoy_data["input_type"]
 
@@ -344,64 +348,54 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.test = False
 
     def process_event(self, event, action_value, extra_data=None):
-        input_type = event.getInputType()
-        if event.is_axis:
-            if event.curve_value is not None:
-                value = event.curve_value
-            else:
-                value = action_value.current
-            if event.is_repeater:
-                value = event.value
-
+        if gremlin.joystick_handling.get_output_target(self.vjoy_id) is None:
+            return True
+        if self.input_type == InputType.JoystickAxis:
+            current = event.curve_value if getattr(event, "curve_value", None) is not None else action_value.current
+            if getattr(event, "is_repeater", False):
+                current = event.value
             if self.axis_mode == "absolute":
-                if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                    joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
+                gremlin.joystick_handling.set_axis(self.vjoy_id, self.vjoy_input_id, float(current))
             else:
-                self.should_stop_thread = abs(event.value) < 0.05
-                self.axis_delta_value = value.current * (self.axis_scaling / 1000.0)
+                self.should_stop_thread = abs(float(current)) < 0.05
+                self.axis_delta_value = float(current) * (self.axis_scaling / 1000.0)
                 self.thread_last_update = time.time()
-                if self.thread_running is False:
+                if not self.thread_running:
                     if isinstance(self.thread, threading.Thread):
                         gremlin.util.safeJoin(self.thread)
-                    self.thread = threading.Thread(target=self.relative_axis_thread, daemon=False)
-                    self.thread.name = "REMAP relative axis"
+                    self.thread = threading.Thread(target=self.relative_axis_thread, daemon=True, name="REMAP relative axis")
                     self.thread.start()
-
-        elif input_type == InputType.JoystickButton:
-            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                if event.event_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed and self.needs_auto_release:
-                    input_devices.CallbackActions().register_button_release((self.vjoy_id, self.vjoy_input_id), event)
-                    joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = event.is_pressed
-
-        elif input_type == InputType.JoystickHat:
-            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = value.current
-
+        elif self.input_type == InputType.JoystickButton:
+            pressed = bool(action_value.current)
+            if pressed and self.needs_auto_release:
+                input_devices.CallbackActions().register_button_release((self.vjoy_id, self.vjoy_input_id), event)
+            gremlin.joystick_handling.set_button(self.vjoy_id, self.vjoy_input_id, pressed)
+        elif self.input_type == InputType.JoystickHat:
+            gremlin.joystick_handling.set_hat(self.vjoy_id, self.vjoy_input_id, action_value.current)
         return True
 
     def relative_axis_thread(self):
-        if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-            self.thread_running = True
-            vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_id]
+        self.thread_running = True
+        try:
+            vjoy_dev = joystick_handling.get_output_device(self.vjoy_id)
+            if vjoy_dev is None:
+                return
             self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
             while self.thread_running:
-                try:
-                    # If the vjoy value has was changed from what we set it to
-                    # in the last iteration, terminate the thread
-                    change = vjoy_dev.axis(self.vjoy_input_id).value - self.axis_value
-                    if abs(change) > 0.0001:
-                        self.thread_running = False
-                        self.should_stop_thread = True
-                        return
-
-                    self.axis_value = max(-1.0, min(1.0, self.axis_value + self.axis_delta_value))
-                    vjoy_dev.axis(self.vjoy_input_id).value = self.axis_value
-
-                    if self.should_stop_thread and self.thread_last_update + 1.0 < time.time():
-                        self.thread_running = False
-                    time.sleep(0.01)
-                except gremlin.error.VJoyError:
-                    self.thread_running = False
+                # Stop if another action has changed this output.
+                change = vjoy_dev.axis(self.vjoy_input_id).value - self.axis_value
+                if abs(change) > 0.0001:
+                    self.should_stop_thread = True
+                    return
+                self.axis_value = max(-1.0, min(1.0, self.axis_value + self.axis_delta_value))
+                vjoy_dev.axis(self.vjoy_input_id).value = self.axis_value
+                if self.should_stop_thread and self.thread_last_update + 1.0 < time.time():
+                    return
+                time.sleep(0.01)
+        except (gremlin.error.VJoyError, gremlin.error.GremlinError, RuntimeError):
+            syslog.debug("Relative virtual axis output became unavailable", exc_info=True)
+        finally:
+            self.thread_running = False
 
 
 class Remap(gremlin.input_item.AbstractAction):
@@ -443,8 +437,7 @@ Use Vjoy Remap instead."""
         # automatically
         self.parent = parent
         self._vjoy_id = 1  # vjoy device #
-        device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
-        self.virtual_device = gremlin.joystick_handling.getDevice(device_guid)
+        self._virtual_device = gremlin.joystick_handling.get_virtual_device(self._vjoy_id)
         self._vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
@@ -510,17 +503,16 @@ Use Vjoy Remap instead."""
         return self._vjoy_id
 
     @vjoy_id.setter
-    def vjoy_id(self, value: int):
-        device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
-        if value != self._vjoy_id:
-            if self._input_type == InputType.JoystickButton:
-                el = gremlin.event_handler.EventListener()
-                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
-                self._vjoy_id = value
-                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, True, self.id)
-            else:
-                self._vjoy_id = value
-        self.virtual_device = gremlin.joystick_handling.getDevice(device_guid)
+    def vjoy_id(self, value):
+        value = gremlin.joystick_handling.parse_virtual_device_key(value)
+        old_device = self.virtual_device
+        if value != self._vjoy_id and self._input_type == InputType.JoystickButton and self._vjoy_input_id:
+            if old_device is not None:
+                self.set_button_used(self._vjoy_input_id, False)
+        self._vjoy_id = value
+        self._virtual_device = gremlin.joystick_handling.get_virtual_device(value)
+        if self._input_type == InputType.JoystickButton and self._vjoy_input_id and self._virtual_device is not None:
+            self.set_button_used(self._vjoy_input_id, True)
 
     @property
     def vjoy_input_id(self) -> int:
@@ -658,7 +650,7 @@ Use Vjoy Remap instead."""
         :param node XML node with which to populate the storage
         """
         try:
-            self._vjoy_id = safe_read(node, "vjoy", int, 1)
+            self.vjoy_id = gremlin.joystick_handling.parse_virtual_device_key(node.get("vjoy", "1"))
 
             if "axis" in node.attrib:
                 self.input_type = InputType.JoystickAxis

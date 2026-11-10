@@ -40,6 +40,7 @@ import gremlin.threading
 
 
 from PySide6 import QtCore
+from shiboken6 import Shiboken
 
 import dinput
 import gremlin.config
@@ -5564,6 +5565,9 @@ class JoystickEventProcessor:
             # nothing to do
             return
 
+        if not isinstance(device_guid, dinput.GUID):
+            device_guid = gremlin.util.to_guid(device_guid)
+
         assert isinstance(callback, Callable), "invalid callback"
 
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
@@ -5581,6 +5585,13 @@ class JoystickEventProcessor:
                 syslog.info("callback already registered for input, skipping")
                 return
         else:
+            owner = getattr(callback, "__self__", None)
+            if isinstance(owner, QtCore.QObject):
+                if not Shiboken.isValid(owner):
+                    return
+                # Qt can delete a parent and its children without calling our
+                # Python teardown helpers. Do not retain their bound callbacks.
+                owner.destroyed.connect(lambda *_args, cb=callback: self.unregisterListenerUICallback(callback=cb))
             self._callback_map[callback] = []
         self._callback_map[callback].append(key)
         if source not in self._listener_callbacks:
@@ -5633,102 +5644,56 @@ class JoystickEventProcessor:
         callback: Callable = None,
         source: EventSourceType = EventSourceType.Any,
     ):
-        """removes a registered callback - if input data is provided only looks for that one - if not provided, removes all inputs associated with the callback
-        :param device_guid: the id of the device
-        :param input_type: the input type
-        :param input_id: the input id, -1 for any of that type
-        :param callback: the handler to call  callback(event)
-        :param source: the source of the event to listen for (dinput, vjoy, midi, osc)
-
-        """
+        """Remove matching UI listeners; the default source removes all providers."""
+        import gremlin.input_item
         assert isinstance(callback, Callable), "invalid callback"
-        if __debug__:
-            if input_type is not None:
-                assert isinstance(input_type, InputType), "invalid input type"
-
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
-
-        input_id_key = gremlin.input_item.getInputIdKey(input_id)
-
-        if device_guid is not None:
-            if not isinstance(device_guid, dinput.GUID):
-                device_guid = gremlin.util.to_guid(device_guid)
-            assert isinstance(device_guid, dinput.GUID), "invalid device guid"
-
-        if callback in self._callback_map and self._callback_map[callback]:
-            for l_source in self._listener_callbacks:
-                if l_source != source and l_source != EventSourceType.Any:
-                    continue
-                for l_mode in self._listener_callbacks[source]:
-                    for l_device_guid in self._listener_callbacks[source][l_mode]:
-                        for l_input_type in self._listener_callbacks[source][l_mode][l_device_guid]:
-                            for l_input_id in self._listener_callbacks[source][l_mode][l_device_guid][l_input_type]:
-                                if callback in self._listener_callbacks[source][l_mode][l_device_guid][l_input_type][l_input_id]:
-                                    if device_guid is not None and input_type is not None and input_id_key is not None:
-                                        if not (l_device_guid == device_guid and l_input_type == input_type and l_input_id == input_id_key):
-                                            continue
-
-                                    self._listener_callbacks[source][l_mode][l_device_guid][l_input_type][l_input_id].remove(callback)
-                                    for mode in (l_mode, CallbackMode.All):
-                                        key = (source, mode, l_device_guid, l_input_type, l_input_id)
-                                        if key in self._callback_map[callback]:
-                                            self._callback_map[callback].remove(key)
-
-                                    if verbose:
-                                        syslog.info(
-                                            f"JEP: remove listener: source: [{source.name}] callback: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]"
-                                        )
-                                        obj = callback.__self__
-                                        if hasattr(obj, "_description"):
-                                            syslog.info(f"\t{obj._description}")
-
-            if not self._callback_map[callback]:
-                del self._callback_map[callback]
+        input_id_key = gremlin.input_item.getInputIdKey(input_id) if input_id is not None else None
+        if device_guid is not None and not isinstance(device_guid, dinput.GUID):
+            device_guid = gremlin.util.to_guid(device_guid)
+        for key in tuple(self._callback_map.get(callback, ())):
+            registered_source, mode, guid, kind, identifier = key
+            if source != EventSourceType.Any and registered_source not in (source, EventSourceType.Any):
+                continue
+            if device_guid is not None and guid != device_guid:
+                continue
+            if input_type is not None and kind != input_type:
+                continue
+            if input_id_key is not None and identifier != input_id_key:
+                continue
+            modes = (CallbackMode.Edit, CallbackMode.Run) if mode == CallbackMode.All else (mode,)
+            for registered_mode in modes:
+                callbacks = self._listener_callbacks.get(registered_source, {}).get(registered_mode, {}).get(guid, {}).get(kind, {}).get(identifier, [])
+                if callback in callbacks:
+                    callbacks.remove(callback)
+            self._callback_map[callback].remove(key)
+        if callback in self._callback_map and not self._callback_map[callback]:
+            del self._callback_map[callback]
 
     def _fireCallbacks(self, event: Event):
         """first all the callbacks on the UI thread"""
         gremlin.util.InvokeUiMethod(self._fireCallbacks_ui, event)
 
     def _fireCallbacks_ui(self, event: Event):
-        """fires all the registered callbacks (ui thread)"""
+        """Dispatch matching sources and wildcard listeners once on the UI thread."""
         gremlin.util.assert_ui_thread()
-
         device_guid = event.device_guid
         input_type = event.getInputType()
-        input_id = event.identifier
-        input_id_key = gremlin.input_item.getInputIdKey(input_id)
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_events or config.verbose_mode_ui_level(3)
+        input_id_key = gremlin.input_item.getInputIdKey(event.identifier)
         mode = CallbackMode.Run if gremlin.shared_state.is_running else CallbackMode.Edit
-        source = event.source
-
-        if verbose:
-            if hasattr(input_id, "message_key"):
-                key = input_id.message_key
-            else:
-                key = input_id
-            syslog.info(f"JEP: fire callbacks: event: {str(event)} input_type: [{input_type}] input_id: [{input_id}] key: [{key}] source: [{source}]")
-
-        if source in self._listener_callbacks:
-            if mode in self._listener_callbacks[source]:
-                if device_guid in self._listener_callbacks[source][mode]:
-                    if input_type in self._listener_callbacks[source][mode][device_guid]:
-                        source_callbacks = self._listener_callbacks[source][mode][device_guid][input_type]
-                        if -1 in source_callbacks:
-                            for callback in source_callbacks[-1]:
-                                if verbose:
-                                    syslog.info(
-                                        f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}"
-                                    )
-                                callback(event)
-
-                        if input_id_key in source_callbacks:
-                            for callback in source_callbacks[input_id_key]:
-                                if verbose:
-                                    syslog.info(
-                                        f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}"
-                                    )
-                                callback(event)
+        sources = (event.source,) if event.source == EventSourceType.Any else (event.source, EventSourceType.Any)
+        callbacks = {}
+        for source in sources:
+            registered = self._listener_callbacks.get(source, {}).get(mode, {}).get(device_guid, {}).get(input_type, {})
+            for identifier in (-1, input_id_key):
+                for callback in tuple(registered.get(identifier, ())):
+                    callbacks[callback] = None
+        for callback in callbacks:
+            if callback in self._callback_map:
+                owner = getattr(callback, "__self__", None)
+                if isinstance(owner, QtCore.QObject) and not Shiboken.isValid(owner):
+                    self.unregisterListenerUICallback(callback=callback)
+                    continue
+                callback(event)
 
     @QtCore.Slot(Event)
     def process_event_ui(self, event: Event):

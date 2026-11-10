@@ -167,6 +167,13 @@ class VJoyProxy:
         :param key id of the vjoy device
         :return the corresponding vjoy device
         """
+        # Legacy scripts keep numeric vJoy IDs; GUIDs can target either backend.
+        vid = parse_virtual_device_key(vid)
+        if not isinstance(vid, int):
+            device = get_output_device(vid)
+            if device is None:
+                raise error.GremlinError(f"Virtual output device is unavailable: {vid}")
+            return device
         # device IDs are 1 min to 16 max
         assert vid > 0 and vid < 17, f"Invalid VJOY device ID provided: {vid}"
         # don't lock on read, only lock on write
@@ -337,6 +344,9 @@ def is_vjoy_device(device_guid) -> bool:
 def is_vjoy_connected(vjoy_id: int) -> bool:
     """true if the vjoy device is connected"""
     global _vjoy_devices_map
+    vjoy_id = parse_virtual_device_key(vjoy_id)
+    if not isinstance(vjoy_id, int):
+        return get_output_target(vjoy_id) is not None
     return vjoy_id in _vjoy_devices_map
 
 
@@ -433,6 +443,35 @@ def configure_failover(vjoy_map : dict):
 def virtual_devices(connected_only=True) -> list:
     """gets the list of all virtual devices with a connection filter"""
     return vjoy_devices(connected_only=connected_only) + maestro_devices(connected_only=connected_only)
+
+
+def parse_virtual_device_key(value):
+    """Keep legacy vJoy indices numeric and virtual device GUIDs as strings."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    try:
+        return int(text) # @IgnoreException
+    except (TypeError, ValueError):
+        return text
+
+
+def virtual_device_key(device):
+    """Serializable output identifier without collisions between providers."""
+    return device.vjoy_id if device.device_type == DeviceType.VJoy else str(device.device_guid)
+
+
+def get_virtual_device(key):
+    """Resolve a legacy index or GUID, including configured offline targets."""
+    key = parse_virtual_device_key(key)
+    if isinstance(key, int):
+        return next((device for device in vjoy_devices(connected_only=False) if device.vjoy_id == key), None)
+    if key is None:
+        return None
+    device = getDevice(key, show_error=False)
+    return device if device is not None and device.is_virtual else None
 
 
 def scale_to_range(value, source_min=-1.0, source_max=1.0, target_min=-1.0, target_max=1.0, invert=False):
@@ -752,6 +791,15 @@ def get_output_target(key) -> OutputTarget | None:
     return target
 
 
+def get_output_device(key):
+    """Get axis/button/hat access through the configured output backend."""
+    key = parse_virtual_device_key(key)
+    target = get_output_target(key)
+    if target is None:
+        return None
+    return target.maestro if target.kind == "maestro" else VJoyProxy()[target.out_id]
+
+
 def resolve_output_targets():
     """rebuilds the virtual device output failover cache - called at profile start and whenever devices change"""
     _output_targets.clear()
@@ -815,7 +863,9 @@ def set_axis(device_guid, index: int, value: float, update_remote: bool = False)
             syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
         return
 
-    if 0 < index <= device.axis_count:
+    axis_ids = getattr(device, "axis_id_map", None)
+    valid_axis = index in axis_ids if axis_ids else 0 < index <= device.axis_count
+    if valid_axis:
         if target.kind == "maestro":
             target.maestro.axis(index).value = value
         else:
@@ -875,13 +925,15 @@ def select_first_valid_vjoy_input(valid_types):
     dict
         Dictionary containing the information about the selected vJoy input
     """
-    for dev in vjoy_devices():
+    for dev in virtual_devices():
+        if dev.disabled:
+            continue
         if InputType.JoystickAxis in valid_types and dev.axis_count > 0:
-            return {"device_id": dev.vjoy_id, "input_type": InputType.JoystickAxis, "input_id": dev.axismap_list[0].axis_index}
+            return {"device_id": virtual_device_key(dev), "input_type": InputType.JoystickAxis, "input_id": dev.axis_sequence_to_input_id(0)}
         elif InputType.JoystickButton in valid_types and dev.button_count > 0:
-            return {"device_id": dev.vjoy_id, "input_type": InputType.JoystickButton, "input_id": 1}
+            return {"device_id": virtual_device_key(dev), "input_type": InputType.JoystickButton, "input_id": 1}
         elif InputType.JoystickHat in valid_types and dev.hat_count > 0:
-            return {"device_id": dev.vjoy_id, "input_type": InputType.JoystickHat, "input_id": 1}
+            return {"device_id": virtual_device_key(dev), "input_type": InputType.JoystickHat, "input_id": 1}
     return None
 
 
@@ -1162,7 +1214,9 @@ def getVjoyDeviceName(vid:int, axis_count:int, button_count:int, hat_count:int):
 
 def getDeviceFromVjoyId(vid: int) -> DeviceSummary | None:
     """gets the device for the given vjoy id"""
-    assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"
+    vid = parse_virtual_device_key(vid)
+    if not isinstance(vid, int):
+        return get_virtual_device(vid)
     dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)
     if dev:
         return dev
@@ -1178,7 +1232,10 @@ def getVjoyFirstIndex():
 
 def getVjoyDeviceGuid(vid: int):
     """gets the vjoy device by the given vjoy id"""
-    assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"
+    vid = parse_virtual_device_key(vid)
+    if not isinstance(vid, int):
+        device = get_virtual_device(vid)
+        return device.device_guid if device is not None else None
     dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)
     if dev:
         return dev.device_guid
@@ -1193,7 +1250,6 @@ def getVjoyDeviceGuid(vid: int):
 
 def getVjoyDeviceGuidStr(vid: int):
     """gets the vjoy device by the given vjoy id as a string"""
-    assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"
     guid = getVjoyDeviceGuid(vid)
     if guid:
         return str(guid)
@@ -1217,6 +1273,10 @@ def vjoy_info_from_vjoy_id(vjoy_id: int, connected_only=True):  # -> DeviceSumma
     :param connected_only: true to filter by connected vjoys only
     """
 
+    vjoy_id = parse_virtual_device_key(vjoy_id)
+    if not isinstance(vjoy_id, int):
+        device = get_virtual_device(vjoy_id)
+        return device if device is not None and (device.connected or not connected_only) else None
     global _all_vjoy_devices_map, _vjoy_devices_map
     if connected_only:
         if vjoy_id in _vjoy_devices_map:
@@ -2772,21 +2832,14 @@ class VjoyStart:
 
     def _ensure_device(self, device_id):
         import gremlin.event_handler
-
-        if not self._device:
-            if isinstance(device_id, int):
-                # vjoy ID
-                device = getDeviceFromVjoyId(device_id)
-            else:
-                device = getDevice(device_id)
-            if device:
-                self._device = device
-                self._connected = self._device.connected
-                self._vjoy_id = self._device.vjoy_id
-                if self._connected:
-                    # trap profile started event
-                    el = gremlin.event_handler.EventListener()
-                    el.profile_started.connect(self.apply)
+        self._device = get_virtual_device(device_id)
+        if self._device is None:
+            return
+        self._vjoy_id = virtual_device_key(self._device)
+        if not self._connected:
+            el = gremlin.event_handler.EventListener()
+            el.profile_started.connect(self.apply)
+            self._connected = True
 
     def setStartValue(self, device_id, id: int, value: float):
         """registers an axis start value"""
@@ -2822,29 +2875,22 @@ class VjoyStart:
         self._button_data = {}
 
     def apply(self):
-        """applies the startup data"""
-        import gremlin.input_devices
-
-        if not self._device:
-            return
-
+        import gremlin.remote
         remote_client = gremlin.remote.remote_client
-        for vjoy_id in self._axis_data:
-            device_guid = getVjoyDeviceGuidStr(vjoy_id)
-            for id in self._axis_data[vjoy_id]:
-                value = self._axis_data[vjoy_id][id]
+        for key, axes in self._axis_data.items():
+            device = get_virtual_device(key)
+            for axis_id, value in axes.items():
                 if value is not None:
-                    set_axis(device_guid, id, value)
-                    remote_client.send_axis(vjoy_id, id, value)
-
-        for vjoy_id in self._button_data:
-            device_guid = getVjoyDeviceGuid(vjoy_id)
-            for id in self._button_data[vjoy_id]:
-                state = self._button_data[vjoy_id][id]
-                if state is None:
-                    state = False
-                set_button(device_guid, id, state)
-                remote_client.send_button(vjoy_id, id, state)
+                    set_axis(key, axis_id, value)
+                    if device is not None:
+                        remote_client.send_axis(device.virtual_id, axis_id, value)
+        for key, buttons in self._button_data.items():
+            device = get_virtual_device(key)
+            for button_id, state in buttons.items():
+                state = bool(state)
+                set_button(key, button_id, state)
+                if device is not None:
+                    remote_client.send_button(device.virtual_id, button_id, state)
 
 
 # instance

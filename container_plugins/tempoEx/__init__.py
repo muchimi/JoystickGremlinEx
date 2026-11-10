@@ -328,7 +328,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """called when a paste occurs"""
         syslog.info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         action_item.data = "short"
         self.container.short_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
@@ -355,7 +357,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """called when a paste occurs"""
         syslog.info("Paste long action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         action_item.data = "long"
         self.container.long_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
@@ -385,7 +389,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """called when a paste occurs"""
         syslog.info("Paste double action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         action_item.data = "double"
         self.container.double_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()

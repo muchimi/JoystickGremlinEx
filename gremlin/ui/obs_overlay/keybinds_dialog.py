@@ -23,6 +23,7 @@ from gremlin.input_types import InputType
 from gremlin.ui.ui_common import Buttons, QDataComboBox, QDataPushButton
 
 from .bindings import (
+    overlay_virtual_key,
     overlay_device_label,
     overlay_physical_devices,
     overlay_vjoy_devices,
@@ -175,7 +176,7 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
         source_group = _enum_radios(
             [
                 ("Physical", "physical"),
-                ("vJoy", "vjoy"),
+                ("Virtual Device", "vjoy"),
                 ("Keyboard/mouse", "keyboard"),
             ],
             source,
@@ -205,14 +206,14 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             device_box.addItem("(none)", 0 if source == "vjoy" else "")
             if source == "vjoy":
                 for dev in overlay_vjoy_devices("button"):
-                    device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
-                current = int(binding.get("vjoy_id") or 0)
+                    device_box.addItem(overlay_device_label(dev), gremlin.joystick_handling.virtual_device_key(dev))
+                current = overlay_virtual_key(binding)
                 selected = 0
                 for i in range(device_box.count()):
-                    if int(device_box.itemData(i) or 0) == current and current > 0:
+                    if overlay_virtual_key(device_box.itemData(i) or 0) == current and bool(current):
                         selected = i
                         break
-                if selected == 0 and current > 0:
+                if selected == 0 and bool(current):
                     missing = binding.get("device_name") or f"vJoy {current}"
                     device_box.addItem(f"{missing} (missing)", current)
                     selected = device_box.count() - 1
@@ -238,10 +239,10 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
                     return
                 if source == "vjoy":
                     try:
-                        vjoy_id = int(device_box.currentData() or 0)
+                        vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
                     except (TypeError, ValueError):
                         vjoy_id = 0
-                    if vjoy_id <= 0:
+                    if not vjoy_id:
                         self._save(
                             rebuild=True,
                             device_guid="",
@@ -294,10 +295,10 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             device = None
             if source == "vjoy":
                 try:
-                    vjoy_id = int(device_box.currentData() or 0)
+                    vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
                 except (TypeError, ValueError):
                     vjoy_id = 0
-                if vjoy_id > 0:
+                if bool(vjoy_id):
                     device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
             else:
                 guid = str(device_box.currentData() or "").strip()

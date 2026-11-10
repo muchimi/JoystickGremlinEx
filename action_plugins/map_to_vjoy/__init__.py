@@ -5037,9 +5037,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             input_name = self.type_to_name_map[input_type].lower()
             input_type = self.name_to_type_map[input_name.capitalize()]
-            if vjoy_dev_id == 0:
-                vjoy_dev_id = sorted(free_inputs.keys())[0]
-            input_list = free_inputs[vjoy_dev_id][input_name]
+            device = self.action_data.virtual_device
+            output_key = gremlin.joystick_handling.virtual_device_key(device) if device is not None else vjoy_dev_id
+            if output_key not in free_inputs:
+                output_key = next(iter(free_inputs), None)
+            input_list = free_inputs.get(output_key, {}).get(input_name, [])
             # If we have an unused item use it, otherwise use the first one
             if len(input_list) > 0:
                 _vjoy_input_id = input_list[0]
@@ -8967,21 +8969,19 @@ Supports axis merging, curved output, command, hat and button mappings.
                             self.vjoy_hat_id = 1
 
             else:
-                vjoy_id = safe_read(node, "vjoy", int, 1)
-
-                if vjoy_id not in self.virtual_device_map[DeviceType.VJoy]:
-                    self.refresh_virtual_inputs()  # ensure we have the latest device list
-
-                if vjoy_id not in self.virtual_device_map[DeviceType.VJoy]:
-                    syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
+                output_key = gremlin.joystick_handling.parse_virtual_device_key(node.get("vjoy", "1"))
+                device = gremlin.joystick_handling.get_virtual_device(output_key)
+                if device is None:
+                    self.refresh_virtual_inputs()
+                    device = gremlin.joystick_handling.get_virtual_device(output_key)
+                if device is None:
+                    syslog.error(f"Profile load: virtual device {output_key} was not found")
                     self.vjoy_axis_id = 1
                     self.vjoy_button_id = 1
                     self.vjoy_hat_id = 1
                     return
 
-                device = self.virtual_device_map[DeviceType.VJoy].get(vjoy_id, None)
-                if device:
-                    self.virtual_device = device
+                self.virtual_device = device
 
             if "mode" in node.attrib:
                 value = node.attrib["mode"]

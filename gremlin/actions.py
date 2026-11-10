@@ -477,11 +477,9 @@ class VJoyCondition(AbstractCondition):
         super().__init__(condition.comparison, container_condition, target=target)
 
         self.vjoy_id = condition.vjoy_id
-        self.device_guid = None
-        for dev in gremlin.joystick_handling.virtual_devices():
-            if dev.vjoy_id == self.vjoy_id:
-                self.device_guid = dev.device_guid
-                break
+        device = gremlin.joystick_handling.get_virtual_device(self.vjoy_id)
+        self.device_guid = device.device_guid if device is not None else None
+        self._maestro_output = device is not None and device.device_type == gremlin.types.DeviceType.Maestro
         self.input_type = condition.input_type
         self.input_id = condition.input_id
         self.input_index = condition.input_index if hasattr(condition, "input_index") else 0
@@ -510,7 +508,8 @@ class VJoyCondition(AbstractCondition):
         if self.device_guid is None:
             syslog.warning(f"VJoyCondition: GUID for vJoy {self.vjoy_id} not found")
             return False
-        joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
+        joy = (gremlin.joystick_handling.get_output_device(self.vjoy_id) if self._maestro_output
+               else gremlin.input_devices.JoystickProxy()[self.device_guid])
         if joy is None:
             # device not found - ignore
             if verbose:
@@ -538,7 +537,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickButton:
-            is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+            is_pressed = joy.button(self.input_id).is_pressed if self._maestro_output else gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if not event.is_pressed and not is_pressed and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -564,7 +563,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickHat:
-            direction = gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)
+            direction = joy.hat(self.input_id).direction if self._maestro_output else gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)
             if not event.is_pressed and direction == (0, 0) and self.ignore_release:
                 # succeed on release
                 if verbose:

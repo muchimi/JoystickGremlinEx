@@ -51,6 +51,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T97)
+- Change: API: Startup sequence modified to probe virtual device options.  If VJOY is installed, Maestro will not be queried by default.  If VJOY is not installed, GEX will actively look for the bridge and issue a warning if the bridge is not located.  If located, it will test connectivity and automatically enable Maestro devices.
+- Change: (setup): The installer will run a connectivity probe against the bridge service and also check for installed versions as part of the GEX installation.
+- Change: API: additional pass on all vjoy output paths to ensure they support Maestro devices (this touches on Overlay, AFCS, Split Axis, Merge Axis, Remap, Macro, etc...)
+- Fix: (setup): The installer will run GEX using a shell prompt to display any UAC warnings that come up if "run GremlinEx" is selected when installation completes.
+- Fix: API (Maestro): default to localhost mode if Maestro is not found at first check.
+- Fix: UI (Maestro): reply port not visible in localhost mode.
+- Fix: API: various fixes to entity paste operations (container, action or condition) linked to new data models in m77
+- Fix: UI (Input Viewer): does not update Maestro virtual device repeaters.
+- Fix: UI: additional work on teardown of UI elements to prevent QT memory desync.
+
+
 ### (m77T96)
 - Change: UI: add virtual failover indicator on the UI to indicate when failover mode is active on Vjoy Remap, legacy Remap and Profile Settings page.
 - Change: API: added support for both VJOY and Maestro defined joysticks as input (virtual joysticks will not display as input device unless configured in profile settings).

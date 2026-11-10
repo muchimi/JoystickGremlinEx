@@ -45,7 +45,7 @@ UsePreviousTasks=no
 UninstallDisplayName={#AppName} {#AppVersion}
 [Tasks]
 Name: "hidhide"; Description: "Download and install HidHide (hide physical controllers from games)"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: NeedsHidHide
-Name: "maestrobridge"; Description: "Install GEX Maestro Bridge for HIDMaestro virtual controllers (vJoy is absent)"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: NeedsMaestroBridge
+Name: "maestrobridge"; Description: "{code:MaestroBridgeDescription}"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: ShowMaestroBridge
 [Files]
 Source: "dependencies.ps1"; Flags: dontcopy
 #ifdef BundledBuild
@@ -55,10 +55,12 @@ Source: "release.ps1"; Flags: dontcopy
 Source: "ffmpeg.ps1"; Flags: dontcopy
 #endif
 [Run]
+; Use the shell so Windows can display any required elevation/security prompt.
+; Show the main window on this launch even if the user normally starts in the tray.
 #ifdef BundledBuild
-Filename: "{app}\gremlinEx.exe"; WorkingDir: "{app}"; Description: "Run GremlinEx"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\gremlinEx.exe"; Parameters: "/no-min"; WorkingDir: "{app}"; Description: "Run GremlinEx"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser
 #else
-Filename: "{app}\gremlinEx.exe"; WorkingDir: "{app}"; Description: "Run GremlinEx"; Flags: postinstall nowait skipifsilent runasoriginaluser; Check: IsManaged
+Filename: "{app}\gremlinEx.exe"; Parameters: "/no-min"; WorkingDir: "{app}"; Description: "Run GremlinEx"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser; Check: IsManaged
 #endif
 Filename: "{#DocumentationUrl}"; Description: "Open GremlinEx documentation"; Flags: postinstall shellexec skipifsilent unchecked
 [Icons]

@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
     QStylePainter,
     QStyleOptionTabBarBase,
     QStyle,
+    
 )
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
@@ -4014,13 +4015,8 @@ class AbstractInputSelector(QWidget):
             device_id = self._device_id_registry[device_index]
             input_index = self.input_item_dropdowns[device_index].currentIndex()
 
-            if input_index == -1:
-                input_index = 0
-                _input_value = self.input_item_dropdowns[device_index].itemText(input_index)
-            else:
-                _input_value = self.input_item_dropdowns[device_index].currentText()
-
-            input_type, input_id = self.input_item_dropdowns[device_index].itemData(input_index)
+            if input_index >= 0:
+                input_type, input_id = self.input_item_dropdowns[device_index].itemData(input_index)
 
         return {"device_id": device_id, "input_id": input_id, "input_type": input_type}
 
@@ -4029,16 +4025,24 @@ class AbstractInputSelector(QWidget):
         if isinstance(device_id, int):
             # vjoy device provided as the device number
             device = gremlin.joystick_handling.getDeviceFromVjoyId(device_id)
-        elif isinstance(device_id, str):
+        elif device_id is not None:
             device = gremlin.joystick_handling.getDevice(device_id)
 
         if not device:
+            with QtCore.QSignalBlocker(self.device_dropdown):
+                self.device_dropdown.setCurrentIndex(-1)
+            for dropdown in self.input_item_dropdowns:
+                dropdown.setVisible(False)
             return
         device_guid = device.device_guid
 
         # Get the index of the combo box associated with this device
         dev_id = self.device_dropdown.findData(device_guid)
         if dev_id == -1:
+            with QtCore.QSignalBlocker(self.device_dropdown):
+                self.device_dropdown.setCurrentIndex(-1)
+            for dropdown in self.input_item_dropdowns:
+                dropdown.setVisible(False)
             syslog.error(
                 f"INPUT SELECTOR: device not found in dropdown: derived id: [{device_guid}] input id: [{device_id}]"
             )
@@ -4078,13 +4082,16 @@ class AbstractInputSelector(QWidget):
                 entry.setCurrentIndex(entry_id)
 
         if emit:
-            self.input_changed.emit(self.get_selection())
+            self.input_changed.emit()
 
     def _update_device(self, index):
 
         for entry in self.input_item_dropdowns:
             with QtCore.QSignalBlocker(entry):
                 entry.setVisible(False)
+
+        if index < 0 or index >= len(self.input_item_dropdowns):
+            return
 
         # Show correct dropdown
         entry = self.input_item_dropdowns[index]
@@ -4256,20 +4263,16 @@ class JoystickSelector(AbstractInputSelector):
 
 
 class VJoySelector(AbstractInputSelector):
-    """Widget allowing the selection of vJoy inputs."""
+    """Virtual output selector preserving numeric IDs for legacy vJoy callers."""
 
     def __init__(self, change_cb, valid_types, invalid_ids: list = None, parent=None, show_connected_only=True):
-        """Creates a widget to select a vJoy output.
-
-
+        """Creates a widget to select a virtual joystick output.
 
         :param change_cb callback to execute when the widget changes
         :param valid_types the input type to present in the selection
         :param invalid_ids list of vid values of vjoy devices to not consider
-        :param show_connected_only: if True, only connected vJoy devices are shown.
-            If False, only vJoy devices configured as input are shown.
         :param parent of this widget
-        :param show_connected_only: if True, only connected vJoy devices are shown.
+        :param show_connected_only: if True, connected virtual outputs are shown.
             If False, only vJoy devices configured as input are shown.
         """
 
@@ -4281,7 +4284,7 @@ class VJoySelector(AbstractInputSelector):
     def _initialize(self):
         if self.show_connected_only:
             potential_devices = sorted(
-                gremlin.joystick_handling.vjoy_devices(connected_only=True), key=lambda x: x.vjoy_id
+                gremlin.joystick_handling.virtual_devices(connected_only=True), key=lambda x: (x.name, str(x.device_guid))
             )
         else:
             profile = gremlin.shared_state.current_profile
@@ -4295,6 +4298,8 @@ class VJoySelector(AbstractInputSelector):
             ]
 
         for dev in potential_devices:
+            if dev.disabled:
+                continue
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,
                 InputType.JoystickButton: dev.button_count,
@@ -4306,16 +4311,53 @@ class VJoySelector(AbstractInputSelector):
                 if input_counts.get(valid_type, 0) > 0:
                     has_inputs = True
 
-            if not (self.invalid_ids and dev.vjoy_id in self.invalid_ids) and has_inputs:
+            excluded = self.invalid_ids and dev.device_type == gremlin.types.DeviceType.VJoy and dev.vjoy_id in self.invalid_ids
+            if self.invalid_ids is not None and dev.device_type == gremlin.types.DeviceType.Maestro:
+                profile = gremlin.shared_state.current_profile
+                if profile is not None:
+                    excluded = profile.settings.getVirtualAsInput(dev.virtual_id, dev.device_type)
+            if not excluded and has_inputs:
                 self.device_list.append(dev)
 
     def _format_device_name(self, device):
         return device.name
-        # return f"{device.name} ({device.vjoy_id:d})"
-        # return f"vJoy Device {device.vjoy_id:d}"
 
     def _device_identifier(self, device):
-        return device.vjoy_id
+        return gremlin.joystick_handling.virtual_device_key(device)
+
+
+class VirtualDeviceSelector(AbstractInputSelector):
+    """Select any registered virtual joystick output by its stable GUID."""
+
+    def __init__(self, change_cb, valid_types, parent=None):
+        super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
+
+    def _initialize(self):
+        devices = gremlin.joystick_handling.virtual_devices(connected_only=False)
+        for device in sorted(devices, key=lambda dev: (dev.name, str(dev.device_guid))):
+            if device.disabled:
+                continue
+            counts = {InputType.JoystickAxis: device.axis_count, InputType.JoystickButton: device.button_count,
+                      InputType.JoystickHat: device.hat_count}
+            if any(counts.get(kind, 0) > 0 for kind in self.valid_types):
+                self.device_list.append(device)
+
+    def _format_device_name(self, device):
+        return device.name if device.connected else f"{device.name} (disconnected)"
+
+    def _device_identifier(self, device):
+        return device.device_guid
+
+    def set_selection(self, input_type, device_id, input_id, emit=False):
+        device = (gremlin.joystick_handling.getDeviceFromVjoyId(device_id) if isinstance(device_id, int)
+                  else gremlin.joystick_handling.getDevice(device_id))
+        if device is None or self.device_dropdown.findData(device.device_guid) == -1:
+            with QtCore.QSignalBlocker(self.device_dropdown):
+                self.device_dropdown.setCurrentIndex(-1)
+            for dropdown in self.input_item_dropdowns:
+                dropdown.setVisible(False)
+            return
+        super().set_selection(input_type, device.device_guid, input_id, emit)
 
 
 class ModeStyle(anytree.AbstractStyle):
@@ -7616,7 +7658,7 @@ class QJoystickListener:
         self._callback: Callable = callback
         self._description = description
         self._connected = False  # tracks connectivity to the event
-        self._event_source = source
+        self._event_source = EventSourceType.Any if source == EventSourceType.notSet else source
 
         if input_item is not None:
             self.setInputItem(input_item, description)
@@ -7657,7 +7699,7 @@ class QJoystickListener:
         self, device_guid: dinput.GUID, input_type: InputType, input_id, description: str = "JoystickListener"
     ):
         """sets hook data based on specific input"""
-        if device_guid != self._device_guid or input_type != self._input_type or self._input_id != self._input_id:
+        if device_guid != self._device_guid or input_type != self._input_type or input_id != self._input_id:
             self._disconnect()
             if device_guid is not None:
                 if not isinstance(device_guid, dinput.GUID):
@@ -7822,10 +7864,9 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         astate = gremlin.event_handler.AxisState()
         data: gremlin.event_handler.AxisData = astate.getAxisData(self._device_guid, self._input_id)
 
-        if data:
-            value = gremlin.joystick_handling.get_axis(self._device_guid, self._input_id)
-            values = data.getAxisValues(value)
-            self._set_value_ui(values)
+        value = gremlin.joystick_handling.get_axis(self._device_guid, self._input_id)
+        values = data.getAxisValues(value) if data else gremlin.event_handler.AxisValues(value)
+        self._set_value_ui(values)
 
         if not self.isVisible():
             self.setVisible(True)
@@ -8084,7 +8125,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         if device.is_virtual:
-            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
+            self.setTitle(f"{device.name} - Axes")
             self._readonly = False
         else:
             self.setTitle(f"{device.name} - Axes")
@@ -8115,14 +8156,16 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 name_index += 1
                 axis_label = QtWidgets.QLabel(f"Axis {device.getAxisName(input_id)}")
                 self.index_map[linear_id] = input_id
-                values = sd.getAxisValues(device.device_guid, input_id)
+                values = (gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(device.device_guid, input_id))
+                          if device.is_virtual else sd.getAxisValues(device.device_guid, input_id))
                 if values is None:
                     syslog.error(f"AxisCurrentState: unregistered axis {device.getAxisName(input_id)}")
                     continue
 
                 # get initial data
                 astate = gremlin.event_handler.AxisState()
-                values = astate.getAxisValues(device.device_guid, input_id)
+                if not device.is_virtual:
+                    values = astate.getAxisValues(device.device_guid, input_id)
 
                 axis_widget = QProgressBar(data=input_id, value=values, orientation=QtCore.Qt.Orientation.Vertical)
 
@@ -8130,9 +8173,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 #     syslog.info(f"AxisCurrentState: virtual device {device.name} axis {device.getAxisName(input_id)} value: {str(values)}")
 
                 # hook the input both runtime and design time
-                source = (
-                    EventSourceType.Virtual if device.is_virtual else EventSourceType.Any
-                )  # event comes from virtual device or directinput device
+                source = EventSourceType.Any
                 jep.registerListenerUICallback(
                     device_guid=device.device_guid,
                     input_type=InputType.JoystickAxis,
@@ -8153,6 +8194,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
 
                 # value = gremlin.joystick_handling.get_axis(device.device_guid, index)
                 value_widget = QFloatLineEdit(data=input_id)
+                value_widget.setValue(value, emit=False)
                 if self.device.is_virtual:
                     value_widget.setReadOnly(self._readonly)
                     if not self._readonly:
@@ -8219,41 +8261,17 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         gremlin.util.clear_layout(self.main_layout)
 
     def process_event_ui(self, event):
-        """handles updates on UI thread"""
+        """Refresh the bar, numeric value and percentage without writing back."""
         assert gremlin.util.is_ui_thread()
-        assert event.is_axis, "handler should not be called if the event is not an axis event"
-        assert event.device_guid == self.device.device_guid, (
-            "handler should not be called if the event is not for this device"
-        )
-        astate = gremlin.event_handler.AxisState()
-        input_id = event.identifier
-        if event.source == EventSourceType.Virtual:
-            value = event.value
-            if input_id in self.axis_widgets:
-                current = self.axis_widgets[input_id].value()
-                if self.axis_widgets[input_id]._normalize_value_key(current) == self.axis_widgets[
-                    input_id
-                ]._normalize_value_key(value):
-                    return
-                self.axis_widgets[input_id].setValue(value)
-            if input_id in self.value_label_widgets:
-                current = self.value_label_widgets[input_id].value()
-                if current == value:
-                    return
-                self.value_label_widgets[input_id].setValue(value)
+        assert event.is_axis, "axis event required"
+        if event.device_guid != self.device.device_guid or event.identifier not in self.axis_widgets:
+            return
+        if self.device.is_virtual or event.source == EventSourceType.Virtual:
+            values = gremlin.event_handler.AxisValues(event.value)
         else:
-            values = astate.getAxisValues(event.device_guid, input_id, event.value)
-            if values is not None:
-                if input_id in self.axis_widgets:
-                    current = self.axis_widgets[input_id].value()
-                    if _normalize_axis_value_key(current) == _normalize_axis_value_key(values):
-                        return
-                    self.axis_widgets[input_id].setValue(values)
-                if input_id in self.value_label_widgets:
-                    current = self.value_label_widgets[input_id].value()
-                    if current == values.actual:
-                        return
-                    self.value_label_widgets[input_id].setValue(values.actual)
+            values = gremlin.event_handler.AxisState().getAxisValues(event.device_guid, event.identifier, event.value)
+        if values is not None:
+            self._set_value(event.identifier, values)
 
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
         """called by axis handler when axis value changes"""
@@ -8300,23 +8318,16 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
             finally:
                 self._manual_lock = False
 
-    def _set_value(self, axis_id: int, value: float | list):
-        if not Shiboken.isValid(self):
+    def _set_value(self, axis_id: int, value):
+        if not Shiboken.isValid(self) or axis_id not in self.axis_widgets:
             return
-        if axis_id not in self.axis_widgets:
-            syslog.error(f"AXIS STATE: set value {value:0.3f} for axis {axis_id} - axis not found")
-            return
-
-        self.axis_widgets[axis_id].setValue(value)
-        widget = self.value_label_widgets[axis_id]
-
-        if hasattr(value, "__iter__"):
-            value = value[0]
-        if hasattr(widget, "setValue"):
-            widget.setValue(value, emit=False)
-        else:
-            widget.setText(f"{value:+0.3f}")
-        percent = gremlin.util.scale_to_range(value, target_min=0, target_max=100)
+        actual = value.actual if hasattr(value, "actual") else value[0] if hasattr(value, "__iter__") else value
+        bar = self.axis_widgets[axis_id]
+        editor = self.value_label_widgets[axis_id]
+        with QtCore.QSignalBlocker(bar), QtCore.QSignalBlocker(editor):
+            bar.setValue(value)
+            editor.setValue(actual, emit=False)
+        percent = gremlin.util.scale_to_range(actual, target_min=0, target_max=100)
         self.percent_widgets[axis_id].setText(f"{percent:0.1f} %")
 
 
@@ -8443,6 +8454,8 @@ class HatWidget(QWidget):
         """
         if not Shiboken.isValid(self):
             return
+        if not self._angle_map:
+            self._update_hotspots()
         self.angle = self._angle_map.get(state, -1)
         # syslog.info(f"SetAngle: {state} {self.angle}")
         self.update()
@@ -8521,7 +8534,7 @@ class HatState(QtWidgets.QGroupBox):
         self.device = device
 
         if device.is_virtual:
-            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Hats")
+            self.setTitle(f"{device.name} - Hats")
         else:
             self.setTitle(f"{device.name} - Hats")
 
@@ -8537,6 +8550,7 @@ class HatState(QtWidgets.QGroupBox):
                 # trap interaction by the user
                 hat_widget.clicked.connect(self._hat_clicked)
             self._hat_map[input_id] = hat_widget
+            hat_widget.set_angle(gremlin.joystick_handling.get_hat_position(device.device_guid, input_id))
             hat_layout.addWidget(hat_widget)
 
             jep.registerListenerUICallback(
@@ -8560,7 +8574,7 @@ class HatState(QtWidgets.QGroupBox):
                 callback=self.process_event_ui,
             )
 
-    @QtCore.Slot()
+    @QtCore.Slot(tuple)
     def _hat_clicked(self, direction):
         widget = self.sender()
         input_id = widget.data
@@ -8581,7 +8595,7 @@ class HatState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
-        if event.event_type == InputType.JoystickHat:
+        if event.device_guid == self.device.device_guid and event.event_type == InputType.JoystickHat and event.identifier in self._hat_map:
             self._hat_map[event.identifier].set_angle(event.value)
             self._event_times[event.identifier] = time.time()
 
@@ -8597,10 +8611,8 @@ class AxesTimeline(QtWidgets.QGroupBox):
         """
         super().__init__(parent)
 
-        if device.is_virtual:
-            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
-        else:
-            self.setTitle(f"{device.name} - Axes")
+        self.device = device
+        self.setTitle(f"{device.name} - Axes")
 
         self.setLayout(QtWidgets.QVBoxLayout())
         layout = self.layout()
@@ -8639,7 +8651,8 @@ class AxesTimeline(QtWidgets.QGroupBox):
     def _update_points(self):
         astate = gremlin.event_handler.AxisState()
         for input_id in self.input_id_list:
-            values = astate.getAxisValues(self.device_guid, input_id)
+            values = (gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(self.device_guid, input_id))
+                      if self.device.is_virtual else astate.getAxisValues(self.device_guid, input_id))
             if values is not None:
                 self.add_point(values.actual, input_id)
 
@@ -9077,6 +9090,7 @@ class JoystickDeviceWidget(QWidget):
 
     def _cleanup_ui(self):
         """cleanup"""
+        self.unhook()
         self._button_widget = None
         self._hat_widget = None
         if self._widgets:
@@ -9552,7 +9566,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
         is_disabled = True
         if device.is_virtual:
-            self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
+            self.setTitle(f"{device.name} - Buttons")
             is_disabled = False
 
         else:
@@ -9572,7 +9586,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
         for i in range(device.button_count):
             input_id = i + 1
-            is_used = profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id)
+            is_used = profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id) if profile else False
             is_marked = input_id in used_buttons
             used_device_guid = device.device_guid
 
@@ -9607,6 +9621,8 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             # read the current state
             is_pressed = gremlin.joystick_handling.get_button(device.device_guid, input_id)
             widget.setDown(is_pressed)
+            widget.setChecked(is_pressed)
+            widget._set_highlight_ui(is_pressed)
             self._widget_map[input_id] = widget
 
             self.flow_layout.addWidget(widget)
@@ -9661,19 +9677,23 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         # update the remote clients if needed
         gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote=True)
 
-    def _cleanup_ui(self):
-        """called when widget is being cleaned up"""
+    def unhook(self):
+        """Detach all button listeners before Qt tears down any children."""
         jep = gremlin.event_handler.JoystickEventProcessor()
-        for input_id, widget in self._widget_map.items():
-            jep.unregisterListenerUICallback(
-                device_guid=self._device.device_guid,
-                input_type=InputType.JoystickButton,
-                input_id=input_id,
-                callback=self.process_event_ui,
-            )
-            widget.hide()
-            self.main_layout.removeWidget(widget)
-            gremlin.util.delete_widget(widget)
+        jep.unregisterListenerUICallback(callback=self.process_event_ui)
+
+    def _cleanup_ui(self):
+        """Release listeners and children, including partially destroyed grids."""
+        self.unhook()
+        widgets = tuple(self._widget_map.values())
+        self._widget_map.clear()
+        self._event_times.clear()
+        layout = getattr(self, "main_layout", None)
+        for widget in widgets:
+            if Shiboken.isValid(widget):
+                if layout is not None and Shiboken.isValid(layout):
+                    layout.removeWidget(widget)
+                gremlin.util.delete_widget(widget)
 
     def process_event_ui(self, event):
         """Updates state visualization based on the given event.
@@ -9681,11 +9701,27 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         :param event the event with which to update the state display
         """
         assert gremlin.util.is_ui_thread()
+        if not Shiboken.isValid(self):
+            self.unhook()
+            return
         input_type = event.getInputType()
-        if input_type == InputType.JoystickButton and event.identifier in self._widget_map:
+        if event.device_guid == self._device.device_guid and input_type == InputType.JoystickButton and event.identifier in self._widget_map:
             # is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
             widget = self._widget_map[event.identifier]
+            if not Shiboken.isValid(widget):
+                self._widget_map.pop(event.identifier, None)
+                self._event_times.pop(event.identifier, None)
+                gremlin.event_handler.JoystickEventProcessor().unregisterListenerUICallback(
+                    device_guid=self._device.device_guid,
+                    input_type=InputType.JoystickButton,
+                    input_id=event.identifier,
+                    callback=self.process_event_ui,
+                )
+                return
+            with QtCore.QSignalBlocker(widget):
+                widget.setChecked(state)
+                widget.setDown(state)
             widget._set_highlight_ui(state)
             self._event_times[event.identifier] = time.time()
 

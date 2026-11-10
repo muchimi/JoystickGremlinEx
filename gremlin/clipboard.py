@@ -107,30 +107,26 @@ class Clipboard(QtCore.QObject):
             # see if the file exists
             if os.path.isfile(self._clipboard_file):
                 # load from that
-                read_ok = True
-                with open(self._clipboard_file, "rb") as f:
-                    try:
+                try:
+                    with open(self._clipboard_file, "rb") as f:
                         data = dill.load(f)
-                    except Exception:
-                        data = None
-                        read_ok = False
-                if not read_ok:
-                    os.unlink(self._clipboard_file)
+                except Exception:
+                    data = None
+                    syslog.exception("Unable to read persisted clipboard data")
 
         else:
             try:
                 pickled = self.get_windows_clipboard_text()
                 if pickled:
                     try:
-                        # attempt regular pickle
-                        if pickled[-1] == 61:  # .endswith("="):
-                            data = dill.loads(base64.b64decode(pickled)).encode()
+                        # this will blow up if the data is not pickled data
+                        data = dill.loads(base64.b64decode(pickled, validate=True))  # @IgnoreException
                     except Exception:
-                        # attempt json pickle
-                        try:
-                            data = dill.loads(pickled)
-                        except Exception:
-                            pass
+                        if isinstance(pickled, bytes):
+                            try:
+                                data = dill.loads(pickled)  # @IgnoreException
+                            except Exception:
+                                pass
 
                     # validate the data is something we recognize
             except Exception:
@@ -138,12 +134,7 @@ class Clipboard(QtCore.QObject):
                 self.set_windows_clipboard_text(None)
                 pass
 
-        if (
-            data
-            and isinstance(data, AbstractContainer)
-            or isinstance(data, AbstractAction)
-            or isinstance(data, ObjectEncoder)
-        ):
+        if isinstance(data, (AbstractContainer, AbstractAction, ObjectEncoder)):
             self._data = data
 
     @data.setter
@@ -155,16 +146,12 @@ class Clipboard(QtCore.QObject):
 
             # persist to a temporary file
             if self._persist_to_file:
-                write_ok = True
-                with open(self._clipboard_file, "wb") as f:
-                    try:
+                try:
+                    with open(self._clipboard_file, "wb") as f:
                         dill.dump(value, f)
                         f.flush()
-                    except Exception as error:
-                        write_ok = False
-                        syslog.error(f"Unable to store clipboard data: {error}")
-                if not write_ok and os.path.isfile(self._clipboard_file):
-                    os.unlink(self._clipboard_file)
+                except Exception:
+                    syslog.exception("Unable to store clipboard data")
 
             else:
                 # persist to windows clipboard
@@ -187,9 +174,11 @@ class Clipboard(QtCore.QObject):
             else:
                 # method 2 - use pywin32
                 win32clipboard.OpenClipboard()
-                win32clipboard.EmptyClipboard()
-                win32clipboard.SetClipboardText(value, win32clipboard.CF_TEXT)
-                win32clipboard.CloseClipboard()
+                try:
+                    win32clipboard.EmptyClipboard()
+                    win32clipboard.SetClipboardText(value, win32clipboard.CF_UNICODETEXT)
+                finally:
+                    win32clipboard.CloseClipboard()
 
     def get_windows_clipboard_text(self, use_qt=False) -> str:
         """gets the windows clipboard text"""
@@ -201,18 +190,24 @@ class Clipboard(QtCore.QObject):
             except Exception:
                 return None
         else:
+            opened = False
             try:
                 win32clipboard.OpenClipboard()
-                if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_TEXT):
+                opened = True
+                if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
+                    value = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
+                elif win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_TEXT):
                     value = win32clipboard.GetClipboardData(win32clipboard.CF_TEXT)
                 else:
                     # not text content
                     return None
-                win32clipboard.CloseClipboard()
                 return value
             except Exception:
                 syslog.error("CLIPBOARD: failed to get text")
                 return None
+            finally:
+                if opened:
+                    win32clipboard.CloseClipboard()
 
     @property
     def enabled(self):
@@ -264,4 +259,9 @@ class Clipboard(QtCore.QObject):
     @property
     def is_valid(self):
         """true if cliboard data is valid"""
-        return self.data is not None and self.is_action or self.is_container
+        data = self.data
+        return data is not None and (
+            self.is_action
+            or self.is_container
+            or (isinstance(data, ObjectEncoder) and data.encoder_type in (EncoderType.Condition, EncoderType.ActivationCondition))
+        )

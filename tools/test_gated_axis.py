@@ -10,6 +10,7 @@ import math
 import sys
 import threading
 from types import SimpleNamespace as NS
+from typing import Callable
 import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -579,6 +580,98 @@ class GateWidgetTests(unittest.TestCase):
         widget._option_display_events = False
         widget.deleteGate(widget.gate_data.getGates()[1])
         self.assert_consistent(widget, 3)
+
+
+class GateConditionEditorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        namespace = dict(UI, Qt=QtCore.Qt, Callable=Callable)
+        load("gremlin/ui/ui_common.py", {"QDataLineEdit"}, namespace)
+        source = definitions("gremlin/gated_handler.py", {"GateConditionEditorDialog"})[0]
+        source.bases = [ast.parse("QtWidgets.QDialog", mode="eval").body]
+        source.body = [node for node in source.body if getattr(node, "name", None) in {
+            "unhook", "closeEvent", "_range_description_changed", "_gate_description_changed",
+        }]
+        future = ast.parse("from __future__ import annotations").body
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[*future, source], type_ignores=[])),
+                     "gremlin/gated_handler.py", "exec"), namespace)
+        cls.Editor = namespace["GateConditionEditorDialog"]
+        cls.LineEdit = namespace["QDataLineEdit"]
+
+    def setUp(self):
+        self.editors = []
+        self.errors = []
+        self.exception_hook = patch.object(sys, "excepthook", lambda *args: self.errors.append(args[1]))
+        self.exception_hook.start()
+
+    def tearDown(self):
+        for editor in self.editors:
+            editor.unhook()
+            Shiboken.delete(editor)
+        flush_deletes()
+        self.exception_hook.stop()
+        self.assertEqual(self.errors, [])
+
+    def editor(self, is_range):
+        editor = self.Editor()
+        editor.main_layout = QtWidgets.QVBoxLayout(editor)
+        editor._is_range = is_range
+        info = NS(description="saved description")
+        editor._range_info = info if is_range else None
+        editor._gate_info = None if is_range else info
+        editor._hooked = True
+        editor._condition_pages = {}
+        editor._gate_data = Mock()
+        editor._trigger_handler = Mock()
+        editor._input_value_changed_handler = Mock()
+        editor._id = str(uuid4())
+        editor._cache = Mock()
+        field = "range" if is_range else "gate"
+        edit = self.LineEdit(text=info.description, parent=editor)
+        setattr(editor, f"{field}_description_widget", edit)
+        edit.textChanged.connect(getattr(editor, f"_{field}_description_changed"))
+        editor.main_layout.addWidget(edit)
+        self.editors.append(editor)
+        return editor, info, edit
+
+    def test_pending_description_is_saved_when_unhooked(self):
+        for is_range in (False, True):
+            with self.subTest(is_range=is_range):
+                editor, info, edit = self.editor(is_range)
+                with QtCore.QSignalBlocker(edit):
+                    edit.setText("pending description")
+                self.assertEqual(info.description, "saved description")
+                editor.unhook()
+                self.assertEqual(info.description, "pending description")
+                self.assertIsNone(editor._range_info)
+                self.assertIsNone(editor._gate_info)
+                editor.unhook()
+
+    def test_late_focus_loss_cannot_update_a_closed_editor(self):
+        for is_range in (False, True):
+            with self.subTest(is_range=is_range):
+                editor, info, edit = self.editor(is_range)
+                editor.unhook()
+                edit.setText("late text")
+                QtCore.QCoreApplication.sendEvent(edit, QtGui.QFocusEvent(QtCore.QEvent.Type.FocusOut))
+                self.assertEqual(info.description, "saved description")
+                # A callback already queued before disconnect must also be safe.
+                editor._gate_description_changed()
+                editor._range_description_changed()
+
+    def test_closing_with_pending_text_preserves_the_description(self):
+        for is_range in (False, True):
+            with self.subTest(is_range=is_range):
+                editor, info, edit = self.editor(is_range)
+                editor.show()
+                edit.setFocus()
+                APP.processEvents()
+                edit.setText("description saved on close")
+                editor.close()
+                APP.processEvents()
+                self.assertEqual(info.description, "description saved on close")
+                self.assertFalse(editor._hooked)
+                self.assertEqual(editor.main_layout.count(), 0)
 
 
 if __name__ == "__main__":

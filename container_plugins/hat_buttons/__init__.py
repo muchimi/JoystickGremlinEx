@@ -178,7 +178,9 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         action_set = self.container.getActionSet(direction)
         action_set.append(action_item)
         self.container.create_or_delete_virtual_button()

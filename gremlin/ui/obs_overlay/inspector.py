@@ -43,6 +43,7 @@ def button_callback(func, *args, **kwargs):
 
 
 from .bindings import (
+    overlay_virtual_key,
     find_overlay_state,
     overlay_device_label,
     overlay_mode_combo_fields,
@@ -2434,10 +2435,10 @@ class OverlayInspector(QtWidgets.QWidget):
         device = str(cond.get("device_name") or "").strip()
         if kind == "vjoy":
             try:
-                vjoy_id = int(cond.get("vjoy_id") or 0)
+                vjoy_id = overlay_virtual_key(cond)
             except (TypeError, ValueError):
                 vjoy_id = 0
-            source = f"vJoy {vjoy_id}" if vjoy_id else (device or "vJoy")
+            source = device or (f"vJoy {vjoy_id}" if isinstance(vjoy_id, int) and vjoy_id else "Virtual Device")
         else:
             source = device or "physical"
         button = f"button {input_id}" if input_id else "button (not set)"
@@ -2682,14 +2683,14 @@ class OverlayInspector(QtWidgets.QWidget):
         device_box.addItem("(none)", 0 if src == "vjoy" else "")
         if src == "vjoy":
             for dev in overlay_vjoy_devices("button"):
-                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
-            current = int(cond.get("vjoy_id") or 0)
+                device_box.addItem(overlay_device_label(dev), gremlin.joystick_handling.virtual_device_key(dev))
+            current = overlay_virtual_key(cond)
             selected = 0
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current and current > 0:
+                if overlay_virtual_key(device_box.itemData(i) or 0) == current and bool(current):
                     selected = i
                     break
-            if selected == 0 and current > 0:
+            if selected == 0 and bool(current):
                 missing = cond.get("device_name") or f"vJoy {current}"
                 device_box.addItem(f"{missing} (missing)", current)
                 selected = device_box.count() - 1
@@ -2715,10 +2716,10 @@ class OverlayInspector(QtWidgets.QWidget):
                 return
             if src == "vjoy":
                 try:
-                    vjoy_id = int(device_box.currentData() or 0)
+                    vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
                 except (TypeError, ValueError):
                     vjoy_id = 0
-                if vjoy_id <= 0:
+                if not vjoy_id:
                     self._set_visibility_condition(item["id"], cond_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
@@ -2753,10 +2754,10 @@ class OverlayInspector(QtWidgets.QWidget):
         device = None
         if src == "vjoy":
             try:
-                vjoy_id = int(device_box.currentData() or 0)
+                vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
             except (TypeError, ValueError):
                 vjoy_id = 0
-            if vjoy_id > 0:
+            if bool(vjoy_id):
                 device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
         else:
             guid = str(device_box.currentData() or "").strip()
@@ -5185,7 +5186,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if src not in ("physical", "vjoy"):
             src = "physical"
         source = _enum_radios(
-            [("Physical", "physical"), ("vJoy", "vjoy")],
+            [("Physical", "physical"), ("Virtual Device", "vjoy")],
             src,
             lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, rebuild=True, source=str(v or "physical")),
         )
@@ -5195,14 +5196,14 @@ class OverlayInspector(QtWidgets.QWidget):
         device_box.addItem("(none)", 0 if src == "vjoy" else "")
         if src == "vjoy":
             for dev in overlay_vjoy_devices("axis"):
-                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
-            current = int(series.get("vjoy_id") or 0)
+                device_box.addItem(overlay_device_label(dev), gremlin.joystick_handling.virtual_device_key(dev))
+            current = overlay_virtual_key(series)
             selected = 0
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current and current > 0:
+                if overlay_virtual_key(device_box.itemData(i) or 0) == current and bool(current):
                     selected = i
                     break
-            if selected == 0 and current > 0:
+            if selected == 0 and bool(current):
                 missing = series.get("device_name") or f"vJoy {current}"
                 device_box.addItem(f"{missing} (missing)", current)
                 selected = device_box.count() - 1
@@ -5228,10 +5229,10 @@ class OverlayInspector(QtWidgets.QWidget):
                 return
             if src == "vjoy":
                 try:
-                    vjoy_id = int(device_box.currentData() or 0)
+                    vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
                 except (TypeError, ValueError):
                     vjoy_id = 0
-                if vjoy_id <= 0:
+                if not vjoy_id:
                     self._set_graph_series(item["id"], series_id, rebuild=True, device_guid="", device_name="", vjoy_id=0, input_id=0)
                     return
                 dev = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
@@ -5266,10 +5267,10 @@ class OverlayInspector(QtWidgets.QWidget):
         device = None
         if src == "vjoy":
             try:
-                vjoy_id = int(device_box.currentData() or 0)
+                vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
             except (TypeError, ValueError):
                 vjoy_id = 0
-            if vjoy_id > 0:
+            if bool(vjoy_id):
                 device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
         else:
             guid = str(device_box.currentData() or "").strip()
@@ -6541,7 +6542,7 @@ class OverlayInspector(QtWidgets.QWidget):
             current_source = "keyboard"
         if current_source not in sources:
             current_source = "physical"
-        source_opts = [("Keyboard/mouse" if value == "keyboard" else ("vJoy" if value == "vjoy" else value.capitalize()), value) for value in sources]
+        source_opts = [("Keyboard/mouse" if value == "keyboard" else ("Virtual Device" if value == "vjoy" else value.capitalize()), value) for value in sources]
 
         def _on_source(v, wid=item["id"], ch=channel, ft=force_type, bind=binding):
             src = str(v or "physical")
@@ -6617,14 +6618,14 @@ class OverlayInspector(QtWidgets.QWidget):
         device_box.addItem("(none)", 0 if active_source == "vjoy" else "")
         if active_source == "vjoy":
             for dev in overlay_vjoy_devices(input_kind):
-                device_box.addItem(overlay_device_label(dev), int(dev.vjoy_id))
-            current = int(binding.get("vjoy_id") or 0)
+                device_box.addItem(overlay_device_label(dev), gremlin.joystick_handling.virtual_device_key(dev))
+            current = overlay_virtual_key(binding)
             selected = 0
             for i in range(device_box.count()):
-                if int(device_box.itemData(i) or 0) == current and current > 0:
+                if overlay_virtual_key(device_box.itemData(i) or 0) == current and bool(current):
                     selected = i
                     break
-            if selected == 0 and current > 0:
+            if selected == 0 and bool(current):
                 # Bound device not currently connected — keep it visible.
                 missing = binding.get("device_name") or f"vJoy {current}"
                 device_box.addItem(f"{missing} (missing)", current)
@@ -6652,10 +6653,10 @@ class OverlayInspector(QtWidgets.QWidget):
             src = str(source.currentData() or "physical")
             if src == "vjoy":
                 try:
-                    vjoy_id = int(device_box.currentData() or 0)
+                    vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
                 except (TypeError, ValueError):
                     vjoy_id = 0
-                if vjoy_id <= 0:
+                if not vjoy_id:
                     self._bind(
                         item["id"],
                         channel,
@@ -6704,10 +6705,10 @@ class OverlayInspector(QtWidgets.QWidget):
         device = None
         if active_source == "vjoy":
             try:
-                vjoy_id = int(device_box.currentData() or 0)
+                vjoy_id = overlay_virtual_key(device_box.currentData() or 0)
             except (TypeError, ValueError):
                 vjoy_id = 0
-            if vjoy_id > 0:
+            if bool(vjoy_id):
                 device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
         else:
             guid = str(device_box.currentData() or "").strip()

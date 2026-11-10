@@ -15,6 +15,7 @@ from PySide6 import QtCore
 from psygnal import Signal
 
 import gremlin.shared_state
+import gremlin.joystick_handling
 import gremlin.util
 from gremlin.ui.obs_overlay.model import default_toggle_binding, normalize_toggle_binding, normalize_visibility
 
@@ -166,15 +167,16 @@ def _normalize_node(raw) -> dict[str, Any] | None:
         props["display_range"] = normalize_input_display_range(props.get("display_range"))
     if kind == "output":
         try:
-            props["vjoy_id"] = int(props.get("vjoy_id") or 1)
+            props["vjoy_id"] = gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1)
         except (TypeError, ValueError):
             props["vjoy_id"] = 1
         try:
             props["axis_id"] = int(props.get("axis_id") or 1)
         except (TypeError, ValueError):
             props["axis_id"] = 1
-        props["vjoy_id"] = max(1, min(16, props["vjoy_id"]))
-        props["axis_id"] = max(1, min(8, props["axis_id"]))
+        if isinstance(props["vjoy_id"], int):
+            props["vjoy_id"] = max(1, min(16, props["vjoy_id"]))
+        props["axis_id"] = max(1, props["axis_id"])
     if kind == "curve":
         props["curve_xml"] = str(props.get("curve_xml") or "")
     if kind == "limiter":

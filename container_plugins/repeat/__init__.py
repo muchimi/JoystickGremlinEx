@@ -184,7 +184,9 @@ class RepeatContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         if self.container.action_sets[0] is None:
             self.container.action_sets[0] = []
         self.container.action_sets[0].append(action_item)

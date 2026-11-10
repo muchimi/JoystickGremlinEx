@@ -2309,10 +2309,10 @@ class Mapper:
             self.button_mapper = "Vjoy Remap"
             self.device = device
 
-            devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
+            devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: (x.name, str(x.device_guid)))
             if not devices:
                 # no vjoy devices to map
-                ui_common.MessageBox(prompt="No VJOY devices found to map to")
+                ui_common.MessageBox(prompt="No virtual output devices found to map to")
                 self.close()
 
             # info
@@ -2344,7 +2344,7 @@ class Mapper:
             self.container_button_layout = QtWidgets.QHBoxLayout(self.container_button_widget)
             self.container_button_layout.setContentsMargins(0, 0, 0, 0)
 
-            self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target VJoy Device:")
+            self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target Virtual Device:")
             self.cb_vjoy_device_selector = gremlin.ui.ui_common.QDataComboBox()
 
             self.container_selector_widget = QtWidgets.QWidget()
@@ -2364,9 +2364,10 @@ class Mapper:
             selected_index = None
             index = 0
             for dev in devices:
-                self.cb_vjoy_device_selector.addItem(dev.name, dev.vjoy_id)
-                self.vjoy_map[dev.vjoy_id] = dev
-                if dev.vjoy_id == self.vjoy_id:
+                key = gremlin.joystick_handling.virtual_device_key(dev)
+                self.cb_vjoy_device_selector.addItem(dev.name, key)
+                self.vjoy_map[key] = dev
+                if key == self.vjoy_id:
                     selected_index = index
                 index += 1
 
@@ -2510,7 +2511,9 @@ class Mapper:
             assert isinstance(mode, str), f"invalid mode: {mode}"
             assert isinstance(input_type, InputType), f"invalid input type: {input_type}"
             assert isinstance(input_id, int), f"invalid input id: {input_id}"
-            assert isinstance(vjoy_id, int), f"invalid vjoy id: {vjoy_id}"
+            target_device = gremlin.joystick_handling.get_virtual_device(vjoy_id)
+            if target_device is None:
+                raise ValueError(f"Virtual output device is unavailable: {vjoy_id}")
             assert isinstance(vjoy_input_type, InputType), f"invalid vjoy input type: {vjoy_input_type}"
             assert isinstance(vjoy_input_id, int), f"invalid vjoy input id: {vjoy_input_id}"
 
@@ -2535,7 +2538,7 @@ class Mapper:
             extra_data = {
                 "input_item": input_item,
                 "container": container,
-                "vjoy_id": vjoy_id,
+                "vjoy_id": target_device.virtual_id,
                 "vjoy_input_id": vjoy_input_id,}
 
             # add a vjoy remap action to that container
@@ -2557,6 +2560,7 @@ class Mapper:
 
 
             action = action_plugins.repository[vjoy_mapper](container, extra_data)
+            action.virtual_device = target_device
             container.add_action(action)
 
             # add the new input to the device
@@ -2606,7 +2610,9 @@ class Mapper:
                 device_hat_list = [i for i in range(1, device.hat_count + 1)]
 
                 vjoy_info: dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-                vjoy_axis_list = [i for i in range(1, vjoy_info.axis_count + 1)]
+                if vjoy_info is None:
+                    return
+                vjoy_axis_list = [vjoy_info.axis_sequence_to_input_id(i) for i in range(vjoy_info.axis_count)]
                 vjoy_hat_list = [i for i in range(1, vjoy_info.hat_count + 1)]
                 vjoy_button_list = [i for i in range(1, vjoy_info.button_count + 1)]
 
@@ -2614,15 +2620,12 @@ class Mapper:
                     unused_entries = profile.list_unused_vjoy_inputs()
                     # gets dict[vjoy_id][axis | button | hat] = list[unused_vjoy_ids]
                     if vjoy_id in unused_entries:
-                        unused_axes = unused_entries["axis"]
-                        if unused_axes:
-                            vjoy_axis_list = [id for id in vjoy_axis_list if id in unused_axes]
-                        unused_buttons = unused_entries["button"]
-                        if unused_buttons:
-                            vjoy_button_list = [id for id in vjoy_button_list if id in unused_buttons]
-                        unused_hats = unused_entries["hat"]
-                        if unused_hats:
-                            vjoy_hat_list = [id for id in vjoy_hat_list if id in unused_hats]
+                        unused_axes = unused_entries[vjoy_id]["axis"]
+                        vjoy_axis_list = [id for id in vjoy_axis_list if id in unused_axes]
+                        unused_buttons = unused_entries[vjoy_id]["button"]
+                        vjoy_button_list = [id for id in vjoy_button_list if id in unused_buttons]
+                        unused_hats = unused_entries[vjoy_id]["hat"]
+                        vjoy_hat_list = [id for id in vjoy_hat_list if id in unused_hats]
 
                 source = []
                 if device_axis_list and vjoy_axis_list:

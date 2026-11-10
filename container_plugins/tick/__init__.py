@@ -227,7 +227,9 @@ class TickContainerWidget(AbstractContainerWidget):
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         if self.container.action_sets[index] is None:
             self.container.action_sets[index] = []
         self.container.action_sets[index].append(action_item)

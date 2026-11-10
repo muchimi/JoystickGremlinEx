@@ -400,7 +400,9 @@ class SwitchContainerWidget(AbstractContainerWidget):
     def _paste_action(self, action, container):
         """pastes an action"""
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item = plugin_manager.duplicate_for_paste(action, self.profile_data)
+        if action_item is None:
+            return
         self.profile_data.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()

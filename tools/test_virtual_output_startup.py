@@ -1,15 +1,19 @@
 """Hardware-free startup checks: python tools/test_virtual_output_startup.py."""
 
 import ast
+from contextlib import nullcontext
 import importlib.util
 import logging
 from pathlib import Path
+import socket
 import sys
 import threading
 from types import ModuleType, SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
 from shiboken6 import Shiboken
+
+from test_maestro_startup import Maestro, NAMESPACE as MAESTRO_NAMESPACE
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -95,9 +99,101 @@ class OptionalVJoyChecks(unittest.TestCase):
         self.assertEqual(self.interface.GetVJDStatus(1), self.module.VJoyState.Missing.value)
 
 
+class BridgeInstallationChecks(unittest.TestCase):
+    def setUp(self):
+        self.registry = {}
+        self.files = set()
+        self.addCleanup(patch.stopall)
+        self.lookup = patch.object(STARTUP.psutil, 'win_service_get',
+            side_effect=STARTUP.psutil.NoSuchProcess(pid=None, name='GEXMaestroBridgeService')).start()
+        patch.object(STARTUP.winreg, 'OpenKey', side_effect=self.open_key).start()
+        patch.object(STARTUP.winreg, 'QueryValueEx', side_effect=self.query_value).start()
+        self.exists = patch.object(STARTUP.Path, 'is_file', autospec=True,
+                                   side_effect=lambda path: str(path) in self.files).start()
+
+    def open_key(self, root, path, reserved, access):
+        view = access & (STARTUP.winreg.KEY_WOW64_64KEY | STARTUP.winreg.KEY_WOW64_32KEY)
+        key = (path, view)
+        if key not in self.registry:
+            raise FileNotFoundError(path)
+        return nullcontext(key)
+
+    def query_value(self, key, name):
+        if name not in self.registry[key]:
+            raise FileNotFoundError(name)
+        value = self.registry[key][name]
+        return (value, STARTUP.winreg.REG_SZ) if isinstance(value, str) else value
+
+    def register(self, path, values, view=None):
+        self.registry[(path, view or STARTUP.winreg.KEY_WOW64_64KEY)] = values
+
+    def service(self, status):
+        self.lookup.side_effect = None
+        service = self.lookup.return_value = Mock()
+        service.status.return_value = status
+        return service
+
+    def test_running_service_is_detected_without_assuming_a_directory(self):
+        service = self.service('running')
+        self.assertTrue(STARTUP.bridge_installed())
+        self.assertTrue(STARTUP.bridge_installed(require_running=True))
+        self.lookup.assert_called_with('GEXMaestroBridgeService')
+        service.status.assert_called_once_with()
+        self.exists.assert_not_called()
+
+    def test_stopped_paused_or_pending_service_is_installed_but_not_running(self):
+        for status in ('stopped', 'paused', 'start_pending', 'stop_pending'):
+            with self.subTest(status=status):
+                self.service(status)
+                self.assertTrue(STARTUP.bridge_installed())
+                self.assertFalse(STARTUP.bridge_installed(require_running=True))
+
+    def test_custom_service_image_path_with_arguments(self):
+        executable = r'D:\Custom Bridge Folder\GEXMaestroBridgeService.exe'
+        self.register(STARTUP._BRIDGE_SERVICE_KEY, {'ImagePath': f'"{executable}" --receive-port 9123'})
+        self.files.add(executable)
+        self.assertTrue(STARTUP.bridge_installed())
+        self.assertFalse(STARTUP.bridge_installed(require_running=True))
+
+    def test_unquoted_service_path_and_environment_variables(self):
+        executable = r'E:\Bridge Folder\GEXMaestroBridgeService.exe'
+        self.files.add(executable)
+        for command in (f'{executable} --mock', r'"%GEX_TEST_BRIDGE%\GEXMaestroBridgeService.exe" --mock'):
+            with self.subTest(command=command), patch.dict(STARTUP.os.environ, GEX_TEST_BRIDGE=r'E:\Bridge Folder'):
+                self.register(STARTUP._BRIDGE_SERVICE_KEY,
+                              {'ImagePath': (command, STARTUP.winreg.REG_EXPAND_SZ)})
+                self.assertTrue(STARTUP.bridge_installed())
+
+    def test_console_install_location_in_either_registry_view(self):
+        location = r'D:\Apps\Bridge Console'
+        for view in (STARTUP.winreg.KEY_WOW64_64KEY, STARTUP.winreg.KEY_WOW64_32KEY):
+            with self.subTest(view=view):
+                self.registry.clear()
+                self.register(STARTUP._BRIDGE_UNINSTALL_KEY, {'InstallLocation': location}, view)
+                self.files.add(str(Path(location) / 'GEXMaestroBridgeService.exe'))
+                self.assertTrue(STARTUP.bridge_installed())
+                self.assertFalse(STARTUP.bridge_installed(require_running=True))
+
+    def test_stale_registration_without_an_executable_is_not_an_installation(self):
+        self.register(STARTUP._BRIDGE_UNINSTALL_KEY, {'InstallLocation': r'D:\Removed Bridge'})
+        self.assertFalse(STARTUP.bridge_installed())
+        self.assertFalse(STARTUP.bridge_installed(require_running=True))
+
+    def test_program_files_is_not_used_as_an_unregistered_fallback(self):
+        self.files.add(r'C:\Program Files\GEXMaestroBridge\GEXMaestroBridgeService.exe')
+        self.assertFalse(STARTUP.bridge_installed())
+        self.exists.assert_not_called()
+
+    def test_service_status_errors_do_not_claim_a_running_service(self):
+        for error in (STARTUP.psutil.AccessDenied(name='GEXMaestroBridgeService'), OSError('Service query failed')):
+            with self.subTest(error=error):
+                self.lookup.side_effect = error
+                self.assertFalse(STARTUP.bridge_installed(require_running=True))
+
+
 class StartupProviderChecks(unittest.TestCase):
     def setUp(self):
-        self.config = NS(vjoy_installed=False, maestro_enabled=False)
+        self.config = NS(vjoy_installed=False, maestro_enabled=False, maestro_use_localhost=True)
         self.maestro = NS(enabled=False, service_running=False, connect=Mock(return_value=None), refreshDevices=Mock())
         self.addCleanup(patch.stopall)
         self.registry = patch.object(STARTUP, '_machine_key_exists', return_value=False).start()
@@ -133,22 +229,67 @@ class StartupProviderChecks(unittest.TestCase):
         self.box.warning.assert_called_once()
         self.install.assert_not_called()
 
+    def test_stopped_local_service_explains_how_to_start_it_without_reinstalling(self):
+        self.installed.side_effect = lambda require_running=False: not require_running
+        self.assertFalse(self.check())
+        self.box.question.assert_not_called()
+        self.install.assert_not_called()
+        self.assertIn('Start GEXMaestroBridgeService', self.box.warning.call_args.args[2])
+        self.installed.assert_called_with(require_running=True)
+
+    def test_running_local_service_with_no_connection_points_to_osc_settings(self):
+        self.installed.return_value = True
+        self.config.maestro_enabled = True
+        self.assertFalse(self.check())
+        self.assertIn('Windows service is running', self.box.warning.call_args.args[2])
+        self.assertIn('service/reply ports', self.box.warning.call_args.args[2])
+        self.box.question.assert_not_called()
+        self.install.assert_not_called()
+
+    def test_remote_configuration_does_not_check_local_service_health(self):
+        self.config.maestro_use_localhost = False
+        self.installed.return_value = True
+        self.assertFalse(self.check())
+        self.installed.assert_called_once_with()
+
     def test_installed_but_unconfigured_vjoy_warns_without_setup(self):
         self.config.vjoy_installed = True
         self.assertFalse(self.check())
         self.box.question.assert_not_called()
         self.box.warning.assert_called_once()
+        self.maestro.connect.assert_not_called()
+        self.installed.assert_not_called()
+        self.assertFalse(self.config.maestro_enabled)
 
     def test_installed_but_disabled_vjoy_warns_without_setup(self):
         self.registry.return_value = True
         self.assertFalse(self.check())
         self.box.question.assert_not_called()
         self.install.assert_not_called()
+        self.maestro.connect.assert_not_called()
+        self.installed.assert_not_called()
+
+    def test_working_vjoy_skips_every_maestro_check(self):
+        self.maestro = object()  # Accessing any Maestro state would fail.
+        self.assertTrue(self.check(vjoy=True))
+        self.installed.assert_not_called()
+        self.registry.assert_not_called()
+        self.assertFalse(self.config.maestro_enabled)
+
+    def test_installed_vjoy_skips_even_cached_maestro_state(self):
+        self.config.vjoy_installed = True
+        self.maestro = object()
+        self.assertFalse(self.check())
+        self.installed.assert_not_called()
+        self.install.assert_not_called()
+        self.assertNotIn('Maestro', self.box.warning.call_args.args[2])
 
     def test_accepted_setup_enables_and_reconnects_maestro(self):
         self.box.question.return_value = self.box.StandardButton.Yes
 
-        def connect():
+        def connect(**kwargs):
+            if not self.install.called:
+                return None
             self.maestro.enabled = self.maestro.service_running = True
             return object()
 
@@ -169,7 +310,8 @@ class StartupProviderChecks(unittest.TestCase):
                 self.assertEqual(self.config.maestro_enabled, code in (3010, 1641))
         self.assertEqual(self.box.information.call_count, 2)
         self.assertEqual(self.box.warning.call_count, 2)
-        self.maestro.connect.assert_not_called()
+        self.assertEqual(self.maestro.connect.call_count, 4)  # Probe before offering each installation.
+        self.maestro.refreshDevices.assert_not_called()
 
     def test_successful_setup_with_stopped_service_warns(self):
         self.box.question.return_value = self.box.StandardButton.Yes
@@ -183,6 +325,171 @@ class StartupProviderChecks(unittest.TestCase):
         self.box.warning.assert_called_once()
 
 
+class LocalhostMaestroChecks(unittest.TestCase):
+    """Run the production connection and startup checks with no driver or service."""
+
+    def setUp(self):
+        self.config = NS(vjoy_installed=False, maestro_enabled=True, maestro_configured=True,
+                         maestro_use_localhost=True, maestro_osc_host='127.0.0.1', maestro_osc_port=8010,
+                         maestro_osc_reply_host='127.0.0.1', maestro_osc_reply_port=8011,
+                         maestro_device_map=None)
+        self.services = ModuleType('gremlin')
+        self.services.config = NS(Configuration=lambda: self.config)
+        self.services.event_handler = ModuleType('gremlin.event_handler')
+        self.services.event_handler.EventListener = Mock(return_value=NS(shutdown=Mock()))
+        self.psutil = Mock()
+        self.psutil.win_service_get.return_value.status.return_value = 'running'
+        self.client_factory = Mock()
+        self.addCleanup(patch.stopall)
+        patch.dict(MAESTRO_NAMESPACE, gremlin=self.services, socket=socket, psutil=self.psutil,
+                   MaestroOscClient=self.client_factory, syslog=Mock()).start()
+        patch.dict(sys.modules, {'gremlin': self.services, 'gremlin.event_handler': self.services.event_handler}).start()
+        self.publish = patch.object(Maestro, 'populateDeviceList').start()
+        patch.object(Maestro, 'sync').start()
+        patch.object(STARTUP, '_machine_key_exists', return_value=False).start()
+        patch.object(STARTUP, 'bridge_installed', return_value=True).start()
+        self.install = patch.object(STARTUP, 'install_bridge').start()
+        self.box = patch.object(STARTUP.QtWidgets, 'QMessageBox').start()
+        patch.object(STARTUP, 'syslog', Mock()).start()
+
+    def client(self, error=None, protocol=('MaestroOscService', 1)):
+        result = Mock(args=protocol)
+        result.raise_for_error.return_value = result
+        client = Mock(destination=('127.0.0.1', 8010))
+        client.request.side_effect = error
+        client.request.return_value = result
+        client.list.return_value = []
+        return client
+
+    def assert_no_prompt(self):
+        self.box.question.assert_not_called()
+        self.box.warning.assert_not_called()
+        self.install.assert_not_called()
+
+    def test_running_localhost_bridge_with_successful_initial_handshake(self):
+        self.client_factory.return_value = self.client()
+        maestro = Maestro()
+        self.assertTrue(maestro.isServiceRunning())
+        self.assertTrue(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.assert_no_prompt()
+
+    def test_running_localhost_bridge_recovers_after_initial_ping_timeout(self):
+        initial_client, ready_client = self.client(TimeoutError('No reply during startup')), self.client()
+        self.client_factory.side_effect = [initial_client, ready_client]
+        maestro = Maestro()
+        self.assertTrue(maestro.isServiceRunning())
+        self.assertFalse(maestro.enabled)
+        self.assertFalse(maestro.service_running)
+        self.assertTrue(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.assertTrue(maestro.enabled)
+        self.assertTrue(maestro.service_running)
+        self.assertEqual(self.client_factory.call_count, 2)
+        self.client_factory.assert_called_with('127.0.0.1', 8010, '127.0.0.1', 8011)
+        ready_client.request.assert_called_with('/maestro_ping', timeout=1.0, attempts=2)
+        ready_client.list.assert_any_call('/maestro_devices')
+        self.assert_no_prompt()
+
+    def test_deferred_startup_recheck_recovers_without_a_warning(self):
+        self.client_factory.side_effect = [self.client(TimeoutError('Startup timeout')), self.client()]
+        maestro = Maestro()
+        self.config.startup_start_minimized = False
+        window = STARTUP.QtWidgets.QMainWindow()
+        window.apply_user_settings = Mock()
+        try:
+            STARTUP.show_startup_ui(window, self.config, maestro, False)
+            self.assertFalse(maestro.enabled)
+            STARTUP.QtWidgets.QApplication.instance().processEvents()
+            self.assertTrue(maestro.enabled)
+            self.assertTrue(window.isVisible())
+            self.assert_no_prompt()
+        finally:
+            Shiboken.delete(window)
+
+    def test_running_service_without_osc_reply_still_warns(self):
+        self.client_factory.side_effect = lambda *args: self.client(TimeoutError('OSC blocked'))
+        maestro = Maestro()
+        self.assertTrue(maestro.isServiceRunning())
+        self.assertFalse(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.box.warning.assert_called_once()
+        self.install.assert_not_called()
+
+    def test_running_localhost_bridge_recovers_after_inventory_error(self):
+        initial_client, ready_client = self.client(), self.client()
+        initial_client.list.side_effect = TimeoutError('Inventory was not ready')
+        self.client_factory.side_effect = [initial_client, ready_client]
+        maestro = Maestro()
+        self.assertTrue(maestro.isServiceRunning())
+        self.assertFalse(maestro.enabled)
+        self.assertTrue(STARTUP.check_virtual_output(self.config, maestro, False))
+        ready_client.list.assert_any_call('/maestro_definitions')
+        ready_client.list.assert_any_call('/maestro_devices')
+        self.assert_no_prompt()
+
+    def test_running_service_with_wrong_protocol_still_warns(self):
+        self.client_factory.side_effect = lambda *args: self.client(protocol=('OtherService', 2))
+        maestro = Maestro()
+        self.assertFalse(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.box.warning.assert_called_once()
+        self.install.assert_not_called()
+
+    def test_detected_bridge_automatically_enables_disabled_maestro(self):
+        self.config.maestro_enabled = False
+        self.client_factory.return_value = self.client()
+        maestro = Maestro()
+        self.client_factory.assert_not_called()
+        self.assertTrue(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.assertTrue(self.config.maestro_enabled)
+        self.assertTrue(maestro.enabled)
+        self.publish.assert_called_once()
+        self.client_factory.return_value.list.assert_any_call('/maestro_devices')
+        self.assert_no_prompt()
+
+    def test_failed_detection_keeps_maestro_disabled(self):
+        self.config.maestro_enabled = False
+        self.client_factory.return_value = self.client(TimeoutError('No bridge reply'))
+        maestro = Maestro()
+        self.assertFalse(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.assertFalse(self.config.maestro_enabled)
+        self.publish.assert_not_called()
+
+    def test_deferred_startup_automatically_enables_a_detected_bridge(self):
+        self.config.maestro_enabled = False
+        self.config.startup_start_minimized = False
+        self.client_factory.return_value = self.client()
+        maestro = Maestro()
+        window = STARTUP.QtWidgets.QMainWindow()
+        window.apply_user_settings = Mock()
+        try:
+            STARTUP.show_startup_ui(window, self.config, maestro, False)
+            self.assertFalse(self.config.maestro_enabled)
+            STARTUP.QtWidgets.QApplication.instance().processEvents()
+            self.assertTrue(self.config.maestro_enabled)
+            self.assertTrue(maestro.enabled)
+            self.assert_no_prompt()
+        finally:
+            Shiboken.delete(window)
+
+    def test_vjoy_suppresses_constructor_and_default_device_probes(self):
+        self.config.vjoy_installed = True
+        self.client_factory.side_effect = AssertionError('Maestro must not be probed when vJoy is installed')
+        maestro = Maestro()
+        self.assertFalse(maestro.initialized)
+        self.assertFalse(maestro.offerDefaultJoysticks())
+        self.assertFalse(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.client_factory.assert_not_called()
+        self.publish.assert_not_called()
+        self.install.assert_not_called()
+
+    def test_reply_port_bind_error_warns_and_keeps_startup_usable(self):
+        self.config.maestro_enabled = False
+        maestro = Maestro()
+        self.config.maestro_enabled = True
+        self.client_factory.side_effect = OSError('Reply port 8011 is already in use')
+        self.assertFalse(STARTUP.check_virtual_output(self.config, maestro, False))
+        self.box.warning.assert_called_once()
+        self.install.assert_not_called()
+
+
 class StartupWindowChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -191,8 +498,12 @@ class StartupWindowChecks(unittest.TestCase):
         cls.app.setQuitOnLastWindowClosed(False)
 
     def setUp(self):
-        self.config = NS(vjoy_installed=False, startup_start_minimized=False)
-        self.maestro = NS(enabled=False, service_running=False)
+        self.config = NS(vjoy_installed=False, maestro_enabled=False, maestro_use_localhost=True,
+                         startup_start_minimized=False)
+        self.maestro = NS(enabled=False, service_running=False, connect=Mock(return_value=None), refreshDevices=Mock())
+        self.registry_patch = patch.object(STARTUP, '_machine_key_exists', return_value=False)
+        self.registry_patch.start()
+        self.addCleanup(self.registry_patch.stop)
         self.applied_settings = []
 
         class Window(STARTUP.QtWidgets.QMainWindow):
@@ -260,6 +571,16 @@ class StartupWindowChecks(unittest.TestCase):
             check.assert_not_called()
         self.assertFalse(self.window.isVisible())
         self.assertEqual(self.applied_settings, [False])
+
+    def test_installed_but_unusable_vjoy_does_not_read_maestro_state(self):
+        self.config.vjoy_installed = True
+        self.maestro = object()
+        with patch.object(STARTUP, 'check_virtual_output') as check:
+            STARTUP.show_startup_ui(self.window, self.config, self.maestro, False)
+            self.app.processEvents()
+            check.assert_called_once_with(self.config, self.maestro, False, parent=self.window)
+        self.assertTrue(self.window.isVisible())
+        self.assertEqual(self.applied_settings, [True])
 
     def test_working_maestro_shows_editor_normally_without_warning(self):
         self.maestro.enabled = self.maestro.service_running = True

@@ -42,15 +42,17 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
         self.profile_data = profile
         self.entries = []
+        self._building = True
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.merge_layout = QtWidgets.QVBoxLayout()
 
-        # If there are no valid output vJoy devices present we can't show
+        # If there are no valid virtual output devices present we can't show
         # the merge dialog.
-        id_list = profile.settings.getVirtualAsInputList()
-        if len(id_list) == 0:
+        devices = [dev for dev in gremlin.joystick_handling.virtual_devices() if not dev.disabled and dev.axis_count > 0
+                   and not profile.settings.getVirtualAsInput(dev.virtual_id, dev.device_type)]
+        if not devices:
             label = QtWidgets.QLabel(
-                "No virtual devices available for axis merging. Either no vJoy devices are configured or all vJoy devices are defined as physical inputs."
+                "No virtual axis outputs are available. Configure a vJoy or Maestro output device."
             )
             label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
             label.setWordWrap(True)
@@ -72,6 +74,7 @@ class MergeAxisUi(ui_common.BaseDialogUi):
             self.main_layout.addWidget(container_widget)
 
             self.from_profile()
+        self._building = False
 
     def _add_entry(self, without_saving=False):
         """Adds a new axis to merge configuration entry."""
@@ -90,9 +93,6 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         """
         assert isinstance(widget, MergeAxisEntry)
 
-        # Remove profile data
-        del self.profile_data.merge_axes[self.entries.index(widget)]
-
         # Remove UI entry
         self.merge_layout.removeWidget(widget)
         self.entries.remove(widget)
@@ -102,12 +102,19 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
     def to_profile(self):
         """Saves all merge axis entries to the profile."""
+        if self._building:
+            return
         self.profile_data.merge_axes = []
         for entry in self.entries:
             vjoy_sel = entry.vjoy_selector.get_selection()
             joy1_sel = entry.joy1_selector.get_selection()
             joy2_sel = entry.joy2_selector.get_selection()
+            if not all(selection and selection.get("device_id") is not None and selection.get("input_id") is not None
+                       for selection in (vjoy_sel, joy1_sel, joy2_sel)):
+                continue
             mode_idx = entry.mode_selector.currentIndex()
+            if not 0 <= mode_idx < len(entry.mode_selector.mode_list):
+                continue
             operation_str = entry.operation_selector.currentText()
             self.profile_data.merge_axes.append(
                 {
@@ -125,7 +132,8 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         for entry in self.profile_data.merge_axes:
             # Show an error if the desired vJoy device is no longer available
             # as an output
-            if self.profile_data.settings.getVirtualAsInput(entry["vjoy"]["vjoy_id"]):
+            device = gremlin.joystick_handling.get_virtual_device(entry["vjoy"]["vjoy_id"])
+            if device is not None and self.profile_data.settings.getVirtualAsInput(device.virtual_id, device.device_type):
                 entries_to_remove.append(entry)
                 gremlin.util.display_error(f"vJoy device {entry['vjoy']['vjoy_id']} used as physical input")
             else:

@@ -986,12 +986,13 @@ class SequenceContainerWidget(AbstractContainerWidget):
             raise ValueError("Action item does not belong to any action set")
         action_set.remove_action(action, delete=delete)
 
-    def _paste_action(self, action: AbstractAction):
+    def _paste_action(self, action, container=None):
         """pastes an action"""
 
-        assert isinstance(action, AbstractAction), "Invalid action"
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
         self.container.add_action(action_item)
         self.container_modified.emit()
 

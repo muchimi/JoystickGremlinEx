@@ -318,7 +318,9 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         """called when a paste occurs"""
         syslog.info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
+        action_item = plugin_manager.duplicate_for_paste(action, self.container)
+        if action_item is None:
+            return
 
         match index:
             case 0:
