@@ -252,10 +252,10 @@ class VJoyChecks(unittest.TestCase):
                 self.services.shared_state.current_profile = None
                 write()
                 self.assertEqual(self.listener.vjoy_event.events, [])
-                self.services.shared_state.current_profile = NS(settings=NS(getVjoyAsInput=lambda vid: True))
+                self.services.shared_state.current_profile = NS(settings=NS(getVirtualAsInput=lambda vid: True))
                 write()
                 self.assertEqual(self.listener.vjoy_event.events, [(1, input_type, identifier, value)])
-                self.services.shared_state.current_profile = NS(settings=NS(getVjoyAsInput=lambda vid: False))
+                self.services.shared_state.current_profile = NS(settings=NS(getVirtualAsInput=lambda vid: False))
                 write()
                 self.assertEqual(len(self.listener.vjoy_event.events), 1)
 

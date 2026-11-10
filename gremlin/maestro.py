@@ -1090,6 +1090,30 @@ class Maestro:
             return None
         return int(match.group(1)) - 1
 
+    @staticmethod
+    def _assign_controller_slots(preferences):
+        """Give each full service ID a distinct slot, retaining valid assignments."""
+        if len(preferences) > GEX_MAX_DEVICES:
+            raise RuntimeError(f"At most {GEX_MAX_DEVICES} Maestro targets can be attached.")
+        assigned = {}
+        occupied = set()
+        for device_id, index in preferences.items():
+            if type(index) is int and 0 <= index < GEX_MAX_DEVICES and index not in occupied:
+                assigned[device_id] = index
+                occupied.add(index)
+        available = iter(index for index in range(GEX_MAX_DEVICES) if index not in occupied)
+        for device_id in preferences:
+            if device_id not in assigned:
+                assigned[device_id] = next(available)
+        return assigned
+
+    def _controller_slot(self, device_id, preferred=None):
+        """Reserve an existing or free slot without replacing another service ID."""
+        with self._lock:
+            preferences = {controller.id: controller.index for controller in self._controller_map.values()}
+            preferences.setdefault(device_id, self._service_index(device_id) if preferred is None else preferred)
+            return self._assign_controller_slots(preferences)[device_id]
+
     @property
     def initialized(self):
         return self._initialized
@@ -1365,7 +1389,7 @@ class Maestro:
 
     def _cache_controller(self, info, definition, index=None) -> MaestroController:
         if index is None:
-            index = self._service_index(info["id"])
+            index = self._controller_slot(info["id"])
         capabilities = self.client.request("/maestro_capabilities", info["id"]).raise_for_error().data
         state = self.client.request("/maestro_state", info["id"]).raise_for_error().data
         axes = tuple(capabilities["axes"])
@@ -1405,17 +1429,41 @@ class Maestro:
         """Attach selected active definitions without recreating hardware."""
         if not self.initialized:
             return
+        config = gremlin.config.Configuration()
         if device_map is None:
-            device_map = gremlin.config.Configuration().maestro_device_map
+            device_map = config.maestro_device_map
         definitions = {d["id"]: d for d in self.client.list("/maestro_definitions")}
-        active = {}
-        name_map = {}
+        devices = {}
         for info in self.client.list("/maestro_devices"):
             if not is_valid_gex_id(info["id"]):
                 syslog.warning("MAESTRO: ignoring 0-based GEX device %s", info["id"])
                 continue
-            index = self._service_index(info["id"]) if device_map is None else device_map.get(info["id"])
-            if index is not None and info["id"] in definitions:
+            if info["id"] in definitions:
+                devices[info["id"]] = info
+        if device_map is None:
+            with self._lock:
+                previous = {controller.id: controller.index for controller in self._controller_map.values()}
+            preferences = {
+                device_id: index for device_id, index in previous.items()
+                if device_id in devices and self._service_index(device_id) is not None
+            }
+            preferences.update({
+                device_id: self._service_index(device_id)
+                for device_id in sorted(devices)
+                if device_id not in preferences and self._service_index(device_id) is not None
+            })
+        else:
+            preferences = device_map
+        slots = self._assign_controller_slots(preferences)
+        if device_map is not None and slots != device_map:
+            device_map.update(slots)
+            if device_map is config.maestro_device_map:
+                config.save()
+        active = {}
+        name_map = {}
+        for device_id, info in devices.items():
+            if device_id in slots:
+                index = slots[device_id]
                 controller = self._cache_controller(info, definitions[info["id"]], index)
                 active[controller.index] = controller
                 name_map[controller.name.casefold()] = controller
@@ -1763,6 +1811,7 @@ class Maestro:
             name = name or self._joystick_id(index)
             if not is_valid_gex_id(name):
                 raise ValueError(f"GEX device id {name} must be 1-based")
+            index = self._controller_slot(name, index)
             vendor_id = GEX_VENDOR_ID
             product_id = GEX_PRODUCT_ID
             # will throw an error if creation fails
@@ -1808,6 +1857,7 @@ class Maestro:
             name = name or self._gamepad_id(index)
             if not is_valid_gex_id(name):
                 raise ValueError(f"GEX device id {name} must be 1-based")
+            index = self._controller_slot(name, index)
             result = self.client.request("/maestro_create_gamepad", name, name, True).raise_for_error()
             controller = self._cache_controller(result.data, dict(kind="gamepad"), index)
             self._register_controller(controller)

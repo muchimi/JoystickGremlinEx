@@ -51,6 +51,20 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T96)
+- Change: UI: add virtual failover indicator on the UI to indicate when failover mode is active on Vjoy Remap, legacy Remap and Profile Settings page.
+- Change: API: added support for both VJOY and Maestro defined joysticks as input (virtual joysticks will not display as input device unless configured in profile settings).
+- Change: UI (filter): show filtered devices color coded.
+- Fix: UI: pressing "no" on save calibration prompt does not close the underlying calibration dialog box.
+- Fix: UI: changing a mode can cause the status bar mode repeater to not update to the curren mode.  
+- Fix: UI: rebuilding the mode list selects the default mode, not the prior selected mode.
+- Fix: UI: button widget should stop emitting events if it is being deleted.
+- Fix: UI (Profile Settings): validate input devices can in fact be used as inputs.  There was only one type of virtual device before, now there are several so the UI was assuming there was only one type.
+- Fix: UI: checkbox style not always resolving its state icons.
+- Fix: UI: filtered device fallback tab selection (if device is invisible or not present) could fail.
+- Fix: UI: adjust dialog restore position if no longer visible due to a resolution or monitor change.
+- Fix: Vjoy Remap Action: update relative mode and set start value causing an exception (broken by recent API changes for startup sync). 
+- Fix: VJoy Remap Action: virtual output device identifiers could overlap for gamepad and joystick Maestro devices with the new unified virtual output API.
 
 ### (m77T95)
 - Change: UI (Maestro): added host scan button to scan for the GEX bridge host.

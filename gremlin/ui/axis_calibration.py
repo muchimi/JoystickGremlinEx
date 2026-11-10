@@ -1343,7 +1343,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 self._lock.release()
 
     def closeEvent(self, event):
-        """save data on dialog close"""
+        """Close the dialog, discarding pending changes when declined."""
 
         try:
             # should close?
@@ -1359,11 +1359,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 msgbox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
                 result = msgbox.exec()
 
-                if result == QtWidgets.QMessageBox.StandardButton.Yes:  # QtWidgets.QDialog.Accepted:
-                    event.accept()
-                else:
-                    event.ignore()
-                    return
+                if result != QtWidgets.QMessageBox.StandardButton.Yes:
+                    # restore original data set on cancel save changes
+                    self.action_data = self.source_data
 
             self._closing = True
 
@@ -1386,6 +1384,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             # update input icons to reflect changes, if any
             el = gremlin.event_handler.EventListener()
             el.update_input_icons.emit()
+
+        return super().closeEvent(event)
 
     @QtCore.Slot()
     def _slider_changed(self, handle, value):

@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import sys
+import traceback
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock
@@ -72,6 +73,7 @@ SERVICES = NS(
             compare_guid=lambda a, b: a == b, singleShot=lambda callback: QtCore.QTimer.singleShot(0, callback),
             get_ext=lambda path: Path(path).suffix, swap_ext=lambda path, ext: f"{path}.{ext}"),
     config=NS(Configuration=lambda: CONFIG), clipboard=NS(Clipboard=lambda: CLIPBOARD),
+    maestro=NS(Maestro=lambda: NS(offerDefaultJoysticks=Mock())),
     shared_state=NS(profile_loading=False, current_profile=object(), current_mode="Default", is_running=False),
     ui=NS(ui_common=NS(getVContainer=vertical_container, QEmptyWidget=LoadingHolder,
                        QHorizontalLine=QtWidgets.QFrame)),
@@ -100,7 +102,7 @@ def load_methods(path, class_name, names, **extra):
     namespace = dict(gremlin=SERVICES, QtWidgets=QtWidgets, QtCore=QtCore, Shiboken=Shiboken,
                      QTimer=QtCore.QTimer, syslog=logging.getLogger("ui-refresh-checks"),
                      with_wait_cursor=lambda method: method,
-                     os=os, _trace=lambda message: None, **extra)
+                     os=os, traceback=traceback, _trace=lambda message: None, **extra)
     exec(compile(ast.fix_missing_locations(module), str(ROOT / path), "exec"), namespace)
     return namespace[class_name]
 
@@ -151,6 +153,10 @@ MainWindow = load_methods("gremlinEx.py", "GremlinUi", {
     "pushSuspendTabUpdate", "popSuspendTabUpdate",
     "_begin_ui_refresh_ui", "_finish_ui_refresh_ui",
     "_unregister_all_widgets_ui", "registerWidget", "_select_input", "_tab_selected_worker", "_tab_selection_complete",
+    "_edit_mode_selector_changed", "_edit_mode_changed", "_edit_mode_changed_ui",
+    "_edit_mode_update", "_edit_mode_update_ui", "_update_mode_status_bar", "_update_mode_status_bar_ui",
+    "setTabsDirty",
+    "_resolve_tab_selection", "getActiveTabDeviceGuid", "getActiveTabType", "_reindex_tabs",
 }, WorkManager=lambda: WORK, sys=sys, QThread=QtCore.QThread, BaseDeviceTabWidget=StartupDeviceTab)
 
 
@@ -182,6 +188,62 @@ def main_window():
     ui.clearWidgets = Mock()
     ui._do_load_profile_internal_worker = Mock()
     return ui
+
+
+class TabSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.ui = MainWindow()
+        self.header = QtWidgets.QTabBar(self.ui)
+        self.ui.ui = NS(devices_tab_header_widget=self.header)
+        self.pages = {}
+        self.ui.getRegisteredWidget = self.pages.get
+        SERVICES.util.to_guid = lambda guid: guid
+
+    def tearDown(self):
+        self.ui.deleteLater()
+        flush_deletes()
+
+    def add_tab(self, guid, with_page=True):
+        index = self.header.addTab(guid)
+        self.header.setTabData(index, NS(device_guid=guid))
+        if with_page:
+            self.pages[guid] = QtWidgets.QWidget(self.ui)
+        return index
+
+    def test_fallback_skips_missing_data_pages_and_deleted_pages(self):
+        self.header.addTab("Missing metadata")
+        self.add_tab("Missing page", with_page=False)
+        self.add_tab("Deleted page")
+        self.pages["Deleted page"].deleteLater()
+        flush_deletes()
+        expected_index = self.add_tab("Available")
+        self.assertEqual(self.ui._resolve_tab_selection("Saved device"),
+                         ("Available", expected_index, self.pages["Available"]))
+
+    def test_preferred_tab_is_preserved_and_hidden_preference_uses_current_order(self):
+        self.add_tab("First")
+        preferred = self.add_tab("Preferred")
+        self.assertEqual(self.ui._resolve_tab_selection("Preferred")[0], "Preferred")
+        self.header.setTabVisible(preferred, False)
+        self.assertEqual(self.ui._resolve_tab_selection("Preferred")[0], "First")
+
+    def test_empty_or_unpopulated_header_has_no_invalid_selection(self):
+        self.assertEqual(self.ui._resolve_tab_selection("Saved device"), (None, -1, None))
+        self.assertIsNone(self.ui.getActiveTabDeviceGuid())
+        self.header.addTab("Missing metadata")
+        self.assertEqual(self.ui._resolve_tab_selection(), (None, -1, None))
+        self.assertIsNone(self.ui.getActiveTabDeviceGuid())
+        self.assertIsNone(self.ui.getActiveTabType())
+
+    def test_reindex_keeps_valid_tabs_after_a_missing_data_row(self):
+        self.header.addTab("Missing metadata")
+        self.add_tab("Available")
+        self.ui._tab_index_map, self.ui._tab_device_map, self.ui._tab_name_map = {}, {}, {}
+        self.ui._get_device_name = lambda guid: guid
+        CONFIG.verbose_mode_device = False
+        self.ui._reindex_tabs()
+        self.assertEqual(self.ui._tab_index_map, {1: "Available"})
+        self.assertEqual(self.ui._tab_device_map, {"Available": 1})
 
 
 class MainRefreshTests(unittest.TestCase):
@@ -438,6 +500,140 @@ class MainRefreshTests(unittest.TestCase):
                 self.ui._select_input.assert_not_called()
         finally:
             sys.path[:] = paths
+
+
+ModeWidgetMethods = load_methods("gremlin/ui/ui_common.py", "ModeWidget", {
+    "populate_selector", "select_mode", "_edit_mode_changed_cb", "currentMode",
+}, get_mode_list=lambda profile: profile.get_mode_display_list())
+
+
+class ModeSelector(ModeWidgetMethods):
+    edit_mode_changed = QtCore.Signal(str)
+
+
+class ModeEvents(QtCore.QObject):
+    edit_mode_changed = QtCore.Signal(str)
+    edit_mode_ui_update = QtCore.Signal(str)
+    update_mode_status_bar = QtCore.Signal(str)
+
+
+class ModeState(NS):
+    @property
+    def current_mode(self):
+        return self.runtime_mode if self.is_running else self.edit_mode
+
+
+ModeHandler = load_methods("gremlin/event_handler.py", "EventHandler", {
+    "change_mode", "_change_mode", "set_edit_mode", "_update_mode_selectors", "current_mode", "edit_mode",
+}, EventListener=lambda: SERVICES.event_handler.EventListener())
+
+
+class EditModeTests(unittest.TestCase):
+    def setUp(self):
+        previous_state = SERVICES.shared_state
+        self.addCleanup(setattr, SERVICES, "shared_state", previous_state)
+        if hasattr(SERVICES, "event_handler"):
+            self.addCleanup(setattr, SERVICES, "event_handler", SERVICES.event_handler)
+        else:
+            self.addCleanup(delattr, SERVICES, "event_handler")
+        self.profile = NS(
+            name="test profile", get_default_mode=lambda: "Default",
+            get_modes=lambda: ["Default", "Combat", "Landing"],
+            get_mode_display_list=lambda: [("Default", "Default"), ("  Combat", "Combat"), ("    Landing", "Landing")],
+            modeExists=lambda mode: mode in ("Default", "Combat", "Landing"),
+        )
+        SERVICES.shared_state = ModeState(
+            profile_loading=False, is_running=False, current_profile=self.profile,
+            edit_mode="Default", runtime_mode="Combat", master_mode="Master",
+        )
+        CONFIG.hide_default_mode = CONFIG.verbose_mode_mode = CONFIG.verbose_mode_ui = False
+        CONFIG.mode_change_message = False
+        CONFIG.get_profile_last_edit_mode = Mock(return_value="Default")
+        CONFIG.set_profile_last_edit_mode = Mock()
+        CONFIG.get_last_input = lambda: ("device", None, None)
+        self.listener = ModeEvents()
+        for name in ("push_input_selection", "pop_input_selection", "select_input", "update_input_state"):
+            setattr(self.listener, name, Mock())
+        self.handler = ModeHandler()
+        self.handler.mode_status_update = NS(emit=Mock())
+        SERVICES.event_handler = NS(EventListener=lambda: self.listener, EventHandler=lambda: self.handler)
+        self.ui = main_window()
+        self.ui.config = CONFIG
+        self.ui._tab_device_map = {}
+        self.ui._status_bar_last_edit_mode = self.ui._status_bar_last_runtime_mode = None
+        self.ui._last_toast_message = None
+        self.ui.status_bar_mode_widget = QtWidgets.QLabel(self.ui)
+        self.ui.ui.tray_icon = NS(showMessage=Mock())
+        self.editor = QtWidgets.QLabel(self.ui)
+        self.ui._create_tabs_ui.side_effect = lambda: self.editor.setText(SERVICES.shared_state.edit_mode)
+        self.selector = ModeSelector(self.ui)
+        self.selector.edit_mode_selector = QtWidgets.QComboBox(self.selector)
+        self.selector.edit_mode_selector.autoSize = Mock()
+        self.selector.edit_mode_selector.currentIndexChanged.connect(self.selector._edit_mode_changed_cb)
+        self.ui.mode_selector = self.selector
+        self.selector.populate_selector(self.profile, "Default")
+        self.selector.edit_mode_changed.connect(self.ui._edit_mode_selector_changed)
+        self.listener.edit_mode_changed.connect(self.ui._edit_mode_changed)
+        self.listener.edit_mode_ui_update.connect(self.ui._edit_mode_update)
+        self.listener.update_mode_status_bar.connect(self.ui._update_mode_status_bar)
+        self.addCleanup(self.cleanup_widgets)
+
+    def cleanup_widgets(self):
+        self.ui.deleteLater()
+        self.handler.deleteLater()
+        self.listener.deleteLater()
+        flush_deletes()
+
+    def test_dropdown_updates_edit_state_editor_and_status_and_survives_refresh(self):
+        self.selector.edit_mode_selector.setCurrentIndex(self.selector.edit_mode_selector.findData("Landing"))
+        pump_until(lambda: self.editor.text() == "Landing")
+        self.assertEqual(SERVICES.shared_state.edit_mode, "Landing")
+        self.assertIn("Edit Mode:</b> Landing", self.ui.status_bar_mode_widget.text())
+        CONFIG.set_profile_last_edit_mode.assert_called_once_with("Landing")
+        self.ui._create_tabs_ui.reset_mock()
+        self.ui.refresh()
+        pump_until(lambda: self.ui._create_tabs_ui.called)
+        self.assertEqual(self.selector.currentMode(), "Landing")
+        self.assertEqual(self.editor.text(), "Landing")
+        self.assertIn("Edit Mode:</b> Landing", self.ui.status_bar_mode_widget.text())
+
+    def test_repopulate_uses_requested_mode_then_saved_mode_then_default(self):
+        CONFIG.get_profile_last_edit_mode.return_value = "Combat"
+        for requested, expected in (("Landing", "Landing"), (None, "Combat"), ("deleted", "Combat")):
+            with self.subTest(requested=requested):
+                self.selector.populate_selector(self.profile, requested)
+                self.assertEqual(self.selector.currentMode(), expected)
+        CONFIG.get_profile_last_edit_mode.return_value = "deleted"
+        self.selector.populate_selector(self.profile)
+        self.assertEqual(self.selector.currentMode(), "Default")
+
+    def test_hidden_default_falls_back_to_a_visible_mode_and_emits_once(self):
+        CONFIG.hide_default_mode = True
+        changed = Mock()
+        self.selector.edit_mode_changed.disconnect(self.ui._edit_mode_selector_changed)
+        self.selector.edit_mode_changed.connect(changed)
+        self.selector.populate_selector(self.profile, "Default", emit=True)
+        self.assertEqual(self.selector.currentMode(), "Combat")
+        changed.assert_called_once_with("Combat")
+
+    def test_empty_selection_does_not_request_an_invalid_mode(self):
+        self.selector.edit_mode_changed.disconnect(self.ui._edit_mode_selector_changed)
+        changed = Mock()
+        self.selector.edit_mode_changed.connect(changed)
+        self.selector.edit_mode_selector.setCurrentIndex(-1)
+        changed.assert_not_called()
+
+    def test_mode_status_and_notification_use_edit_or_runtime_mode(self):
+        CONFIG.mode_change_message = True
+        for running, expected in ((False, "Edit Mode:</b> Landing"), (True, "Runtime Mode:</b> Landing")):
+            with self.subTest(running=running):
+                SERVICES.shared_state.is_running = running
+                self.ui.ui.tray_icon.showMessage.reset_mock()
+                self.ui._update_mode_status_bar_ui("Landing")
+                self.assertIn(expected, self.ui.status_bar_mode_widget.text())
+                self.ui.ui.tray_icon.showMessage.assert_called_once()
+                message = self.ui.ui.tray_icon.showMessage.call_args.args[0]
+                self.assertIn("Runtime Mode: Landing" if running else "Edit mode: Landing", message)
 
 
 class Model(QtCore.QObject):

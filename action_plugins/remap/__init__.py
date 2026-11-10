@@ -36,6 +36,52 @@ import gremlin.event_handler
 from shiboken6 import Shiboken
 import dinput
 
+from gremlin.ui.ui_common import (
+    Buttons,
+    clear_layout,
+    Color,
+    ConfirmBox,
+    get_text_width,
+    getGridContainer,
+    getHContainer,
+    getLayoutWidgetHeight,
+    getVContainer,
+    Icons,
+    InputListenerWidget,
+    QArrowPairWidget,
+    QAutoResizeStackedWidget,
+    QAxisRepeaterProgressbar,
+    QCurveWidget,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataLabel,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
+    QDataRadioButtonGroup,
+    QDataWidget,
+    QDelayWidget,
+    QExecuteWidget,
+    QFloatLineEdit,
+    QFrameBox,
+    QHatSelectorComboBox,
+    QHorizontalLine,
+    QHorizontalSeparator,
+    QIconLabel,
+    QIntLineEdit,
+    QProgressBar,
+    QShowAtCursorDialog,
+    QSideBarContainer,
+    QSyncModeWidget,
+    QUsedPushButton,
+    QWarningWidget,
+    RemoteClientWidget,
+    synchronize_grids,
+    QFailoverWidget,
+    VJoySelector
+)
+
+
 syslog = logging.getLogger("system")
 
 
@@ -71,13 +117,14 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-        import gremlin.shared_state
+        #import gremlin.shared_state
 
         if not Shiboken.isValid(self):
             return
-        if not gremlin.shared_state.vjoy_enabled:
-            self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
-            return
+
+        # if not gremlin.shared_state.vjoy_enabled
+        #     self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
+        #     return
 
         self._last_input_type = self.action_data.input_type
         self._last_button_id = -1  # no last button selected
@@ -93,15 +140,15 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
         }
         input_type = self.action_data.get_input_type()
 
-        self.vjoy_selector = ui_common.VJoySelector(
+        self.vjoy_selector = VJoySelector(
             lambda x: self.save_changes(),  # handler when selection changes
             input_types[input_type],
-            self.action_data.get_settings().getVjoyAsInputList(),
+            self.action_data.get_settings().getVirtualAsInputList(),
         )
 
         self.vjoy_selector.input_changed.connect(self._input_changed)
 
-        self.main_layout.addWidget(self.vjoy_selector)
+        self.main_layout.addWidget(getHContainer([self.vjoy_selector, QFailoverWidget(),"||"], widget_only=True))
 
         # Create UI widgets for absolute / relative axis modes if the remap
         # action is being added to an axis input type
@@ -109,9 +156,9 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
             self.remap_type_widget = QtWidgets.QWidget()
             self.remap_type_layout = QtWidgets.QHBoxLayout(self.remap_type_widget)
 
-            self.absolute_checkbox = QtWidgets.QRadioButton("Absolute")
+            self.absolute_checkbox = QDataRadioButton("Absolute")
             self.absolute_checkbox.setChecked(True)
-            self.relative_checkbox = QtWidgets.QRadioButton("Relative")
+            self.relative_checkbox = QDataRadioButton("Relative")
             self.relative_scaling = ui_common.DynamicDoubleSpinBox()
             self.relative_scaling.setRange(0, 1000)
 
@@ -129,19 +176,8 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
                 self.remap_type_widget.show()
 
         # display a warning that this is a legacy mapper
-        warning_container = QtWidgets.QWidget()
-        warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel(
-            "ph.shield-warning-fill",
-            use_qta=True,
-            icon_color=QtGui.QColor(warning_color),
-            text="Legacy mapper - consider using <i>VJoy Remap</i> for additional functionality",
-            use_wrap=False,
-        )
-        warning_layout.addWidget(warning_widget)
-        warning_layout.addStretch()
-        self.main_layout.addWidget(warning_container)
+        warning_widget = QWarningWidget("Legacy mapper - consider using <b>VJoy Remap</b> for additional functionality")
+        self.main_layout.addWidget(warning_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
     @QtCore.Slot()

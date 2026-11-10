@@ -595,8 +595,8 @@ class EventListener(QtCore.QObject):
     # Signal emitted when a joystick is attached or removed
     device_change_event = Signal()
 
-    # fires when vjoy input state changes, parameter is the id of the vjoy and what it's changing to
-    vjoy_as_input_changed = Signal()
+    # Fires when either provider's virtual input selections change.
+    virtual_as_input_changed = Signal()  # vJoy or Maestro profile input selections changed
 
     # fires when the number of gamepad devices changes
     gamepad_change_event = Signal()
@@ -1200,6 +1200,8 @@ class EventListener(QtCore.QObject):
 
     def _queue_settled_axis_event(self, device_guid, input_id: int, raw_axis_value: float, is_virtual: bool):
         """Queues a synthesized final axis sample when an axis has settled."""
+        if is_virtual and self.js.inputIgnored(device_guid):
+            return
         raw_value = gremlin.util.scale_to_range(raw_axis_value, source_min=-32768, source_max=32767, target_min=-1.0, target_max=1.0)
         value = raw_value
         extra_data = {"settled": True}
@@ -1767,7 +1769,7 @@ class EventListener(QtCore.QObject):
         vjoy_id = vjoyevent.vjoy_id
         verbose = self._verbose_vjoy
         # verbose = True # debug mode - force output for diagnostics regardless of user settings
-        if self._profile_started and self.js.getVjoyAsInput(vjoy_id):
+        if self._profile_started and self.js.getVirtualAsInput(vjoy_id):
             # profile is running and started, and the vjoy device is a loopback device (used as input)
             input_type = vjoyevent.input_type
             input_id = vjoyevent.input_id
@@ -2105,6 +2107,10 @@ class EventListener(QtCore.QObject):
                 syslog.info(f"DINPUT EVENT: device not found: [{device.name}]: {dinput_event}")
             return
 
+        # Filter virtual output-only devices before scheduling axis settling.
+        if device.is_virtual and self.js.inputIgnored(device.device_guid):
+            return
+
         if self._dinput_event_filter(device, dinput_event):
             # filtered out
             if verbose:
@@ -2120,7 +2126,7 @@ class EventListener(QtCore.QObject):
 
         event_list = []
         is_virtual = device.is_virtual if device is not None else False
-        if is_virtual:
+        if is_virtual and device.device_type == DeviceType.VJoy:
             input_type = None
             vjoy_id = device.vjoy_id
             if self.js.inputIgnored(data.device_guid):
@@ -2129,7 +2135,7 @@ class EventListener(QtCore.QObject):
                     syslog.info(f"Ignore input: {device.name} input: {dinput_event.input_index} type: {dinput_event.input_type}")
                 return
 
-            if gremlin.shared_state.current_profile.settings.getVjoyAsInput(vjoy_id):
+            if gremlin.shared_state.current_profile.settings.getVirtualAsInput(vjoy_id):
                 # update the event tracker for loop back devices
                 # we need to record the event because vjoy can sometimes trigger, or not trigger a DINPUT event when it's receiving commands.
                 verbose_vjoy = self._verbose_vjoy
@@ -4547,8 +4553,9 @@ class JoystickState:
 
     def hook(self):
         el = EventListener()
-        el.vjoy_as_input_changed.connect(self._vjoy_as_input_changed)  # hook vjoy as input changes
+        el.virtual_as_input_changed.connect(self._virtual_as_input_changed)
         el.profile_loaded.connect(self.reset)  # reset data on profile unload before a new profile is loaded
+        el.device_change_event.connect(self.reset)
 
     def reset(self):
         """resets the ignored device list"""
@@ -4570,29 +4577,31 @@ class JoystickState:
                 self.setInputEnabled(dev.device_guid, False)
                 self.setOutputEnabled(device_guid, True)
             elif dev.is_virtual:
-                is_input_enabled = current_profile.settings.getVjoyAsInput(vid=dev.vjoy_id) if current_profile else False
-                is_output_enabled = True  # not is_input
-                self.setInputEnabled(device_guid, is_output_enabled)
-                self.setOutputEnabled(device_guid, is_input_enabled)
-                self.setVjoyAsInput(dev.vjoy_id, is_input_enabled)
-
-                if verbose:
-                    syslog.info(f"VJOY: {dev.name} [{dev.vjoy_id}] used as {'input' if is_input_enabled else 'output'}")
-            else:
-                self.setInputEnabled(device_guid, False)
+                is_input_enabled = bool(current_profile and current_profile.settings.getVirtualAsInput(dev))
+                is_input_enabled = (
+                    is_input_enabled and dev.connected and not dev.disabled and dev.input_enabled
+                    and not dev.data.get("failover", False)
+                )
+                self.setInputEnabled(device_guid, is_input_enabled)
                 self.setOutputEnabled(device_guid, True)
 
-    def getVjoyAsInput(self, vid: int) -> bool:
-        """true if vjoy device is also used as input"""
+                if verbose:
+                    syslog.info(f"VIRTUAL INPUT: {dev.name} enabled: {is_input_enabled}")
+            else:
+                self.setInputEnabled(device_guid, True)
+                self.setOutputEnabled(device_guid, True)
+
+    def getVirtualAsInput(self, device, device_type=DeviceType.VJoy) -> bool:
+        """Return whether a virtual joystick is selected as input."""
         profile = gremlin.shared_state.current_profile
         if profile:
-            return profile.settings.getVjoyAsInput(vid)
+            return profile.settings.getVirtualAsInput(device, device_type)
         return False
 
-    def setVjoyAsInput(self, vid: int, enabled: bool):
+    def setVirtualAsInput(self, device, enabled: bool, device_type=DeviceType.VJoy):
         profile = gremlin.shared_state.current_profile
         if profile:
-            profile.settings.setVjoyAsInput(vid, enabled)
+            profile.settings.setVirtualAsInput(device, enabled, device_type)
 
     def inputEnabled(self, device_guid) -> bool:
         """true if device input is enabled"""
@@ -4626,10 +4635,8 @@ class JoystickState:
             # registry; getDeviceName() handles that and reports the guid
             # instead, so verbose logging can never crash profile load.
             device_name = gremlin.joystick_handling.getDeviceName(device_guid)
-            syslog.info(f"VJOY: {device_name} input: {'off' if enabled else 'on'}")
+            syslog.info(f"JOYSTICK: {device_name} input: {'on' if enabled else 'off'}")
         self._input_ignored_device_list[device_guid] = not enabled
-        if verbose:
-            syslog.info("VJOY ")
 
     def setOutputEnabled(self, device_guid, enabled: bool):
         """marks a device as output ignored"""
@@ -4644,19 +4651,18 @@ class JoystickState:
             # getDevice() can return None for an unknown guid - use the
             # name helper which reports the guid instead of raising.
             device_name = gremlin.joystick_handling.getDeviceName(device_guid)
-            syslog.info(f"VJOY: {device_name} output: {'off' if enabled else 'on'}")
+            syslog.info(f"JOYSTICK: {device_name} output: {'on' if enabled else 'off'}")
 
-    def _vjoy_as_input_changed(self):
-        import gremlin.joystick_handling
-        vjoy_devices = gremlin.joystick_handling.all_vjoy_devices()
+    def _virtual_as_input_changed(self):
+        """Apply profile input selections for both virtual joystick providers."""
         profile = gremlin.shared_state.current_profile
-        if profile:
-            vid_list = profile.settings.getVjoyAsInputList()
-            for dev in vjoy_devices:
-                # vjoy input is enabled, disable output to it
-                device_id = dev.device_id
-                input_enabled = dev.vjoy_id in vid_list
-                self.setInputEnabled(device_id, input_enabled)
+        for dev in gremlin.joystick_handling.virtual_devices(connected_only=False):
+            input_enabled = bool(profile and profile.settings.getVirtualAsInput(dev))
+            input_enabled = (
+                input_enabled and dev.connected and not dev.disabled and dev.input_enabled
+                and not dev.data.get("failover", False)
+            )
+            self.setInputEnabled(dev.device_guid, input_enabled)
 
 
 class AxisValues:

@@ -293,11 +293,11 @@ class Axis:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Loopback only for "vJoy as input" devices. Needed so mappings on the
+        # Loopback only for "virtual as input" devices. Needed so mappings on the
         # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis — DINPUT
         # echo is unreliable. Gated to avoid flooding normal output-only devices.
         profile = shared_state.current_profile
-        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+        if profile is not None and profile.settings.getVirtualAsInput(self.vjoy_id):
             el.vjoy_event.emit(
                 event_handler.VjoyEvent(
                     self.vjoy_id,
@@ -392,10 +392,10 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Loopback only for "vJoy as input" devices (button chaining). Not emitted
+        # Loopback only for "virtual as input" devices (button chaining). Not emitted
         # for normal output-only vJoy writes.
         profile = shared_state.current_profile
-        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+        if profile is not None and profile.settings.getVirtualAsInput(self.vjoy_id):
             el.vjoy_event.emit(
                 event_handler.VjoyEvent(
                     self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
@@ -566,9 +566,9 @@ class Hat:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # m76T185 hat loopback, gated to vJoy-as-input devices only.
+        # m76T185 hat loopback, gated to virtual-as-input devices only.
         profile = shared_state.current_profile
-        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+        if profile is not None and profile.settings.getVirtualAsInput(self.vjoy_id):
             el.vjoy_event.emit(
                 event_handler.VjoyEvent(
                     self.vjoy_id, InputType.JoystickHat, self.hat_id, direction

@@ -78,6 +78,7 @@ from gremlin.ui.ui_common import (
     QWarningWidget,
     RemoteClientWidget,
     synchronize_grids,
+    QFailoverWidget
 )
 
 from gremlin.ui.qsliderwidget import QSliderWidget
@@ -1761,7 +1762,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.relative_checkbox.clicked.connect(self._axis_mode_changed)
         self.relative_scaling_widget.valueChanged.connect(self._axis_scaling_changed)
 
-        # self.sb_start_value.valueChanged.connect(self._axis_start_value_changed)
         self.b_min_value.clicked.connect(self._b_min_start_value_clicked)
         self.b_center_value.clicked.connect(self._b_center_start_value_clicked)
         self.b_max_value.clicked.connect(self._b_max_start_value_clicked)
@@ -2521,8 +2521,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.virtual_device_selector_widget = QDataComboBox(callback_index=self._handle_virtual_device_input_changed)
         self.virtual_device_selector_widget.setFixedWidth(width)
 
+        self.failover_widget = QFailoverWidget() # shows when GEX is in virtual failover mode
+
         self.container_device_selector_widget = getGridContainer(
-            [self.virtual_device_label_widget, self.virtual_device_selector_widget, " "],
+            [self.virtual_device_label_widget, self.virtual_device_selector_widget, self.failover_widget],
             widget_only=True,
             bottom_margin=4,
         )
@@ -4719,8 +4721,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.virtual_output_selector_widget.setVisible(input_selector_visible)
         self.virtual_output_label_widget.setVisible(input_selector_visible)
 
-        # self.sb_start_value.setEnabled(start_value_enabled)
-
         self.button_to_axis_value_widget.setEnabled(set_target_visible)
 
         self.container_axis_to_button_range_widget.setVisible(button_range_visible)
@@ -5159,10 +5159,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_range_text()
 
     @QtCore.Slot()
-    def _axis_start_value_changed(self):
-        self.action_data.axis_start_value = self.sb_start_value.value()
-
-    @QtCore.Slot()
     def _button_range_low_changed(self):
         self.action_data.button_range_min = self.sb_button_range_low.value()
 
@@ -5206,15 +5202,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _b_min_start_value_clicked(self):
-        self.sb_start_value.setValue(-1.0)
+        self._sync_widget.setValue(-1.0)
 
     @QtCore.Slot()
     def _b_center_start_value_clicked(self):
-        self.sb_start_value.setValue(0.0)
+        self._sync_widget.setValue(0.0)
 
     @QtCore.Slot()
     def _b_max_start_value_clicked(self):
-        self.sb_start_value.setValue(1.0)
+        self._sync_widget.setValue(1.0)
 
     @QtCore.Slot(bool)
     def _ignore_release_changed(self, checked: bool):
@@ -6209,8 +6205,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             worker.stop()
 
     def _relative_pulse_on(self, data):
-        vjoy_id, vjoy_input_id, is_local, is_remote = data
-        if not self._is_output_connected(self.vjoy_id):
+        vjoy_id, vjoy_input_id, is_local, is_remote, force_remote = data
+        if not self._is_output_connected(vjoy_id):
             return
 
         with self.lock:
@@ -6221,18 +6217,22 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 syslog.info(f"Tick: {offset:0.3f} scale: {self.scale_factor:0.3f}")
 
             # read the current output axis value
-            value = self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value
+            value = self._get_axis(vjoy_id, vjoy_input_id)
 
             # apply the offset
             value = gremlin.util.clamp(value + offset)
             if is_local:
-                self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value = value
+                self._set_axis(vjoy_id, vjoy_input_id, value, send_flags=(True, False))
             if is_remote:
+                # The receiver adds this delta to its own current position.
+                if self.usage_data.is_inverted(self._output_key(vjoy_id), vjoy_input_id):
+                    offset = -offset
                 self.remote_client.send_relative_axis(
-                    self.vjoy_id,
-                    self.vjoy_input_id,
-                    value,
+                    vjoy_id,
+                    vjoy_input_id,
+                    offset,
                     client_list=self.client_list,
+                    force_remote=force_remote,
                 )
             # remember the last value
             self.action_data.axis_last_value = value
@@ -6573,7 +6573,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         relative_input = event.value if event.value is not None else value
                         direction = -1 if relative_input < 0 else 1
                         self.scale_factor = abs(relative_input) if self.action_data.use_relative_value else 1.0
-                        worker_data = (self.vjoy_id, self.vjoy_input_id, is_local, is_remote)
+                        worker_data = (self.vjoy_id, self.vjoy_input_id, is_local, is_remote, force_remote)
                         if self._relative_pulse_worker is None:
                             self._relative_pulse_worker = PulseWorker(
                                 0,

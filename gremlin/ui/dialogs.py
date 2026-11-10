@@ -291,7 +291,7 @@ class HostIpDialog(BaseDialogUi):
         ok_widget = QDataPushButton("Ok", callback=self._ok_cb)
         cancel_widget = QDataPushButton("Cancel", callback=self._cancel_cb)
 
-        widget = getHContainer([ok_widget, cancel_widget], left_stretch=True, widget_only=True)
+        widget = getHContainer([ok_widget, cancel_widget], left_stretch=True, auto_size=True, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self._update_ip()
@@ -316,7 +316,9 @@ class HostIpDialog(BaseDialogUi):
     def _update_ui(self):
         self._host_ip_widget.setReadOnly(self._existing_only)
 
-        msg = "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
+        msg = (
+            "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
+        )
         self._instruction_widget.setText(msg)
 
     @QtCore.Slot()
@@ -450,8 +452,12 @@ class OptionsDialog(BaseDialogUi):
             message_box = QtWidgets.QMessageBox()
             message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
             message_box.setText("Configuration Error")
-            message_box.setInformativeText("The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries.")
-            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Cancel | QtWidgets.QMessageBox.StandardButton.Discard)
+            message_box.setInformativeText(
+                "The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries."
+            )
+            message_box.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Cancel | QtWidgets.QMessageBox.StandardButton.Discard
+            )
             gremlin.util.centerDialog(message_box)
             result = message_box.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Discard:
@@ -560,81 +566,127 @@ class OptionsDialog(BaseDialogUi):
         page_layout.addStretch()
 
         # Close to system tray option
-        self.close_to_systray = QDataCheckbox("Closing minimizes to system tray", checked=self.config.close_to_tray, callback=self._close_to_systray)
+        self.close_to_systray = QDataCheckbox(
+            "Closing minimizes to system tray", checked=self.config.close_to_tray, callback=self._close_to_systray
+        )
 
         # show import dialog on missing devices
-        self.import_prompt_widget = QDataCheckbox("Import prompt on missing devices", checked=self.config.import_prompt_enabled, callback=self._import_prompt)
-        self.import_prompt_widget.setToolTip("When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device")
+        self.import_prompt_widget = QDataCheckbox(
+            "Import prompt on missing devices", checked=self.config.import_prompt_enabled, callback=self._import_prompt
+        )
+        self.import_prompt_widget.setToolTip(
+            "When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device"
+        )
 
         # synchronize action/container drop downs
         self.sync_last_selection = QDataCheckbox(
-            "Sync action and container selections", checked=self.config.sync_last_selection, callback=self._sync_last_selection
+            "Sync action and container selections",
+            checked=self.config.sync_last_selection,
+            callback=self._sync_last_selection,
         )
-        self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
+        self.sync_last_selection.setToolTip(
+            "When enabled, action and container drop downs will remain synchronized with the last selected entry"
+        )
 
         # ignore device changes at runtime
         self.runtime_ignore_device_change = QDataCheckbox(
-            "Ignore device change at runtime", checked=self.config.runtime_ignore_device_change, callback=self._runtime_ignore_device_change
+            "Ignore device change at runtime",
+            checked=self.config.runtime_ignore_device_change,
+            callback=self._runtime_ignore_device_change,
         )
-        self.runtime_ignore_device_change.setToolTip("When enabled, device connect/disconnects will be ignored at runtime")
+        self.runtime_ignore_device_change.setToolTip(
+            "When enabled, device connect/disconnects will be ignored at runtime"
+        )
 
-        self.show_input_enable = QDataCheckbox("Show input enable buttons", checked=self.config.show_input_enable, callback=self._show_input_enable)
-        self.show_input_enable.setToolTip("When enabled, displays a toggle button for each input to enable or disable it in the profile")
+        self.show_input_enable = QDataCheckbox(
+            "Show input enable buttons", checked=self.config.show_input_enable, callback=self._show_input_enable
+        )
+        self.show_input_enable.setToolTip(
+            "When enabled, displays a toggle button for each input to enable or disable it in the profile"
+        )
         self.show_input_enable.setDisabled(True)
 
-        self.start_on_f5 = QDataCheckbox("Start profile on F5", checked=self.config.start_on_f5, callback=self._start_on_f5)
+        self.start_on_f5 = QDataCheckbox(
+            "Start profile on F5", checked=self.config.start_on_f5, callback=self._start_on_f5
+        )
         self.start_on_f5.setToolTip("When enabled, profiles can be started using the F5 key")
 
         # Start minimized option
-        self.start_minimized = QDataCheckbox("Start Gremlin Ex minimized", checked=self.config.start_minimized, callback=self._start_minimized)
+        self.start_minimized = QDataCheckbox(
+            "Start Gremlin Ex minimized", checked=self.config.start_minimized, callback=self._start_minimized
+        )
 
         # Start on user login
-        self.start_with_windows = QDataCheckbox("Start Gremlin Ex with Windows", checked=self._start_windows_enabled(), callback=self._start_windows)
+        self.start_with_windows = QDataCheckbox(
+            "Start Gremlin Ex with Windows", checked=self._start_windows_enabled(), callback=self._start_windows
+        )
         self.start_with_windows.setToolTip("Enables starting GremlinEx at login (GremlinEx must run as administrator)")
         is_admin = self.is_admin()
         self.start_with_windows.setEnabled(is_admin)
 
         # Persist clipboard to file (user profile)
         self.persist_clipboard = QDataCheckbox(
-            "Persist clipboard data between sessions", checked=self._persist_clipboard_enabled(), callback=self._persist_clipboard
+            "Persist clipboard data between sessions",
+            checked=self._persist_clipboard_enabled(),
+            callback=self._persist_clipboard,
         )
 
         self.allow_invalid_container_build = QDataCheckbox(
-            "Invalid container does not fail build", checked=self.config.allow_exec_tree_container_validation_fail, callback=self._allow_invalid_container_build
+            "Invalid container does not fail build",
+            checked=self.config.allow_exec_tree_container_validation_fail,
+            callback=self._allow_invalid_container_build,
         )
-        self.allow_invalid_container_build.setToolTip("When enabled, an invalid container will not fail the execution build.")
+        self.allow_invalid_container_build.setToolTip(
+            "When enabled, an invalid container will not fail the execution build."
+        )
 
         # allow partial plugin configurations
-        self.partial_plugin_save = QDataCheckbox("Save partial user plugin data", checked=self.config.partial_plugin_save, callback=self._partial_plugin_save)
+        self.partial_plugin_save = QDataCheckbox(
+            "Save partial user plugin data", checked=self.config.partial_plugin_save, callback=self._partial_plugin_save
+        )
         self.partial_plugin_save.setToolTip(
             "When enabled, user-plugin configuration will be saved even if one or more input variable reports not-configured.<br>This feature allows saving of the configuration to date.<br>Incomplete configurations will not be activated at runtime even if this feature is used."
         )
 
         # range resolution - decimal
-        self.range_precision_widget = QIntLineEdit(min_range=0, max_range=8, value=self.config.range_comparison_decimals)
+        self.range_precision_widget = QIntLineEdit(
+            min_range=0, max_range=8, value=self.config.range_comparison_decimals
+        )
         self.range_precision_widget.setToolTip("Number of decimals for floating point range comparisons")
         self.range_precision_widget.valueChanged.connect(self._range_precision_changed)
 
         # use version names in log files
         self.enable_version_log_widget = QDataCheckbox(
-            "Version based Configuration Data (restart required)", checked=self.config.enable_log_version, callback=self._enable_version_log_changed
+            "Version based Configuration Data (restart required)",
+            checked=self.config.enable_log_version,
+            callback=self._enable_version_log_changed,
         )
-        self.enable_version_log_widget.setToolTip("If enabled, GremlinEx will use a versioned data folder.  Not recommended for normal usage.")
+        self.enable_version_log_widget.setToolTip(
+            "If enabled, GremlinEx will use a versioned data folder.  Not recommended for normal usage."
+        )
 
         # global numlock
-        self.numlock_enabled = QDataCheckbox("Force Numlock Off (global)", checked=self.config.numlock_off, callback=self._numlock_off)
-        self.numlock_enabled.setToolTip("When set, numlock will be turned off whenever a profile starts unless that profile has its own setting")
+        self.numlock_enabled = QDataCheckbox(
+            "Force Numlock Off (global)", checked=self.config.numlock_off, callback=self._numlock_off
+        )
+        self.numlock_enabled.setToolTip(
+            "When set, numlock will be turned off whenever a profile starts unless that profile has its own setting"
+        )
 
         # Show message on mode change
         self.show_mode_change_message = QDataCheckbox(
-            "Show message when changing mode", checked=self.config.mode_change_message, callback=self._show_mode_change_message
+            "Show message when changing mode",
+            checked=self.config.mode_change_message,
+            callback=self._show_mode_change_message,
         )
         self.show_mode_change_message.setToolTip("Displays mode changes in the status bar when enabled.")
 
         # Default action selection
 
         self.default_action_dropdown = QDataComboBox(auto_adjust=True)
-        self.default_action_widget, self.default_action_layout = getHContainer([self.default_action_dropdown, ("", 100)], "Default Action:")
+        self.default_action_widget, self.default_action_layout = getHContainer(
+            [self.default_action_dropdown, ("", 100)], "Default Action:"
+        )
         self._init_action_dropdown()
 
         # Macro axis polling rate
@@ -779,7 +831,9 @@ class OptionsDialog(BaseDialogUi):
             widget.clicked.connect(self._theme_changed)
             widgets.append(widget)
 
-        self.customize_theme_widget = QDataPushButton("Custom Colors...", tooltip="Customize theme", callback=self._handle_customize_theme)
+        self.customize_theme_widget = QDataPushButton(
+            "Custom Colors...", tooltip="Customize theme", callback=self._handle_customize_theme
+        )
         widgets.append("(Restart Required)")
 
         self.theme_widget = getHContainer(widgets, widget_only=True)
@@ -793,21 +847,27 @@ class OptionsDialog(BaseDialogUi):
         col1_layout.addWidget(box)
 
         # Switch to highlighted device (master switch)
-        self.highlight_enabled = QDataCheckbox("Enable Input Highlighting", checked=self.config.highlight_enabled, callback=self._highlight_enabled_cb)
+        self.highlight_enabled = QDataCheckbox(
+            "Enable Input Highlighting", checked=self.config.highlight_enabled, callback=self._highlight_enabled_cb
+        )
         self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
         self.highlight_enabled.setToolTip("Enable device highlighting.")
         self.highlight_enabled.setChecked(self.config.highlight_enabled)
 
         # highlight autoswitch
         self.highlight_autoswitch = QDataCheckbox(
-            "Switch to new device on input highlight trigger", checked=self.config.highlight_autoswitch, callback=self._highlight_autoswitch
+            "Switch to new device on input highlight trigger",
+            checked=self.config.highlight_autoswitch,
+            callback=self._highlight_autoswitch,
         )
         self.highlight_autoswitch.setToolTip(
             "This option enables automatic device tab switching between device on device input triggers (physical hardware only).<br>Requires axis or button highlight options to be enabled as well."
         )
 
         self.highlight_hotkey_autoswitch = QDataCheckbox(
-            "Allow autoswitch override on hotkey", checked=self.config.highlight_hotkey_autoswitch, callback=self._highlight_hotkey_autoswitch
+            "Allow autoswitch override on hotkey",
+            checked=self.config.highlight_hotkey_autoswitch,
+            callback=self._highlight_hotkey_autoswitch,
         )
         self.highlight_hotkey_autoswitch.setToolTip(
             "This option enables automatic device tab switching between device if the hotkeys are pressed for the axis/button overrides even when the autoswitch option is off."
@@ -815,7 +875,9 @@ class OptionsDialog(BaseDialogUi):
 
         # Highlight input option
         self.highlight_input_axis = QDataCheckbox(
-            "Highlight currently triggered axis", checked=self.config.highlight_input_axis, callback=self._highlight_input_axis
+            "Highlight currently triggered axis",
+            checked=self.config.highlight_input_axis,
+            callback=self._highlight_input_axis,
         )
         self.highlight_input_axis.setToolTip(
             "This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input."
@@ -823,7 +885,9 @@ class OptionsDialog(BaseDialogUi):
 
         # Highlight input option buttons
         self.highlight_input_buttons = QDataCheckbox(
-            "Highlight currently triggered button", checked=self.config.highlight_input_buttons, callback=self._highlight_input_buttons
+            "Highlight currently triggered button",
+            checked=self.config.highlight_input_buttons,
+            callback=self._highlight_input_buttons,
         )
         self.highlight_input_buttons.setToolTip(
             "This otion will enable automatic selection and highlighting of detected button input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a shift key while pressing a button."
@@ -879,7 +943,9 @@ class OptionsDialog(BaseDialogUi):
 
         # show parent mode in mode name drop downs
         self.show_parent_mode_widget = QDataCheckbox(
-            "Show parent mode in mode selector", checked=self.config.show_parent_mode, callback=self._show_parent_mode_widget_cb
+            "Show parent mode in mode selector",
+            checked=self.config.show_parent_mode,
+            callback=self._show_parent_mode_widget_cb,
         )
         self.show_parent_mode_widget.setToolTip("When enabled, shows the parent mode name in the mode drop downs")
 
@@ -898,9 +964,13 @@ class OptionsDialog(BaseDialogUi):
 
         # show scan codes
         self.show_scancodes_widget = QDataCheckbox(
-            "Show keyboard scancodes for keyboard inputs", checked=self.config.show_scancodes, callback=self._show_scancodes_cb
+            "Show keyboard scancodes for keyboard inputs",
+            checked=self.config.show_scancodes,
+            callback=self._show_scancodes_cb,
         )
-        self.show_scancodes_widget.setToolTip("When enabled, keyboard hexadecimal scan codes will be displayed in the keyboard input UI")
+        self.show_scancodes_widget.setToolTip(
+            "When enabled, keyboard hexadecimal scan codes will be displayed in the keyboard input UI"
+        )
 
         box = QBoxFrameLayout(title="Keyboard", transparent=True)
         box.addWidget(self.show_scancodes_widget)
@@ -923,7 +993,9 @@ class OptionsDialog(BaseDialogUi):
         # )
         # self.runtime_ui_update.setEnabled(False)
 
-        self.show_id_widget = QDataCheckbox("Show container/action IDs", checked=self.config.show_container_id, callback=self._show_id_changed)
+        self.show_id_widget = QDataCheckbox(
+            "Show container/action IDs", checked=self.config.show_container_id, callback=self._show_id_changed
+        )
 
         log_description_widget = QDataCheckbox(
             "Log description action",
@@ -1519,9 +1591,10 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
 
     def _handle_use_v2_macro_mode_changed(self, checked: bool):
         self.config.use_v2_macro_mode = checked
-        
+
     def _handle_virtual_output_failover_changed(self, checked: bool):
         self.config.virtual_output_failover = checked
+
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
         page_widget, page_layout = getVContainer()
@@ -1604,7 +1677,9 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
         self.tts_rate_widget.setValue(self.config.initial_load_rate_tts)
         self.tts_rate_widget.valueChanged.connect(self._rate_changed_cb)
         self.tts_rate_widget.doubleClick.connect(self._rate_reset_cb)
-        self.tts_rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
+        self.tts_rate_widget.setToolTip(
+            f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}"
+        )
 
         self.tts_volume_widget = QIntLineEdit()
         self.tts_volume_widget.setRange(0, 100)
@@ -1802,10 +1877,18 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_layout.setContentsMargins(6, 0, 6, 0)
         self.scroll_layout.addStretch()
 
-        sort_profile_widget = QDataPushButton("Sort Profile", callback=self._sort_profile_cb, tooltip="Sorts mappings by profile")
-        sort_process_widget = QDataPushButton("Sort Process", callback=self._sort_process_cb, tooltip="Sorts mappings by process")
+        sort_profile_widget = QDataPushButton(
+            "Sort Profile", callback=self._sort_profile_cb, tooltip="Sorts mappings by profile"
+        )
+        sort_process_widget = QDataPushButton(
+            "Sort Process", callback=self._sort_process_cb, tooltip="Sorts mappings by process"
+        )
 
-        add_map_widget = QDataPushButton("Add mapping", callback=self._add_profile_map_cb, tooltip="Adds a new application (process) to profile mapping entry")
+        add_map_widget = QDataPushButton(
+            "Add mapping",
+            callback=self._add_profile_map_cb,
+            tooltip="Adds a new application (process) to profile mapping entry",
+        )
         icon = Icons.addIcon()
         add_map_widget.setIcon(icon)
 
@@ -1814,7 +1897,9 @@ This setting is also available on a profile by profile basis on the profile tab,
         count = self.config.backup_count
         self.backup_count_widget.setValue(count)
         self.backup_count_widget.valueChanged.connect(self._backup_count_changed)
-        self.backup_count_widget.setToolTip("Number of backups to make when saving a profile.\nSet to 0 to disable backups.")
+        self.backup_count_widget.setToolTip(
+            "Number of backups to make when saving a profile.\nSet to 0 to disable backups."
+        )
 
         self.backup_count_disabled = QtWidgets.QLabel("(disabled)")
         self.backup_count_disabled.setVisible(count == 0)
@@ -2056,7 +2141,9 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         self._local_host_ip_widget.setMaximumWidth(w)
 
         self._select_ip_widget = QDataPushButton("Select")
-        self._select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address.")
+        self._select_ip_widget.setToolTip(
+            "Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address."
+        )
         self._select_ip_widget.clicked.connect(self._change_host_ip)
 
         row = 0
@@ -2197,18 +2284,48 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout.addWidget(QtWidgets.QLabel("Module Configuration Options"))
 
         modules = [
-            ("streamdeck", "StreamDeck Bridge", "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.", "GEX_STREAMDECK_ENABLED"),
-            ("overlay", "Overlay", "When set, GremlinEx enables the overlay module for displaying information on screen.", "GEX_OVERLAY_ENABLED"),
-            ("afcs", "AFCS", "When set, GremlinEx enables the AFCS visual axis-flow designer tab and Map to AFCS action.", "GEX_AFCS_ENABLED"),
-            ("midi", "MIDI", "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.", "GEX_MIDI_ENABLED"),
+            (
+                "streamdeck",
+                "StreamDeck Bridge",
+                "GremlinEx enables the StreamDeck bridge module to manage Elgato StreamDecks.",
+                "GEX_STREAMDECK_ENABLED",
+            ),
+            (
+                "overlay",
+                "Overlay",
+                "When set, GremlinEx enables the overlay module for displaying information on screen.",
+                "GEX_OVERLAY_ENABLED",
+            ),
+            (
+                "afcs",
+                "AFCS",
+                "When set, GremlinEx enables the AFCS visual axis-flow designer tab and Map to AFCS action.",
+                "GEX_AFCS_ENABLED",
+            ),
+            (
+                "midi",
+                "MIDI",
+                "When set, GremlinEx enables the MIDI module for interacting with MIDI devices.",
+                "GEX_MIDI_ENABLED",
+            ),
             (
                 "osc",
                 "OSC",
                 "When set, GremlinEx enables the OSC module for interacting with OSC protocols including Bitfocus managed devices, and OSC control surfaces on the network.",
                 "GEX_OSC_ENABLED",
             ),
-            ("voice", "Voice", "When set, GremlinEx enabl es the voice module for voice command interactions.", "GEX_VOICE_ENABLED"),
-            ("octavi", "Octavi", "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.", "GEX_OCTAVI_ENABLED"),
+            (
+                "voice",
+                "Voice",
+                "When set, GremlinEx enabl es the voice module for voice command interactions.",
+                "GEX_VOICE_ENABLED",
+            ),
+            (
+                "octavi",
+                "Octavi",
+                "When set, GremlinEx enables the Octavi device module for interacting with Octavi devices.",
+                "GEX_OCTAVI_ENABLED",
+            ),
             (
                 "maestro",
                 "Maestro",
@@ -2249,7 +2366,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 case "maestro":
                     value = self.config.maestro_enabled
                     enabled = False
-            checkbox = QDataCheckbox(name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed)
+            checkbox = QDataCheckbox(
+                name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed
+            )
             checkbox.setEnabled(enabled)
             if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
                 var_widget = QtWidgets.QLabel(f"({env_var} set)")
@@ -3376,7 +3495,9 @@ Enabled modules may not show until the device filter is updated.
                 restore_widget = QDataCheckbox("Restore last mode on start", item)
                 restore_widget.setChecked(item.restore_last_mode_on_auto_activate)
                 restore_widget.clicked.connect(self._restore_profile_last_mode_on_change)
-                restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
+                restore_widget.setToolTip(
+                    "When set, restores the last used mode if the profile has been automatically loaded on process change"
+                )
 
                 mode_widget = QDataComboBox(item)
 
@@ -3466,7 +3587,9 @@ Enabled modules may not show until the device filter is updated.
     def _profile_open_cb(self, widget):
         """opens the profile list"""
         item = widget.data
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Select Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None, "Select Profile", gremlin.shared_state.data_path, "XML files (*.xml)"
+        )
         if fname:
             item.profile = fname
             with QtCore.QSignalBlocker(widget):
@@ -3500,7 +3623,9 @@ Enabled modules may not show until the device filter is updated.
         # pixmap = load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
+        )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
@@ -3589,7 +3714,9 @@ class ProcessWindow(BaseDialogUi):
         self.button_bar_layout = QtWidgets.QHBoxLayout()
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
-        self.refresh_button = QDataPushButton("Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh)
+        self.refresh_button = QDataPushButton(
+            "Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh
+        )
 
         self.main_layout.addWidget(self.list_view)
 
@@ -3796,7 +3923,9 @@ class ModeManagerAddUI(BaseDialogUi):
         widget, layout = getGridContainer(["New mode:", self._edit_widget])
         grid_widgets.append(widget)
 
-        self._parent_widget = QDataComboBox(tooltip="Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode.")
+        self._parent_widget = QDataComboBox(
+            tooltip="Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode."
+        )
 
         widget, layout = getGridContainer(["Parent mode:", self._parent_widget])
         grid_widgets.append(widget)
@@ -3815,7 +3944,9 @@ class ModeManagerAddUI(BaseDialogUi):
         cancel_button_widget = QDataPushButton("Cancel", callback=self._cancel_cb)
         ok_button_widget = QDataPushButton("Ok", callback=self._close_cb)
 
-        widget = getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True, auto_size=True)
+        widget = getHContainer(
+            [ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True, auto_size=True
+        )
         button_container_widget = widget
 
         self.main_layout.addWidget(button_container_widget)
@@ -3923,9 +4054,13 @@ class ModeManagerDialog(BaseDialogUi):
         self.scroll_layout.addWidget(self.mode_widget)
         self.scroll_layout.addStretch()
 
-        self.add_button = QDataPushButton("Add Mode", callback=self._add_mode_cb, tooltip="Adds a new mode to the profile")
+        self.add_button = QDataPushButton(
+            "Add Mode", callback=self._add_mode_cb, tooltip="Adds a new mode to the profile"
+        )
 
-        label = QtWidgets.QLabel('A mode represents a unique set of mappings.A parent for a mode causes the the mode "inherits" all actions of the parent. ')
+        label = QtWidgets.QLabel(
+            'A mode represents a unique set of mappings.A parent for a mode causes the the mode "inherits" all actions of the parent. '
+        )
         label.setStyleSheet(f"QLabel {{ background-color : {Color().selectColor()}; }}")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
@@ -4045,13 +4180,17 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"), tooltip="Edit", callback=self._create_rename_mode_cb(mode))
+            self.mode_rename[mode] = QDataPushButton(
+                icon=load_icon("ei.edit"), tooltip="Edit", callback=self._create_rename_mode_cb(mode)
+            )
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"), tooltip="Delete", callback=self._create_delete_mode_cb(mode))
+            self.mode_delete[mode] = QDataPushButton(
+                icon=load_icon("mdi.delete"), tooltip="Delete", callback=self._create_delete_mode_cb(mode)
+            )
             self.mode_delete[mode].setEnabled(len(mode_list) > 1)
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
@@ -4139,7 +4278,9 @@ The setting can be overriden by the global mode reload option set in Options for
         """
 
         # Retrieve new name from the user
-        new_name, user_input = QtWidgets.QInputDialog.getText(self, "Mode name", "", QtWidgets.QLineEdit.Normal, current_name)
+        new_name, user_input = QtWidgets.QInputDialog.getText(
+            self, "Mode name", "", QtWidgets.QLineEdit.Normal, current_name
+        )
         new_name = new_name.strip()
         if new_name == current_name:
             # nothing to change
@@ -4152,7 +4293,10 @@ The setting can be overriden by the global mode reload option set in Options for
                 self._populate_mode_layout()
 
     def _delete_mode(self, mode_name):
-        if ConfirmBox(prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?", parent=self):
+        if ConfirmBox(
+            prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?",
+            parent=self,
+        ):
             self._delete_mode_confirm(mode_name)
 
     def _delete_mode_confirm(self, mode_name):
@@ -4320,14 +4464,18 @@ class DeviceInformationDialog(BaseDialogUi):
 
         devices = gremlin.joystick_handling.all_joystick_devices()
 
-        connected_devices = [d for d in devices if d.connected and not d.is_virtual]  # list of connected hardware devices
+        connected_devices = [
+            d for d in devices if d.connected and not d.is_virtual
+        ]  # list of connected hardware devices
         connected_vjoy_devices = [d for d in devices if d.connected and d.is_virtual]  # list of connected vjoy devices
 
         connected_devices.sort(key=lambda d: (d.device_type, d.vendor_id, d.name))
         connected_vjoy_devices.sort(key=lambda d: d.vjoy_id)
 
         if show_disconnected:
-            disconnected_devices = [d for d in devices if not d.connected]  # list of disconnected devices, including vjoy devices
+            disconnected_devices = [
+                d for d in devices if not d.connected
+            ]  # list of disconnected devices, including vjoy devices
             disconnected_devices.sort(key=lambda d: (d.vjoy_id, d.device_type, d.vendor_id, d.name))
         else:
             disconnected_devices = []
@@ -4373,7 +4521,11 @@ class DeviceInformationDialog(BaseDialogUi):
 
     def eventFilter(self, source, event):
         """table event filter"""
-        if isinstance(event, QtGui.QSinglePointEvent) and event.type() == QtCore.QEvent.MouseButtonPress and source is self.table.viewport():
+        if (
+            isinstance(event, QtGui.QSinglePointEvent)
+            and event.type() == QtCore.QEvent.MouseButtonPress
+            and source is self.table.viewport()
+        ):
             button = event.buttons()
             if button == QtCore.Qt.RightButton:
                 pos = event.position().toPoint()
@@ -4437,15 +4589,21 @@ class DeviceInformationDialog(BaseDialogUi):
             if device.is_virtual:
                 # skip virtual devices
                 continue
-            var_name = re.sub("[^0-9a-zA-Z]+", "_", device.name)  # cleanup non alphanumeric in the name for clean variable names
-            s_list.append(f"\n# device {device.name} - axis count: {device.axis_count}  hat count: {device.hat_count}  button count: {device.button_count}")
+            var_name = re.sub(
+                "[^0-9a-zA-Z]+", "_", device.name
+            )  # cleanup non alphanumeric in the name for clean variable names
+            s_list.append(
+                f"\n# device {device.name} - axis count: {device.axis_count}  hat count: {device.hat_count}  button count: {device.button_count}"
+            )
             s_list.append(f'{var_name}_NAME = "{device.name}"')
             s_list.append(f'{var_name}_GUID = "{device.device_guid}"')
             for mode_name in mode_list:
                 mode_suffix = mode_name.replace(" ", "_")
                 if mode_name not in a_map.keys():
                     a_map[mode_name] = set()
-                a_map[mode_name].add(f'{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, "{mode_name}")')
+                a_map[mode_name].add(
+                    f'{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, "{mode_name}")'
+                )
 
         script = ""
         for line in s_list:
@@ -4628,7 +4786,9 @@ class SubstituteDialog(QRememberDialog):
         self.main_layout.addWidget(self.header_container_widget)
         self.main_layout.addStretch()
 
-        self._profile_devices = [device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick]
+        self._profile_devices = [
+            device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick
+        ]
         self._profile_devices.sort(key=lambda x: x.name.casefold())
 
         # populate devices currently connected
@@ -4673,7 +4833,9 @@ class SubstituteDialog(QRememberDialog):
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText(content)
-        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
+        )
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         return result == QtWidgets.QMessageBox.StandardButton.Ok
@@ -4732,7 +4894,9 @@ class SubstituteDialog(QRememberDialog):
                 if tmp_guid.casefold() == current_guid.casefold():
                     node.set("device-guid", new_device_guid)
                     node.set("name", new_device_name)
-                    node_comment = etree.Comment(f"Substituted: [{current_guid}] {current_name} with [{new_device_guid}] {new_device_name}")
+                    node_comment = etree.Comment(
+                        f"Substituted: [{current_guid}] {current_name} with [{new_device_guid}] {new_device_name}"
+                    )
                     previous_node = node.getprevious()
                     if previous_node is not None:
                         previous_node.append(node_comment)
@@ -4886,14 +5050,27 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
     def __init__(self, name: str, visible: bool, visible_change_callback: Callable, data: object, parent=None):
         super().__init__(parent=parent)
         self.data = data
-        name_widget = QtWidgets.QLabel(name)
-        self.visible_widget = QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self)
-        widget = getHContainer([self.visible_widget, name_widget], widget_only=True)
+        self.visible_widget = QDataCheckbox(
+            callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self
+        )
+        self.name_widget = QLabel(name)
+        self.visible_widget.setAccessibleName(name)
+        self.name_widget.setBuddy(self.visible_widget)
+        self.visible_widget.toggled.connect(self._update_text_color)
+        self._update_text_color(visible)
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(widget)
+        layout.setContentsMargins(2, 2, 2, 0)
+        layout.addWidget(self.visible_widget)
+        layout.addWidget(self.name_widget)
+        layout.addStretch()
 
         self._list_widget = None
+
+    def _update_text_color(self, visible: bool):
+        self.name_widget.setProperty("deviceVisible", visible)
+        self.name_widget.style().unpolish(self.name_widget)
+        self.name_widget.style().polish(self.name_widget)
+        self.name_widget.update()
 
     def setListWidget(self, list_widget):
         self._list_widget = list_widget
@@ -4907,6 +5084,7 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
     def _set_device_visible_ui(self, visible: bool):
         with QtCore.QSignalBlocker(self.visible_widget):
             self.visible_widget.setValue(visible)
+        self._update_text_color(visible)
 
     def setVisibleEnabled(self, value: bool):
         gremlin.util.InvokeUiMethod(self._set_visible_enabled_ui, value)
@@ -4915,8 +5093,25 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
         self.visible_widget.setEnabled(value)
 
 
+class ReorderListWidget(QListWidget):
+    """Reorder device rows and highlight the text of devices selected for display."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setDropIndicatorShown(True)
+        self.setStyleSheet(f"""
+            QLabel[deviceVisible="true"] {{
+                color: {Color().alternateActiveColor()};
+            }}
+        """)
+
+
 class DeviceDisplayDialog(QRememberDialog):
-    """dialog for drag drop re-ordering of device tabs"""
+    """dialog for drag drop re-ordering of device tabs and device filtering"""
 
     def __init__(self, parent=None):
         import gremlin.config
@@ -4934,13 +5129,7 @@ class DeviceDisplayDialog(QRememberDialog):
         label = QLabel("Visibility and Device List:")
         self.main_layout.addWidget(label)
 
-        # list_widget = ReorderListWidget()
-        list_widget = QListWidget()
-        list_widget.setDragEnabled(True)
-        list_widget.setAcceptDrops(True)
-        list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        list_widget.setDropIndicatorShown(True)
+        list_widget = ReorderListWidget(self)
 
         all_devices = gremlin.joystick_handling.getAllDevicesMap()
 
@@ -4969,7 +5158,7 @@ class DeviceDisplayDialog(QRememberDialog):
                     if not streamdeck_enabled:
                         continue
             device_id = device.device_id
-            visible = self.visible_map[device_id] if device_id in self.visible_map else True
+            visible = self.visible_map.get(device_id, True)
             tab_map[index] = (device, visible)
 
         self._list_widget = list_widget
@@ -4979,16 +5168,39 @@ class DeviceDisplayDialog(QRememberDialog):
 
         self.main_layout.addWidget(list_widget)
 
-        default_order_widget = QDataPushButton("Default", tooltip="Default device order", callback=self._handle_default_order)
+        default_order_widget = QDataPushButton(
+            "Default", tooltip="Default device order", callback=self._handle_default_order
+        )
 
-        save_order_widget = QDataPushButton("Save...", tooltip="Save a device device order", callback=self._handle_save_order)
-        load_order_widget = QDataPushButton("Load...", tooltip="Load a saved device order", callback=self._handle_load_order)
+        save_order_widget = QDataPushButton(
+            "Save...", tooltip="Save a device device order", callback=self._handle_save_order
+        )
+        load_order_widget = QDataPushButton(
+            "Load...", tooltip="Load a saved device order", callback=self._handle_load_order
+        )
+        select_all_widget = QDataPushButton(
+            "Select All", tooltip="Select all devices", callback=self._handle_select_all
+        )
+        select_none_widget = QDataPushButton(
+            "Select None", tooltip="Select no devices", callback=self._handle_select_none
+        )
 
-        self.last_order_widget = QDataPushButton("Load Last", tooltip="Load last saved device order", callback=self._handle_load_last_order)
+        self.last_order_widget = QDataPushButton(
+            "Load Last", tooltip="Load last saved device order", callback=self._handle_load_last_order
+        )
 
         action_container_widget = getHContainer(
-            [default_order_widget, "||", save_order_widget, self.last_order_widget, load_order_widget],
+            [
+                default_order_widget,
+                select_all_widget,
+                select_none_widget,
+                "||",
+                save_order_widget,
+                self.last_order_widget,
+                load_order_widget,
+            ],
             widget_only=True,
+            auto_size=True,
         )
 
         self.main_layout.addWidget(action_container_widget)
@@ -5037,7 +5249,9 @@ class DeviceDisplayDialog(QRememberDialog):
         tab_map = self._get_current_map()
         # add visibiliy data
         if tab_map:
-            fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Device Order", gremlin.shared_state.data_path, "JSON files (*.json)")
+            fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+                None, "Save Device Order", gremlin.shared_state.data_path, "JSON files (*.json)"
+            )
             if fname != "":
                 try:
                     data = json.dumps(tab_map, indent=4)
@@ -5066,6 +5280,25 @@ class DeviceDisplayDialog(QRememberDialog):
         if fname:
             self._load_order_file(fname)
             self._update_ui()
+
+    def _handle_select_none(self, widget):
+        """deselects all devices"""
+        self._set_all_devices_visible(False)
+
+    def _handle_select_all(self, widget):
+        """selects all devices"""
+        self._set_all_devices_visible(True)
+
+    def _set_all_devices_visible(self, visible: bool):
+        """Keep row indicators and saved visibility values in sync."""
+        for index in range(self._list_widget.count()):
+            item = self._list_widget.item(index)
+            row = self._list_widget.itemWidget(item)
+            if row is None or not row.visible_widget.isEnabled():
+                continue
+            row.setDeviceVisible(visible)
+            # setDeviceVisible blocks checkbox signals, so update the model explicitly.
+            self._handle_visible_changed(row.visible_widget, visible)
 
     def _load_order_file(self, fname: str):
 
@@ -5135,6 +5368,10 @@ class DeviceDisplayDialog(QRememberDialog):
         self._populate_list_widget(tab_map)
 
     def _device_enabled(self, device):
+        if device.is_virtual:
+            return any(
+                dev.device_guid == device.device_guid for dev in gremlin.joystick_handling.virtual_input_devices()
+            )
         config = gremlin.config.Configuration()
         match device.device_type:
             case DeviceType.Osc:
@@ -5156,7 +5393,7 @@ class DeviceDisplayDialog(QRememberDialog):
     def _populate_list_widget(self, tab_map):
         """populates the list widget with the tab_map"""
         self._list_widget.clear()
-        for index, (device, visible) in tab_map.items():
+        for device, visible in tab_map.values():
             if not isinstance(device, dinput.DeviceSummary):
                 syslog.warning(f"DeviceDisplayDialog: got an invalid device: [{device}]")
                 continue
@@ -5166,7 +5403,9 @@ class DeviceDisplayDialog(QRememberDialog):
             # check for disabled devices from a configuration perspective
             if not self._device_enabled(device):
                 continue
-            widget = ReorderDeviceListWidget(device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device)
+            widget = ReorderDeviceListWidget(
+                device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device
+            )
             item = QListWidgetItem(self._list_widget)
             item.setData(QtCore.Qt.UserRole, (device, visible))
             item.setSizeHint(widget.sizeHint())

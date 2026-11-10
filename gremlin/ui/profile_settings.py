@@ -23,13 +23,60 @@ import gremlin.input_item
 import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
+import gremlin.config
+from gremlin.types import DeviceType
 from gremlin.ui.ui_common import QDataPushButton, getVContainer, getHContainer, QDataCheckbox, Buttons, QInfoBox
+from dinput import DeviceSummary
 import gremlin.util
 from psygnal import Signal
 from gremlin.ui.qdatawidget import QDataWidget
 from shiboken6 import Shiboken
 import gremlin.tabstate
 from functools import partial
+
+from gremlin.ui.ui_common import (
+    Buttons,
+    clear_layout,
+    Color,
+    ConfirmBox,
+    get_text_width,
+    getGridContainer,
+    getHContainer,
+    getLayoutWidgetHeight,
+    getVContainer,
+    Icons,
+    InputListenerWidget,
+    QArrowPairWidget,
+    QAutoResizeStackedWidget,
+    QAxisRepeaterProgressbar,
+    QCurveWidget,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataLabel,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
+    QDataRadioButtonGroup,
+    QDataWidget,
+    QDelayWidget,
+    QExecuteWidget,
+    QFloatLineEdit,
+    QFrameBox,
+    QHatSelectorComboBox,
+    QHorizontalLine,
+    QHorizontalSeparator,
+    QIconLabel,
+    QIntLineEdit,
+    QProgressBar,
+    QShowAtCursorDialog,
+    QSideBarContainer,
+    QSyncModeWidget,
+    QUsedPushButton,
+    QWarningWidget,
+    RemoteClientWidget,
+    synchronize_grids,
+    QFailoverWidget,
+)
 
 
 class ProfileSettingsWidget(QDataWidget):
@@ -101,14 +148,13 @@ class ProfileSettingsWidget(QDataWidget):
     def refresh(self, emit=True):
         gremlin.util.InvokeUiMethod(self._refresh_ui, emit)  # UI thread
 
-    @QtCore.Slot(int, bool)
-    def vjoy_as_input_changed(self, vjoy_map: dict[int, bool]):
-        """ask the UI to add a new tab for the vjoy device that was enabled"""
-        vid_list = [vid for vid, enabled in vjoy_map.items() if enabled]
-        for vid in vid_list:
-            # ensure the VJOy device is released so another app can trigger UI events here
-            vjoy = gremlin.joystick_handling.VJoyProxy()[vid]
-            vjoy.ensure_released()
+    @QtCore.Slot(dict)
+    def virtual_as_input_changed(self, virtual_map: dict):
+        """Release vJoy handles so external applications can drive selected inputs."""
+        for (device_type, index), enabled in virtual_map.items():
+            if enabled and device_type == DeviceType.VJoy:
+                vjoy = gremlin.joystick_handling.VJoyProxy()[index]
+                vjoy.ensure_released()
 
     def _create_ui(self):
         """Creates the UI elements of this widget."""
@@ -125,9 +171,9 @@ class ProfileSettingsWidget(QDataWidget):
         mode_widget = DefaultModeSelector(self.profile_settings)
         delay_widget = DefaultDelay(self.profile_settings)
 
-        # vJoy devices as inputs
-        vjoy_as_input_widget = VJoyAsInputWidget(self.profile_settings)
-        vjoy_as_input_widget.changed.connect(self.vjoy_as_input_changed)
+        # Maestro input remains available when virtual output failover is on.
+        virtual_as_input_widget = VirtualAsInputWidget(self.profile_settings)
+        virtual_as_input_widget.changed.connect(self.virtual_as_input_changed)
 
         # vJoy axis initialization value setup
         widget = QtWidgets.QGroupBox("Profile Start Initial Values")
@@ -136,32 +182,19 @@ class ProfileSettingsWidget(QDataWidget):
 
         grid_widget, grid_layout = gremlin.ui.ui_common.getGridContainer()
         max_col = 5
-        row = 0
-        col = 0
 
         box_layout.addWidget(grid_widget)
         box_layout.addStretch()
-
-        # vjoy_devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
-        # for dev in vjoy_devices:
-        #     dialog_widget = gremlin.ui.ui_common.Buttons.getEditWidget(callback=partial(self._edit_dialog, dev), label=f"Edit {dev.name} #{dev.vjoy_id}")
-        #     grid_layout.addWidget(dialog_widget, row, col)
-        #     col += 1
-        #     if col == max_col:
-        #         row += 1
-        #         col = 0
-
-        #     self.scroll_layout.addWidget(widget)
 
         grid_layout.addWidget(QtWidgets.QWidget(), 0, max_col)
         grid_layout.setColumnStretch(max_col, 2)
 
         # Information label
-        label_widget = QInfoBox("Select profile default settings and VJOY input devices if any.  These values will be used when activating Gremlin.")
+        label_widget = QInfoBox("Select profile defaults and vJoy or Maestro joystick inputs. These values will be used when activating Gremlin.")
 
         self.scroll_layout.addWidget(label_widget)
 
-        widgets = [mode_widget, delay_widget, vjoy_as_input_widget, grid_widget, label_widget]
+        widgets = [mode_widget, delay_widget, virtual_as_input_widget, grid_widget, label_widget]
 
         # holds all the inputs in a vertical box
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
@@ -618,11 +651,11 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         # )
 
 
-class VJoyAsInputWidget(QtWidgets.QGroupBox):
-    """Configures which vJoy devices are treated as physical inputs."""
+class VirtualAsInputWidget(QtWidgets.QGroupBox):
+    """Configure vJoy and Maestro virtual joysticks as profile inputs."""
 
     # Signal emitted when a change occurs
-    changed = Signal(dict)  # indicates vjoy as input has changed and sends the dict[vjoy_id -> enabled]
+    changed = Signal(dict)  # (provider, device index) -> enabled
 
     def __init__(self, profile_settings, parent=None):
         """Creates a new instance.
@@ -635,10 +668,10 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
 
         self.settings = profile_settings
 
-        self.setTitle("vJoy as Input")
-        self._vjoy_widgets = {}  # map of vjoy IDs to their corresponding widgets
+        self.setTitle("Virtual as Input")
+        self._virtual_widgets = {}  # (provider, device index) -> widget
         self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.vjoy_layout = QtWidgets.QVBoxLayout()
+        self.virtual_layout = QtWidgets.QVBoxLayout()
 
         self._create_ui()
 
@@ -647,26 +680,31 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         if not Shiboken.isValid(self):
             return
 
-        for dev in sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id):
-            enabled = self.settings.getVjoyAsInput(dev.vjoy_id)
-            widget = QDataCheckbox(dev.name, data=dev.vjoy_id, value=enabled)
-            self._vjoy_widgets[dev.vjoy_id] = widget
-
-            widget.setReadOnly(True)  # make readonly - use the dialog to change vjoy as input
+        devices = gremlin.joystick_handling.virtual_input_candidates()
+        for dev in sorted(devices, key=lambda dev: (dev.device_type, dev.name.casefold())):
+            is_vjoy = dev.device_type == DeviceType.VJoy
+            enabled = self.settings.getVirtualAsInput(dev)
+            _, index = self.settings._virtual_input_key(dev, dev.device_type)
+            label = f"{'vJoy' if is_vjoy else 'Maestro'}: {dev.name}"
+            if isinstance(index, str):
+                label += f" [{index}]"
+            widget = QDataCheckbox(label, data=index, value=enabled, readonly=True)
+            self._virtual_widgets[(dev.device_type, index)] = widget
             widget.setEnabled(enabled)
-            if enabled:
-                settings = QDataPushButton("...", tooltip=f"Configure vJoy {dev.vjoy_id} settings", data=dev, callback=self._edit_dialog)
-                self.vjoy_layout.addWidget(getHContainer([widget, settings], widget_only=True))
+            if enabled and is_vjoy:
+                settings = QDataPushButton("...", tooltip=f"Configure vJoy {index} settings", data=dev, callback=self._edit_dialog)
+                self.virtual_layout.addWidget(getHContainer([widget, settings], widget_only=True))
             else:
-                self.vjoy_layout.addWidget(widget)
+                self.virtual_layout.addWidget(widget)
 
+        self.virtual_layout.addWidget(QFailoverWidget())
         # Information label
         dialog_button = gremlin.ui.ui_common.QDataPushButton(
-            "Configure...", tooltip="Select which vJoy devices can be used as input in this profile.", callback=self._open_dialog
+            "Configure...", tooltip="Select vJoy and Maestro joysticks to use as inputs in this profile.", callback=self._open_dialog
         )
-        self.vjoy_layout.addWidget(getHContainer([dialog_button, "||"], widget_only=True))
+        self.virtual_layout.addWidget(getHContainer([dialog_button, "||"], widget_only=True))
 
-        self.main_layout.addLayout(self.vjoy_layout)
+        self.main_layout.addLayout(self.virtual_layout)
 
         self.main_layout.addStretch()
 
@@ -676,35 +714,32 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         self.dialog.exec()
 
     def _open_dialog(self):
-        self._dialog = gremlin.input_item.VJoyAsInputDialog(self.settings, parent=self)
+        self._dialog = gremlin.input_item.VirtualAsInputDialog(self.settings, parent=self)
         self._dialog.accepted.connect(self._accepted)
         self._dialog.exec()
 
     def _accepted(self):
-        vjoy_map = self._dialog.vjoy_map
+        virtual_map = self._dialog.virtual_map
         has_changes = False
         config = gremlin.config.Configuration()
-        for vid, enabled in vjoy_map.items():
-            value = self.settings.getVjoyAsInput(vid)
+        for (device_type, index), enabled in virtual_map.items():
+            value = self.settings.getVirtualAsInput(index, device_type)
             if value != enabled:
-                self.settings.setVjoyAsInput(vid, enabled)
+                self.settings.setVirtualAsInput(index, enabled, device_type, emit=False)
                 has_changes = True
                 # if the device is newly enabled, force a device filter visibility update
                 if enabled:
-                    dev = gremlin.joystick_handling.getDeviceFromVjoyId(vid)
-                    config.setDeviceVisible(dev.device_guid, True)
+                    if device_type == DeviceType.VJoy:
+                        dev = gremlin.joystick_handling.getDeviceFromVjoyId(index)
+                    elif isinstance(index, str):
+                        dev = gremlin.joystick_handling.getDevice(index)
+                    else:
+                        dev = gremlin.joystick_handling.maestro_info_from_index(index)
+                    if dev:
+                        config.setDeviceVisible(dev.device_guid, True)
 
         if has_changes:
-            # update the UI
-            for vid, widget in self._vjoy_widgets.items():
-                value = self.settings.getVjoyAsInput(vid)
-                widget.setValue(value)
-            # tell the UI to reload devices
+            # Release vJoy handles before the shared event rebuilds the tabs.
+            self.changed.emit(virtual_map)
             el = gremlin.event_handler.EventListener()
-            el.vjoy_as_input_changed.emit()
-
-    @QtCore.Slot(bool)
-    def _state_changed(self, widget, checked: bool):
-        vid: int = widget.data
-        self.settings.setVjoyAsInput(vid, checked)
-        self.changed.emit(vid, checked)
+            el.virtual_as_input_changed.emit()

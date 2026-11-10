@@ -78,6 +78,8 @@ class Slider(QtWidgets.QWidget):
 
 
 class FloatWidget(QtWidgets.QWidget):
+    valueChanged = QtCore.Signal()
+
     def __init__(self):
         super().__init__()
         self.values = []
@@ -90,6 +92,8 @@ class FloatWidget(QtWidgets.QWidget):
 
 
 class DeadzoneWidget(QtWidgets.QWidget):
+    changed = QtCore.Signal()
+
     def setValues(self, values):
         self.values = values
 
@@ -492,6 +496,49 @@ class CalibrationChecks(unittest.TestCase):
         self.assertEqual(dialog._calibrated_value_widget.values, [0.1, 0.2])
         self.assertEqual(dialog._calibrated_slider_widget.values, [0.1, 0.2])
         self.services.util.InvokeUiMethod.assert_not_called()
+
+    def test_dialog_close_applies_or_discards_changes_and_finishes(self):
+        buttons = QtWidgets.QMessageBox.StandardButton
+        self.services.ui.ui_common.Icons = NS(warningIcon=QtGui.QIcon)
+        self.listener.update_input_icons = Signal()
+        for response in (None, buttons.Yes, buttons.No):
+            with self.subTest(response=response):
+                self.data = self.ns["CalibrationData"]()
+                dialog = self.make_dialog()
+                dialog.source_data = dialog.action_data.clone()
+                if response is not None:
+                    dialog.action_data.calibrated_max = 0.8
+                dialog.main_layout = QtWidgets.QVBoxLayout(dialog)
+                dialog.main_layout.addWidget(QtWidgets.QLabel("calibration"))
+                for signal, callback in (
+                    (dialog._input_slider_widget.valueChanged, dialog._slider_changed),
+                    (dialog._deadzone_widget.changed, dialog._deadzone_changed),
+                    (dialog._calibrated_min_widget.valueChanged, dialog._calibrated_min_changed),
+                    (dialog._calibrated_max_widget.valueChanged, dialog._calibrated_max_changed),
+                    (dialog._calibrated_center_widget.valueChanged, dialog._calibrated_center_changed),
+                ):
+                    signal.connect(callback)
+                self.listener.joystick_event_ui.connect(dialog._joystick_event_handler)
+                finished = Mock()
+                dialog.finished.connect(finished)
+                message_box = Mock(StandardButton=buttons)
+                message_box.return_value.exec.return_value = response
+                dialog.show()
+                with patch.object(QtWidgets, "QMessageBox", message_box):
+                    self.assertTrue(dialog.close())
+                self.assertFalse(dialog.isVisible())
+                self.assertTrue(dialog._closing)
+                self.assertEqual(dialog.main_layout.count(), 0)
+                self.assertNotIn(dialog._joystick_event_handler, self.listener.joystick_event_ui.callbacks)
+                finished.assert_called_once_with(QtWidgets.QDialog.DialogCode.Rejected)
+                expected_max = 0.8 if response == buttons.Yes else 1.0
+                self.assertEqual(dialog.action_data.calibrated_max, expected_max)
+                self.assertEqual(dialog.source_data.calibrated_max, 1.0)
+                if response is None:
+                    message_box.assert_not_called()
+                else:
+                    message_box.return_value.exec.assert_called_once_with()
+        self.assertEqual(len(self.listener.update_input_icons.events), 3)
 
     def test_dialog_refreshes_bounds_after_settings_change(self):
         dialog = self.make_dialog()

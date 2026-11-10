@@ -770,9 +770,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self._last_selected_index = 0  # last selected index in the list
 
-        # if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
-        #     self.inputItemListView.limit_input_types([InputType.JoystickAxis])
-
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
@@ -795,13 +792,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.setInputItemListModel(model)
         model.addCallback(self._handle_model_changed)  # listen to model changes
-
-        # Handle vJoy as input and vJoy as output devices properly
-
-        vjoy_as_input = profile.settings._vjoy_as_input
-
-        # For vJoy as output only show axes entries, for all others treat them
-        # as if they were physical input devices
 
         # device stats
         self.stats: gremlin.base_profile.JoystickInputStats = profile.settings.getJoystickInputStats(device.device_guid)
@@ -854,8 +844,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         gremlin.ui.ui_common.synchronize_grids(grids)
 
-        # Add a help text for the purpose of the vJoy tab
-        if device is not None and device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
+        # Add help text for virtual joystick devices.
+        if device is not None and device.is_virtual and not profile.settings.getVirtualAsInput(device):
             # msg = '''
             #     This tab allows assigning a response curve to virtual axis.
             #     The purpose of this is to enable split and merge axis to be

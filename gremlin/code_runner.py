@@ -504,8 +504,8 @@ class CodeRunner:
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)
 
-            # list of vjoys as input
-            input_vids = gremlin.shared_state.current_profile.settings.getVjoyAsInputList()
+            # vJoy indices selected through virtual input settings
+            input_vids = gremlin.shared_state.current_profile.settings.getVirtualAsInputList()
 
             # list of vjoy device ID to force a release on
             for vid in input_vids:

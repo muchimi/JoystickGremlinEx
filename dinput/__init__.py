@@ -529,6 +529,18 @@ class DeviceSummary:
                 syslog.error(f"Unable to decode device name: {data.name} - contains invalid characters.  Defaulting.")
                 self.name = f"Unable to decode {self.device_id} "
 
+            # Older/custom Maestro drivers may expose cached product names and
+            # placeholder VID/PID values. The reserved GEX product name still
+            # identifies a virtual joystick, but does not identify a bridge slot.
+            suffix = self.name.removeprefix(GEX_PRODUCT_STRING).strip()
+            if self._device_type == DeviceType.Joystick and (
+                self.name == GEX_PRODUCT_STRING
+                or (self.name.startswith(GEX_PRODUCT_STRING + " ") and suffix.isdecimal())
+            ):
+                self._device_type = DeviceType.Maestro
+                self._is_virtual = True
+                self.data["maestro_native_input"] = True
+
             self.axis_count = data.axis_count
             self.button_count = data.button_count
             self.hat_count = data.hat_count

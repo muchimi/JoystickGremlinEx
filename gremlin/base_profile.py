@@ -270,7 +270,8 @@ class ProfileDeviceNode:
                             device = vjoy_device
 
                             settings = self.profile.settings
-                            settings.setVjoyAsInput(device.vjoy_id, True)
+                            if device.vjoy_id not in settings._virtual_as_input.get(DeviceType.VJoy, {}):
+                                settings.setVirtualAsInput(device, True)
 
                         # not a matching device, treat as a regular
 
@@ -305,6 +306,8 @@ class ProfileDeviceNode:
 
                         device.vjoy_id = vjoy_id
                         device.virtual_id = device.vjoy_id
+                    elif device_type == DeviceType.Maestro:
+                        device.virtual_id = safe_read(node, "virtual-id", int, -1)
 
                     device.button_count = 128
                     device.hat_count = 4
@@ -366,6 +369,8 @@ class ProfileDeviceNode:
 
             node.set("type", DeviceType.to_string(self.device_type))
             node.set("virtual", safe_format(self.device.is_virtual, bool))
+            if self.device_type == DeviceType.Maestro:
+                node.set("virtual-id", safe_format(self.device.virtual_id, int))
 
             mode_list = sorted(self.modes.values(), key=lambda x: x.name)
             for mode in mode_list:
@@ -964,8 +969,7 @@ class Settings:
         if verbose:
             syslog.info("profile settings init...")
         self.profile: Profile = profile
-        self._vjoy_as_input = {}  # key by index : int, boolean, true if the vjoy device can be used as input to GEX
-        self.maestro_as_input = {}  # key by index : int, boolean, true if the maestro device can be used as input to GEX
+        self._virtual_as_input = {}  # provider -> device index or native GUID -> enabled
         self.vjoy_initial_values = {}
         self.startup_mode = None
         self.default_delay = 0.05
@@ -979,8 +983,7 @@ class Settings:
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             syslog.info("profile settings reset...")
-        self._vjoy_as_input.clear()
-        self.maestro_as_input.clear()
+        self._virtual_as_input.clear()
         self.vjoy_initial_values.clear()
         self.startup_mode = None
         self.default_delay = 0.05
@@ -1012,19 +1015,17 @@ class Settings:
         delay_node.text = safe_format(self.default_delay, float)
         node.append(delay_node)
 
-        # Process vJoy as input settings
-        for vid, visible in self._vjoy_as_input.items():
-            if visible is True:
-                vjoy_node = etree.Element("vjoy-input")
-                vjoy_node.set("id", safe_format(vid, int))
-                node.append(vjoy_node)
-
-        # proces maestro as input settings
-        for mid, visible in self.maestro_as_input.items():
-            if visible is True:
-                maestro_node = etree.Element("maestro-input")
-                maestro_node.set("id", safe_format(mid, int))
-                node.append(maestro_node)
+        # Keep the existing provider-specific XML tags for profile compatibility.
+        for device_type, tag in ((DeviceType.VJoy, "vjoy-input"), (DeviceType.Maestro, "maestro-input")):
+            for index, enabled in self._virtual_as_input.get(device_type, {}).items():
+                input_node = etree.Element(tag)
+                if isinstance(index, str):
+                    input_node.set("guid", index)
+                else:
+                    input_node.set("id", safe_format(index, int))
+                if not enabled:
+                    input_node.set("enabled", "False")
+                node.append(input_node)
 
         # Process vJoy axis initial values
         for vid, data in self.vjoy_initial_values.items():
@@ -1091,28 +1092,24 @@ class Settings:
         if node.find("default-delay") is not None:
             self.default_delay = float(node.find("default-delay").text)
 
-        # vJoy as input settings
-        self._vjoy_as_input.clear()
-
-        for vjoy_node in node.findall("vjoy-input"):
-            vid = safe_read(vjoy_node, "id", int, 0)
-            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vid)
-            if device:
-                device_guid = device.device_guid
-                sd.setOutputEnabled(device_guid, True)  # allow as output
-                sd.setInputEnabled(device_guid, True)  # allow as input
-            self._vjoy_as_input[vid] = True
-
-        # maestro as input settings
-        self.maestro_as_input.clear()
-        for maestro_node in node.findall("maestro-input"):
-            mid = safe_read(maestro_node, "id", int, 0)
-            device = gremlin.joystick_handling.maestro_info_from_index(mid)
-            if device:
-                device_guid = device.device_guid
-                sd.setOutputEnabled(device_guid, True)  # allow as output
-                sd.setInputEnabled(device_guid, True)  # allow as input
-            self.maestro_as_input[mid] = True
+        # Virtual input selections use separate provider namespaces.
+        self._virtual_as_input.clear()
+        for device_type, tag, lookup in (
+            (DeviceType.VJoy, "vjoy-input", gremlin.joystick_handling.vjoy_info_from_vjoy_id),
+            (DeviceType.Maestro, "maestro-input", gremlin.joystick_handling.maestro_info_from_index),
+        ):
+            for input_node in node.findall(tag):
+                index = safe_read(input_node, "guid", str, "") or safe_read(input_node, "id", int, 0)
+                enabled = safe_read(input_node, "enabled", bool, True)
+                device = gremlin.joystick_handling.getDevice(index) if isinstance(index, str) else lookup(index)
+                if device:
+                    sd.setOutputEnabled(device.device_guid, True)
+                    input_enabled = (
+                        enabled and device.connected and not device.disabled and device.input_enabled
+                        and not device.data.get("failover", False)
+                    )
+                    sd.setInputEnabled(device.device_guid, input_enabled)
+                self.setVirtualAsInput(index, enabled, device_type=device_type, emit=False)
 
         # vjoy initialization values
         self.vjoy_initial_values = {}
@@ -1173,24 +1170,38 @@ class Settings:
         """gets the file name for the default profile input filtering data"""
         return os.path.join(gremlin.util.userprofile_path(), "default_filter.xml")
 
-    def setVjoyAsInput(self, vid, enabled=True):
-        """enables a vjoy device as an input device"""
-        self._vjoy_as_input[vid] = enabled
+    @staticmethod
+    def _virtual_input_key(device, device_type):
+        if isinstance(device, (int, str)):
+            return device_type, device
+        # Unmatched native joysticks have no trustworthy service slot. Keep
+        # their input identity even if a later bridge refresh matches them.
+        if device.device_type == DeviceType.Maestro and (device.virtual_id < 0 or device.data.get("maestro_native_input", False)):
+            return device.device_type, device.device_id
+        index = device.vjoy_id if device.device_type == DeviceType.VJoy else device.virtual_id
+        return device.device_type, index
+
+    def setVirtualAsInput(self, device, enabled=True, device_type=DeviceType.VJoy, emit=True):
+        """Select a virtual joystick, or an index within the specified provider."""
+        device_type, index = self._virtual_input_key(device, device_type)
+        if device_type not in (DeviceType.VJoy, DeviceType.Maestro):
+            raise ValueError("Virtual inputs must be vJoy or Maestro joysticks")
+        self._virtual_as_input.setdefault(device_type, {})[index] = enabled
         verbose = gremlin.config.Configuration().verbose_mode_joystick
-        if verbose and enabled:
-            syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
-        el = gremlin.event_handler.EventListener()
-        el.vjoy_as_input_changed.emit()
+        if verbose:
+            syslog.info(f"Virtual input: provider [{device_type.name}] device [{index}] enabled [{enabled}]")
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.virtual_as_input_changed.emit()
 
-    def getVjoyAsInput(self, vid) -> bool:
-        """returns true if the vjoy device is configured as an input device"""
-        if vid in self._vjoy_as_input:
-            return self._vjoy_as_input[vid]
-        return False
+    def getVirtualAsInput(self, device, device_type=DeviceType.VJoy) -> bool:
+        device_type, index = self._virtual_input_key(device, device_type)
+        return self._virtual_as_input.get(device_type, {}).get(index, False)
 
-    def getVjoyAsInputList(self) -> list[int]:
-        """returns a list of vjoy device IDs that are configured as input devices"""
-        return list(vid for vid, enabled in self._vjoy_as_input.items() if enabled)
+    def getVirtualAsInputList(self, device_type=DeviceType.VJoy) -> list[int | str]:
+        """Return enabled indices or native GUIDs for one virtual joystick provider."""
+        return [index for index, enabled in self._virtual_as_input.get(device_type, {}).items() if enabled]
+
 
     def get_vjoy_axis_enabled(self, vid, aid) -> bool:
         """true if the value is enabled for this axis"""
@@ -4126,6 +4137,53 @@ class Profile:
         if modes:
             return modes[0]
 
+    def _configure_vjoy_failover(self, root):
+        """Create missing vJoy devices only for vJoy references in this profile."""
+        config = gremlin.config.Configuration()
+        config.vjoy_failover = False
+        if config.vjoy_installed:
+            return
+
+        gremlin.joystick_handling.clearVjoyDevices()
+        vjoy_ids = set()
+        vjoy_guid_map = {}
+
+        for node in root.xpath("//device | //vjoy-device"):
+            name = node.get("name", "")
+            device_type = node.get("type", "").casefold()
+            if node.tag != "vjoy-device" and device_type != "vjoy" and not (
+                not device_type and name.casefold().startswith("vjoy")
+            ):
+                continue
+            vjoy_id = safe_read(node, "vjoy-id", int, 0)
+            if not vjoy_id:
+                match = re.search(r"\((\d+)\)", name)
+                vjoy_id = int(match.group(1)) if match else 0
+            vjoy_ids.add(vjoy_id)
+            device_guid = node.get("device-guid") or node.get("device")
+            if device_guid:
+                vjoy_guid_map[vjoy_id] = parse_guid(device_guid)
+
+        for node in root.findall(".//vjoyremap"):
+            if node.get("device-type", "vjoy").casefold() in ("", "vjoy"):
+                vjoy_ids.add(safe_read(node, "virtual-id", int, safe_read(node, "vjoy", int, 0)))
+        for node in root.findall(".//remap"):
+            vjoy_ids.add(safe_read(node, "vjoy", int, 0))
+        for path, attribute in (
+            ("./settings/vjoy-input", "id"),
+            ("./settings/vjoy", "id"),
+            ("./merge-axis/vjoy", "vjoy-id"),
+        ):
+            for node in root.findall(path):
+                vjoy_ids.add(safe_read(node, attribute, int, 0))
+
+        vjoy_ids = {vjoy_id for vjoy_id in vjoy_ids if 1 <= vjoy_id <= 16}
+        config.vjoy_failover = bool(vjoy_ids)
+        if vjoy_ids:
+            syslog.warning("VJOY: Profile references vJoy devices but vJoy is not installed - setting up failover mode")
+            for vjoy_id in sorted(vjoy_ids):
+                gremlin.joystick_handling.configure_vjoy_failover(vjoy_id, vjoy_guid_map.get(vjoy_id))
+
     def from_xml(self, fname, data=None, extra_data=None, fname_is_xml: bool = False):
         """Parses the profile XML document into the profile data structure.
 
@@ -4213,62 +4271,7 @@ class Profile:
         # removed devices
         self._removed_devices.clear()
 
-        # setup failover devices if the profile uses vjoy references but vjoy is not available
-
-        if not config.vjoy_installed:
-            # see if the profile references vjoy devices anywhere
-            device_nodes = root.xpath("/profile/devices//device")
-            unique_vjoy_ids = set()
-            vjoy_guid_map = {} # map of id to discovered GUID
-            warning_issued = False
-
-            # clear prior profile fake vJoy devices
-            gremlin.joystick_handling.clearVjoyDevices()
-
-
-            # new profiles have the device entry under settings
-            for child in root.xpath("//device[contains(@name, 'VJoy')]"):
-                name = child.get("name")
-                match = re.search(r"\((\d+)\)", name)
-                vjoy_id = int(match.group(1)) if match else None
-                if vjoy_id is None:
-                    continue
-                unique_vjoy_ids.add(vjoy_id)
-                vjoy_guid_map[vjoy_id] = gremlin.util.parse_guid(child.get("device"))
-
-            for child in device_nodes:
-                if "type" in child.attrib and DeviceType.to_enum(child.get("type")) == DeviceType.VJoy:
-                    name = child.get("name")
-                    match = re.search(r"\((\d+)\)", name)
-                    vjoy_id = int(match.group(1)) if match else None
-                    if vjoy_id is None:
-                        continue
-                    unique_vjoy_ids.add(vjoy_id)
-
-                # check mappings for vjoyremap
-                for node in root.findall(".//vjoyremap"):
-                    # Get the 'virtual-id' attribute value
-                    device_id = gremlin.util.safe_read(node, "virtual-id", int, 0)
-                    unique_vjoy_ids.add(device_id)
-
-                # check mappings for legacy remap
-                for node in root.findall(".//remap"):
-                    unique_vjoy_ids.add(gremlin.util.safe_read(node, "vjoy", int, 0))
-
-            for vjoy_id in unique_vjoy_ids:
-                if vjoy_id < 1 or vjoy_id > 16:
-                    # skip not found in case the xml is malformed
-                    continue
-                if not warning_issued:
-                    syslog.warning(f"VJOY: Profile references Vjoy device ID [{vjoy_id}] but Vjoy is not installed - setting up failover mode")
-                    warning_issued = True
-                # create the fake device and register
-                gremlin.joystick_handling.configure_vjoy_failover(vjoy_id, vjoy_guid_map.get(vjoy_id))
-
-
-
-
-
+        self._configure_vjoy_failover(root)
 
         # Parse each device into separate DeviceConfiguration objects
         device_nodes = root.xpath("/profile/devices//device")
@@ -4318,11 +4321,12 @@ class Profile:
             if not dd:
                 name = safe_read(child, "name", str, "n/a")
                 syslog.warning(f"Profile: unable to find device [{device_guid}] - name: [{name}] - XML source line: {child.sourceline}")
-            elif dd.is_virtual:
-                # vjoy as input
-                self.settings.setVjoyAsInput(dd.vjoy_id, True)
-                if verbose:
-                    syslog.info(f"PROFILE: enable vjoy as input device [{dd.vjoy_id}]")
+            elif dd.device_type in (DeviceType.VJoy, DeviceType.Maestro):
+                device_type, index = self.settings._virtual_input_key(dd, dd.device_type)
+                if isinstance(index, int) and index >= 0 and index not in self.settings._virtual_as_input.get(device_type, {}):
+                    self.settings.setVirtualAsInput(dd, True)
+                    if verbose:
+                        syslog.info(f"PROFILE: enable virtual input device [{dd.name}]")
 
         # Parse each vjoy device into separate DeviceConfiguration objects
         if not extra_data:

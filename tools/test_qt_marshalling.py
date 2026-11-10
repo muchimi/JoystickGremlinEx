@@ -197,6 +197,87 @@ class MarshallingTests(unittest.TestCase):
         self.assertEqual(len(APP.findChildren(dispatcher_type)), 1)
 
 
+BUTTON_UI = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, Qt=QtCore.Qt,
+                 Shiboken=Shiboken, inspect=inspect, Callable=Callable,
+                 Buttons=NS(_default_parent=None), Color=lambda: NS(cssButton=lambda: ""))
+exec(compile(ast.Module(body=definitions("gremlin/ui/ui_common.py", {"QDataPushButton"}),
+                        type_ignores=[]), "ui_common.py", "exec"), BUTTON_UI)
+DataPushButton = BUTTON_UI["QDataPushButton"]
+
+
+class PushButtonLifetimeTests(unittest.TestCase):
+    def mouse_event(self, event_type, button=QtCore.Qt.MouseButton.LeftButton):
+        modifiers = (QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier
+                     | QtCore.Qt.KeyboardModifier.AltModifier)
+        return QtGui.QMouseEvent(event_type, QtCore.QPointF(5, 5), QtCore.QPointF(5, 5), button, button, modifiers)
+
+    def test_press_callbacks_can_delete_the_button_or_its_parent(self):
+        for with_menu in (False, True):
+            stages = ("press", "extended", "callback") if with_menu else ("press", "toggled", "extended", "callback")
+            for stage in stages:
+                with self.subTest(menu=with_menu, stage=stage):
+                    parent = QtWidgets.QWidget()
+                    button = DataPushButton("Activate", parent=parent)
+                    if with_menu:
+                        button.setMenu(QtWidgets.QMenu(button))
+                    calls = []
+
+                    def destroy(*args):
+                        calls.append("destroy")
+                        Shiboken.delete(parent)
+
+                    if stage == "press":
+                        button.on_press = destroy
+                    elif stage == "toggled":
+                        button.setCheckable(True)
+                        button.toggled.connect(destroy)
+                    elif stage == "extended":
+                        button.setCallbackEx(destroy)
+                    else:
+                        button.setCallback(destroy)
+                    button.clicked.connect(lambda: calls.append("clicked"))
+                    try:
+                        event = self.mouse_event(QtCore.QEvent.Type.MouseButtonPress)
+                        self.assertTrue(button.eventFilter(button, event))
+                        self.assertFalse(Shiboken.isValid(button))
+                        self.assertEqual(calls, ["destroy"])
+                        self.assertTrue(button.eventFilter(button, event))
+                    finally:
+                        if Shiboken.isValid(parent):
+                            parent.deleteLater()
+                        flush_deletes()
+
+    def test_release_hook_can_delete_the_button(self):
+        button = DataPushButton("Activate")
+        button.on_release = lambda: Shiboken.delete(button)
+        self.assertTrue(button.eventFilter(button, self.mouse_event(QtCore.QEvent.Type.MouseButtonRelease)))
+        self.assertFalse(Shiboken.isValid(button))
+
+    def test_live_buttons_keep_callback_order_modifiers_and_menu_handling(self):
+        for with_menu in (False, True):
+            with self.subTest(menu=with_menu):
+                calls = []
+                button = DataPushButton("Activate", callback=lambda: calls.append("callback"), checkable=True)
+                if with_menu:
+                    button.setMenu(QtWidgets.QMenu(button))
+                button.setCallbackEx(lambda widget, ctrl, shift, alt, right:
+                                     calls.append(("extended", ctrl, shift, alt, right)))
+                button.clicked.connect(lambda: calls.append("clicked"))
+                try:
+                    event = self.mouse_event(QtCore.QEvent.Type.MouseButtonPress)
+                    self.assertEqual(button.eventFilter(button, event), not with_menu)
+                    expected = [("extended", True, True, True, False), "callback"]
+                    self.assertEqual(calls, expected if with_menu else expected + ["clicked"])
+                    self.assertEqual(button.isChecked(), not with_menu)
+                    calls.clear()
+                    event = self.mouse_event(QtCore.QEvent.Type.MouseButtonPress, QtCore.Qt.MouseButton.RightButton)
+                    self.assertTrue(button.eventFilter(button, event))
+                    self.assertEqual(calls, [("extended", True, True, True, True)])
+                finally:
+                    button.deleteLater()
+                    flush_deletes()
+
+
 def load_http_receiver():
     tree = ast.parse((ROOT / "gremlin/ui/obs_overlay/websocket_server.py").read_bytes())
     source = next(node for node in tree.body if getattr(node, "name", None) == "OverlayWebsocketSession")

@@ -229,25 +229,6 @@ def all_maestro_devices() -> list[DeviceSummary]:
     return list(_maestro_devices)
 
 
-def vjoy_input_devices() -> list[DeviceSummary]:
-    """returns the list of input vjoy devices"""
-    import gremlin.shared_state
-
-    # import gremlin.config
-    global _vjoy_devices
-
-    profile = gremlin.shared_state.current_profile
-    if profile is None or getattr(profile, "settings", None) is None:
-        # Profile unload / mid-load: callers (e.g. map_to_vjoy.updateDevices) can race.
-        return []
-    settings = profile.settings
-    # verbose = gremlin.config.Configuration().verbose_mode_joystick
-    # if verbose:
-    #     syslog.info(f"Vjoy as input list: {settings.getVjoyAsInputList()}")
-    devices = [dev for dev in _vjoy_devices if settings.getVjoyAsInput(dev.vjoy_id)]
-    return devices
-
-
 def vjoy_id_list(connected=True) -> list[int]:
     """gets the list of vjoy device IDs"""
     global _vjoy_devices
@@ -266,57 +247,69 @@ def vjoy_output_devices() -> list[DeviceSummary]:
     if profile is None or getattr(profile, "settings", None) is None:
         return []
     settings = profile.settings
-    devices = [dev for dev in _vjoy_devices if not settings.getVjoyAsInput(dev.vjoy_id)]
+    devices = [dev for dev in _vjoy_devices if not settings.getVirtualAsInput(dev.vjoy_id)]
     return devices
+
+
+def virtual_input_candidates() -> list[DeviceSummary]:
+    """Connected virtual joysticks that can generate local DirectInput events."""
+    return [
+        dev for dev in all_joystick_devices()
+        if dev.device_type in (DeviceType.VJoy, DeviceType.Maestro)
+        and (dev.device_type != DeviceType.VJoy or dev.vjoy_id > 0)
+        and dev.connected and not dev.disabled and dev.input_enabled
+        and not dev.data.get("failover", False)
+    ]
+
+
+def virtual_input_devices() -> list[DeviceSummary]:
+    """Virtual joysticks selected as inputs in the current profile."""
+    profile = gremlin.shared_state.current_profile
+    if profile is None or getattr(profile, "settings", None) is None:
+        return []
+    return [dev for dev in virtual_input_candidates() if profile.settings.getVirtualAsInput(dev)]
 
 
 def axis_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that has axes"""
     global _all_joystick_devices
-    vjoy_devices = vjoy_input_devices()
-    devices = [dev for dev in _all_joystick_devices if dev.axis_count and dev.enabled and dev.device_type != DeviceType.VJoy]
-    devices.extend(vjoy_devices)
+    devices = [dev for dev in _all_joystick_devices if dev.axis_count and dev.enabled and not dev.is_virtual]
+    devices.extend(dev for dev in virtual_input_devices() if dev.axis_count)
     return devices
 
 
 def button_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that have buttons"""
     global _all_joystick_devices
-    vjoy_devices = vjoy_input_devices()
-    devices = [dev for dev in _all_joystick_devices if dev.button_count and dev.enabled and dev.device_type != DeviceType.VJoy]
-    devices.extend(vjoy_devices)
+    devices = [dev for dev in _all_joystick_devices if dev.button_count and dev.enabled and not dev.is_virtual]
+    devices.extend(dev for dev in virtual_input_devices() if dev.button_count)
     return devices
 
 
 def hat_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that define hats"""
     global _all_joystick_devices
-    vjoy_devices = vjoy_input_devices()
-    devices = [dev for dev in _all_joystick_devices if dev.hat_count and dev.enabled and dev.device_type != DeviceType.VJoy]
-    devices.extend(vjoy_devices)
+    devices = [dev for dev in _all_joystick_devices if dev.hat_count and dev.enabled and not dev.is_virtual]
+    devices.extend(dev for dev in virtual_input_devices() if dev.hat_count)
     return devices
 
 
 def filtered_input_devices(input_type_list=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], virtual_only=False):
     """gets a list of devices filtered by axis, button or hat"""
-    global _all_joystick_devices
-
-    def filter_func(dev: DeviceSummary):
-        # returns TRUE if device can be used
-        syslog.info(f"Filtering device: {dev.name}:  {str(dev)}")
-        if dev.disabled:
-            return False
-        if virtual_only and not dev.is_virtual:
-            return False
-        if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-            for input_type in input_type_list:
-                match input_type:
-                    case InputType.JoystickAxis | InputType.JoystickHat | InputType.JoystickButton:
-                        return dev.axis_count > 0 or dev.button_count > 0 or dev.hat_count > 0
-        return False
-
-    devices = [dev for dev in _all_joystick_devices if filter_func(dev) and dev.enabled]
-    return devices
+    providers = {
+        InputType.JoystickAxis: axis_input_devices,
+        InputType.JoystickButton: button_input_devices,
+        InputType.JoystickHat: hat_input_devices,
+    }
+    devices = {}
+    for input_type in input_type_list:
+        provider = providers.get(input_type)
+        if provider is None:
+            continue
+        for dev in provider():
+            if not virtual_only or dev.is_virtual:
+                devices[dev.device_guid] = dev
+    return list(devices.values())
 
 
 def is_hardware_device(device_guid) -> bool:
@@ -1783,7 +1776,8 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                                 case DeviceType.VJoy:
                                     dinput_vjoy_device_map[dev.hashkey] = dev
                                 case DeviceType.Maestro:
-                                    _maestro_devices_map[dev.virtual_id] = dev
+                                    if dev.virtual_id >= 0:
+                                        _maestro_devices_map[dev.virtual_id] = dev
                                 case _:
                                     syslog.warning(
                                         f"\tWarning: Unknown virtual device [{dev.name}] with vendor ID: [0x{dev.vendor_id:X}] product ID: [0x{dev.product_id:X}]"
@@ -2070,7 +2064,7 @@ def _update_joystick_device_maps():
         _vjoy_devices.sort(key=lambda x: x.vjoy_id)
         _disconnected_devices_map = {dev.device_guid: dev for dev in _all_devices_map.values() if not dev.connected}
         _disconnected_devices = [dev for dev in _disconnected_devices_map.values()]
-        _maestro_devices_map = {dev.virtual_id: dev for dev in _all_devices_map.values() if dev.device_type == DeviceType.Maestro}
+        _maestro_devices_map = {dev.virtual_id: dev for dev in _all_devices_map.values() if dev.device_type == DeviceType.Maestro and dev.virtual_id >= 0}
         _maestro_devices = [dev for dev in _maestro_devices_map.values()]
         _maestro_devices.sort(key=lambda x: x.name.casefold())
 

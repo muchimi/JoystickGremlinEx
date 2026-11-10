@@ -55,44 +55,28 @@ DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNO
 # T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules
 # works from a frozen exe without requiring launch_gex.cmd env vars.
 
-VOICE_ENABLED = (
-    True  # "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
-)
-MIDI_ENABLED = (
-    True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
-)
+VOICE_ENABLED = True  # "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
 OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in (
     "1",
     "true",
     "yes",
 )
-OVERLAY_ENABLED = (
-    True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-)
-AFCS_ENABLED = (
-    True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
-)
+OVERLAY_ENABLED = True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
+AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
 STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
-OCTAVI_ENABLED = (
-    True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
-)
+OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
 PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
-GEX_MAESTRO_ENABLED = (
-    True  # "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
-)
-VJOY_ENABLED = (
-    True  # "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
-)
+GEX_MAESTRO_ENABLED = True  # "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
+VJOY_ENABLED = True  # "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
 
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
-    changed = Signal(
-        str, object
-    )  # fires on some configuration value changes, passes the method to get the value that has changed
+    changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
 
     def get_config(self) -> str:
         """local config file (version based)"""
@@ -752,20 +736,12 @@ class Configuration(QtCore.QObject):
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
             disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
-            disk_foreign = {
-                key: merged[key]
-                for key in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                if isinstance(merged, dict) and key in merged
-            }
+            disk_foreign = {key: merged[key] for key in self._PROFILE_SIDECAR_FOREIGN_KEYS if isinstance(merged, dict) and key in merged}
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
             # on top of on-disk data before writing — never foreign module payloads.
             if pending_profile_data:
-                pending = {
-                    key: value
-                    for key, value in pending_profile_data.items()
-                    if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                }
+                pending = {key: value for key, value in pending_profile_data.items() if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS}
                 merged.update(pending)
 
             # Restore foreign keys captured from disk before update(). Without this,
@@ -782,9 +758,7 @@ class Configuration(QtCore.QObject):
             mem_custom = self._streamdeck_pages_custom_count(mem_pages)
             if disk_custom > 0 and mem_custom < disk_custom:
                 merged["streamdeck_pages"] = disk_pages
-                syslog.info(
-                    f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})"
-                )
+                syslog.info(f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})")
 
             # Re-read foreign keys immediately before write so an overlay/Stream Deck
             # save that landed during this merge is not rolled back.
@@ -852,9 +826,7 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
-            syslog.info(
-                f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]"
-            )
+            syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -983,9 +955,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data(
-            "tts_mode_switch_enabled", False
-        )  # change in m77 default is to not speak mode changes by default
+        return self._get_data("tts_mode_switch_enabled", False)  # change in m77 default is to not speak mode changes by default
 
     @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value: bool):
@@ -2632,9 +2602,7 @@ class Configuration(QtCore.QObject):
         elif isinstance(input_id, (list, set, tuple)):
             pass
         else:
-            syslog.warning(
-                f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
-            )
+            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             return
 
         input_type = InputType.convert(input_type)
@@ -2644,9 +2612,7 @@ class Configuration(QtCore.QObject):
         input_type_string = InputType.to_string(input_type)
         self._profile_data["last_input"] = data
         self._profile_data["last_input_device_guid"] = normalized_device_guid
-        self._profile_data["last_device_guid"] = (
-            normalized_device_guid  # read first by last_device_guid; must not go stale
-        )
+        self._profile_data["last_device_guid"] = normalized_device_guid  # read first by last_device_guid; must not go stale
         self._profile_data["last_input_id"] = input_id
         self._profile_data["last_input_type"] = input_type_string
         self._profile_data["last_input_mode"] = mode
@@ -2661,9 +2627,7 @@ class Configuration(QtCore.QObject):
             syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
 
         if __debug__:
-            syslog.info(
-                f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]"
-            )
+            syslog.info(f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]")
 
         # save the config
         self.save_profile_settings()
@@ -2852,9 +2816,7 @@ class Configuration(QtCore.QObject):
         dinput_device_guid = device.device_guid
         device_guid = device.device_id
         normalized_dinput_device_guid = gremlin.util.normalize_guid(dinput_device_guid)
-        normalized_requested_guid = (
-            gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
-        )
+        normalized_requested_guid = gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
 
         data: dict = self._profile_data.get("last_input", {})
         lookup_keys = [device_guid, normalized_dinput_device_guid]
@@ -2871,11 +2833,7 @@ class Configuration(QtCore.QObject):
                 syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                 input_type = InputType.NotSet
 
-            if (
-                isinstance(input_id, str)
-                and input_id.isnumeric()
-                and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
-            ):
+            if isinstance(input_id, str) and input_id.isnumeric() and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                 input_id = int(input_id)
 
             if input_id is not None and isinstance(input_id, int):
@@ -2993,9 +2951,7 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        return MIDI_ENABLED and self._data.get(
-            "midi_enabled", False
-        )  # defaults to OFF and must be explicitly enabled by the user
+        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
@@ -3015,9 +2971,7 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self) -> bool:
         """True if OSC support is enabled"""
         if self._osc_enabled is None:
-            self._osc_enabled = self._get_data(
-                "osc_enabled", True
-            )  # defaults to OFF and must be explicitly enabled by the user
+            self._osc_enabled = self._get_data("osc_enabled", True)  # defaults to OFF and must be explicitly enabled by the user
         return OSC_ENABLED and self._osc_enabled
 
     @osc_enabled.setter
@@ -3070,9 +3024,7 @@ class Configuration(QtCore.QObject):
     @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return STREAMDECK_ENABLED and self._get_data(
-            "streamdeck_enabled", False
-        )  # defaults to OFF and must be explicitly enabled by the user
+        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -4280,9 +4232,7 @@ class Configuration(QtCore.QObject):
     @property
     def virpil_led_executable(self) -> str:
         """returns the path to the virpil LED executable"""
-        return self._get_data(
-            "virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe"
-        )
+        return self._get_data("virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe")
 
     @virpil_led_executable.setter
     def virpil_led_executable(self, value: str):

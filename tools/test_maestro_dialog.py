@@ -103,7 +103,7 @@ class DialogHarness(UI["MaestroDialog"]):
     def __init__(self, definitions):
         UI["QRememberDialog"].__init__(self, "MaestroDialogChecks")
         self.config = NS(maestro_device_map={row["id"]: i for i, row in enumerate(definitions)},
-                         maestro_device_count=len(definitions), maestro_enabled=True,
+                         maestro_device_count=len(definitions), maestro_enabled=True, maestro_use_localhost=True,
                          maestro_osc_host="127.0.0.1", maestro_osc_port=8010,
                          maestro_osc_reply_host="127.0.0.1", maestro_osc_reply_port=8011, save=Mock())
         self.maestro = MaestroFixture(Bridge(definitions))
@@ -117,7 +117,7 @@ class DialogHarness(UI["MaestroDialog"]):
         self._signals.completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
         self.warning_widget = QtWidgets.QLabel(self)
         self.status_widget = QtWidgets.QLabel(self)
-        for name in ("connection_group", "devices_group", "connected_widget", "close_button",
+        for name in ("connection_group", "devices_group", "host_container", "reply_host_container", "connected_widget", "close_button",
                      "select_all_button", "delete_all_button", "presets_widget", "apply_button"):
             setattr(self, name, QtWidgets.QPushButton(self))
         self.enabled_widget = QtWidgets.QCheckBox(self)

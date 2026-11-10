@@ -12417,20 +12417,12 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         )
 
 
-class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
-    """Dialog to pick which vJoy devices are treated as physical inputs."""
-
-    """Dialog to pick which vJoy devices are treated as physical inputs.
-
-    :param profile_settings: the settings of the profile
-    :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
-    :param parent: parent widget, optional
-    """
+class VirtualAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
+    """Pick vJoy and Maestro virtual joysticks to use as profile inputs."""
 
     def __init__(self, profile_settings: gremlin.base_profile.Settings, parent=None):
         """
         :param profile_settings: the settings of the profile
-        :param callback: called as callback(vid, enabled) for each changed device on OK (optional)
         :param parent: parent widget, optional
         """
         super().__init__(self.__class__.__name__, parent=parent)
@@ -12438,26 +12430,32 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.settings = profile_settings
         self._widgets = []
-        self.vjoy_map = {}  # map of vjoy IDs to their selection state
+        self.virtual_map = {}  # (provider, device index) -> selected
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.setWindowTitle("vJoy as Input Configuration")
+        self.setWindowTitle("Virtual as Input")
         self.setModal(True)
 
         label = QInfoBox(
-            "Declaring a vJoy device as an input device will allow it to be used like a physical device. "
+            "Selected vJoy and Maestro joysticks can be used like physical input devices. "
             "Take care to avoid endless loops when the input triggers an output that is also used as input.\n"
-            "NOTE: This list only shows connected vJoy devices."
+            "Only connected joysticks available through local DirectInput are listed."
         )
         self.main_layout.addWidget(label)
 
-        group = QtWidgets.QGroupBox("Select vJoy devices for input:")
+        group = QtWidgets.QGroupBox("Select virtual joysticks for input:")
         group_layout = QtWidgets.QVBoxLayout(group)
-        for dev in sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id):
-            enabled = self.settings.getVjoyAsInput(dev.vjoy_id)
-            widget = QDataCheckbox(dev.name, data=dev.vjoy_id, value=enabled, callback=self._handle_state_changed)
+        devices = gremlin.joystick_handling.virtual_input_candidates()
+        for dev in sorted(devices, key=lambda dev: (dev.device_type, dev.name.casefold())):
+            enabled = self.settings.getVirtualAsInput(dev)
+            is_vjoy = dev.device_type == DeviceType.VJoy
+            _, index = self.settings._virtual_input_key(dev, dev.device_type)
+            label = f"{'vJoy' if is_vjoy else 'Maestro'}: {dev.name}"
+            if isinstance(index, str):
+                label += f" [{index}]"
+            widget = QDataCheckbox(label, data=(dev.device_type, index), value=enabled, callback=self._handle_state_changed)
 
-            self.vjoy_map[dev.vjoy_id] = enabled
+            self.virtual_map[(dev.device_type, index)] = enabled
             group_layout.addWidget(widget)
             self._widgets.append(widget)
         group_layout.addStretch()
@@ -12476,8 +12474,7 @@ class VJoyAsInputDialog(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(widget)
 
     def _handle_state_changed(self, widget, checked: bool):
-        vid: int = widget.data
-        self.vjoy_map[vid] = checked
+        self.virtual_map[widget.data] = checked
 
     def _set_all(self, checked: bool):
         for widget in self._widgets:

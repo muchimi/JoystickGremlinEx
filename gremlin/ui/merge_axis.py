@@ -47,7 +47,7 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
         # If there are no valid output vJoy devices present we can't show
         # the merge dialog.
-        id_list = profile.settings.getVjoyAsInputList()
+        id_list = profile.settings.getVirtualAsInputList()
         if len(id_list) == 0:
             label = QtWidgets.QLabel(
                 "No virtual devices available for axis merging. Either no vJoy devices are configured or all vJoy devices are defined as physical inputs."
@@ -125,7 +125,7 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         for entry in self.profile_data.merge_axes:
             # Show an error if the desired vJoy device is no longer available
             # as an output
-            if self.profile_data.settings.getVjoyAsInput(vid=entry["vjoy"]["vjoy_id"]):
+            if self.profile_data.settings.getVirtualAsInput(entry["vjoy"]["vjoy_id"]):
                 entries_to_remove.append(entry)
                 gremlin.util.display_error(f"vJoy device {entry['vjoy']['vjoy_id']} used as physical input")
             else:
@@ -169,7 +169,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
 
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
-        self.vjoy_selector = ui_common.VJoySelector(lambda x: callback(), [InputType.JoystickAxis], profile_data.settings.vjoy_as_input)
+        self.vjoy_selector = ui_common.VJoySelector(lambda x: callback(), [InputType.JoystickAxis], profile_data.settings.getVirtualAsInputList())
         self.joy1_selector = ui_common.JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
         self.joy2_selector = ui_common.JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
 
