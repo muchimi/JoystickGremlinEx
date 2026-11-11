@@ -650,7 +650,7 @@ class VJoy:
         if not VJoyInterface.vJoyEnabled():
             syslog.error("vJoy is not currently running")
             self._enabled = False
-            return
+            raise VJoyError("vJoy is not currently running")
 
         # true if the device is successfully acquired by GremlinEx.
         # Was previously assigned True then immediately overwritten with False,

@@ -40,6 +40,20 @@ import threading
 import gremlin.config
 from gremlin.types import SyncMode
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    Buttons,
+    ConfirmBox,
+    DeviceSummary,
+    QDataCheckbox,
+    QDataRadioButton,
+    QDelayWidget,
+    QFrameBox,
+    QHorizontalLine,
+    QJoystickSelectorWidget,
+    QSyncModeWidget,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -148,11 +162,11 @@ class SwitchWidget(QtWidgets.QWidget):
 
         # allow buttons or hats as inputs to the switch
         input_types = [InputType.JoystickButton, InputType.JoystickHat]
-        self.selector_widget = gremlin.ui.ui_common.QJoystickSelectorWidget(
+        self.selector_widget = QJoystickSelectorWidget(
             input_types, default_device, InputType.JoystickButton, selected_input_id, show_listen=True, callback=self._handle_input_changed
         )
 
-        self.delete_button = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+        self.delete_button = Buttons.getDeleteWidget(
             f"Delete position {data.index + 1}", callback=self._delete_cb, tooltip="Deletes this switch position"
         )
 
@@ -163,7 +177,7 @@ class SwitchWidget(QtWidgets.QWidget):
 
         for switch_type in SwitchModeType:
             if switch_type != SwitchModeType.NotSet:
-                rb = gremlin.ui.ui_common.QDataRadioButton(
+                rb = QDataRadioButton(
                     label=SwitchModeType.to_display_name(switch_type),
                     data=switch_type,
                     value=data.mode == switch_type,
@@ -171,13 +185,13 @@ class SwitchWidget(QtWidgets.QWidget):
                 )
                 mode_widgets.append(rb)
 
-        widget = gremlin.ui.ui_common.getHContainer(mode_widgets, widget_only=True)
-        mode_widget = gremlin.ui.ui_common.getVContainer(["Switch Execution Options:", widget], widget_only=True)
+        widget = getHContainer(mode_widgets, widget_only=True)
+        mode_widget = getVContainer(["Switch Execution Options:", widget], widget_only=True)
 
         # header widget
-        widget = gremlin.ui.ui_common.getHContainer(
+        widget = getHContainer(
             [
-                gremlin.ui.ui_common.QFrameBox(f"<b>Position [{data.index + 1}]</b>"),
+                QFrameBox(f"<b>Position [{data.index + 1}]</b>"),
                 self.selector_widget,
                 mode_widget,
                 self.delete_button,
@@ -186,14 +200,14 @@ class SwitchWidget(QtWidgets.QWidget):
             widget_only=True,
         )
 
-        widgets.append(gremlin.ui.ui_common.QHorizontalLine())
+        widgets.append(QHorizontalLine())
         widgets.append(widget)
 
         # release mode options
-        self.autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Auto Release", value=data.autoRelease, callback=self._handle_autorelease_changed)
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(value=data.releaseDelay, callback=self._handle_delay_changed)
+        self.autorelease_widget = QDataCheckbox("Auto Release", value=data.autoRelease, callback=self._handle_autorelease_changed)
+        self.delay_widget = QDelayWidget(value=data.releaseDelay, callback=self._handle_delay_changed)
 
-        self.release_option_container = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget], widget_only=True)
+        self.release_option_container = getHContainer([self.autorelease_widget, self.delay_widget], widget_only=True)
 
         widgets.append(self.release_option_container)
 
@@ -210,7 +224,7 @@ class SwitchWidget(QtWidgets.QWidget):
         widget.model.data_changed.connect(self._action_changed)
         self.action_widget = widget
 
-        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        widget = getVContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(widget)
 
@@ -241,7 +255,7 @@ class SwitchWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _delete_cb(self):
         if Shiboken.isValid(self):
-            result = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
+            result = ConfirmBox(f"Delete switch {self.data.index}?")
             if result:
                 self.delete_item.emit(self.data)
 
@@ -306,7 +320,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
         self.header_layout.addWidget(QtWidgets.QLabel(f"<b>Defined Switch Positions: {self.profile_data.position_count}</b>"))
 
         # switch positions
-        self.add_position_widget = gremlin.ui.ui_common.Buttons.getAddWidget(
+        self.add_position_widget = Buttons.getAddWidget(
             "Add a new switch position", tooltip="Adds a new switch position to the switch", callback=self._handle_add_position
         )
 
@@ -314,7 +328,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
         # sync option
         sync_modes = [SyncMode.Ignore, SyncMode.Input]
-        sync_widget = gremlin.ui.ui_common.QSyncModeWidget(
+        sync_widget = QSyncModeWidget(
             mode=self.profile_data.sync_mode, label="State on profile start:", callback=self._handle_sync_changed, sync_modes=sync_modes
         )
 
@@ -702,7 +716,7 @@ class SwitchData:
         self.releaseExtraData = None  # extra data for the release
 
     @property
-    def device(self) -> gremlin.ui.ui_common.DeviceSummary | None:
+    def device(self) -> DeviceSummary | None:
         """gets the device associated with this entry"""
         if self.device_guid:
             return gremlin.joystick_handling.getDevice(self.device_guid)

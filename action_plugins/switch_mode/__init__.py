@@ -31,6 +31,13 @@ import gremlin.shared_state
 import logging
 from shiboken6 import Shiboken
 from gremlin.util import safe_format, safe_read
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QExecuteWidget,
+    QWarningWidget,
+    getHContainer,
+    get_mode_list,
+)
 
 
 syslog = logging.getLogger("system")
@@ -46,16 +53,16 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.mode_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.mode_selector_widget = QDataComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self._warning_widget = gremlin.ui.ui_common.QWarningWidget("Mode must not be empty and cannot be the current mode.")
+        self._warning_widget = QWarningWidget("Mode must not be empty and cannot be the current mode.")
 
-        widget = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget, "Switch to mode:", widget_only=True)
+        widget = getHContainer(self.mode_selector_widget, "Switch to mode:", widget_only=True)
 
         self.main_layout.addWidget(widget)
 
@@ -91,7 +98,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         profile = gremlin.shared_state.current_profile
-        mode_list = gremlin.ui.ui_common.get_mode_list(profile)
+        mode_list = get_mode_list(profile)
         is_warning = False
 
         with QtCore.QSignalBlocker(self.mode_selector_widget):

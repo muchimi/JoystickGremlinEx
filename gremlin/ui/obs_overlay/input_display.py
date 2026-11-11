@@ -19,6 +19,9 @@ from PySide6 import QtWidgets
 
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import MouseButton
+from gremlin.ui.ui_common import (
+    QDataPushButton,
+)
 
 DEFAULT_PRESET = "wasd_mouse"
 
@@ -973,7 +976,7 @@ def _build_picker_class():
             self.setWindowTitle("Select keys and mouse buttons to display")
             self.clear_widget.setText("Deselect all")
             self.clear_widget.setToolTip("Clear every selected key and mouse button.")
-            self.select_all_widget = gremlin.ui.ui_common.QDataPushButton(
+            self.select_all_widget = QDataPushButton(
                 "Select all",
                 tooltip="Select every key and mouse button on this picker.",
                 clicked=self._select_all_cb,

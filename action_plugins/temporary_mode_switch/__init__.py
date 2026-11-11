@@ -32,6 +32,11 @@ import gremlin.execution_graph
 from shiboken6 import Shiboken
 import gremlin.util
 from gremlin.util import safe_format, safe_read
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QExecuteWidget,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -46,7 +51,7 @@ class TemporaryModeSwitchWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        self.mode_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.mode_selector_widget = QDataComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
 
         self.ec = gremlin.execution_graph.ExecutionContext()
@@ -58,16 +63,16 @@ class TemporaryModeSwitchWidget(gremlin.input_item.AbstractActionWidget):
         self.return_mode_widget.setToolTip("If enabled, the return mode will be the specified mode instead of the last mode.")
         self.return_mode_widget.clicked.connect(self._change_enable_return_mode)
 
-        self.return_mode_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.return_mode_selector_widget = QDataComboBox()
         self.return_mode_selector_widget.currentIndexChanged.connect(self._return_mode_selected_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(self.mode_selector_widget, "Mode:", widget_only=True)
+        widget = getHContainer(self.mode_selector_widget, "Mode:", widget_only=True)
         self.main_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.return_mode_widget, self.return_mode_selector_widget], widget_only=True)
+        widget = getHContainer([self.return_mode_widget, self.return_mode_selector_widget], widget_only=True)
         self.main_layout.addWidget(widget)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 

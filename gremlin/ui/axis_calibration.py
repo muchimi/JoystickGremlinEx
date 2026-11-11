@@ -34,6 +34,19 @@ import threading
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    BaseDialogUi,
+    Buttons,
+    Icons,
+    MessageBoxInfo,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataPushButton,
+    QFloatLineEdit,
+    QTimedLabel,
+    getHContainer,
+    clear_layout,
+)
 
 
 syslog = logging.getLogger("system")
@@ -46,7 +59,7 @@ def _invoke_ui(method, *args):
     return gremlin.util.InvokeUiMethod(method, *args)
 
 
-class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
+class CalibrationUi(BaseDialogUi):
     """Dialog to calibrate joystick axes."""
 
     def __init__(self, parent=None):
@@ -84,7 +97,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
             return
 
         # Device selection drop down
-        self.device_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.device_dropdown = QDataComboBox()
         for device in self.devices:
             self.device_dropdown.addItem(device.name)
 
@@ -155,7 +168,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         :param index the index of the currently selected device
             in the dropdown menu
         """
-        ui_common.clear_layout(self.axes_layout)
+        clear_layout(self.axes_layout)
         self.axes = []
         self._device_guid = None
         self._axis_widgets = {}
@@ -916,7 +929,7 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
 
         self.result = False
 
-        ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback=self._accept_ui)
+        ok_widget = Buttons.getOkWidget(callback=self._accept_ui)
         self.main_layout.addWidget(ok_widget, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
         # capture the events
@@ -1090,7 +1103,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         )
         self._bounds_center_widget.clicked.connect(self._bounds_center)
 
-        self._auto_calibrate_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self._auto_calibrate_widget = QDataCheckbox(
             label="Auto Calibrate",
             value=self._auto_calibrate,
             tooltip="If set, the axis will auto-calibrate to min/max travel as needed as the input is moved.",
@@ -1103,7 +1116,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         self._threshold_enabled_widget.clicked.connect(self._threshold_enabled_changed)
 
-        self._threshold_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._threshold_value_widget = QFloatLineEdit()
         self._threshold_value_widget.setMinimum(0)
         self._threshold_value_widget.setValue(self.action_data.threshold)
         self._threshold_value_widget.valueChanged.connect(self._threshold_value_changed)
@@ -1125,7 +1138,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         # self._options_container_repeater_layout.addWidget(self._reset_widget)
         self._options_container_repeater_layout.addWidget(self._auto_calibrate_widget)
 
-        widget = gremlin.ui.ui_common.getHContainer([self._threshold_enabled_widget, self._threshold_value_widget], widget_only=True)
+        widget = getHContainer([self._threshold_enabled_widget, self._threshold_value_widget], widget_only=True)
 
         self._options_container_repeater_layout.addWidget(widget)
 
@@ -1152,33 +1165,33 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._calibrated_slider_widget.handleColor = QColor("#d6ae3e")
         self._calibrated_slider_widget.setToolTip("Calibrated output value")
 
-        self._raw_value_widget = ui_common.QFloatLineEdit()
+        self._raw_value_widget = QFloatLineEdit()
         self._raw_value_widget.setReadOnly(True)
 
-        self._calibrated_value_widget = ui_common.QFloatLineEdit()
+        self._calibrated_value_widget = QFloatLineEdit()
         self._calibrated_value_widget.setReadOnly(True)
         self._calibrated_value_widget.setToolTip("Computed output value based on the current calibration settings.")
 
-        self._calibrated_min_widget = ui_common.QFloatLineEdit()
+        self._calibrated_min_widget = QFloatLineEdit()
         self._calibrated_min_widget.valueChanged.connect(self._calibrated_min_changed)
         self._calibrated_min_widget.setToolTip(
             "Minimum value of the axis possible input travel.<br>Move the input to the minimum travel position to set this value after pressing the calibrate button.<br>Can also be set manually."
         )
 
-        self._calibrated_max_widget = ui_common.QFloatLineEdit()
+        self._calibrated_max_widget = QFloatLineEdit()
         self._calibrated_max_widget.valueChanged.connect(self._calibrated_max_changed)
         self._calibrated_max_widget.setToolTip(
             "Maximum value of the axis possible input travel.<br>Move the input to the maximum travel position to set this value after pressing the calibrate button.<br>Can also be set manually."
         )
 
-        self._calibrated_center_widget = ui_common.QFloatLineEdit()
+        self._calibrated_center_widget = QFloatLineEdit()
         self._calibrated_center_widget.valueChanged.connect(self._calibrated_center_changed)
         self._calibrated_center_widget.setToolTip(
             "For centered inputs, this is the position of the input when it is at the center detent or midpoint of travel.<br>Press the center button to set this value when the axis is in the center position.<br>can also be set manually."
         )
 
         widgets = [QtWidgets.QLabel("Center:"), self._calibrated_center_widget]
-        self._container_center_widget, _ = ui_common.getHContainer(widgets)
+        self._container_center_widget, _ = getHContainer(widgets)
 
         widgets = [
             QtWidgets.QLabel("Min:"),
@@ -1190,7 +1203,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             self._calibrated_max_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
 
         self._raw_container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
         self._raw_container_repeater_layout.addWidget(self._raw_value_widget)
@@ -1202,32 +1215,32 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self._deadzone_widget.isCentered = self.action_data.centered
         self._deadzone_widget.changed.connect(self._deadzone_changed)
 
-        self._status_widget = gremlin.ui.ui_common.QTimedLabel()
+        self._status_widget = QTimedLabel()
 
-        save_global_widget = gremlin.ui.ui_common.QDataPushButton(
+        save_global_widget = QDataPushButton(
             "Save (Global)",
             callback=self._handle_save_global,
             tooltip="Saves the calibration data to the global default. Note: Profiles that have profile specific calibration data will use that instead. This will close the dialog after saving.",
         )
 
-        save_profile_widget = gremlin.ui.ui_common.QDataPushButton(
+        save_profile_widget = QDataPushButton(
             "Save (Profile)",
             callback=self._handle_save_profile,
             tooltip="Saves the calibration data to the profile.  The profile will use this data instead of the global calibration if it exists.  This will close the dialog after saving.",
             enabled=gremlin.shared_state.current_profile.profile_file is not None,
         )
 
-        delete_calibration_widget = gremlin.ui.ui_common.QDataPushButton(
+        delete_calibration_widget = QDataPushButton(
             "Clear/Reset",
             callback=self._reset_calibration,
             tooltip="Clears and resets the calibration data for this axis",
         )
 
-        close_widget = gremlin.ui.ui_common.QDataPushButton("Close", callback=self._handle_close)
+        close_widget = QDataPushButton("Close", callback=self._handle_close)
 
         widgets = [save_global_widget, save_profile_widget, delete_calibration_widget, close_widget]
 
-        button_container = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True, widget_only=True)
+        button_container = getHContainer(widgets, left_stretch=True, widget_only=True)
 
         self.main_layout.addWidget(self._options_container_repeater_widget)
         self.main_layout.addWidget(self._input_slider_widget)
@@ -1349,7 +1362,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             # should close?
             if self.source_data != self.action_data:
                 # changes not saved
-                icon = gremlin.ui.ui_common.Icons.warningIcon()
+                icon = Icons.warningIcon()
                 pixmap = icon.pixmap(48)
                 msgbox = QtWidgets.QMessageBox(parent=self)
                 msgbox.setWindowTitle("Notice")
@@ -1421,7 +1434,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         _value = self.action_data.hasData
         self._update_ui()
         self._status_widget.setText("Reset")
-        gremlin.ui.ui_common.MessageBoxInfo(prompt="Calibration reset.", informative_text="Remember to save the data.", parent=self)
+        MessageBoxInfo(prompt="Calibration reset.", informative_text="Remember to save the data.", parent=self)
 
     @QtCore.Slot()
     def _set_center_calibration(self):

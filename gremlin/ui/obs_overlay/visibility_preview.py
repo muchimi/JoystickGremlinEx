@@ -18,6 +18,11 @@ from .visibility_logic import (
     pretty_visibility_expression,
     truth_table,
 )
+from gremlin.ui.ui_common import (
+    Buttons,
+    QRememberDialog,
+    getHContainer,
+)
 
 _FILL = QtGui.QColor(40, 90, 200)
 _EMPTY = QtGui.QColor(255, 255, 255)
@@ -145,7 +150,7 @@ class VisibilityVennWidget(QtWidgets.QWidget):
         painter.end()
 
 
-class VisibilityPreviewDialog(gremlin.ui.ui_common.QRememberDialog):
+class VisibilityPreviewDialog(QRememberDialog):
     def __init__(self, expression: str, legend: list[tuple[str, str]], parent=None):
         super().__init__("overlay_visibility_preview", parent=parent)
         self.setWindowTitle("Visibility preview")
@@ -228,9 +233,9 @@ class VisibilityPreviewDialog(gremlin.ui.ui_common.QRememberDialog):
         split.setStretchFactor(1, 1)
         layout.addWidget(split, 1)
 
-        close_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Close", callback=self.accept)
+        close_btn = Buttons.getOkWidget(label="Close", callback=self.accept)
         layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(["||", close_btn], widget_only=True)
+            getHContainer(["||", close_btn], widget_only=True)
         )
 
 
@@ -370,7 +375,7 @@ _BOOLEAN_OPERATORS = (
 )
 
 
-class BooleanOperatorsDialog(gremlin.ui.ui_common.QRememberDialog):
+class BooleanOperatorsDialog(QRememberDialog):
     """Graphical reference for every visibility boolean operator."""
 
     def __init__(self, parent=None):
@@ -429,7 +434,7 @@ class BooleanOperatorsDialog(gremlin.ui.ui_common.QRememberDialog):
         scroll.setWidget(host)
         layout.addWidget(scroll, 1)
 
-        close_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Close", callback=self.accept)
+        close_btn = Buttons.getOkWidget(label="Close", callback=self.accept)
         layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(["||", close_btn], widget_only=True)
+            getHContainer(["||", close_btn], widget_only=True)
         )

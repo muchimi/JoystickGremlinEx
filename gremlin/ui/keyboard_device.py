@@ -47,6 +47,21 @@ from lxml import etree
 import gremlin.ui.ui_common
 import gremlin.base_profile
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Buttons,
+    Icons,
+    QDataComboBox,
+    QDataLineEdit,
+    QInputLockWidget,
+    QKeyboardKeysWidget,
+    getGridContainer,
+    getHContainer,
+    get_text_width,
+    synchronize_grids,
+    clear_layout,
+    InputListenerWidget,
+    ConfirmPushButton,
+)
 
 
 syslog = logging.getLogger("system")
@@ -581,7 +596,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         if not Shiboken.isValid(self):
             return
 
-        ui_common.clear_layout(self.main_layout)
+        clear_layout(self.main_layout)
 
         # self.grid_widget = QtWidgets.QWidget()
         # self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
@@ -593,19 +608,19 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         self._widget_map = {}
 
-        self.key_widget = gremlin.ui.ui_common.QKeyboardKeysWidget()
+        self.key_widget = QKeyboardKeysWidget()
 
-        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
-        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+        self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
+        self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
 
-        self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label="Listen", callback=self._listen_cb)
-        self.select_button_widget = gremlin.ui.ui_common.Buttons.getKeyboardWidget(label="Select Keys", callback=self._select_user_input)
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+        self.record_button_widget = Buttons.getEditWidget(label="Listen", callback=self._listen_cb)
+        self.select_button_widget = Buttons.getKeyboardWidget(label="Select Keys", callback=self._select_user_input)
+        self.delete_button_widget = Buttons.getDeleteWidget(
             callback=self.handle_remove,
             tooltip="Delete condition",
         )
 
-        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.comparison_dropdown = QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         self.comparison_dropdown.setWidthToContent()
@@ -626,7 +641,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             self.delete_button_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self._update_keys()
@@ -672,7 +687,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         """Prompts the user for the input to bind to this item."""
 
         gremlin.shared_state.push_suspend_highlighting()
-        self.button_press_dialog = ui_common.InputListenerWidget(
+        self.button_press_dialog = InputListenerWidget(
             [InputType.Keyboard, InputType.Mouse],
             return_kb_event=False,
             multi_keys=True,
@@ -945,39 +960,39 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.setInputItemListModel(model)
 
         # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(["Keyboard/Mouse Inputs", "||", lock_widget], widget_only=True)
+        lock_widget = QInputLockWidget(data=self.device_guid)
+        widget = getHContainer(["Keyboard/Mouse Inputs", "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            width = get_text_width(gremlin.util.get_guid())
+            line_edit = QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit = QDataLineEdit()
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            synchronize_grids([w1, w2])
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
 
         # key clear button
 
-        clear_keyboard_button = ui_common.ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        clear_keyboard_button = ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
+        icon = Icons.trashIcon()
         clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
@@ -985,7 +1000,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # sort keyboard input
         sort_button = QtWidgets.QPushButton("Sort")
-        icon = gremlin.ui.ui_common.Icons.sortIcon()
+        icon = Icons.sortIcon()
         sort_button.setIcon(icon)
         sort_button.clicked.connect(self._sort_input_cb)
         button_container_layout.addWidget(sort_button)
@@ -994,7 +1009,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         virtual_keyboard_button = QtWidgets.QPushButton("Add")
         virtual_keyboard_button.setToolTip("Adds a new key/mouse input to the profile")
-        icon = gremlin.ui.ui_common.Icons.keyboardIcon()
+        icon = Icons.keyboardIcon()
         virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
@@ -1350,7 +1365,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             widgets = [lbl]
 
         # update
-        container_widget, container_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        container_widget, container_layout = getHContainer(widgets)
         input_widget.setCustomContent(container_widget)
 
     def _update_input_widget(self, input_widget, container_widget):

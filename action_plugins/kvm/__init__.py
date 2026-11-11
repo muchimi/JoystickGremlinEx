@@ -36,6 +36,14 @@ from gremlin.types import SyncMode
 import gremlin.joystick_handling
 import gremlin.event_handler
 import gremlin.raw_input
+from gremlin.ui.ui_common import (
+    QDataCheckbox,
+    QInfoBox,
+    QSyncModeWidget,
+    RemoteClientWidget,
+    getHContainer,
+    getVContainer,
+)
 
 
 syslog = logging.getLogger("system")
@@ -58,26 +66,26 @@ class KVMWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         """Creates the UI components."""
 
-        mouse_widget = gremlin.ui.ui_common.QDataCheckbox(
+        mouse_widget = QDataCheckbox(
             "Enable mouse",
             value=self.action_data.mouse_enabled,
             tooltip="Mouse data will be set (motion, wheel and buttons)",
             callback=self._handle_mouse_enabled_changed,
         )
 
-        keyboard_widget = gremlin.ui.ui_common.QDataCheckbox(
+        keyboard_widget = QDataCheckbox(
             "Enable keyboard", value=self.action_data.keyboard_enabled, tooltip="Keyboard data will be sent", callback=self._handle_keyboard_enabled_changed
         )
 
-        invert_x_widget = gremlin.ui.ui_common.QDataCheckbox(
+        invert_x_widget = QDataCheckbox(
             "Invert X", value=self.action_data.invert_x, tooltip="Inverts the x motion", callback=self._handle_invert_x_changed
         )
 
-        invert_y_widget = gremlin.ui.ui_common.QDataCheckbox(
+        invert_y_widget = QDataCheckbox(
             "Invert Y", value=self.action_data.invert_y, tooltip="Inverts the y motion", callback=self._handle_invert_y_changed
         )
 
-        rotate_widget = gremlin.ui.ui_common.QDataCheckbox(
+        rotate_widget = QDataCheckbox(
             "Flip X/Y (rotation)", value=self.action_data.rotate, tooltip="Flips mouse x and y for rotated displays", callback=self._handle_rotation_changed
         )
 
@@ -88,16 +96,16 @@ class KVMWidget(gremlin.input_item.AbstractActionWidget):
             rotate_widget,
         ]
 
-        self.container_output_options = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, left_margin=12)
+        self.container_output_options = getHContainer(widgets, widget_only=True, left_margin=12)
 
-        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
+        self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
 
         sync_modes = [SyncMode.Ignore, SyncMode.Input]
-        sync_widget = gremlin.ui.ui_common.QSyncModeWidget(
+        sync_widget = QSyncModeWidget(
             mode=self.action_data.sync_mode, label="State on profile start:", callback=self._sync_changed, sync_modes=sync_modes
         )
 
-        info_widget = gremlin.ui.ui_common.QInfoBox(
+        info_widget = QInfoBox(
             "Keyboard and mouse output follows the current remote control mode. "
             "Local input remains enabled in concurrent mode.<br>"
             "Press <i>left-shift + esc</i> to return local control if the input becomes blocked."
@@ -112,7 +120,7 @@ class KVMWidget(gremlin.input_item.AbstractActionWidget):
             info_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        widget = getVContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self._update_ui()

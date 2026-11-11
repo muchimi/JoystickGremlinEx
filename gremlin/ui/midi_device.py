@@ -43,6 +43,23 @@ from psygnal import Signal
 from gremlin.types import DeviceType, EventSourceType
 from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, InputItemListView, BaseDeviceTabWidget
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    ConfirmPushButton,
+    Icons,
+    MessageBoxWarning,
+    QDataComboBox,
+    QDataLineEdit,
+    QHLine,
+    QIconLabel,
+    QInputLockWidget,
+    QShowAtCursorDialog,
+    getGridContainer,
+    getHContainer,
+    get_text_width,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 
@@ -975,7 +992,7 @@ class MidiInputListenerWidget(QBoxFrame):
             )
         )
 
-        cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self._cancel_cb)
+        cancel_widget = Buttons.getCancelWidget(callback=self._cancel_cb)
 
         self.main_layout.addWidget(cancel_widget, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
@@ -1025,7 +1042,7 @@ class MidiInputListenerWidget(QBoxFrame):
         gremlin.shared_state.pop_suspend_highlighting()
 
 
-class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class MidiInputConfigDialog(QShowAtCursorDialog):
     """dialog showing the MIDI input configuration options"""
 
     def __init__(self, current_mode: str, index: int, input_item: MidiInputItem, parent):
@@ -1066,16 +1083,16 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         # MIDI port selector
         items = []
 
-        self._midi_port_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_port_changed)
+        self._midi_port_selector_widget = QDataComboBox(callback=self._handle_port_changed)
         self._handle_port_refresh()
 
         if not self._midi_port_selector_widget.count():
-            gremlin.ui.ui_common.MessageBoxWarning("MIDI CONFIG: No MIDI ports available")
+            MessageBoxWarning("MIDI CONFIG: No MIDI ports available")
             self.close()
             return
 
         items = MidiCommandType.to_pairs()
-        self._midi_command_selector_widget = gremlin.ui.ui_common.QDataComboBox(source=items, callback=self._handle_command_changed)
+        self._midi_command_selector_widget = QDataComboBox(source=items, callback=self._handle_command_changed)
 
         a_widget = QtWidgets.QSpinBox()
         a_widget.setRange(0, 127)
@@ -1126,7 +1143,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.config_layout.addWidget(self._midi_data_widget, 1, sysex_col, 1, -1)
 
         # port refresh
-        refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+        refresh_widget = Buttons.getRefreshWidget(
             "Refresh Ports", callback=self._handle_port_refresh, tooltip="Refresh the list of available MIDI ports"
         )
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -1139,10 +1156,10 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
 
         # listen all ports button
-        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._listen_cb)
+        listen_widget = Buttons.getListenWidget(callback=self._listen_cb)
 
         # listen current port button
-        self.listen_filter_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._listen_port_cb)
+        self.listen_filter_widget = Buttons.getListenWidget(callback=self._listen_port_cb)
 
         self.button_layout.addWidget(refresh_widget)
         self.button_layout.addWidget(listen_widget)
@@ -1159,7 +1176,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._midi_message_container_layout.addWidget(self._midi_message_widget)
 
         # validation message
-        self._validation_message_widget = gremlin.ui.ui_common.QIconLabel()
+        self._validation_message_widget = QIconLabel()
 
         # input mode
         self._container_mode_widget = QtWidgets.QWidget()
@@ -1189,7 +1206,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._mode_on_change_widget = QtWidgets.QRadioButton("Change")
         self._mode_on_change_widget.setToolTip("The input will trigger as button press on any change in value")
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
-        self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
+        self._mode_locked_widget = QIconLabel()
 
         self._container_mode_radio_layout.addWidget(QtWidgets.QLabel("Action mode:"))
         self._container_mode_radio_layout.addWidget(self._mode_on_change_widget)
@@ -1206,7 +1223,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(self._container_mode_widget)
         main_layout.addWidget(self._midi_message_container_widget)
         main_layout.addWidget(self._validation_message_widget)
-        main_layout.addWidget(gremlin.ui.ui_common.QHLine())
+        main_layout.addWidget(QHLine())
         main_layout.addWidget(self.button_widget)
 
         self.setLayout(main_layout)
@@ -1463,7 +1480,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     with QtCore.QSignalBlocker(self._mode_on_change_widget):
                         self._mode_on_change_widget.setChecked(True)
                 self._validation_message_widget.setText("The current MIDI command cannot be setup as an axis input.")
-                warning_color = gremlin.ui.ui_common.Color().warningColor()
+                warning_color = Color().warningColor()
                 icon_color = QtGui.QColor(warning_color)
                 self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
             else:
@@ -1677,7 +1694,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     if key == other_key:
                         syslog.info(f"MIDI: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index + 1}] - ensure inputs are unique")
-                        warning_color = gremlin.ui.ui_common.Color().warningColor()
+                        warning_color = Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         valid = False
@@ -1789,38 +1806,38 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
         self.setInputItemListModel(model)
 
         # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(["MIDI Inputs", "||", lock_widget], widget_only=True)
+        lock_widget = QInputLockWidget(data=self.device_guid)
+        widget = getHContainer(["MIDI Inputs", "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            width = get_text_width(gremlin.util.get_guid())
+            line_edit = QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit = QDataLineEdit()
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            synchronize_grids([w1, w2])
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
 
         # clear inputs button
-        clear_button = gremlin.ui.ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback=self._show_clear_cb)
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        clear_button = ConfirmPushButton("Clear MIDI Inputs", show_callback=self._show_clear_cb)
+        icon = Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.confirmed.connect(self._clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
@@ -2184,7 +2201,7 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
             icon = gremlin.util.load_icon(
                 "ph.shield-warning-fill",
                 use_qta=True,
-                qta_color=gremlin.ui.ui_common.Color().warningColor(),
+                qta_color=Color().warningColor(),
             )
 
         input_widget.setStatus(status_text, icon)
@@ -2193,7 +2210,7 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
         """called when a button is created for custom content"""
 
         layout = QtWidgets.QVBoxLayout(container_widget)
-        self._status_widget = gremlin.ui.ui_common.QIconLabel()
+        self._status_widget = QIconLabel()
         self._status_widget.setObjectName("status")
 
         layout.addWidget(self._status_widget)

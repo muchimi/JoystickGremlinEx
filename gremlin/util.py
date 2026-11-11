@@ -42,7 +42,6 @@ import hashlib
 import random
 
 from PySide6 import QtCore, QtWidgets, QtGui
-from PySide6.QtCore import QMetaObject
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 from psygnal import Signal
@@ -2812,32 +2811,32 @@ def save_xml(file_name, root):
 
 def ansiText(value, color=None, bold=False):
     """converts a value to an ansi colored expression"""
-    import gremlin.ui.ui_common
+    from gremlin.ui.ui_common import Color
 
-    ansiReset = gremlin.ui.ui_common.Color().ansiReset()
+    ansiReset = Color().ansiReset()
     if not color and isinstance(value, bool):
         if value:
-            ansiColor = gremlin.ui.ui_common.Color().ansiYellow(bold)
+            ansiColor = Color().ansiYellow(bold)
         else:
-            ansiColor = gremlin.ui.ui_common.Color().ansiGreen(bold)
+            ansiColor = Color().ansiGreen(bold)
     else:
         match color:
             case "red":
-                ansiColor = gremlin.ui.ui_common.Color().ansiRed(bold)
+                ansiColor = Color().ansiRed(bold)
             case "green":
-                ansiColor = gremlin.ui.ui_common.Color().ansiGreen(bold)
+                ansiColor = Color().ansiGreen(bold)
             case "yellow":
-                ansiColor = gremlin.ui.ui_common.Color().ansiYellow(bold)
+                ansiColor = Color().ansiYellow(bold)
             case "blue":
-                ansiColor = gremlin.ui.ui_common.Color().ansiBlue(bold)
+                ansiColor = Color().ansiBlue(bold)
             case "magenta":
-                ansiColor = gremlin.ui.ui_common.Color().ansiMagenta(bold)
+                ansiColor = Color().ansiMagenta(bold)
             case "cyan":
-                ansiColor = gremlin.ui.ui_common.Color().ansiCyan(bold)
+                ansiColor = Color().ansiCyan(bold)
             case "white":
-                ansiColor = gremlin.ui.ui_common.Color().ansiWhite(bold)
+                ansiColor = Color().ansiWhite(bold)
             case "black":
-                ansiColor = gremlin.ui.ui_common.Color().ansiBlack(bold)
+                ansiColor = Color().ansiBlack(bold)
             case _:
                 ansiColor = color
 
@@ -2846,10 +2845,10 @@ def ansiText(value, color=None, bold=False):
 
 def ansiBold(value: str):
     """converts a value to an ansi bold expression"""
-    import gremlin.ui.ui_common
+    from gremlin.ui.ui_common import Color
 
-    ansiReset = gremlin.ui.ui_common.Color().ansiReset()
-    ansiBold = gremlin.ui.ui_common.Color().ansiBold()
+    ansiReset = Color().ansiReset()
+    ansiBold = Color().ansiBold()
     return f"{ansiBold}{value}{ansiReset}"
 
 

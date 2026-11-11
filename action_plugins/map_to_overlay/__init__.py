@@ -27,6 +27,10 @@ from gremlin.input_types import InputType
 from gremlin.repeater import PulseWorker
 from gremlin.types import VjoyAction
 from gremlin.util import safe_format, safe_read
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QDelayWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -522,17 +526,17 @@ class MapToOverlayWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self._action_box = gremlin.ui.ui_common.QDataComboBox(self)
+        self._action_box = QDataComboBox(self)
         for value, label in OVERLAY_ACTIONS:
             self._action_box.addItem(label, value)
         self._action_box.currentIndexChanged.connect(self._on_action)
 
-        self._mode_box = gremlin.ui.ui_common.QDataComboBox(self)
+        self._mode_box = QDataComboBox(self)
         for mode in BUTTON_MODES:
             self._mode_box.addItem(VjoyAction.to_name(mode), mode)
         self._mode_box.currentIndexChanged.connect(self._on_mode)
 
-        self._pulse_widget = gremlin.ui.ui_common.QDelayWidget()
+        self._pulse_widget = QDelayWidget()
         self._pulse_widget.setToolTip("Pulse duration in milliseconds")
         self._pulse_widget.valueChanged.connect(self._on_pulse)
 
@@ -586,11 +590,11 @@ class MapToOverlayWidget(gremlin.input_item.AbstractActionWidget):
         # ---- Set variable panel ----
         self._variable_box = QtWidgets.QGroupBox("Variable", self)
         var_form = QtWidgets.QFormLayout(self._variable_box)
-        self._variable_combo = gremlin.ui.ui_common.QDataComboBox(self)
+        self._variable_combo = QDataComboBox(self)
         self._variable_combo.currentIndexChanged.connect(self._on_variable)
         var_form.addRow("Name:", self._variable_combo)
 
-        self._write_mode_box = gremlin.ui.ui_common.QDataComboBox(self)
+        self._write_mode_box = QDataComboBox(self)
         for value, label in VARIABLE_WRITE_MODES:
             self._write_mode_box.addItem(label, value)
         self._write_mode_box.currentIndexChanged.connect(self._on_write_mode)

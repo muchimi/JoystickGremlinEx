@@ -5280,16 +5280,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         return joystick_handling.getDeviceFromVjoyId(device_id)
 
     def _is_output_connected(self, device_id):
-        if self._is_maestro_target():
-            device = self._target_device(device_id)
-            return device is not None and device.connected
-        return joystick_handling.is_vjoy_connected(device_id)
+        return joystick_handling.get_output_target(self._output_key(device_id)) is not None
 
     def _output_device(self, device_id):
-        if self._is_maestro_target():
-            from gremlin.maestro import MaestroOutputDevice
-            return MaestroOutputDevice(device_id)
-        return joystick_handling.VJoyProxy()[device_id]
+        return joystick_handling.get_output_device(self._output_key(device_id))
 
     def _send_flags(self):
         # Maestro's OSC host is its output transport. GEX's separate remote
@@ -7228,7 +7222,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if fire_event:
                         self.action_data.button_last_value = is_pressed
-                        if is_local:
+                        if is_local and self._is_output_connected(self.vjoy_id):
                             if verbose:
                                 syslog.info(f"VJOY: send local button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
                             self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
@@ -7245,7 +7239,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         elif input_type == InputType.JoystickHat:
             if verbose:
                 syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
-            if is_local:
+            if is_local and self._is_output_connected(self.vjoy_id):
                 if self.verbose:
                     syslog.info(f"VJOY: send local hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}")
                 self._output_device(self.vjoy_id).hat(self.vjoy_input_id).direction = action_value.current
@@ -7510,9 +7504,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if self.usage_data.is_inverted(self._output_key(vid), axis_id):
             value = -value
         if is_local:
-            if self.verbose:
-                syslog.info(f"VJOY: send local axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
-            self._output_device(vid).axis(axis_id).value = value
+            device = self._output_device(vid)
+            if device is not None:
+                if self.verbose:
+                    syslog.info(f"VJOY: send local axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
+                device.axis(axis_id).value = value
         if is_remote:
             if self.verbose:
                 syslog.info(f"VJOY: send remote axis: vjoy [{vid}] axis [{axis_id}] value: {value:0.03f}")
@@ -7526,7 +7522,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _get_axis(self, vid: int, axis_id: int) -> float:
         """gets the axis value using the inversion factor"""
-        value = self._output_device(vid).axis(axis_id).value
+        device = self._output_device(vid)
+        value = device.axis(axis_id).value if device is not None else 0.0
         inverted = self.usage_data.is_inverted(self._output_key(vid), axis_id)
         if inverted:
             value = -value

@@ -30,6 +30,10 @@ import gremlin.ui.ui_common
 import time
 import logging
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    QDataRadioButton,
+    QDelayWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -55,9 +59,9 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
             return
         self.mode_container_widget = QtWidgets.QWidget()
         self.mode_container_layout = QtWidgets.QHBoxLayout(self.mode_container_widget)
-        self.mode_delay_widget = gremlin.ui.ui_common.QDataRadioButton("Delay")
+        self.mode_delay_widget = QDataRadioButton("Delay")
         self.mode_delay_widget.data = PauseMode.Delay
-        self.mode_pause_widget = gremlin.ui.ui_common.QDataRadioButton("Pause Callback Execution")
+        self.mode_pause_widget = QDataRadioButton("Pause Callback Execution")
         self.mode_pause_widget.data = PauseMode.PauseAction
         self.mode_container_layout.addWidget(QtWidgets.QLabel("Mode:"))
         self.mode_container_layout.addWidget(self.mode_delay_widget)
@@ -71,7 +75,7 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
         self.mode_delay_widget.clicked.connect(self._mode_changed)
         self.mode_pause_widget.clicked.connect(self._mode_changed)
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.delay_widget = QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
         self.delay_widget.valueChanged.connect(self._value_changed)
         self.main_layout.addWidget(self.mode_container_widget)

@@ -18,6 +18,12 @@ from gremlin.types import ControlAction
 from shiboken6 import Shiboken
 
 from gremlin.types import SyncMode
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QExecuteWidget,
+    QSyncModeWidget,
+    getGridContainer,
+)
 
 
 syslog = logging.getLogger("system")
@@ -46,9 +52,9 @@ class ControlWidget(gremlin.input_item.AbstractActionWidget):
 
         items = [(ControlAction.to_display_name(action), action) for action in ControlAction]
 
-        self.action_widget = gremlin.ui.ui_common.QDataComboBox(value=self.action_data.action, source=items, tooltip="Control action")
+        self.action_widget = QDataComboBox(value=self.action_data.action, source=items, tooltip="Control action")
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(
+        self._execute_widget = QExecuteWidget(
             self.action_data.exec_on_press,
             self.action_data.exec_on_release,
             press_callback=self._execute_on_press_changed,
@@ -58,11 +64,11 @@ class ControlWidget(gremlin.input_item.AbstractActionWidget):
         self.action_widget.currentIndexChanged.connect(self._action_changed_cb)
 
         sync_modes = [SyncMode.Ignore, SyncMode.Input]
-        sync_widget = gremlin.ui.ui_common.QSyncModeWidget(
+        sync_widget = QSyncModeWidget(
             mode=self.action_data.sync_mode, label="State on profile start:", callback=self._sync_changed, sync_modes=sync_modes
         )
 
-        self.grid_action_widget, grid_action_layout = gremlin.ui.ui_common.getGridContainer()
+        self.grid_action_widget, grid_action_layout = getGridContainer()
 
         row = 0
         grid_action_layout.addWidget(QtWidgets.QLabel("Action:"), row, 0)

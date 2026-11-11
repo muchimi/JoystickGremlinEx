@@ -9,6 +9,13 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 import logging
 from gremlin.ui.ui_common import QRememberMainWindow
+from gremlin.ui.ui_common import (
+    Buttons,
+    Icons,
+    QEmptyWidget,
+    QTabHeader,
+    load_icon,
+)
 
 
 syslog = logging.getLogger("system")
@@ -16,11 +23,8 @@ syslog = logging.getLogger("system")
 
 class Ui_Gremlin(object):
     def build(self, main_window: QRememberMainWindow):
-        import gremlin.ui.ui_common
-        import gremlin.ktts
 
-        # background_color = gremlin.ui.ui_common.Color().backgroundColor()
-        # css = f"background-color: black;"
+
 
         # main content panel - holds the device tabs
         self.tab_bar_widget = QtWidgets.QWidget()
@@ -35,10 +39,10 @@ class Ui_Gremlin(object):
         self.tab_content_layout.setContentsMargins(0, 0, 0, 0)
         self.tab_content_layout.setSpacing(0)
 
-        self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
+        self.tab_filter_widget = Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
 
         # tab header for the device selection
-        self.devices_tab_header_widget = gremlin.ui.ui_common.QTabHeader()
+        self.devices_tab_header_widget = QTabHeader()
         self.devices_tab_header_widget.setContentsMargins(0, 0, 0, 0)
         self.devices_tab_header_widget.setMovable(True)
         self.devices_tab_header_widget.setUsesScrollButtons(True)
@@ -58,7 +62,7 @@ class Ui_Gremlin(object):
         self.tab_content_layout.addWidget(self.device_page_widget)
 
         # blank input for device content
-        self.device_loading_widget = gremlin.ui.ui_common.QEmptyWidget(mode="wait")
+        self.device_loading_widget = QEmptyWidget(mode="wait")
         self.device_page_widget.addWidget(self.device_loading_widget)  # reserved index 0
 
         # bottom status bar
@@ -165,7 +169,7 @@ class Ui_Gremlin(object):
         self.actionHTMLCheatsheet.setEnabled(False)
 
         self.actionCheatsheet = QtGui.QAction(main_window)
-        self.actionCheatsheet.setIcon(gremlin.ui.ui_common.Icons.treeIcon())
+        self.actionCheatsheet.setIcon(Icons.treeIcon())
         self.actionCheatsheet.setObjectName("actionCheatsheet")
         # self.actionPDFCheatsheet.setEnabled(False)
 
@@ -200,7 +204,7 @@ class Ui_Gremlin(object):
         # self.actionSwapDevices.setObjectName("actionSwapDevices")
         self.actionReloadDevices = QtGui.QAction(main_window)
         self.actionReloadDevices.setObjectName("actionReloadDevices")
-        icon = gremlin.ui.ui_common.load_icon("mdi6.reload")
+        icon = load_icon("mdi6.reload")
         self.actionReloadDevices.setIcon(icon)
         self.actionReloadDevices.setToolTip("Performs a fresh scan of devices and reloads them")
 
@@ -317,11 +321,11 @@ class Ui_Gremlin(object):
 
         self.actionSimconnectOptions = QtGui.QAction(main_window, text="Simconnect...")
         self.actionSimconnectOptions.setObjectName("actionSimconnectOptions")
-        self.actionSimconnectOptions.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
+        self.actionSimconnectOptions.setIcon(Icons.aircraftIcon())
 
         self.actionSimconnectOptionsToolbar = QtGui.QAction(main_window)
         self.actionSimconnectOptionsToolbar.setObjectName("actionSimconnectOptionsToolbar")
-        self.actionSimconnectOptionsToolbar.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
+        self.actionSimconnectOptionsToolbar.setIcon(Icons.aircraftIcon())
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionSimconnectOptions)
@@ -342,18 +346,7 @@ class Ui_Gremlin(object):
         profile = gremlin.shared_state.current_profile
         profile_converter.convert_legacy(profile.profile_file)
 
-    # def _handle_generate_tts(self):
-    #     import gremlin.ktts
-    #     import gremlin.shared_state
-    #     import gremlin.sound
 
-    #     ui = gremlin.shared_state.ui
-    #     ktts = gremlin.ktts.KTTS()
-    #     if not ktts.is_available():
-    #         return
-
-    #     dialog = gremlin.sound.TTSGeneratorDialog(ui)
-    #     dialog.exec()
 
     def _handle_convert_tts(self):
         import gremlin.util
@@ -363,45 +356,11 @@ class Ui_Gremlin(object):
         import gremlin.shared_state
         import gremlin.sound
 
-        # if not ktts.is_available():
-        #     gremlin.ui.ui_common.MessageBoxWarning(prompt="AI engine not found on this system.", parent=ui)
-        #     return False
-
         profile = gremlin.shared_state.current_profile
         new_file = profile.convertTTSToPlaySound()
         if new_file:
             el = gremlin.event_handler.EventListener()
             el.request_profile_reload.emit(new_file, False)
-
-        # profile_converter = gremlin.profile.ProfileConverter()
-        # profile = gremlin.shared_state.current_profile
-        # fname = profile.profile_file
-        # if not fname or not os.path.isfile(fname):
-        #     gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.", parent=ui)
-        #     return False
-
-        # dialog = gremlin.sound.GenerateDialog(parent=ui)
-        # result = dialog.exec()
-        # if result != QtWidgets.QDialog.DialogCode.Accepted:
-        #     # do not convert
-        #     return
-
-        # # make a backup
-        # backup_fname = gremlin.util.swap_ext(fname, suffix="_tts")
-        # index = 1
-        # while os.path.isfile(backup_fname):
-        #     backup_fname = gremlin.util.swap_ext(fname, suffix=f"_tts_{index}")
-        #     index += 1
-        # try:
-        #     shutil.copy(fname, backup_fname)
-        #     syslog.info(f"CONVERT TTS: backup file saved to: {backup_fname}")
-        # except Exception as e:
-        #     syslog.error(f"CONVERT TTS: unable to make backup file: {str(e)}")
-        #     return False
-
-        # if profile_converter.convert_tts(fname):
-        #     el = gremlin.event_handler.EventListener()
-        #     el.request_profile_reload.emit(fname, False)
 
     def update_toolbar(self):
         """sets / resets the toolbar based on options"""

@@ -15,6 +15,11 @@ from PySide6 import QtWidgets
 
 from .blink import normalize_blink
 from .model import default_style, normalize_visibility, widget_is_locked
+from gremlin.ui.ui_common import (
+    Buttons,
+    QRememberDialog,
+    getHContainer,
+)
 
 PROPERTY_GROUPS = (
     ("geometry_position", "Geometry (position)"),
@@ -94,7 +99,7 @@ def clipboard_groups() -> list[str]:
     return list(_clipboard.get("groups") or [])
 
 
-class PropertyGroupsDialog(gremlin.ui.ui_common.QRememberDialog):
+class PropertyGroupsDialog(QRememberDialog):
     def __init__(self, title: str, action: str, groups: list[str] | None = None, parent=None):
         super().__init__("overlay_property_groups", parent=parent)
         self.setWindowTitle(title)
@@ -110,10 +115,10 @@ class PropertyGroupsDialog(gremlin.ui.ui_common.QRememberDialog):
             box.setEnabled(key in allowed)
             self._boxes[key] = box
             layout.addWidget(box)
-        ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label=action, callback=self.accept)
-        cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
+        ok_btn = Buttons.getOkWidget(label=action, callback=self.accept)
+        cancel_btn = Buttons.getCancelWidget(callback=self.reject)
         layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
+            getHContainer(["||", ok_btn, cancel_btn], widget_only=True)
         )
 
     def selected_groups(self) -> list[str]:

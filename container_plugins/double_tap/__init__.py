@@ -33,6 +33,13 @@ from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
 import copy
 from gremlin.util import safe_read, safe_format, ansiYellow, ansiMagenta,  ansiResult, ansiRed
+from gremlin.ui.ui_common import (
+    QDataCheckbox,
+    QDelayWidget,
+    QExecuteWidget,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -62,25 +69,25 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.container.create_or_delete_virtual_button()
 
         # Activation delay
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.delay_widget = QDelayWidget(
             label="Double-tap delay:",
             callback=self._delay_changed_cb,
             value=self.container.doubletap_delay * 1000,
             tooltip="Set the delay for double-tap detection in milliseconds.  This is the time window within which two taps must occur to be considered a double-tap.",
         )
 
-        widget = gremlin.ui.ui_common.getHContainer([self.delay_widget, "||"], widget_only=True)
+        widget = getHContainer([self.delay_widget, "||"], widget_only=True)
         self.action_layout.addWidget(widget)
 
         # autorelease
-        self.auto_release_checkbox = gremlin.ui.ui_common.QDataCheckbox(
+        self.auto_release_checkbox = QDataCheckbox(
             "Auto Release",
             value=self.container.auto_release,
             callback=self._auto_release_changed_cb,
             tooltip="Enable or disable trigger auto release.  If enabled, the trigger will automatically release after the specified delay.",
         )
 
-        self.auto_release_delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.auto_release_delay_widget = QDelayWidget(
             label="Auto Release Delay:",
             callback=self._auto_release_delay_changed_cb,
             value=self.container.autorelease_delay,
@@ -88,19 +95,19 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         )
 
         self.auto_release_delay_widget.setValue(self.container.autorelease_delay)
-        widget = gremlin.ui.ui_common.getHContainer([self.auto_release_checkbox, "|", self.auto_release_delay_widget, "||"], widget_only=True)
+        widget = getHContainer([self.auto_release_checkbox, "|", self.auto_release_delay_widget, "||"], widget_only=True)
         self.action_layout.addWidget(widget)
 
 
         # chain options
-        self.chain_short_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.chain_short_widget = QDataCheckbox(
             "Short Actions",
             value = self.container.chain_short,
             callback = self._handle_chain_short_changed_cb,
             tooltip="Enable or disable short action chaining.\nWhen chained, a single action executes per trigger in roundrobin fashion."
         )
 
-        self.chain_double_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.chain_double_widget = QDataCheckbox(
             "Double Tap Actions",
             value = self.container.chain_double,
             callback = self._handle_chain_double_changed_cb,
@@ -113,7 +120,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
                         "5s":5,
                         "10s":10}
 
-        self.chain_timeout_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.chain_timeout_widget = QDelayWidget(
             value = self.container.chain_timeout, # to ms
             callback = self._chain_timeout_changed_cb,
             tooltip="Set the chain delay timeout value in seconds.  When chaining, if this time elapses, the chain will reset.",
@@ -136,11 +143,11 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         ]
 
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)
 
 
-        widget = gremlin.ui.ui_common.QExecuteWidget(
+        widget = QExecuteWidget(
             self.container.execute_on_press,
             self.container.execute_on_release,
             press_callback=self._execute_on_press_changed,
@@ -149,10 +156,10 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(widget)
 
 
-        self.short_widget, self.short_layout = gremlin.ui.ui_common.getVContainer()
+        self.short_widget, self.short_layout = getVContainer()
         self.short_widget.setContentsMargins(8, 0, 0, 0)
 
-        self.double_widget, self.double_layout = gremlin.ui.ui_common.getVContainer()
+        self.double_widget, self.double_layout = getVContainer()
         self.double_widget.setContentsMargins(8, 0, 0, 0)
 
         self.action_layout.addWidget(self.short_widget)

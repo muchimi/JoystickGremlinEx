@@ -29,6 +29,10 @@ from gremlin.util import safe_read
 import subprocess
 import logging
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Color,
+    QPathLineItem,
+)
 
 syslog = logging.getLogger("system")
 
@@ -44,7 +48,7 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.process_widget = gremlin.ui.ui_common.QPathLineItem("Process:", self.action_data.process, self.action_data)
+        self.process_widget = QPathLineItem("Process:", self.action_data.process, self.action_data)
         self.process_widget.pathChanged.connect(self._process_changed_cb)
         self.process_widget.open.connect(self._process_open_cb)
         self.process_widget.installEventFilter(self)
@@ -55,7 +59,7 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self.args_widget.installEventFilter(self)
 
         self.run_widget = QtWidgets.QPushButton("Test")
-        self.run_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color().activeColor()))
+        self.run_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=Color().activeColor()))
         self.run_widget.setToolTip("Runs the process")
         self.run_widget.clicked.connect(self._run_process)
 

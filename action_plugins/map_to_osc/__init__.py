@@ -36,6 +36,18 @@ from gremlin.ui.osc_device import OscInterface
 from psygnal import Signal
 from shiboken6 import Shiboken
 import html
+from gremlin.ui.ui_common import (
+    Color,
+    ConfirmBox,
+    QAxisRepeaterProgressbar,
+    QBoxFrame,
+    QDataIPLineEdit,
+    QDataLineEdit,
+    QFloatLineEdit,
+    QIconLabel,
+    QIntLineEdit,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -53,9 +65,7 @@ class OscValueWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.content_layout = QtWidgets.QGridLayout()
 
-        # self._frame_widget.setContentsMargins(0,0,0,0)
-        # self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
-        # self._frame_layout = QtWidgets.QHBoxLayout(self._frame_widget)
+
         self._is_axis = False  # true if mapping to an axis input
         self._enabled = enabled
 
@@ -70,8 +80,8 @@ class OscValueWidget(QtWidgets.QWidget):
         if not value:
             value = 1.0
 
-        self._value_float_widget = gremlin.ui.ui_common.QFloatLineEdit()
-        self._value_int_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._value_float_widget = QFloatLineEdit()
+        self._value_int_widget = QIntLineEdit()
 
         self._value_float_widget.setValue(value)
         self._value_int_widget.setValue(int(value))
@@ -96,7 +106,7 @@ class OscValueWidget(QtWidgets.QWidget):
             self._is_int_widget,
             self._is_float_widget,
         ]
-        self._value_container_widget, self._value_container_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        self._value_container_widget, self._value_container_layout = getHContainer(widgets)
 
         self._value_container_layout.addWidget(QtWidgets.QLabel("Value:"))
         self._value_container_layout.addWidget(self._value_float_widget)
@@ -213,7 +223,7 @@ class OscInputWidget(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self._frame_widget = gremlin.ui.ui_common.QBoxFrame()
+        self._frame_widget = QBoxFrame()
         self._frame_widget.setContentsMargins(0, 0, 0, 0)
         self._frame_layout = QtWidgets.QGridLayout(self._frame_widget)
         self._is_axis = False  # true if mapping to an axis input
@@ -224,28 +234,23 @@ class OscInputWidget(QtWidgets.QWidget):
         # this value should be updated when the axis value changes via setRepeaterValue() if in axis mode
         self._repeater_value = -1.0
 
-        # self._send_input_value_widget = QtWidgets.QRadioButton("Send input value")
-        # self._send_fixed_value_widget = QtWidgets.QRadioButton("Send fixed value")
-
-        # self._send_fixed_value_data_widget = gremlin.ui.ui_common.QFloatLineEdit()
-
         self._is_enabled_widget = QtWidgets.QCheckBox("Enabled")
         self._is_enabled_widget.setToolTip("Enables this parameter")
         self._is_enabled_widget.setChecked(self.enabled)
         self._is_enabled_widget.clicked.connect(self._enabled_changed)
 
-        self._axis_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._axis_min_widget = QFloatLineEdit()
         self._axis_min_widget.setMinimum(0)
         self._axis_min_widget.setValue(min_value)
         self._axis_min_widget.valueChanged.connect(self._range_changed)
-        self._axis_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._axis_max_widget = QFloatLineEdit()
         self._axis_max_widget.setMinimum(0)
         self._axis_max_widget.setValue(max_value)
         self._axis_max_widget.valueChanged.connect(self._range_changed)
-        self._axis_repeater_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar()
+        self._axis_repeater_widget = QAxisRepeaterProgressbar()
         self._axis_repeater_widget.setRange(min_value, max_value)
 
-        self._axis_container_widget, self._axis_container_layout = gremlin.ui.ui_common.getHContainer()
+        self._axis_container_widget, self._axis_container_layout = getHContainer()
 
         self._axis_container_layout.addWidget(QtWidgets.QLabel("Range Min:"))
         self._axis_container_layout.addWidget(self._axis_min_widget)
@@ -254,7 +259,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._axis_container_layout.addWidget(self._axis_repeater_widget)
         self._axis_container_layout.addStretch()
 
-        self._container_widget, self._container_layout = gremlin.ui.ui_common.getHContainer()
+        self._container_widget, self._container_layout = getHContainer()
 
         self._value_press_widget = OscValueWidget(label="Press Value:", is_integer=is_press_integer, enabled=enable_press)
         self._value_release_widget = OscValueWidget(label="Release Value:", is_integer=is_release_integer, enabled=enable_release)
@@ -463,9 +468,9 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
         self._server_container_widget.setContentsMargins(0, 0, 0, 0)
         self._server_container_layout = QtWidgets.QHBoxLayout(self._server_container_widget)
 
-        self._server_ip_widget = gremlin.ui.ui_common.QDataIPLineEdit(self.action_data.server_ip)
+        self._server_ip_widget = QDataIPLineEdit(self.action_data.server_ip)
         self._server_ip_widget.textChanged.connect(self._server_ip_changed)
-        self._server_port_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._server_port_widget = QIntLineEdit()
 
         self._server_port_widget.setRange(4096, 65535)
         self._server_port_widget.setValue(self.action_data.server_port)
@@ -537,7 +542,7 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
 
         self._container_layout.addWidget(self._osc_container_widget)
 
-        self._osc_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._osc_widget = QDataLineEdit()
         self._osc_widget.setToolTip("OSC command")
         if self.action_data.command:
             self._osc_widget.setText(self.action_data.command)
@@ -556,8 +561,8 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
         self._value_container_layout.addWidget(self._v2_widget)
         self._value_container_layout.addStretch()
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        self._warning_widget = QIconLabel(
             "ph.shield-warning-fill", use_qta=True, icon_color=QtGui.QColor(warning_color), text="", use_wrap=False
         )
         self.main_layout.addWidget(QtWidgets.QLabel("Send OSC command:"))
@@ -609,7 +614,7 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _reset_server(self):
         """reset IP and port to configured defaults"""
-        result = gremlin.ui.ui_common.ConfirmBox("Reset server data to defaults?")
+        result = ConfirmBox("Reset server data to defaults?")
         if result:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host)  # also updates action_data

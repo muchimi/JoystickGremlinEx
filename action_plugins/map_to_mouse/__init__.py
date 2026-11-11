@@ -32,6 +32,13 @@ import gremlin.input_item
 import gremlin.sendinput
 from shiboken6 import Shiboken
 import gremlin.remote
+from gremlin.ui.ui_common import (
+    Color,
+    DynamicDoubleSpinBox,
+    InputListenerWidget,
+    NoKeyboardPushButton,
+    QIconLabel,
+)
 
 syslog = logging.getLogger("system")
 
@@ -87,8 +94,8 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
         else:
             self._create_button_hat_ui()
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor(warning_color),
@@ -125,7 +132,7 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
-        self.time_to_max_speed = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.time_to_max_speed = DynamicDoubleSpinBox()
         self.time_to_max_speed.setRange(0.0, 100.0)
         self.time_to_max_speed.setValue(0.0)
         self.time_to_max_speed.setDecimals(2)
@@ -147,7 +154,7 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _create_mouse_button_ui(self):
-        self.mouse_button = gremlin.ui.ui_common.NoKeyboardPushButton(gremlin.types.MouseButton.to_string(self.action_data.button_id))
+        self.mouse_button = NoKeyboardPushButton(gremlin.types.MouseButton.to_string(self.action_data.button_id))
         self.mouse_button.clicked.connect(self._request_user_input)
 
         self.button_layout.addWidget(QtWidgets.QLabel("Mouse Button"), 0, 0)
@@ -291,7 +298,7 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
 
     def _request_user_input(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Mouse], return_kb_event=False)
+        self.button_press_dialog = InputListenerWidget([InputType.Mouse], return_kb_event=False)
         self.button_press_dialog.item_selected.connect(self._update_mouse_button)
 
         # Display the dialog centered in the middle of the UI

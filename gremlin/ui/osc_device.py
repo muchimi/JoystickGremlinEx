@@ -27,7 +27,6 @@ from gremlin.singleton_decorator import SingletonDecorator
 
 import gremlin.input_devices
 import gremlin.joystick_handling
-import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
 from gremlin.types import DeviceType, EventSourceType
 from gremlin.input_types import InputType
@@ -71,6 +70,30 @@ import enum
 # from gremlin.base_classes import AbstractInputItem
 import gremlin.util
 from psygnal import Signal
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    DeviceWidgetTracker,
+    DynamicDoubleSpinBox,
+    Icons,
+    MessageBox,
+    QDataCheckbox,
+    QDataLineEdit,
+    QDataRadioButton,
+    QDelayWidget,
+    QHLine,
+    QIconLabel,
+    QInfoBox,
+    QInputDialog,
+    QInputLockWidget,
+    QRememberDialog,
+    QShowAtCursorDialog,
+    getGridContainer,
+    getHContainer,
+    get_text_width,
+    ConfirmPushButton,
+    synchronize_grids,
+)
 
 
 
@@ -2239,7 +2262,7 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
 
         self._axis_values = []
         current_mode = gremlin.shared_state.current_mode
-        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker = DeviceWidgetTracker()
 
         tracker.registerWidget(
             self,
@@ -2462,7 +2485,7 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
             current_mode = gremlin.shared_state.current_mode
             client = InputOscClient()
             client.unregisterInput(self)
-            tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+            tracker = DeviceWidgetTracker()
             tracker.unregisterWidget(
                 self._device_guid,
                 current_mode,
@@ -2810,7 +2833,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.DarkGray)
         self.setPalette(palette)
 
-        cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self._cancel_cb)
+        cancel_widget = Buttons.getCancelWidget(callback=self._cancel_cb)
 
         # listen for the escape key
         event_listener = gremlin.event_handler.EventListener()
@@ -2857,7 +2880,7 @@ class OscInputListenerWidget(QtWidgets.QFrame):
         self.close()
 
 
-class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class OscInputConfigDialog(QShowAtCursorDialog):
     """dialog showing the OSC input configuration options"""
 
     def __init__(self, current_mode, input_item: OscInputItem, extra_data: dict = {}, parent=None):
@@ -2908,24 +2931,24 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._command = None  # OSC command text
         self._command_data = []  # OSC arguments
 
-        self._command_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._command_widget = QDataLineEdit()
         self._command_widget.valueChanged.connect(self._command_changed)
 
         self._config_layout.addWidget(QtWidgets.QLabel("Cmd:"))
         self._config_layout.addWidget(self._command_widget)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer()
+        widget, layout = getHContainer()
         self._data_container_widget = widget
         self._data_container_layout = layout
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self._data_container_widget], "Parameters:")
+        widget, layout = getHContainer([self._data_container_widget], "Parameters:")
         self._parameter_widget = widget
 
-        widget, layout = gremlin.ui.ui_common.getHContainer()
+        widget, layout = getHContainer()
         self._source_container_widget = widget
         self._source_container_layout = layout
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self._source_container_widget], "Source:")
+        widget, layout = getHContainer([self._source_container_widget], "Source:")
         self._source_widget = widget
 
         self._config_layout.addStretch()
@@ -2933,7 +2956,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._container_mode_radio_widget = QtWidgets.QWidget()
         self._container_mode_radio_layout = QtWidgets.QHBoxLayout(self._container_mode_radio_widget)
 
-        self._container_mode_description_widget = gremlin.ui.ui_common.QInfoBox()
+        self._container_mode_description_widget = QInfoBox()
 
         self._container_command_mode_radio_widget = QtWidgets.QWidget()
         self._container_command_mode_radio_layout = QtWidgets.QHBoxLayout()
@@ -2955,10 +2978,10 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._container_range_widget = QtWidgets.QWidget()
         self._container_range_layout = QtWidgets.QHBoxLayout(self._container_range_widget)
 
-        self._min_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self._min_range_widget = DynamicDoubleSpinBox()
         self._min_range_widget.setValue(0.0)  # default min range
         self._min_range_widget.valueChanged.connect(self._min_range_cb)
-        self._max_range_widget = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self._max_range_widget = DynamicDoubleSpinBox()
         self._max_range_widget.setValue(1.0)  # default min range
         self._min_range_widget.valueChanged.connect(self._max_range_cb)
 
@@ -2969,7 +2992,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._container_range_layout.addStretch()
 
         # validation message
-        self._validation_message_widget = gremlin.ui.ui_common.QIconLabel()
+        self._validation_message_widget = QIconLabel()
 
         self._container_mode_radio_layout.addWidget(self._mode_axis_widget)
 
@@ -2981,18 +3004,18 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._mode_on_change_widget = QtWidgets.QRadioButton("Change")
         self._mode_on_change_widget.setToolTip("The input will trigger as button press on any change in value")
         self._mode_on_change_widget.clicked.connect(self._mode_change_cb)
-        self._mode_locked_widget = gremlin.ui.ui_common.QIconLabel()
+        self._mode_locked_widget = QIconLabel()
 
-        self._trigger_on_message_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self._trigger_on_message_widget = QDataCheckbox(
             "Trigger on message",
             value=self.input_item._trigger_autorelease,
             callbackEx=self._autorelease_change_cb,
             tooltip="When enabled, receiving a message regardless of parameter will trigger the action with an autorelease.<br>Use this option when the OSC source message does not send >0 for press, 0 for release.",
         )
 
-        self._trigger_on_message_delay_widget = gremlin.ui.ui_common.QDelayWidget(value=self._pulse_delay, callback=self._pulse_value_changed)
+        self._trigger_on_message_delay_widget = QDelayWidget(value=self._pulse_delay, callback=self._pulse_value_changed)
 
-        self._container_trigger_widget = gremlin.ui.ui_common.getHContainer(
+        self._container_trigger_widget = getHContainer(
             [self._trigger_on_message_widget, self._trigger_on_message_delay_widget],
             widget_only=True,
         )
@@ -3026,7 +3049,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.button_layout = QtWidgets.QHBoxLayout(self.button_widget)
 
         # listen all ports button
-        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._listen_cb)
+        self.listen_widget = Buttons.getListenWidget(callback=self._listen_cb)
 
         self.button_layout.addWidget(self.listen_widget)
         self.button_layout.addStretch(1)
@@ -3043,7 +3066,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(self._container_mode_description_widget)
         main_layout.addWidget(self._container_command_mode_description_widget)
         main_layout.addWidget(self._validation_message_widget)
-        main_layout.addWidget(gremlin.ui.ui_common.QHLine())
+        main_layout.addWidget(QHLine())
         main_layout.addWidget(self.button_widget)
 
         self.setLayout(main_layout)
@@ -3117,7 +3140,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
                         syslog.info(f"OSC: conflict detected: key {key} is the same as {other_key}")
                         self._validation_message_widget.setText(f"Input conflict detected with input [{index + 1}] - ensure inputs are unique")
-                        warning_color = gremlin.ui.ui_common.Color().warningColor()
+                        warning_color = Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         valid = False
@@ -3134,14 +3157,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
                     if self._min_range > self._max_range:
                         self._validation_message_widget.setText("Min range must be less than max range")
-                        warning_color = gremlin.ui.ui_common.Color().warningColor()
+                        warning_color = Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
 
                     if self._min_range == self._max_range:
                         self._validation_message_widget.setText("Min range cannot be the same as the max range")
-                        warning_color = gremlin.ui.ui_common.Color().warningColor()
+                        warning_color = Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
@@ -3152,7 +3175,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
                         self._validation_message_widget.setText("First data item must be a number for axis input")
-                        warning_color = gremlin.ui.ui_common.Color().warningColor()
+                        warning_color = Color().warningColor()
                         icon_color = QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill", True, color=icon_color)
                         return
@@ -3244,11 +3267,11 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             return
 
         if index not in self._data_widgets:
-            widget = gremlin.ui.ui_common.QDataLineEdit()
+            widget = QDataLineEdit()
             widget.setReadOnly(True)
             widget.data = index
             label = QtWidgets.QLabel(f"P{index + 1}:")
-            selector = gremlin.ui.ui_common.QDataRadioButton(f"P{index + 1}")
+            selector = QDataRadioButton(f"P{index + 1}")
             selector.data = index
             if index == self._source_index:
                 selector.setChecked(True)
@@ -3490,19 +3513,19 @@ class OscFilterWidget(QtWidgets.QWidget):
 
         current_filter = self._config.osc_filter
 
-        self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text=current_filter, tooltip="Enter filter text")
+        self._filter_widget = QDataLineEdit(text=current_filter, tooltip="Enter filter text")
         self._filter_widget.enterPressed.connect(self._apply_filter)  # apply the filter
 
-        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback=self._find_entry, tooltip="Search (F3)")
+        self._find_widget = Buttons.getSearchWidget(callback=self._find_entry, tooltip="Search (F3)")
 
         self._apply_widget = QtWidgets.QPushButton("Apply")
         self._apply_widget.setToolTip("Apply current filter")
         self._apply_widget.clicked.connect(self._apply_filter)
 
-        self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear_filter, label=None)
+        self._clear_filter_widget = Buttons.getClearWidget(callback=self._clear_filter, label=None)
         self._clear_filter_widget.setMaximumWidth(24)
 
-        widget = gremlin.ui.ui_common.getHContainer(
+        widget = getHContainer(
             [
                 self._find_widget,
                 "||",
@@ -3520,7 +3543,7 @@ class OscFilterWidget(QtWidgets.QWidget):
 
         # count row
         self._count_widget = QtWidgets.QLabel()
-        widget = gremlin.ui.ui_common.getHContainer(self._count_widget, widget_only=True)
+        widget = getHContainer(self._count_widget, widget_only=True)
 
         self.main_layout.addWidget(widget)
         self.main_layout.setSpacing(2)
@@ -3545,7 +3568,7 @@ class OscFilterWidget(QtWidgets.QWidget):
         """displays the find dialog"""
         config = gremlin.config.Configuration()
         current_term = config.osc_last_search_term
-        self._dialog = gremlin.ui.ui_common.QInputDialog("Find OSC message", "Search for:", text=current_term)
+        self._dialog = QInputDialog("Find OSC message", "Search for:", text=current_term)
         self._dialog.accepted.connect(self._find_entry_accept)
         self._dialog.setModal(True)
         self._dialog.show()
@@ -3591,7 +3614,7 @@ class OscFilterWidget(QtWidgets.QWidget):
                 el = gremlin.event_handler.EventListener()
                 el.select_input.emit(input_item.device_guid, input_item.input_type, input_item.input_id, False, True, False, None)
             else:
-                gremlin.ui.ui_common.MessageBox(prompt="Term not found")
+                MessageBox(prompt="Term not found")
                 self._last_search_term = search_term
                 self._last_search_index = -1
 
@@ -3637,7 +3660,7 @@ class OscFilterWidget(QtWidgets.QWidget):
         return self._filter_widget.text()
 
 
-class OscBulkLoadDialog(gremlin.ui.ui_common.QRememberDialog):
+class OscBulkLoadDialog(QRememberDialog):
     """dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse"""
 
     closed = QtCore.Signal()  # sent when the dialog closes
@@ -3663,7 +3686,7 @@ Valid suffixes are A for axis, BNP for a no paramater (auto-release) button, B f
 Existing entries will be ignored.
 """
 
-        info_box = gremlin.ui.ui_common.QInfoBox(msg)
+        info_box = QInfoBox(msg)
         main_layout.addWidget(info_box)
 
         cancel_button_widget = QtWidgets.QPushButton("Cancel")
@@ -3672,7 +3695,7 @@ Existing entries will be ignored.
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._close_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer(
+        widget = getHContainer(
             [ok_button_widget, cancel_button_widget],
             left_stretch=True,
             widget_only=True,
@@ -3800,30 +3823,30 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         self.setInputItemListModel(model)
 
         # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(["OSC Inputs", "||", lock_widget], widget_only=True)
+        lock_widget = QInputLockWidget(data=self.device_guid)
+        widget = getHContainer(["OSC Inputs", "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            width = get_text_width(gremlin.util.get_guid())
+            line_edit = QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit = QDataLineEdit()
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            synchronize_grids([w1, w2])
 
         # filter view
         self._filter_widget = OscFilterWidget(self.inputItemListModel)
@@ -3837,8 +3860,8 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         # key clear button
 
-        clear_button = ui_common.ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        clear_button = ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
+        icon = Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.setToolTip("Deletes all OSC inputs")
         clear_button.confirmed.connect(self._clear_inputs_cb)
@@ -3856,7 +3879,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # Key add button
         add_button = QtWidgets.QPushButton("Add")
         add_button.setToolTip("Adds a new OSC message input to the profile")
-        icon = gremlin.ui.ui_common.Icons.addIcon()
+        icon = Icons.addIcon()
         add_button.setIcon(icon)
         add_button.clicked.connect(self._add_input_cb)
 
@@ -3865,7 +3888,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # load from list button - load / edit from list
         load_button = QtWidgets.QPushButton("Import")
         load_button.setToolTip("Adds multiple OSC message inputs to the profile from a list.")
-        icon = gremlin.ui.ui_common.Icons.addIcon(gremlin.ui.ui_common.Color().yellowColor())
+        icon = Icons.addIcon(Color().yellowColor())
         load_button.setIcon(icon)
         load_button.clicked.connect(self._handle_bulk_load)
         button_container_layout.addWidget(load_button)
@@ -4183,7 +4206,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                 self.inputItemListView.selectInputItem(imported_list[0])
 
             # show results
-            gremlin.ui.ui_common.MessageBox(prompt=f"Imported {len(imported_list):,} entries.", is_warning=False)
+            MessageBox(prompt=f"Imported {len(imported_list):,} entries.", is_warning=False)
 
     @QtCore.Slot()
     def _sort_input_cb(self):
@@ -4308,7 +4331,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                 other_key = other_input.message_key
                 if key == other_key:
                     index = widgets.index(widget)
-                    warning_color = gremlin.ui.ui_common.Color().warningColor()
+                    warning_color = Color().warningColor()
                     icon_color = QtGui.QColor(warning_color)
 
                     self._set_status(
@@ -4333,7 +4356,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
     def _set_status(self, widget, icon=None, status=None, use_qta=True, color=None):
         """sets the status of an input widget"""
-        status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        status_widget = widget.findChild(QIconLabel, "status")
         if status_widget:
             if color:
                 status_widget.setIcon(icon, use_qta=use_qta, color=color)
@@ -4348,7 +4371,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         input_item: OscInputItem = input_widget.input_item
         input_item._update_display_name()
 
-        css = gremlin.ui.ui_common.Color().cssEntry()
+        css = Color().cssEntry()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
         input_widget.setInputDescriptionStyle(css)
@@ -4362,7 +4385,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         icon = None
         if is_warning:
-            warning_color = gremlin.ui.ui_common.Color().warningColor()
+            warning_color = Color().warningColor()
             icon_color = QtGui.QColor(warning_color)
             icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=icon_color)
 
@@ -4371,7 +4394,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
-        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget = QIconLabel()
         status_widget.setObjectName("status")
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)
@@ -4663,7 +4686,7 @@ class InputOscClient(QtCore.QObject):
 
         # get the input items behind this message
         config = gremlin.config.Configuration()
-        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker = DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
         _cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message

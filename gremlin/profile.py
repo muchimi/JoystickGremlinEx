@@ -38,6 +38,14 @@ from PySide6 import QtWidgets
 from . import error, joystick_handling
 
 from gremlin.types import PlayMode
+from gremlin.ui.ui_common import (
+    Buttons,
+    MessageBox,
+    QDataComboBox,
+    QDataPushButton,
+    QFloatLineEdit,
+    getHContainer,
+)
 
 
 syslog = logging.getLogger("system")
@@ -77,17 +85,17 @@ class TTSDialog(QtWidgets.QDialog):
 
         # get a list of speakers
 
-        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
+        self.speaker_widget = QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
         self._update_speakers(initialize=True)
         self.speaker_widget.setCallback(self._handle_speaker_changed)
 
-        refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+        refresh_speaker_widget = Buttons.getRefreshWidget(
             label=None,
             callback=self._handle_refresh_speakers,
             tooltip="Refresh available AI speakers",
         )
 
-        self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        self.tts_speed_widget = QFloatLineEdit(
             min_range=0.1,
             max_range=10.0,
             value=tts_speed,
@@ -103,14 +111,14 @@ class TTSDialog(QtWidgets.QDialog):
             self.tts_speed_widget,
         ]
 
-        ai_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        ai_container = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(ai_container)
 
-        ok_button = gremlin.ui.ui_common.QDataPushButton("Ok", callback=self._handle_ok)
-        cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel", callback=self._handle_cancel)
+        ok_button = QDataPushButton("Ok", callback=self._handle_ok)
+        cancel_button = QDataPushButton("Cancel", callback=self._handle_cancel)
 
         widgets = ["||", ok_button, cancel_button, "||"]
-        button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        button_container = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(button_container)
 
     def _handle_tts_speed_changed(self, value: float):
@@ -1311,7 +1319,7 @@ class ProfileConverter:
                     syslog.error(err)
 
             syslog.info("CONVERT: did not find any actions to convert")
-            gremlin.ui.ui_common.MessageBox(title="Conversion Results", prompt="No actions converted.")
+            MessageBox(title="Conversion Results", prompt="No actions converted.")
 
         else:
             # items were converted
@@ -1336,7 +1344,7 @@ class ProfileConverter:
             syslog.info(f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
 
             # output a message box
-            gremlin.ui.ui_common.MessageBox(
+            MessageBox(
                 title="Conversion Results",
                 prompt=f"Converted {keyboard_count} keyboard actions and {remap_count} remap actions.",
             )

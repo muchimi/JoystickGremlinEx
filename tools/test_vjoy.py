@@ -153,6 +153,14 @@ class VJoyChecks(unittest.TestCase):
         self.listener.vjoy_output_event_ui.events.clear()
         self.listener.vjoy_event.events.clear()
 
+    def test_disabled_driver_does_not_return_a_partially_initialized_device(self):
+        self.driver.vJoyEnabled.return_value = False
+        with self.assertRaisesRegex(VJoyError, "vJoy is not currently running"):
+            self.ns["VJoy"](1)
+        self.driver.GetVJDStatus.assert_not_called()
+        self.driver.AcquireVJD.assert_not_called()
+        self.driver.GetVJDButtonNumber.assert_not_called()
+
     def test_axis_scaling_clamping_and_nan(self):
         for value, expected in ((-2, -1), (-1, -1), (-0.5, -0.5), (0, 0), (0.5, 0.5), (1, 1), (2, 1), (math.nan, -1)):
             with self.subTest(value=value):

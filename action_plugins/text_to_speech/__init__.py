@@ -34,6 +34,15 @@ import time
 from gremlin.util import safe_format, safe_read, TimedRandomInt
 from shiboken6 import Shiboken
 import logging
+from gremlin.ui.ui_common import (
+    Color,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataRadioButton,
+    QExecuteWidget,
+    QIntLineEdit,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -49,7 +58,7 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.voice_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.voice_widget = QDataComboBox()
         tts = gremlin.tts.TextToSpeech()
         for voice in tts.getVoices():
             self.voice_widget.addItem(voice.name, voice.id)
@@ -75,7 +84,7 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         self.volume_widget.valueChanged.connect(self._volume_changed_cb)
         self.volume_widget.setToolTip("Default volume percent (0..100)")
 
-        self.rate_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.rate_widget = QIntLineEdit()
         self.rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.rate_widget.setValue(self.action_data.rate)
         self.rate_widget.valueChanged.connect(self._rate_changed_cb)
@@ -83,7 +92,7 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         self.rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
 
         self.play_widget = QtWidgets.QPushButton("Play")
-        self.play_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color().activeColor()))
+        self.play_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=Color().activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._play_cb)
 
@@ -102,17 +111,17 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             self.play_widget,
         ]
 
-        self.container_options_widget, self.container_layout = gremlin.ui.ui_common.getHContainer(widgets)
+        self.container_options_widget, self.container_layout = getHContainer(widgets)
         abort = self.action_data.abort
 
-        self.abort_off_widget = gremlin.ui.ui_common.QDataRadioButton(
+        self.abort_off_widget = QDataRadioButton(
             "Speech Mode",
             data=False,
             value=not abort,
             callback=self._handle_mode_change,
             tooltip="In this mode, the text below will be spoken via the TTS options selected.",
         )
-        self.abort_on_widget = gremlin.ui.ui_common.QDataRadioButton(
+        self.abort_on_widget = QDataRadioButton(
             "Stop TTS Mode",
             data=True,
             value=abort,
@@ -120,14 +129,14 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Aborts any prior speech processing when triggered.",
         )
 
-        self.tts_suppress_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.tts_suppress_enabled_widget = QDataCheckbox(
             "Suppress Duplicate Playback",
             value=self.action_data.tts_suppress_duplicate,
             callback=self._handle_tts_suppress_enabled_changed,
             tooltip="Suppress duplicate playback within the cooldown period.",
         )
 
-        self.tts_suppress_cooldown_widget = gremlin.ui.ui_common.QIntLineEdit(
+        self.tts_suppress_cooldown_widget = QIntLineEdit(
             min_range=0,
             max_range=60,
             value=self.action_data.tts_suppress_cooldown,
@@ -136,14 +145,14 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Cooldown time in seconds to suppress duplicate TTS playback.",
         )
 
-        cooldown_container = gremlin.ui.ui_common.getHContainer(
+        cooldown_container = getHContainer(
             [self.tts_suppress_enabled_widget, "Cooldown (s):", self.tts_suppress_cooldown_widget], widget_only=True
         )
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
-        override_widget = gremlin.ui.ui_common.QDataCheckbox(
+        override_widget = QDataCheckbox(
             "Override Suppress",
             value=self.action_data.override_suppress,
             callback=self._handle_suppress_change,
@@ -158,7 +167,7 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             self._execute_widget,
         ]
 
-        self.container_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.container_mode_widget = getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(self.container_mode_widget)
         self.main_layout.addWidget(self.text_field)

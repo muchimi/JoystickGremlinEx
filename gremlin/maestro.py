@@ -1899,7 +1899,8 @@ class Maestro:
             syslog.exception("MAESTRO: device list refresh failed")
 
     def deleteDevice(self, name: str) -> MaestroResult:
-        result = self.client.request("/maestro_remove", name)
+        """Delete the active device and its saved definition, then publish the remaining targets."""
+        result = self.client.request("/maestro_delete", name)
         if not result:
             syslog.error(f"MAESTRO: failed to delete device {name}: {result.code}: {result.message}")
         else:
@@ -2379,8 +2380,6 @@ class MaestroDialog(QRememberDialog):
         layout = QtWidgets.QVBoxLayout(self)
         self._select_widget_map = {}  # map of device ID to the selection box in the table
 
-        # self.enabled_widget = QEnabledWidget()
-        # self.connected_widget = QEnabledWidget("Enable Maestro", enabled=self.maestro.connected())
 
         self.localhost_widget = QDataCheckbox(
             "LocalHost",
@@ -2553,7 +2552,7 @@ class MaestroDialog(QRememberDialog):
         for widget in (self.host_widget, self.reply_host_widget, self.port_widget, self.reply_port_widget):
             widget.textChanged.connect(self._invalidate_connection)
 
-        #layout.addWidget(getHContainer([self.connected_widget, self.enabled_widget], widget_only=True))
+
 
         self.status_bar_maestro_widget = QOnOffStatusfWidget(
             on_icon="mdi6.gamepad-variant",
@@ -2738,14 +2737,20 @@ class MaestroDialog(QRememberDialog):
         """delete all devices managed by GEX"""
         if not self.maestro.ensureConnected():
             return
-        MessageBoxYesNo(prompt="Are you sure you want to delete all devices?", callback=self._delete_all_callback)
+        MessageBoxYesNo(prompt="Are you sure you want to delete all devices?", callback=self._delete_all_devices)
 
-    def _delete_all_callback(self, result):
-        """deletes all device after confirmation box is confirmed"""
+    def _delete_all_devices(self, result: bool, data: tuple ):
+        """deletes all devices after confirmation box is confirmed"""
+        def operation():
+            self.maestro.deleteAll()
+            return self._read_snapshot()
+        def complete(snapshot):
+            self._selected_ids.clear()
+            self._load_snapshot(snapshot)
+            self.status_widget.setText("All devices have been deleted.")
+
         if result:
-            result = self.maestro.deleteAll()
-            if result.ok:
-                self._refresh_devices()
+            self._submit(operation, complete,"Deleting all devices...")
 
     def _handle_maestro_connection_changed(self, connected: bool):
         gremlin.util.InvokeUiMethod(self._handle_maestro_connection_changed_ui, connected)
@@ -2812,8 +2817,7 @@ class MaestroDialog(QRememberDialog):
         self.connection_group.setEnabled(idle)
         self.devices_group.setEnabled(connected and idle)
         self.apply_button.setEnabled(connected and idle)
-        # self.enabled_widget.setEnabled(idle)
-        # self.connected_widget.setEnabled(connected)
+
         self.close_button.setEnabled(idle)
         has_devices = bool(self._select_widget_map)
         self.select_all_button.setEnabled(has_devices)
@@ -2966,44 +2970,21 @@ class MaestroDialog(QRememberDialog):
         else:
             self._selected_ids.discard(widget.data.device_id)
 
-    # def _edit_clicked(self, widget, data):
-    #     self._edit_device(data)
-
     def _delete_clicked(self, widget, data):
         self._delete_device(data)
 
-    # def _edit_device(self, device_id):
-    #     """ called when the edit button is pressed """
-    #     self._previous = dict(self._definitions[device_id])
-    #     row = self._previous
-    #     self.id_widget.setText(row["device_id"])
-    #     self.id_widget.setReadOnly(True)
-    #     self.name_widget.setText(row["name"])
-    #     profile_id = "" if row["kind"] == "custom" else row["profile_id"]
-    #     index = self.profile_widget.findData(profile_id)
-    #     if index < 0:
-    #         self.profile_widget.addItem(profile_id, profile_id)
-    #         index = self.profile_widget.count() - 1
-    #     self.profile_widget.setCurrentIndex(index)
-    #     self.axes_widget.setValue(row["axes"])
-    #     self.buttons_widget.setValue(row["buttons"])
-    #     self.hats_widget.setValue(row["hats"])
-    #     self.active_widget.setChecked(row["enabled"])
-    #     self.include_widget.setChecked(device_id in self._selected_ids)
-    #     self._profile_changed()
-
     def _delete_device(self, device_id):
-        try:
-            self.maestro.deleteDevice(device_id)  # @IgnoreException
-        except MaestroServiceError as e:
-            MessageBox.warning(self, "Error", f"Failed to delete device {device_id}: {e}")
-            return
+        def operation():
+            self.maestro.deleteDevice(device_id).raise_for_error()
+            return self._read_snapshot()
 
-        if device_id in self._definitions:
-            del self._definitions[device_id]
-        if device_id in self._selected_ids:
+        def complete(snapshot):
             self._selected_ids.discard(device_id)
-        self._refresh_devices()
+            self._load_snapshot(snapshot)
+            self.devices_changed.emit()
+            self.status_widget.setText(f"Deleted Maestro device {device_id}.")
+
+        self._submit(operation, complete, "Deleting device…")
 
     def _create_new_joystick(self):
         """Prompts for all device creation parameters and creates the device on the host."""
@@ -3060,15 +3041,16 @@ class MaestroDialog(QRememberDialog):
                 slots += list(range(GEX_MAX_DEVICES))
                 device_map[device_id] = next(index for index in slots if index not in device_map.values())
         settings = self._tested_settings
-        enabled = self.enabled_widget.isChecked()
+        connected = self.maestro.connected()
 
         def operation():
             # A previous Apply may have disabled/closed the output transport.
-            if not self.maestro.connected():
-                syslog.warning("MAESTRO: cannot apply settings - no client available")
-                return
-            self.maestro.connect(*settings)
-            if enabled:
+            nonlocal connected
+            if not connected:
+                # attemp to reconnect
+                self.maestro.connect(*settings)
+                connected = self.maestro.connected()
+            if connected:
                 self.maestro.LoadActiveControllers(device_map)
                 self.maestro.populateDeviceList()
             else:
@@ -3089,6 +3071,7 @@ class MaestroDialog(QRememberDialog):
             return self._read_snapshot() if self.maestro.client is not None else None
 
         def complete(snapshot):
+            nonlocal connected
             (
                 self.config.maestro_osc_host,
                 self.config.maestro_osc_port,
@@ -3097,7 +3080,7 @@ class MaestroDialog(QRememberDialog):
             ) = settings
             self.config.maestro_device_map = device_map
             self.config.maestro_device_count = len(device_map)
-            self.config.maestro_enabled = enabled
+            self.config.maestro_enabled = connected
             self.config.save()
             if snapshot is not None:
                 self._load_snapshot(snapshot)

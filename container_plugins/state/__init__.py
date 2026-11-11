@@ -31,6 +31,13 @@ import logging
 from PySide6 import QtCore, QtWidgets
 import gremlin.ui.state_device
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QDataRadioButton,
+    getGridContainer,
+    getHContainer,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 
@@ -65,23 +72,23 @@ class StateContainerWidget(AbstractContainerWidget):
         if verbose_ui:
             syslog.info("StateContainerWidget: create action UI start")
 
-        self.state_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.state_selector_widget = QDataComboBox()
         self.state_selector_widget.currentIndexChanged.connect(self._handle_state_changed)
         desired_height = self.state_selector_widget.sizeHint().height()
         self.state_selector_widget.setFixedHeight(desired_height)  # fix for layout issue in QT causing the box to expand vertically for some odd reason
 
         widgets = ["State:", self.state_selector_widget]
-        widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
+        widget = getGridContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)
         w1 = widget
 
         self.state_description_widget = QtWidgets.QLabel()
         widgets = ["Description:", self.state_description_widget]
-        widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
+        widget = getGridContainer(widgets, widget_only=True)
         w2 = widget
 
         widgets = []
-        rb = gremlin.ui.ui_common.QDataRadioButton(
+        rb = QDataRadioButton(
             value=self.container.required_value,
             label="On/Pressed",
             data=True,
@@ -89,7 +96,7 @@ class StateContainerWidget(AbstractContainerWidget):
             tooltip="The container actions execute if the state exists and is on/pressed.",
         )
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton(
+        rb = QDataRadioButton(
             value=not self.container.required_value,
             label="Off/Released",
             data=False,
@@ -97,7 +104,7 @@ class StateContainerWidget(AbstractContainerWidget):
             tooltip="The container actions execute if the state exists and is off/released.",
         )
         widgets.append(rb)
-        rb = gremlin.ui.ui_common.QDataRadioButton(
+        rb = QDataRadioButton(
             value=not self.container.required_value,
             label="Any value",
             data=None,
@@ -105,8 +112,8 @@ class StateContainerWidget(AbstractContainerWidget):
             tooltip="The container actions execute if the state exists and is either on/pressed or off/released.",
         )
         widgets.append(rb)
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-        widget = gremlin.ui.ui_common.getGridContainer(["Execute when state is:", widget], widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
+        widget = getGridContainer(["Execute when state is:", widget], widget_only=True)
         self.action_layout.addWidget(widget)
         w3 = widget
 
@@ -136,7 +143,7 @@ class StateContainerWidget(AbstractContainerWidget):
 
         self.populate_selector()
 
-        gremlin.ui.ui_common.synchronize_grids([w1, w2, w3])
+        synchronize_grids([w1, w2, w3])
 
         if verbose_ui:
             syslog.info("StateContainerWidget: create action UI completed")

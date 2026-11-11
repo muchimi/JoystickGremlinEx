@@ -35,6 +35,9 @@ import gremlin.base_profile
 import gremlin.input_item
 import traceback
 import html
+from gremlin.ui.ui_common import (
+    MessageBox,
+)
 
 syslog = logging.getLogger("system")
 
@@ -575,7 +578,7 @@ class ReportEngine:
     def generate(self, options: ReportOptions):
         """generate a map of the current profile"""
         if not self._ensure_path():
-            gremlin.ui.ui_common.MessageBox(prompt="This feature requires GraphViz.\nGraphViz could not be located.")
+            MessageBox(prompt="This feature requires GraphViz.\nGraphViz could not be located.")
             return
 
         # current profile

@@ -77,6 +77,20 @@ from gremlin.ui.ui_common import (
     QHBoxLayout,
     QWarningWidget,
 )
+from gremlin.ui.ui_common import (
+    ConfirmPushButton,
+    MessageBox,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataLineEdit,
+    QFloatLineEdit,
+    QIconLabel,
+    QInputLockWidget,
+    QShowAtCursorDialog,
+    getGridContainer,
+    get_text_width,
+    synchronize_grids,
+)
 
 
 syslog = logging.getLogger("system")
@@ -339,9 +353,9 @@ class StateCategories(QtCore.QObject):
         changed_callback=None,
         default_category: StateCategory = None,
         editable=False,
-    ) -> gremlin.ui.ui_common.QDataComboBox:
+    ) -> QDataComboBox:
         """gets a selector combo box for categories"""
-        widget = gremlin.ui.ui_common.QDataComboBox()
+        widget = QDataComboBox()
         widget.setEditable(editable)
         widget.setValidator(CategoryValidator())
 
@@ -1638,23 +1652,23 @@ class StateConditionWidget(AbstractConditionWidget):
     def _create_ui(self, extra_data: dict = None):
         if not Shiboken.isValid(self):
             return
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+        self.delete_button_widget = Buttons.getDeleteWidget(
             callback=self.handle_remove,
             tooltip="Delete condition",
         )
-        widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only=True)
+        widget = getHContainer(self.delete_button_widget, left_stretch=True, widget_only=True)
         self.main_layout.addWidget(widget)
 
-        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.state_selector = QDataComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
-        widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only=True)
+        widget = getHContainer(["State:", self.state_selector], widget_only=True)
         self.main_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only=True)
+        widget = getHContainer(["Description:", self.state_description_widget], widget_only=True)
         self.main_layout.addWidget(widget)
 
-        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.comparison_dropdown = QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         self.comparison_dropdown.setWidthToContent()
@@ -2489,7 +2503,7 @@ class StateCategoryEditorDelegate(QtWidgets.QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         value = editor.text()
         if not value or not value.strip():
-            gremlin.ui.ui_common.MessageBox(title="Category Error", prompt="Category name cannot be blank.")
+            MessageBox(title="Category Error", prompt="Category name cannot be blank.")
             return
 
         model.setData(index, value, QtCore.Qt.EditRole)
@@ -2504,7 +2518,7 @@ class StateCategoryEditor(QtWidgets.QDialog):
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget, layout = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
 
         self.ok_widget.clicked.connect(self.accept)
         self.cancel_widget.clicked.connect(self.reject)
@@ -2548,7 +2562,7 @@ class StateCategoryListView(QtWidgets.QListView):
         return super().focusOutEvent(event)
 
 
-class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class StateCategoryConfigDialog(QShowAtCursorDialog):
     """dialog showing the category configuration options"""
 
     def __init__(self, parent=None):
@@ -2585,23 +2599,23 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         # add button
         self._add_button = QtWidgets.QPushButton("Add")
         self._add_button.setToolTip("Adds a new category")
-        icon = gremlin.ui.ui_common.Icons.addIcon()
+        icon = Icons.addIcon()
         self._add_button.setIcon(icon)
         self._add_button.clicked.connect(self._add_input_cb)
 
         self._delete_button = QtWidgets.QPushButton()
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        icon = Icons.trashIcon()
         self._delete_button.setIcon(icon)
         self._delete_button.setMaximumWidth(24)
         self._delete_button.setToolTip("Deletes the selected items")
         self._delete_button.clicked.connect(self._delete_cb)
 
-        self._edit_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._edit_widget = QDataLineEdit()
         self._edit_widget.setTriggerOnFocusOnly(False)  # trigger on every character
 
         self._edit_widget.valueChanged.connect(self._new_category_changed_cb)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self._edit_widget, self._add_button, self._delete_button], "New Category:")
+        widget, layout = getHContainer([self._edit_widget, self._add_button, self._delete_button], "New Category:")
         main_layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -2610,7 +2624,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget, layout = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
 
         main_layout.addWidget(widget)
 
@@ -2672,7 +2686,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         for index, category in enumerate(items):
             if index in rows:
                 if category == self._default_category:
-                    gremlin.ui.ui_common.MessageBox(
+                    MessageBox(
                         title="Category Error",
                         prompt="The default category cannot be removed.",
                     )
@@ -2687,7 +2701,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         # confirm box
         msg = "Delete the selected entries?" if deleteCount > 1 else "Delete the selected entry?"
-        msgbox = gremlin.ui.ui_common.ConfirmBox(prompt=msg)
+        msgbox = ConfirmBox(prompt=msg)
         result = msgbox.show()
 
         if result == QtWidgets.QMessageBox.StandardButton.Yes:
@@ -2724,7 +2738,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             name = name.casefold().strip()
         if name:
             if self._cm.findByName(name):
-                gremlin.ui.ui_common.MessageBox(title="Category Error", prompt=f"Category [{name}] already exists.")
+                MessageBox(title="Category Error", prompt=f"Category [{name}] already exists.")
             else:
                 item = StateCategory(name)
                 self._model.addData(item)
@@ -2928,7 +2942,7 @@ class StateAttributeEditorWidget(QtWidgets.QWidget):
             self._loading = False
 
 
-class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class StateExclusivePickerDialog(QShowAtCursorDialog):
     """Multi-select popup to choose mutually exclusive peer states."""
 
     def __init__(self, current_key: str, selected_keys: list[str] | None = None, parent=None):
@@ -2949,9 +2963,9 @@ class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
-        self._search_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._search_widget = QDataLineEdit()
         self._search_widget.setPlaceholderText("Search…")
-        layout.addWidget(gremlin.ui.ui_common.getHContainer(["Search:", self._search_widget], widget_only=True))
+        layout.addWidget(getHContainer(["Search:", self._search_widget], widget_only=True))
 
         self._list = QtWidgets.QListWidget(self)
         self._list.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
@@ -2962,7 +2976,7 @@ class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         with QtCore.QSignalBlocker(self._category_widget):
             self._category_widget.insertItem(0, "(all categories)", None)
             self._category_widget.setCurrentIndex(0)
-        layout.addWidget(gremlin.ui.ui_common.getHContainer(["Category:", self._category_widget], widget_only=True))
+        layout.addWidget(getHContainer(["Category:", self._category_widget], widget_only=True))
         layout.addWidget(self._list, 1)
         layout.addWidget(self._count_widget)
 
@@ -2970,7 +2984,7 @@ class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ok.clicked.connect(self.accept)
         cancel = QtWidgets.QPushButton("Cancel")
         cancel.clicked.connect(self.reject)
-        layout.addWidget(gremlin.ui.ui_common.getHContainer([ok, cancel], left_stretch=True, widget_only=True))
+        layout.addWidget(getHContainer([ok, cancel], left_stretch=True, widget_only=True))
 
         self._list.itemChanged.connect(self._item_changed)
         self._search_widget.textChanged.connect(self._search_changed)
@@ -3030,7 +3044,7 @@ class StateExclusivePickerDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._count_widget.setText(f"{self._list.count()} state(s) · {len(self._selected)} selected")
 
 
-class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class StateInputConfigDialog(QShowAtCursorDialog):
     """dialog showing the state input configuration options"""
 
     def __init__(
@@ -3060,13 +3074,13 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(main_layout)
 
-        self._config_widget, self._config_layout = gremlin.ui.ui_common.getGridContainer()
+        self._config_widget, self._config_layout = getGridContainer()
         self.data = state
         self.ref_data = ref_state  # reference state
         self._exclusive_keys = list(state.exclusive_keys or [])
         self._exclusive_enabled = bool(self._exclusive_keys)
 
-        self._name_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._name_widget = QDataLineEdit()
         self._name_widget.setText(state.key)
         self._name_widget.textChanged.connect(self._name_changed)
 
@@ -3075,7 +3089,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._is_expression_widget.setChecked(self.data.isExpression)
         self._is_expression_widget.clicked.connect(self._is_expression_changed)
 
-        self._expression_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._expression_widget = QDataLineEdit()
         self._expression_widget.setText(state.expression)
         self._expression_widget.textChanged.connect(self._expression_changed)
 
@@ -3084,23 +3098,23 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._test_widget.clicked.connect(self._test_expression)
         self._test_widget.setEnabled(bool(state.expression))
 
-        self._description_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._description_widget = QDataLineEdit()
         self._description_widget.setText(state._description)
         self._description_widget.textChanged.connect(self._description_changed)
 
-        self._autorelease_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self._autorelease_widget = QDataCheckbox(
             "Autorelease",
             value=state.autorelease,
             callback=self._handle_autorelease_changed,
         )
-        self._autorelease_delay_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        self._autorelease_delay_widget = QFloatLineEdit(
             min_range=0,
             max_range=1000,
             step=0.1,
             value=state.autorelease_delay,
             callback=self._handle_autorelease_delay_changed,
         )
-        self._autorelease_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._autorelease_mode_widget = QDataComboBox()
         modes = [
             ("Toggle", "toggle"),
             ("On", "on"),
@@ -3115,7 +3129,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self._autorelease_mode_widget.currentIndexChanged.connect(self._handle_autorelease_mode_changed)
 
-        self._autorelease_trigger_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._autorelease_trigger_mode_widget = QDataComboBox()
         modes = [
             ("Any", "any"),
             ("On", "on"),
@@ -3136,28 +3150,28 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._autorelease_delay_widget,
         ]
 
-        r1_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        r1_widget = getHContainer(widgets, widget_only=True)
 
         widgets = [
             "Set Value:",
             self._autorelease_mode_widget,
         ]
 
-        r2_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        r2_widget = getHContainer(widgets, widget_only=True)
 
         widgets = ["Trigger on:", self._autorelease_trigger_mode_widget]
 
-        r3_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        r3_widget = getHContainer(widgets, widget_only=True)
 
         widgets = [r1_widget, r2_widget, r3_widget]
 
-        self._autorelease_options_container_widget = gremlin.ui.ui_common.getVContainer(widgets, left_margin=12, widget_only=True)
+        self._autorelease_options_container_widget = getVContainer(widgets, left_margin=12, widget_only=True)
 
         widgets = [self._autorelease_widget, self._autorelease_options_container_widget]
 
-        self._autorelease_container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self._autorelease_container_widget = getVContainer(widgets, widget_only=True)
 
-        self._exclusive_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self._exclusive_widget = QDataCheckbox(
             "Mutually exclusive",
             value=self._exclusive_enabled,
             callback=self._handle_exclusive_changed,
@@ -3170,17 +3184,17 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._exclusive_select_widget = QtWidgets.QPushButton("Select…")
         self._exclusive_select_widget.setToolTip("Choose which states are mutually exclusive with this one.")
         self._exclusive_select_widget.clicked.connect(self._open_exclusive_picker)
-        self._exclusive_options_widget = gremlin.ui.ui_common.getHContainer(
+        self._exclusive_options_widget = getHContainer(
             [self._exclusive_summary_widget, self._exclusive_select_widget],
             widget_only=True,
         )
-        self._exclusive_container_widget = gremlin.ui.ui_common.getVContainer(
+        self._exclusive_container_widget = getVContainer(
             [self._exclusive_widget, self._exclusive_options_widget],
             widget_only=True,
         )
         self._refresh_exclusive_summary()
 
-        self._status_widget = gremlin.ui.ui_common.QWarningWidget()
+        self._status_widget = QWarningWidget()
 
         self._cm = StateCategories()
 
@@ -3200,12 +3214,12 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     self._category_selector_widget.setCurrentIndex(index)
 
         self._category_config_widget = QtWidgets.QPushButton()
-        self._category_config_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        self._category_config_widget.setIcon(Icons.gearIcon())
         self._category_config_widget.setMaximumWidth(24)
         self._category_config_widget.clicked.connect(self._category_config_cb)
         self._category_config_widget.setToolTip("Edit categories")
 
-        category_widget = gremlin.ui.ui_common.getHContainer(
+        category_widget = getHContainer(
             [self._category_selector_widget, self._category_config_widget],
             widget_only=True,
         )
@@ -3227,7 +3241,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_layout.addWidget(self._is_expression_widget, row, col, 1, -1)
 
         row += 1
-        self._expression_container_widget = gremlin.ui.ui_common.getHContainer(
+        self._expression_container_widget = getHContainer(
             [self._expression_widget, self._test_widget],
             "Expression:",
             widget_only=True,
@@ -3242,9 +3256,9 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         row += 1
 
-        self._default_on_widget = gremlin.ui.ui_common.QDataRadioButton("On", True)
+        self._default_on_widget = QDataRadioButton("On", True)
         self._default_on_widget.setToolTip("If checked, the state will default to Active/On/Pressed")
-        self._default_off_widget = gremlin.ui.ui_common.QDataRadioButton("Off", False)
+        self._default_off_widget = QDataRadioButton("Off", False)
         self._default_on_widget.setToolTip("If checked, the state will default to Inactive/Off/Released")
         if state.default_value:
             self._default_on_widget.setChecked(True)
@@ -3253,7 +3267,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._default_off_widget.clicked.connect(self._default_changed)
         self._default_on_widget.clicked.connect(self._default_changed)
 
-        self._default_container_widget = gremlin.ui.ui_common.getHContainer(
+        self._default_container_widget = getHContainer(
             [self._default_on_widget, self._default_off_widget],
             "Default State:",
             widget_only=True,
@@ -3435,7 +3449,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         value, is_error, error_msg = self.data.evaluate(as_tuple=True, force=True)
         value_str = "On (true/1)" if value else ("Off (false/0)")
         msg = error_msg if is_error else f"Result: {value_str}"
-        gremlin.ui.ui_common.MessageBox(title="Expression Evaluation", prompt=msg, is_warning=is_error)
+        MessageBox(title="Expression Evaluation", prompt=msg, is_warning=is_error)
 
     @QtCore.Slot(bool)
     def _default_changed(self, checked: bool):
@@ -3449,7 +3463,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         if self.data.expression:
             value, is_error, error_msg = self.data.evaluate(as_tuple=True, force=True)
             if is_error:
-                gremlin.ui.ui_common.MessageBox(
+                MessageBox(
                     title="Expression Evaluation Error",
                     prompt=error_msg,
                     is_warning=is_error,
@@ -3474,7 +3488,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                         data = sc.getStates()
                         states = [item.key for item in data.values() if item.id != id and key_low == item.key]
                         if states:
-                            gremlin.ui.ui_common.MessageBox(
+                            MessageBox(
                                 title="State Error",
                                 prompt=f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.",
                             )
@@ -3488,7 +3502,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 gremlin.shared_state.pop_suspend_highlighting()
                 self.accept()
         else:
-            gremlin.ui.ui_common.MessageBox(title="State Error", prompt="A state name is required.")
+            MessageBox(title="State Error", prompt="A state name is required.")
 
     def _cancel_button_cb(self):
         """cancel button pressed"""
@@ -3900,7 +3914,7 @@ class StateVisualizerWidget(QWidget):
                 i += 1
 
         else:
-            icon = Icons.warningIcon(gremlin.ui.ui_common.Color().yellowColor())
+            icon = Icons.warningIcon(Color().yellowColor())
             stub = f"Showing {len(items)} out of {state_count}" if has_states else "No states available"
             widget = QWarningWidget(stub, icon=icon)
             layout.addWidget(widget)
@@ -4006,31 +4020,31 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         config = gremlin.config.Configuration()
 
         # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
+        lock_widget = QInputLockWidget(data=self.device_guid)
         count_widget = StateFilterCountWidget()
-        widget = gremlin.ui.ui_common.getHContainer(["State Inputs", count_widget, "||", lock_widget], widget_only=True)
+        widget = getHContainer(["State Inputs", count_widget, "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            width = get_text_width(gremlin.util.get_guid())
+            line_edit = QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit = QDataLineEdit()
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            synchronize_grids([w1, w2])
 
         self._filter = gremlin.util.decorate_filter(config.state_filter)
         self._category_filter = config.state_category_filter
@@ -4054,14 +4068,14 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.addLeftPanelHeaderWidget(self._filter_widget)
 
         # clear and add buttons to add/clear all states
-        clear_button = gremlin.ui.ui_common.ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        clear_button = ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
+        icon = Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.setToolTip("Deletes all states")
         clear_button.confirmed.connect(self._confirm_clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
 
-        test_button = gremlin.ui.ui_common.QDataPushButton("Test", callback=self._test_input_cb)
+        test_button = QDataPushButton("Test", callback=self._test_input_cb)
         button_container_layout.addWidget(test_button)
 
         # right align
@@ -4069,7 +4083,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # sort states
         sort_button = QtWidgets.QPushButton("Sort")
-        icon = gremlin.ui.ui_common.Icons.sortIcon()
+        icon = Icons.sortIcon()
         sort_button.setIcon(icon)
         sort_button.clicked.connect(self._sort_input_cb)
         button_container_layout.addWidget(sort_button)
@@ -4077,7 +4091,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # Key add button
         add_button = QtWidgets.QPushButton("Add")
         add_button.setToolTip("Adds a new state to the profile")
-        icon = gremlin.ui.ui_common.Icons.addIcon()
+        icon = Icons.addIcon()
         add_button.setIcon(icon)
         add_button.clicked.connect(self._add_input_cb)
 
@@ -4341,7 +4355,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 index = self._index_for_key(data)
                 self.inputItemListView._select_item_ui(index, True)
             else:
-                gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
+                MessageBox(prompt=f"State [{name}] not found.")
 
     @QtCore.Slot()
     def _add_input_cb(self):
@@ -4543,8 +4557,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             widget.addWidget(label)
 
         if input_item.expression:
-            icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color().expressionColor())
-            expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data=input_item)
+            icon = Icons.calculateIcon(Color().expressionColor())
+            expression_widget = QIconLabel(icon, input_item.expression, data=input_item)
             widget.addWidget(expression_widget)
             StateData().expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))
         else:
@@ -4628,7 +4642,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 msg += f"<li>{entry}</li>"
             msg += "</ul><br>"
 
-            icon = gremlin.ui.ui_common.Icons.warningIcon()
+            icon = Icons.warningIcon()
             pixmap = icon.pixmap(48)
             msgbox = QtWidgets.QMessageBox()
             msgbox.setWindowTitle("Notice")
@@ -4654,7 +4668,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _set_status(self, widget, icon=None, status=None, use_qta=True, color=None):
         """sets the status of an input widget"""
-        status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        status_widget = widget.findChild(QIconLabel, "status")
         if color:
             status_widget.setIcon(icon, use_qta=use_qta, color=color)
         else:
@@ -4670,7 +4684,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
-        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget = QIconLabel()
         status_widget.setObjectName("status")
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)

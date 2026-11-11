@@ -38,6 +38,7 @@ import dinput
 
 from gremlin.ui.ui_common import (
     Buttons,
+    DynamicDoubleSpinBox,
     clear_layout,
     Color,
     ConfirmBox,
@@ -159,7 +160,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
             self.absolute_checkbox = QDataRadioButton("Absolute")
             self.absolute_checkbox.setChecked(True)
             self.relative_checkbox = QDataRadioButton("Relative")
-            self.relative_scaling = ui_common.DynamicDoubleSpinBox()
+            self.relative_scaling = DynamicDoubleSpinBox()
             self.relative_scaling.setRange(0, 1000)
 
             self.remap_type_layout.addStretch()

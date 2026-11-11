@@ -33,6 +33,11 @@ from shiboken6 import Shiboken
 import vjoy.vjoy
 from PySide6 import QtCore
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    QHorizontalLine,
+    clear_layout,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -74,10 +79,9 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         if not Shiboken.isValid(self):
             return
 
-        gremlin.ui.ui_common.clear_layout(self.action_layout)
+        clear_layout(self.action_layout)
 
-        # warning_widget = gremlin.ui.ui_common.QWarningWidget("Experimental container.  Not all features may function as expected.")
-        # self.action_layout.addWidget(warning_widget)
+        
         self._widget_map = {} # map of position to action widget
 
         self.four_way = QtWidgets.QRadioButton("4 Way")
@@ -100,11 +104,11 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         widgets = ["<b>Button mode</b>", self.four_way, self.eight_way, self.sticky_widget]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)
 
         for position in self.container.action_set_position_map:
-            self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+            self.action_layout.addWidget(QHorizontalLine())
             widget = self._create_action_widget(position, self.action_layout, ContainerViewTypes.Action)
             self._widget_map[position] = widget
 

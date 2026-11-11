@@ -68,6 +68,39 @@ import time
 
 
 from enum import auto, Enum, IntEnum
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    ConfirmBox,
+    Icons,
+    MessageBox,
+    ModeSelectorWidget,
+    QAxisRepeaterProgressbar,
+    QContentWidget,
+    QDataCheckbox,
+    QDataCheckBox,
+    QDataComboBox,
+    QDataLineEdit,
+    QDataPushButton,
+    QDelayWidget,
+    QFloatLineEdit,
+    QIconLabel,
+    QInfoBox,
+    QJoystickRangeWidget,
+    QPaginator,
+    QRememberDialog,
+    QRowSelectorFrame,
+    QPathLineItem,
+    clear_layout,
+    getGridContainer,
+    getHContainer,
+    getRadioContainer,
+    getVContainer,
+    get_mode_list,
+    get_text_width,
+    synchronize_grids,
+    load_icon,
+)
 
 syslog = logging.getLogger("system")
 
@@ -1145,7 +1178,7 @@ class SimConnectMonitor:
         profile = gremlin.shared_state.current_profile
         profile_file = profile.profile_file
         if not profile_file or not os.path.isfile(profile_file):
-            gremlin.ui.ui_common.MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
+            MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
             return
         self._dialog_options = SimconnectOptionsUi(SimConnectManager().simconnect)
         self._dialog_options.closed.connect(self._handle_options_closed)
@@ -1491,7 +1524,7 @@ class SimConnectMonitor:
         # updates or clears UI status bar with the aicraft name
         el = gremlin.event_handler.EventListener()
         if name:
-            icon = gremlin.ui.ui_common.Icons.aircraftIcon()
+            icon = Icons.aircraftIcon()
             el.module_state_register.emit("simconnect_aicraft", name, icon, None)
         else:
             # no aircraft = clear status
@@ -1542,7 +1575,7 @@ class SimConnectMonitor:
         eh.change_mode(mode, validate=False)
 
 
-class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
+class SimconnectModeSelectDialog(QRememberDialog):
     """pops ups a dialog for profile mode selection when a new aircraft is detected"""
 
     def __init__(self, name: str = None, parent=None):
@@ -1562,22 +1595,22 @@ class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
 
         line_entry_width = 250
 
-        self.current_aircraft_widget = ui_common.QDataLineEdit()
+        self.current_aircraft_widget = QDataLineEdit()
         self.current_aircraft_widget.setReadOnly(True)
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
         self.current_aircraft_widget.setText(current_aircraft)
 
-        widget = gremlin.ui.ui_common.getHContainer(self.current_aircraft_widget, "Aircraft:", widget_only=True)
+        widget = getHContainer(self.current_aircraft_widget, "Aircraft:", widget_only=True)
         main_layout.addWidget(widget)
 
         mode = self._monitor.getStartupMode(current_aircraft)
         if not mode:
             mode = gremlin.shared_state.current_profile.default()
-        self._mode_selector_widget = gremlin.ui.ui_common.ModeSelectorWidget()
+        self._mode_selector_widget = ModeSelectorWidget()
         self._mode_selector_widget.setMode(mode)
         self._mode_selector_widget.modeChanged.connect(self._handle_mode_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(self._mode_selector_widget, "Profile Mode:", widget_only=True)
+        widget = getHContainer(self._mode_selector_widget, "Profile Mode:", widget_only=True)
         main_layout.addWidget(widget)
 
         msg = """
@@ -1585,7 +1618,7 @@ GremlinEx detected a new aicraft with no mode mapping.
 Please select the mode for this aicraft:
 """
 
-        widget = gremlin.ui.ui_common.QInfoBox(msg)
+        widget = QInfoBox(msg)
         main_layout.addWidget(widget)
 
         # button bar
@@ -1595,7 +1628,7 @@ Please select the mode for this aicraft:
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._ok_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer(
+        widget = getHContainer(
             [ok_button_widget, cancel_button_widget],
             left_stretch=True,
             widget_only=True,
@@ -1629,7 +1662,7 @@ Please select the mode for this aicraft:
         self.close()
 
 
-class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
+class SimconnectOptionsUi(QRememberDialog):
     """UI to set individual simconnect  settings"""
 
     closed = QtCore.Signal()  # fires when we close this dialog
@@ -1672,7 +1705,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._manual_mode_selector_map = {}
         self._manual_selected_cb_map = {}
 
-        self._content_widget = gremlin.ui.ui_common.QContentWidget()
+        self._content_widget = QContentWidget()
         self._content_widget.resized.connect(self._content_resized)
         self._content_widget.setContentsMargins(0, 0, 0, 0)
 
@@ -1731,7 +1764,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._auto_mode_lock.setChecked(self.options.auto_mode_lock)
         self._auto_mode_lock.clicked.connect(self._auto_mode_lock_cb)
 
-        self._msfs_path_widget = ui_common.QPathLineItem(
+        self._msfs_path_widget = QPathLineItem(
             header="MSFS Community Folder",
             text=self.options.community_folder,
             dir_mode=True,
@@ -1739,23 +1772,23 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._msfs_path_widget.pathChanged.connect(self._community_folder_changed_cb)
         self._msfs_path_widget.open.connect(self._community_folder_open_cb)
 
-        self._mode_from_aircraft_button_widget = QtWidgets.QPushButton("Mode from Aicraft")
+        self._mode_from_aircraft_button_widget = QDataPushButton("Mode from Aicraft")
         self._mode_from_aircraft_button_widget.clicked.connect(self._mode_from_aircraft_button_cb)
 
         # enabled box
 
-        self._simconnect_enabled_widget = QtWidgets.QCheckBox("Enable SimConnect")
+        self._simconnect_enabled_widget = QDataCheckBox("Enable SimConnect")
         self._simconnect_enabled_widget.setChecked(enabled)
         self._simconnect_enabled_widget.clicked.connect(self._handle_simconnect_enabled_changed)
         self.main_layout.addWidget(self._simconnect_enabled_widget)
 
         # toolbar for map
-        self.container_bar_widget, self.container_bar_layout = gremlin.ui.ui_common.getHContainer()
+        self.container_bar_widget, self.container_bar_layout = getHContainer()
 
-        self.edit_mode_widget = QtWidgets.QPushButton()
+        self.edit_mode_widget = QDataPushButton()
 
         manage_modes_icon = "dark_manage_modes.svg" if is_dark else "manage_modes.svg"
-        self.edit_mode_widget.setIcon(ui_common.load_icon(manage_modes_icon))
+        self.edit_mode_widget.setIcon(load_icon(manage_modes_icon))
         self.edit_mode_widget.clicked.connect(self._manage_modes_cb)
         self.edit_mode_widget.setToolTip("Manage Modes")
 
@@ -1766,13 +1799,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         line_entry_width = 250
 
-        self.current_aircraft_widget = ui_common.QDataLineEdit()
+        self.current_aircraft_widget = QDataLineEdit()
         self.current_aircraft_widget.setReadOnly(True)
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
         current_aircraft = self._monitor.getCurrentAircraft()  # inline aircraft request
         self.current_aircraft_widget.setText(current_aircraft)
 
-        self._mode_selector_widget = gremlin.ui.ui_common.ModeSelectorWidget()
+        self._mode_selector_widget = ModeSelectorWidget()
 
         el = gremlin.event_handler.EventListener()
         el.profile_modes_changed.connect(self._handle_profile_modes_modified)
@@ -1787,7 +1820,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.current_aircraft_title = None  # holds the active aicraft title (from the sim)
         self.current_aircraft_name = None  # holds the active aicraft name (from the sim)
 
-        self.refresh_current_aircraft_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(callback=self._refresh_aircraft_cb)
+        self.refresh_current_aircraft_widget = Buttons.getRefreshWidget(callback=self._refresh_aircraft_cb)
         # self.refresh_current_aircraft_widget = QtWidgets.QPushButton("Get Current Aircraft")
         # self.refresh_current_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
         # self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
@@ -1802,7 +1835,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # self.add_manual_entry_widget.setToolTip("Adds a manual entry")
         # self.add_manual_entry_widget.clicked.connect(self.add_entry_cb)
 
-        self.paginator_widget = gremlin.ui.ui_common.QPaginator(page_size=self._page_size)
+        self.paginator_widget = QPaginator(page_size=self._page_size)
         self.paginator_widget.pageChanged.connect(self._handle_paginator)
 
         row_widgets = [
@@ -1813,7 +1846,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.refresh_current_aircraft_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getGridContainer(row_widgets, widget_only=True)
+        widget = getGridContainer(row_widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self.filter_widget = QtWidgets.QLineEdit()
@@ -1846,7 +1879,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.refresh_aircraft_list_widget,
         ]
 
-        widget, layout = gremlin.ui.ui_common.getGridContainer(row_widgets)
+        widget, layout = getGridContainer(row_widgets)
         self.container_navigation_widget = widget
         self.container_navigation_layout = layout
 
@@ -1858,11 +1891,11 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         page_sizes = [10, 25, 50, 100]
         widgets = [self.paginator_widget]
         for size in page_sizes:
-            widget = ui_common.QDataPushButton(str(size), size)
+            widget = QDataPushButton(str(size), size)
             widget.clicked.connect(self._handle_page_size)
             widgets.append(widget)
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True)
+        widget, layout = getHContainer(widgets, left_stretch=True)
         self.container_paginator_widget = widget
         self.container_paginator_layout = layout
 
@@ -1935,8 +1968,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        self.warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor(warning_color),
@@ -1955,7 +1988,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._content_widget,
         ]
 
-        self._containers_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self._containers_widget = getVContainer(widgets, widget_only=True)
         self.main_layout.addWidget(self._containers_widget)
 
         self.main_layout.addWidget(warning_container)
@@ -2024,7 +2057,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
     def _profile_edit_mode_changed(self):
         """called when profile modes have been edited or changed"""
-        self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
+        self.mode_pair_list = get_mode_list(self.profile)
         self._populate_ui()
 
     def _set_warning(self, message=None):
@@ -2094,7 +2127,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._manager.activate()
         QtWidgets.QApplication.processEvents()
         if not self._manager.connected:
-            gremlin.ui.ui_common.MessageBox(prompt="Unable to attach to Simconnect")
+            MessageBox(prompt="Unable to attach to Simconnect")
             return
         self._manager.request_aircraft_list()  # get aircraft list
 
@@ -2108,7 +2141,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         QtWidgets.QApplication.processEvents()
 
         if not self._manager.connected:
-            gremlin.ui.ui_common.MessageBox(prompt="Unable to attach to Simconnect")
+            MessageBox(prompt="Unable to attach to Simconnect")
             return
 
         self._manager.request_aircraft_title()  # request_loaded_aircraft() # will trigger the aircraft loaded callback
@@ -2138,7 +2171,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             else:
                 self.options.addManualEntry(name, mode=default_mode)  # add a manual
 
-                # gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
+
         else:
             # manual entry
             item = self.options.find_definition_by_sim_name(name)
@@ -2156,7 +2189,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         item, _ = widget.data
 
         # confirm
-        result = gremlin.ui.ui_common.ConfirmBox(f"Remove {item.sim_name}?")
+        result = ConfirmBox(f"Remove {item.sim_name}?")
         if result:
             if item and self.options.removeEntry(item):
                 self._populate_ui()
@@ -2304,7 +2337,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         """updates the regular scanned or sim list"""
 
         # clear the widgets
-        gremlin.ui.ui_common.clear_layout(self.map_layout)
+        clear_layout(self.map_layout)
 
         # display one row per aicraft found
         if not self._data:
@@ -2327,9 +2360,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         profile = gremlin.shared_state.current_profile
         default_mode = profile.get_default_mode()
 
-        _icon_color = gremlin.ui.ui_common.Color().normalColor()
+        _icon_color = Color().normalColor()
 
-        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
+        create_mode_icon = Icons.addIcon()
 
         start_index = self.paginator_widget.startIndex
         end_index = self.paginator_widget.endIndex
@@ -2340,42 +2373,31 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 select_widget.clicked.connect(self._global_selected_changed_cb)
                 select_widget.setToolTip("Select/Deselect All")
 
-                display_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback=self._sort_display_up_cb, tooltip="Sort aircraft ascending")
+                display_sort_up_widget = Buttons.getSortUpWidget(callback=self._sort_display_up_cb, tooltip="Sort aircraft ascending")
                 display_sort_up_widget.setMaximumWidth(20)
                 display_sort_up_widget.setStyleSheet("border: none;")
 
-                display_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(
+                display_sort_down_widget = Buttons.getSortDownWidget(
                     callback=self._sort_display_down_cb,
                     tooltip="Sort aircraft descending",
                 )
                 display_sort_down_widget.setMaximumWidth(20)
                 display_sort_down_widget.setStyleSheet("border: none;")
 
-                # model_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_model_up_cb, tooltip="Sort model ascending")
-                # model_sort_up_widget.setMaximumWidth(20)
-                # model_sort_up_widget.setStyleSheet("border: none;")
-
-                # model_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_model_down_cb, tooltip="Sort model descending")
-                # model_sort_down_widget.setMaximumWidth(20)
-                # model_sort_down_widget.setStyleSheet("border: none;")
-
-                mode_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback=self._sort_mode_up_cb, tooltip="Sort by mode")
+                mode_sort_up_widget = Buttons.getSortUpWidget(callback=self._sort_mode_up_cb, tooltip="Sort by mode")
                 mode_sort_up_widget.setMaximumWidth(20)
                 mode_sort_up_widget.setStyleSheet("border: none;")
 
-                # mode_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_mode_down_cb, tooltip="Sort by mode descending")
-                # mode_sort_down_widget.setMaximumWidth(20)
-                # mode_sort_down_widget.setStyleSheet("border: none;")
 
-                aircraft_display_widget = gremlin.ui.ui_common.getHContainer(
+                aircraft_display_widget = getHContainer(
                     ["||", display_sort_up_widget, display_sort_down_widget],
                     "Aircraft:",
                     widget_only=True,
                 )
 
-                mode_header_widget = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget], "Mode:", widget_only=True)
+                mode_header_widget = getHContainer(["||", mode_sort_up_widget], "Mode:", widget_only=True)
 
-                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
+                row_selector = QRowSelectorFrame()
                 row_selector.setSelectable(False)
                 spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
@@ -2396,16 +2418,16 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 row += 1
 
             # selector
-            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected=item.selected)
+            row_selector = QRowSelectorFrame(selected=item.selected)
             row_selector.setMinimumHeight(30)
             row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data=(item, row_selector))
+            selected_widget = QDataCheckbox(data=(item, row_selector))
             selected_widget.setChecked(item.selected)
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
             row_selector.data = (item, selected_widget)
 
             # aicraft display
-            display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data=(item, selected_widget))
+            display_header_widget = QDataLineEdit(data=(item, selected_widget))
             display_header_widget.setReadOnly(True)
             display_header_widget.setText(item.display_name)
             display_header_widget.setToolTip(item.display_name)
@@ -2414,14 +2436,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             if w > display_width:
                 display_width = w
 
-            # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # model_widget.setReadOnly(True)
-            # if item.icao_model:
-            #     model_widget.setText(item.icao_model)
-            # model_widget.installEventFilter(self)
-
             # mode drop down
-            mode_selector = gremlin.ui.ui_common.QDataComboBox(data=(item, selected_widget), wheel_enabled=False)
+            mode_selector = QDataComboBox(data=(item, selected_widget), wheel_enabled=False)
 
             for display_mode, mode in self.mode_pair_list:
                 mode_selector.addItem(display_mode, mode)
@@ -2438,7 +2454,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._mode_selector_map[item] = mode_selector
             self._selected_cb_map[item] = selected_widget
 
-            create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
+            create_mode_widget = QDataPushButton()
             create_mode_widget.setIcon(create_mode_icon)
             create_mode_widget.data = (item, select_widget)
             create_mode_widget.setMaximumWidth(24)
@@ -2481,25 +2497,25 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         # manual entries
         # clear the widgets
-        gremlin.ui.ui_common.clear_layout(self.manual_map_layout)
+        clear_layout(self.manual_map_layout)
         if not self.options._aircraft_manual_definitions:
             missing = QtWidgets.QLabel("No manual mappings found.")
             missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
             self.manual_map_layout.addWidget(missing)
             return
 
-        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
+        create_mode_icon = Icons.addIcon()
 
         profile = gremlin.shared_state.current_profile
         default_mode = profile.get_default_mode()
 
         # headers
 
-        delete_icon = gremlin.ui.ui_common.Icons.trashIcon()
+        delete_icon = Icons.trashIcon()
         row = 0
         for item in self.options._aircraft_manual_definitions:
             if row == 0:
-                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
+                row_selector = QRowSelectorFrame()
                 row_selector.setSelectable(False)
                 spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
@@ -2522,28 +2538,23 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 row += 1
 
             # selector
-            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected=item.selected)
+            row_selector = QRowSelectorFrame(selected=item.selected)
             row_selector.setMinimumHeight(30)
             row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data=(item, row_selector))
+            selected_widget = QDataCheckbox(data=(item, row_selector))
             selected_widget.setChecked(item.selected)
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
             row_selector.data = (item, selected_widget)
 
-            # name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # if item.sim_name:
-            #     name_widget.setText(item.sim_name)
-            # name_widget.valueChanged.connect(self._name_changed_cb)
-            # name_widget.installEventFilter(self)
-
-            delete_widget = gremlin.ui.ui_common.QDataPushButton()
+            
+            delete_widget = QDataPushButton()
             delete_widget.setIcon(delete_icon)
             delete_widget.setMaximumWidth(24)
             delete_widget.data = (item, selected_widget)
             delete_widget.clicked.connect(self._remove_current_aircraft_cb)
 
             # mode drop down
-            mode_selector = gremlin.ui.ui_common.QDataComboBox(data=(item, selected_widget))
+            mode_selector = QDataComboBox(data=(item, selected_widget))
 
             for display_mode, mode in self.mode_pair_list:
                 mode_selector.addItem(display_mode, mode)
@@ -2561,7 +2572,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._manual_mode_selector_map[item] = mode_selector
             self._manual_selected_cb_map[item] = selected_widget
 
-            create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
+            create_mode_widget = QDataPushButton()
             create_mode_widget.setIcon(create_mode_icon)
             create_mode_widget.data = (item, select_widget)
             create_mode_widget.setMaximumWidth(24)
@@ -2614,7 +2625,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._auto_mode_lock.setEnabled(self._auto_mode_switch.isChecked())
 
         # sync the grids
-        gremlin.ui.ui_common.synchronize_grids(self.grid_sync_widgets)
+        synchronize_grids(self.grid_sync_widgets)
 
     @QtCore.Slot()
     def _sort_display_up_cb(self):
@@ -2714,7 +2725,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             dialog.setWindowModality(QtCore.Qt.ApplicationModal)
             dialog.show()
         else:
-            gremlin.ui.ui_common.MessageBox(prompt=f"Mode {item.sim_name} already exists in the profile.")
+            MessageBox(prompt=f"Mode {item.sim_name} already exists in the profile.")
 
     @QtCore.Slot(int)
     def _mode_selector_changed_cb(self, selected_index):
@@ -2809,8 +2820,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}"
             )
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        self._warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor(warning_color),
@@ -2822,7 +2833,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.chained_input = self.action_data.input_item.is_action
 
         # mode from aircraft button - grabs the aicraft name as a mode
-        icon = gremlin.ui.ui_common.Icons.gearIcon()
+        icon = Icons.gearIcon()
         self._options_button_widget = QtWidgets.QPushButton("Simconnect Options")
         self._options_button_widget.setIcon(icon)
         self._options_button_widget.clicked.connect(self._show_options_dialog_cb)
@@ -2843,7 +2854,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             for mode in SimConnectCommandMode
         ]
 
-        self._mode_container_widget, self._mode_container_layout = gremlin.ui.ui_common.getRadioContainer(
+        self._mode_container_widget, self._mode_container_layout = getRadioContainer(
             data,
             self._command_mode_changed_cb,
             default=self.action_data.command_mode,
@@ -2856,8 +2867,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         self._type_is_settable_widget = QtWidgets.QCheckBox("Settable")
 
-        self._type_datatype_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self._type_units_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._type_datatype_widget = QDataLineEdit()
+        self._type_units_widget = QDataLineEdit()
 
         self._type_container_layout.addWidget(self._type_is_calculator_widget)
         self._type_container_layout.addWidget(self._type_is_settable_widget)
@@ -2892,7 +2903,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._calculator_release_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # list of possible events to trigger
-        self._command_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._command_selector_widget = QDataComboBox()
         self._command_list = self.action_data._manager.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
@@ -2910,7 +2921,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             ("Block", SimConnectCommandType.SimVar),
             ("LVAR", SimConnectCommandType.LVar),
         ]
-        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(
+        self._simvar_mode_container_widget = getRadioContainer(
             data,
             self._command_type_changed,
             default=self.action_data.command_type,
@@ -2921,7 +2932,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._lvar_command_widget = QtWidgets.QLineEdit()
         self._lvar_command_widget.setText(self.action_data.command)
         self._lvar_command_widget.textChanged.connect(self._lvar_changed_cb)
-        self._lvar_container_widget = gremlin.ui.ui_common.getHContainer(self._lvar_command_widget, "Set LVAR:", widget_only=True)
+        self._lvar_container_widget = getHContainer(self._lvar_command_widget, "Set LVAR:", widget_only=True)
 
         self._command_container_layout.addWidget(self._simvar_mode_container_widget)
         self._command_container_layout.addWidget(self._action_selector_widget)
@@ -2938,7 +2949,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._refresh_lvar_widget.clicked.connect(self._refresh_lvar_cb)
 
         # list of possible lvars to trigger
-        self._lvar_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._lvar_selector_widget = QDataComboBox()
         self._lvar_selector_widget.setEditable(True)
         self._lvar_selector_widget.addItems(self.manager.get_lvar_name_list())
         self._lvar_selector_widget.currentIndexChanged.connect(self._command_changed_cb)
@@ -2946,7 +2957,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._lvar_selector_widget.setMinimumWidth(200)
         self._lvar_selector_widget.setToolTip("LVAR lookup")
 
-        self._lvar_button_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip="Adds to the calculator expression", callback=self._lvar_selected_cb)
+        self._lvar_button_widget = Buttons.getAddWidget(tooltip="Adds to the calculator expression", callback=self._lvar_selected_cb)
 
         # setup auto-completer for the lvar
         self._lvar_completer = QtWidgets.QCompleter(self._lvar_selector_widget.validator().lvars, self)
@@ -2990,7 +3001,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
         self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
 
-        self._autorepeat_delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self._autorepeat_delay_widget = QDelayWidget(
             self.action_data.auto_repeat_interval,
             callback=self._auto_repeat_delay_changed,
             label="Interval (ms)",
@@ -3091,7 +3102,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_range_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # output value widget - displays a min/max range or a fixed value
-        self._value_widget = gremlin.ui.ui_common.QJoystickRangeWidget(
+        self._value_widget = QJoystickRangeWidget(
             show_mode_change=False,
             min_norm=self.action_data.normalized_min_range,
             max_norm=self.action_data.normalized_max_range,
@@ -3108,7 +3119,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._value_widget.invertChanged.connect(self._inverted_changed)
 
         # output range buttons
-        widget, layout = gremlin.ui.ui_common.getHContainer()
+        widget, layout = getHContainer()
         self._range_button_container_widget = widget
         self._range_button_container_layout = layout
 
@@ -3116,7 +3127,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_range_container_layout.addWidget(self._value_widget)
         self._output_range_container_layout.addWidget(self._range_button_container_widget)
 
-        w = gremlin.ui.ui_common.get_text_width("0000000.0000")
+        w = get_text_width("0000000.0000")
 
         self._reset_range_widget = QtWidgets.QPushButton("Reset")
         self._reset_range_widget.setToolTip("Reset the range to -1 +1")
@@ -3127,8 +3138,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
 
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
-        active_color = gremlin.ui.ui_common.Color().activeColor()
-        normal_color = gremlin.ui.ui_common.Color().normalColor()
+        active_color = Color().activeColor()
+        normal_color = Color().normalColor()
         self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
 
@@ -3141,8 +3152,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_clear_widget.setToolTip("Removes the curve output")
         self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
 
-        self._axis_repeater_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar()
-        self._axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._axis_repeater_widget = QAxisRepeaterProgressbar()
+        self._axis_value_widget = QFloatLineEdit()
         self._axis_value_widget.setRange(-16383, 16384)
         self._axis_value_widget.setReadOnly(True)
         self._axis_value_widget.setMinimumWidth(w)
@@ -3167,26 +3178,26 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         self._range_button_container_layout.addWidget(QtWidgets.QLabel("Presets:"))
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Percent", data=(0, 100))
+        widget = QDataPushButton("Percent", data=(0, 100))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.QDataPushButton("-16K..+16K", data=(-16383, 16384))
+        widget = QDataPushButton("-16K..+16K", data=(-16383, 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.QDataPushButton("0..16K", data=(0, 16384))
+        widget = QDataPushButton("0..16K", data=(0, 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
         # airbus detent data
         # sets up output gates
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Reverse Detent", data=(-16383 + int(16383 * 0.1), 16384))
+        widget = QDataPushButton("Reverse Detent", data=(-16383 + int(16383 * 0.1), 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Min Detent", data=(-16383 + int(16383 * 0.1), 16384))
+        widget = QDataPushButton("Min Detent", data=(-16383 + int(16383 * 0.1), 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
@@ -3243,10 +3254,10 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_trigger_bool_container_layout.addStretch()
 
         # status widget
-        self.status_text_widget = gremlin.ui.ui_common.QIconLabel()
+        self.status_text_widget = QIconLabel()
 
         # output options container - shows below selector - visible when a command is selected and changes with the active mode
-        widget, layout = gremlin.ui.ui_common.getVContainer()
+        widget, layout = getVContainer()
         self._output_container_widget = widget
         self._output_container_layout = layout
 
@@ -3260,8 +3271,8 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         # self.main_layout.addWidget(self._toolbar_container_widget)
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor(warning_color),

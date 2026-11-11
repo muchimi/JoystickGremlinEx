@@ -33,6 +33,13 @@ from gremlin.types import ContainerViewTypes, Interactions
 
 import gremlin.config
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Buttons,
+    DynamicDoubleSpinBox,
+    QDataComboBox,
+    QDataRadioButton,
+    QIntLineEdit,
+)
 
 syslog = logging.getLogger("system")
 
@@ -88,7 +95,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         action_data._widget = self
 
         # min range box
-        min_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        min_box = DynamicDoubleSpinBox()
         min_box.setMinimum(-1.0)
         min_box.setMaximum(1.0)
         min_box.setDecimals(3)
@@ -119,7 +126,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         any_change_mode.setToolTip("When set, the action will be triggered on any axis value change.")
 
         any_change_label = QtWidgets.QLabel("Delta %")
-        any_change_delta = gremlin.ui.ui_common.QIntLineEdit(min_range=0, max_range=100)  # QtWidgets.QSpinBox()
+        any_change_delta = QIntLineEdit(min_range=0, max_range=100)  # QtWidgets.QSpinBox()
         self.ui_any_change_delta = any_change_delta
         any_change_delta.setRange(0, 100)
         any_change_delta.setValue(action_data.any_change_delta)
@@ -129,9 +136,9 @@ class RangeContainerWidget(AbstractContainerWidget):
         container_mode_widget.setContentsMargins(0, 0, 0, 0)
         container_mode_layout = QtWidgets.QHBoxLayout(container_mode_widget)
         container_mode_layout.setContentsMargins(0, 0, 0, 0)
-        rb_change_both = gremlin.ui.ui_common.QDataRadioButton("Both", 0)
-        rb_change_up = gremlin.ui.ui_common.QDataRadioButton("Up", 1)
-        rb_change_down = gremlin.ui.ui_common.QDataRadioButton("Down", -1)
+        rb_change_both = QDataRadioButton("Both", 0)
+        rb_change_up = QDataRadioButton("Up", 1)
+        rb_change_down = QDataRadioButton("Down", -1)
         if action_data.any_change_direction == 0:
             rb_change_both.setChecked(True)
         elif action_data.any_change_direction == 1:
@@ -167,7 +174,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         )
 
         action_label = QtWidgets.QLabel("Actions")
-        self.ui_action_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.ui_action_dropdown = QDataComboBox()
         action_plugins = gremlin.plugin_manager.ActionPlugins()
         for entry in action_plugins.repository.values():
             if not action_plugins.is_action_available(entry):
@@ -178,7 +185,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         self.ui_action_dropdown.setCurrentText(cfg.last_action)
         self.ui_action_dropdown.setToolTip("Determines the default action added to a new container")
 
-        self.add_button_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._add_action)
+        self.add_button_widget = Buttons.getAddWidget(callback=self._add_action)
         self.add_button_widget.setToolTip("Adds a new range container")
 
         range_count_label = QtWidgets.QLabel("Add Count")
@@ -199,7 +206,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         replace_range.setToolTip("Replaces all containers with a new range.  Warning: this will delete any existing actions.")
 
         # max range box
-        max_box = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        max_box = DynamicDoubleSpinBox()
         max_box.setMinimum(-1.0)
         max_box.setMaximum(1.0)
         max_box.setDecimals(3)

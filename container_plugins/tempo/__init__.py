@@ -35,6 +35,11 @@ import gremlin.base_profile
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
 import gremlin.config
+from gremlin.ui.ui_common import (
+    Icons,
+    QDelayWidget,
+    QHeaderLabel,
+)
 
 
 syslog = logging.getLogger("system")
@@ -61,13 +66,13 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
         self.options2_layout = QtWidgets.QHBoxLayout()
 
-        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Long Press Delay (ms):")
+        self.longpress_delay_widget = QDelayWidget(label="Long Press Delay (ms):")
         self.longpress_delay_widget.setValue(self.container.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
         self.options_layout.addWidget(self.longpress_delay_widget)
         self.options_layout.addStretch()
 
-        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Autorelease Delay (ms):")
+        self.autorelease_delay_widget = QDelayWidget(label="Autorelease Delay (ms):")
         self.autorelease_delay_widget.setValue(self.container.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
         self.options2_layout.addWidget(self.autorelease_delay_widget)
@@ -89,9 +94,9 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.action_layout.addLayout(self.options_layout)
         self.action_layout.addLayout(self.options2_layout)
 
-        icon = gremlin.ui.ui_common.Icons.chevronIcon()
+        icon = Icons.chevronIcon()
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon))
+        self.action_layout.addWidget(QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon))
 
         if self.container.action_sets[0] is None:
             self._add_action_selector(
@@ -102,7 +107,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         else:
             self._create_action_widget(0, None, self.action_layout, ContainerViewTypes.Action)
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon))
+        self.action_layout.addWidget(QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon))
 
         if self.container.action_sets[1] is None:
             self._add_action_selector(

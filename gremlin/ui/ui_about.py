@@ -8,6 +8,9 @@
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore, QtWidgets
+from gremlin.ui.ui_common import (
+    QUrlLabel,
+)
 
 
 class Ui_About(object):
@@ -40,8 +43,8 @@ class Ui_About(object):
         self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
         #self.about_box_layout.addWidget(self.about)
 
-        github_widget =  gremlin.ui.ui_common.QUrlLabel("https://github.com/muchimi/JoystickGremlinEx/","GremlinEx Project")
-        doc_widget = gremlin.ui.ui_common.QUrlLabel("https://muchimi.github.io/JoystickGremlinEx/","GremlinEx Documentation")
+        github_widget =  QUrlLabel("https://github.com/muchimi/JoystickGremlinEx/","GremlinEx Project")
+        doc_widget = QUrlLabel("https://muchimi.github.io/JoystickGremlinEx/","GremlinEx Documentation")
         
         self.about_box_layout.addWidget(github_widget)
         self.about_box_layout.addWidget(doc_widget)

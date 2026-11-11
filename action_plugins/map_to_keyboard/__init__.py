@@ -30,6 +30,13 @@ from gremlin.util import safe_format
 import gremlin.util
 from shiboken6 import Shiboken
 import html
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    InputListenerWidget,
+    QIconLabel,
+    getHContainer,
+)
 
 
 class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
@@ -48,20 +55,20 @@ class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
         self.key_combination = QtWidgets.QLabel()
-        self.record_button = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._record_keys_cb)
+        self.record_button = Buttons.getListenWidget(callback=self._record_keys_cb)
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.record_button, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor(warning_color),
             text="Legacy mapper - consider using <i>Map to Keyboard Ex</i> for additional functionality",
             use_wrap=False,
         )
-        warning_container, warning_layout = gremlin.ui.ui_common.getHContainer(warning_widget)
+        warning_container, warning_layout = getHContainer(warning_widget)
         self.main_layout.addWidget(warning_container)
 
     def _populate_ui(self):
@@ -90,7 +97,7 @@ class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
     def _record_keys_cb(self):
         """Prompts the user to press the desired key combination."""
 
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
+        self.button_press_dialog = InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
             multi_keys=False,

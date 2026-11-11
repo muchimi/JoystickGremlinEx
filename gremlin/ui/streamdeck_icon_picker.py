@@ -25,6 +25,11 @@ import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.util
 from gremlin.ui.ui_common import Buttons, Color, QDataPushButton
+from gremlin.ui.ui_common import (
+    QInfoBox,
+    QRememberDialog,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -507,7 +512,7 @@ class _PackSection(QtWidgets.QWidget):
                 tile.setChecked(False)
 
 
-class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
+class IconLibraryDialog(QRememberDialog):
     """Elgato-style categorized icon browser."""
 
     def __init__(self, parent=None, title: str = "Icon Library — Stream Deck"):
@@ -637,7 +642,7 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         self._ok = Buttons.getOkWidget(callback=self._accept_selection)
         self._ok.setEnabled(False)
         cancel_btn = Buttons.getCancelWidget(callback=self.reject)
-        footer.addWidget(gremlin.ui.ui_common.getHContainer([self._ok, cancel_btn], widget_only=True))
+        footer.addWidget(getHContainer([self._ok, cancel_btn], widget_only=True))
         layout.addLayout(footer)
 
     def _update_color_swatch(self):
@@ -813,7 +818,7 @@ class IconLibraryDialog(gremlin.ui.ui_common.QRememberDialog):
         return render_icon_to_png(self._selected.path, color=tint)
 
 
-class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
+class IconSourceDialog(QRememberDialog):
     """Choose Icon Library vs Custom file, with optional drag-drop tip."""
 
     SOURCE_LIBRARY = "library"
@@ -832,7 +837,7 @@ class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
         show_tip = should_show_icon_source_tip()
         self._again: QtWidgets.QCheckBox | None = None
         if show_tip:
-            banner = gremlin.ui.ui_common.QInfoBox(
+            banner = QInfoBox(
                 "Tip: you can also drag and drop an image file directly onto a Stream Deck key (or onto the Released / Pressed icon preview)."
             )
             self._again = QtWidgets.QCheckBox("Don't show this again")
@@ -856,7 +861,7 @@ class IconSourceDialog(gremlin.ui.ui_common.QRememberDialog):
         layout.addLayout(row)
 
         cancel_btn = Buttons.getCancelWidget(callback=self.reject)
-        layout.addWidget(gremlin.ui.ui_common.getHContainer(["||", cancel_btn], widget_only=True))
+        layout.addWidget(getHContainer(["||", cancel_btn], widget_only=True))
 
     def _persist_tip(self):
         if self._again is not None and self._again.isChecked():

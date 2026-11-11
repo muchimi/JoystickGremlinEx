@@ -26,10 +26,18 @@ from gremlin import common, joystick_handling, macro, util
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    ActionLabel,
+    BaseDialogUi,
+    InputListenerWidget,
+    LeftRightPushButton,
+    clear_layout,
+)
+
 # TODO: Retire this entire bit here as the action library will replace it
 #       in it's entirety
 
-class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
+class ProfileCreator(BaseDialogUi):
 
     """Displays a dialog to create a new profile from an existing one.
 
@@ -108,7 +116,7 @@ class ProfileCreator(gremlin.ui.ui_common.BaseDialogUi):
         """Creates the UI of this dialog."""
         if not Shiboken.isValid(self):
             return
-        gremlin.ui.ui_common.clear_layout(self.main_layout)
+        clear_layout(self.main_layout)
         self.mode_index = {}
 
         # Create the drawers for each of the modes
@@ -336,7 +344,7 @@ class BindableAction(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.description = QtWidgets.QLabel(description)
-        self.bound_action = gremlin.ui.ui_common.LeftRightPushButton(label)
+        self.bound_action = LeftRightPushButton(label)
         self.bound_action.setMinimumWidth(200)
         self.bound_action.setMaximumWidth(200)
         self.bound_action.clicked.connect(self._bind_action)
@@ -349,13 +357,13 @@ class BindableAction(QtWidgets.QWidget):
         for container in input_item.containers:
             for action_set in container.action_sets:
                 for action in action_set:
-                    self.icon_layout.addWidget(gremlin.ui.ui_common.ActionLabel(action))
+                    self.icon_layout.addWidget(ActionLabel(action))
         self.main_layout.addLayout(self.icon_layout)
         self.main_layout.addWidget(self.bound_action)
 
     def _bind_action(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
+        self.button_press_dialog = InputListenerWidget(
             BindableAction.valid_bind_types[self.input_type],
             return_kb_event=True
         )

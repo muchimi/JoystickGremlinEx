@@ -33,6 +33,13 @@ from gremlin.util import safe_format, safe_read
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 import gremlin.base_profile
+from gremlin.ui.ui_common import (
+    QDelayWidget,
+    QFrameBox,
+    QHorizontalLine,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -68,11 +75,11 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.autorelease_widget.clicked.connect(self._autorelease_changed)
         self.autorelease_widget.setToolTip("When enabled, the actions will automatically receive a release trigger after the specified delay.")
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Autorelease Delay (ms):")
+        self.delay_widget = QDelayWidget(label="Autorelease Delay (ms):")
         self.delay_widget.setValue(self.container.autorelease_delay)
         self.delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget], "Options", widget_only=True)
+        widget = getHContainer([self.autorelease_widget, self.delay_widget], "Options", widget_only=True)
 
         self.action_layout.addWidget(widget)
 
@@ -149,10 +156,10 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param label the name of the action to create
         """
 
-        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>{label}</b>")
-        widget = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
-        widget = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+        layout.addWidget(QHorizontalLine())
+        step_widget = QFrameBox(f"<b>{label}</b>")
+        widget = getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
+        widget = getHContainer(widget, widget_only=True)
         layout.addWidget(widget)
 
         action_set = self.container.action_sets[index]

@@ -53,6 +53,9 @@ from .widgets import (
     widget_rotation_deg,
     apply_widget_rotation,
 )
+from gremlin.ui.ui_common import (
+    Color,
+)
 
 ROTATE_HANDLE = 8
 CROP_HANDLE_BASE = 20
@@ -1958,7 +1961,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.drag_bar.setVisible(show_bar)
                 chroma = chroma_fill_color(self.page_canvas)
                 bar = chroma if chroma.alpha() > 80 else QtGui.QColor("#8a93a3")
-                fg = gremlin.ui.ui_common.Color().normalColor()
+                fg = Color().normalColor()
                 self.drag_bar.setStyleSheet(f"background:{bar.darker(130).name()}; color:{fg};")
                 if Shiboken.isValid(self.view):
                     self.view._sync_paint_mode()

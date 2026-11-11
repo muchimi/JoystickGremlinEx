@@ -34,6 +34,22 @@ from shiboken6 import Shiboken
 from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateInfoWidget, RangeInfoWidget, TriggerMode
 import gremlin.ui.ui_common
 import gremlin.util
+from gremlin.ui.ui_common import (
+    Color,
+    Icons,
+    MessageBox,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataPushButton,
+    QHLine,
+    QHelper,
+    QHorizontalLine,
+    QInfoBox,
+    QRememberDialog,
+    getFlowContainer,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -43,7 +59,7 @@ _decimals = 5
 _single_step = 0.001
 
 
-class GatedAxisInstructions(gremlin.ui.ui_common.QRememberDialog):
+class GatedAxisInstructions(QRememberDialog):
     """
     Dialog box for instructions
     """
@@ -129,7 +145,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self._rwi_map = {}  # map of range info objects to (row, col) in the range table
         self._gwi_map = {}  # map of gate info objects to (row, col) in the gate table
 
-        self._helper = gremlin.ui.ui_common.QHelper()
+        self._helper = QHelper()
 
         self.single_step = 0.001  # amount of a single step when scrolling
 
@@ -145,9 +161,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(missing)
             return
 
-        self._grab_icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor())
-        self._setup_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor())
-        self._setup_container_icon = gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().activeContentColor())
+        self._grab_icon = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color=Color().recordColor())
+        self._setup_icon = Icons.gearIcon(qta_color=Color().inactiveColor())
+        self._setup_container_icon = Icons.gearIcon(qta_color=Color().activeContentColor())
 
         # get the curent axis normalized value -1 to +1
         if action_data.input_is_hardware():
@@ -162,7 +178,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.slider_frame_widget = QtWidgets.QFrame()
         self.slider_frame_layout = QtWidgets.QHBoxLayout(self.slider_frame_widget)
-        background_color = gremlin.ui.ui_common.Color().sliderBackgroundColor()
+        background_color = Color().sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f".QFrame{{background-color: {background_color}; border-radius: 10px;}}")
         self._slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(parent=self.slider_frame_widget, object_name=f"Slider for {self.objectName()} [{self.id}]")
 
@@ -198,21 +214,21 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_slider_widget.setContentsMargins(0, 0, 0, 0)
 
         # configure trigger button
-        self._configure_trigger_widget = gremlin.ui.ui_common.QDataPushButton("Configure", callback=self._trigger_cb)
+        self._configure_trigger_widget = QDataPushButton("Configure", callback=self._trigger_cb)
         self._configure_trigger_widget.setIcon(self._setup_icon)
         self._show_configuration = show_configuration
         # self._configure_trigger_widget.setVisible(show_configuration)
 
         # manual and grab value widgets
 
-        display_event_widget = gremlin.ui.ui_common.QDataCheckbox(
+        display_event_widget = QDataCheckbox(
             value=self._option_display_events, callback=self._handle_display_event_changed, tooltip="Hide or show events", label="Show events"
         )
 
-        display_event_container = gremlin.ui.ui_common.getHContainer(display_event_widget, bottom_margin=6, widget_only=True)
+        display_event_container = getHContainer(display_event_widget, bottom_margin=6, widget_only=True)
 
         self._display_label_widget = QtWidgets.QLabel("Display Mode:")
-        self._display_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._display_mode_widget = QDataComboBox()
 
         self._show_output_mode = show_output_mode
         if show_output_mode:
@@ -236,24 +252,24 @@ class QGatedAxisWidget(QtWidgets.QWidget):
             self._display_mode_widget,
         ]
 
-        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin=12, widget_only=True)
+        self.container_options_widget = getHContainer(widgets, left_margin=12, widget_only=True)
 
         # holds gateinfo widgets
-        self.container_gate_ui_widget, self.container_gate_ui_layout = gremlin.ui.ui_common.getVContainer()
+        self.container_gate_ui_widget, self.container_gate_ui_layout = getVContainer()
         self.container_gate_ui_widget.setContentsMargins(8, 0, 0, 0)
 
-        self.container_gate_widget, self.container_gate_layout = gremlin.ui.ui_common.getVContainer()
+        self.container_gate_widget, self.container_gate_layout = getVContainer()
 
         self.gate_count_widget = QtWidgets.QLabel()
         self.container_gate_ui_layout.addWidget(self.gate_count_widget)
 
-        self.gate_flow_widget, self.gate_flow_layout = gremlin.ui.ui_common.getFlowContainer()
+        self.gate_flow_widget, self.gate_flow_layout = getFlowContainer()
         self.container_gate_ui_layout.addWidget(self.gate_flow_widget)
 
         # self.container_gate_layout.addWidget(self.gate_table_widget)
 
-        self.range_flow_widget, self.range_flow_layout = gremlin.ui.ui_common.getFlowContainer()
-        self.container_range_widget, self.container_range_layout = gremlin.ui.ui_common.getVContainer()
+        self.range_flow_widget, self.range_flow_layout = getFlowContainer()
+        self.container_range_widget, self.container_range_layout = getVContainer()
         self.container_range_layout.setContentsMargins(6, 6, 6, 6)
         self.range_flow_layout.lineCountChanged.connect(self._handle_range_line_count_changed)
 
@@ -275,7 +291,7 @@ It is recommended to configure and finalize the general number of gates before a
 It is also possible to save existing mappings via action duplication to the same or different container, saving the mappings to templates or the clipboard before
 making changes that impact the order of gates or ranges."""
 
-        warning_widget = gremlin.ui.ui_common.QInfoBox(text=msg, hide_key="gated_axis")
+        warning_widget = QInfoBox(text=msg, hide_key="gated_axis")
 
         self.main_layout.addWidget(QtWidgets.QLabel())
         self.main_layout.addWidget(warning_widget)
@@ -288,8 +304,8 @@ making changes that impact the order of gates or ranges."""
         self.main_layout.addWidget(self.container_gate_ui_widget, row, 0, 1, -1)
         row += 1
         # spacer
-        widgets = [QtWidgets.QLabel(" "), gremlin.ui.ui_common.QHorizontalLine()]
-        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        widgets = [QtWidgets.QLabel(" "), QHorizontalLine()]
+        widget = getVContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget, row, 0, 1, -1)
 
         row += 1
@@ -539,7 +555,7 @@ making changes that impact the order of gates or ranges."""
             gremlin.util.centerDialog(dialog, w, h)
             dialog.show()
         else:
-            gremlin.ui.ui_common.MessageBox(prompt="Unable to locate help file")
+            MessageBox(prompt="Unable to locate help file")
 
     def hook(self):
         """enables connections"""
@@ -1010,7 +1026,7 @@ making changes that impact the order of gates or ranges."""
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete one or more gates.\nAre you sure?")
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        pixmap = Icons.to_pixmap(Icons.warningIcon())
         # pixmap = gremlin.util.load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
@@ -1029,7 +1045,7 @@ making changes that impact the order of gates or ranges."""
         count = len(self._gate_data.getGates())
         if count <= 2:
             syslog.warning("Unable to delete gate: at least two gates must be defined.")
-            gremlin.ui.ui_common.MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
+            MessageBox(prompt="Unable to remove this gate.  At least two gates must be defined.")
             return  # do not allow fewer than 2 gates
 
         # only prompt if deleting the gate would remove mappings either in the gate or the associated ranges
@@ -1088,10 +1104,10 @@ making changes that impact the order of gates or ranges."""
         menu = QtWidgets.QMenu(self)
         rng = self._gate_data.findRangeByValue(value)
         msg = f"<b>Range {rng.to_display()}</b>"
-        line = gremlin.ui.ui_common.QHLine()
-        color = gremlin.ui.ui_common.Color().menuSeparatorColor()
+        line = QHLine()
+        color = Color().menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
-        widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
+        widget = getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
 
         action_range_info = QtWidgets.QWidgetAction(menu)
         action_range_info.setDefaultWidget(widget)
@@ -1100,7 +1116,7 @@ making changes that impact the order of gates or ranges."""
         action_add_gate.setData(value)
 
         action_configure = QtGui.QAction("Configure...", self, triggered=self._trigger_configure_range)
-        action_configure.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        action_configure.setIcon(Icons.gearIcon())
         action_configure.setData(value)
 
         menu.addAction(action_range_info)
@@ -1119,20 +1135,20 @@ making changes that impact the order of gates or ranges."""
 
         gate = self._gate_data.getGateSliderIndex(handle_index)
         msg = f"<b>Gate [{handle_index + 1}]</b> {gate.value:0.{_decimals}f}"
-        line = gremlin.ui.ui_common.QHLine()
-        color = gremlin.ui.ui_common.Color().menuSeparatorColor()
+        line = QHLine()
+        color = Color().menuSeparatorColor()
         line.setStyleSheet(f"QFrame {{ color: {color}; background-color: {color};}} ")
-        widget = gremlin.ui.ui_common.getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
+        widget = getVContainer([QtWidgets.QLabel(msg), line], widget_only=True)
 
         action_gate_info = QtWidgets.QWidgetAction(menu)
         action_gate_info.setDefaultWidget(widget)
 
         action_configure = QtGui.QAction("Configure...", self, triggered=self._trigger_configure_gate)
-        action_configure.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        action_configure.setIcon(Icons.gearIcon())
         action_configure.setData(handle_index)
 
         action_delete = QtGui.QAction("Delete Gate", self, triggered=self._trigger_delete_gate)
-        action_delete.setIcon(gremlin.ui.ui_common.Icons.trashIcon())
+        action_delete.setIcon(Icons.trashIcon())
         action_delete.setData(handle_index)
 
         menu.addAction(action_gate_info)
@@ -1233,7 +1249,7 @@ making changes that impact the order of gates or ranges."""
         for _, trigger in enumerate(TriggerMode):
             if trigger not in self._gate_data.filter_map.keys():
                 self._gate_data.filter_map[trigger] = True
-            widget = gremlin.ui.ui_common.QDataCheckbox(
+            widget = QDataCheckbox(
                 label=TriggerMode.to_display_name(trigger), data=trigger, callbackEx=self._filter_cb, value=self._gate_data.filter_map[trigger]
             )
 
@@ -1246,8 +1262,8 @@ making changes that impact the order of gates or ranges."""
 
         row += 1
         col = 0
-        select_all_widget = gremlin.ui.ui_common.QDataPushButton("All", callback=self._select_all_filters_cb)
-        clear_all_widget = gremlin.ui.ui_common.QDataPushButton("None", callback=self._clear_all_filters_cb)
+        select_all_widget = QDataPushButton("All", callback=self._select_all_filters_cb)
+        clear_all_widget = QDataPushButton("None", callback=self._clear_all_filters_cb)
         self.container_filter_layout.addWidget(select_all_widget, row, col)
         col += 1
         self.container_filter_layout.addWidget(clear_all_widget, row, col)
@@ -1360,18 +1376,18 @@ making changes that impact the order of gates or ranges."""
         """adds gate"""
         gate_count = self._gate_data.gateCount()
         if gate_count >= self._gate_data.max_gates:
-            gremlin.ui.ui_common.MessageBox(prompt=f"Too many gates are defined.  Maximumn is {self._gate_data.max_gates}.")
+            MessageBox(prompt=f"Too many gates are defined.  Maximumn is {self._gate_data.max_gates}.")
             return
         if check_exists:
             gate = self._gate_data.findGate(value)
             if gate:
-                gremlin.ui.ui_common.MessageBox(prompt="A gate already exists at this location")
+                MessageBox(prompt="A gate already exists at this location")
                 return
         self._pushState()  # save before adding the gate
         gate = self._gate_data.addGate(value)
         if not gate:
             # ran too many gates
-            gremlin.ui.ui_common.MessageBox(prompt="Unable to add gate.  Check the log.")
+            MessageBox(prompt="Unable to add gate.  Check the log.")
             return
 
         self._reload_widgets()
@@ -1388,7 +1404,7 @@ making changes that impact the order of gates or ranges."""
         # add the missing steps only (re-use other steps so we don't lose their config)
         max_gates = GateData.max_gates
         if gate_count < 2 or gate_count > max_gates:
-            gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add the requested gates: The Maximum gate count is reached ({max_gates})")
+            MessageBox(prompt=f"Unable to add the requested gates: The Maximum gate count is reached ({max_gates})")
             return
 
         if gate_count == self.gate_data.gateCount():
@@ -1423,7 +1439,7 @@ making changes that impact the order of gates or ranges."""
             message_box.setInformativeText("This will reduce gates, delete gate configurations and normalize gates.\nAre you sure?")
             # pixmap = gremlin.util.load_pixmap("warning.svg")
             # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+            pixmap = Icons.to_pixmap(Icons.warningIcon())
             message_box.setIconPixmap(pixmap)
             message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
@@ -1530,9 +1546,9 @@ making changes that impact the order of gates or ranges."""
             if gate is None:
                 self._slider_widget.setHandleIcon(index, None)
             elif gate.hasAnyContainers():
-                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color().activeContentColor())
+                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, Color().activeContentColor())
             else:
-                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, gremlin.ui.ui_common.Color().inactiveColor())
+                self._slider_widget.setHandleIcon(index, "fa6s.gear", True, Color().inactiveColor())
 
         # find the widgets for the gate
         if gate in self._gwi_map:

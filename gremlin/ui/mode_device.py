@@ -38,6 +38,15 @@ import html
 import logging
 import dinput
 from gremlin.ui.ui_common import Ansi
+from gremlin.ui.ui_common import (
+    QDataLineEdit,
+    QIconLabel,
+    QInputLockWidget,
+    getGridContainer,
+    getHContainer,
+    get_text_width,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 
@@ -359,31 +368,31 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         )
 
         # lock widget
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only=True)
+        lock_widget = QInputLockWidget(data=self.device_guid)
+        widget = getHContainer(lock_widget, left_stretch=True, widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
         if config.show_container_id:
             device = gremlin.joystick_handling.get_device(self.device_guid)
-            width = gremlin.ui.ui_common.get_text_width(gremlin.util.get_guid())
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            width = get_text_width(gremlin.util.get_guid())
+            line_edit = QDataLineEdit()
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
-            line_edit = gremlin.ui.ui_common.QDataLineEdit()
+            line_edit = QDataLineEdit()
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
+            widget = getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])
+            synchronize_grids([w1, w2])
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
@@ -660,7 +669,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _set_status(self, widget, icon=None, status=None, use_qta=True, color=None):
         """sets the status of an input widget"""
-        status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
+        status_widget = widget.findChild(QIconLabel, "status")
         if color:
             status_widget.setIcon(icon, use_qta=use_qta, color=color)
         else:
@@ -676,7 +685,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
-        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget = QIconLabel()
         status_widget.setObjectName("status")
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)

@@ -38,6 +38,9 @@ from .model import (
     normalize_runtime_bindings,
     normalize_toggle_binding,
 )
+from gremlin.ui.ui_common import (
+    InputListenerWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -152,7 +155,7 @@ class RuntimeActionBindingEditor(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget(
+        listener = InputListenerWidget(
             [InputType.JoystickButton],
             callback=_captured,
             virtual_only=False,

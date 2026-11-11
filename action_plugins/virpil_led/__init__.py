@@ -47,6 +47,20 @@ from dinput import DeviceSummary
 import gremlin.ui.ui_common
 from typing import Callable
 from dataclasses import dataclass
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    Icons,
+    QDataComboBox,
+    QDataPushButton,
+    QDataRadioButton,
+    QDelayWidget,
+    QExecuteWidget,
+    QIconPushButton,
+    QLineEdit,
+    QWarningWidget,
+    getHContainer,
+)
 
 
 syslog = logging.getLogger("system")
@@ -613,10 +627,10 @@ class VirpilButtonWidget(QtWidgets.QWidget):
         main_widgets.extend([self.blink_label, self.blink_swatch, self.blink_button])
 
         if delete_callback is not None:
-            delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete)
+            delete_widget = Buttons.getDeleteWidget(callback=self._handle_delete)
             main_widgets.append(delete_widget)
 
-        widget = gremlin.ui.ui_common.getHContainer(main_widgets, widget_only=True, no_stretch=True)
+        widget = getHContainer(main_widgets, widget_only=True, no_stretch=True)
         self.main_layout.addWidget(widget)
         self._update_colors()
         self.set_blink_visible(bool(getattr(self.action_data, "blink_enabled", False)))
@@ -624,7 +638,7 @@ class VirpilButtonWidget(QtWidgets.QWidget):
     def _make_color_controls(self, title: str, callback: Callable):
         swatch = QtWidgets.QLabel("     ")
         swatch.setFixedWidth(50)
-        button = gremlin.ui.ui_common.QDataPushButton(f"Select {title}", callback=callback)
+        button = QDataPushButton(f"Select {title}", callback=callback)
         return swatch, button
 
     def refresh_led_options(self):
@@ -681,7 +695,7 @@ class VirpilButtonWidget(QtWidgets.QWidget):
 
     def _paint_swatch(self, widget: QtWidgets.QLabel, rgb: int):
         color = QColor().fromRgb(rgb)
-        border_color = gremlin.ui.ui_common.Color().borderColor()
+        border_color = Color().borderColor()
         widget.setStyleSheet(f".QLabel {{ background-color: {color.name()}; border: 4px solid {border_color}; }}")
 
     def _update_colors(self):
@@ -722,16 +736,16 @@ class VirpilLedPickerDialog(QtWidgets.QDialog):
         layout.addWidget(self.list_widget)
 
         if not available:
-            layout.addWidget(gremlin.ui.ui_common.QWarningWidget("All LEDs for this device are already added."))
+            layout.addWidget(QWarningWidget("All LEDs for this device are already added."))
 
-        self.add_selected_widget = gremlin.ui.ui_common.Buttons.getOkWidget(label="Add Selected", callback=self._add_selected)
-        self.add_all_widget = gremlin.ui.ui_common.QDataPushButton("Add All", callback=self._add_all)
-        self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
+        self.add_selected_widget = Buttons.getOkWidget(label="Add Selected", callback=self._add_selected)
+        self.add_all_widget = QDataPushButton("Add All", callback=self._add_all)
+        self.cancel_widget = Buttons.getCancelWidget(callback=self.reject)
 
         self.add_selected_widget.setEnabled(bool(available))
         self.add_all_widget.setEnabled(bool(available))
 
-        buttons = gremlin.ui.ui_common.getHContainer(
+        buttons = getHContainer(
             [self.add_selected_widget, self.add_all_widget, self.cancel_widget],
             widget_only=True,
             left_stretch=True,
@@ -782,17 +796,17 @@ class VirpilExecutableDialog(QtWidgets.QDialog):
         self.action_data = action_data
         self.setWindowTitle("Select Virpil Executable")
         self.layout = QtWidgets.QVBoxLayout(self)
-        self.file_path_widget = gremlin.ui.ui_common.QLineEdit(
+        self.file_path_widget = QLineEdit(
             update_on_text_change=True, text=action_data.virpil_executable, callback=self._handle_executable_changed, tooltip="Path to Virpil LED executable"
         )
         self.file_path_widget.setMinimumWidth(300)
 
         self.setMinimumWidth(500)
 
-        self.edit_path_widget = gremlin.ui.ui_common.Buttons.getFolderWidget(callback=self._get_executable)
+        self.edit_path_widget = Buttons.getFolderWidget(callback=self._get_executable)
 
         self.layout.addWidget(QtWidgets.QLabel("Virpil Executable: (VPC_LED_Control.exe)"))
-        widget = gremlin.ui.ui_common.getHContainer([(self.file_path_widget, 100), self.edit_path_widget], widget_only=True)
+        widget = getHContainer([(self.file_path_widget, 100), self.edit_path_widget], widget_only=True)
         self.layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -801,7 +815,7 @@ class VirpilExecutableDialog(QtWidgets.QDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
         self.layout.addWidget(widget)
 
     @QtCore.Slot()
@@ -855,18 +869,18 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_ui(self):
 
-        warning_widget = gremlin.ui.ui_common.QWarningWidget("This action is an experimental Feature.")
+        warning_widget = QWarningWidget("This action is an experimental Feature.")
         self.main_layout.addWidget(warning_widget)
 
         items = [(dev.name, dev) for dev in self.action_data.device_map.values()]
         self._widget_map = {}  # holds the button widgets in the list, indexed by the display order
 
-        self.device_selector = gremlin.ui.ui_common.QDataComboBox(
+        self.device_selector = QDataComboBox(
             source=items, tooltip="Virpil Device Selector", value=self.action_data.device, callback=self._handle_device_changed
         )
 
-        self.configure_executable_widget = gremlin.ui.ui_common.QIconPushButton(
-            icon=gremlin.ui.ui_common.Icons.gearIcon(), tooltip="Configure Options", callback=self._handle_configure, height=24, width=24, icon_size=18
+        self.configure_executable_widget = QIconPushButton(
+            icon=Icons.gearIcon(), tooltip="Configure Options", callback=self._handle_configure, height=24, width=24, icon_size=18
         )
 
         self.main_layout.addWidget(self.configure_executable_widget)
@@ -875,25 +889,25 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         widgets = ["Trigger Mode:"]
         modes = [(mode.name, mode) for mode in VirpilOutputMode]
         for name, mode in modes:
-            widget = gremlin.ui.ui_common.QDataRadioButton(
+            widget = QDataRadioButton(
                 name, data=mode, value=mode == self.action_data.output_mode, callbackEx=self._handle_mode_changed, tooltip=VirpilOutputMode.to_description(mode)
             )
             widgets.append(widget)
 
         widgets.append(self.configure_executable_widget)  # configure button
 
-        self.output_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.output_mode_widget = getHContainer(widgets, widget_only=True)
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(value=self.action_data.pulse_duration, callback=self._handle_delay_changed)
+        self.delay_widget = QDelayWidget(value=self.action_data.pulse_duration, callback=self._handle_delay_changed)
 
         self.view_widget = QtWidgets.QListWidget()
         self.view_widget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.view_widget.setMinimumHeight(300)
-        self.add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._handle_add)
+        self.add_widget = Buttons.getAddWidget(callback=self._handle_add)
 
-        self.test_widget = gremlin.ui.ui_common.Buttons.getPlayWidget(callback=self._handle_test)
+        self.test_widget = Buttons.getPlayWidget(callback=self._handle_test)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -908,28 +922,28 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         self.blink_while_held_widget.setChecked(bool(self.action_data.blink_while_held))
         self.blink_while_held_widget.toggled.connect(self._handle_blink_while_held_changed)
 
-        self.blink_interval_widget = gremlin.ui.ui_common.QDelayWidget(value=self.action_data.blink_interval_ms, callback=self._handle_blink_interval_changed)
+        self.blink_interval_widget = QDelayWidget(value=self.action_data.blink_interval_ms, callback=self._handle_blink_interval_changed)
 
         self.main_layout.addWidget(self.output_mode_widget)
         self.main_layout.addWidget(self.device_selector)
 
-        self.no_device_warning_widget = gremlin.ui.ui_common.QWarningWidget("Select a Virpil device first before adding LEDs.")
+        self.no_device_warning_widget = QWarningWidget("Select a Virpil device first before adding LEDs.")
         self.main_layout.addWidget(self.no_device_warning_widget)
 
         self.main_layout.addWidget(self.view_widget)
 
         # button bar
         widgets = [self.add_widget, self.test_widget]
-        container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        container = getHContainer(widgets, widget_only=True)
         self.button_bar_widget = container
         self.main_layout.addWidget(container)
 
         # delay widget
-        self.pulse_container_widget = gremlin.ui.ui_common.getHContainer(["Pulse Duration (ms):", self.delay_widget], widget_only=True)
+        self.pulse_container_widget = getHContainer(["Pulse Duration (ms):", self.delay_widget], widget_only=True)
         self.main_layout.addWidget(self.pulse_container_widget)
 
         # blink panel
-        blink_row = gremlin.ui.ui_common.getHContainer(
+        blink_row = getHContainer(
             [
                 self.blink_enabled_widget,
                 self.blink_while_held_widget,
@@ -1013,7 +1027,7 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         fname = self.file_path_widget.text()
         valid = os.path.isfile(fname)
         if valid:
-            self._setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color().activeColor())
+            self._setIcon("mdi.checkbox-marked-outline", color=Color().activeColor())
             self.action_data.virpil_executable = self.action_data.virpil_executable  # force a reload at next play
             self._populate_ui()
         else:

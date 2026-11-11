@@ -24,18 +24,11 @@ import dinput
 from dinput import DeviceSummary
 import time
 import traceback
-
-
 import gremlin.config
-import gremlin.types
-
 import gremlin.shared_state
-import gremlin.types
 from gremlin.types import DeviceType, DeviceCategory
 import gremlin.singleton_decorator
 import gremlin.util
-import gremlin.types
-
 
 from . import error, util
 from vjoy import vjoy
@@ -760,7 +753,8 @@ def _find_output_target(key) -> OutputTarget | None:
         requested_kind = device.device_type
         requested_id = device.vjoy_id if requested_kind == DeviceType.VJoy else device.virtual_id
 
-    if device and device.connected and device.is_virtual:
+    # Failover entries describe profile mappings, not a live vJoy driver device.
+    if device and device.connected and device.is_virtual and not device.data.get("failover", False):
         if device.device_type == DeviceType.Maestro:
             return OutputTarget(device, "maestro", device.virtual_id, requested_id)
         if isinstance(device.vjoy_id, int) and 1 <= device.vjoy_id <= 16:
@@ -773,7 +767,7 @@ def _find_output_target(key) -> OutputTarget | None:
     # the requested device is not available - use the counterpart with the same index
     if requested_kind == DeviceType.Maestro:
         alt = next((dev for dev in vjoy_devices() if dev.vjoy_id == requested_id), None)
-        if alt and alt.connected:
+        if alt and alt.connected and not alt.data.get("failover", False):
             return OutputTarget(alt, "vjoy", alt.vjoy_id, requested_id)
     else:
         alt = next((dev for dev in maestro_devices() if dev.virtual_id == requested_id and dev.connected), None)

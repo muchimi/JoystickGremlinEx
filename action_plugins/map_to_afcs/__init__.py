@@ -25,6 +25,9 @@ import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    RemoteClientWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -44,7 +47,7 @@ class MapToAfcsWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(QtWidgets.QLabel("AFCS input name"))
         self.main_layout.addWidget(self.name_edit)
         self.main_layout.addWidget(hint)
-        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
+        self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
         self.main_layout.addWidget(self.remote_widget)
 
     def _populate_ui(self):

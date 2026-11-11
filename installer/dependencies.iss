@@ -2,12 +2,14 @@
 // vJoyInterface.dll as evidence of an installed vJoy driver.
 var
   DependencyRestartRequired: Boolean;
-  BridgeStatusChecked, BridgeInstalled, BridgeCanInstall: Boolean;
+  BridgeStatusChecked, BridgeInstalled, BridgeCanInstall, VjoyInstalled: Boolean;
   BridgeInstalledVersion, BridgeLatestVersion: String;
   BridgeConnectionState, BridgeConnectionMessage: String;
   BridgeCheckProgress: TOutputProgressWizardPage;
   BridgeConnectionLabel: TNewStaticText;
   BridgeTestButton: TNewButton;
+
+function IsVjoyInstalled(): Boolean; forward;
 
 function NeedsHidHide: Boolean;
 var
@@ -40,8 +42,8 @@ begin
   BridgeConnectionMessage := 'The localhost bridge connection could not be checked. Check Tools > Maestro Devices after setup.';
   if not ConnectionOnly then begin
     BridgeInstalled := IsMaestroBridgeInstalled;
-    BridgeCanInstall := not BridgeInstalled and
-      not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\vjoy');
+    VjoyInstalled := IsVjoyInstalled;
+    BridgeCanInstall := not BridgeInstalled;
   end;
   // Keep a useful local status if PowerShell or the online version check fails.
   if BridgeInstalled then begin
@@ -52,12 +54,6 @@ begin
         'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{D26DA10A-73A7-482A-A711-6B7E04C8D8A0}_is1',
         'DisplayVersion', BridgeInstalledVersion);
   end;
-  if not ConnectionOnly and not BridgeInstalled and not BridgeCanInstall then begin
-    BridgeConnectionState := 'not_installed';
-    BridgeConnectionMessage := 'GEX Maestro Bridge is not installed; vJoy is already installed.';
-    exit;
-  end;
-
   ExtractTemporaryFile('dependencies.ps1');
   StatusFile := ExpandConstant('{tmp}\maestro-bridge-status.ini');
   if FileExists(StatusFile) then DeleteFile(StatusFile);
@@ -126,7 +122,10 @@ var
   I: Integer;
 begin
   if CurPageID <> wpSelectTasks then exit;
-  BridgeConnectionLabel.Caption := BridgeConnectionMessage;
+  if VjoyInstalled then
+    BridgeConnectionLabel.Caption := 'Warning: a vJoy installation was detected which could be a false-positive.%nThis does not prevent installing GEX Maestro Bridge.%nAny remaining vJoy installation may be disabled and configuration data deleted when the bridge is running due to a known driver level conflict.'
+  else
+    BridgeConnectionLabel.Caption := BridgeConnectionMessage;
   BridgeTestButton.Enabled := BridgeInstalled;
   for I := 0 to WizardForm.TasksList.Items.Count - 1 do begin
     if WizardForm.TasksList.Items[I] = MaestroBridgeDescription('') then begin
@@ -218,4 +217,42 @@ end;
 function NeedRestart: Boolean;
 begin
   Result := DependencyRestartRequired;
+end;
+
+function IsVjoyInstalled(): Boolean;
+// Checks if the vJoy driver is installed by looking for its service in the HIDCLASS registry key
+// or the application's uninstall key
+var
+  Name, RegValVjoy, Path: String;
+  Len: Longint;
+  Res: Boolean;
+  Names: TArrayOfString;
+begin
+  Result := RegKeyExists(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Services\vjoy');
+  RegValVjoy := 'SYSTEM\CurrentControlSet\Enum\Root\HIDCLASS';
+
+  // Enumerate the subkeys (typically '0000', '0001', etc.)
+  if not Result and RegGetSubkeyNames(HKEY_LOCAL_MACHINE, RegValVjoy, Names) then
+    if GetArrayLength(Names) > 0 then begin
+    // Check the first device instance registered under HIDCLASS
+    RegValVjoy := RegValVjoy + '\' + Names[0];
+    Name := 'Service';
+
+    // Look up the name of the driver service handling this device
+    Res := RegQueryStringValue(HKEY_LOCAL_MACHINE, RegValVjoy, Name, Path);
+    if Res then
+      Len := Length(Path)
+    else
+      Len := 0;
+
+    if (Len > 0) and (CompareText(Path, 'vjoy') = 0) then
+      Result := True;
+  end;
+
+  // Checks both 32-bit and 64-bit views of the Windows Uninstall Registry
+  if not Result then
+  begin
+    Result := RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{8E31F76F-74C3-47F1-9550-E041EEDC5FBB}_is1') or
+              RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{8E31F76F-74C3-47F1-9550-E041EEDC5FBB}_is1');
+  end;
 end;

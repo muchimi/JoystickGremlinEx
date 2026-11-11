@@ -38,6 +38,7 @@ from gremlin.util import safeReplace
 from collections import deque
 import gremlin.singleton_decorator
 
+
 syslog = logging.getLogger("system")
 
 
@@ -200,6 +201,7 @@ class Configuration(QtCore.QObject):
     def backup(self) -> bool:
         """backs the config up"""
         import gremlin.util
+        import gremlin.ui.ui_common
 
         backup_fname = self.get_backup_config()
         try:

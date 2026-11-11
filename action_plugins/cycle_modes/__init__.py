@@ -33,6 +33,12 @@ import gremlin.util
 import html
 
 import logging
+from gremlin.ui.ui_common import (
+    Buttons,
+    Icons,
+    QDataComboBox,
+    get_mode_list,
+)
 
 syslog = logging.getLogger("system")
 
@@ -133,15 +139,15 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
         self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         # Add widgets which allow modifying the mode list
-        self.mode_list_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._add_cb)
-        self.button_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._remove_cb)
+        self.mode_list_widget = QDataComboBox()
+        self.button_add_widget = Buttons.getAddWidget(callback=self._add_cb)
+        self.button_delete_widget = Buttons.getDeleteWidget(callback=self._remove_cb)
 
-        icon = gremlin.ui.ui_common.Icons.listUpIcon()
+        icon = Icons.listUpIcon()
         self.up = QtWidgets.QPushButton(icon, "Up")
 
         self.up.clicked.connect(self._up_cb)
-        icon = gremlin.ui.ui_common.Icons.listDownIcon()
+        icon = Icons.listDownIcon()
         self.down = QtWidgets.QPushButton(icon, "Down")
 
         self.down.clicked.connect(self._down_cb)
@@ -180,7 +186,7 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.mode_list_widget):
             self.mode_list_widget.clear()
             profile = gremlin.shared_state.current_profile
-            mode_list = gremlin.ui.ui_common.get_mode_list(profile)
+            mode_list = get_mode_list(profile)
             self.model.clear()
             for display, mode in mode_list:
                 if mode:

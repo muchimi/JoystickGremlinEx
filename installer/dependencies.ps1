@@ -34,7 +34,7 @@ function Test-DependencyNeeded {
     if ($installed.Installed) {
         return ($null -ne $installed.Version -and $null -ne $AvailableVersion -and $AvailableVersion -gt $installed.Version)
     }
-    return -not (Test-RegistryKey LocalMachine 'SYSTEM\CurrentControlSet\Services\vjoy')
+    return $true
 }
 
 function Get-RegistryValue {
@@ -320,7 +320,6 @@ function Get-BridgeUpdateStatus {
     }
     if ($SkipReleaseCheck) { return $status }
     if (-not $installed.Installed) {
-        if (Test-RegistryKey LocalMachine 'SYSTEM\CurrentControlSet\Services\vjoy') { return $status }
         $status.Action = 'install'
     }
     try {

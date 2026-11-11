@@ -21,13 +21,20 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin
 import gremlin.types
-from . import ui_common
 from gremlin.input_types import InputType
+from gremlin.ui.ui_common import (
+    BaseDialogUi,
+    VJoySelector,
+    JoystickSelector,
+    ModeWidget,
+
+    QDataComboBox,
+)
 
 syslog = logging.getLogger("system")
 
 
-class MergeAxisUi(ui_common.BaseDialogUi):
+class MergeAxisUi(BaseDialogUi):
     """Allows merging physical axes into a single virtual ones."""
 
     def __init__(self, profile, parent=None):
@@ -48,12 +55,13 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
         # If there are no valid virtual output devices present we can't show
         # the merge dialog.
-        devices = [dev for dev in gremlin.joystick_handling.virtual_devices() if not dev.disabled and dev.axis_count > 0
-                   and not profile.settings.getVirtualAsInput(dev.virtual_id, dev.device_type)]
+        devices = [
+            dev
+            for dev in gremlin.joystick_handling.virtual_devices()
+            if not dev.disabled and dev.axis_count > 0 and not profile.settings.getVirtualAsInput(dev.virtual_id, dev.device_type)
+        ]
         if not devices:
-            label = QtWidgets.QLabel(
-                "No virtual axis outputs are available. Configure a vJoy or Maestro output device."
-            )
+            label = QtWidgets.QLabel("No virtual axis outputs are available. Configure a vJoy or Maestro output device.")
             label.setStyleSheet("QLabel { background-color : '#FFF4B0'; }")
             label.setWordWrap(True)
             label.setFrameShape(QtWidgets.QFrame.Box)
@@ -109,8 +117,9 @@ class MergeAxisUi(ui_common.BaseDialogUi):
             vjoy_sel = entry.vjoy_selector.get_selection()
             joy1_sel = entry.joy1_selector.get_selection()
             joy2_sel = entry.joy2_selector.get_selection()
-            if not all(selection and selection.get("device_id") is not None and selection.get("input_id") is not None
-                       for selection in (vjoy_sel, joy1_sel, joy2_sel)):
+            if not all(
+                selection and selection.get("device_id") is not None and selection.get("input_id") is not None for selection in (vjoy_sel, joy1_sel, joy2_sel)
+            ):
                 continue
             mode_idx = entry.mode_selector.currentIndex()
             if not 0 <= mode_idx < len(entry.mode_selector.mode_list):
@@ -132,6 +141,8 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         for entry in self.profile_data.merge_axes:
             # Show an error if the desired vJoy device is no longer available
             # as an output
+            if "vjoy" not in entry:
+                continue  # skip entries that do not have a vjoy configuration
             device = gremlin.joystick_handling.get_virtual_device(entry["vjoy"]["vjoy_id"])
             if device is not None and self.profile_data.settings.getVirtualAsInput(device.virtual_id, device.device_type):
                 entries_to_remove.append(entry)
@@ -143,7 +154,6 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
         for entry in entries_to_remove:
             del self.profile_data.merge_axes[self.profile_data.merge_axes.index(entry)]
-
 
 
 class MergeAxisEntry(QtWidgets.QDockWidget):
@@ -177,12 +187,12 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
 
         # Selectors for both physical and virtual joystick axis for the
         # mapping selection
-        self.vjoy_selector = ui_common.VJoySelector(lambda x: callback(), [InputType.JoystickAxis], profile_data.settings.getVirtualAsInputList())
-        self.joy1_selector = ui_common.JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
-        self.joy2_selector = ui_common.JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
+        self.vjoy_selector = VJoySelector(lambda x: callback(), [InputType.JoystickAxis], profile_data.settings.getVirtualAsInputList())
+        self.joy1_selector = JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
+        self.joy2_selector = JoystickSelector(lambda x: callback(), [InputType.JoystickAxis])
 
         # Operation selection
-        self.operation_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.operation_selector = QDataComboBox()
         self.operation_selector.addItem("Average")
         self.operation_selector.addItem("Minimum")
         self.operation_selector.addItem("Maximum")
@@ -193,7 +203,7 @@ class MergeAxisEntry(QtWidgets.QDockWidget):
         self.mode_container_widget = QtWidgets.QWidget()
         self.mode_container_layout = QtWidgets.QVBoxLayout(self.mode_container_widget)
 
-        self.mode_selector = gremlin.ui.ui_common.ModeWidget()
+        self.mode_selector = ModeWidget()
         self.mode_selector.populate_selector(profile_data)
         self.mode_selector.edit_mode_changed.connect(callback)
         self.mode_selector.setShowModeEdit(False)

@@ -30,6 +30,10 @@ import gremlin.ui.ui_common
 import gremlin.input_item
 from shiboken6 import Shiboken
 from gremlin.ui.octavi_device import OctaviButton, OctaviInterface
+from gremlin.ui.ui_common import (
+    QDataRadioButton,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -61,35 +65,35 @@ class MapToOctaviIfr1Widget(gremlin.input_item.AbstractActionWidget):
 
         widget.currentIndexChanged.connect(self._button_changed)
 
-        container = gremlin.ui.ui_common.getHContainer(widget, "LED selection:", widget_only=True)
+        container = getHContainer(widget, "LED selection:", widget_only=True)
         self.main_layout.addWidget(container)
 
         widgets = []
 
         action = self.action_data.action
 
-        widget = gremlin.ui.ui_common.QDataRadioButton("Turn On", "on")
+        widget = QDataRadioButton("Turn On", "on")
         widget.setToolTip("Turns the LED on")
         if action == "on":
             widget.setChecked(True)
         widget.clicked.connect(self._action_changed)
         widgets.append(widget)
 
-        widget = gremlin.ui.ui_common.QDataRadioButton("Turn On", "off")
+        widget = QDataRadioButton("Turn On", "off")
         widget.setToolTip("Turns the LED on")
         if action == "off":
             widget.setChecked(True)
         widget.clicked.connect(self._action_changed)
         widgets.append(widget)
 
-        widget = gremlin.ui.ui_common.QDataRadioButton("Toggle", "toggle")
+        widget = QDataRadioButton("Toggle", "toggle")
         widget.setToolTip("Toggle the LED")
         if action == "toggle":
             widget.setChecked(True)
         widget.clicked.connect(self._action_changed)
         widgets.append(widget)
 
-        container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        container = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(container)
 
     def _populate_ui(self):

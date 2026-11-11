@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from PySide6 import QtCore, QtWidgets
-from test_maestro_startup import COMMON, GREMLIN, load_definitions
+from test_maestro_startup import COMMON, GREMLIN, Maestro as MaestroService, load_definitions
 from test_qt_marshalling import APP, flush_deletes, pump_until
 
 
@@ -31,7 +31,7 @@ UI.update(dataclass=dataclass, threading=threading, re=re, Slot=QtCore.Slot, GEX
           Maestro=NS(klass=NS(_service_index=lambda device_id: int(device_id.split("-")[-1]) - 1)))
 load_definitions("gremlin/maestro.py", {
     "MaestroProfileInfo", "_MaestroDialogSignals", "MaestroDialog", "service_snapshot",
-    "is_valid_gex_id", "save_device_definition",
+    "is_valid_gex_id", "save_device_definition", "MaestroServiceError", "MaestroResult",
 }, UI)
 
 
@@ -47,6 +47,7 @@ class Bridge:
         self.definitions = {row["id"]: dict(row) for row in definitions}
         self.profiles = {}
         self.requests = []
+        self.request_threads = []
 
     def list(self, address):
         if address == "/maestro_definitions":
@@ -59,17 +60,22 @@ class Bridge:
 
     def request(self, address, *args, **kwargs):
         self.requests.append((address, args))
+        self.request_threads.append(threading.get_ident())
         if address == "/maestro_create_custom":
             device_id, name, buttons, axes, hats = args
             self.definitions[device_id] = joystick(device_id) | dict(name=name, buttons=buttons, axes=axes, hats=hats)
         elif address == "/maestro_remove":
             self.definitions[args[0]]["enabled"] = False
+        elif address == "/maestro_delete":
+            del self.definitions[args[0]]
         else:
             raise AssertionError(address)
-        return NS(ok=True)
+        return UI["MaestroResult"](True, address)
 
 
 class MaestroFixture:
+    deleteDevice = MaestroService.deleteDevice
+
     def __init__(self, bridge):
         self.client = bridge
         self._controller_map = {}
@@ -80,6 +86,7 @@ class MaestroFixture:
         self.capability_threads = []
         self.connect = Mock(return_value=True)
         self.populateDeviceList = Mock()
+        self.refreshDevices = Mock()
 
     def connected(self):
         return True
@@ -117,6 +124,11 @@ class DialogHarness(UI["MaestroDialog"]):
         self._signals.completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
         self.warning_widget = QtWidgets.QLabel(self)
         self.status_widget = QtWidgets.QLabel(self)
+        self.status_bar_maestro_widget = Mock()
+        self.host_widget = QtWidgets.QLineEdit("127.0.0.1", self)
+        self.reply_host_widget = QtWidgets.QLineEdit("127.0.0.1", self)
+        self.port_widget = NS(value=lambda: 8010)
+        self.reply_port_widget = NS(value=lambda: 8011)
         for name in ("connection_group", "devices_group", "host_container", "reply_host_container", "connected_widget", "close_button",
                      "select_all_button", "delete_all_button", "presets_widget", "apply_button"):
             setattr(self, name, QtWidgets.QPushButton(self))
@@ -134,8 +146,13 @@ class DialogHarness(UI["MaestroDialog"]):
 
     def labels(self):
         layout = self.device_list.getLayout()
-        return [label.text() for i in range(layout.count())
-                for label in layout.itemAt(i).widget().findChildren(QtWidgets.QLabel)]
+        labels = []
+        for i in range(layout.count()):
+            widget = layout.itemAt(i).widget()
+            if isinstance(widget, QtWidgets.QLabel):
+                labels.append(widget.text())
+            labels.extend(label.text() for label in widget.findChildren(QtWidgets.QLabel))
+        return labels
 
 
 class DeviceListChecks(unittest.TestCase):
@@ -171,6 +188,57 @@ class DeviceListChecks(unittest.TestCase):
         self.dialog._apply()
         pump_until(lambda: not self.dialog._busy)
         self.assertEqual(set(self.dialog._select_widget_map), {"gex-1"})
+
+    def test_delete_removes_the_definition_and_row_but_keeps_other_devices(self):
+        self.create_device()
+        changed = Mock()
+        self.dialog.devices_changed.connect(changed)
+        self.dialog._delete_device("gex-1")
+        pump_until(lambda: not self.dialog._busy)
+        self.assertFalse(self.dialog.warning_widget.text())
+        self.assertEqual(set(self.dialog.maestro.client.definitions), {"gex-2"})
+        self.assertEqual(set(self.dialog._definitions), {"gex-2"})
+        self.assertEqual(set(self.dialog._select_widget_map), {"gex-2"})
+        self.assertEqual(self.dialog._selected_ids, {"gex-2"})
+        self.assertEqual(len(self.dialog.labels()), 1)
+        self.assertIn("gex-2", self.dialog.labels()[0])
+        self.assertEqual(self.dialog.maestro.client.requests[-1], ("/maestro_delete", ("gex-1",)))
+        self.assertNotEqual(self.dialog.maestro.client.request_threads[-1], threading.get_ident())
+        self.dialog.maestro.refreshDevices.assert_called_once_with()
+        changed.assert_called_once_with()
+        self.dialog._load_snapshot(self.dialog.snapshot())
+        self.assertNotIn("gex-1", self.dialog._select_widget_map)
+
+    def test_delete_last_inactive_device_shows_the_empty_list_message(self):
+        self.dialog.maestro.client.definitions["gex-1"]["enabled"] = False
+        self.dialog._load_snapshot(self.dialog.snapshot())
+        self.dialog._delete_device("gex-1")
+        pump_until(lambda: not self.dialog._busy)
+        self.assertFalse(self.dialog._definitions)
+        self.assertFalse(self.dialog._select_widget_map)
+        self.assertFalse(self.dialog._selected_ids)
+        self.assertIn("No devices were found", self.dialog.labels()[0])
+        self.assertFalse(self.dialog.select_all_button.isEnabled())
+        self.assertFalse(self.dialog.delete_all_button.isEnabled())
+
+    def test_failed_delete_preserves_the_device_and_selection(self):
+        changed = Mock()
+        self.dialog.devices_changed.connect(changed)
+        for error in (
+            UI["MaestroServiceError"]("/maestro_delete", "delete_failed", "Device is busy"),
+            TimeoutError("No reply from the bridge"),
+        ):
+            with self.subTest(error=error), patch.dict(UI, syslog=Mock()):
+                result = UI["MaestroResult"].from_error("/maestro_delete", error)
+                with patch.object(self.dialog.maestro.client, "request", return_value=result):
+                    self.dialog._delete_device("gex-1")
+                    pump_until(lambda: not self.dialog._busy)
+                self.assertEqual(set(self.dialog._definitions), {"gex-1"})
+                self.assertEqual(set(self.dialog._select_widget_map), {"gex-1"})
+                self.assertEqual(self.dialog._selected_ids, {"gex-1"})
+                self.assertIn(str(error), self.dialog.warning_widget.text())
+                self.dialog.maestro.refreshDevices.assert_not_called()
+                changed.assert_not_called()
 
     def test_created_but_unselected_device_is_still_visible(self):
         self.create_device(include=False)

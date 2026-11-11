@@ -25,6 +25,13 @@ import gremlin.util
 from gremlin.types import *
 import gremlin.ui.ui_common
 import enum
+from gremlin.ui.ui_common import (
+    QDataWidget,
+    QFloatLineEdit,
+    getHContainer,
+    QDataPushButton,
+
+)
 
 
 class DeadzonePreset(enum.IntEnum):
@@ -92,14 +99,14 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.right_slider.desired_height = 20
 
         # Create spin boxes for the left slider
-        self.left_lower = ui_common.QFloatLineEdit()
+        self.left_lower = QFloatLineEdit()
         self.left_lower.setMinimum(-1.0)
         self.left_lower.setMaximum(0.0)
         self.left_lower.setSingleStep(0.05)
         self.left_lower.setValue(-1)
         self.left_lower.setToolTip("Low (-1.0) deadzone")
 
-        self.left_upper = ui_common.QFloatLineEdit()
+        self.left_upper = QFloatLineEdit()
         self.left_upper.setMinimum(-1.0)
         self.left_upper.setMaximum(0.0)
         self.left_upper.setSingleStep(0.05)
@@ -107,14 +114,14 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.left_upper.setToolTip("Center left deadzone")
 
         # Create spin boxes for the right slider
-        self.right_lower = ui_common.QFloatLineEdit()
+        self.right_lower = QFloatLineEdit()
         self.right_lower.setSingleStep(0.05)
         self.right_lower.setMinimum(0.0)
         self.right_lower.setMaximum(1.0)
         self.right_lower.setValue(0)
         self.right_lower.setToolTip("Center right deadzone")
 
-        self.right_upper = ui_common.QFloatLineEdit()
+        self.right_upper = QFloatLineEdit()
         self.right_lower.setToolTip("High (+1.0) deadzone")
         self.right_upper.setSingleStep(0.05)
         self.right_upper.setMinimum(0.0)
@@ -140,7 +147,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self._center_presets = []
         for preset in DeadzonePreset:
             name = DeadzonePreset.to_display(preset)
-            button = ui_common.QDataPushButton(name)
+            button = QDataPushButton(name)
             button.data = preset
             button.clicked.connect(self._deadzone_preset_cb)
             self.container_preset_layout.addWidget(button)
@@ -157,14 +164,14 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(self.left_slider, row, 0, 1, 2)
         self.main_layout.addWidget(self.right_slider, row, 2, 1, 2)
         row += 1
-        widget = gremlin.ui.ui_common.QDataWidget()
+        widget = QDataWidget()
         layout = QtWidgets.QHBoxLayout(widget)
         layout.addWidget(QtWidgets.QLabel("Min:"))
         layout.addWidget(self.left_lower)
         layout.addStretch()
         self.main_layout.addWidget(widget, row, 0)
 
-        widget = gremlin.ui.ui_common.QDataWidget()
+        widget = QDataWidget()
         widget.data = DeadzonePreset.center_five  # this is so it gets hidden when in slider mode
         layout = QtWidgets.QHBoxLayout(widget)
         layout.addStretch()
@@ -174,7 +181,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget, row, 1)
         self._center_presets.append(widget)
 
-        widget = gremlin.ui.ui_common.QDataWidget()
+        widget = QDataWidget()
         widget.data = DeadzonePreset.center_five  # this is so it gets hidden when in slider mode
         layout = QtWidgets.QHBoxLayout(widget)
 
@@ -184,7 +191,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(widget, row, 2)
         self._center_presets.append(widget)
-        widget = gremlin.ui.ui_common.QDataWidget()
+        widget = QDataWidget()
         layout = QtWidgets.QHBoxLayout(widget)
         layout.addStretch()
         layout.addWidget(QtWidgets.QLabel("Max:"))

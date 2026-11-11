@@ -33,6 +33,13 @@ from gremlin.input_types import InputType
 import gremlin.types
 from psygnal import Signal
 import gremlin.event_handler
+from gremlin.ui.ui_common import (
+    InputListenerWidget,
+    ModeWidget,
+    QDataCheckbox,
+    QDataComboBox,
+    VJoySelector,
+)
 
 syslog = logging.getLogger("system")
 
@@ -416,7 +423,7 @@ class BoolVariable(AbstractVariable):
 
         value = bool(value)
 
-        value_widget = gremlin.ui.ui_common.QDataCheckbox(data = self, checked = value, callback = self._handle_checkbox_clicked)
+        value_widget = QDataCheckbox(data = self, checked = value, callback = self._handle_checkbox_clicked)
         #value_widget = QtWidgets.QCheckBox()
 
         #value_widget.setCheckState(QtCore.Qt.Checked if value else QtCore.Qt.Unchecked)
@@ -491,7 +498,7 @@ class ModeVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.ui_common.ModeWidget()
+        value_widget = ModeWidget()
         value_widget.setShowModeEdit(False)
         value_widget.setShowProfileOptions(False)
         value_widget.setLabelText("")
@@ -559,7 +566,7 @@ class VirtualInputVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.ui_common.VJoySelector(lambda data: self.value_changed.emit(data), self.valid_types)
+        value_widget = VJoySelector(lambda data: self.value_changed.emit(data), self.valid_types)
         if value is not None:
             value_widget.set_selection(value["input_type"], value["device_id"], value["input_id"])
 
@@ -641,7 +648,7 @@ class PhysicalInputVariable(AbstractVariable):
         return layout
 
     def _record_user_input(self):
-        widget = gremlin.ui.ui_common.InputListenerWidget(self.valid_types, callback=self._update_user_input)
+        widget = InputListenerWidget(self.valid_types, callback=self._update_user_input)
 
         root = QtWidgets.QApplication.activeWindow()
         assert root is not None, "unable to find parent window"
@@ -695,7 +702,7 @@ class SelectionVariable(AbstractVariable):
         layout.addWidget(label, 0, 0)
 
         # Populate drop down list
-        value_widget = gremlin.ui.ui_common.QDataComboBox()
+        value_widget = QDataComboBox()
         for entry in self.options:
             value_widget.addItem(str(entry))
 

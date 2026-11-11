@@ -25,6 +25,13 @@ from gremlin.util import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    MessageBoxInfo,
+    MessageBoxWarning,
+    QDataComboBox,
+    QExecuteWidget,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -251,7 +258,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         if not self.action_data.execute_on_press and not self.action_data.execute_on_release:
             self.action_data.execute_on_press = True
 
-        self.device_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.device_widget = QDataComboBox()
         self.device_widget.setMinimumWidth(220)
         self.device_widget.currentIndexChanged.connect(self._device_changed)
 
@@ -263,14 +270,14 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.test_btn.setToolTip("Run this page function now (profile does not need to be running)")
         self.test_btn.clicked.connect(self._test_clicked)
 
-        device_row = gremlin.ui.ui_common.getHContainer(
+        device_row = getHContainer(
             [self.device_widget, self.refresh_btn, self.test_btn],
             "Device:",
             widget_only=True,
         )
         self.main_layout.addWidget(device_row)
 
-        self.function_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.function_widget = QDataComboBox()
         for value, label in FUNCTIONS:
             self.function_widget.addItem(label, value)
         idx = self.function_widget.findData(self.action_data.command)
@@ -278,16 +285,16 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
             idx = 0
         self.function_widget.setCurrentIndex(idx)
         self.function_widget.currentIndexChanged.connect(self._function_changed)
-        self.main_layout.addWidget(gremlin.ui.ui_common.getHContainer(self.function_widget, "Function:", widget_only=True))
+        self.main_layout.addWidget(getHContainer(self.function_widget, "Function:", widget_only=True))
 
-        self.page_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.page_widget = QDataComboBox()
         self.page_widget.setMinimumWidth(220)
         self.page_widget.setToolTip(
             "GEX virtual page (Companion-style bank). Unlimited — not limited by Elgato's ~10 profile pages. "
             "Populate one Elgato page with JG Ex Buttons as the hardware viewport."
         )
         self.page_widget.currentIndexChanged.connect(self._page_changed)
-        self.page_row = gremlin.ui.ui_common.getHContainer(self.page_widget, "Page:", widget_only=True)
+        self.page_row = getHContainer(self.page_widget, "Page:", widget_only=True)
         self.main_layout.addWidget(self.page_row)
 
         self.auto_return_widget = QtWidgets.QCheckBox("Auto-return to previous page")
@@ -313,13 +320,13 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.auto_return_seconds_widget.setValue(max(0.1, seconds))
         self.auto_return_seconds_widget.valueChanged.connect(self._auto_return_seconds_changed)
 
-        self.auto_return_row = gremlin.ui.ui_common.getHContainer(
+        self.auto_return_row = getHContainer(
             [self.auto_return_widget, self.auto_return_seconds_widget],
             widget_only=True,
         )
         self.main_layout.addWidget(self.auto_return_row)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(
+        self._execute_widget = QExecuteWidget(
             self.action_data.execute_on_press,
             self.action_data.execute_on_release,
             press_callback=self._press_changed,
@@ -507,22 +514,22 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
                 if cmd == "returnToLast"
                 else ("Live JG Ex keys should show that bank's titles. Presses now run mappings for that page.")
             )
-            gremlin.ui.ui_common.MessageBoxInfo(
+            MessageBoxInfo(
                 title="Map to Stream Deck",
                 prompt=f"{label} activated.\n\n{detail}{extra}",
             )
         elif not connected:
-            gremlin.ui.ui_common.MessageBoxWarning(
+            MessageBoxWarning(
                 title="Map to Stream Deck",
                 prompt=("Plugin is not connected.\nEnable the Stream Deck bridge and confirm the PI shows Connected."),
             )
         elif cmd == "returnToLast":
-            gremlin.ui.ui_common.MessageBoxWarning(
+            MessageBoxWarning(
                 title="Map to Stream Deck",
                 prompt=("No previous page is stored yet.\nChange to another page first, then use Return to Last."),
             )
         else:
-            gremlin.ui.ui_common.MessageBoxWarning(
+            MessageBoxWarning(
                 title="Map to Stream Deck",
                 prompt="Could not change page. Check the Stream Deck bridge connection.",
             )

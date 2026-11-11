@@ -37,6 +37,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+SetupIconFile=..\icons\gex.ico
 Compression=lzma2
 DisableProgramGroupPage=yes
 CloseApplications=yes

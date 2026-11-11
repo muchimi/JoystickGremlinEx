@@ -28,6 +28,10 @@ from gremlin import util
 import gremlin.ui.ui_common
 import gremlin.input_item
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    DynamicDoubleSpinBox,
+    VJoySelector,
+)
 
 syslog = logging.getLogger("system")
 
@@ -51,7 +55,7 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
         self.split_slider.setRange(-100000, 100000)
         self.split_slider.setTickInterval(10000)
         self.split_slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self.split_readout = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.split_readout = DynamicDoubleSpinBox()
         self.split_readout.setRange(-1, 1)
         self.split_readout.setSingleStep(0.1)
         self.split_slider_layout.addWidget(self.split_slider)
@@ -63,8 +67,8 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
 
         # Device selection
         self.split_device_layout = QtWidgets.QHBoxLayout()
-        self.vjoy_selector_1 = gremlin.ui.ui_common.VJoySelector(self._create_vjoy_selector_callback(1), [InputType.JoystickAxis])
-        self.vjoy_selector_2 = gremlin.ui.ui_common.VJoySelector(self._create_vjoy_selector_callback(2), [InputType.JoystickAxis])
+        self.vjoy_selector_1 = VJoySelector(self._create_vjoy_selector_callback(1), [InputType.JoystickAxis])
+        self.vjoy_selector_2 = VJoySelector(self._create_vjoy_selector_callback(2), [InputType.JoystickAxis])
         self.split_device_layout.addWidget(self.vjoy_selector_1)
         self.split_device_layout.addWidget(self.vjoy_selector_2)
 

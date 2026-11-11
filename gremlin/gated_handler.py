@@ -49,6 +49,23 @@ import threading
 import time
 import html
 import logging
+from gremlin.ui.ui_common import (
+    Color,
+    Icons,
+    MessageBox,
+    QAxisRepeaterProgressbar,
+    QComboBox,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataLabel,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataWidget,
+    QDelayWidget,
+    QFloatLineEdit,
+    QRememberDialog,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20  # number of steps on the UNDO stack
@@ -1936,7 +1953,7 @@ class GateData:
             text += line + "\n"
         return text
 
-    def populate_condition_widget(self, widget: gremlin.ui.ui_common.QComboBox, default=None, is_range=False):
+    def populate_condition_widget(self, widget: QComboBox, default=None, is_range=False):
         """populates a condition widget"""
         widget.clear()
         if is_range:
@@ -1963,7 +1980,7 @@ class GateData:
         if current_index is not None:
             widget.setCurrentIndex(current_index)
 
-    def populate_output_widget(self, widget: gremlin.ui.ui_common.QComboBox, default=None):
+    def populate_output_widget(self, widget: QComboBox, default=None):
         """populates a range widget"""
         current_index = None
         for index, output in enumerate(GateRangeOutputMode):
@@ -2260,7 +2277,7 @@ class GateData:
         gate_count = len(gates)
         max_gates = GateData.max_gates
         if gate_count > max_gates:
-            gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add the requested gates: The Maximum gate count is reached ({max_gates})")
+            MessageBox(prompt=f"Unable to add the requested gates: The Maximum gate count is reached ({max_gates})")
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_gate
@@ -3824,7 +3841,7 @@ class TriggerData:
             return f"{stub} value: {value_stub}%{gate_stub}"
 
 
-class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
+class GateInfoWidget(QDataWidget):
     """holds the data for a single gate"""
 
     valueChanged = QtCore.Signal(object)  # fires when a gate value is changed - sends the gate
@@ -3896,12 +3913,12 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         """updates the icon on the setup button depending on the container state"""
         # syslog.info(f"update icon for gate : {self.gate.to_display()}")
         if self.gate.hasAnyContainers():
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().activeContentColor()))
+            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor()))
+            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color().inactiveColor()))
 
         if self.gate.isError:
-            warning_color = gremlin.ui.ui_common.Color().warningColor()
+            warning_color = Color().warningColor()
             self.setIcon("ph.shield-warning-fill", color=QtGui.QColor(warning_color))
         else:
             self.setIcon(None)
@@ -3984,17 +4001,17 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         self.label_warning.setMinimumWidth(20)
         # self.label_warning.setVisible(False)
 
-        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        self.value_widget = QFloatLineEdit(
             gate, gate.parent.to_display(range_min), gate.parent.to_display(range_max), decimals=gate.parent.decimals
         )
         self.value_widget.setValue(gate.display_value)
         self.value_widget.valueChanged.connect(self._value_changed_cb)  # hook manual changes made to the widget
 
-        self.grab_widget = gremlin.ui.ui_common.QDataPushButton()
+        self.grab_widget = QDataPushButton()
         self.grab_widget.setIcon(
             load_icon(
                 "mdi.checkbox-blank-circle",
-                qta_color=gremlin.ui.ui_common.Color().recordColor(),
+                qta_color=Color().recordColor(),
             )
         )
         self.grab_widget.setMaximumWidth(20)
@@ -4002,14 +4019,14 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
         self.grab_widget.setToolTip("Grab axis value")
         self.grab_widget.data = (gate, self.value_widget)
 
-        self.setup_widget = gremlin.ui.ui_common.QDataPushButton(
+        self.setup_widget = QDataPushButton(
             callback=self._handle_configure_request,
             tooltip=f"Setup actions for gate {gate.gate_display()}",
             data=gate,
         )
         self.setup_widget.setMaximumWidth(20)
 
-        self.clear_widget = gremlin.ui.ui_common.QDataPushButton()
+        self.clear_widget = QDataPushButton()
         self.clear_widget.setIcon(load_icon("mdi.delete"))
         self.clear_widget.setMaximumWidth(20)
 
@@ -4102,10 +4119,10 @@ class RangeInfoWidget(QtWidgets.QWidget):
 
         self.label_widget = QtWidgets.QLabel(f"Range {display_index}:")
 
-        self.range_widget = gremlin.ui.ui_common.QDataLabel()  #  gremlin.ui.ui_common.QDataLineEdit()
+        self.range_widget = QDataLabel()
 
         self.range_widget.data = (rng, self.range_widget)
-        self.setup_widget = gremlin.ui.ui_common.QDataPushButton(data=rng)
+        self.setup_widget = QDataPushButton(data=rng)
 
         self.setup_widget.setMaximumWidth(20)
         self.setup_widget.clicked.connect(self._handle_configure)
@@ -4137,9 +4154,9 @@ class RangeInfoWidget(QtWidgets.QWidget):
     def update_icon(self):
         has_containers = self._range.hasAnyContainers()
         if has_containers:
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().activeContentColor()))
+            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color().activeContentColor()))
         else:
-            self.setup_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon(qta_color=gremlin.ui.ui_common.Color().inactiveColor()))
+            self.setup_widget.setIcon(Icons.gearIcon(qta_color=Color().inactiveColor()))
 
     def set_decimals(self, value):
         self.decimals = value
@@ -4292,7 +4309,7 @@ class GatedAxisRangeCondition(gremlin.actions.AbstractCondition):
         return f"Gated Axis Range Condition: condition: {self._condition_type.name} range: {self.range_info.to_display()}"
 
 
-class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
+class GateConditionEditorDialog(QRememberDialog):
     """UI to setup the individual action trigger containers and sub actions"""
 
     delete_requested = QtCore.Signal(GateInfo)  # fired when the remove button is clicked - passes the GateData to blitz
@@ -4346,15 +4363,15 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_condition_layout.setContentsMargins(0, 0, 0, 0)
         self.container_condition_layout.addWidget(self._condition_tab)
 
-        # self.setStyleSheet(gremlin.ui.ui_common.Color().cssTab())
+        
 
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color().activeColor(),
+            qta_color=Color().activeColor(),
         )
         self._icon_disabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
+            qta_color=Color().inactiveColor(),
         )
 
         if is_range:
@@ -4365,11 +4382,11 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self.setWindowTitle("Gated Axis Range Configuration")
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Range Configuration: {info_object.range_display()}"))
 
-            self.range_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.range_description_widget = QDataLineEdit()
             self.range_description_widget.setMinimumWidth(200)
             self.range_description_widget.setText(self._range_info.description)
             self.range_description_widget.textChanged.connect(self._range_description_changed)
-            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Range Description:"), self.range_description_widget])
+            widget, layout = getHContainer([QtWidgets.QLabel("Range Description:"), self.range_description_widget])
             self.trigger_condition_layout.addWidget(widget)
 
             # print (f"Range: configuration: {range_info.range_display_ex()}")
@@ -4387,9 +4404,9 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self.slider.setValue(values)
             self.slider.setReadOnly(True)
 
-            self.axis_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar()
+            self.axis_widget = QAxisRepeaterProgressbar()
 
-            self.output_mode_widget = gremlin.ui.ui_common.QDataComboBox()
+            self.output_mode_widget = QDataComboBox()
             self.output_container_widget = QtWidgets.QWidget()
             self.output_container_widget.setContentsMargins(0, 0, 0, 0)
             self.output_container_layout = QtWidgets.QHBoxLayout(self.output_container_widget)
@@ -4408,16 +4425,16 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self.container_output_range_layout = QtWidgets.QHBoxLayout(self.container_output_range_widget)
             self.container_output_range_widget.setContentsMargins(0, 0, 0, 0)
 
-            self.sb_range_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            self.sb_range_min_widget = QFloatLineEdit()
             self.sb_range_min_widget.setValue(info_object.output_range_min)
             self.sb_range_min_widget.valueChanged.connect(self._range_min_changed_cb)
 
-            self.sb_range_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            self.sb_range_max_widget = QFloatLineEdit()
             self.sb_range_max_widget.setValue(info_object.output_range_max)
 
             self.sb_range_max_widget.valueChanged.connect(self._range_max_changed_cb)
 
-            self.sb_fixed_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+            self.sb_fixed_value_widget = QFloatLineEdit()
             if info_object.fixed_value is None:
                 info_object.fixed_value = info_object.v1
             self.sb_fixed_value_widget.setValue(info_object.fixed_value)
@@ -4470,11 +4487,11 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self._gate_info = info_object
             self.trigger_condition_layout.addWidget(QtWidgets.QLabel(f"Gate {self._gate_info.slider_index + 1} Configuration:"))
 
-            self.gate_description_widget = gremlin.ui.ui_common.QDataLineEdit()
+            self.gate_description_widget = QDataLineEdit()
             self.gate_description_widget.setMinimumWidth(200)
             self.gate_description_widget.setText(self._gate_info.description)
             self.gate_description_widget.textChanged.connect(self._gate_description_changed)
-            widget, layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel("Gate Description:"), self.gate_description_widget])
+            widget, layout = getHContainer([QtWidgets.QLabel("Gate Description:"), self.gate_description_widget])
             self.trigger_condition_layout.addWidget(widget)
 
         # delay
@@ -4483,7 +4500,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         else:
             delay = self._gate_info.delay
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.delay_widget = QDelayWidget(
             value=delay,
             tooltip="Delay in milliseconds between a press and release event for autorelease triggers",
             callback=self._handle_delay_changed,
@@ -4599,7 +4616,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
         message_box.setInformativeText("This will delete this entry.\nAre you sure?")
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        pixmap = Icons.to_pixmap(Icons.warningIcon())
         # pixmap = gremlin.util.load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
@@ -4716,7 +4733,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self._condition_tab.clear()
 
             for condition in conditions:
-                condition_container_widget = gremlin.ui.ui_common.QDataWidget()
+                condition_container_widget = QDataWidget()
                 condition_container_widget.data = condition  # store the condition as the data
                 condition_container_layout = QtWidgets.QVBoxLayout(condition_container_widget)
 
@@ -4734,13 +4751,13 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                         GateConditionType.OutsideRange,
                         GateConditionType.RangeHold,
                     ):
-                        autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                        autorelease_widget = QDataCheckbox("Autorelease")
                         autorelease_widget.setChecked(self._range_info.autorelease_map[condition])
                         autorelease_widget.data = (self._range_info, condition)
                         condition_container_layout.addWidget(autorelease_widget)
                         autorelease_widget.clicked.connect(self._autorelease_changed)
                 else:
-                    autorelease_widget = gremlin.ui.ui_common.QDataCheckbox("Autorelease")
+                    autorelease_widget = QDataCheckbox("Autorelease")
                     autorelease_widget.setChecked(self._gate_info.autorelease_map[condition])
                     autorelease_widget.data = (self._gate_info, condition)
                     condition_container_layout.addWidget(autorelease_widget)

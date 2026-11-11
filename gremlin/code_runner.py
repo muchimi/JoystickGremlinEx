@@ -48,6 +48,7 @@ import gremlin.execution_graph
 import gremlin.ui
 import gremlin.remote
 import gremlin.base_profile
+from gremlin.ui.ui_common import MessageBox, MessageBoxWarning
 
 import traceback
 
@@ -97,6 +98,59 @@ class CodeRunner:
         """enables UI"""
         self.setUIState(True)
 
+    def _warn_missing_virtual_outputs(self, profile):
+        """Report configured outputs without a local device or failover target."""
+        keys = set()
+
+        def collect_outputs(action, extra_data):
+            if action.tag in ("remap", "vjoyremap"):
+                if action.vjoy_input_id:
+                    device = action.virtual_device
+                    keys.add(gremlin.joystick_handling.virtual_device_key(device) if device is not None else action.vjoy_id)
+            elif action.tag == "split-axis":
+                for key, axis in ((action.device_low_vjoy_id, action.device_low_axis),
+                                  (action.device_high_vjoy_id, action.device_high_axis)):
+                    if axis:
+                        keys.add(key)
+            elif action.tag == "macro":
+                for entry in action.sequence:
+                    if isinstance(entry, gremlin.macro.VJoyMacroAction):
+                        keys.add(entry.device_guid if entry.device_guid is not None else entry.vjoy_id)
+            return True
+
+        profile.filter_actions(["remap", "vjoyremap", "split-axis", "macro"], collect_outputs)
+        for entry in profile.merge_axes:
+            output = entry.get("vjoy")
+            if output and output.get("vjoy_id") is not None:
+                keys.add(output["vjoy_id"])
+        keys.update(key for key, _, _ in profile.settings.get_initial_vjoy_axis_value_list())
+        for key, state in profile._start_state.items():
+            if state.get("buttons") or any(state.get("enabled", {}).values()):
+                keys.add(key)
+
+        missing = set()
+        for key in keys:
+            key = gremlin.joystick_handling.parse_virtual_device_key(key)
+            if key is None or (isinstance(key, int) and not 1 <= key <= 16):
+                continue
+            if gremlin.joystick_handling.get_output_target(key) is not None:
+                continue
+            device = gremlin.joystick_handling.get_virtual_device(key)
+            name = device.name if device is not None else (f"vJoy {key}" if isinstance(key, int) else f"Virtual device {key}")
+            missing.add(name)
+
+        if missing:
+            devices = "\n".join(f"- {name}" for name in sorted(missing, key=str.casefold))
+            syslog.warning(f"PROFILE START: Virtual output devices unavailable:\n{devices}")
+            MessageBoxWarning(
+                title="Virtual Output Devices Unavailable",
+                prompt=f"This profile uses virtual output devices with no corresponding device available:\n\n{devices}",
+                informative_text=(
+                    "The profile will continue running, but local output to these devices will be skipped. "
+                    "Connect or configure the devices, or enable an available failover target."
+                ),
+            )
+
     def start(self, inheritance_tree, settings, start_mode, profile) -> bool:
         """Starts listening to events and loads all existing callbacks.
 
@@ -122,6 +176,7 @@ class CodeRunner:
         # this enables missing vjoy devices to output to maestro devices if they exist
         # mapping is done by the name of the output device to vjoy id
         gremlin.joystick_handling.resolve_output_targets()
+        self._warn_missing_virtual_outputs(profile)
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild=True)  # rebuild the execution tree
@@ -221,7 +276,7 @@ class CodeRunner:
                         spec.loader.exec_module(tmp)
                     else:
                         basename = os.path.basename(plugin.file_name)
-                        gremlin.ui.ui_common.MessageBox(prompt=f"Plugin {basename} was not found and will not be loaded.")
+                        MessageBox(prompt=f"Plugin {basename} was not found and will not be loaded.")
 
             # Update system path list searched by Python
             sys.path = system_paths
@@ -739,7 +794,10 @@ class CodeRunner:
         """Register each merge through normal mode-aware event dispatch."""
         self._merge_axes.clear()
         for entry in profile.merge_axes:
+            if "vjoy" not in entry:
+                continue  # skip entries that do not have a vjoy configuration
             try:
+
                 merger = MergeAxis(entry["vjoy"]["vjoy_id"], entry["vjoy"]["axis_id"], entry["operation"])
                 callbacks = []
                 for name, callback in (("lower", merger.update_axis1), ("upper", merger.update_axis2)):

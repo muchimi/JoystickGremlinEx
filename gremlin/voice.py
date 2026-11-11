@@ -72,6 +72,9 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pycaw")
 from pycaw.pycaw import DEVICE_STATE, AudioUtilities, IAudioEndpointVolume, EDataFlow, IMMEndpoint, IMMDeviceEnumerator  # noqa: E402
 from pycaw.constants import CLSID_MMDeviceEnumerator  # noqa: E402
+from gremlin.ui.ui_common import (
+    Color,
+)
 
 
 class PROPERTYKEY(comtypes.Structure):
@@ -1669,7 +1672,7 @@ class Voice:
             on_gui_thread = app is not None and QtCore.QThread.currentThread() is app.thread()
             if on_gui_thread:
                 parent = app.activeWindow()
-                css = gremlin.ui.ui_common.Color().cssProgressDialog()
+                css = Color().cssProgressDialog()
                 dialog = QtWidgets.QProgressDialog(f"Downloading {self._model_size} voice recognition model...", None, 0, 0, parent)
                 dialog.setWindowModality(QtCore.Qt.WindowModal)
                 dialog.setCancelButton(None)

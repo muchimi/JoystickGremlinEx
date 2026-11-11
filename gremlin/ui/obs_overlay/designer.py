@@ -90,6 +90,12 @@ from .templates import (
     save_user_template,
     update_user_template,
 )
+from gremlin.ui.ui_common import (
+    Buttons,
+    QHorizontalLine,
+    getFlowContainer,
+    getHContainer,
+)
 
 
 WIDGET_TITLES = {
@@ -1977,13 +1983,13 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._page_tabs.tabBarDoubleClicked.connect(self._rename_page_tab)
         self._page_tabs.tabContextMenu.connect(self._page_tab_context)
         self._page_tabs.tabMoveCompleted.connect(self._on_page_tab_moved)
-        add = gremlin.ui.ui_common.Buttons.getAddWidget(
+        add = Buttons.getAddWidget(
             label=None,
             tooltip="Add overlay page",
             callback=self._add_page,
         )
         add.setFixedSize(24, 24)
-        row = gremlin.ui.ui_common.getHContainer([add, self._page_tabs], widget_only=True)
+        row = getHContainer([add, self._page_tabs], widget_only=True)
         row.setContentsMargins(0, 0, 0, 0)
         row.setMaximumHeight(30)
         self._page_tabs_sig = None
@@ -2258,7 +2264,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         view_layout.addWidget(view_toggle)
         view_layout.addStretch(1)
         layout.addWidget(view_row)
-        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        layout.addWidget(QHorizontalLine())
         layout.addSpacing(4)
 
         self._palette_widgets_host = QtWidgets.QWidget()
@@ -2270,7 +2276,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
 
         layout.addSpacing(8)
         layout.addWidget(QtWidgets.QLabel("Templates"))
-        templates_host, templates_flow = gremlin.ui.ui_common.getFlowContainer()
+        templates_host, templates_flow = getFlowContainer()
         for name, tip, factory in TEMPLATES:
             btn = TemplateButton(name, editable=False)
             btn.setToolTip(tip)
@@ -2283,7 +2289,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         saved_row.setContentsMargins(0, 0, 0, 0)
         saved_row.setSpacing(4)
         saved_row.addWidget(QtWidgets.QLabel("Saved templates"))
-        add_template = gremlin.ui.ui_common.Buttons.getAddWidget(
+        add_template = Buttons.getAddWidget(
             label=None,
             tooltip="Save the current widgets as a global template (not profile-specific)",
             callback=self._save_template,
@@ -2339,10 +2345,10 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         wrap_mode = getattr(self, "_palette_view", _palette_view_mode()) != "list"
         for index, (title, types) in enumerate(PALETTE_GROUPS):
             if wrap_mode and index > 0:
-                layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+                layout.addWidget(QHorizontalLine())
             layout.addWidget(QtWidgets.QLabel(title))
             if wrap_mode:
-                host, flow = gremlin.ui.ui_common.getFlowContainer()
+                host, flow = getFlowContainer()
                 for widget_type in types:
                     flow.addWidget(self._palette_type_button(widget_type))
                 layout.addWidget(host)

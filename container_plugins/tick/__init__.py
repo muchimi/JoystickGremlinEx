@@ -37,6 +37,11 @@ from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    QFloatLineEdit,
+    QHorizontalLine,
+    QIntLineEdit,
+)
 
 
 class TickContainerWidget(AbstractContainerWidget):
@@ -66,12 +71,12 @@ class TickContainerWidget(AbstractContainerWidget):
         self.action_data: TickContainer = self.container
         self.action_data.create_or_delete_virtual_button()
 
-        self.interval_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self.interval_widget = QFloatLineEdit()
         self.interval_widget.setRange(0, 2)
         self.interval_widget.setValue(self.action_data.interval)
         self.interval_widget.valueChanged.connect(self._interval_changed)
 
-        self.tick_count_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.tick_count_widget = QIntLineEdit()
         self.tick_count_widget.setRange(0, 100)
         self.tick_count_widget.setValue(self.action_data.getTickCount())
         self.tick_count_widget.valueChanged.connect(self._tick_count_changed)
@@ -100,7 +105,7 @@ class TickContainerWidget(AbstractContainerWidget):
         self.action_layout.addLayout(self.options_layout)
 
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.action_layout.addWidget(QHorizontalLine())
         if self.container.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
@@ -110,7 +115,7 @@ class TickContainerWidget(AbstractContainerWidget):
         else:
             self._create_action_widget(0, "Tick Up", self.action_layout, ContainerViewTypes.Action)
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.action_layout.addWidget(QHorizontalLine())
         if self.container.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),

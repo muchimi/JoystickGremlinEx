@@ -71,6 +71,12 @@ from .ops import (
     sample_limiter_curve,
 )
 from .runtime import curve_from_xml, curve_to_xml
+from gremlin.ui.ui_common import (
+    InputListenerWidget,
+    QHorizontalLine,
+    getFlowContainer,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -502,7 +508,7 @@ class ActivationBindingWidget(QtWidgets.QWidget):
         self.changed.emit(dict(self._binding))
 
     def _listen(self) -> None:
-        dialog = gremlin.ui.ui_common.InputListenerWidget(
+        dialog = InputListenerWidget(
             [InputType.JoystickButton],
             callback=self._listen_done,
         )
@@ -892,7 +898,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickButton], callback=_captured, parent=self)
+        listener = InputListenerWidget([InputType.JoystickButton], callback=_captured, parent=self)
         self._listen_dialog = listener
         listener.show()
 
@@ -1424,7 +1430,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             callback=lambda _data=None: self._add_mode(),
         )
         add.setFixedSize(24, 24)
-        row = gremlin.ui.ui_common.getHContainer([add, self._mode_tabs], widget_only=True)
+        row = getHContainer([add, self._mode_tabs], widget_only=True)
         row.setContentsMargins(0, 0, 0, 0)
         row.setMaximumHeight(30)
         return row
@@ -1451,7 +1457,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         view_layout.addWidget(view_toggle)
         view_layout.addStretch(1)
         layout.addWidget(view_row)
-        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        layout.addWidget(QHorizontalLine())
         self._node_palette_host = QtWidgets.QWidget()
         self._node_palette_layout = QtWidgets.QVBoxLayout(self._node_palette_host)
         self._node_palette_layout.setContentsMargins(0, 0, 0, 0)
@@ -1502,7 +1508,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         )
         wrap = getattr(self, "_node_palette_view", _palette_view_mode()) != "list"
         if wrap:
-            host, flow = gremlin.ui.ui_common.getFlowContainer()
+            host, flow = getFlowContainer()
             for kind, label in kinds:
                 flow.addWidget(self._node_kind_button(kind, label))
             layout.addWidget(host)
@@ -2643,7 +2649,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             except Exception:
                 pass
             self._axis_listen_dialog = None
-        dialog = gremlin.ui.ui_common.InputListenerWidget(
+        dialog = InputListenerWidget(
             [InputType.JoystickAxis],
             callback=lambda event, n=node: self._listen_axis_done(n, event),
             parent=self,

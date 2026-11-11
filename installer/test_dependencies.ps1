@@ -28,17 +28,18 @@ $script:RegistryValues = @{}
 $script:ExecutableVersions = @{}
 $script:ConsoleBridgeInstalled = $false
 Assert-True (Test-DependencyNeeded hidhide) 'Offer missing HidHide.'
-Assert-True (Test-DependencyNeeded bridge) 'Offer bridge when no virtual-controller provider exists.'
+Assert-True (Test-DependencyNeeded bridge) 'Offer bridge when it is not installed.'
 foreach ($path in @('SYSTEM\CurrentControlSet\Services\HidHide', 'Installer\Dependencies\NSS.Drivers.HidHide.x64')) {
     $script:InstalledKeys = @($path)
     Assert-True (-not (Test-DependencyNeeded hidhide)) "Skip installed HidHide: $path"
 }
-foreach ($path in @('SYSTEM\CurrentControlSet\Services\vjoy',
-    'SYSTEM\CurrentControlSet\Services\GEXMaestroBridgeService',
+foreach ($path in @('SYSTEM\CurrentControlSet\Services\GEXMaestroBridgeService',
     'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{D26DA10A-73A7-482A-A711-6B7E04C8D8A0}_is1')) {
     $script:InstalledKeys = @($path)
     Assert-True (-not (Test-DependencyNeeded bridge)) "Skip bridge: $path"
 }
+$script:InstalledKeys = @('SYSTEM\CurrentControlSet\Services\vjoy')
+Assert-True (Test-DependencyNeeded bridge) 'Allow bridge installation when vJoy is installed.'
 $script:InstalledKeys = @()
 $script:ConsoleBridgeInstalled = $true
 Assert-True (-not (Test-DependencyNeeded bridge)) 'Skip an existing console bridge.'
@@ -237,7 +238,7 @@ try {
     $script:LastApi = ''
     $script:InstalledKeys = @('SYSTEM\CurrentControlSet\Services\vjoy')
     $status = Get-BridgeUpdateStatus
-    Assert-True ($status.Action -eq 'none' -and -not $script:LastApi) 'Skip the bridge download check when vJoy is installed and the bridge is absent.'
+    Assert-True ($status.Action -eq 'install' -and $script:LastApi) 'Offer bridge installation when vJoy is installed and the bridge is absent.'
     $script:InstalledKeys = @($uninstallKey, 'SYSTEM\CurrentControlSet\Services\vjoy')
     $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
     $status = Get-BridgeUpdateStatus

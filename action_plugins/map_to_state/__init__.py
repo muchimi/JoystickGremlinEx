@@ -41,6 +41,19 @@ from gremlin.ui.ui_common import (
     AutoSize,
 )
 from enum import Enum
+from gremlin.ui.ui_common import (
+    Color,
+    ConfirmBox,
+    MessageBox,
+    QDataComboBox,
+    QDataRadioButtonGroup,
+    QExecuteWidget,
+    QIconLabel,
+    QInfoBox,
+    QIntLineEdit,
+    QRememberDialog,
+    QSyncModeWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -57,7 +70,7 @@ class MapToStateActionMode(Enum):
     SET_OR = 6  # set the other states to OR (set if any are on)
 
 
-class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
+class StateAddDialog(QRememberDialog):
     """add state dialog - allows state creation directly from the state mapper"""
 
     def __init__(self, parent=None):
@@ -84,7 +97,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
 
         main_layout.addWidget(widget)
 
-        gremlin.ui.ui_common.synchronize_grids(widgets)
+        synchronize_grids(widgets)
 
         self._default_on_widget = QDataRadioButton("On", True)
         self._default_off_widget = QDataRadioButton("Off", False)
@@ -114,11 +127,11 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         """ok button pressed"""
         key = self.state_widget.text()
         if not key:
-            gremlin.ui.ui_common.MessageBox(title="Invalid State", prompt="State cannot be blank", parent=self)
+            MessageBox(title="Invalid State", prompt="State cannot be blank", parent=self)
             return
         sd = gremlin.ui.state_device.StateData()
         if sd.exists(key):
-            gremlin.ui.ui_common.MessageBox(title="Duplicate State", prompt=f"State {key} already exists", parent=self)
+            MessageBox(title="Duplicate State", prompt=f"State {key} already exists", parent=self)
             self._state = sd.getState(key)
             return
         self._state = sd.register(key, self.default_value, self.description_widget.text())
@@ -227,7 +240,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.state_selector = QDataComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
 
@@ -239,7 +252,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             ("Category", "category", "Apply the action to every state in the selected category"),
             ("Attributes", "attributes", "Apply the action to every state that has any of the listed attributes"),
         ]
-        self.target_widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+        self.target_widget = QDataRadioButtonGroup(
             options=target_options, callback=self._target_mode_changed, value=self.action_data.target_mode, label="Apply to:"
         )
         self.main_layout.addWidget(self.target_widget)
@@ -326,7 +339,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             "||",
         ]
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, label="Pulse Options:", widget_only=True)
+        self.container_pulse_widget = getHContainer(widgets, label="Pulse Options:", widget_only=True)
 
         # map to state modes
         mode_options = [
@@ -340,7 +353,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             ("Latch", "latch", "When the state is set, it starts a timer that will ignore ON re-triggers until the state is set to OFF or the timer lapses."),
         ]
 
-        widget = gremlin.ui.ui_common.QDataRadioButtonGroup(options=mode_options, callback=self._mode_changed, value=self.action_data.mode, label="Mode:")
+        widget = QDataRadioButtonGroup(options=mode_options, callback=self._mode_changed, value=self.action_data.mode, label="Mode:")
 
         self.main_layout.addWidget(widget)
         self.mode_widget = widget
@@ -357,12 +370,12 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         ]
 
         widgets = []
-        widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+        widget = QDataRadioButtonGroup(
             options=action_modes, callback=self._handle_action_mode_changed, value=self.action_data.action_mode, label="Other State Mode:"
         )
         widgets.append(widget)
 
-        widget = gremlin.ui.ui_common.QDataCheckbox(
+        widget = QDataCheckbox(
             "Category Only",
             value=self.action_data.other_state_category_only,
             callback=self._handle_other_state_category_only_changed,
@@ -370,12 +383,12 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         )
         widgets.append(widget)
         widgets.append("||")
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(widget)
 
         widgets = []
-        widget = gremlin.ui.ui_common.QDataCheckbox(
+        widget = QDataCheckbox(
             "Randomize",
             value=self.action_data.randomize_mode,
             callback=self._handle_randomize_mode_changed,
@@ -383,25 +396,25 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         )
         widgets.append(widget)
 
-        self.randomize_weight_widget = gremlin.ui.ui_common.QIntLineEdit(
+        self.randomize_weight_widget = QIntLineEdit(
             min_range=0, max_range=100, value=int(self.action_data.randomize_weight * 100), callback=self._handle_randomize_weight_changed
         )
         widgets.append("|")
         widgets.append("Skip Chance %:")
         widgets.append(self.randomize_weight_widget)
 
-        self.container_randomize_widget = gremlin.ui.ui_common.getHContainer(
+        self.container_randomize_widget = getHContainer(
             widgets,
             widget_only=True,
             left_margin=8,
             tooltip="If enabled, the state change is randomized.  The skip chance percentage of 0 means never skipped, 100 always skipped, 50 is a 50/50 chance of skipping.\nThis mode is meant to be used in a wiggle scenario when radomized state changes are required.",
         )
 
-        widget = gremlin.ui.ui_common.QDelayWidget(
+        widget = QDelayWidget(
             value=self.action_data.latch_delay,
             callback=self._handle_latch_delay_changed,
         )
-        self.container_latch_widget = gremlin.ui.ui_common.getHContainer(
+        self.container_latch_widget = getHContainer(
             widget, "Latch delay (ms):", widget_only=True, left_margin=12, tooltip="Latch timeout delay in milliseconds"
         )
 
@@ -409,13 +422,13 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_randomize_widget)
         self.main_layout.addWidget(self.container_latch_widget)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode=self.action_data.sync_mode, label="State on profile start:", callback=self._sync_changed)
+        self._sync_widget = QSyncModeWidget(mode=self.action_data.sync_mode, label="State on profile start:", callback=self._sync_changed)
 
-        self._reset_default_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self._reset_default_widget = QDataCheckbox(
             label="Reset to Default on stop",
             tooltip="If enabled, state values will return to default values on profile stop",
             callback=self._handle_reset_default_changed,
@@ -423,11 +436,11 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         widgets = [self._execute_widget, self._reset_default_widget, "||"]
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         widgets = [self._sync_widget]
-        widget = gremlin.ui.ui_common.getHContainer(widgets, left_margin=12, widget_only=True)
+        widget = getHContainer(widgets, left_margin=12, widget_only=True)
 
         self.main_layout.addWidget(widget)
 
@@ -437,7 +450,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
         You can choose to limit the <b>other state mode</b> to states within the same category as the selected state, or it can apply to all other states regardless of category.
         If there are no other states, the <b>other state mode</b> will have no effect.
         If both <b>mode</b> and <b>other state mode</b> are set to <b>NoOp</b>, the action will do nothing."""
-        widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="map_to_state_info")
+        widget = QInfoBox(msg, hide_key="map_to_state_info")
         self.main_layout.addWidget(widget)
 
         self.populate_selector()
@@ -720,13 +733,13 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
         row = 0
         for position in positions:  # 9 positions - 8 cardinal and center push
-            cb = gremlin.ui.ui_common.QDataComboBox()
+            cb = QDataComboBox()
             cb.data = position
 
             name = vjoy.vjoy.Hat.direction_to_name[position]
             icon = vjoy.vjoy.Hat.direction_to_icon[position]
-            lbl = gremlin.ui.ui_common.QIconLabel(
-                icon_path=icon, text=f"{name}:", use_wrap=False, icon_color=QtGui.QColor(gremlin.ui.ui_common.Color().activeColor()), icon_size=32, use_qta=True
+            lbl = QIconLabel(
+                icon_path=icon, text=f"{name}:", use_wrap=False, icon_color=QtGui.QColor(Color().activeColor()), icon_size=32, use_qta=True
             )
 
             lbl.setIcon(icon)
@@ -739,19 +752,19 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             mode_container_widget.setContentsMargins(0, 0, 0, 0)
             mode_container_layout = QtWidgets.QHBoxLayout(mode_container_widget)
 
-            rb_hold = gremlin.ui.ui_common.QDataRadioButton("Hold")
+            rb_hold = QDataRadioButton("Hold")
             rb_hold.setToolTip("Output will match the current state of the input.")
             rb_hold.data = position
-            rb_pulse = gremlin.ui.ui_common.QDataRadioButton("Pulse")
+            rb_pulse = QDataRadioButton("Pulse")
             rb_pulse.setToolTip("Output will pulse on (pressed), wait a delay, and turn off (released) when triggered.")
             rb_pulse.data = position
-            rb_press = gremlin.ui.ui_common.QDataRadioButton("Press")
+            rb_press = QDataRadioButton("Press")
             rb_press.setToolTip("Output will be turned on (pressed) when triggered.")
             rb_press.data = position
-            rb_release = gremlin.ui.ui_common.QDataRadioButton("Release")
+            rb_release = QDataRadioButton("Release")
             rb_release.setToolTip("Output will be turned off (released) when triggered.")
             rb_release.data = position
-            rb_noop = gremlin.ui.ui_common.QDataRadioButton("NoOp")
+            rb_noop = QDataRadioButton("NoOp")
             rb_noop.setToolTip("No output.")
             rb_noop.data = position
 
@@ -826,7 +839,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _clear_map(self):
         """sets all mappings to pulse mode"""
-        result = gremlin.ui.ui_common.ConfirmBox(prompt="Clear all hat button mappings?")
+        result = ConfirmBox(prompt="Clear all hat button mappings?")
         if result:
             positions = self.action_data.hat_positions
             for position in positions:
@@ -836,7 +849,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _auto_map(self):
         """sets all mappings to pulse mode"""
-        result = gremlin.ui.ui_common.ConfirmBox(prompt="Remap all hat button mappings?")
+        result = ConfirmBox(prompt="Remap all hat button mappings?")
         if result:
             positions = self.action_data.hat_positions
             vjoy_id = self.action_data.vjoy_id

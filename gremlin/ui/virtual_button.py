@@ -25,6 +25,16 @@ from gremlin.util import load_icon
 from gremlin.ui import ui_common
 import gremlin.ui.ui_common
 from psygnal import Signal
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    QDataComboBox,
+    QAxisRepeaterProgressbar,
+    QIconLabel,
+    QDataPushButton,
+    DynamicDoubleSpinBox,
+
+)
 
 
 class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
@@ -79,32 +89,32 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.enabled_widget.setChecked(self.condition_data.enabled)
         self.enabled_widget.clicked.connect(self._enabled_changed)
 
-        self.axis_repeater_widget = ui_common.QAxisRepeaterProgressbar()
+        self.axis_repeater_widget = QAxisRepeaterProgressbar()
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
-        self.range_status_widget = ui_common.QIconLabel()
-        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color=gremlin.ui.ui_common.Color().activeColor())
+        self.range_status_widget = QIconLabel()
+        self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color=Color().activeColor())
 
-        self.grab_low_widget = ui_common.QDataPushButton()
-        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor()))
+        self.grab_low_widget = QDataPushButton()
+        self.grab_low_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=Color().recordColor()))
         self.grab_low_widget.setMaximumWidth(20)
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
 
-        self.grab_high_widget = ui_common.QDataPushButton()
-        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=gremlin.ui.ui_common.Color().recordColor()))
+        self.grab_high_widget = QDataPushButton()
+        self.grab_high_widget.setIcon(load_icon("mdi.checkbox-blank-circle", qta_color=Color().recordColor()))
         self.grab_high_widget.setMaximumWidth(20)
         self.grab_high_widget.clicked.connect(self._grab_high)
         self.grab_high_widget.setToolTip("Grab axis value")
 
         self.range_layout = QtWidgets.QHBoxLayout()
-        self.lower_limit_widget = ui_common.DynamicDoubleSpinBox()
+        self.lower_limit_widget = DynamicDoubleSpinBox()
         self.lower_limit_widget.setRange(-1.0, 1.0)
         self.lower_limit_widget.setSingleStep(0.05)
-        self.upper_limit_widget = ui_common.DynamicDoubleSpinBox()
+        self.upper_limit_widget = DynamicDoubleSpinBox()
         self.upper_limit_widget.setRange(-1.0, 1.0)
         self.upper_limit_widget.setSingleStep(0.05)
-        self.direction_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.direction_widget = QDataComboBox()
         self.direction_widget.addItem("Anywhere")
         self.direction_widget.addItem("Above")
         self.direction_widget.addItem("Below")
@@ -121,7 +131,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.range_layout.addWidget(self.range_status_widget)
         self.range_layout.addStretch()
 
-        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback=self._show_hint)  # QtWidgets.QPushButton(load_icon("help.png"), "")
+        self.help_button_widget = Buttons.getHelpWidget(callback=self._show_hint)  # QtWidgets.QPushButton(load_icon("help.png"), "")
         self.help_button_widget.clicked.connect(self._show_hint)
         self.range_layout.addWidget(self.help_button_widget)
 
@@ -259,7 +269,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
             self.main_layout.addStretch()
 
-            self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback=self._show_hint)
+            self.help_button = Buttons.getHelpWidget(callback=self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:
             VirtualHatButtonWidget.locked = False

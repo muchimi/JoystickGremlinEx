@@ -151,6 +151,13 @@ from .widgets import (
     widget_rotated_bounds,
     widget_rotation_deg,
 )
+from gremlin.ui.ui_common import (
+    InputListenerWidget,
+    QHorizontalLine,
+    QIconPushButton,
+    QWarningWidget,
+    getHContainer,
+)
 
 CANVAS_TOGGLE_ID = "__canvas_toggle__"
 CANVAS_RUNTIME_PREFIX = "__canvas_runtime__:"
@@ -491,26 +498,26 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(QtWidgets.QLabel("<b>Current key combination:</b>"))
-        self._display, self._display_layout = gremlin.ui.ui_common.getHContainer()
+        self._display, self._display_layout = getHContainer()
         sample = gremlin.ui.virtual_keyboard.QKeyWidget()
         self._display.setMinimumHeight(int(sample.desiredHeight) + 4)
         layout.addWidget(self._display)
-        layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        listen = gremlin.ui.ui_common.Buttons.getListenWidget(callback=button_callback(self._listen, False), no_keyboard=False)
+        layout.addWidget(QHorizontalLine())
+        listen = Buttons.getListenWidget(callback=button_callback(self._listen, False), no_keyboard=False)
         listen.setToolTip("Listen for a single keyboard or mouse input.")
-        listen_multi = gremlin.ui.ui_common.Buttons.getListenWidget(
+        listen_multi = Buttons.getListenWidget(
             label="Listen (multi)",
             callback=button_callback(self._listen, True),
             no_keyboard=False,
         )
         listen_multi.setToolTip("Listen for multiple inputs. Click OK when done.")
-        clear = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear)
-        select = gremlin.ui.ui_common.QIconPushButton("Select...")
-        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
+        clear = Buttons.getClearWidget(callback=self._clear)
+        select = QIconPushButton("Select...")
+        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=Color().listenColor()))
         select.setToolTip("Select keys using the virtual keyboard")
         select.setFixedHeight(24)
         select.clicked.connect(self._select)
-        actions = gremlin.ui.ui_common.getHContainer([listen, listen_multi, clear, select], widget_only=True)
+        actions = getHContainer([listen, listen_multi, clear, select], widget_only=True)
         layout.addWidget(actions)
         self.set_keys(keys)
 
@@ -526,7 +533,7 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
     def _populate(self):
         gremlin.util.clear_layout(self._display_layout)
         if not self._keys:
-            self._display_layout.addWidget(gremlin.ui.ui_common.QWarningWidget("No input selected. Please select at least one input."))
+            self._display_layout.addWidget(QWarningWidget("No input selected. Please select at least one input."))
             self._display_layout.addStretch()
             return
         for key in self._keys:
@@ -597,7 +604,7 @@ class OverlayKeyCombinationWidget(QtWidgets.QWidget):
     def _listen(self, multi_keys: bool):
         self._close_listen()
         gremlin.shared_state.push_suspend_highlighting()
-        listener = gremlin.ui.ui_common.InputListenerWidget(
+        listener = InputListenerWidget(
             [InputType.Keyboard, InputType.Mouse],
             return_kb_event=False,
             multi_keys=multi_keys,
@@ -2922,7 +2929,7 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget(
+        listener = InputListenerWidget(
             [InputType.JoystickButton],
             callback=_captured,
             virtual_only=bool(virtual_only),
@@ -5071,15 +5078,15 @@ class OverlayInspector(QtWidgets.QWidget):
         form.addRow("Preset", preset)
         count = QtWidgets.QLabel(f"{len(item.get('keys') or [])} selected", self._host)
         form.addRow("Selection", count)
-        select = gremlin.ui.ui_common.QIconPushButton("Select keys...")
-        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
+        select = QIconPushButton("Select keys...")
+        select.setIcon(gremlin.util.load_icon("mdi.keyboard-settings-outline", qta_color=Color().listenColor()))
         select.setToolTip("Choose keys and mouse buttons on the virtual keyboard.")
         select.setFixedHeight(24)
         select.clicked.connect(button_callback(self._open_input_display_picker, item["id"]))
         form.addRow(select)
         all_btn = QDataPushButton("Select all", clicked=button_callback(self._select_all_input_display_keys, item["id"]))
         none_btn = QDataPushButton("Deselect all", clicked=button_callback(self._clear_input_display_keys, item["id"]))
-        row = gremlin.ui.ui_common.getHContainer([all_btn, none_btn], widget_only=True)
+        row = getHContainer([all_btn, none_btn], widget_only=True)
         form.addRow(row)
 
     def _apply_input_display_preset(self, widget_id: str, preset: str):
@@ -5442,7 +5449,7 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget(
+        listener = InputListenerWidget(
             [InputType.JoystickAxis],
             callback=_captured,
             virtual_only=bool(virtual_only),
@@ -6872,7 +6879,7 @@ class OverlayInspector(QtWidgets.QWidget):
             except Exception:
                 pass
             self._listen_dialog = None
-        listener = gremlin.ui.ui_common.InputListenerWidget(
+        listener = InputListenerWidget(
             types,
             callback=_captured,
             virtual_only=bool(virtual_only),

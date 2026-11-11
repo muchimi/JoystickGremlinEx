@@ -37,6 +37,9 @@ from shiboken6 import Shiboken
 
 from itertools import pairwise
 from bisect import bisect_left, bisect_right
+from gremlin.ui.ui_common import (
+    Color,
+)
 
 syslog = logging.getLogger("system")
 
@@ -85,14 +88,14 @@ class QSliderWidget(QtWidgets.QWidget):
 
         self._tick_count = 0  # no ticks
 
-        self.handleColor = QColor(gremlin.ui.ui_common.Color().sliderHandleColor())  # QColor("#a7b59e")
-        self.tickColor = QColor(gremlin.ui.ui_common.Color().sliderTickColor())  # QColor("#232323")
-        self.handleBorderColor = QColor(gremlin.ui.ui_common.Color().sliderHandleBorderColor())  # QColor("#e0e0e0")
-        self.rangeBorderColor = QColor(gremlin.ui.ui_common.Color().sliderRangeBorderColor())  # QColor("#e0e0e0")
-        self.rangeColor = QColor(gremlin.ui.ui_common.Color().sliderRangeColor())  # QColor("8fb9bc")
-        self.rangeAlternateColor = QColor(gremlin.ui.ui_common.Color().sliderAlternateRangeColor())  # QColor("#8fb9bc")
+        self.handleColor = QColor(Color().sliderHandleColor())  # QColor("#a7b59e")
+        self.tickColor = QColor(Color().sliderTickColor())  # QColor("#232323")
+        self.handleBorderColor = QColor(Color().sliderHandleBorderColor())  # QColor("#e0e0e0")
+        self.rangeBorderColor = QColor(Color().sliderRangeBorderColor())  # QColor("#e0e0e0")
+        self.rangeColor = QColor(Color().sliderRangeColor())  # QColor("8fb9bc")
+        self.rangeAlternateColor = QColor(Color().sliderAlternateRangeColor())  # QColor("#8fb9bc")
         self.UseAlternateColor = True  # alternate range colors
-        self.BackgroundColor = QColor(gremlin.ui.ui_common.Color().sliderBackgroundColor())  # QColor("#c3c3c3")
+        self.BackgroundColor = QColor(Color().sliderBackgroundColor())  # QColor("#c3c3c3")
 
         self._finishedProgressLength = 0
         self._handle_hotspots = []  # rects of handle clickable spots

@@ -1260,7 +1260,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         self._status = QtWidgets.QLabel()
         self._status.setObjectName("streamdeck_designer_status")
-        refresh = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+        refresh = Buttons.getRefreshWidget(
             "Refresh",
             tooltip="Reload live plugin keys",
             callback=self._on_refresh,

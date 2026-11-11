@@ -51,6 +51,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T98)
+- Change: (setup): vJoy detection is now setup as a warning rather than a hard stop:  the detection of vJoy is registry scan based and these may still persist on a system after vJoy is uninstalled.  Setup will still allow the installation of the bridge after displaying a warning in case it's a false-positive.  This warning does not show if the system never had vJoy installed.
+- Change: API: On profile start, GEX will check for a virtual output being available if used in the profile, and display a warning message to the effect if GEX did not find a suitable output path for those.  The profile will still run but notify that a virtual output device is not available.  This warning only displays if a mapping exists that results in a virtual axis, button or hat output, but no virtual output device (vjoy or Maestro) is found for it.
+- Change: API: refactored a number of UI related widget references application wide and converted more older UI elements to the newer versions for style consistency.
+- Fix: UI (Maestro): individual or all device delete does not refresh the device list properly.
+- Fix: UI (Maestro): fix for exceptions due to a refactor still having references to a widget that no longer exists in the UI.
+
+
 ### (m77T97)
 - Change: API: Startup sequence modified to probe virtual device options.  If VJOY is installed, Maestro will not be queried by default.  If VJOY is not installed, GEX will actively look for the bridge and issue a warning if the bridge is not located.  If located, it will test connectivity and automatically enable Maestro devices.
 - Change: (setup): The installer will run a connectivity probe against the bridge service and also check for installed versions as part of the GEX installation.

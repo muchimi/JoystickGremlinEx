@@ -36,6 +36,11 @@ import gremlin.shared_state
 from gremlin.curve_handler import Point2D
 from psygnal import Signal
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QWarningWidget,
+    clear_layout,
+)
 
 syslog = logging.getLogger("system")
 
@@ -1045,14 +1050,14 @@ class ResponseCurveWidget(gremlin.input_item.AbstractActionWidget):
             return
 
         msg = "Deprecated legacy action - please use <i><b>Vjoy Remap</b></i> or <i><b>Response Curve Ex</b></i> instead. This action is not aware of all GremlinEx features."
-        warning_widget = gremlin.ui.ui_common.QWarningWidget(msg)
+        warning_widget = QWarningWidget(msg)
         self.main_layout.addWidget(warning_widget)
 
         self.container_options_widget = QtWidgets.QWidget()
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
 
         # Dropdown menu for the different curve types
-        self.curve_type_selection = gremlin.ui.ui_common.QDataComboBox()
+        self.curve_type_selection = QDataComboBox()
         self.curve_type_selection.addItem("Cubic Spline")
         self.curve_type_selection.addItem("Cubic Bezier Spline")
         self.curve_type_selection.currentTextChanged.connect(self._change_curve_type)
@@ -1214,7 +1219,7 @@ class ResponseCurveWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_view.setFixedSize(QtCore.QSize(510, 510))
         self.curve_view.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.curve_view.setSceneRect(QtCore.QRectF(-g_scene_size, -g_scene_size, 2 * g_scene_size, 2 * g_scene_size))
-        gremlin.ui.ui_common.clear_layout(self.curve_view_layout)
+        clear_layout(self.curve_view_layout)
         self.curve_view_layout.addStretch()
         self.curve_view_layout.addWidget(self.curve_view)
         self.curve_view_layout.addStretch()

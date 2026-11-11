@@ -32,6 +32,9 @@ from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    DynamicDoubleSpinBox,
+)
 
 syslog = logging.getLogger("system")
 
@@ -76,7 +79,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_selector.action_paste.connect(self._paste_action)
 
         self.widget_layout.addWidget(QtWidgets.QLabel("<b>Timeout:</b> "))
-        self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.timeout_input = DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)

@@ -23,7 +23,6 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
-import gremlin.ui.ui_common
 import gremlin.util
 from shiboken6 import Shiboken
 from gremlin.keyboard import Key
@@ -33,6 +32,17 @@ import datetime
 import time
 from psygnal import Signal
 import threading
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    QDataPushButton,
+    QDataRadioButton,
+    QHLine,
+    QNoWheelPlainTextEdit,
+    QShowAtCursorDialog,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -125,7 +135,6 @@ class QKeyWidget(QtWidgets.QPushButton):
         return self._auto_release_delay
 
     def _update_style(self):
-        Color = gremlin.ui.ui_common.Color
         foreground_color = Color().keyForegroundColor()
         background_color = Color().keyBackgroundColor()
         selected_color = Color().selectColor()
@@ -301,7 +310,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
         self.config = gremlin.config.Configuration()
 
-        widget, layout = gremlin.ui.ui_common.getVContainer()
+        widget, layout = getVContainer()
         self.repeater_container_widget = widget
         self.repeater_container_layout = layout
 
@@ -328,10 +337,10 @@ class QKeyboardWidget(QtWidgets.QWidget):
         invert_display_widget.setChecked(self._invert_display)
         invert_display_widget.clicked.connect(self._invert_display_changed)
 
-        self.options_widget, _ = gremlin.ui.ui_common.getHContainer([clear_widget, capture_mouse_widget, invert_display_widget])
+        self.options_widget, _ = getHContainer([clear_widget, capture_mouse_widget, invert_display_widget])
 
         self.repeater_container_layout.addWidget(self.options_widget)
-        self.repeater_widget = gremlin.ui.ui_common.QNoWheelPlainTextEdit()
+        self.repeater_widget = QNoWheelPlainTextEdit()
         self.repeater_widget.setReadOnly(True)
         self.repeater_container_layout.addWidget(self.repeater_widget)
 
@@ -921,7 +930,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
             self.repeater_widget.setTextCursor(cursor)
 
 
-class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class InputKeyboardDialog(QShowAtCursorDialog):
     """dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse"""
 
     closed = QtCore.Signal()  # sent when the dialog closes
@@ -963,15 +972,15 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.button_layout = QtWidgets.QHBoxLayout()
         self.button_widget.setLayout(self.button_layout)
 
-        self.clear_widget = gremlin.ui.ui_common.QDataPushButton("Clear")
+        self.clear_widget = QDataPushButton("Clear")
         self.clear_widget.clicked.connect(self._clear_button_cb)
         self.clear_widget.setToolTip("Clears the selection")
 
-        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback=self._listen_cb)
+        self.listen_widget = Buttons.getListenWidget(label="Listen (multi)", callback=self._listen_cb)
 
         self._size_map = {"Small": 1.0, "Medium": 1.5, "Large": 2.0}
 
-        widgets = [gremlin.ui.ui_common.QDataRadioButton(display, value) for display, value in self._size_map.items()]
+        widgets = [QDataRadioButton(display, value) for display, value in self._size_map.items()]
 
         current = gremlin.config.Configuration().keySize
         index = next((index for index, value in enumerate(self._size_map.values()) if value == current), 0)
@@ -981,7 +990,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         for w in widgets:
             w.clicked.connect(self._size_changed)
 
-        self.size_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.size_container_widget = getHContainer(widgets, widget_only=True)
 
         self.numlock_widget = QtWidgets.QCheckBox("Force numlock Off")
         self.numlock_widget.setChecked(gremlin.shared_state.current_profile.get_force_numlock())
@@ -1007,7 +1016,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(self.keyboard_widget)
         main_layout.addWidget(self.mouse_widget)
         main_layout.addWidget(self.media_widget)
-        main_layout.addWidget(gremlin.ui.ui_common.QHLine())
+        main_layout.addWidget(QHLine())
         main_layout.addWidget(self.button_widget)
 
         self.setLayout(main_layout)
@@ -1260,7 +1269,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             self._key_map[(key.scan_code, key.is_extended)] = key.lookup_name
             self._key_widget_map[key.lookup_name] = widget
 
-        container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        container = getHContainer(widgets, widget_only=True)
         return container
 
     def _get_media_widget(self, parent=None):

@@ -33,6 +33,15 @@ from gremlin.input_item import AbstractContainer, AbstractContainerWidget, Actio
 from gremlin.util import safe_format, safe_read, write_guid
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes
+from gremlin.ui.ui_common import (
+    QDataCheckbox,
+    QDelayWidget,
+    QHorizontalLine,
+    QIntLineEdit,
+    getGridContainer,
+    getHContainer,
+    synchronize_grids,
+)
 
 syslog = logging.getLogger("system")
 
@@ -63,7 +72,7 @@ class RepeatContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(QtWidgets.QLabel("Repeat Options:"))
 
-        widget = gremlin.ui.ui_common.QDataCheckbox(
+        widget = QDataCheckbox(
             "Trigger on initial press",
             value=self.action_data.trigger_on_start,
             tooltip="If set, the repeated action will trigger immediately, wait for the initial delay, and start repeating the actions if the input is pressed.\nIf not set, there is no intitial trigger, and repeated action will only trigger if the input is still held after the initial delay has lapsed.\nHas no effect if the initial delay is disabled (0).",
@@ -74,18 +83,18 @@ class RepeatContainerWidget(AbstractContainerWidget):
 
         widgets = []
 
-        widget = gremlin.ui.ui_common.QIntLineEdit(
+        widget = QIntLineEdit(
             value=self.action_data.repeat_count,
             callback=self._handle_repeat_count_changed,
             tooltip="Number of times to repeat the actions.  Set to 0 to disable (unlimited).",
         )
 
-        widget = gremlin.ui.ui_common.getHContainer([widget, "(0 for unlimited)"], widget_only=True)
+        widget = getHContainer([widget, "(0 for unlimited)"], widget_only=True)
 
         widgets.append(("Repeat Count:", widget))
 
         # activation delay
-        widget = gremlin.ui.ui_common.QDelayWidget(
+        widget = QDelayWidget(
             value=int(self.action_data.initial_pulse_delay * 1000),
             callback=self._handle_delay_changed,
             tooltip="Initial delay in milliseconds before actions are repeated.  Set to 0 to start repeating immediately.",
@@ -96,7 +105,7 @@ class RepeatContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(widget)
 
         # repeat delay
-        widget = gremlin.ui.ui_common.QDelayWidget(
+        widget = QDelayWidget(
             value=int(self.action_data.hold_delay * 1000),
             callback=self._handle_interval_changed,
             tooltip="How long in milliseconds the action is held pressed.",
@@ -105,7 +114,7 @@ class RepeatContainerWidget(AbstractContainerWidget):
         widgets.append(("Repeat hold time (ms):", widget))
 
         # pulse delay
-        widget = gremlin.ui.ui_common.QDelayWidget(
+        widget = QDelayWidget(
             value=int(self.action_data.pulse_interval_delay * 1000), callback=self._handle_pulse_changed, tooltip="Delay in milliseconds between repeats."
         )
 
@@ -114,14 +123,14 @@ class RepeatContainerWidget(AbstractContainerWidget):
         # build the table
         row_widgets = []
         for label, widget in widgets:
-            row_widget = gremlin.ui.ui_common.getGridContainer(widget, label, widget_only=True)
+            row_widget = getGridContainer(widget, label, widget_only=True)
             self.action_layout.addWidget(row_widget)
             row_widgets.append(row_widget)
 
         # sync the table column widths
-        gremlin.ui.ui_common.synchronize_grids(row_widgets)
+        synchronize_grids(row_widgets)
 
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.action_layout.addWidget(QHorizontalLine())
 
         if len(self.container.action_sets) > 0:
             assert len(self.container.action_sets) == 1,"Repeat container should have exactly one action set"

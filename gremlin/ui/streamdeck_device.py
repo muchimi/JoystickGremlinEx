@@ -39,6 +39,10 @@ from gremlin.types import DeviceCategory, DeviceType, EventSourceType
 from gremlin.util import compare_guid
 from lxml import etree as ElementTree
 from psygnal import Signal
+from gremlin.ui.ui_common import (
+    QIconLabel,
+    QInfoBox,
+)
 
 syslog = logging.getLogger("system")
 
@@ -3121,7 +3125,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.clearLeftPanelHeaderWidget()
 
         if self._is_legacy_tab:
-            banner = gremlin.ui.ui_common.QInfoBox("Legacy Stream Deck tab (pre multi-device). New keys appear on per-device tabs.")
+            banner = QInfoBox("Legacy Stream Deck tab (pre multi-device). New keys appear on per-device tabs.")
             self.addLeftPanelHeaderWidget(banner)
         else:
             from gremlin.ui.streamdeck_designer import StreamDeckDesignerWidget
@@ -3565,7 +3569,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         layout = QtWidgets.QVBoxLayout(container_widget)
-        status_widget = gremlin.ui.ui_common.QIconLabel()
+        status_widget = QIconLabel()
         status_widget.setObjectName("status")
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)

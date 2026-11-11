@@ -69,6 +69,22 @@ from gremlin.ui import midi_device, osc_device, keyboard_device
 # from xml.dom import minidom
 from lxml import etree as ElementTree
 import html
+from gremlin.ui.ui_common import (
+    MessageBox,
+    ActionLabel,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataPushButton,
+    QIconLabel,
+    QIntLineEdit,
+    QRememberDialog,
+    QDataLineEdit,
+    QPathLineItem,
+    get_text_width,
+    QDataLabel,
+    ConfirmBox,
+
+)
 
 
 NodeItem = namedtuple("NodeItem", "device_name device_guid device_type node")
@@ -201,14 +217,14 @@ class DeviceInfoWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(self.device_widget)
 
-    def getIntWidget(self, value: int) -> ui_common.QIntLineEdit:
-        widget = ui_common.QIntLineEdit()
+    def getIntWidget(self, value: int) -> QIntLineEdit:
+        widget = QIntLineEdit()
         widget.setReadOnly(True)
         widget.setValue(value)
         return widget
 
-    def getStrWidget(self, value: int) -> ui_common.QDataLineEdit:
-        widget = ui_common.QDataLineEdit()
+    def getStrWidget(self, value: int) -> QDataLineEdit:
+        widget = QDataLineEdit()
         widget.setReadOnly(True)
         widget.setText(value)
         return widget
@@ -413,7 +429,7 @@ class ImportItem(AbstractTreeItem):
         return max_count
 
 
-class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
+class ImportProfileDialog(QRememberDialog):
     """dialog for import options"""
 
     def __init__(self, profile_path, parent=None):
@@ -435,7 +451,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         base_devices = self.target_profile.get_ordered_device_list()
         if len(base_devices) == 0:
             syslog.error("Import error: No mappable devices found in target profile")
-            ui_common.MessageBox("Import error:", "No mappable devices found in the target profile")
+            MessageBox("Import error:", "No mappable devices found in the target profile")
             self.close()
             return
 
@@ -545,7 +561,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_path_layout = QtWidgets.QHBoxLayout(self.container_path_widget)
         self.container_path_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.path_widget = ui_common.QPathLineItem("Profile source:", self.profile_path)
+        self.path_widget = QPathLineItem("Profile source:", self.profile_path)
         self.path_widget.pathChanged.connect(self._load_import_profile)
 
         self.container_path_layout.addWidget(self.path_widget)
@@ -565,7 +581,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.create_mode_widget = QtWidgets.QCheckBox("Import modes")
         self.target_mode_label_widget = QtWidgets.QLabel("Target Mode:")
 
-        self.target_mode_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.target_mode_selector = QDataComboBox()
         # populate the modes of the current device being imported into
         self.populate_mode_selector(self.target_mode_selector, self.target_profile)
 
@@ -573,7 +589,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.import_modes_widget.setToolTip("Import all modes from profile and add them to the existing profile if they don't exist")
         self.import_single_mode_widget = QtWidgets.QRadioButton("Import single mode")
         self.import_single_mode_widget.setToolTip("Import specific mode")
-        self.import_mode_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.import_mode_selector = QDataComboBox()
 
         self.import_mode_list_widget = QtWidgets.QListWidget()
 
@@ -607,40 +623,40 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_command_header_layout = QtWidgets.QHBoxLayout(self.container_command_header_widget)
         self.container_command_header_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.command_one_to_one_button_widget = gremlin.ui.ui_common.QDataPushButton("Map 1:1",
+        self.command_one_to_one_button_widget = QDataPushButton("Map 1:1",
                                                                                      callback=self._cmd_one_to_one,
                                                                                       tooltip = "Maps inputs to outputs 1:1 if the input exists in the output.<br>If the output doesn't exist, the first available slot to import to will be used.")
 
 
-        self.command_deselect_all_button_widget = gremlin.ui.ui_common.QDataPushButton("Select None",
+        self.command_deselect_all_button_widget = QDataPushButton("Select None",
                                                                                        callback=self._cmd_deselect_all,
                                                                                        tooltip="Deselects all imports")
 
-        self.command_select_all_button_widget = gremlin.ui.ui_common.QDataPushButton("Select All",
+        self.command_select_all_button_widget = QDataPushButton("Select All",
                                                                                      callback=self._cmd_select_all,
                                                                                      tooltip="Selects all imports")
 
-        width = ui_common.get_text_width("MMMM")
+        width = get_text_width("MMMM")
 
         # cmd_resize = QtWidgets.QPushButton("Resize")
         # cmd_resize.clicked.connect(self._resize_map)
 
-        self.command_level_1_button_widget = gremlin.ui.ui_common.QDataPushButton("L1",
+        self.command_level_1_button_widget = QDataPushButton("L1",
                                                                                  callback=lambda: self._cmd_set_level(1),
                                                                                  tooltip="Expand/Collapse to Devices")
         self.command_level_1_button_widget.setMaximumWidth(width)
 
-        self.command_level_2_button_widget = gremlin.ui.ui_common.QDataPushButton("L2",
+        self.command_level_2_button_widget = QDataPushButton("L2",
                                                                                  callback=lambda: self._cmd_set_level(2),
                                                                                  tooltip="Expand/Collapse to Modes")
         self.command_level_2_button_widget.setMaximumWidth(width)
 
-        self.command_level_3_button_widget = gremlin.ui.ui_common.QDataPushButton("L3",
+        self.command_level_3_button_widget = QDataPushButton("L3",
                                                                                  callback=lambda: self._cmd_set_level(3),
                                                                                  tooltip="Expand/Collapse to Inputs")
         self.command_level_3_button_widget.setMaximumWidth(width)
 
-        self.command_level_4_button_widget = gremlin.ui.ui_common.QDataPushButton("L4",
+        self.command_level_4_button_widget = QDataPushButton("L4",
                                                                                  callback=lambda: self._cmd_set_level(4),
                                                                                  tooltip="Expand/Collapse to Containers")
         self.command_level_4_button_widget.setMaximumWidth(width)
@@ -661,14 +677,14 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_buttons_layout = QtWidgets.QHBoxLayout(self.container_buttons_widget)
         self.container_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.clear_profile_widget = gremlin.ui.ui_common.QDataPushButton("Clear Profile",
+        self.clear_profile_widget = QDataPushButton("Clear Profile",
                                                                          callback=self._clear_profile,
                                                                          tooltip="Clears the current profile before import")
 
-        self.import_button_widget = gremlin.ui.ui_common.QDataPushButton("Import",
+        self.import_button_widget = QDataPushButton("Import",
                                                                         callback=self._execute_import,
                                                                         tooltip="Imports the mapped items into the current profile")
-        self.close_button_widget = gremlin.ui.ui_common.QDataPushButton("Close",
+        self.close_button_widget = QDataPushButton("Close",
                                                                       callback=self._close_cb,
                                                                       tooltip="Closes the dialog")
 
@@ -684,7 +700,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_mode_layout.addWidget(self.import_mode_selector)
         # self.container_mode_layout.addWidget(self.import_mode_list_widget)
 
-        warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_widget = QIconLabel(
             "ph.shield-warning-fill",
             use_qta=True,
             icon_color=QtGui.QColor("orange"),
@@ -771,7 +787,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         # update input list
         self._update_map()
 
-    def populate_mode_selector(self, selector: ui_common.QDataComboBox, profile: gremlin.base_profile.Profile):
+    def populate_mode_selector(self, selector: QDataComboBox, profile: gremlin.base_profile.Profile):
         """populates profile modes for the specified profile
 
         :param: selector = the combo box to populate (will be cleared)
@@ -785,7 +801,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         # Create mode name labels visualizing the tree structure
         inheritance_tree = profile.build_inheritance_tree()
         labels = []
-        gremlin.ui.ui_common._inheritance_tree_to_labels(labels, inheritance_tree, 0)
+        profile._inheritance_tree_to_labels(labels, inheritance_tree, 0)
 
         # Filter the mode names such that they only occur once below
         # their correct parent
@@ -1480,7 +1496,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
             if mode_index != -1:
                 mode_widget.setCurrentIndex(mode_index)
 
-            cb = ui_common.QDataCheckbox(f"Mode: [{mode_item.mode}]")
+            cb = QDataCheckbox(f"Mode: [{mode_item.mode}]")
             cb.data = mode_item
             mode_item.selected_widget = cb
             cb.setChecked(import_item.selected)
@@ -1557,7 +1573,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 container_layout = QtWidgets.QHBoxLayout(container_widget)
                 container_layout.setContentsMargins(0, 0, 0, 0)
 
-                cb = ui_common.QDataCheckbox(f"Input: {input_item.input_name}")
+                cb = QDataCheckbox(f"Input: {input_item.input_name}")
                 cb.data = input_item
                 input_item.selected_widget = cb
                 cb.clicked.connect(self._select_import_item_cb)
@@ -1570,8 +1586,8 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 if has_mapping:
                     map_to_input_widget, widget = self._create_target_input_widget(import_item, input_item, target_device_guid, target_input_id)
                 else:
-                    widget = ui_common.QDataLabel("N/A")
-                    map_to_input_widget = ui_common.QDataLabel("N/A")
+                    widget = QDataLabel("N/A")
+                    map_to_input_widget = QDataLabel("N/A")
 
                 tree.setItemWidget(input_node, 0, container_widget)
                 if map_to_input_widget is not None:
@@ -1586,7 +1602,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     container_node = QtWidgets.QTreeWidgetItem()
                     container_node.setData(0, 0, container_item)
                     self._tree_container_nodes.append(container_node)
-                    cb = ui_common.QDataCheckbox(f"Container: {container_item.container_name}")
+                    cb = QDataCheckbox(f"Container: {container_item.container_name}")
                     cb.data = container_item
                     container_item.selected_widget = cb
                     cb.clicked.connect(self._select_import_item_cb)
@@ -1612,7 +1628,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     # container_layout.addWidget(QtWidgets.QLabel("Actions:"))
 
                     for action in container_item.actions:
-                        al = ui_common.ActionLabel(action)
+                        al = ActionLabel(action)
                         al.setToolTip(action.display_name())
                         container_layout.addWidget(al)
                     container_layout.addStretch()
@@ -1658,7 +1674,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 self._tree_device_nodes.append(device_node)
                 root_node.addChild(device_node)
 
-                cb = ui_common.QDataCheckbox(f"{import_item.device_name}")
+                cb = QDataCheckbox(f"{import_item.device_name}")
                 cb.data = import_item
                 import_item.selected_widget = cb
                 cb.setChecked(import_item.selected)
@@ -1672,8 +1688,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
                 target_widget.data = import_item  # indicate which import_item holds this device mapping
                 import_item.map_to_widget = target_widget
-
-                remap_widget = ui_common.QDataPushButton("Re-Import")
+                remap_widget = QDataPushButton("Re-Import")
                 remap_widget.setToolTip("Re-imports the input profile on the new device")
                 remap_widget.clicked.connect(self._re_import_device)
                 remap_widget.data = (import_item, device_node)
@@ -1681,7 +1696,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 detail_widget = None
                 width = gremlin.shared_state.char_width * 3
                 if import_item.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-                    detail_widget = ui_common.QDataPushButton("...")
+                    detail_widget = QDataPushButton("...")
                     detail_widget.setToolTip("Details")
                     detail_widget.clicked.connect(self._view_details)
                     detail_widget.data = (import_item, device_node)
@@ -1724,7 +1739,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        widget = ui_common.QDataComboBox()
+        widget = QDataComboBox()
         # limit drop down size
         widget.setMaxVisibleItems(20)
         widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
@@ -1746,7 +1761,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        widget = ui_common.QDataComboBox()
+        widget = QDataComboBox()
         container_layout.addWidget(widget)
         # limit drop down size
         widget.setMaxVisibleItems(20)
@@ -1897,7 +1912,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         container_widget.setContentsMargins(0, 0, 0, 0)
         container_layout = QtWidgets.QHBoxLayout(container_widget)
         container_layout.setContentsMargins(0, 0, 0, 0)
-        target_input_id_widget = ui_common.QDataComboBox()
+        target_input_id_widget = QDataComboBox()
         # limit drop down size
         target_input_id_widget.setMaxVisibleItems(20)
         target_input_id_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
@@ -2058,7 +2073,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _clear_profile(self):
         """clears the current profile data before import"""
-        result = gremlin.ui.ui_common.Confirmbox("Reset profile?")
+        result = ConfirmBox("Reset profile?")
         if result:
             self.target_profile = gremlin.base_profile.Profile()
 
@@ -2247,14 +2262,14 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
         finally:
             mode_count = len(processed_mode_set)
-            ui_common.MessageBox(
+            MessageBox(
                 "Import results:",
                 f"Imported {input_count:,} input(s)<br>{mode_count:,} mode(s)<br>{container_count:,} container(s)<br>{action_count:,} action(s)",
                 is_warning=False,
             )
 
 
-class ImportDetailDialog(gremlin.ui.ui_common.QRememberDialog):
+class ImportDetailDialog(QRememberDialog):
     def __init__(self, import_item: ImportItem, target_device_guid: dinput.GUID, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
 
@@ -2291,7 +2306,7 @@ def import_profile():
 class Mapper:
     """mapping helper class"""
 
-    class MapperDialog(gremlin.ui.ui_common.QRememberDialog):
+    class MapperDialog(QRememberDialog):
         """dialog for mapping options"""
 
         def __init__(self, device: dinput.DeviceSummary, parent=None):
@@ -2312,7 +2327,7 @@ class Mapper:
             devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: (x.name, str(x.device_guid)))
             if not devices:
                 # no vjoy devices to map
-                ui_common.MessageBox(prompt="No virtual output devices found to map to")
+                MessageBox(prompt="No virtual output devices found to map to")
                 self.close()
 
             # info
@@ -2345,7 +2360,7 @@ class Mapper:
             self.container_button_layout.setContentsMargins(0, 0, 0, 0)
 
             self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target Virtual Device:")
-            self.cb_vjoy_device_selector = gremlin.ui.ui_common.QDataComboBox()
+            self.cb_vjoy_device_selector = QDataComboBox()
 
             self.container_selector_widget = QtWidgets.QWidget()
             self.container_selector_widget.setContentsMargins(0, 0, 0, 0)
@@ -2395,9 +2410,9 @@ class Mapper:
             self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
             self.mode: MapperMode = self.rollover_widget.mode
 
-            self.execute_button = gremlin.ui.ui_common.QDataPushButton("Map 1:1",
+            self.execute_button = QDataPushButton("Map 1:1",
                                                                       callback=self._execute_mapping)
-            self.cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel",
+            self.cancel_button = QDataPushButton("Cancel",
                                                                      callback=self.close)
 
             self.container_button_layout.addStretch()
@@ -2412,14 +2427,14 @@ class Mapper:
             self.main_layout.addStretch()
             self.main_layout.addWidget(self.container_button_widget)
 
-        def getIntWidget(self, value: int) -> ui_common.QIntLineEdit:
-            widget = ui_common.QIntLineEdit()
+        def getIntWidget(self, value: int) -> QIntLineEdit:
+            widget = QIntLineEdit()
             widget.setReadOnly(True)
             widget.setValue(value)
             return widget
 
-        def getStrWidget(self, value: int) -> ui_common.QDataLineEdit:
-            widget = ui_common.QDataLineEdit()
+        def getStrWidget(self, value: int) -> QDataLineEdit:
+            widget = QDataLineEdit()
             widget.setReadOnly(True)
             widget.setText(value)
             return widget
@@ -2588,7 +2603,7 @@ class Mapper:
                     TabDeviceType.Joystick,
                     TabDeviceType.VjoyInput,
                 ):
-                    gremlin.ui.ui_common.MessageBox(
+                    MessageBox(
                         "Information",
                         "1:1 mapping is only available on input joysticks",
                     )

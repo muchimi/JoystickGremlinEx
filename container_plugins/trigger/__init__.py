@@ -33,6 +33,13 @@ import logging
 from PySide6 import QtWidgets, QtCore
 from gremlin.util import safe_format, safe_read
 import threading
+from gremlin.ui.ui_common import (
+    QExecuteWidget,
+    QFloatLineEdit,
+    QInfoBox,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -63,11 +70,11 @@ class TriggerContainerWidget(AbstractContainerWidget):
 
         # trigger delay
 
-        delay_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        delay_widget = QFloatLineEdit(
             value=self.container.trigger_delay, callback=self._handle_delay_changed, tooltip="Delay trigger in seconds.  Set to 0 to disable."
         )
 
-        execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.container.exec_on_press, self.container.exec_on_release)
+        execute_widget = QExecuteWidget(self.container.exec_on_press, self.container.exec_on_release)
         execute_widget.pressChanged.connect(self._execute_on_press_changed)
         execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -75,7 +82,7 @@ class TriggerContainerWidget(AbstractContainerWidget):
             delay_widget,
             execute_widget,
         ]
-        delay_container = gremlin.ui.ui_common.getHContainer(widgets, "Trigger delay (s):", widget_only=True, left_margin=12)
+        delay_container = getHContainer(widgets, "Trigger delay (s):", widget_only=True, left_margin=12)
 
         msg = """This container will execute the contained actions on input trigger if the defined condition succeeds.
 If the condition fails when the timer lapses, the actions will not be executed.
@@ -83,15 +90,15 @@ If there is no condition defined, the condition will succeeed and the actions wi
 If the timer is set to 0, the actions get executed immediately if the condition passes (or is not set)
 """
 
-        info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="TriggerContainer")
+        info_widget = QInfoBox(msg, hide_key="TriggerContainer")
         self.action_layout.addWidget(info_widget)
 
         self.action_layout.addWidget(QtWidgets.QLabel("Trigger Configuration:"))
         self.action_layout.addWidget(delay_container)
 
         # create two tabs - one for the action sets, one for the conditions to check
-        action_tab_widget, self.action_tab_layout = gremlin.ui.ui_common.getVContainer()
-        condition_tab_widget, self.condition_tab_layout = gremlin.ui.ui_common.getVContainer()
+        action_tab_widget, self.action_tab_layout = getVContainer()
+        condition_tab_widget, self.condition_tab_layout = getVContainer()
 
         self.tab_widget = QtWidgets.QTabWidget()
         self.tab_widget.addTab(action_tab_widget, "Trigger Actions")

@@ -77,6 +77,11 @@ from gremlin.ui.ui_common import (
     synchronize_grids,
     QFailoverWidget,
 )
+from gremlin.ui.ui_common import (
+    ModeSelectorWidget,
+    QButtonGrid,
+    QRememberDialog,
+)
 
 
 class ProfileSettingsWidget(QDataWidget):
@@ -140,7 +145,7 @@ class ProfileSettingsWidget(QDataWidget):
     def _refresh_ui(self, emit=False):
         """reloads the tab"""
 
-        gremlin.ui.ui_common.clear_layout(self.scroll_layout)
+        clear_layout(self.scroll_layout)
         self._create_ui()
         if emit:
             self.changed.emit()
@@ -180,7 +185,7 @@ class ProfileSettingsWidget(QDataWidget):
         box_layout = QtWidgets.QHBoxLayout()
         widget.setLayout(box_layout)
 
-        grid_widget, grid_layout = gremlin.ui.ui_common.getGridContainer()
+        grid_widget, grid_layout = getGridContainer()
         max_col = 5
 
         box_layout.addWidget(grid_widget)
@@ -197,10 +202,10 @@ class ProfileSettingsWidget(QDataWidget):
         widgets = [mode_widget, delay_widget, virtual_as_input_widget, grid_widget, label_widget]
 
         # holds all the inputs in a vertical box
-        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        widget = getVContainer(widgets, widget_only=True)
 
         # make the box only use the width needed to show
-        container = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+        container = getHContainer(widget, widget_only=True)
 
         self.scroll_layout.addWidget(container)
 
@@ -226,11 +231,11 @@ class DefaultDelay(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QHBoxLayout(self)
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.delay_widget = QDelayWidget(
             max_value_seconds=10, value=self.profile_data.default_delay, callback=self._handle_delay_changed, show_zero=True
         )
 
-        widget = gremlin.ui.ui_common.getHContainer(["Default Macro Action Delay:", self.delay_widget], widget_only=True)
+        widget = getHContainer(["Default Macro Action Delay:", self.delay_widget], widget_only=True)
         self.main_layout.addWidget(widget)
 
     def _handle_delay_changed(self, value):
@@ -258,13 +263,13 @@ class DefaultModeSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins
 
-        self.selector_widget = gremlin.ui.ui_common.ModeSelectorWidget(text="Profile Start Mode:")  # gremlin.ui.ui_common.QDataComboBox()
+        self.selector_widget = ModeSelectorWidget(text="Profile Start Mode:")
         self.selector_widget.setContentsMargins(0, 0, 0, 0)
         mode = gremlin.shared_state.current_profile.get_start_mode()
         self.selector_widget.setMode(mode)
         self.selector_widget.modeChanged.connect(self._handle_mode_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(self.selector_widget, widget_only=True)
+        widget = getHContainer(self.selector_widget, widget_only=True)
 
         el = gremlin.event_handler.EventListener()
         el.profile_modes_changed.connect(self._handle_profile_modes_modified)
@@ -282,7 +287,7 @@ class DefaultModeSelector(QtWidgets.QWidget):
         gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
-class VjoyDefaultsDialog(gremlin.ui.ui_common.QRememberDialog):
+class VjoyDefaultsDialog(QRememberDialog):
     def __init__(self, device, settings, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
 
@@ -309,7 +314,7 @@ class VjoyDefaultsDialog(gremlin.ui.ui_common.QRememberDialog):
         self.ok_widget = QDataPushButton("Ok", callback=self._ok_button_cb)
         self.cancel_widget = QDataPushButton("Cancel", callback=self._cancel_button_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer(["||", self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
+        widget = getHContainer(["||", self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
 
         main_layout.addWidget(widget)
 
@@ -332,7 +337,7 @@ class VJoyButtonsDefaultsWidget(QtWidgets.QWidget):
     def __init__(self, device, settings, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.grid_widget = gremlin.ui.ui_common.QButtonGrid(device)
+        self.grid_widget = QButtonGrid(device)
         self.main_layout.addWidget(self.grid_widget)
 
         on_widget = QtWidgets.QPushButton("All On")
@@ -342,7 +347,7 @@ class VJoyButtonsDefaultsWidget(QtWidgets.QWidget):
         off_widget.setToolTip("Sets all buttons to off")
         off_widget.clicked.connect(self._all_off)
 
-        button_container_widget = gremlin.ui.ui_common.getHContainer([on_widget, off_widget], left_stretch=True, widget_only=True)
+        button_container_widget = getHContainer([on_widget, off_widget], left_stretch=True, widget_only=True)
         self.main_layout.addWidget(button_container_widget)
 
     def _all_on(self):
@@ -408,7 +413,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
         widgets = [enabled_widget, disabled_widget, " ", min_widget, zero_widget, max_widget]
 
-        button_container_widget = gremlin.ui.ui_common.getHContainer(widgets, left_stretch=True, widget_only=True, auto_size=True)
+        button_container_widget = getHContainer(widgets, left_stretch=True, widget_only=True, auto_size=True)
         self.main_layout.addWidget(button_container_widget)
 
     def _all_enabled(self):
@@ -513,12 +518,9 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
         for input_id in self.device.axis_index_list():
             axis_name = self.device.get_axis_name(input_id)
             self.grid_layout.addWidget(QtWidgets.QLabel(axis_name), row, 0)
-            # frame = gremlin.ui.ui_common.QBoxFrame()
-            # frame.setStyleSheet(f"border: 2px solid {gremlin.ui.ui_common.Color().selectColor()};")
-            # frame.setLayout(QtWidgets.QHBoxLayout())
 
             value = self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id)
-            box = gremlin.ui.ui_common.QFloatLineEdit()
+            box = QFloatLineEdit()
             box.setRange(-1, 1)
             value = self.settings.get_initial_vjoy_axis_value(self.device.vjoy_id, input_id)
             box.setValue(value)
@@ -533,7 +535,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             self.grid_layout.addWidget(box, row, 1)
 
             is_enabled = self.settings.get_vjoy_axis_enabled(vjoy_id, input_id)
-            enabled_widget = gremlin.ui.ui_common.QDataCheckbox("Enabled")
+            enabled_widget = QDataCheckbox("Enabled")
             enabled_widget.data = input_id
             enabled_widget.setChecked(is_enabled)
             enabled_widget.clicked.connect(self._enabled_changed)
@@ -546,7 +548,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             container_layout = QtWidgets.QHBoxLayout(container_widget)
             container_layout.addWidget(enabled_widget)
             for value in presets:
-                widget = gremlin.ui.ui_common.QDataPushButton(f"{value:0.3f}")
+                widget = QDataPushButton(f"{value:0.3f}")
                 widget.data = (row, value)  # (axis_id, value)
                 widget.setToolTip(f"Sets to {value:0.3f}")
                 widget.clicked.connect(self._handle_preset)
@@ -699,7 +701,7 @@ class VirtualAsInputWidget(QtWidgets.QGroupBox):
 
         self.virtual_layout.addWidget(QFailoverWidget())
         # Information label
-        dialog_button = gremlin.ui.ui_common.QDataPushButton(
+        dialog_button = QDataPushButton(
             "Configure...", tooltip="Select vJoy and Maestro joysticks to use as inputs in this profile.", callback=self._open_dialog
         )
         self.virtual_layout.addWidget(getHContainer([dialog_button, "||"], widget_only=True))

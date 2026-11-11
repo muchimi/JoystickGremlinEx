@@ -17,6 +17,9 @@ from gremlin.ui.ui_common import Color, QDataPushButton, QDataRadioButtonGroup
 from .model import OverlayScene, widget_display_name
 from .qt_guard import alive
 from .widgets import widget_rotated_bounds
+from gremlin.ui.ui_common import (
+    getHContainer,
+)
 
 _TYPE_TITLES = {
     "axis_bar": "Bar",
@@ -215,7 +218,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
             tooltip="Ungroup the selected widgets (Ctrl+Shift+G).",
             clicked=self._ungroup,
         )
-        root.addWidget(gremlin.ui.ui_common.getHContainer([self._group_btn, self._ungroup_btn], widget_only=True))
+        root.addWidget(getHContainer([self._group_btn, self._ungroup_btn], widget_only=True))
 
         self._structure_sig = None
         # Remember which group folders the user left open/closed across refreshes.

@@ -135,7 +135,6 @@ import gremlin.util
 import graphviz
 
 import gremlin.ui.axis_calibration
-import gremlin.ui.ui_common
 import gremlin.ui.joystick_device
 import gremlin.ui.dialogs
 import gremlin.ui.input_viewer
@@ -155,6 +154,25 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.tabstate import TabData
 
 from logging.handlers import RotatingFileHandler
+from gremlin.ui.ui_common import (
+    Color,
+    ConfirmBox,
+    GexAppStyle,
+    Icons,
+    MessageBox,
+    MessageBoxWarning,
+    ModeWidget,
+    QEmptyWidget,
+    QHorizontalSeparator,
+    QOnOffStatusfWidget,
+    QRememberMainWindow,
+    QSplitTabWidget,
+    StateTracker,
+    WidgetCacheTracker,
+    clear_layout,
+    getHContainer,
+    get_text_width,
+)
 
 # Figure out the location of the code / executable and change the working
 # directory accordingly
@@ -168,7 +186,7 @@ if os.path.isdir(install_path):
 syslog = logging.getLogger("system")
 
 
-class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
+class GremlinUi(QRememberMainWindow):
     """Main window of the Joystick Gremlin user interface."""
 
     ui = None
@@ -289,11 +307,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color().activeColor(),
+            qta_color=Color().activeColor(),
         )
         self._icon_off = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
-            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
+            qta_color=Color().inactiveColor(),
         )
         self._button_highlighting_enabled = self.config.highlight_input_buttons  # true if highlighting on buttons
         self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
@@ -332,7 +350,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.tab_guids = []
 
-        self.mode_selector = gremlin.ui.ui_common.ModeWidget()  # main UI mode selector
+        self.mode_selector = ModeWidget()  # main UI mode selector
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_selector_changed)
         self.mode_selector.setRuntimeDisabled(True)
 
@@ -1132,7 +1150,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         config = gremlin.config.Configuration()
         if not config.maestro_enabled:
-            gremlin.ui.ui_common.MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
+            MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
             return
 
         dialog = gremlin.maestro.MaestroDialog(parent=self)
@@ -1200,7 +1218,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 xml = f'<device name="{device.name}" label="" device-guid="{device.device_id}" type="{DeviceType.to_string(device.device_type)}">'
                 clipboard.set_windows_clipboard_text(xml)
             else:
-                gremlin.ui.ui_common.MessageBoxWarning(prompt="Device is not found. Cannot derive XML header.")
+                MessageBoxWarning(prompt="Device is not found. Cannot derive XML header.")
         else:
             clipboard.set_windows_clipboard_text(gremlin.util.normalize_guid(device_guid))
 
@@ -1220,18 +1238,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
         device: gremlin.base_profile.ProfileDeviceNode = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
-        result = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
+        result = ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
         if result:
             self._tab_clear_map_execute(device, current_mode)
 
-    # def _tab_remove_device_cb(self):
-    #     """removes a disconnected device from the menu"""
-    #     self.change_visible_profile_devices()
-
     def _tab_import_cb(self):
         """imports a profile into the device"""
-        # tab_guid = gremlin.util.parse_guid(gremlin.shared_state.ui._active_tab_guid())
-        # device : gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
         gremlin.import_profile.import_profile()
 
     def _tab_clear_map_execute(self, device, mode_name):
@@ -1583,7 +1595,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # wait for things to stabilize
         QtWidgets.QApplication.processEvents()
         if message:
-            gremlin.ui.ui_common.MessageBox(prompt=message)
+            MessageBox(prompt=message)
 
     def setUiMode(self, enabled: bool = True):
         """enables or disables the UI based on the runtime mode and options
@@ -1739,7 +1751,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     gremlin.diagnostics.breadcrumb("profile start failed")
                     if not gremlin.shared_state.profile_message_issued:
                         # error message not issued = issue it
-                        gremlin.ui.ui_common.MessageBox(
+                        MessageBox(
                             title="Profile Start Error",
                             prompt="An error occured when starting the profile.\nCheck the log file for specifics.",
                         )
@@ -2221,28 +2233,28 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         server_icon = "mdi6.wifi-arrow-up"
         client_icon = "ph.cloud-arrow-down-bold"
         remote_icon = "mdi6.wifi-arrow-up"
-        self.status_bar_server_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+        self.status_bar_server_widget = QOnOffStatusfWidget(
             on_icon=server_icon,
             off_icon=server_icon,
             icon_size=20,
             tooltip="Server state",
         )
-        self.status_bar_client_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+        self.status_bar_client_widget = QOnOffStatusfWidget(
             on_icon=client_icon,
             off_icon=client_icon,
             icon_size=20,
             tooltip="Client state",
         )
-        self.status_bar_remote_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+        self.status_bar_remote_widget = QOnOffStatusfWidget(
             on_icon=remote_icon,
             off_icon=remote_icon,
-            off_color=gremlin.ui.ui_common.Color().orangeOffColor(),
-            on_color=gremlin.ui.ui_common.Color().orangeColor(),
+            off_color=Color().orangeOffColor(),
+            on_color=Color().orangeColor(),
             icon_size=20,
             tooltip="Profile remote state",
         )
 
-        self.status_bar_maestro_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+        self.status_bar_maestro_widget = QOnOffStatusfWidget(
             on_icon="mdi6.gamepad-variant",
             off_icon="mdi6.gamepad-variant",
             icon_size=20,
@@ -2293,7 +2305,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self.status_bar_maestro_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.ui.statusbar_layout.addWidget(widget)
 
         self.ui.statusbar_layout.addWidget(self.status_bar_is_active_widget)
@@ -2316,11 +2328,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Device"))
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_tabswitch_widget)
 
-        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QHorizontalSeparator())
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Axis"))
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_axis_widget)
 
-        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QHorizontalSeparator())
         self.ui_statusbar_highlight_state_container_layout.addWidget(QtWidgets.QLabel("Button"))
         self.ui_statusbar_highlight_state_container_layout.addWidget(self.status_bar_highlight_button_widget)
 
@@ -2328,7 +2340,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("<b>Highlight</b>"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.ui_statusbar_highlight_state_container_widget)
 
-        self.ui_statusbar_highlight_state_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
+        self.ui_statusbar_highlight_state_container_layout.addWidget(QHorizontalSeparator())
         self.ui_statusbar_highlight_container_layout.addWidget(QtWidgets.QLabel("Enabled"))
         self.ui_statusbar_highlight_container_layout.addWidget(self.status_bar_highlight_enable_widget)
 
@@ -2342,21 +2354,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color().recordColor(),
+            qta_color=Color().recordColor(),
         )
         self._icon_red = icon
         self._status_red = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color().activeColor(),
+            qta_color=Color().activeColor(),
         )
         self._icon_green = icon
         self._status_green = icon.pixmap(icon_size)
         icon = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
             use_qta=True,
-            qta_color=gremlin.ui.ui_common.Color().inactiveColor(),
+            qta_color=Color().inactiveColor(),
         )
         self._icon_gray = icon
         self._status_gray = icon.pixmap(icon_size)
@@ -2430,7 +2442,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """recreates the module status bar UI based on current status - this is used for modules to add content to the status bar at runtime"""
         if not Shiboken.isValid(self.status_bar_module_container_widget):
             return
-        gremlin.ui.ui_common.clear_layout(self.status_bar_module_container_layout)
+        clear_layout(self.status_bar_module_container_layout)
         index = 0
         for label, state, callback in self._status_bar_module_states.values():
             pixmap = None
@@ -2466,7 +2478,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if index and label:
                 # add a separator
-                self.status_bar_module_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalSeparator())
+                self.status_bar_module_container_layout.addWidget(QHorizontalSeparator())
 
             self.status_bar_module_container_layout.addWidget(action_widget)
             if widget:
@@ -2689,7 +2701,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         stacked_widget = self.ui.device_page_widget
         loading_widget = getattr(self.ui, "device_loading_widget", None)
         if loading_widget is None or not Shiboken.isValid(loading_widget):
-            loading_widget = gremlin.ui.ui_common.QEmptyWidget(mode="wait")
+            loading_widget = QEmptyWidget(mode="wait")
             self.ui.device_loading_widget = loading_widget
         if stacked_widget.indexOf(loading_widget) != 0:
             stacked_widget.insertWidget(0, loading_widget)
@@ -2734,7 +2746,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def clearWidgets(self):
         """clears the device cache"""
-        tracker = gremlin.ui.ui_common.StateTracker()
+        tracker = StateTracker()
         tracker.clear()
         # self.unregisterAllWidgets()
         verbose = gremlin.config.Configuration().verbose_mode_ui
@@ -2862,7 +2874,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             assert index != -1, "device widget not found in the UI"
             self.setDeviceContentIndex(index)
 
-    def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
+    def getActiveTabWidget(self) -> QSplitTabWidget:
         """gets the current tab widget"""
         return self.getCurrentRegisteredWidget()
 
@@ -2916,8 +2928,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # device.update()  # update connection state
             if not device.connected:
                 # indicate device is disconnected
-                color = gremlin.ui.ui_common.Color().tabMissingForegroundColor()
-                icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
+                color = Color().tabMissingForegroundColor()
+                icon = Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
                 self.ui.devices_tab_header_widget.setTabIcon(position, icon)
                 self.ui.devices_tab_header_widget.setTabTextColor(position, color)
             else:
@@ -2927,16 +2939,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 has_active_map = edit_mode in mode_map and mode_map[edit_mode]
                 has_map = False
                 if has_active_map:
-                    color = gremlin.ui.ui_common.Color().tabUsedForegroundColor()
-                    icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
+                    color = Color().tabUsedForegroundColor()
+                    icon = Icons.mappedIcon(qta_color=color)
                 else:
                     has_map = sum(mode_map.values()) > 0
                     if has_map:
-                        color = gremlin.ui.ui_common.Color().tabUsedOtherForegroundColor()
-                        icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
+                        color = Color().tabUsedOtherForegroundColor()
+                        icon = Icons.mappedOtherIcon(qta_color=color)
 
                     else:
-                        color = gremlin.ui.ui_common.Color().tabForegroundColor()
+                        color = Color().tabForegroundColor()
                         icon = QtGui.QIcon()
 
                 self.ui.devices_tab_header_widget.setTabTextColor(position, color)
@@ -4819,7 +4831,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tabdata = self.ui.devices_tab_header_widget.tabData(position)
         if tabdata:
             current_tab_device_guid = tabdata.device_guid
-            widget: gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
+            widget: QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
             if widget is None:
                 syslog.warning(f"SELECT: no UI widget found for the given device: {current_tab_device_guid}")
                 return
@@ -5032,8 +5044,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not os.path.isdir(gfx_folder):
                 raise gremlin.error.GremlinError(f"Unable to find icons: {folder}")
 
-        normal_color = gremlin.ui.ui_common.Color().normalColor()
-        active_color = gremlin.ui.ui_common.Color().activeColor()
+        normal_color = Color().normalColor()
+        active_color = Color().activeColor()
         is_dark = gremlin.shared_state.is_dark_theme
 
         profile_icon = "dark_profile_open.svg" if is_dark else "profile_open.svg"
@@ -5362,7 +5374,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if not current_profile_path or not os.path.isfile(current_profile_path):
                 syslog.info("PROC: no current profile found - auto process start is unable to function")
-                # gremlin.ui.ui_common.MessageBox(prompt = f"Current profile  [{current_profile_path}] is not saved or the XML could not be found.  Process auto-start disabled.")
                 return
 
             current_profile_base = os.path.basename(current_profile_path)
@@ -5383,7 +5394,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             if not os.path.isfile(new_profile_path):
                 syslog.error(f"PROC: process [{new_process_path}] profile file [{new_profile_path}] not found - ignoring process change")
-                # gremlin.ui.ui_common.MessageBox(prompt = f"New profile [{new_profile_path}] profile XML could not be found.  Process auto-start disabled.")
                 return
 
             new_profile_base = os.path.basename(new_profile_path)
@@ -5462,7 +5472,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :param is_active True if the system is active, False otherwise
         """
         gremlin.util.assert_ui_thread()
-        Color = gremlin.ui.ui_common.Color
         try:
             if self._is_active:
                 text_active = f'<font color="{Color().activeColor()}">Active</font>'
@@ -5694,10 +5703,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _create_cheatsheet(self):
         """Creates a profile cheatsheet"""
 
-        import gremlin.ui.ui_common
         import gremlin.ui.dialogs
 
-        # gremlin.ui.ui_common.MessageBox(prompt="This feature is not currently available.")
         # return # disable in this version
 
         dialog = gremlin.ui.dialogs.CreateReportDialog(parent=self)
@@ -5707,7 +5714,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """Clears all managed sound files"""
         import gremlin.sound
 
-        result = gremlin.ui.ui_common.ConfirmBox("Clear all managed sound files?\nThis will force GEX to regenerate them.?")
+        result = ConfirmBox("Clear all managed sound files?\nThis will force GEX to regenerate them.?")
         if result:
             pdm = gremlin.sound.PhraseDataManager()
             pdm.purgeManagedSoundFiles()
@@ -6657,8 +6664,8 @@ if __name__ == "__main__":
 
     app.setQuitOnLastWindowClosed(False)  # don't quit when the main window is hidden (minimize to tray)
 
-    app.setStyle(gremlin.ui.ui_common.GexAppStyle())
-    app.setStyleSheet(gremlin.ui.ui_common.Color().cssApplication())
+    app.setStyle(GexAppStyle())
+    app.setStyleSheet(Color().cssApplication())
     icon = gremlin.util.load_icon("gex.ico")
     if icon:
         app.setWindowIcon(icon)
@@ -6667,7 +6674,7 @@ if __name__ == "__main__":
     config.start()
 
     # color
-    color = gremlin.ui.ui_common.Color()
+    color = Color()
     color.setTheme(theme)
 
     # set faster context switch for Python
@@ -6694,7 +6701,7 @@ if __name__ == "__main__":
                 break
 
             if not prompted:
-                result = gremlin.ui.ui_common.ConfirmBox(
+                result = ConfirmBox(
                     informative_text="Another instance of GremlinEx is already running.  If the current instance cannot be terminated, this one will exit.",
                     prompt="Terminate running process?",
                 )
@@ -6836,10 +6843,6 @@ if __name__ == "__main__":
         maestro = gremlin.maestro.Maestro()
         maestro.offerDefaultJoysticks()
 
-        # instance
-        # _pixmaps = gremlin.ui.ui_common.Pixmaps()
-        # _widget_manager = gremlin.ui.ui_common.WidgetManager()
-
         # check for gamepad availability via VIGEM
         if gremlin.gamepad_handling.gamepadAvailable():
             gremlin.gamepad_handling.gamepad_initialization()
@@ -6861,7 +6864,7 @@ if __name__ == "__main__":
         gremlin.plugin_manager.ContainerPlugins()
 
         # input map tracking instance
-        iim_tracker = gremlin.ui.ui_common.WidgetCacheTracker()
+        iim_tracker = WidgetCacheTracker()
 
         # Create Gremlin UI
         ui = GremlinUi()
@@ -6892,7 +6895,7 @@ if __name__ == "__main__":
 
         ec = gremlin.execution_graph.ExecutionContext()
 
-        gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
+        gremlin.shared_state.char_width = get_text_width("M")
 
         # report ui
         report = gremlin.reporting.ReportEngine()

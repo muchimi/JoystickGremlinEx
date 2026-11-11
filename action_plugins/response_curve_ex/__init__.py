@@ -30,6 +30,9 @@ import gremlin.shared_state
 import gremlin.curve_handler
 import gremlin.util
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    QWarningWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -55,7 +58,7 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
             return
 
         msg = "Consider using <i><b>Vjoy Remap</b></i> to curve axis output to further reduce response latency.<br>Curve Ex should only be used in special situations that require chained or nested processing."
-        warning_widget = gremlin.ui.ui_common.QWarningWidget(msg)
+        warning_widget = QWarningWidget(msg)
         self.main_layout.addWidget(warning_widget)
         self.curve_widget = gremlin.curve_handler.AxisCurveWidget(self.action_data.curve_data, self)
         self.main_layout.addWidget(self.curve_widget)

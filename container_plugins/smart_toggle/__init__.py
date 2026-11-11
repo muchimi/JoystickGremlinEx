@@ -31,6 +31,9 @@ from gremlin.input_item import AbstractContainer, AbstractContainerWidget, Actio
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    QDelayWidget,
+)
 
 syslog = logging.getLogger("system")
 
@@ -60,7 +63,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         # Activation delay
         self.options_layout.addWidget(QtWidgets.QLabel("<b>Toggle time: </b>"))
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
+        self.delay_widget = QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
         self.delay_widget.setValue(self.container.delay * 1000)
         self.delay_widget.valueChanged.connect(self._delay_changed_cb)

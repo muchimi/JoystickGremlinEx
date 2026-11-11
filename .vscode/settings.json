@@ -2,6 +2,10 @@
     "python.REPL.enableREPLSmartSend": false,
     "python.terminal.activateEnvironment": false,
     "yaml.schemas": {   "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml" },
+    "files.associations": {
+        "*.iss": "innosetup",
+        "dependencies.iss": "innopascal"
+    },
 
   "yaml.customTags": [
 

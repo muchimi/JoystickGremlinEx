@@ -16,6 +16,11 @@ import gremlin.ui.ui_common
 from gremlin.ui.ui_common import Color, QDataRadioButtonGroup
 
 from .widgets import qcolor
+from gremlin.ui.ui_common import (
+    Buttons,
+    QRememberDialog,
+    getHContainer,
+)
 
 MAX_STOPS = 6
 GRADIENT_TYPE = "gradient"
@@ -414,7 +419,7 @@ class _GradientBar(QtWidgets.QWidget):
             self.update()
 
 
-class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
+class GradientEditorDialog(QRememberDialog):
     """Limited Photoshop-like gradient editor."""
 
     preview_changed = QtCore.Signal(object)
@@ -509,9 +514,9 @@ class GradientEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         stop_row.addWidget(self._stop_pos)
         layout.addLayout(stop_row)
 
-        ok_btn = gremlin.ui.ui_common.Buttons.getOkWidget(label="Ok", callback=self.accept)
-        cancel_btn = gremlin.ui.ui_common.Buttons.getCancelWidget(callback=self.reject)
-        layout.addWidget(gremlin.ui.ui_common.getHContainer(["||", ok_btn, cancel_btn], widget_only=True))
+        ok_btn = Buttons.getOkWidget(label="Ok", callback=self.accept)
+        cancel_btn = Buttons.getCancelWidget(callback=self.reject)
+        layout.addWidget(getHContainer(["||", ok_btn, cancel_btn], widget_only=True))
 
         self._sync_angle_enabled()
         self._refresh_stop_editors()

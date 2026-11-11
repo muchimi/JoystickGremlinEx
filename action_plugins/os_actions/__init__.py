@@ -40,6 +40,18 @@ import time
 import logging
 from shiboken6 import Shiboken
 import gremlin.process
+from gremlin.ui.ui_common import (
+    FindWindowDialog,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataPushButton,
+    QFloatLineEdit,
+    QHorizontalLine,
+    QLineEdit,
+    QPathLineItem,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -76,7 +88,7 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
 
         items = [("Set Window Focus", OsActionMode.SetFocus)]
 
-        self.action_selector = gremlin.ui.ui_common.QDataComboBox(
+        self.action_selector = QDataComboBox(
             value=self.action_data.action,
             source=items,
             callback=self._handle_action_changed,
@@ -84,11 +96,11 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
             auto_adjust=True,
         )
 
-        widget = gremlin.ui.ui_common.getHContainer(self.action_selector, "Mode:", widget_only=True)
+        widget = getHContainer(self.action_selector, "Mode:", widget_only=True)
         self.action_selector.setMaximumWidth(300)
         self.main_layout.addWidget(widget)
 
-        self.process_path_widget = gremlin.ui.ui_common.QPathLineItem(
+        self.process_path_widget = QPathLineItem(
             text=self.action_data.process_name,
             callback=self._handle_process_path_changed,
             callback_open=self._handle_find_window,
@@ -96,18 +108,18 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
         )
         self.process_path_widget.setMaximumWidth(300)
 
-        select_process = gremlin.ui.ui_common.QDataPushButton("Select Executable...", callback=self._handle_select_executable)
+        select_process = QDataPushButton("Select Executable...", callback=self._handle_select_executable)
 
-        container_process = gremlin.ui.ui_common.getHContainer([self.process_path_widget, select_process], widget_only=True)
+        container_process = getHContainer([self.process_path_widget, select_process], widget_only=True)
 
-        start_widget = gremlin.ui.ui_common.QDataCheckbox(
+        start_widget = QDataCheckbox(
             "Auto-start process if not running",
             value=self.action_data.start_process,
             callback=self._handle_autostart_changed,
             tooltip="Attemps to start the process if not running.",
         )
 
-        self.timeout_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        self.timeout_widget = QFloatLineEdit(
             value=self.action_data.start_timeout,
             min_range=1,
             max_range=1000,
@@ -115,20 +127,20 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
             callback=self._handle_timeout_changed,
         )
 
-        self.args_widget = gremlin.ui.ui_common.QLineEdit(
+        self.args_widget = QLineEdit(
             self.action_data.process_args,
             callback=self._handle_args_changed,
             tooltip="Command line arguments to pass to the process (optional)",
         )
 
         margin = 12
-        self.container_timeout = gremlin.ui.ui_common.getHContainer(
+        self.container_timeout = getHContainer(
             self.timeout_widget,
             "Process start timeout (s):",
             widget_only=True,
             left_margin=margin,
         )
-        self.container_args = gremlin.ui.ui_common.getHContainer(
+        self.container_args = getHContainer(
             self.args_widget,
             "Process command line arguments:",
             widget_only=True,
@@ -143,8 +155,8 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
             self.container_args,
         ]
 
-        self.container_setfocus = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
-        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.container_setfocus = getVContainer(widgets, widget_only=True)
+        self.main_layout.addWidget(QHorizontalLine())
         self.main_layout.addWidget(self.container_setfocus)
 
         self._update_ui()
@@ -176,7 +188,7 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot(object)
     def _handle_find_window(self, widget):
         """show find window dialog"""
-        self.dialog = gremlin.ui.ui_common.FindWindowDialog()
+        self.dialog = FindWindowDialog()
         self.dialog.closed.connect(self._handle_dialog_closed)
         self.dialog.exec()
 

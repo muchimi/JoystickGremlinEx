@@ -29,6 +29,23 @@ import gremlin.types
 
 import gremlin.util
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    DynamicDoubleSpinBox,
+    InputListenerWidget,
+    MessageBoxWarning,
+    NoKeyboardPushButton,
+    QDataCheckbox,
+    QDataComboBox,
+    QDataPushButton,
+    QExecuteWidget,
+    QIntLineEdit,
+    QProcessSelectorWidget,
+    RemoteClientWidget,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -63,14 +80,13 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         self.release_widget = QtWidgets.QWidget()
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        # self._send_selector = gremlin.ui.ui_common.QSendModeSelector(value = self.action_data.sendMode, callback = self._handle_sendmode_changed)
-        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
+        self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
 
-        self.mode_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.mode_widget = QDataComboBox()
 
         input_type = self.action_data.get_input_type()
         if input_type == InputType.JoystickAxis:
@@ -114,7 +130,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
             self.mode_press,
             self.mode_release,
         ]
-        self.click_options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.click_options_widget = getHContainer(widgets, widget_only=True)
 
         self.options_layout.addStretch()
 
@@ -125,23 +141,23 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         self.button_widget.hide()
         self.motion_widget.hide()
 
-        self._monitor_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_monitor_changed)
+        self._monitor_selector_widget = QDataComboBox(callback=self._handle_monitor_changed)
 
-        self.x_widget = gremlin.ui.ui_common.QIntLineEdit(value=self.action_data.mouse_x, max_range=None, min_range=None, callback=self._handle_mouse_x_changed)
-        self.y_widget = gremlin.ui.ui_common.QIntLineEdit(value=self.action_data.mouse_y, max_range=None, min_range=None, callback=self._handle_mouse_y_changed)
+        self.x_widget = QIntLineEdit(value=self.action_data.mouse_x, max_range=None, min_range=None, callback=self._handle_mouse_x_changed)
+        self.y_widget = QIntLineEdit(value=self.action_data.mouse_y, max_range=None, min_range=None, callback=self._handle_mouse_y_changed)
 
-        record_widget = gremlin.ui.ui_common.Buttons.getRecordWidget(callback=self._handle_mouse_position_record)
+        record_widget = Buttons.getRecordWidget(callback=self._handle_mouse_position_record)
 
-        center_widget = gremlin.ui.ui_common.QDataPushButton("Center", callback=self._handle_mouse_position_center)
+        center_widget = QDataPushButton("Center", callback=self._handle_mouse_position_center)
 
-        relative_widget = gremlin.ui.ui_common.QDataCheckbox(
+        relative_widget = QDataCheckbox(
             "Position is relative to processs", value=self.action_data.process_position_relative, callback=self._handle_process_relative_changed
         )
-        self.focus_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.focus_widget = QDataCheckbox(
             "Set focus to window", value=self.action_data.process_focus, callback=self._handle_process_focus_changed
         )
 
-        self.process_path_widget = gremlin.ui.ui_common.QProcessSelectorWidget(
+        self.process_path_widget = QProcessSelectorWidget(
             path=self.action_data.process_path,
             autostart=self.action_data.process_autostart,
             timeout=self.action_data.process_timeout,
@@ -155,13 +171,13 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets = [self.process_path_widget]
 
-        self.container_process = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self.container_process = getVContainer(widgets, widget_only=True)
 
-        self.container_monitor = gremlin.ui.ui_common.getHContainer(self._monitor_selector_widget, "Monitor:", widget_only=True)
+        self.container_monitor = getHContainer(self._monitor_selector_widget, "Monitor:", widget_only=True)
 
         widgets = ["Mouse position X:", self.x_widget, "Y:", self.y_widget, record_widget, center_widget]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
 
         widgets = [
             relative_widget,
@@ -170,7 +186,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
             widget,
         ]
 
-        self.container_position = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self.container_position = getVContainer(widgets, widget_only=True)
 
         self.main_layout.addLayout(self.mode_layout)
 
@@ -203,8 +219,8 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
         self.curve_button_widget = QtWidgets.QPushButton("Curve")
 
-        active_color = gremlin.ui.ui_common.Color().activeColor()
-        normal_color = gremlin.ui.ui_common.Color().normalColor()
+        active_color = Color().activeColor()
+        normal_color = Color().normalColor()
         self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
         self.curve_button_widget.setToolTip("Curve output")
@@ -221,7 +237,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
             self.curve_clear_widget,
         ]
 
-        self.container_output_curve_widget = gremlin.ui.ui_common.getHContainer(
+        self.container_output_curve_widget = getHContainer(
             widgets, "Input Curve Options", min_height=self.container_height, widget_only=True, left_margin=12
         )
         self.main_layout.addWidget(self.container_output_curve_widget)
@@ -389,14 +405,14 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         if started:
             hwnd = self.action_data.getProcessWindowHwnd()
             if hwnd:
-                self.dialog = gremlin.ui.ui_common.InputListenerWidget(
+                self.dialog = InputListenerWidget(
                     event_types=[InputType.Mouse],
                 )
                 self.dialog.closed.connect(self._handle_listen_selection)
                 self.dialog.show()
                 return
 
-        gremlin.ui.ui_common.MessageBoxWarning(prompt="Process window was not found.  Ensure the window is available.")
+        MessageBoxWarning(prompt="Process window was not found.  Ensure the window is available.")
 
     def _handle_listen_selection(self, accepted):
         if accepted:
@@ -488,7 +504,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         self.min_speed.setRange(0, 1e5)
         self.max_speed = QtWidgets.QSpinBox()
         self.max_speed.setRange(0, 1e5)
-        self.time_to_max_speed = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.time_to_max_speed = DynamicDoubleSpinBox()
         self.time_to_max_speed.setRange(0.0, 100.0)
         self.time_to_max_speed.setValue(0.0)
         self.time_to_max_speed.setDecimals(2)
@@ -510,7 +526,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _create_mouse_button_ui(self):
-        self.mouse_button_listen_widget = gremlin.ui.ui_common.NoKeyboardPushButton(
+        self.mouse_button_listen_widget = NoKeyboardPushButton(
             gremlin.types.MouseButton.to_string(self.action_data.button_id), tooltip="Listen for a mouse button"
         )
         self.mouse_button_listen_widget.clicked.connect(self._handle_button_listen)
@@ -522,7 +538,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         self.mouse_container_layout.addWidget(QtWidgets.QLabel("Mouse Button"))
         self.mouse_container_layout.addWidget(self.mouse_button_listen_widget)
 
-        self.mouse_button_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.mouse_button_selector_widget = QDataComboBox()
         self.mouse_button_selector_widget.addItem("Left (mouse 1)", MouseButton.Left)
         self.mouse_button_selector_widget.addItem("Middle (mouse 2)", MouseButton.Middle)
         self.mouse_button_selector_widget.addItem("Right (mouse 3)", MouseButton.Right)
@@ -735,7 +751,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_button_listen(self):
         """Prompts the user for the input to bind to this item."""
-        dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Mouse], return_kb_event=False)
+        dialog = InputListenerWidget([InputType.Mouse], return_kb_event=False)
         dialog.item_selected.connect(self._update_mouse_button)
         # Display the dialog centered in the middle of the UI
         root = self

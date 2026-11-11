@@ -75,6 +75,10 @@ from gremlin.input_item import InputItem, AbstractAction
 import dinput
 from psygnal import Signal
 import html
+from gremlin.ui.ui_common import (
+    ConfirmBox,
+    MessageBox,
+)
 
 
 syslog = logging.getLogger("system")
@@ -3082,7 +3086,7 @@ class Profile:
         # skip the root node
         show_parent = gremlin.config.Configuration().show_parent_mode
         for child in tree.children:
-            for pre, fill, node in anytree.RenderTree(child, style=anytree.ContStyle()):  # style=gremlin.ui.ui_common.ModeStyle()):
+            for pre, fill, node in anytree.RenderTree(child, style=anytree.ContStyle()):  
                 #'└''─'
                 # pre = '' if node.parent.is_root else '└'
                 # fill = '─' * (node.depth-1)
@@ -4858,7 +4862,7 @@ class Profile:
         verbose = gremlin.config.Configuration().verbose
         if save_as_name is None:
             if self._profile_fname is None:
-                gremlin.ui.ui_common.MessageBox(prompt="File is not set, please save the profile first")
+                MessageBox(prompt="File is not set, please save the profile first")
                 return
 
             assert self._profile_fname, "File name is not set"
@@ -5603,10 +5607,10 @@ class Profile:
 
         nodes = list(root.xpath("//text-to-speech"))
         if not nodes:
-            gremlin.ui.ui_common.MessageBox(informative_text="No TTS entries found in the profile.")
+            MessageBox(informative_text="No TTS entries found in the profile.")
             return None
 
-        result = gremlin.ui.ui_common.ConfirmBox(
+        result = ConfirmBox(
             informative_text="Do you want to convert all TTS entries to lay sound entries?\nThis will save to a new profile."
         )
         if not result:
@@ -5769,10 +5773,10 @@ class Profile:
         nodes = list(root.xpath("//macro"))
 
         if not nodes:
-            gremlin.ui.ui_common.MessageBox(informative_text="No Macro entries found in the profile.")
+            MessageBox(informative_text="No Macro entries found in the profile.")
             return None
 
-        result = gremlin.ui.ui_common.ConfirmBox(
+        result = ConfirmBox(
             informative_text="Do you want to convert all Macro entries to sequence containers??\nThis will save to a new profile."
         )
         if not result:

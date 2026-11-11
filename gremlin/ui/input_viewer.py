@@ -83,6 +83,14 @@ from gremlin.ui.ui_common import (
     QScrollableWidget,
     QWarningWidget,
     synchronize_grids,
+    JoystickDeviceWidget,
+)
+from gremlin.ui.ui_common import (
+    QActionCheckbox,
+    QEmptyWidget,
+    QScrollAreaResizeCallback,
+    QScrollLayout,
+    resetWidgetSize,
 )
 
 syslog = logging.getLogger("system")
@@ -291,8 +299,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         :param parent the parent of this widget
         """
         super().__init__(parent)
-        self.focus_icon = focus_icon or gremlin.ui.ui_common.Icons.circleArrowRight()
-        self.unfocus_icon = unfocus_icon or gremlin.ui.ui_common.Icons.circleArrowLeft()
+        self.focus_icon = focus_icon or Icons.circleArrowRight()
+        self.unfocus_icon = unfocus_icon or Icons.circleArrowLeft()
         self.focus_icon_size = focus_icon_size
 
         self.viewer = viewer
@@ -378,7 +386,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 # has axes
                 key = (device.key, VisualizationType.AxisTemporal)
                 value = vc.getValue(key, device, VisualizationType.AxisTemporal)
-                at_cb = gremlin.ui.ui_common.QActionCheckbox(
+                at_cb = QActionCheckbox(
                     "Axes - Temporal", data=key, value=value, action_size=focus_icon_size, action_callback=self._handle_visualizer_action
                 )
                 at_cb.setIgnoreKeyboard(True)
@@ -395,7 +403,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
                 key = (device.key, VisualizationType.AxisCurrent)
                 value = vc.getValue(key, device, VisualizationType.AxisCurrent)
-                ac_cb = gremlin.ui.ui_common.QActionCheckbox(
+                ac_cb = QActionCheckbox(
                     "Axes - Current", data=key, value=value, action_size=focus_icon_size, action_callback=self._handle_visualizer_action
                 )
                 ac_cb.setIgnoreKeyboard(True)
@@ -425,7 +433,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     # has button or hats
                     key = (device.key, VisualizationType.ButtonHat)
                     value = vc.getValue(key, device, VisualizationType.ButtonHat)
-                    bh_cb = gremlin.ui.ui_common.QActionCheckbox(
+                    bh_cb = QActionCheckbox(
                         stub, data=key, value=value, action_size=focus_icon_size, action_callback=self._handle_visualizer_action
                     )
                     bh_cb.setIgnoreKeyboard(True)
@@ -442,7 +450,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 if has_buttons:
                     key = (device.key, VisualizationType.Button)
                     value = vc.getValue(key, device, VisualizationType.Button)
-                    bo_cb = gremlin.ui.ui_common.QActionCheckbox(
+                    bo_cb = QActionCheckbox(
                         "Buttons", data=key, value=value, action_size=focus_icon_size, action_callback=self._handle_visualizer_action
                     )
                     bo_cb.setIgnoreKeyboard(True)
@@ -459,7 +467,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 if has_hats:
                     key = (device.key, VisualizationType.Hat)
                     value = vc.getValue(key, device, VisualizationType.Hat)
-                    ho_cb = gremlin.ui.ui_common.QActionCheckbox(
+                    ho_cb = QActionCheckbox(
                         "Hats", data=key, value=value, action_size=focus_icon_size, action_callback=self._handle_visualizer_action
                     )
                     ho_cb.setIgnoreKeyboard(True)
@@ -520,7 +528,7 @@ class VisualizationSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _select_real(self):
         """selects all hardware inputs"""
-        result = gremlin.ui.ui_common.ConfirmBox(
+        result = ConfirmBox(
             "Select all hardware inputs?",
             "This will select all non-temporal hardware inputs.<br>This could be extremely memory and performance intensive.<br>Are you sure you want to select all?",
             parent=self,
@@ -763,17 +771,17 @@ class VisualizerWidget(QtWidgets.QWidget):
         else:
             # show the widget
 
-            close_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(size=20, tooltip="Close")
+            close_widget = Buttons.getDeleteWidget(size=20, tooltip="Close")
             close_widget.clicked.connect(lambda: self.closed.emit(self._key))
 
             # give the widget a 100x expansion ratio so it fills most of the available space horizontally
             widget.setFixedWidth(600)
-            self._widget_container = gremlin.ui.ui_common.getHContainer([(widget, 100), "||", close_widget], widget_only=True, alignment=QtCore.Qt.AlignTop)
+            self._widget_container = getHContainer([(widget, 100), "||", close_widget], widget_only=True, alignment=QtCore.Qt.AlignTop)
 
             container_widget = QtWidgets.QWidget()
             container_layout = QtWidgets.QVBoxLayout(container_widget)
             container_layout.setContentsMargins(0, 0, 0, 0)
-            container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+            container_layout.addWidget(QHorizontalLine())
             container_layout.addWidget(self._widget_container)
             self._container = container_widget
 
@@ -829,15 +837,12 @@ class VisualizerWidget(QtWidgets.QWidget):
 
                     case VisualizationType.State:
                         # handle state widget
-                        # self.setFixedHeight(self.layout().sizeHint().height())
                         h = self._container.sizeHint().height()
                         self.setFixedHeight(h)
 
-                        # self._widget.updateLayout()
-                        # gremlin.ui.ui_common.resetWidgetSize(self)
                     case _:
                         # all others - free size
-                        gremlin.ui.ui_common.resetWidgetSize(self)
+                        resetWidgetSize(self)
                 return
             else:
                 # hide
@@ -852,7 +857,7 @@ class VisualizerWidget(QtWidgets.QWidget):
         self.setWidget(None)
 
 
-class InputViewerDialog(ui_common.BaseDialogUi):
+class InputViewerDialog(BaseDialogUi):
     """Main UI dialog for the input viewer."""
 
     def __init__(self, parent=None):
@@ -865,7 +870,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self.setStyleSheet("QGroupBox { border: 0px }")  # turn group box borders off
 
         self.focus_icon_size = 20
-        self.focus_icon = gremlin.ui.ui_common.Icons.focusIcon()
+        self.focus_icon = Icons.focusIcon()
 
         self.vis_selector = VisualizationSelector(
             change_callback=self._add_remove_visualization_widget, viewer=self, focus_icon=self.focus_icon, focus_icon_size=self.focus_icon_size
@@ -930,7 +935,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         vc.registerKey(key, device)
 
         checked = vc.getValue(None, None, VisualizationType.Keyboard, False)
-        self.keyboard_widget_selector = gremlin.ui.ui_common.QActionCheckbox(
+        self.keyboard_widget_selector = QActionCheckbox(
             "Keyboard/Mouse",
             value=checked,
             callback=self._toggle_keyboard_widget,
@@ -948,7 +953,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         key = vc.state_key
         vc.registerKey(key, device)
         checked = vc.getValue(None, None, VisualizationType.State, False)
-        self.state_widget_selector = gremlin.ui.ui_common.QActionCheckbox(
+        self.state_widget_selector = QActionCheckbox(
             "State",
             value=checked,
             callback=self._toggle_state_widget,
@@ -964,7 +969,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         # option to combine hat/buttons
         config = gremlin.config.Configuration()
-        self.combine_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.combine_widget = QDataCheckbox(
             "Combine Button + Hats",
             callback=self._toggle_combine_button_hat,
             value=config.input_viewer_combine_buttonhats,
@@ -1015,7 +1020,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
-        options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, auto_size=True)
+        options_widget = getHContainer(widgets, widget_only=True, auto_size=True)
         options_widget.setMaximumHeight(32)
 
         self.main_layout.addWidget(options_widget)
@@ -1034,9 +1039,9 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 3)
 
-        self._stacked_widget = QtWidgets.QStackedWidget()  # gremlin.ui.ui_common.QStackedWidgetSizeReporting(resize_callback=self._handle_view_resized)
+        self._stacked_widget = QtWidgets.QStackedWidget()
         self._blank_widget = QtWidgets.QLabel("Please select a visualizer.")
-        widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, "||", gremlin.ui.ui_common.QEmptyWidget(), "||"], widget_only=True)
+        widget = getVContainer([self._blank_widget, "||", QEmptyWidget(), "||"], widget_only=True)
         widget.setContentsMargins(4, 4, 4, 4)
         widget.setProperty("cssClass", "box_frame")
         self._stacked_widget.setContentsMargins(0, 0, 0, 0)
@@ -1055,7 +1060,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 """
 
-        info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap=True, hide_key="input_viewer")
+        info_box = QInfoBox(msg, wrap=True, hide_key="input_viewer")
         self.view_container_layout.addWidget(info_box)
 
         self.closed.connect(self._closed)
@@ -1321,7 +1326,7 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _select_all(self):
         # select keyboard and state
 
-        result = gremlin.ui.ui_common.ConfirmBox(
+        result = ConfirmBox(
             "Select all non-temporal inputs?",
             "This will select all non-temporal inputs.<br>This could be extremely memory and performance intensive.<br>Are you sure you want to select all?",
             parent=self,
@@ -1548,7 +1553,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose:
                     syslog.info(f"\tCreating new vis: {device.name}: {visualization.name}  key: {key}")
 
-                widget = ui_common.JoystickDeviceWidget(device, visualization)
+                widget = JoystickDeviceWidget(device, visualization)
                 visualizer_widget = self._viewer_widget_map[key]
                 visualizer_widget.setWidget(widget)
                 visualizer_widget.setFixedWidth(self.visualizerWidth)
@@ -1671,7 +1676,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             # layout.addWidget(self.keyboard_widget)
 
             self.keyboard_widget.hook()
-            self._keyboard_visualizer_widget = widget  # gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+            self._keyboard_visualizer_widget = widget 
             self._keyboard_visible = True
 
             # if self._visualizer_width:
@@ -1866,14 +1871,14 @@ class InputViewerArea(QtWidgets.QWidget):
 
         self._viewer_widgets = {}  # holds view widgets by key
 
-        self.scroll_area = gremlin.ui.ui_common.QScrollAreaResizeCallback(callback)
+        self.scroll_area = QScrollAreaResizeCallback(callback)
         self.scroll_area.setWidgetResizable(True)
         # self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn) # prevent flicker with nested scroll areas
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = gremlin.ui.ui_common.QScrollLayout(self.scroll_widget)
+        self.scroll_layout = QScrollLayout(self.scroll_widget)
         self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self.scroll_area.setWidget(self.scroll_widget)

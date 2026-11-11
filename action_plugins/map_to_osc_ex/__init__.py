@@ -37,6 +37,26 @@ from gremlin.ui.osc_device import OscInterface
 from psygnal import Signal
 from shiboken6 import Shiboken
 import html
+from gremlin.ui.ui_common import (
+    Color,
+    ConfirmBox,
+    Icons,
+    QAxisSourceSelector,
+    QDataComboBox,
+    QDataIPLineEdit,
+    QDataLineEdit,
+    QExecuteWidget,
+    QFloatLineEdit,
+    QGroupBox,
+    QIconLabel,
+    QIntLineEdit,
+    QOnOffWidget,
+    QReorderToolbar,
+    QTypeSelectorWidget,
+    QWarningWidget,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -347,7 +367,7 @@ class OscValueWidget(QtWidgets.QWidget):
 
         self._arg.valueChanged.connect(self._value_changed)
 
-        self._type_selector_widget = gremlin.ui.ui_common.QTypeSelectorWidget(data_type=osc_arg.dataType())
+        self._type_selector_widget = QTypeSelectorWidget(data_type=osc_arg.dataType())
         self._type_selector_widget.valueChanged.connect(self._type_changed)
 
         self.enabled_widget = QtWidgets.QCheckBox("Enabled")
@@ -355,7 +375,7 @@ class OscValueWidget(QtWidgets.QWidget):
         self.enabled_widget.clicked.connect(self._enabled_changed)
         self.enabled_widget.setToolTip("Enables this parameter output")
 
-        self._source_widget = gremlin.ui.ui_common.QDataComboBox()
+        self._source_widget = QDataComboBox()
         self._source_widget.addItem("Input", "input")
 
         source_mode = osc_arg.sourceMode()
@@ -383,12 +403,12 @@ class OscValueWidget(QtWidgets.QWidget):
         min_float = sys.float_info.min
 
         # input is an axis
-        self._scale_min_widget = gremlin.ui.ui_common.QFloatLineEdit(value=osc_arg.min_range, min_range=min_float, max_range=max_float)
+        self._scale_min_widget = QFloatLineEdit(value=osc_arg.min_range, min_range=min_float, max_range=max_float)
         self._scale_min_widget.valueChanged.connect(self._scale_min_changed)
-        self._scale_max_widget = gremlin.ui.ui_common.QFloatLineEdit(value=osc_arg.max_range, min_range=min_float, max_range=max_float)
+        self._scale_max_widget = QFloatLineEdit(value=osc_arg.max_range, min_range=min_float, max_range=max_float)
         self._scale_min_widget.valueChanged.connect(self._scale_max_changed)
 
-        self._scale_widget, self._scale_layout = gremlin.ui.ui_common.getHContainer(
+        self._scale_widget, self._scale_layout = getHContainer(
             [
                 QtWidgets.QLabel("Scale Min:"),
                 self._scale_min_widget,
@@ -408,11 +428,11 @@ class OscValueWidget(QtWidgets.QWidget):
         self._send_on_release_widget.setToolTip("If checked, commands sends on a release event")
         self._send_on_release_widget.clicked.connect(self._send_on_release_changed)
 
-        self._value_float_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range=min_float, max_range=max_float)
+        self._value_float_widget = QFloatLineEdit(min_range=min_float, max_range=max_float)
         self._value_float_widget.valueChanged.connect(self._press_value_changed)
 
         # float editor for fixed value release
-        self._release_float_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range=min_float, max_range=max_float)
+        self._release_float_widget = QFloatLineEdit(min_range=min_float, max_range=max_float)
         self._release_float_widget.valueChanged.connect(self._release_value_changed)
 
         if is_float:
@@ -425,17 +445,17 @@ class OscValueWidget(QtWidgets.QWidget):
                 self.release_widget = self._release_float_widget
 
         # int editor
-        self._value_int_widget = gremlin.ui.ui_common.QIntLineEdit()
-        self._release_int_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._value_int_widget = QIntLineEdit()
+        self._release_int_widget = QIntLineEdit()
         if is_integer:
             self._value_int_widget.setValue(value)
             self._release_int_widget.setValue(release_value)
 
         # string editor
-        self._value_string_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._value_string_widget = QDataLineEdit()
         self._value_string_widget.textChanged.connect(self._value_string_changed)
 
-        self._release_string_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._release_string_widget = QDataLineEdit()
         self._release_string_widget.textChanged.connect(self._release_string_changed)
         if is_string:
             self._value_string_widget.setText(value)
@@ -445,35 +465,35 @@ class OscValueWidget(QtWidgets.QWidget):
         widgets = []
 
         widgets.append(QtWidgets.QLabel("On Press:"))
-        self._value_bool_widget = gremlin.ui.ui_common.QOnOffWidget(value=True)
+        self._value_bool_widget = QOnOffWidget(value=True)
         widgets.append(self._value_bool_widget)
 
-        self._release_bool_widget = gremlin.ui.ui_common.QOnOffWidget(value=False)
+        self._release_bool_widget = QOnOffWidget(value=False)
         widgets.append(self._release_bool_widget)
 
         if is_bool:
             self._value_bool_widget.setValue(value)
             self._release_bool_widget.setValue(release_value)
 
-        self._float_widget, self._float_layout = gremlin.ui.ui_common.getHContainer(
+        self._float_widget, self._float_layout = getHContainer(
             [QtWidgets.QLabel("On press:"), self._value_float_widget, QtWidgets.QLabel("On release:"), self._release_float_widget]
         )
 
-        self._int_widget, self._float_layout = gremlin.ui.ui_common.getHContainer(
+        self._int_widget, self._float_layout = getHContainer(
             [QtWidgets.QLabel("On press:"), self._value_int_widget, QtWidgets.QLabel("On release:"), self._release_int_widget]
         )
 
-        self._string_widget, self._string_layout = gremlin.ui.ui_common.getHContainer(
+        self._string_widget, self._string_layout = getHContainer(
             [QtWidgets.QLabel("On press:"), self._value_string_widget, QtWidgets.QLabel("On release:"), self._release_string_widget]
         )
 
-        self._bool_widget, self._bool_layout = gremlin.ui.ui_common.getHContainer(
+        self._bool_widget, self._bool_layout = getHContainer(
             [QtWidgets.QLabel("On press:"), self._value_bool_widget, QtWidgets.QLabel("On release:"), self._release_bool_widget]
         )
 
         device_id = osc_arg.sourceDevice()
         input_id = osc_arg.sourceAxis()
-        self._selector_widget = gremlin.ui.ui_common.QAxisSourceSelector(device_id=device_id, input_id=input_id, label=None)
+        self._selector_widget = QAxisSourceSelector(device_id=device_id, input_id=input_id, label=None)
 
         self._selector_widget.valueChanged.connect(self._source_changed)
 
@@ -482,22 +502,22 @@ class OscValueWidget(QtWidgets.QWidget):
         self._sync_widget.clicked.connect(self._sync_input)
         self._sync_widget.setEnabled(self._action_data is not None)
 
-        self._axis_widget = gremlin.ui.ui_common.getHContainer([self._selector_widget, self._sync_widget], widget_only=True)
+        self._axis_widget = getHContainer([self._selector_widget, self._sync_widget], widget_only=True)
 
-        widget = gremlin.ui.ui_common.getHContainer(self._source_widget, "Source:", widget_only=True)
+        widget = getHContainer(self._source_widget, "Source:", widget_only=True)
         self.main_layout.addWidget(widget)
 
         self._auto_widget = QtWidgets.QLabel("Auto (scaled axis value 0..1)" if self._is_axis else "Auto (1 for press, 0 for release)")
-        self._warning_widget = gremlin.ui.ui_common.QWarningWidget()
+        self._warning_widget = QWarningWidget()
 
         widgets = [self._auto_widget, self._warning_widget, self._axis_widget, self._float_widget, self._int_widget, self._bool_widget, self._string_widget]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, "Output:", widget_only=True)
+        widget = getHContainer(widgets, "Output:", widget_only=True)
         self.main_layout.addWidget(widget)
 
         self.main_layout.addWidget(self._scale_widget)
 
-        self._send_widget = gremlin.ui.ui_common.getHContainer([self._send_on_press_widget, self._send_on_release_widget], widget_only=True)
+        self._send_widget = getHContainer([self._send_on_press_widget, self._send_on_release_widget], widget_only=True)
         self.main_layout.addWidget(self._send_widget)
 
         # self.main_layout.addWidget(QtWidgets.QLabel(f"Is axis: {self._is_axis}"))
@@ -722,14 +742,14 @@ class OscInputWidget(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         self._arg = arg
-        self._frame_widget = gremlin.ui.ui_common.QGroupBox()
+        self._frame_widget = QGroupBox()
         self._frame_widget.setContentsMargins(0, 0, 0, 0)
         self._frame_layout = QtWidgets.QGridLayout(self._frame_widget)  # QtWidgets.QGridLayout(self._frame_widget)
         self._is_axis = action_data.input_is_axis()  # true if mapping to an axis input
         self._action_data = action_data
 
-        left_content_widget, left_content_layout = gremlin.ui.ui_common.getVContainer()
-        right_content_widget, right_content_layout = gremlin.ui.ui_common.getVContainer()
+        left_content_widget, left_content_layout = getVContainer()
+        right_content_widget, right_content_layout = getVContainer()
         alignment = QtCore.Qt.AlignmentFlag.AlignTop
 
         self._frame_widget.setTitle(label)
@@ -738,17 +758,17 @@ class OscInputWidget(QtWidgets.QWidget):
         self._frame_layout.addWidget(right_content_widget, 0, 2, alignment=alignment)
         self._frame_layout.setColumnStretch(1, 1)
 
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        icon = Icons.trashIcon()
         delete_widget = QtWidgets.QPushButton()
         delete_widget.setIcon(icon)
         delete_widget.setToolTip("Delete this parameter")
         delete_widget.clicked.connect(self._delete_cb)
 
         arg_count = len(action_data.args) if action_data else 0
-        toolbar = gremlin.ui.ui_common.QReorderToolbar(index=arg.index, count=arg_count, hide=True)
+        toolbar = QReorderToolbar(index=arg.index, count=arg_count, hide=True)
         toolbar.moveRequested.connect(self._move_requested)
 
-        widget = gremlin.ui.ui_common.getHContainer([toolbar, delete_widget], widget_only=True)
+        widget = getHContainer([toolbar, delete_widget], widget_only=True)
 
         right_content_layout.addWidget(widget)
 
@@ -944,9 +964,9 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
         self._server_container_widget.setContentsMargins(0, 0, 0, 0)
         self._server_container_layout = QtWidgets.QHBoxLayout(self._server_container_widget)
 
-        self._server_ip_widget = gremlin.ui.ui_common.QDataIPLineEdit(self.action_data.server_ip)
+        self._server_ip_widget = QDataIPLineEdit(self.action_data.server_ip)
         self._server_ip_widget.textChanged.connect(self._server_ip_changed)
-        self._server_port_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self._server_port_widget = QIntLineEdit()
 
         self._server_port_widget.setRange(4096, 65535)
         self._server_port_widget.setValue(self.action_data.server_port)
@@ -967,37 +987,37 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
         self._server_container_layout.addWidget(self._test_widget)
         self._server_container_layout.addStretch()
 
-        self._list_widget, self._list_layout = gremlin.ui.ui_common.getVContainer()
+        self._list_widget, self._list_layout = getVContainer()
 
-        icon = gremlin.ui.ui_common.Icons.addIcon()
+        icon = Icons.addIcon()
         self.add_arg_widget = QtWidgets.QPushButton("Add Argument")
         self.add_arg_widget.setIcon(icon)
         self.add_arg_widget.setToolTip("Adds a new OSC argument")
         self.add_arg_widget.clicked.connect(self._add_arg)
 
         self.clear_args_widget = QtWidgets.QPushButton("Clear Arguments")
-        icon = gremlin.ui.ui_common.Icons.trashIcon()
+        icon = Icons.trashIcon()
         self.clear_args_widget.setIcon(icon)
         self.clear_args_widget.setToolTip("Clears all argurments")
 
         self.clear_args_widget.clicked.connect(self._clear_args)
 
-        self._osc_widget = gremlin.ui.ui_common.QDataLineEdit()
+        self._osc_widget = QDataLineEdit()
         self._osc_widget.setToolTip("OSC command")
         if self.action_data.command:
             self._osc_widget.setText(self.action_data.command)
         self._osc_widget.textChanged.connect(self._command_changed)
 
-        self._osc_container_widget, self._osc_container_layout = gremlin.ui.ui_common.getHContainer(
+        self._osc_container_widget, self._osc_container_layout = getHContainer(
             [QtWidgets.QLabel("Command:"), self._osc_widget, self._server_container_widget]
         )
 
         self._container_layout.addWidget(self._osc_container_widget)
 
-        self._button_widget = gremlin.ui.ui_common.getHContainer([self.add_arg_widget, self.clear_args_widget], left_stretch=True, widget_only=True)
+        self._button_widget = getHContainer([self.add_arg_widget, self.clear_args_widget], left_stretch=True, widget_only=True)
 
-        warning_color = gremlin.ui.ui_common.Color().warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel(
+        warning_color = Color().warningColor()
+        self._warning_widget = QIconLabel(
             "ph.shield-warning-fill", use_qta=True, icon_color=QtGui.QColor(warning_color), text="", use_wrap=False
         )
         self.main_layout.addWidget(QtWidgets.QLabel("Send OSC command:"))
@@ -1006,7 +1026,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._warning_widget)
         self.main_layout.addWidget(self._button_widget)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release, label="Command")
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release, label="Command")
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -1029,7 +1049,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets = [self._execute_on_load_widget, self._execute_on_start_widget, self._execute_on_stop_widget]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self._warning_widget.setVisible(False)
@@ -1154,7 +1174,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _reset_server(self):
         """reset IP and port to configured defaults"""
-        result = gremlin.ui.ui_common.ConfirmBox("Reset server data to defaults?")
+        result = ConfirmBox("Reset server data to defaults?")
         if result:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host)  # also updates action_data
@@ -1173,7 +1193,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
     def _clear_args(self):
         """removes all args"""
         if self.action_data.args:
-            result = gremlin.ui.ui_common.ConfirmBox("Remove arguments?")
+            result = ConfirmBox("Remove arguments?")
             if result:
                 self.action_data.args.clear()
                 self._update()

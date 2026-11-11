@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
     QStylePainter,
     QStyleOptionTabBarBase,
     QStyle,
-    
+
 )
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
@@ -5453,10 +5453,14 @@ def _message_box_ui(
     result = msgbox.exec()
     if callback:
         arg_count = inspect.signature(callback).parameters
-        if len(arg_count) == 1:
-            callback(result)
-        else:
-            callback(result, data)
+        count = len(arg_count)
+        match count:
+            case 0:
+                callback()
+            case 1:
+                callback(result)
+            case _:
+                callback(result, data)
 
 
 class QHLine(QtWidgets.QFrame):
@@ -11313,7 +11317,7 @@ class QSplitTabWidget(QDataWidget):
         self.setObjectName(object_name)
         self._cleanup_started = False
 
-        self.setStyleSheet(gremlin.ui.ui_common.Color().cssTabContent())
+        self.setStyleSheet(Color().cssTabContent())
         self.setContentsMargins(0, 0, 0, 0)
 
         self._id = gremlin.util.get_guid()  # unique ID
@@ -11723,7 +11727,7 @@ class QSplitTabWidget(QDataWidget):
 
         if key in self._widget_config_index_map:
             index = self._widget_config_index_map[key]
-            iis = gremlin.ui.ui_common.WidgetCacheTracker()
+            iis = WidgetCacheTracker()
             if iis.contains(key):
                 # this will trigger the expired event that will remove the widget
                 iis.removeWidget(key)
@@ -11786,7 +11790,7 @@ class QSplitTabWidget(QDataWidget):
             syslog.info("RIGHT PANEL: clear all widgets")
 
         # remove cached widgets
-        iis = gremlin.ui.ui_common.WidgetCacheTracker()
+        iis = WidgetCacheTracker()
         keys = list(self._widget_config_index_map.keys())
         for key in keys:
             if iis.contains(key):
@@ -15140,8 +15144,8 @@ class QJoystickInputWidget(QWidget):
 
         has_inputs = (filtered_axis or 0) + (filtered_button or 0) + (filtered_hat or 0)
         if not has_inputs:
-            warning_color = gremlin.ui.ui_common.Color().blueColor()
-            widget = gremlin.ui.ui_common.QIconLabel(
+            warning_color = Color().blueColor()
+            widget = QIconLabel(
                 "ph.shield-warning-fill",
                 use_qta=True,
                 icon_color=QtGui.QColor(warning_color),
@@ -15393,7 +15397,7 @@ class QCollapsible(QFrame):
         self._title_layout = QVBoxLayout(self._title_widget)
 
         # holds the collapse button
-        title_button_widget = gremlin.ui.ui_common.getVContainer(self._toggle_widget, widget_only=True)
+        title_button_widget = getVContainer(self._toggle_widget, widget_only=True)
 
         # holds the bar next to the collapse button
         self._top_bar_widget = AutohideContainer(name="top_bar_widget")
@@ -18148,43 +18152,43 @@ class QInteractWidget(QtWidgets.QWidget):
         widgets = []
 
         if self._interactions is None or Interactions.Delete in self._interactions:
-            self.remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+            self.remove_widget = Buttons.getDeleteWidget(
                 callback=self._handle_delete_step, data=data
             )
             self.remove_widget.setFixedSize(size, size)
             widgets.append(self.remove_widget)
 
         if self._interactions is None or Interactions.Up in self._interactions:
-            self.step_up_widget = gremlin.ui.ui_common.Buttons.getMoveUpWidget(
+            self.step_up_widget = Buttons.getMoveUpWidget(
                 callback=self._handle_move_step_up, data=data
             )
             self.step_up_widget.setFixedSize(size, size)
             widgets.append(self.step_up_widget)
 
         if self._interactions is None or Interactions.Down in self._interactions:
-            self.step_down_widget = gremlin.ui.ui_common.Buttons.getMoveDownWidget(
+            self.step_down_widget = Buttons.getMoveDownWidget(
                 callback=self._handle_move_step_down, data=data
             )
             self.step_down_widget.setFixedSize(size, size)
             widgets.append(self.step_down_widget)
 
         if self._interactions is None or Interactions.Top in self._interactions:
-            self.step_top_widget = gremlin.ui.ui_common.Buttons.getMoveTopWidget(
+            self.step_top_widget = Buttons.getMoveTopWidget(
                 callback=self._handle_move_step_top, data=data
             )
             self.step_top_widget.setFixedSize(size, size)
             widgets.append(self.step_top_widget)
 
         if self._interactions is None or Interactions.Bottom in self._interactions:
-            self.step_bottom_widget = gremlin.ui.ui_common.Buttons.getMoveBottomWidget(
+            self.step_bottom_widget = Buttons.getMoveBottomWidget(
                 callback=self._handle_move_step_bottom, data=data
             )
             self.step_bottom_widget.setFixedSize(size, size)
             widgets.append(self.step_bottom_widget)
 
-        move_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        move_container = getHContainer(widgets, widget_only=True)
 
-        widget = gremlin.ui.ui_common.getVContainer([move_container], widget_only=True)
+        widget = getVContainer([move_container], widget_only=True)
         self.has_edit_controls = len(widgets) > 0
 
         self.main_layout.addWidget(widget)
@@ -18282,7 +18286,7 @@ class QStepTile(QtWidgets.QWidget):
             )
         )
         if icon:
-            self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
+            self.icon_label = QIconLabel(icon, icon_size=16, text=label)
             self.main_layout.addWidget(self.icon_label)
         else:
             if label:

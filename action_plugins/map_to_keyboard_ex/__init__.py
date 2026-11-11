@@ -40,6 +40,26 @@ from gremlin.types import KeyboardOutputMode, SyncMode, SendType
 import gremlin.remote
 import vjoy.vjoy
 import gremlin.process
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    InputListenerWidget,
+    QDataRadioButton,
+    QDelayWidget,
+    QExecuteWidget,
+    QHorizontalLine,
+    QIconPushButton,
+    QInfoBox,
+    QIntLineEdit,
+    QSyncModeWidget,
+    QWarningWidget,
+    RemoteClientWidget,
+    TargetProcessWidget,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
+    synchronize_grids,
+)
 
 
 syslog = logging.getLogger("system")
@@ -66,82 +86,82 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         self.key_map = {}  # map of key to widgets
         self.keys = []  # list of keys
 
-        self.display_container_widget, self.display_container_layout = gremlin.ui.ui_common.getVContainer()
+        self.display_container_widget, self.display_container_layout = getVContainer()
 
-        self.key_combination_widget, self.key_combination_layout = gremlin.ui.ui_common.getHContainer()
+        self.key_combination_widget, self.key_combination_layout = getHContainer()
 
         widget = gremlin.ui.virtual_keyboard.QKeyWidget()
         self._key_height = widget.desiredHeight
         self.display_container_widget.setMinimumHeight(self._key_height + 4)
         self.display_container_layout.addWidget(self.key_combination_widget)
 
-        self.listen_multi_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback=self._record_multi_keys_cb)
+        self.listen_multi_widget = Buttons.getListenWidget(label="Listen (multi)", callback=self._record_multi_keys_cb)
         self.listen_multi_widget.setToolTip(
             "Listen for multiple inputs.  Click on ok when done.  Clicks on the buttons will not be included in the recorded list."
         )
 
-        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._record_keys_cb)
+        self.listen_widget = Buttons.getListenWidget(callback=self._record_keys_cb)
         self.listen_widget.setToolTip("Listen for a single input.")
 
-        self.show_keyboard_widget = gremlin.ui.ui_common.QIconPushButton("Select...")
-        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=gremlin.ui.ui_common.Color().listenColor()))
+        self.show_keyboard_widget = QIconPushButton("Select...")
+        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=Color().listenColor()))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
         self.show_keyboard_widget.setToolTip("Select keys using the virtual keyboard")
         self.show_keyboard_widget.setFixedHeight(24)  # match the other buttons
 
-        self.clear_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear_keys_cb)
+        self.clear_widget = Buttons.getClearWidget(callback=self._clear_keys_cb)
         self.clear_widget.setToolTip("Clears the current keys")
 
-        self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay)
-        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay)
+        self.delay_box = QDelayWidget(self.action_data.delay)
+        self.autorepeat_delay_box = QDelayWidget(self.action_data.autorepeat_delay)
 
         self.delay_box.setValue(self.action_data.delay)
         self.autorepeat_delay_box.setValue(self.action_data.autorepeat_delay)
 
         widgets = []
         for mode in KeyboardOutputMode:
-            rb = gremlin.ui.ui_common.QDataRadioButton(KeyboardOutputMode.to_displayname(mode), mode)
+            rb = QDataRadioButton(KeyboardOutputMode.to_displayname(mode), mode)
             rb.setChecked(self.action_data.mode == mode)
             rb.clicked.connect(self._mode_changed)
             widgets.append(rb)
 
-        self.description_widget = gremlin.ui.ui_common.QInfoBox(hide_key=self.__class__.__name__)
+        self.description_widget = QInfoBox(hide_key=self.__class__.__name__)
 
         self.delay_box.valueChanged.connect(self._delay_changed)
         self.autorepeat_delay_box.valueChanged.connect(self._autorepeat_changed)
 
-        self.container_options_widget = gremlin.ui.ui_common.getGridContainer(
-            gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True), "Output Mode:", widget_only=True, left_margin=12
+        self.container_options_widget = getGridContainer(
+            getGridContainer(widgets, widget_only=True), "Output Mode:", widget_only=True, left_margin=12
         )
 
         widgets = [
-            gremlin.ui.ui_common.getGridContainer(self.delay_box, "Duration (ms):", widget_only=True),
-            gremlin.ui.ui_common.getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only=True),
+            getGridContainer(self.delay_box, "Duration (ms):", widget_only=True),
+            getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only=True),
         ]
 
-        self.container_delay_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True, left_margin=12)
+        self.container_delay_widget = getVContainer(widgets, widget_only=True, left_margin=12)
         widgets.append(self.container_options_widget)
-        gremlin.ui.ui_common.synchronize_grids(widgets)
+        synchronize_grids(widgets)
 
         widgets = [self.clear_widget, self.listen_widget, self.listen_multi_widget, self.show_keyboard_widget]
 
-        self.container_action_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.container_action_widget = getHContainer(widgets, widget_only=True)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self._sync_widget = gremlin.ui.ui_common.QSyncModeWidget(
+        self._sync_widget = QSyncModeWidget(
             mode=self.action_data.sync_mode, label="State on profile start:", sync_modes=[SyncMode.Ignore, SyncMode.Input], callback=self._sync_changed
         )
         widgets = [self._execute_widget]
 
-        exec_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        exec_container = getHContainer(widgets, widget_only=True)
 
-        sync_container = gremlin.ui.ui_common.getHContainer(self._sync_widget, left_margin=12, widget_only=True)
+        sync_container = getHContainer(self._sync_widget, left_margin=12, widget_only=True)
 
-        widget = gremlin.ui.ui_common.QIntLineEdit(value=self.action_data.wheel_factor, min_range=1, max_range=100, callback=self._handle_wheel_factor_changed)
-        wheel_factor_container = gremlin.ui.ui_common.getHContainer(
+        widget = QIntLineEdit(value=self.action_data.wheel_factor, min_range=1, max_range=100, callback=self._handle_wheel_factor_changed)
+        wheel_factor_container = getHContainer(
             widget,
             "Mouse Wheel Factor:",
             widget_only=True,
@@ -151,7 +171,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.display_container_widget)
-        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.main_layout.addWidget(QHorizontalLine())
         self.main_layout.addWidget(self.container_action_widget)
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.container_delay_widget)
@@ -161,12 +181,12 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.description_widget)
 
         # new T183 - remote configuration widget
-        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
-        self.process_widget = gremlin.ui.ui_common.TargetProcessWidget(self.action_data.remote_config)
+        self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
+        self.process_widget = TargetProcessWidget(self.action_data.remote_config)
         self.main_layout.addWidget(self.remote_widget)
         self.main_layout.addWidget(self.process_widget)
 
-        self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
+        self.warning_widget = QWarningWidget()
         self.main_layout.addWidget(self.warning_widget)
 
         self.main_layout.addStretch()
@@ -231,7 +251,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
                     self._add_key(key)
 
         else:
-            self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarningWidget("No input selected. Please select at least one input."))
+            self.key_combination_layout.addWidget(QWarningWidget("No input selected. Please select at least one input."))
             self.key_combination_layout.addStretch()
 
     def _add_key(self, key):
@@ -398,7 +418,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
     def _record_keys_ui(self, multi_keys):
         """Prompts the user to press the desired key combination. - runs on UI thread"""
         gremlin.shared_state.push_suspend_highlighting()
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Keyboard, InputType.Mouse], return_kb_event=False, multi_keys=multi_keys)
+        button_press_dialog = InputListenerWidget([InputType.Keyboard, InputType.Mouse], return_kb_event=False, multi_keys=multi_keys)
 
         button_press_dialog.item_selected.connect(self._update_keys)
         button_press_dialog.keyInput.connect(self._handle_key_input)

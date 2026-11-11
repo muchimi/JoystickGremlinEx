@@ -42,6 +42,15 @@ from gremlin.input_types import InputType
 import gremlin.event_handler
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
+from gremlin.ui.ui_common import (
+    DynamicDoubleSpinBox,
+    Icons,
+    QDelayWidget,
+    QHeaderLabel,
+    QWarningWidget,
+    getHContainer,
+    getVContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -70,36 +79,36 @@ class TempoExContainerWidget(AbstractContainerWidget):
             return
         self._redraw_lock = False
         self.container.create_or_delete_virtual_button()
-        self.short_widget, self.short_layout = gremlin.ui.ui_common.getVContainer()
+        self.short_widget, self.short_layout = getVContainer()
         self.short_widget.setContentsMargins(8, 0, 0, 0)
 
-        self.long_widget, self.long_layout = gremlin.ui.ui_common.getVContainer()
+        self.long_widget, self.long_layout = getVContainer()
         self.long_widget.setContentsMargins(8, 0, 0, 0)
 
-        self.double_widget, self.double_layout = gremlin.ui.ui_common.getVContainer()
+        self.double_widget, self.double_layout = getVContainer()
         self.double_widget.setContentsMargins(8, 0, 0, 0)
 
-        self.options_widget, self.options_layout = gremlin.ui.ui_common.getVContainer()
+        self.options_widget, self.options_layout = getVContainer()
 
-        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Long Press Delay (ms):")
+        self.longpress_delay_widget = QDelayWidget(label="Long Press Delay (ms):")
         self.longpress_delay_widget.setToolTip(
             "Delay to detect long press, should be greater than double tap delay.\nIf the input is released before this value, a short press is executed.\nIf the input is released on or after this value, a long press is executed."
         )
         self.longpress_delay_widget.setValue(self.container.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
 
-        self.dtap_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Double-Tap Delay (ms):")
+        self.dtap_delay_widget = QDelayWidget(label="Double-Tap Delay (ms):")
         self.dtap_delay_widget.setToolTip("Delay to detect double tap.  If the input is pressed twice within this timeframe, a double-tap will be executed.")
         self.dtap_delay_widget.setValue(self.container.doubletap_delay * 1000)
         self.dtap_delay_widget.valueChanged.connect(self._dtap_delay_changed_cb)
 
-        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(
+        self.autorelease_delay_widget = QDelayWidget(
             label="Autorelease Delay (ms):", tooltip="Time between a press and release trigger.  Set to 0 to disable autoreleases."
         )
         self.autorelease_delay_widget.setValue(self.container.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
 
-        self.warning_widget = gremlin.ui.ui_common.QWarningWidget(text="", autohide=True)
+        self.warning_widget = QWarningWidget(text="", autohide=True)
 
         widgets = [
             self.longpress_delay_widget,
@@ -109,7 +118,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             # self.info_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        widget = getVContainer(widgets, widget_only=True)
         self.options_layout.addWidget(widget)
 
         # Activation moment
@@ -118,7 +127,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         widgets = ["<b>Activate On:</b", self.activate_press, self.activate_release]
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
 
         self.options_layout.addWidget(widget)
 
@@ -151,7 +160,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         # chain timeout
 
-        self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
+        self.timeout_input = DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
@@ -163,21 +172,21 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.timeout_input,
         ])
 
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = getHContainer(widgets, widget_only=True)
         self.options_layout.addWidget(widget)
 
-        icon = gremlin.ui.ui_common.Icons.chevronIcon()
+        icon = Icons.chevronIcon()
         widgets = [
             self.options_widget,
-            gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon),
+            QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon),
             self.short_widget,
-            gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon),
+            QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon),
             self.long_widget,
-            gremlin.ui.ui_common.QHeaderLabel("<b>Double Tap Press Action Sets</b>", icon=icon),
+            QHeaderLabel("<b>Double Tap Press Action Sets</b>", icon=icon),
             self.double_widget,
         ]
 
-        self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer(widgets)
+        self.content_widget, self.content_layout = getVContainer(widgets)
 
         self.short_action_selector = ActionSelector(
             # self.container.get_input_type(),

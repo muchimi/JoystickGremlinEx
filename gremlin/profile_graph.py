@@ -89,6 +89,18 @@ from lxml.etree import _Element as Element
 
 from abc import ABC, abstractmethod
 import html
+from gremlin.ui.ui_common import (
+    QDataComboBox,
+    QWarningWidget,
+    BaseDialogUi,
+    QShowAtCursorDialog,
+    getHContainer,
+    getVContainer,
+    QDataPushButton,
+    QDataCheckbox,
+    QDataLineEdit,
+    clear_layout,
+)
 
 syslog = logging.getLogger("system")
 
@@ -925,7 +937,7 @@ class GraphModeNode(GraphBaseNode):
         self.setBadgeColor(getGraphNodeColor(ProfileNodeType.Mode))
 
 
-class ProfileTreeDialogUI(ui_common.BaseDialogUi):
+class ProfileTreeDialogUI(BaseDialogUi):
     """dialog that renders the profile tree in a NodeGraphQt graph view"""
 
     def __init__(self, graph: ProfileGraph, parent=None):
@@ -1353,7 +1365,7 @@ class ProfileTreeDialogUI(ui_common.BaseDialogUi):
         return str(node.nodeType).split(".")[-1]
 
 
-class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
+class DeviceCopyDialogUI(QShowAtCursorDialog):
     def __init__(self, device_guid=None, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
 
@@ -1361,7 +1373,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        warning_widget = gremlin.ui.ui_common.QWarningWidget("This is an experimental feature.")
+        warning_widget = QWarningWidget("This is an experimental feature.")
         self.main_layout.addWidget(warning_widget)
 
         self.source_device = gremlin.joystick_handling.getDevice(device_guid)
@@ -1369,7 +1381,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
             syslog.error(f"Device copy: source [{device_guid}] device not found")
             self.close()
 
-        self.device_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.device_selector = QDataComboBox()
         devices = gremlin.joystick_handling.all_joystick_devices()
         devices = [dev for dev in devices if dev.device_guid != self.source_device.device_guid and dev.device_type == self.source_device.device_type]
 
@@ -1383,7 +1395,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         self.target_device = self.device_selector.currentData()
         self.device_selector.currentIndexChanged.connect(self._device_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(["Target Device:", self.device_selector], widget_only=True)
+        widget = getHContainer(["Target Device:", self.device_selector], widget_only=True)
         self.main_layout.addWidget(widget)
 
         self.main_layout.addWidget(QtWidgets.QWidget())  # separator
@@ -1391,7 +1403,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         ok_button_widget.clicked.connect(self._execute_cb)
         cancel_button_widget = QtWidgets.QPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._close_cb)
-        button_container_widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True)
+        button_container_widget = getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True)
 
         self.main_layout.addWidget(button_container_widget)
 
@@ -1410,7 +1422,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         self.close()
 
 
-class DeviceRemapDialogUI(ui_common.BaseDialogUi):
+class DeviceRemapDialogUI(BaseDialogUi):
     """dialog box to handle a profile remap between like devices"""
 
     def __init__(self, graph: ProfileGraph, parent=None, device_guid=None):  # noqa: F821
@@ -1447,13 +1459,13 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         self._graph = graph
 
         # Add header information
-        header_widget, layout = ui_common.getHContainer(QtWidgets.QLabel("Joystick Device Mappings:"))
+        header_widget, layout = getHContainer(QtWidgets.QLabel("Joystick Device Mappings:"))
 
-        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget = QDataPushButton("Ok")
         ok_button_widget.clicked.connect(self._execute_cb)
-        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget = QDataPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._close_cb)
-        button_container_widget, button_container_layout = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True)
+        button_container_widget, button_container_layout = getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, auto_size=True)
 
         profile_node = graph.root
 
@@ -1538,7 +1550,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
     def update_ui(self, profile_node):
         """populates the UI mapping for joysticks only - the other devices always map 1:1"""
         map_layout = self.map_layout
-        ui_common.clear_layout(map_layout)
+        clear_layout(map_layout)
         device_nodes = self._device_nodes
         row = 0
 
@@ -1548,12 +1560,12 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         device_node: ProfileDeviceNode
 
-        select_all_widget = QtWidgets.QPushButton("Select All")
+        select_all_widget = QDataPushButton("Select All")
         select_all_widget.clicked.connect(self._select_all)
-        select_none_widget = QtWidgets.QPushButton("Select None")
+        select_none_widget = QDataPushButton("Select None")
         select_none_widget.clicked.connect(self._select_none)
 
-        widget, layout = ui_common.getHContainer([select_all_widget, select_none_widget])
+        widget = getHContainer([select_all_widget, select_none_widget], auto_size=True, widget_only=True)
         map_layout.addWidget(widget, row, 0, 1, 2, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
         map_layout.addWidget(QtWidgets.QLabel(""), row, 2)
         row += 1
@@ -1562,7 +1574,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
             if device_node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
                 source_device: DeviceSummary = self._source_map[device_node.device_guid]
 
-                enable_widget = ui_common.QDataCheckbox("Enable", data=device_node)
+                enable_widget = QDataCheckbox("Enable", data=device_node)
                 enable_widget.setToolTip("Enables remap")
                 enable_widget.setChecked(device_node.enabled)
                 enable_widget.clicked.connect(self._enabled_changed)
@@ -1572,26 +1584,26 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 map_layout.addWidget(enable_widget, row, 0)
                 row += 1
 
-                source_device_name_widget = ui_common.QDataLineEdit(device_node.device_name)
+                source_device_name_widget = QDataLineEdit(device_node.device_name)
                 source_device_name_widget.setReadOnly(True)
 
-                source_device_guid_widget = ui_common.QDataLineEdit(device_node.device_id)
+                source_device_guid_widget = QDataLineEdit(device_node.device_id)
                 source_device_guid_widget.setReadOnly(True)
 
-                source_device_type_widget = ui_common.QDataLineEdit(device_node.device_type.name)
+                source_device_type_widget = QDataLineEdit(device_node.device_type.name)
                 source_device_type_widget.setReadOnly(True)
 
-                target_device_list_widget = ui_common.QDataComboBox(data=(source_device, device_node))
+                target_device_list_widget = QDataComboBox(data=(source_device, device_node))
                 self._populate_devices(target_device_list_widget, device_node)
                 target_device: DeviceSummary = target_device_list_widget.currentData()
 
                 target_id = target_device.device_id
-                target_device_guid_widget = ui_common.QDataLineEdit(target_id)
+                target_device_guid_widget = QDataLineEdit(target_id)
                 target_device_guid_widget.setReadOnly(True)
 
                 self._target_device_guid_map[device_node.id] = target_device_guid_widget
 
-                target_device_type_widget = ui_common.QDataLineEdit(target_device.device_type.name)
+                target_device_type_widget = QDataLineEdit(target_device.device_type.name)
                 target_device_type_widget.setReadOnly(True)
                 self._target_device_type_map[device_node.id] = target_device_type_widget
 

@@ -30,6 +30,17 @@ import gremlin.ui.ui_common
 from gremlin.ui.ui_common import QBoxFrame
 import os
 from shiboken6 import Shiboken
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    Icons,
+    QDataLineEdit,
+    QHLine,
+    QInfoBox,
+    clear_layout,
+    getHContainer,
+    getVContainer,
+)
 
 
 syslog = logging.getLogger("system")
@@ -137,7 +148,7 @@ class ModuleManagementController(QtCore.QObject):
             return
         layout = panel.layout()
         if layout is not None:
-            gremlin.ui.ui_common.clear_layout(layout)
+            clear_layout(layout)
 
     def rename_instance(self, instance, widget, name):
         instance.name = name
@@ -196,7 +207,7 @@ class ModuleManagementController(QtCore.QObject):
         variables = gremlin.user_plugin.get_variable_definitions(instance.parent.file_name)
 
         layout = self.view.right_panel_widget.layout()
-        gremlin.ui.ui_common.clear_layout(layout)
+        clear_layout(layout)
         self._configured_instance = instance
 
         # add the name of the instance being configured
@@ -205,7 +216,7 @@ class ModuleManagementController(QtCore.QObject):
         header_container_widget.setContentsMargins(0, 0, 0, 0)
         header_container_layout.setContentsMargins(0, 0, 0, 0)
 
-        instance_name_widget = gremlin.ui.ui_common.QDataLineEdit(text=instance.name)
+        instance_name_widget = QDataLineEdit(text=instance.name)
         instance_name_widget.setStyleSheet("border-style: solid;border-width: 1px;")
         instance_name_widget.data = instance
         instance_name_widget.textChanged.connect(self._update_instance_name_cb)
@@ -214,7 +225,7 @@ class ModuleManagementController(QtCore.QObject):
         # header_container_layout.addStretch()
 
         layout.addWidget(header_container_widget)
-        layout.addWidget(gremlin.ui.ui_common.QHLine())
+        layout.addWidget(QHLine())
         verbose = gremlin.config.Configuration().verbose
 
         if verbose:
@@ -370,12 +381,12 @@ class ModuleManagementViewWidget(QtWidgets.QSplitter):
         self.module_list = ModuleListWidget()
 
         # Button to add a new module
-        self.add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(
+        self.add_widget = Buttons.getAddWidget(
             "Add Plugin", tooltip="Adds a Python user plugin to the profile", callback=self._handle_add_module
         )
-        widget = gremlin.ui.ui_common.getHContainer(self.add_widget, left_stretch=True, widget_only=True)
+        widget = getHContainer(self.add_widget, left_stretch=True, widget_only=True)
 
-        info_widget = gremlin.ui.ui_common.QInfoBox(
+        info_widget = QInfoBox(
             """
 Please add one or more Python modules to the profile. Each module will be loaded or reloaded at profile start and any errors will be shown at profile start.
 Modules get reloaded at every profile start.
@@ -385,7 +396,7 @@ This is due to the way dynamic module loading and packaging works in Python.
         )
 
         widgets = [self.module_list, widget, info_widget]
-        self.left_panel_widget, self.left_panel_layout = gremlin.ui.ui_common.getVContainer(widgets, no_stretch=True)
+        self.left_panel_widget, self.left_panel_layout = getVContainer(widgets, no_stretch=True)
 
         # Create the right panel which will show the parameters of a
         # selected module instance (scrollable — plugins can have many rows)
@@ -477,7 +488,7 @@ class ModuleListWidget(QtWidgets.QScrollArea):
 
     def clear(self):
         self.widget_list = []
-        gremlin.ui.ui_common.clear_layout(self.content_layout)
+        clear_layout(self.content_layout)
         self.content.layout().addStretch()
 
 
@@ -490,7 +501,7 @@ class ModuleWidget(QBoxFrame):
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        background_color = gremlin.ui.ui_common.Color().actionBackgroundColor()
+        background_color = Color().actionBackgroundColor()
         self.setStyleSheet(f"QFrame {{ background-color : {background_color}; }}")
 
         header_layout = QtWidgets.QHBoxLayout()
@@ -500,11 +511,11 @@ class ModuleWidget(QBoxFrame):
         _prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         if self.has_variables:
-            icon = gremlin.ui.ui_common.Icons.addIcon()
+            icon = Icons.addIcon()
             self.btn_add_instance = QtWidgets.QPushButton(icon, "")
             header_layout.addWidget(self.btn_add_instance)
 
-        icon = gremlin.ui.ui_common.Icons.removeIcon()
+        icon = Icons.removeIcon()
         self.btn_delete = QtWidgets.QPushButton(icon, "")
         header_layout.addWidget(self.btn_delete)
 
@@ -543,20 +554,20 @@ class InstanceWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self):
             return
 
-        icon_color = gremlin.ui.ui_common.Color().normalColor()
+        icon_color = Color().normalColor()
 
         self.label_name = QtWidgets.QLabel(self.name)
 
-        self.btn_rename = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.editIcon(), "")
+        self.btn_rename = QtWidgets.QPushButton(Icons.editIcon(), "")
         self.btn_rename.setToolTip("Rename this instance")
 
         self.btn_rename.clicked.connect(self.rename_instance)
-        self.btn_configure = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.gearIcon(qta_color=icon_color), "")
+        self.btn_configure = QtWidgets.QPushButton(Icons.gearIcon(qta_color=icon_color), "")
         self.btn_configure.setToolTip("Configure this instance")
-        self.btn_delete = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.removeIcon(), "")
+        self.btn_delete = QtWidgets.QPushButton(Icons.removeIcon(), "")
         self.btn_delete.setToolTip("Delete this instance")
 
-        self.btn_copy = QtWidgets.QPushButton(gremlin.ui.ui_common.Icons.copyIcon(), "")
+        self.btn_copy = QtWidgets.QPushButton(Icons.copyIcon(), "")
         self.btn_copy.setToolTip("Copy this instance")
 
         self.main_layout.addWidget(self.label_name)

@@ -24,6 +24,20 @@ import gremlin.util
 
 
 import gremlin.ui.ui_common
+from gremlin.ui.ui_common import (
+    Buttons,
+    InputListenerWidget,
+    JoystickSelector,
+    QDataCheckbox,
+    QDataRadioButton,
+    QDelayWidget,
+    QExecuteWidget,
+    QFloatLineEdit,
+    QHatSelectorComboBox,
+    QInfoBox,
+    QWarningWidget,
+    getHContainer,
+)
 
 syslog = logging.getLogger("system")
 
@@ -39,10 +53,7 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        # self.action_selector_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
-        # self.action_selector_widget.addItem("Joystick","joystick")
-
-        self.device_selector_widget = gremlin.ui.ui_common.JoystickSelector(
+        self.device_selector_widget = JoystickSelector(
             valid_types=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], callback=self._handle_device_selected
         )
 
@@ -52,35 +63,35 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
         margin = 12
 
-        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._handle_listen_request)
+        listen_widget = Buttons.getListenWidget(callback=self._handle_listen_request)
 
         widgets = [self.device_selector_widget, listen_widget]
 
-        self.container_selector_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.container_selector_widget = getHContainer(widgets, widget_only=True)
 
         # button press widget
-        self.button_release_widget = gremlin.ui.ui_common.QDataRadioButton(
+        self.button_release_widget = QDataRadioButton(
             "Released", value=self.action_data.mode == "release", data="release", callbackEx=self._handle_button_state_changed
         )
-        self.button_press_widget = gremlin.ui.ui_common.QDataRadioButton(
+        self.button_press_widget = QDataRadioButton(
             "Pressed",
             value=self.action_data.mode == "press",
             data="press",
             callbackEx=self._handle_button_state_changed,
         )
 
-        self.pulse_widget = gremlin.ui.ui_common.QDataRadioButton(
+        self.pulse_widget = QDataRadioButton(
             "Pulse", value=self.action_data.mode == "pulse", data="pulse", callbackEx=self._handle_button_state_changed
         )
 
-        self.pulse_delay_widget = gremlin.ui.ui_common.QDelayWidget(value=self.action_data.pulse_delay, callback=self._handle_pulse_delay_changed)
+        self.pulse_delay_widget = QDelayWidget(value=self.action_data.pulse_delay, callback=self._handle_pulse_delay_changed)
 
 
         # set button widgets
         widgets = [self.button_press_widget, self.button_release_widget, self.pulse_widget, self.pulse_delay_widget, "||"]
-        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets, "Mode:", left_margin=margin, widget_only=True)
+        self.container_button_widget = getHContainer(widgets, "Mode:", left_margin=margin, widget_only=True)
 
-        self.use_actual_widget = gremlin.ui.ui_common.QDataCheckbox(
+        self.use_actual_widget = QDataCheckbox(
             "Use actual value",
             value=self.action_data.use_actual,
             callback=self._handle_use_actual_changed,
@@ -88,15 +99,15 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         # set axis widgets
-        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(value=self.action_data.value, callback=self._handle_value_changed)
-        self.container_value_widget = gremlin.ui.ui_common.getHContainer(self.value_widget, "Set Axis:", left_margin=margin, widget_only=True)
+        self.value_widget = QFloatLineEdit(value=self.action_data.value, callback=self._handle_value_changed)
+        self.container_value_widget = getHContainer(self.value_widget, "Set Axis:", left_margin=margin, widget_only=True)
 
         # set hat direction widgets
-        self.direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(value=self.action_data.direction, callback=self._handle_direction_changed)
+        self.direction_widget = QHatSelectorComboBox(value=self.action_data.direction, callback=self._handle_direction_changed)
 
-        self.container_direction_widget = gremlin.ui.ui_common.getHContainer(self.direction_widget, "Set Position:", left_margin=margin, widget_only=True)
+        self.container_direction_widget = getHContainer(self.direction_widget, "Set Position:", left_margin=margin, widget_only=True)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        self._execute_widget = QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -111,10 +122,10 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self._execute_widget)
 
-        self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
+        self.warning_widget = QWarningWidget()
         self.main_layout.addWidget(self.warning_widget)
 
-        info_widget = gremlin.ui.ui_common.QInfoBox("This action will trigger a virtual event as if the input was triggered.", hide_key="trigger_action")
+        info_widget = QInfoBox("This action will trigger a virtual event as if the input was triggered.", hide_key="trigger_action")
         self.main_layout.addWidget(info_widget)
 
         self._update_ui()
@@ -129,7 +140,7 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_listen_request(self):
         """calls up a listen box to select the input"""
-        dialog = gremlin.ui.ui_common.InputListenerWidget(
+        dialog = InputListenerWidget(
             [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
             callback=self._handle_listen_selection,
         )
