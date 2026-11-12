@@ -32,7 +32,7 @@ import gremlin.util
 
 from . import error, util
 from vjoy import vjoy
-from vjoy.vjoy_interface import VJoyInterface
+from gremlin.virtual_output_startup import vjoy_installed
 
 from gremlin.input_types import InputType
 import gremlin.config
@@ -1858,7 +1858,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                 disconnected_list = []
                 used_counts = []
 
-                config.vjoy_installed = bool(VJoyInterface.valid and VJoyInterface.vJoyEnabled())
+                config.vjoy_installed = vjoy_installed(config)
 
                 for vid in range(1, 17):  # index 1 up to 16
                     # Only process devices that actually exist

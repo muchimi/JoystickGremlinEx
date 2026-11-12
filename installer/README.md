@@ -21,6 +21,13 @@ Both installers offer unchecked tasks for optional dependencies:
 - HidHide is offered when its driver/service and installer dependency registration are absent.
 - GEX Maestro Bridge is offered when the bridge is not installed. vJoy detection shows a warning but does not prevent bridge installation. Bridge detection includes the Windows services, the bridge's 32/64-bit uninstall registration, and its default console installation.
 
+Both setup and application startup confirm vJoy availability by calling
+`vJoyEnabled()` through `vJoyInterface.dll` and finding at least one defined
+device in slots 1–16 with `GetVJDStatus()`. Owned, free, and busy devices count;
+the checks do not acquire devices. Registry entries and cached flags alone do
+not count as an installed driver. Setup includes a matching x86 probe DLL for
+its x86 process; merely loading that DLL is not a positive result.
+
 Selected installers run sequentially after GremlinEx is installed and before its launch option runs. They are independent installations: GremlinEx uninstall does not remove them. Cancellation or download/install failure leaves GremlinEx installed. Restart requests are passed back to GremlinEx setup, and automatic dependency reboots are suppressed.
 
 Downloads use the latest stable x64 setup from the official repositories:

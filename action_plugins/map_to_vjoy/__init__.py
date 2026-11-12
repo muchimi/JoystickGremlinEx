@@ -7738,7 +7738,7 @@ class MergeData:
 class VjoyRemap(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
-    name = "Vjoy Remap"
+    name = "Virtual Remap"
     aliases = ["Vjoy Remap", "Map to Vjoy"]
     tag = "vjoyremap"
     hint = """Advanced VJOY mapper.
@@ -9770,5 +9770,5 @@ Supports axis merging, curved output, command, hat and button mappings.
 
 
 version = 1
-name = "Vjoy Remap"
+name = "Virtual Remap"
 create = VjoyRemap

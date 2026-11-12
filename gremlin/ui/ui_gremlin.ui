@@ -77,7 +77,7 @@
     <addaction name="actionPDFCheatsheet"/>
     <addaction name="separator"/>
     <addaction name="actionOptions"/>
-    <addaction name="actionLogDisplay"/>
+    <!-- <addaction name="actionLogDisplay"/> -->
    </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
@@ -208,11 +208,11 @@
     <string>Create 1:1 mapping</string>
    </property>
   </action>
-  <action name="actionLogDisplay">
+  <!-- <action name="actionLogDisplay">
    <property name="text">
     <string>&amp;Log display</string>
    </property>
-  </action>
+  </action> -->
   <action name="actionMergeAxis">
    <property name="text">
     <string>&amp;Merge Axis</string>

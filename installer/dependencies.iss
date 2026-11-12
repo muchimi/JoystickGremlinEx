@@ -1,5 +1,5 @@
-// Shared by the bundled and online installers. Do not use the packaged
-// vJoyInterface.dll as evidence of an installed vJoy driver.
+// Shared by the bundled and online installers. Require a live driver response;
+// neither registry data nor the presence of the packaged DLL proves installation.
 var
   DependencyRestartRequired: Boolean;
   BridgeStatusChecked, BridgeInstalled, BridgeCanInstall, VjoyInstalled: Boolean;
@@ -10,6 +10,12 @@ var
   BridgeTestButton: TNewButton;
 
 function IsVjoyInstalled(): Boolean; forward;
+
+function VJoyDriverEnabled: Boolean;
+external 'vJoyEnabled@files:vJoyInterface.dll cdecl delayload setuponly';
+
+function VJoyDeviceStatus(DeviceID: Cardinal): Integer;
+external 'GetVJDStatus@files:vJoyInterface.dll cdecl delayload setuponly';
 
 function NeedsHidHide: Boolean;
 var
@@ -123,7 +129,9 @@ var
 begin
   if CurPageID <> wpSelectTasks then exit;
   if VjoyInstalled then
-    BridgeConnectionLabel.Caption := 'Warning: a vJoy installation was detected which could be a false-positive.%nThis does not prevent installing GEX Maestro Bridge.%nAny remaining vJoy installation may be disabled and configuration data deleted when the bridge is running due to a known driver level conflict.'
+    BridgeConnectionLabel.Caption := 'Warning: vJoy is running with configured devices.' + #13#10 +
+      'This does not prevent installing GEX Maestro Bridge.' + #13#10 +
+      'Any remaining vJoy installation may be disabled and configuration data deleted when the bridge is running due to a known driver level conflict.'
   else
     BridgeConnectionLabel.Caption := BridgeConnectionMessage;
   BridgeTestButton.Enabled := BridgeInstalled;
@@ -220,12 +228,12 @@ begin
 end;
 
 function IsVjoyInstalled(): Boolean;
-// Checks if the vJoy driver is installed by looking for its service in the HIDCLASS registry key
-// or the application's uninstall key
+// Require a live DLL response and at least one defined device. Registry data is a hint.
 var
   Name, RegValVjoy, Path: String;
   Len: Longint;
-  Res: Boolean;
+  DeviceID, Status: Integer;
+  Res, DriverResponding: Boolean;
   Names: TArrayOfString;
 begin
   Result := RegKeyExists(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Services\vjoy');
@@ -254,5 +262,26 @@ begin
   begin
     Result := RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{8E31F76F-74C3-47F1-9550-E041EEDC5FBB}_is1') or
               RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{8E31F76F-74C3-47F1-9550-E041EEDC5FBB}_is1');
+  end;
+  try
+    DriverResponding := VJoyDriverEnabled;
+    if Result and not DriverResponding then
+      Log('Ignoring stale vJoy registry data: the driver did not respond through the DLL.');
+    Result := False;
+    if DriverResponding then begin
+      for DeviceID := 1 to 16 do begin
+        Status := VJoyDeviceStatus(DeviceID);
+        // Owned (0), free (1), or busy (2) means defined. Do not acquire it.
+        if (Status >= 0) and (Status <= 2) then begin
+          Result := True;
+          Break;
+        end;
+      end;
+      if not Result then
+        Log('The vJoy driver responds through its DLL, but no device is defined in slots 1..16.');
+    end;
+  except
+    Log('Unable to query the vJoy driver through its DLL: ' + GetExceptionMessage);
+    Result := False;
   end;
 end;

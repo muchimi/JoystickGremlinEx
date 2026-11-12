@@ -15,7 +15,7 @@ import time
 from types import ModuleType, SimpleNamespace as NS
 from typing import Callable
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
@@ -132,6 +132,37 @@ class DefaultDeviceChecks(unittest.TestCase):
         self.assertTrue(self.maestro.offerDefaultJoysticks(parent))
         self.maestro.createDefaultJoysticks.assert_called_once_with(16)
         NAMESPACE["MaestroDefaultDevicesDialog"].assert_called_once_with(parent=parent)
+
+    def test_successful_deletion_suppresses_offers_before_refresh_and_later_profile_loads(self):
+        for delete_all in (False, True):
+            with self.subTest(delete_all=delete_all), patch.dict(NAMESPACE, GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1):
+                self.maestro._default_devices_prompted = False
+                self.maestro.client.request.return_value = Mock()
+                self.maestro.refreshDevices.reset_mock()
+                self.maestro.refreshDevices.side_effect = lambda: self.assertFalse(self.maestro.offerDefaultJoysticks())
+                if delete_all:
+                    self.maestro.deleteAll()
+                else:
+                    self.maestro.deleteDevice("gex-1")
+                self.assertTrue(self.maestro._default_devices_prompted)
+                self.maestro.refreshDevices.assert_called_once_with()
+                self.assertFalse(self.maestro.offerDefaultJoysticks())
+                self.assertFalse(self.maestro.offerDefaultJoysticks())
+                NAMESPACE["MaestroDefaultDevicesDialog"].assert_not_called()
+
+    def test_failed_deletion_does_not_suppress_the_initial_offer(self):
+        for delete_all in (False, True):
+            with self.subTest(delete_all=delete_all), patch.dict(NAMESPACE, GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1):
+                self.maestro._default_devices_prompted = False
+                result = MagicMock(code="delete_failed", message="Device busy")
+                result.__bool__.return_value = False
+                self.maestro.client.request.return_value = result
+                if delete_all:
+                    self.maestro.deleteAll()
+                else:
+                    self.maestro.deleteDevice("gex-1")
+                self.assertFalse(self.maestro._default_devices_prompted)
+                self.maestro.refreshDevices.assert_not_called()
 
     def create(self, **kwargs):
         controller = NS(id=kwargs["name"], index=kwargs["at_index"])

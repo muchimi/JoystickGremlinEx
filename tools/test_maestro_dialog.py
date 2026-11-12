@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from PySide6 import QtCore, QtWidgets
-from test_maestro_startup import COMMON, GREMLIN, Maestro as MaestroService, load_definitions
+from test_maestro_startup import COMMON, GREMLIN, NAMESPACE, Maestro as MaestroService, load_definitions
 from test_qt_marshalling import APP, flush_deletes, pump_until
 
 
@@ -68,6 +68,8 @@ class Bridge:
             self.definitions[args[0]]["enabled"] = False
         elif address == "/maestro_delete":
             del self.definitions[args[0]]
+        elif address == "/maestro_delete_all":
+            self.definitions.clear()
         else:
             raise AssertionError(address)
         return UI["MaestroResult"](True, address)
@@ -75,9 +77,11 @@ class Bridge:
 
 class MaestroFixture:
     deleteDevice = MaestroService.deleteDevice
+    deleteAll = MaestroService.deleteAll
 
     def __init__(self, bridge):
         self.client = bridge
+        self._default_devices_prompted = False
         self._controller_map = {}
         self._lock = threading.RLock()
         self._stopping = threading.Event()
@@ -157,6 +161,9 @@ class DialogHarness(UI["MaestroDialog"]):
 
 class DeviceListChecks(unittest.TestCase):
     def setUp(self):
+        service_ids = patch.dict(NAMESPACE, GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1)
+        service_ids.start()
+        self.addCleanup(service_ids.stop)
         self.dialog = DialogHarness([joystick("gex-1")])
         self.addCleanup(self.cleanup_dialog)
 
@@ -220,6 +227,37 @@ class DeviceListChecks(unittest.TestCase):
         self.assertIn("No devices were found", self.dialog.labels()[0])
         self.assertFalse(self.dialog.select_all_button.isEnabled())
         self.assertFalse(self.dialog.delete_all_button.isEnabled())
+        self.assertTrue(self.dialog.maestro._default_devices_prompted)
+
+    def test_delete_all_suppresses_default_device_offers(self):
+        self.create_device()
+        self.dialog._delete_all_devices(True, None)
+        pump_until(lambda: not self.dialog._busy)
+        self.assertFalse(self.dialog.warning_widget.text())
+        self.assertFalse(self.dialog.maestro.client.definitions)
+        self.assertFalse(self.dialog._definitions)
+        self.assertFalse(self.dialog._selected_ids)
+        self.assertTrue(self.dialog.maestro._default_devices_prompted)
+        self.dialog.maestro.refreshDevices.assert_called_once_with()
+
+    def test_cancelled_delete_all_does_not_suppress_device_offers(self):
+        self.dialog._delete_all_devices(False, None)
+        self.assertEqual(set(self.dialog._definitions), {"gex-1"})
+        self.assertFalse(self.dialog.maestro._default_devices_prompted)
+        self.dialog.maestro.refreshDevices.assert_not_called()
+
+    def test_failed_delete_all_preserves_devices_and_does_not_suppress_offers(self):
+        error = UI["MaestroServiceError"]("/maestro_delete_all", "delete_failed", "Device busy")
+        result = UI["MaestroResult"].from_error("/maestro_delete_all", error)
+        with (patch.object(self.dialog.maestro.client, "request", return_value=result),
+              patch.dict(UI, syslog=Mock())):
+            self.dialog._delete_all_devices(True, None)
+            pump_until(lambda: not self.dialog._busy)
+        self.assertEqual(set(self.dialog._definitions), {"gex-1"})
+        self.assertEqual(self.dialog._selected_ids, {"gex-1"})
+        self.assertFalse(self.dialog.maestro._default_devices_prompted)
+        self.assertIn("Device busy", self.dialog.warning_widget.text())
+        self.dialog.maestro.refreshDevices.assert_not_called()
 
     def test_failed_delete_preserves_the_device_and_selection(self):
         changed = Mock()
@@ -238,6 +276,7 @@ class DeviceListChecks(unittest.TestCase):
                 self.assertEqual(self.dialog._selected_ids, {"gex-1"})
                 self.assertIn(str(error), self.dialog.warning_widget.text())
                 self.dialog.maestro.refreshDevices.assert_not_called()
+                self.assertFalse(self.dialog.maestro._default_devices_prompted)
                 changed.assert_not_called()
 
     def test_created_but_unselected_device_is_still_visible(self):

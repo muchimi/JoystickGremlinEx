@@ -26,6 +26,7 @@ from PySide6.QtCore import Qt, QMimeData, QPoint
 from PySide6.QtGui import QDrag, QPixmap
 
 import dinput
+from dinput import DeviceSummary
 
 import gremlin
 from gremlin.clipboard import Clipboard
@@ -3789,87 +3790,87 @@ class ProcessWindow(BaseDialogUi):
             self.close()
 
 
-class LogWindowUi(BaseDialogUi):
-    """Window displaying log file content."""
+# class LogWindowUi(BaseDialogUi):
+#     """Window displaying log file content."""
 
-    def __init__(self, parent=None):
-        """Creates a new instance.
+#     def __init__(self, parent=None):
+#         """Creates a new instance.
 
-        :param parent the parent of this widget
-        """
-        super().__init__(self.__class__.__name__, parent=parent)
+#         :param parent the parent of this widget
+#         """
+#         super().__init__(self.__class__.__name__, parent=parent)
 
-        self.setWindowTitle("Log Viewer")
-        self.setMinimumWidth(600)
+#         self.setWindowTitle("Log Viewer")
+#         self.setMinimumWidth(600)
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.tab_container = QtWidgets.QTabWidget()
-        self.main_layout.addWidget(self.tab_container)
+#         self.main_layout = QtWidgets.QVBoxLayout(self)
+#         self.tab_container = QtWidgets.QTabWidget()
+#         self.main_layout.addWidget(self.tab_container)
 
-        info_widget = QWarningWidget(
-            "Legacy feature:\nThis log viewer can become extremely slow and resource intensive with large log files.\nPlease use an external log viewer where possible like LogExpert."
-        )
-        self.main_layout.addWidget(info_widget)
+#         info_widget = QWarningWidget(
+#             "Legacy feature:\nThis log viewer can become extremely slow and resource intensive with large log files.\nPlease use an external log viewer where possible like LogExpert."
+#         )
+#         self.main_layout.addWidget(info_widget)
 
-        self._ui_elements = {}
-        log_path = gremlin.shared_state.system_log
-        self._create_log_display_ui(log_path, "System")
-        user_path = gremlin.shared_state.user_log
-        self._create_log_display_ui(user_path, "User")
-        self.watcher = gremlin.util.FileWatcher([log_path, user_path])
-        self.watcher.file_changed.connect(self._reload)
+#         self._ui_elements = {}
+#         log_path = gremlin.shared_state.system_log
+#         self._create_log_display_ui(log_path, "System")
+#         user_path = gremlin.shared_state.user_log
+#         self._create_log_display_ui(user_path, "User")
+#         self.watcher = gremlin.util.FileWatcher([log_path, user_path])
+#         self.watcher.file_changed.connect(self._reload)
 
-    def closeEvent(self, event):
-        """Handles closing of the window.
+#     def closeEvent(self, event):
+#         """Handles closing of the window.
 
-        :param event the closing event
-        """
-        self.watcher.stop()
-        return super().closeEvent(event)
+#         :param event the closing event
+#         """
+#         self.watcher.stop()
+#         return super().closeEvent(event)
 
-    def _create_log_display_ui(self, fname, title):
-        """Creates a new tab displaying log file contents.
+#     def _create_log_display_ui(self, fname, title):
+#         """Creates a new tab displaying log file contents.
 
-        :param fname path to the file whose content to display
-        :param title the title of the tab
-        """
-        gremlin.util.assert_ui_thread()
-        page = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(page)
-        log_display = QtWidgets.QTextEdit()
-        log_display.setText(open(fname).read())
-        button = QDataPushButton("Clear log", tooltip="Clears the log", callback=lambda f=fname: self._clear_log(f))
+#         :param fname path to the file whose content to display
+#         :param title the title of the tab
+#         """
+#         gremlin.util.assert_ui_thread()
+#         page = QtWidgets.QWidget()
+#         layout = QtWidgets.QVBoxLayout(page)
+#         log_display = QtWidgets.QTextEdit()
+#         log_display.setText(open(fname).read())
+#         button = QDataPushButton("Clear log", tooltip="Clears the log", callback=lambda f=fname: self._clear_log(f))
 
-        layout.addWidget(log_display)
-        layout.addWidget(button)
+#         layout.addWidget(log_display)
+#         layout.addWidget(button)
 
-        self._ui_elements[fname] = {
-            "page": page,
-            "layout": layout,
-            "button": button,
-            "log_display": log_display,
-        }
+#         self._ui_elements[fname] = {
+#             "page": page,
+#             "layout": layout,
+#             "button": button,
+#             "log_display": log_display,
+#         }
 
-        self.tab_container.addTab(self._ui_elements[fname]["page"], title)
+#         self.tab_container.addTab(self._ui_elements[fname]["page"], title)
 
-    def _clear_log(self, fname):
-        """Clears the specified log file.
+#     def _clear_log(self, fname):
+#         """Clears the specified log file.
 
-        :param fname path to the file to clear
-        """
-        open(fname, "w").close()
+#         :param fname path to the file to clear
+#         """
+#         open(fname, "w").close()
 
-    def _reload(self, fname):
-        gremlin.util.InvokeUiMethod(self._reload_ui, fname)
+#     def _reload(self, fname):
+#         gremlin.util.InvokeUiMethod(self._reload_ui, fname)
 
-    def _reload_ui(self, fname):
-        """Reloads the content of tab displaying the given file.
+#     def _reload_ui(self, fname):
+#         """Reloads the content of tab displaying the given file.
 
-        :param fname name of the file whose content to update
-        """
-        widget = self._ui_elements[fname]["log_display"]
-        widget.setText(open(fname).read())
-        widget.verticalScrollBar().setValue(widget.verticalScrollBar().maximum())
+#         :param fname name of the file whose content to update
+#         """
+#         widget = self._ui_elements[fname]["log_display"]
+#         widget.setText(open(fname).read())
+#         widget.verticalScrollBar().setValue(widget.verticalScrollBar().maximum())
 
 
 class AboutUi(BaseDialogUi):
@@ -4406,6 +4407,7 @@ class DeviceInformationDialog(BaseDialogUi):
 
         headers = [
             "Device Name",
+            "Device Type",
             "Axis Count",
             "Buttons Count",
             "Hat Count",
@@ -4490,14 +4492,15 @@ class DeviceInformationDialog(BaseDialogUi):
             if device.disabled:
                 continue
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(device.name))
-            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(device.axis_count)))
-            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(device.button_count)))
-            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(device.hat_count)))
-            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{device.vendor_id:04X}"))
-            self.table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{device.product_id:04X}"))
-            self.table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(device.device_guid)))
-            self.table.setItem(row, 7, QtWidgets.QTableWidgetItem(device.name.lower()))
-            self.table.setItem(row, 8, QtWidgets.QTableWidgetItem(f"{'Y' if device.connected else 'N'}"))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{device.device_type.name}{'/gamepad' if device.is_gamepad else ''}"))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(device.axis_count)))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(device.button_count)))
+            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(device.hat_count)))
+            self.table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{device.vendor_id:04X}"))
+            self.table.setItem(row, 6, QtWidgets.QTableWidgetItem(f"{device.product_id:04X}"))
+            self.table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(device.device_guid)))
+            self.table.setItem(row, 8, QtWidgets.QTableWidgetItem(device.name.lower()))
+            self.table.setItem(row, 9, QtWidgets.QTableWidgetItem(f"{'Y' if device.connected else 'N'}"))
 
             # row color
             is_dark = gremlin.shared_state.is_dark_theme
@@ -4575,6 +4578,8 @@ class DeviceInformationDialog(BaseDialogUi):
 
         # sync the profile with the profile registy to ensure we have the full device list
         self.profile.sync()
+
+        device : DeviceSummary
 
         for device in self.profile.devices.values():
             for mode in device.modes.values():

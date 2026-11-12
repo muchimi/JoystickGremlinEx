@@ -1441,15 +1441,15 @@ class GremlinUi(QRememberMainWindow):
         self.modal_windows["device_information"].show()
         self.modal_windows["device_information"].closed.connect(lambda: self._remove_modal_window("device_information"))
 
-    def log_window(self):
-        gremlin.util.InvokeUiMethod(self._log_window_ui)
+    # def log_window(self):
+    #     gremlin.util.InvokeUiMethod(self._log_window_ui)
 
-    def _log_window_ui(self):
-        """Opens the log display window."""
-        gremlin.util.assert_ui_thread()
-        self.modal_windows["log"] = gremlin.ui.dialogs.LogWindowUi()
-        self.modal_windows["log"].closed.connect(lambda: self._remove_modal_window("log"))
-        self.modal_windows["log"].show()
+    # def _log_window_ui(self):
+    #     """Opens the log display window."""
+    #     gremlin.util.assert_ui_thread()
+    #     self.modal_windows["log"] = gremlin.ui.dialogs.LogWindowUi()
+    #     self.modal_windows["log"].closed.connect(lambda: self._remove_modal_window("log"))
+    #     self.modal_windows["log"].show()
 
     def log_edit(self):
         """opens the log file in the editor"""
@@ -2179,7 +2179,7 @@ class GremlinUi(QRememberMainWindow):
         self.ui.actionClearManagedSound.triggered.connect(self._clear_managed_sound)
         # self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
-        self.ui.actionLogDisplay.triggered.connect(self.log_window)
+        # self.ui.actionLogDisplay.triggered.connect(self.log_window)
         self.ui.actionLogEdit.triggered.connect(self.log_edit)
         # About
         self.ui.actionAbout.triggered.connect(self.about)
@@ -5089,9 +5089,9 @@ class GremlinUi(QRememberMainWindow):
         # icon = load_icon(input_viewer_icon)
         # self.ui.actionInputViewer.setIcon(icon)
 
-        icon = load_icon(f"{prefix}logview.png")
-        self.ui.actionLogDisplay.setIcon(icon)
-        self.ui.actionLogEdit.setIcon(icon)
+        # icon = load_icon(f"{prefix}logview.png")
+        # self.ui.actionLogDisplay.setIcon(icon)
+        # self.ui.actionLogEdit.setIcon(icon)
 
         options_icon = f"{prefix}options.svg"
         icon = load_icon(options_icon)
@@ -6838,7 +6838,7 @@ if __name__ == "__main__":
         time.sleep(0.25)
 
         # Publish saved OSC targets before input enumeration and profile load.
-        # Detect even an unavailable vJoy driver before Maestro can connect.
+        # Require a responding vJoy driver with a defined device before Maestro can connect.
         config.vjoy_installed = gremlin.virtual_output_startup.vjoy_installed(config)
         maestro = gremlin.maestro.Maestro()
         maestro.offerDefaultJoysticks()

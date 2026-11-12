@@ -5514,9 +5514,6 @@ class QIconLabel(QWidget):
 
         container_widget, container_layout = getHContainer()
 
-        # w = get_text_width("M")*80
-        # container_widget.setMaximumWidth(w)
-
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
 
         self._icon_size = QtCore.QSize(icon_size, icon_size)

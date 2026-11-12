@@ -492,6 +492,7 @@ class DeviceSummary:
         self.name = None
         self._device_type = gremlin.types.DeviceType.NotSet
         self._device_category = gremlin.types.DeviceCategory.NotSet
+        self._is_gamepad = False  # true if the device is recognized as a gamepad
         self.data = {}  # tracked data for this device, example, stepped index data for an axis
         self._get_button_callback = None  # custom callback to read a button value from this device if a special device
         self._get_axis_callback = None  # custom callback to read an axis value from this device if a special device
@@ -546,6 +547,9 @@ class DeviceSummary:
             self.hat_count = data.hat_count
             self.usage_page = data.usage_page
             self.usage = data.usage
+            # Generic Desktop / Game Pad covers hardware and emulated pads,
+            # including ViGEm devices enumerated through DirectInput.
+            self.setGamepad(self.usage_page == 0x01 and self.usage == 0x05)
 
             logical_count = 0
             self.input_enabled = True  # allow usage as an input device by default for special and physical devices
@@ -700,6 +704,14 @@ class DeviceSummary:
     def is_special(self) -> bool:
         """true if the device is a special device"""
         return self._device_category in (DeviceCategory.Special, DeviceCategory.Config)
+
+    @property
+    def is_gamepad(self) -> bool:
+        """True if this hardware or virtual device is recognized as a gamepad."""
+        return self._is_gamepad
+
+    def setGamepad(self, is_gamepad: bool):
+        self._is_gamepad = is_gamepad
 
     @property
     def is_config(self) -> bool:

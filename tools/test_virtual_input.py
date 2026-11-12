@@ -204,7 +204,7 @@ class VirtualInputChecks(unittest.TestCase):
             widget.deleteLater()
         flush_deletes()
 
-    def native_summary(self, name="GEX Custom Device 3", vendor=1, product=1):
+    def native_summary(self, name="GEX Custom Device 3", vendor=1, product=1, usage_page=1, usage=4):
         self.services.types = NS(DeviceType=DeviceType, DeviceCategory=DeviceCategory)
         self.ui.update(
             GUID=uuid.UUID,
@@ -226,13 +226,35 @@ class VirtualInputChecks(unittest.TestCase):
                 axis_count=8,
                 button_count=128,
                 hat_count=4,
-                usage_page=1,
-                usage=4,
+                usage_page=usage_page,
+                usage=usage,
                 axis_map=[],
             )
         )
         native.device_category = DeviceCategory.Virtual if native.is_virtual else DeviceCategory.Physical
         return native
+
+    def test_hardware_gamepads_are_recognized_by_hid_usage(self):
+        for vendor, product in ((0x045E, 0x028E), (0x054C, 0x05C4), (0x0F0D, 0x00C1)):
+            with self.subTest(vendor=vendor, product=product):
+                native = self.native_summary("HID controller", vendor, product, usage=5)
+                self.assertTrue(native.is_gamepad)
+                self.assertTrue(native._is_gamepad)
+                self.assertFalse(native.is_virtual)
+
+    def test_vigem_gamepad_summaries_retain_gamepad_classification(self):
+        for vendor, product in ((0x045E, 0x028E), (0x054C, 0x05C4)):
+            with self.subTest(vendor=vendor, product=product):
+                native = self.native_summary("Virtual controller", vendor, product, usage=5)
+                native.setVirtual(True)
+                self.assertTrue(native.is_gamepad)
+                self.assertTrue(native.is_virtual)
+
+    def test_joysticks_and_other_hid_usages_are_not_gamepads(self):
+        for usage_page, usage in ((1, 4), (1, 8), (1, 6), (2, 5), (0, 0)):
+            with self.subTest(usage_page=usage_page, usage=usage):
+                native = self.native_summary("Controller", usage_page=usage_page, usage=usage)
+                self.assertFalse(native.is_gamepad)
 
     def test_native_gex_classification_with_placeholder_vid_pid(self):
         native = self.native_summary()

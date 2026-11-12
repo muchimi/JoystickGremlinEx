@@ -4,13 +4,14 @@
 
 GremlinEx (GEX) is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Sound Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, convert text to speech and play sounds.  It can send output to a game or another process.
 
+As of m77T90, for virtual programmable joysticks and gamepads, GEX supports both vJoy/VIGEM and the newer HID Maestro virtual devices.  The support for HID Maestro is built-in the GEX Maestro Bridge service.  Note that you cannot have both vJoy/VIGEM and the bridge service running concurrently due to driver level conflicts external to GEX.
+
 With OSC support, GremlinEx can receive input from custom designed glass (touch screen) surfaces, and supports two way communication to any device supported by BitFocus Companion such as the Elgato Streamdeck.  This communication is two-way so GremlinEx can also send data to a glass surface or an external hardware panel.
 
-GremlinEx can be expanded using custom plugins written in Python.  
+GremlinEx can be expanded using custom plugins written in Python.
 
 ![gremlinex](gremlinex.png)
 ![gremlinex viewer](gremlinex_viewer.png)
-
 
 # Documentation
 
@@ -37,9 +38,9 @@ There are two ways you can safely and securely contribute to the project:
 - via GitHub's sponsorship program.
 - via a Paypal direct donation
 
-The links are the top of this project page, or on the right side under sponsorships. 
+The links are the top of this project page, or on the right side under sponsorships.
 
-Again, thank you for your shared passion and for your generosity and support. It means a lot, and sponsors make a huge difference. 
+Again, thank you for your shared passion and for your generosity and support. It means a lot, and sponsors make a huge difference.
 
 # Test versions
 
@@ -51,6 +52,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T99)
+- Change: UI (Device Information): device information dialog adds a device type column.
+- Change: Map to Vjoy action has been renamed to "Virtual Remap" as it supports mapping to virtual joysticks (and Maestro gamepads created by GEX).  This is a visual name only - profiles are unchanged.
+- Fix: API: The vJoy detection for GEX and the installers now includes a driver level check for devices in addition to a registry check in case of stale installation entries.  The check looks for at least one configured device in vJoy. The lack of a configured vJoy device will be interpreted as vJoy being unavailable.
+- Fix: API (Maestro): on startup, GEX will check all GEX devices (gex-n and gex-gp-n where n is the index number) to make sure they are unique.  The device order on the bridge will be used.  While the name doesn't matter (as in the vJoy device names), they matter to the profile designer to know which device is which.
+- Fix: UI: old log dialog deprecated as it does not support large log files nor special ANSI encoding.  Logs can be viewed and will call up the log file in the system's default editor.
 
 ### (m77T98)
 - Change: (setup): vJoy detection is now setup as a warning rather than a hard stop:  the detection of vJoy is registry scan based and these may still persist on a system after vJoy is uninstalled.  Setup will still allow the installation of the bridge after displaying a warning in case it's a false-positive.  This warning does not show if the system never had vJoy installed.
@@ -77,14 +84,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API: added support for both VJOY and Maestro defined joysticks as input (virtual joysticks will not display as input device unless configured in profile settings).
 - Change: UI (filter): show filtered devices color coded.
 - Fix: UI: pressing "no" on save calibration prompt does not close the underlying calibration dialog box.
-- Fix: UI: changing a mode can cause the status bar mode repeater to not update to the curren mode.  
+- Fix: UI: changing a mode can cause the status bar mode repeater to not update to the curren mode.
 - Fix: UI: rebuilding the mode list selects the default mode, not the prior selected mode.
 - Fix: UI: button widget should stop emitting events if it is being deleted.
 - Fix: UI (Profile Settings): validate input devices can in fact be used as inputs.  There was only one type of virtual device before, now there are several so the UI was assuming there was only one type.
 - Fix: UI: checkbox style not always resolving its state icons.
 - Fix: UI: filtered device fallback tab selection (if device is invisible or not present) could fail.
 - Fix: UI: adjust dialog restore position if no longer visible due to a resolution or monitor change.
-- Fix: Vjoy Remap Action: update relative mode and set start value causing an exception (broken by recent API changes for startup sync). 
+- Fix: Vjoy Remap Action: update relative mode and set start value causing an exception (broken by recent API changes for startup sync).
 - Fix: VJoy Remap Action: virtual output device identifiers could overlap for gamepad and joystick Maestro devices with the new unified virtual output API.
 
 ### (m77T95)
@@ -137,7 +144,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 Command line parameters use - or / as the prefix - example `/help` or `-help` for both Python style and Windows style parameters.
-	
+
 | Parameter | Description |
 | --- | --- |
 |/np /no-profile  | Do not load a profile on start (/r /p will be ignored if provided) |
@@ -242,7 +249,7 @@ Command line parameters use - or / as the prefix - example `/help` or `-help` fo
 - New: UI (experimental): custom color theme (this may not presently entirely work as intended as more testing is needed).  This is available under theme options in the UI configuration options and brings up a custom dialog.  Presently a number of color usage descriptions may not make a lot of sense at this point, nor indicate where they are used.  The custom theme can be saved.  A GEX restart is required after making changes.
 - New: DOC: New user guide for [Map to Vjoy](https://muchimi.github.io/JoystickGremlinEx/actions/map_to_vjoy_user_guide/)
 - New: DOC: New user guide for [Gated Axis Action](https://muchimi.github.io/JoystickGremlinEx/actions/gated_axis_user_guide/)
-- New: DOC: New user guide for [Map to Keyboard/Mouse EX Action](https://muchimi.github.io/JoystickGremlinEx/actions/keyboard_ex_user_guide/) 
+- New: DOC: New user guide for [Map to Keyboard/Mouse EX Action](https://muchimi.github.io/JoystickGremlinEx/actions/keyboard_ex_user_guide/)
 - Change: DOC: started updating the documentation for m77.
 - Change: UI: adjusted some light mode colors for improved contrast.
 - Change: Input Viewer: Added tooltips to state visualizer buttons - expression states will include their definitions.
@@ -261,13 +268,13 @@ Command line parameters use - or / as the prefix - example `/help` or `-help` fo
 - Fix: API (State): add aliases for older API calls to avoid exception with older references in the UI.
 - Fix: API (engine): Refactor execution engine data lookups and shortcut condition logic handling to improve runtime response.
 - Fix: UI (Curve Editor): default dialog size should now fit its contents without having to resize.
-- Fix: Input Viewer: clear button does not clear state visualizer. 
+- Fix: Input Viewer: clear button does not clear state visualizer.
 
 ### (m77T81):
 - Fix: API: TriggerDict: fix for internal Python copy operation exception depending on  key/value data types and dundar updates for comparison calls.
 - Fix: Repeater container: ported to new container API/data model.
 - Fix: Config: add Octavi IFR1 to list of modules that can be disabled if not used, which avoids running a monitoring loop if the device is connected but not used.
-- Fix: API: low level keyboard/mouse performance pass. Eliminated win32 library, use ctype calls directly.  Mouse wheel move from timers to single scheduler to reduce threads and overhead. 
+- Fix: API: low level keyboard/mouse performance pass. Eliminated win32 library, use ctype calls directly.  Mouse wheel move from timers to single scheduler to reduce threads and overhead.
 - Fix: API: event handling rework and performance pass to reduce timer usage and blocking loops, reduction in lookups.
 - Fix: API: axis input filter rework and performance pass. Move from timers to a single scheduler. EMA code branching streamlining.
 - Fix: API: legacy macro engine scheduler rework and performance pass.

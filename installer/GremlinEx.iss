@@ -48,6 +48,9 @@ UninstallDisplayName={#AppName} {#AppVersion}
 Name: "hidhide"; Description: "Download and install HidHide (hide physical controllers from games)"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: NeedsHidHide
 Name: "maestrobridge"; Description: "{code:MaestroBridgeDescription}"; GroupDescription: "Optional dependencies (Internet required for downloads):"; Flags: unchecked; Check: ShowMaestroBridge
 [Files]
+; Setup is an x86 process, including when installing the x64 application.
+; Package the matching DLL for a live driver query before files are installed.
+Source: "..\vjoy\x86\vJoyInterface.dll"; Flags: dontcopy noencryption
 Source: "dependencies.ps1"; Flags: dontcopy
 #ifdef BundledBuild
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

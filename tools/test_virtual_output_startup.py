@@ -16,6 +16,8 @@ from shiboken6 import Shiboken
 from test_maestro_startup import Maestro, NAMESPACE as MAESTRO_NAMESPACE
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def load_module(name, path):
@@ -97,6 +99,79 @@ class OptionalVJoyChecks(unittest.TestCase):
         self.assertFalse(self.interface.valid)
         self.assertFalse(self.interface.vJoyEnabled())
         self.assertEqual(self.interface.GetVJDStatus(1), self.module.VJoyState.Missing.value)
+
+
+class VJoyInstallationChecks(unittest.TestCase):
+    def setUp(self):
+        self.config = NS(vjoy_installed=False)
+        self.interface = NS(valid=True, vJoyEnabled=Mock(return_value=False), GetVJDStatus=Mock(return_value=1))
+        self.addCleanup(patch.stopall)
+        patch.object(STARTUP, 'VJoyInterface', self.interface).start()
+        self.registry = patch.object(STARTUP, '_machine_key_exists', return_value=False).start()
+        patch.object(STARTUP, 'syslog', Mock()).start()
+
+    def test_stale_registry_does_not_count_as_an_installed_driver(self):
+        self.registry.return_value = True
+        self.assertFalse(STARTUP.vjoy_installed(self.config))
+        self.interface.vJoyEnabled.assert_called_once_with()
+        self.interface.GetVJDStatus.assert_not_called()
+
+    def test_cached_installed_flag_does_not_override_the_dll(self):
+        self.config.vjoy_installed = True
+        self.assertFalse(STARTUP.vjoy_installed(self.config))
+        self.interface.vJoyEnabled.assert_called_once_with()
+
+    def test_a_loaded_dll_without_a_responding_driver_is_not_an_installation(self):
+        self.assertFalse(STARTUP.vjoy_installed(self.config))
+        self.interface.vJoyEnabled.assert_called_once_with()
+
+    def test_a_responding_driver_is_detected_with_or_without_registry_data(self):
+        self.interface.vJoyEnabled.return_value = True
+        for registered in (False, True):
+            with self.subTest(registered=registered):
+                self.registry.return_value = registered
+                self.assertTrue(STARTUP.vjoy_installed(self.config))
+
+    def test_missing_or_invalid_dll_does_not_count_as_an_installed_driver(self):
+        self.registry.return_value = True
+        self.config.vjoy_installed = True
+        self.interface.valid = False
+        self.assertFalse(STARTUP.vjoy_installed(self.config))
+        self.interface.vJoyEnabled.assert_not_called()
+
+    def test_dll_query_errors_do_not_claim_an_installed_driver(self):
+        self.registry.return_value = True
+        self.config.vjoy_installed = True
+        for error in (OSError('Driver unavailable'), RuntimeError('DLL query failed')):
+            with self.subTest(error=error):
+                self.interface.vJoyEnabled.side_effect = error
+                self.assertFalse(STARTUP.vjoy_installed(self.config))
+
+    def test_responding_driver_with_no_defined_device_is_not_installed(self):
+        self.config.vjoy_installed = self.registry.return_value = True
+        self.interface.vJoyEnabled.return_value = True
+        for status in (3, 4, -1, 99):
+            with self.subTest(status=status):
+                self.interface.GetVJDStatus.reset_mock()
+                self.interface.GetVJDStatus.return_value = status
+                self.assertFalse(STARTUP.vjoy_installed(self.config))
+                self.assertEqual([call.args[0] for call in self.interface.GetVJDStatus.call_args_list],
+                                 list(range(1, 17)))
+
+    def test_a_defined_device_in_slot_16_counts_even_when_owned_or_busy(self):
+        self.interface.vJoyEnabled.return_value = True
+        for status in (0, 1, 2):
+            with self.subTest(status=status):
+                self.interface.GetVJDStatus.reset_mock()
+                self.interface.GetVJDStatus.side_effect = lambda device_id: status if device_id == 16 else 3
+                self.assertTrue(STARTUP.vjoy_installed(self.config))
+                self.assertEqual([call.args[0] for call in self.interface.GetVJDStatus.call_args_list],
+                                 list(range(1, 17)))
+
+    def test_device_status_query_error_does_not_claim_an_installation(self):
+        self.interface.vJoyEnabled.return_value = True
+        self.interface.GetVJDStatus.side_effect = OSError('Device query failed')
+        self.assertFalse(STARTUP.vjoy_installed(self.config))
 
 
 class BridgeInstallationChecks(unittest.TestCase):
@@ -196,6 +271,8 @@ class StartupProviderChecks(unittest.TestCase):
         self.config = NS(vjoy_installed=False, maestro_enabled=False, maestro_use_localhost=True)
         self.maestro = NS(enabled=False, service_running=False, connect=Mock(return_value=None), refreshDevices=Mock())
         self.addCleanup(patch.stopall)
+        self.interface = NS(valid=True, vJoyEnabled=Mock(return_value=False), GetVJDStatus=Mock(return_value=1))
+        patch.object(STARTUP, 'VJoyInterface', self.interface).start()
         self.registry = patch.object(STARTUP, '_machine_key_exists', return_value=False).start()
         self.installed = patch.object(STARTUP, 'bridge_installed', return_value=False).start()
         self.install = patch.object(STARTUP, 'install_bridge', return_value=0).start()
@@ -254,6 +331,7 @@ class StartupProviderChecks(unittest.TestCase):
 
     def test_installed_but_unconfigured_vjoy_warns_without_setup(self):
         self.config.vjoy_installed = True
+        self.interface.vJoyEnabled.return_value = True
         self.assertFalse(self.check())
         self.box.question.assert_not_called()
         self.box.warning.assert_called_once()
@@ -261,13 +339,24 @@ class StartupProviderChecks(unittest.TestCase):
         self.installed.assert_not_called()
         self.assertFalse(self.config.maestro_enabled)
 
-    def test_installed_but_disabled_vjoy_warns_without_setup(self):
+    def test_stale_vjoy_registration_does_not_block_working_maestro(self):
         self.registry.return_value = True
-        self.assertFalse(self.check())
+        self.maestro.enabled = self.maestro.service_running = True
+        self.assertTrue(self.check())
         self.box.question.assert_not_called()
+        self.box.warning.assert_not_called()
         self.install.assert_not_called()
         self.maestro.connect.assert_not_called()
         self.installed.assert_not_called()
+
+    def test_vjoy_with_no_defined_devices_does_not_block_working_maestro(self):
+        self.registry.return_value = True
+        self.interface.vJoyEnabled.return_value = True
+        self.interface.GetVJDStatus.return_value = 3
+        self.maestro.enabled = self.maestro.service_running = True
+        self.assertTrue(self.check())
+        self.box.warning.assert_not_called()
+        self.install.assert_not_called()
 
     def test_working_vjoy_skips_every_maestro_check(self):
         self.maestro = object()  # Accessing any Maestro state would fail.
@@ -278,6 +367,7 @@ class StartupProviderChecks(unittest.TestCase):
 
     def test_installed_vjoy_skips_even_cached_maestro_state(self):
         self.config.vjoy_installed = True
+        self.interface.vJoyEnabled.return_value = True
         self.maestro = object()
         self.assertFalse(self.check())
         self.installed.assert_not_called()
@@ -341,6 +431,10 @@ class LocalhostMaestroChecks(unittest.TestCase):
         self.psutil.win_service_get.return_value.status.return_value = 'running'
         self.client_factory = Mock()
         self.addCleanup(patch.stopall)
+        patch.object(STARTUP, 'VJoyInterface', NS(
+            valid=True, vJoyEnabled=Mock(side_effect=lambda: self.config.vjoy_installed),
+            GetVJDStatus=Mock(return_value=1),
+        )).start()
         patch.dict(MAESTRO_NAMESPACE, gremlin=self.services, socket=socket, psutil=self.psutil,
                    MaestroOscClient=self.client_factory, syslog=Mock()).start()
         patch.dict(sys.modules, {'gremlin': self.services, 'gremlin.event_handler': self.services.event_handler}).start()
@@ -501,6 +595,12 @@ class StartupWindowChecks(unittest.TestCase):
         self.config = NS(vjoy_installed=False, maestro_enabled=False, maestro_use_localhost=True,
                          startup_start_minimized=False)
         self.maestro = NS(enabled=False, service_running=False, connect=Mock(return_value=None), refreshDevices=Mock())
+        interface_patch = patch.object(STARTUP, 'VJoyInterface', NS(
+            valid=True, vJoyEnabled=Mock(side_effect=lambda: self.config.vjoy_installed),
+            GetVJDStatus=Mock(return_value=1),
+        ))
+        interface_patch.start()
+        self.addCleanup(interface_patch.stop)
         self.registry_patch = patch.object(STARTUP, '_machine_key_exists', return_value=False)
         self.registry_patch.start()
         self.addCleanup(self.registry_patch.stop)
@@ -620,7 +720,7 @@ class EnumerationChecks(unittest.TestCase):
         services.ui = NS(axis_calibration=NS(CalibrationManager=lambda: NS(reload=Mock())))
         services.hid = NS(Hid=Mock())
         namespace = dict(gremlin=services, dinput=NS(DILL=NS(init=Mock(), get_device_count=lambda: 0),
-            AxisMap=lambda: NS(getName=lambda: '')), vjoy=vjoy, VJoyInterface=driver,
+            AxisMap=lambda: NS(getName=lambda: '')), vjoy=vjoy, vjoy_installed=STARTUP.vjoy_installed,
             syslog=logging.getLogger('startup-checks'), VJoyProxy=lambda: NS(reset=Mock()),
             _joystick_initialized=False, _last_device_signature=None,
             _joystick_init_lock=threading.Lock(), _device_registry_lock=threading.RLock(),
@@ -632,7 +732,9 @@ class EnumerationChecks(unittest.TestCase):
         namespace['_create_vjoy_device'] = lambda vid: NS(device_guid=f'vjoy-{vid}', button_count=128,
             axis_count=8, hat_count=4, axismap_list=[], axis_names={})
         exec(compile(ast.Module(body=[node], type_ignores=[]), 'joystick_handling.py', 'exec'), namespace)
-        with patch.dict(sys.modules, {'gremlin': services, 'gremlin.util': services.util}):
+        with (patch.dict(sys.modules, {'gremlin': services, 'gremlin.util': services.util}),
+              patch.object(STARTUP, 'VJoyInterface', driver),
+              patch.object(STARTUP, '_machine_key_exists', return_value=False)):
             self.assertTrue(namespace['joystick_devices_initialization']())
         self.assertFalse(config.vjoy_installed)
         self.assertTrue(namespace['_joystick_initialized'])

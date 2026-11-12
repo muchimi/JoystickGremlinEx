@@ -1,22 +1,58 @@
-# GremlinEx Overview
+# GremlinEx (GEX) Overview - updated for GEX m77 series
 
-GremlinEx (GEX) combines inputs from joysticks, gamepads, keyboards, mice, hardware panels, and networked controls into mappings for games and other applications. Outputs include vJoy, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.
+     THIS DOCUMENTATION IS A WORK IN PROGRESS
+
+GremlinEx (GEX) is an integrator software specifically targetting game and simulator controls.
+
+GEX combines inputs from joysticks, gamepads, keyboards, mice, hardware panels (some of which can be networked), into mappings for games, simulators, and other applications. Output support features include virtual joysticks, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.  These are used by the target application and look like any regular hardware device connected to the machine.
 
 This overview covers the **m77 development series**, including its Overlay, Stream Deck, Voice, and AFCS modules. Enable the modules you need in **Options → Modules**; availability can depend on the build and installed dependencies.
 
-The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.
+By integration, we mean that GEX can combine inputs together from multiple excletic devices into a single, consolidated logical output set, featuring advanced transformations via filters and transformations, and output this to applications running on the same, or different system.
 
 The project's [home is on GitHub](https://github.com/muchimi/JoystickGremlinEx) from where you can download the latest releases and view patch notes.
 
 The project has a dedicated [Discord server](https://discord.com/channels/1279461873317707827) where you can lookup solutions to typical mapping questions, how-to, ask questions and report any issues.
 
-## Key Features: What can GremlinEx do?
+GEX is in active development and testing, and relies on feedback from the user community.
 
-Choose the inputs, outputs, and optional modules needed by your profile.
+## Key Features: What is GremlinEx?
+
+GEX is an open source application, distributed as source code, or a packaged application (.exe), and an installation package for ease of use.
+
+GEX currently only supports the Windows 10 or 11 x64 operating system due to underlying dependencies, so targets the Windows gaming/simulation platform.
+
+GEX transforms, applies decision logic using a state machine or conditions, nested modes and concurrent, real time, input from multiple devices to program a profile.  The profile's mappings and design results in a consolidated set of virtual axis, button, hat and keyboard and mouse sent to the target applications based on your preferences.  As such, multiple behaviors can be achieved, from curving an axis, to merging multiple inputs together, to changing the behavior on the fly with modes, states and conditions.  You can output macros, create actions from specific positions on an axis or directional movement, to specifically design the input data seen by the target game or simulator.
+
+GEX lets you use non traditional inputs, such as input from Streamdeck devices, touch (glass) surfaces, and sound stage controllers (faders, encoders), including over local netowrk, as input into a game that does not support these devices.
+
+GEX supports remote output to other GEX instances on the local network, and use inputs from devices connected to other computers as well, and fully supports environments like simpits.
+
+With m77, GEX also gained the ability to manage graphical overlays for in-game for streaming or educational use, optical character recognition, and also has support for web inputs to support non Windows devices like smartphones and touch-enabled tablets.
+
+To augment the gaming experience, GEX also supports high quality AI based text to speech (TTS), and AI based voice recognition that can be mapped to trigger profile actions you have mapped.  It can also playback multiple audio streams concurrently and perform basic audio filtering like fade-in and fade-out, volume and playback rate manipulations.
+
+GEX supports custom modules, such as the support for Microsoft Flight Simulator's SDK and API (SimConnect) including support of internal expressions to manage MSFS aircraft, incuding third party add-on products, from within a GEX profile.  This lets you manage MSFS without mapping devices in MSFS.
+
+GEX is vendor agnostic.  It is compatible with any Windows compatible game controller, keyboard and mouse.  It relies on published hardware API standards that all controllers must follow to be recognized as a Windows controller.  It is not dependent on third party proprietary software.  GEX only uses open source components and works with any application that uses standard keyboard, mouse, DINPUT (and for gamepads, XINPUT) standards, and indeed implements many features of payware applications.
+
+### Programming virtual joystick and gamepad devices
+
+The primary purpose of GEX is to take input from joystick, gamepad, keyboard, mouse connected to the computer, and other inputs like OSC or MIDI devices and map them to one or more virtual joysticks (or gamepads) used by games and simulators.  GEX supports the older vJoy/VIGEM virtual devices, and the newer HID Maestro devices.
+
+GEX supports the following virtual devices that are seen by an application as regular Windows controllers:
+
+- [vJoy](https://github.com/shauleiz/vJoy) (and derivatives for Windows 11 support) for virtual joysticks - this driver is no longer actively supported by the developer
+- [VIGEM](https://github.com/nefarius/vigembus) for virtual gamepads - this driver is no longer actively supported by the developer
+- (recommended) [HID Maestro](https://github.com/hifihedgehog/HIDMaestro) for joystick and virtual gamepads via the [GEX Maestro Bridge](https://github.com/muchimi/JoystickGremlinBridge) - this driver is actively supported by the developer and does not run in kernel mode.  No additional software is needed as GEX includes all that is needed.
+
+![warning](assets/warning.png) The bridge software replaces vJoy/VIGEM and may not be used concurrently with vJoy/VIGEM.
+
+GEX meant to be used in conjunction with [HID Hide](https://github.com/nefarius/hidhide).  This is so the target application only see the virtual devices, not the real devices.
 
 ### Mapping and transforms
 
-GremlinEx (GEX) takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input. GEX also understands network inputs that come from other devices on the network via the OSC protocol.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).  GEX can also remote control other GEX clients on the network, including output of axis, button, keyboard and mouse, as well as two-way controls of hardware panels and glass surfaces via the OSC protocol.
+GremlinEx (GEX) takes input from physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages.  GEX can also optionally read from virtual devices as well.  GEX lets you design a profile to apply a mapping, also known as a transform, to each input on a supported input device.  GEX also understands network inputs that come from other devices on the network via the OSC protocol.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).  GEX can also remote control other GEX clients on the network, including output of axis, button, keyboard and mouse, as well as two-way controls of hardware panels and glass surfaces via the OSC protocol.
 
 The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.
 
@@ -38,7 +74,7 @@ GremlinEx can combine inputs from multiple types of devices:  GremlinEx lets you
 
 Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.
 
-### VJoy output
+### Virtual output
 
 The [Map to vJoy action](actions/map_to_vjoy_user_guide.md) maps controls to virtual axes, buttons, and hats. It includes output curves, scaling, axis merging, axis-to-button ranges, pulses, and toggles. A game can bind these virtual outputs while HidHide keeps the original hardware out of its input list.
 
@@ -46,7 +82,7 @@ m77 also expands button-to-axis control with presets, accelerated encoder input,
 
 ### Virtual as input
 
-GremlinEx supports vJoy and Maestro virtual joysticks as inputs. Select them under **Profile Settings > Virtual as Input > Configure...**. Each enabled joystick gets its own input tab, where axes, buttons and hats can trigger mappings just like a physical joystick. Maestro input requires a local joystick available through DirectInput; remote output-only devices and virtual output failover devices are not listed.
+GremlinEx supports vJoy and [GEX Maestro Bridge Service](https://github.com/muchimi/GEXMaestroBridgeService) virtual joysticks as inputs. Select them under **Profile Settings > Virtual as Input > Configure...**. Each enabled joystick gets its own input tab, where axes, buttons and hats can trigger mappings just like a physical joystick. Maestro input requires a local joystick available through DirectInput; remote output-only devices and virtual output failover devices are not listed.
 
 By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increase the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.
 
