@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Overlay widget blink: swap off/on appearance on a timer.
 #

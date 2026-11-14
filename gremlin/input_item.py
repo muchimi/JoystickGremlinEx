@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -1138,6 +1137,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     def _handle_axis_state_request(self):
         """request to reload axis state with this input item"""
+        if gremlin.shared_state.profile_loading:
+            return
+        # Signal connections can outlive the profile that created this item.
+        # Never restore an old profile's axes or curves into the current state.
+        if self.parent is None or self.parent.profile is not gremlin.shared_state.current_profile:
+            return
         if self._is_axis:
             astate = gremlin.event_handler.AxisState()
             astate.registerAxisInputItem(self)
@@ -2988,7 +2993,7 @@ class InputItemWidget(QBoxFrame):
                         self._repeater_container_widget.setWidget(widget)
 
                         if verbose:
-                            description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(input_item.device_guid)}] axis id: [{input_item.input_id}] "
+                            description = f"input repeater:  hook id: [{hook_id}] [{self.input_item.id!s}] device [{gremlin.joystick_handling.getDeviceName(input_item.device_guid)}] axis id: [{input_item.input_id}] "
                             syslog.info(f"register repeater: {description}")
 
                     self.axis_repeater_widget.triggerUpdate()  # force an update
@@ -3557,7 +3562,7 @@ class InputItemWidget(QBoxFrame):
                     row += 1
 
         else:
-            widget = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+            widget = QtWidgets.QLabel("\u2205", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
             font = widget.font()
             font.setPixelSize(24)
             widget.setFont(font)
@@ -3630,7 +3635,7 @@ class InputItemWidget(QBoxFrame):
             # self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
         else:
             layout.addWidget(
-                QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight),
+                QtWidgets.QLabel("\u2205", alignment=QtCore.Qt.AlignmentFlag.AlignRight),
                 0,
                 1,
             )
@@ -5396,7 +5401,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def debug_name(self) -> str:
         """friendly display name"""
-        return f"container: [{self.tag}] id: [{str(self.id)}] {self.input_item.debug_name}"
+        return f"container: [{self.tag}] id: [{self.id!s}] {self.input_item.debug_name}"
 
     def getActionsSets(self) -> ActionSets:  # noqa: F405
         return self._action_sets
@@ -6126,7 +6131,7 @@ class AbstractAction(BaseProfileData):
     @property
     def debug_name(self) -> str:
         """friendly display name"""
-        return f"[action: {self.tag} id: {str(self.id)}] input: [{self.get_container().debug_name}]"
+        return f"[action: {self.tag} id: {self.id!s}] input: [{self.get_container().debug_name}]"
 
     @property
     def conditions(self) -> ConditionModel:
@@ -6625,7 +6630,7 @@ class ActionSet(AbstractCallbackModel):
                 if tag not in action_name_map:
                     # new mapper not found
                     tag = child.tag
-            elif config.convert_vjoy_remap and tag == "remap":
+            elif config.convert_vjoy_remap and child.tag == "remap":
                 tag = "vjoyremap"
                 if tag not in action_name_map:
                     # new mapper not found
@@ -13184,7 +13189,7 @@ class BaseDeviceTabWidget(QSplitTabWidget):
         """Selects an input by index on the UI thread.
 
         A queued re-selection can fire during tab/mode rebuild before the list
-        view has been reconstructed — ignore until the view exists.
+        view has been reconstructed \u2014 ignore until the view exists.
         """
         if not gremlin.util.is_ui_thread():
             gremlin.util.InvokeUiMethod(self._select_input_item_index_ui, index, force, emit)
@@ -13424,7 +13429,7 @@ class FilterChip(QWidget):
         layout.setContentsMargins(8, 2, 6, 2)
         layout.setSpacing(4)
         layout.addWidget(QLabel(label))
-        button = QPushButton("×")
+        button = QPushButton("\u00d7")
         button.setFixedSize(22, 22)
         button.clicked.connect(lambda: on_remove(key))
         layout.addWidget(button)
@@ -13488,7 +13493,7 @@ class FilterControlWidget(QWidget):
         self.category_combo = QComboBox()
         self.category_combo.addItem("All categories", None)
         controls.addWidget(self.category_combo, 1)
-        self.attr_button = QPushButton("Attributes ▼")
+        self.attr_button = QPushButton("Attributes \u25bc")
         self.attr_menu = QMenu(self)
         self.attr_button.setMenu(self.attr_menu)
         controls.addWidget(self.attr_button, 1)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -891,7 +890,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
             lapsed = now - self._last_event
             # lapsed = delta.total_seconds() * 1000
             # duration = datetime.timedelta(milliseconds=lapsed)
-            stub = f" (lapsed {str(lapsed)})"
+            stub = f" (lapsed {lapsed!s})"
 
         line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}{stub}"
 

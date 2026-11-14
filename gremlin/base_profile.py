@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -299,6 +298,7 @@ class ProfileDeviceNode:
                     device.device_category = DeviceCategory.Physical  # assume physical device if in a profile not under virtual sticks
                     device_type_str = safe_read(node, "type", str, "")
                     device_type = DeviceType.to_enum(device_type_str)
+                    device.device_type = device_type
                     device.setVirtual(device_type in (DeviceType.VJoy, DeviceType.Maestro))
                     if device_type == DeviceType.VJoy:
                         vjoy_id = int(safe_read(node, "vjoy-id", int, -1))
@@ -2250,7 +2250,7 @@ class ProfileRegistry:
                         input_item.setSortCallback(self._handle_joystick_sort)
 
                 input_item.setInputType(input_type)
-                # OSC / MIDI / Stream Deck use the item itself as input_id — never assign a string key.
+                # OSC / MIDI / Stream Deck use the item itself as input_id â€” never assign a string key.
                 if input_type not in (
                     InputType.OpenSoundControl,
                     InputType.Midi,
@@ -2693,7 +2693,7 @@ class Profile:
 
                                         input_item = StreamDeckInputItem(self)
                                         input_item.setOverrideInputType(InputType.JoystickButton)
-                                        # Do not setInputId(string) — Stream Deck uses the item as input_id.
+                                        # Do not setInputId(string) â€” Stream Deck uses the item as input_id.
                                         if isinstance(input_id, str) and ":" in input_id:
                                             parts = input_id.split(":")
                                             if len(parts) >= 3:
@@ -3086,12 +3086,12 @@ class Profile:
         # skip the root node
         show_parent = gremlin.config.Configuration().show_parent_mode
         for child in tree.children:
-            for pre, fill, node in anytree.RenderTree(child, style=anytree.ContStyle()):  
-                #'└''─'
-                # pre = '' if node.parent.is_root else '└'
-                # fill = '─' * (node.depth-1)
+            for pre, fill, node in anytree.RenderTree(child, style=anytree.ContStyle()):
+                #'â””''â”€'
+                # pre = '' if node.parent.is_root else 'â””'
+                # fill = 'â”€' * (node.depth-1)
                 if node.parent.name and show_parent:
-                    text = f"{pre} {node.name} (↑{node.parent.name})"
+                    text = f"{pre} {node.name} (â†‘{node.parent.name})"
                     labels.append((node.name, text))
                 else:
                     text = f"{pre} {node.name}"
@@ -3806,7 +3806,7 @@ class Profile:
 
         node.name = new_mode
 
-        # mode device objects — ProfileModeNode.id is unchanged; only the name moves
+        # mode device objects â€” ProfileModeNode.id is unchanged; only the name moves
         mode: ProfileModeNode
         for device in self.devices.values():
             for mode in device.modes.values():
@@ -4089,7 +4089,7 @@ class Profile:
         else:
             self._profile_fname = None
             self._profile_config_fname = None
-        # Path changed — never reuse a previous profile's in-memory sidecar cache.
+        # Path changed â€” never reuse a previous profile's in-memory sidecar cache.
         self._config_data_read = False
         self._read_config_data = {}
 
@@ -4107,39 +4107,11 @@ class Profile:
             return
 
         gremlin.joystick_handling.clearVjoyDevices()
-        vjoy_ids = set()
-        vjoy_guid_map = {}
+        from gremlin.device_remap import vjoy_references
 
-        for node in root.xpath("//device | //vjoy-device"):
-            name = node.get("name", "")
-            device_type = node.get("type", "").casefold()
-            if node.tag != "vjoy-device" and device_type != "vjoy" and not (
-                not device_type and name.casefold().startswith("vjoy")
-            ):
-                continue
-            vjoy_id = safe_read(node, "vjoy-id", int, 0)
-            if not vjoy_id:
-                match = re.search(r"\((\d+)\)", name)
-                vjoy_id = int(match.group(1)) if match else 0
-            vjoy_ids.add(vjoy_id)
-            device_guid = node.get("device-guid") or node.get("device")
-            if device_guid:
-                vjoy_guid_map[vjoy_id] = parse_guid(device_guid)
-
-        for node in root.findall(".//vjoyremap"):
-            if node.get("device-type", "vjoy").casefold() in ("", "vjoy"):
-                vjoy_ids.add(safe_read(node, "virtual-id", int, safe_read(node, "vjoy", int, 0)))
-        for node in root.findall(".//remap"):
-            vjoy_ids.add(safe_read(node, "vjoy", int, 0))
-        for path, attribute in (
-            ("./settings/vjoy-input", "id"),
-            ("./settings/vjoy", "id"),
-            ("./merge-axis/vjoy", "vjoy-id"),
-        ):
-            for node in root.findall(path):
-                vjoy_ids.add(safe_read(node, attribute, int, 0))
-
-        vjoy_ids = {vjoy_id for vjoy_id in vjoy_ids if 1 <= vjoy_id <= 16}
+        references = vjoy_references(root)
+        vjoy_ids = set(references)
+        vjoy_guid_map = {index: parse_guid(guid) for index, guid in references.items() if guid}
         config.vjoy_failover = bool(vjoy_ids)
         if vjoy_ids:
             syslog.warning("VJOY: Profile references vJoy devices but vJoy is not installed - setting up failover mode")
@@ -4233,6 +4205,7 @@ class Profile:
         # removed devices
         self._removed_devices.clear()
 
+        # setup vjoy failover mode if needed
         self._configure_vjoy_failover(root)
 
         # Parse each device into separate DeviceConfiguration objects
@@ -4710,8 +4683,8 @@ class Profile:
                 summary.name = device_name
             summary.setConnected(False)
             if device_type == DeviceType.VJoy:
-                summary.setVirtual(True)
                 summary.device_type = DeviceType.VJoy
+                summary.setVirtual(True)
             elif device_type is not None:
                 summary.device_type = device_type
         node.device = summary

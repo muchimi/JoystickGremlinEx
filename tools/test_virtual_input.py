@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import Mock
 
 from lxml import etree
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from psygnal import Signal
 from shiboken6 import Shiboken
 from test_maestro_startup import COMMON
@@ -136,13 +136,14 @@ class VirtualInputChecks(unittest.TestCase):
         self.state = self.ui["JoystickState"]()
         self.services.event_handler.JoystickState = lambda: self.state
         self.settings = self.make_settings()
-        self.profile = NS(settings=self.settings)
+        self.profile = NS(settings=self.settings, devices={}, vjoy_devices={})
         self.services.shared_state.current_profile = self.profile
         self.services.joystick_handling = NS(
             virtual_devices=lambda connected_only=True: [
                 dev for dev in self.devices if dev.is_virtual and (dev.connected or not connected_only)
             ],
             all_joystick_devices=lambda: list(self.devices),
+            display_devices=lambda profile: list(self.devices),
             getAllDevices=lambda: list(self.devices),
             getDevice=lambda guid: next((dev for dev in self.devices if dev.device_id == guid), None),
             getSpecialDevices=lambda: [],
@@ -209,6 +210,7 @@ class VirtualInputChecks(unittest.TestCase):
         self.ui.update(
             GUID=uuid.UUID,
             VJOY_VID=0x1234,
+            VJOY_PID=0xBEAD,
             MAESTRO_VID=0x1209,
             GEX_VID=0x1209,
             GEX_PID_BASE=0x1000,
@@ -242,13 +244,14 @@ class VirtualInputChecks(unittest.TestCase):
                 self.assertTrue(native._is_gamepad)
                 self.assertFalse(native.is_virtual)
 
-    def test_vigem_gamepad_summaries_retain_gamepad_classification(self):
+    def test_vigem_gamepad_summaries_remain_physical_for_gex(self):
         for vendor, product in ((0x045E, 0x028E), (0x054C, 0x05C4)):
             with self.subTest(vendor=vendor, product=product):
                 native = self.native_summary("Virtual controller", vendor, product, usage=5)
                 native.setVirtual(True)
                 self.assertTrue(native.is_gamepad)
-                self.assertTrue(native.is_virtual)
+                self.assertFalse(native.is_virtual)
+                self.assertEqual(native.device_category, DeviceCategory.Physical)
 
     def test_joysticks_and_other_hid_usages_are_not_gamepads(self):
         for usage_page, usage in ((1, 4), (1, 8), (1, 6), (2, 5), (0, 0)):
@@ -305,6 +308,67 @@ class VirtualInputChecks(unittest.TestCase):
         self.settings.setVirtualAsInput(selected, False)
         self.assertFalse(self.state.inputEnabled(selected.device_id))
 
+    def test_profile_only_disconnected_device_gets_a_tab_in_default_and_saved_order(self):
+        missing = Device("Old left VPC", DeviceType.Joystick, connected=False)
+        # Profile-only placeholders are registered in the general device map,
+        # but are absent from the native joystick inventory.
+        shown = [*self.devices, missing]
+        self.services.joystick_handling.display_devices = lambda profile: shown
+        self.services.joystick_handling.getAllDevices = lambda: shown
+        self.services.joystick_handling.getDevice = lambda guid: next((d for d in shown if d.device_id == guid), None)
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config, window.profile = self.config, self.profile
+        for saved in ({}, {0: (missing.device_id, True), 1: (self.devices[3].device_id, True)}):
+            with self.subTest(saved=bool(saved)):
+                self.config.tab_list = saved
+                result = window._get_sorted_tab_map()
+                self.assertIn(missing, result["sorted"])
+                self.assertIn(missing, result["disconnected"])
+                self.assertNotIn(missing, result["physical"])
+                if saved:
+                    self.assertIs(result["sorted"][0], missing)
+
+    def test_tab_connection_state_uses_profile_aware_snapshot(self):
+        cached = self.devices[3]
+        missing = Device(cached.name, DeviceType.Joystick, connected=False)
+        self.services.joystick_handling.display_devices = lambda profile: [missing]
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config, window.profile = self.config, self.profile
+        self.config.tab_list = {0: (cached.device_id, True)}
+        result = window._get_sorted_tab_map()
+        self.assertEqual(result["disconnected"], [missing])
+        self.assertNotIn(cached, result["physical"])
+        self.assertIs(result["sorted"][0], missing)
+
+    def test_missing_tab_uses_disconnected_icon_color_and_tooltip(self):
+        cached = self.devices[3]
+        missing = Device(cached.name, DeviceType.Joystick, connected=False)
+        self.ui["Color"] = lambda: NS(tabMissingForegroundColor=lambda: "missing-color")
+        self.ui["Icons"] = NS(disconnectedIcon=lambda: "missing-icon")
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_update_tab_ui"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window._all_devices_map = {missing.device_id: missing}
+        window.getTabIndexForDevice = lambda guid: 0
+        header = Mock()
+        window.ui = NS(devices_tab_header_widget=header)
+        # The registry still reports connected, but tabs use the reconciled snapshot.
+        window._update_tab_ui(missing.device_id)
+        header.setTabIcon.assert_called_once_with(0, "missing-icon")
+        header.setTabTextColor.assert_called_once_with(0, "missing-color")
+        self.assertIn("Disconnected", header.setTabToolTip.call_args.args[1])
+        self.assertIn(missing.device_id, header.setTabToolTip.call_args.args[1])
+        header.reset_mock()
+        window.getTabIndexForDevice = lambda guid: -1
+        window._update_tab_ui(missing)
+        header.setTabIcon.assert_not_called()
+        header.setTabTextColor.assert_not_called()
+        header.setTabToolTip.assert_not_called()
+
     def test_unmatched_native_maestros_do_not_become_bridge_output_slots(self):
         natives = [self.native_summary() for _ in range(4)]
         namespace = dict(
@@ -313,9 +377,12 @@ class VirtualInputChecks(unittest.TestCase):
             _device_registry_lock=threading.RLock(),
             _all_devices_map={dev.device_guid: dev for dev in natives},
             _maestro_service_devices={},
+            _maestro_excluded_native_guids=set(),
+            _joystick_device_guid_map={},
             _all_virtual_devices_map={},
             _all_vjoy_devices_map={},
             _output_targets={},
+            updateFailoverMap=Mock(),
         )
         load(
             "gremlin/joystick_handling.py",
@@ -323,6 +390,7 @@ class VirtualInputChecks(unittest.TestCase):
                 "_update_joystick_device_maps",
                 "_update_virtual_map",
                 "_apply_maestro_service_devices",
+                "_maestro_output_summary",
             },
             namespace,
         )
@@ -473,6 +541,7 @@ class VirtualInputChecks(unittest.TestCase):
         self.ui["DefaultModeSelector"] = lambda settings: QtWidgets.QLabel("Mode")
         self.ui["DefaultDelay"] = lambda settings: QtWidgets.QLabel("Delay")
         self.services.ui.ui_common.getGridContainer = lambda: (QtWidgets.QWidget(), QtWidgets.QGridLayout())
+        self.ui["getGridContainer"] = self.services.ui.ui_common.getGridContainer
         self.services.ui.ui_common.getVContainer = self.ui["getVContainer"]
         window = self.ui["ProfileSettingsWidget"]()
         window.profile_settings = self.settings
@@ -499,7 +568,7 @@ class VirtualInputChecks(unittest.TestCase):
                 self.assertEqual(set(result["sorted"]), {self.devices[1], self.devices[3]})
 
     def test_device_visibility_list_only_includes_selected_virtual_inputs(self):
-        self.ui["Color"] = lambda: NS(alternateActiveColor=lambda: "#8a761c")
+        self.ui["Color"] = lambda: NS(alternateActiveColor=lambda: "#8a761c", disconnectedColor=lambda: "#db6512")
         self.services.util.InvokeUiMethod = lambda callback, *args: callback(*args)
         self.ui.update(dinput=NS(DeviceSummary=Device), QListWidgetItem=QtWidgets.QListWidgetItem)
         self.ui.update(QListWidget=QtWidgets.QListWidget, QAbstractItemView=QtWidgets.QAbstractItemView, QLabel=QtWidgets.QLabel)
@@ -571,6 +640,27 @@ class VirtualInputChecks(unittest.TestCase):
         self.settings.setVirtualAsInput(self.devices[0], False)
         self.devices[1].input_enabled = False
         self.assertEqual(populate(), [self.devices[3]])
+
+        # Missing profile devices remain eligible even without a live virtual input slot.
+        offline = [Device("Missing joystick", DeviceType.Joystick, connected=False),
+                   Device("Missing vJoy", DeviceType.VJoy, connected=False),
+                   Device("Missing Maestro", connected=False)]
+        orphan = Device("Old profile joystick", DeviceType.Joystick, connected=False)
+        self.profile.devices = {device.device_guid: NS(device=device) for device in offline}
+        for device in (*offline, orphan):
+            tab_map[len(tab_map)] = (device, True)
+        shown = populate()
+        self.assertEqual(shown, [self.devices[3], *offline])
+        for index in range(1, dialog._list_widget.count()):
+            offline_row = dialog._list_widget.itemWidget(dialog._list_widget.item(index))
+            self.assertTrue(offline_row.name_widget.property("deviceDisconnected"))
+            self.assertIn("Disconnected", offline_row.name_widget.toolTip())
+            offline_row.name_widget.ensurePolished()
+            text_color = QtGui.QPalette.ColorRole.WindowText
+            self.assertEqual(offline_row.name_widget.palette().color(text_color).name(), "#db6512")
+            self.assertTrue(offline_row.name_widget.text().endswith("(disconnected)"))
+            offline_row.setDeviceVisible(False)
+            self.assertEqual(offline_row.name_widget.palette().color(text_color).name(), "#db6512")
 
     def test_tab_creation_uses_joystick_editors_for_both_virtual_providers(self):
         class InputEditor(QtWidgets.QWidget):

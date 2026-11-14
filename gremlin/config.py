@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -41,6 +39,7 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
+GEX_PROFILE_FOLDER = "Joystick Gremlin Ex"
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
 PACKAGED = not GEX_DEV_ENABLED and hasattr(sys, "_MEIPASS")
@@ -53,31 +52,74 @@ DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNO
 
 # general override flags for builds and execution - these override configuration settings from the config file
 # this is used to simplify diagnostics and help with development of work in progress modules
-# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules
+# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options â†’ Modules
 # works from a frozen exe without requiring launch_gex.cmd env vars.
 
-VOICE_ENABLED = True  # "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
-MIDI_ENABLED = True  # "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
-OSC_ENABLED = True  # "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
+VOICE_ENABLED = (
+    "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_VOICE_ENABLED" in os.environ
+    else True
+)
+MIDI_ENABLED = (
+    "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_MIDI_ENABLED" in os.environ
+    else True
+)
+OSC_ENABLED = (
+    "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_OSC_ENABLED" in os.environ
+    else True
+)
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in (
     "1",
     "true",
     "yes",
 )
-OVERLAY_ENABLED = True  # "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-AFCS_ENABLED = True  # "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
-STREAMDECK_ENABLED = True  # "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
-OCTAVI_ENABLED = True  # "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
-PROFILE_GRAPH_ENABLED = True  # "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
-GEX_MAESTRO_ENABLED = True  # "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
-VJOY_ENABLED = True  # "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
+OVERLAY_ENABLED = (
+    "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_OVERLAY_ENABLED" in os.environ
+    else True
+)
+AFCS_ENABLED = (
+    "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_AFCS_ENABLED" in os.environ
+    else True
+)
+STREAMDECK_ENABLED = (
+    "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_STREAMDECK_ENABLED" in os.environ
+    else True
+)
+OCTAVI_ENABLED = (
+    "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_OCTAVI_ENABLED" in os.environ
+    else True
+)
+PROFILE_GRAPH_ENABLED = (
+    "GEX_PROFILE_GRAPH_ENABLED" in os.environ
+    and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_PROFILE_GRAPH_ENABLED" in os.environ
+    else True
+)
+GEX_MAESTRO_ENABLED = (
+    "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_MAESTRO_ENABLED" in os.environ
+    else True
+)
+VJOY_ENABLED = (
+    "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_VJOY_ENABLED" in os.environ
+    else True
+)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
-    changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
+    changed = Signal(
+        str, object
+    )  # fires on some configuration value changes, passes the method to get the value that has changed
 
     def get_config(self) -> str:
         """local config file (version based)"""
@@ -285,7 +327,7 @@ class Configuration(QtCore.QObject):
 
     def ensureProfilePath(self):
         if not self._profile_path:
-            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
+            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), GEX_PROFILE_FOLDER))
             self._profile_path = user_profile_path
             os.path.makedirs(self._profile_path, exist_ok=True)
 
@@ -358,7 +400,7 @@ class Configuration(QtCore.QObject):
 
         if not self._app_path:
             enable_version = self.enable_log_version
-            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
+            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), GEX_PROFILE_FOLDER))
             self._profile_path = user_profile_path
 
             if enable_version:
@@ -738,12 +780,20 @@ class Configuration(QtCore.QObject):
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
             disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
-            disk_foreign = {key: merged[key] for key in self._PROFILE_SIDECAR_FOREIGN_KEYS if isinstance(merged, dict) and key in merged}
+            disk_foreign = {
+                key: merged[key]
+                for key in self._PROFILE_SIDECAR_FOREIGN_KEYS
+                if isinstance(merged, dict) and key in merged
+            }
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
-            # on top of on-disk data before writing — never foreign module payloads.
+            # on top of on-disk data before writing â€” never foreign module payloads.
             if pending_profile_data:
-                pending = {key: value for key, value in pending_profile_data.items() if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS}
+                pending = {
+                    key: value
+                    for key, value in pending_profile_data.items()
+                    if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS
+                }
                 merged.update(pending)
 
             # Restore foreign keys captured from disk before update(). Without this,
@@ -760,7 +810,9 @@ class Configuration(QtCore.QObject):
             mem_custom = self._streamdeck_pages_custom_count(mem_pages)
             if disk_custom > 0 and mem_custom < disk_custom:
                 merged["streamdeck_pages"] = disk_pages
-                syslog.info(f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})")
+                syslog.info(
+                    f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})"
+                )
 
             # Re-read foreign keys immediately before write so an overlay/Stream Deck
             # save that landed during this merge is not rolled back.
@@ -828,7 +880,9 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
-            syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
+            syslog.info(
+                f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]"
+            )
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -957,7 +1011,9 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data("tts_mode_switch_enabled", False)  # change in m77 default is to not speak mode changes by default
+        return self._get_data(
+            "tts_mode_switch_enabled", False
+        )  # change in m77 default is to not speak mode changes by default
 
     @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value: bool):
@@ -1556,7 +1612,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def remote_video_quality(self) -> int:
-        """JPEG quality 1–100 (also used as quality hint for future codecs)."""
+        """JPEG quality 1â€“100 (also used as quality hint for future codecs)."""
         try:
             return max(1, min(100, int(self._get_data("remote_video_quality", 55) or 55)))
         except TypeError, ValueError:
@@ -2242,7 +2298,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_maestro(self):
         """true if verbose mode for maestro"""
-        return True
+        # return True
         return self.verbose and VerboseMode.Maestro in self.verbose_mode
 
     @property
@@ -2604,7 +2660,9 @@ class Configuration(QtCore.QObject):
         elif isinstance(input_id, (list, set, tuple)):
             pass
         else:
-            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
+            syslog.warning(
+                f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
+            )
             return
 
         input_type = InputType.convert(input_type)
@@ -2614,7 +2672,9 @@ class Configuration(QtCore.QObject):
         input_type_string = InputType.to_string(input_type)
         self._profile_data["last_input"] = data
         self._profile_data["last_input_device_guid"] = normalized_device_guid
-        self._profile_data["last_device_guid"] = normalized_device_guid  # read first by last_device_guid; must not go stale
+        self._profile_data["last_device_guid"] = (
+            normalized_device_guid  # read first by last_device_guid; must not go stale
+        )
         self._profile_data["last_input_id"] = input_id
         self._profile_data["last_input_type"] = input_type_string
         self._profile_data["last_input_mode"] = mode
@@ -2629,7 +2689,9 @@ class Configuration(QtCore.QObject):
             syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
 
         if __debug__:
-            syslog.info(f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]")
+            syslog.info(
+                f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]"
+            )
 
         # save the config
         self.save_profile_settings()
@@ -2818,7 +2880,9 @@ class Configuration(QtCore.QObject):
         dinput_device_guid = device.device_guid
         device_guid = device.device_id
         normalized_dinput_device_guid = gremlin.util.normalize_guid(dinput_device_guid)
-        normalized_requested_guid = gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
+        normalized_requested_guid = (
+            gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
+        )
 
         data: dict = self._profile_data.get("last_input", {})
         lookup_keys = [device_guid, normalized_dinput_device_guid]
@@ -2835,7 +2899,11 @@ class Configuration(QtCore.QObject):
                 syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                 input_type = InputType.NotSet
 
-            if isinstance(input_id, str) and input_id.isnumeric() and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+            if (
+                isinstance(input_id, str)
+                and input_id.isnumeric()
+                and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+            ):
                 input_id = int(input_id)
 
             if input_id is not None and isinstance(input_id, int):
@@ -2953,7 +3021,9 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
+        return MIDI_ENABLED and self._data.get(
+            "midi_enabled", False
+        )  # defaults to OFF and must be explicitly enabled by the user
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
@@ -2973,7 +3043,9 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self) -> bool:
         """True if OSC support is enabled"""
         if self._osc_enabled is None:
-            self._osc_enabled = self._get_data("osc_enabled", True)  # defaults to OFF and must be explicitly enabled by the user
+            self._osc_enabled = self._get_data(
+                "osc_enabled", True
+            )  # defaults to OFF and must be explicitly enabled by the user
         return OSC_ENABLED and self._osc_enabled
 
     @osc_enabled.setter
@@ -3026,7 +3098,9 @@ class Configuration(QtCore.QObject):
     @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
+        return STREAMDECK_ENABLED and self._get_data(
+            "streamdeck_enabled", False
+        )  # defaults to OFF and must be explicitly enabled by the user
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -3617,22 +3691,6 @@ class Configuration(QtCore.QObject):
         self._set_data("allow_exec_tree_container_validation_fail", value)
 
     @property
-    def vjoy_loopback_use_time(self):
-        return self._get_data("vjoy_loopback_use_time", True)
-
-    @vjoy_loopback_use_time.setter
-    def vjoy_loopback_use_time(self, value: bool):
-        self._set_data("vjoy_loopback_use_time", value)
-
-    @property
-    def vjoy_loopback_delay(self):
-        return self._get_data("vjoy_loopback_delay", 250)
-
-    @vjoy_loopback_delay.setter
-    def vjoy_loopback_delay(self, value: int):
-        self._set_data("vjoy_loopback_delay", value)
-
-    @property
     def macro_last_device_id(self):
         """id of the last device selected as an input for macros"""
         return self._get_data("macro_last_device_id", "")
@@ -3660,12 +3718,51 @@ class Configuration(QtCore.QObject):
         self._set_data("macro_last_input_id", id)
 
     @property
+    def vjoy_loopback_use_time(self):
+        return self._get_data("vjoy_loopback_use_time", True)
+
+    @vjoy_loopback_use_time.setter
+    def vjoy_loopback_use_time(self, value: bool):
+        self._set_data("vjoy_loopback_use_time", value)
+
+    @property
+    def vjoy_loopback_delay(self):
+        return self._get_data("vjoy_loopback_delay", 250)
+
+    @vjoy_loopback_delay.setter
+    def vjoy_loopback_delay(self, value: int):
+        self._set_data("vjoy_loopback_delay", value)
+
+    @property
     def vjoy_show_disconnected(self) -> bool:
         return self._get_data("vjoy_show_disconnected", False)
 
     @vjoy_show_disconnected.setter
     def vjoy_show_disconnected(self, value: bool):
         self._set_data("vjoy_show_disconnected", value)
+
+    @property
+    def vjoy_failover(self) -> bool:
+        """returns true if vjoy failover is enabled
+        this flag is set at profile load time when no VJOY installation is detected to create fake vjoy devices as needed and use
+        the failover capability to maestro devices.
+
+        """
+        return self._vjoy_failover if hasattr(self, "_vjoy_failover") else False
+
+    @vjoy_failover.setter
+    def vjoy_failover(self, value: bool):
+        self._vjoy_failover = value
+
+    @property
+    def vjoy_installed(self) -> bool:
+        """returns true if VJOY is installed (this is set on GEX startup and not persisted)"""
+        # force off for some configurations (diagnostics mode)
+        return VJOY_ENABLED and self._vjoy_installed if hasattr(self, "_vjoy_installed") else False
+
+    @vjoy_installed.setter
+    def vjoy_installed(self, value: bool):
+        self._vjoy_installed = value
 
     @property
     def show_disconnected(self) -> bool:
@@ -4200,29 +4297,6 @@ class Configuration(QtCore.QObject):
         self._set_data("virtual_output_failover", value)
 
     @property
-    def vjoy_failover(self) -> bool:
-        """returns true if vjoy failover is enabled
-        this flag is set at profile load time when no VJOY installation is detected to create fake vjoy devices as needed and use
-        the failover capability to maestro devices.
-
-        """
-        return self._vjoy_failover if hasattr(self, "_vjoy_failover") else False
-
-    @vjoy_failover.setter
-    def vjoy_failover(self, value: bool):
-        self._vjoy_failover = value
-
-    @property
-    def vjoy_installed(self) -> bool:
-        """returns true if VJOY is installed (this is set on GEX startup and not persisted)"""
-        # force off for some configurations (diagnostics mode)
-        return VJOY_ENABLED and self._vjoy_installed if hasattr(self, "_vjoy_installed") else False
-
-    @vjoy_installed.setter
-    def vjoy_installed(self, value: bool):
-        self._vjoy_installed = value
-
-    @property
     def last_save_path(self) -> str:
         """returns the last save path used for audio files"""
         return self._get_data("last_save_path", "")
@@ -4234,7 +4308,9 @@ class Configuration(QtCore.QObject):
     @property
     def virpil_led_executable(self) -> str:
         """returns the path to the virpil LED executable"""
-        return self._get_data("virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe")
+        return self._get_data(
+            "virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe"
+        )
 
     @virpil_led_executable.setter
     def virpil_led_executable(self, value: str):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -1748,7 +1747,7 @@ class DeviceRemapDialogUI(BaseDialogUi):
         root = self._graph.root
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
-                syslog.info(f"{pre}{str(node)}")
+                syslog.info(f"{pre}{node!s}")
 
     def _get_device_node(self, device_guid):
         return self._graph.get_device_node(device_guid)
@@ -1874,7 +1873,7 @@ class ProfileDeviceNode(ProfileBaseNode):
 
     @virtual.setter
     def virtual(self, value: bool):
-        self._device.is_virtual = value
+        self._device.setVirtual(value)
 
     @property
     def device_type(self) -> DeviceType:
@@ -2483,7 +2482,7 @@ class ProfileContainerNode(ProfileBaseNode):
             return self.container.to_xml()
 
     def __str__(self):
-        return f"{self.nodeType.name}: {str(self.container)}"
+        return f"{self.nodeType.name}: {self.container!s}"
 
 
 class ProfileActionSetNode(ProfileBaseNode):
@@ -2523,7 +2522,7 @@ class ProfileActionSetNode(ProfileBaseNode):
             return self.action_set.to_xml()
 
     def __str__(self):
-        return f"{self.nodeType.name}: {str(self.action_set)}"
+        return f"{self.nodeType.name}: {self.action_set!s}"
 
 
 class ProfileActionNode(ProfileBaseNode):
@@ -2553,7 +2552,7 @@ class ProfileActionNode(ProfileBaseNode):
             return self.action.to_xml()
 
     def __str__(self):
-        return f"{self.nodeType.name}: {str(self.action)}"
+        return f"{self.nodeType.name}: {self.action!s}"
 
 
 class ProfileMergedAxisNode(ProfileBaseNode):
@@ -2636,7 +2635,7 @@ class ProfileGraph:
         root = self._root
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
-                syslog.info(f"{pre}{str(node)}")
+                syslog.info(f"{pre}{node!s}")
 
     def from_xml(self, source_xml: str, data=None, fname_is_xml: bool = False):
         """reads a profile from XML"""

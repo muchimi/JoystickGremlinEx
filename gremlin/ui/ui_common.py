@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -43,7 +42,6 @@ from PySide6.QtWidgets import (
     QStylePainter,
     QStyleOptionTabBarBase,
     QStyle,
-
 )
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
@@ -4284,7 +4282,8 @@ class VJoySelector(AbstractInputSelector):
     def _initialize(self):
         if self.show_connected_only:
             potential_devices = sorted(
-                gremlin.joystick_handling.virtual_devices(connected_only=True), key=lambda x: (x.name, str(x.device_guid))
+                gremlin.joystick_handling.virtual_devices(connected_only=True),
+                key=lambda x: (x.name, str(x.device_guid)),
             )
         else:
             profile = gremlin.shared_state.current_profile
@@ -4293,7 +4292,10 @@ class VJoySelector(AbstractInputSelector):
                 configured_input_vids = set(profile.settings.getVirtualAsInputList())
             potential_devices = [
                 dev
-                for dev in sorted(gremlin.joystick_handling.vjoy_devices(connected_only=False), key=lambda x: x.vjoy_id)
+                for dev in sorted(
+                    gremlin.joystick_handling.vjoy_devices(connected_only=False, resolve_failover=False),
+                    key=lambda x: x.vjoy_id,
+                )
                 if dev.vjoy_id in configured_input_vids
             ]
 
@@ -4311,7 +4313,11 @@ class VJoySelector(AbstractInputSelector):
                 if input_counts.get(valid_type, 0) > 0:
                     has_inputs = True
 
-            excluded = self.invalid_ids and dev.device_type == gremlin.types.DeviceType.VJoy and dev.vjoy_id in self.invalid_ids
+            excluded = (
+                self.invalid_ids
+                and dev.device_type == gremlin.types.DeviceType.VJoy
+                and dev.vjoy_id in self.invalid_ids
+            )
             if self.invalid_ids is not None and dev.device_type == gremlin.types.DeviceType.Maestro:
                 profile = gremlin.shared_state.current_profile
                 if profile is not None:
@@ -4337,8 +4343,11 @@ class VirtualDeviceSelector(AbstractInputSelector):
         for device in sorted(devices, key=lambda dev: (dev.name, str(dev.device_guid))):
             if device.disabled:
                 continue
-            counts = {InputType.JoystickAxis: device.axis_count, InputType.JoystickButton: device.button_count,
-                      InputType.JoystickHat: device.hat_count}
+            counts = {
+                InputType.JoystickAxis: device.axis_count,
+                InputType.JoystickButton: device.button_count,
+                InputType.JoystickHat: device.hat_count,
+            }
             if any(counts.get(kind, 0) > 0 for kind in self.valid_types):
                 self.device_list.append(device)
 
@@ -4349,8 +4358,11 @@ class VirtualDeviceSelector(AbstractInputSelector):
         return device.device_guid
 
     def set_selection(self, input_type, device_id, input_id, emit=False):
-        device = (gremlin.joystick_handling.getDeviceFromVjoyId(device_id) if isinstance(device_id, int)
-                  else gremlin.joystick_handling.getDevice(device_id))
+        device = (
+            gremlin.joystick_handling.getDeviceFromVjoyId(device_id)
+            if isinstance(device_id, int)
+            else gremlin.joystick_handling.getDevice(device_id)
+        )
         if device is None or self.device_dropdown.findData(device.device_guid) == -1:
             with QtCore.QSignalBlocker(self.device_dropdown):
                 self.device_dropdown.setCurrentIndex(-1)
@@ -6802,27 +6814,6 @@ class QHatSelectorComboBox(QDataComboBox):
 
         for position in HatDirection:
             icon = load_icon(vjoy.vjoy.Hat.direction_to_icon[position.value])
-            # match position:
-            #     case HatDirection.Center:
-            #         png = f"{prefix}hat_ctr.png"
-            #     case HatDirection.North:
-            #         png = f"{prefix}hat_n.png"
-            #     case HatDirection.NorthEast:
-            #         png = f"{prefix}hat_ne.png"
-            #     case HatDirection.NorthWest:
-            #         png = f"{prefix}hat_nw.png"
-            #     case HatDirection.East:
-            #         png = f"{prefix}hat_e.png"
-            #     case HatDirection.South:
-            #         png = f"{prefix}hat_s.png"
-            #     case HatDirection.SouthEast:
-            #         png = f"{prefix}hat_se.png"
-            #     case HatDirection.SouthWest:
-            #         png = f"{prefix}hat_sw.png"
-            #     case HatDirection.West:
-            #         png = f"{prefix}hat_w.png"
-            # icon = load_icon(png)
-            # icon_active = load_icon(png_active)
 
             self.addItem(
                 icon,
@@ -7795,7 +7786,6 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
 
         super().__init__(
             orientation=Qt.Orientation.Horizontal,
-            input_item=input_item,
             callback=self._handle_update_ui,
             description=description,
             source=source,
@@ -7806,6 +7796,11 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         self._get_values_callback = callback
         if values is not None:
             self._set_value_ui(values)
+
+        # QWidget invokes the listener mixin before its C++ object is valid.
+        # Register only after construction so the deleted-owner guard accepts us.
+        if input_item is not None:
+            self.setInputItem(input_item, description)
 
     def _handle_update_ui(self, event: gremlin.event_handler.Event):
         """handles joystick event"""
@@ -8157,8 +8152,11 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 name_index += 1
                 axis_label = QtWidgets.QLabel(f"Axis {device.getAxisName(input_id)}")
                 self.index_map[linear_id] = input_id
-                values = (gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(device.device_guid, input_id))
-                          if device.is_virtual else sd.getAxisValues(device.device_guid, input_id))
+                values = (
+                    gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(device.device_guid, input_id))
+                    if device.is_virtual
+                    else sd.getAxisValues(device.device_guid, input_id)
+                )
                 if values is None:
                     syslog.error(f"AxisCurrentState: unregistered axis {device.getAxisName(input_id)}")
                     continue
@@ -8596,7 +8594,11 @@ class HatState(QtWidgets.QGroupBox):
 
         :param event the event with which to update the state display
         """
-        if event.device_guid == self.device.device_guid and event.event_type == InputType.JoystickHat and event.identifier in self._hat_map:
+        if (
+            event.device_guid == self.device.device_guid
+            and event.event_type == InputType.JoystickHat
+            and event.identifier in self._hat_map
+        ):
             self._hat_map[event.identifier].set_angle(event.value)
             self._event_times[event.identifier] = time.time()
 
@@ -8652,8 +8654,11 @@ class AxesTimeline(QtWidgets.QGroupBox):
     def _update_points(self):
         astate = gremlin.event_handler.AxisState()
         for input_id in self.input_id_list:
-            values = (gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(self.device_guid, input_id))
-                      if self.device.is_virtual else astate.getAxisValues(self.device_guid, input_id))
+            values = (
+                gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(self.device_guid, input_id))
+                if self.device.is_virtual
+                else astate.getAxisValues(self.device_guid, input_id)
+            )
             if values is not None:
                 self.add_point(values.actual, input_id)
 
@@ -9587,7 +9592,9 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
         for i in range(device.button_count):
             input_id = i + 1
-            is_used = profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id) if profile else False
+            is_used = (
+                profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id) if profile else False
+            )
             is_marked = input_id in used_buttons
             used_device_guid = device.device_guid
 
@@ -9706,7 +9713,11 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             self.unhook()
             return
         input_type = event.getInputType()
-        if event.device_guid == self._device.device_guid and input_type == InputType.JoystickButton and event.identifier in self._widget_map:
+        if (
+            event.device_guid == self._device.device_guid
+            and input_type == InputType.JoystickButton
+            and event.identifier in self._widget_map
+        ):
             # is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
             widget = self._widget_map[event.identifier]
@@ -11509,7 +11520,7 @@ class QSplitTabWidget(QDataWidget):
         assert False, "Abstract member must be implemented in derived class"
 
     def _default_splitter_sizes(self, width: int) -> list[int]:
-        """Left-biased default from stretch factors (classic tabs ≈ 1:4 / 200px)."""
+        """Left-biased default from stretch factors (classic tabs \u2248 1:4 / 200px)."""
         if width <= 0:
             return [200, 200]
         # QSplitter has setStretchFactor() but no stretchFactor() getter.
@@ -12381,7 +12392,7 @@ class QCustomThemeDialog(QRememberDialog):
         layout.addWidget(description)
 
         self._search = QtWidgets.QLineEdit()
-        self._search.setPlaceholderText("Search colors…")
+        self._search.setPlaceholderText("Search colors\u2026")
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._filter_rows)
         layout.addWidget(self._search)
@@ -12477,7 +12488,7 @@ class QCustomThemeDialog(QRememberDialog):
             editor.setAccessibleName(name + " hex color")
             editor.setToolTip("#RRGGBB or #AARRGGBB (alpha first)")
             editor.setMinimumWidth(110)
-            swatch = QtWidgets.QPushButton("Choose…")
+            swatch = QtWidgets.QPushButton("Choose\u2026")
             swatch.setAccessibleName("Choose " + name)
             swatch.setAutoDefault(False)
             self._style_swatch(swatch, value)
@@ -15364,8 +15375,8 @@ class QCollapsible(QFrame):
         content_widget: QWidget | None = None,  # content widget if any
         collapsed=False,  # initial state
         parent: QWidget | None = None,
-        expandedIcon: QIcon | str | None = "▼",
-        collapsedIcon: QIcon | str | None = "▲",
+        expandedIcon: QIcon | str | None = "\u25bc",
+        collapsedIcon: QIcon | str | None = "\u25b2",
     ):
         super().__init__(parent)
         self._locked = False
@@ -18149,37 +18160,27 @@ class QInteractWidget(QtWidgets.QWidget):
         widgets = []
 
         if self._interactions is None or Interactions.Delete in self._interactions:
-            self.remove_widget = Buttons.getDeleteWidget(
-                callback=self._handle_delete_step, data=data
-            )
+            self.remove_widget = Buttons.getDeleteWidget(callback=self._handle_delete_step, data=data)
             self.remove_widget.setFixedSize(size, size)
             widgets.append(self.remove_widget)
 
         if self._interactions is None or Interactions.Up in self._interactions:
-            self.step_up_widget = Buttons.getMoveUpWidget(
-                callback=self._handle_move_step_up, data=data
-            )
+            self.step_up_widget = Buttons.getMoveUpWidget(callback=self._handle_move_step_up, data=data)
             self.step_up_widget.setFixedSize(size, size)
             widgets.append(self.step_up_widget)
 
         if self._interactions is None or Interactions.Down in self._interactions:
-            self.step_down_widget = Buttons.getMoveDownWidget(
-                callback=self._handle_move_step_down, data=data
-            )
+            self.step_down_widget = Buttons.getMoveDownWidget(callback=self._handle_move_step_down, data=data)
             self.step_down_widget.setFixedSize(size, size)
             widgets.append(self.step_down_widget)
 
         if self._interactions is None or Interactions.Top in self._interactions:
-            self.step_top_widget = Buttons.getMoveTopWidget(
-                callback=self._handle_move_step_top, data=data
-            )
+            self.step_top_widget = Buttons.getMoveTopWidget(callback=self._handle_move_step_top, data=data)
             self.step_top_widget.setFixedSize(size, size)
             widgets.append(self.step_top_widget)
 
         if self._interactions is None or Interactions.Bottom in self._interactions:
-            self.step_bottom_widget = Buttons.getMoveBottomWidget(
-                callback=self._handle_move_step_bottom, data=data
-            )
+            self.step_bottom_widget = Buttons.getMoveBottomWidget(callback=self._handle_move_step_bottom, data=data)
             self.step_bottom_widget.setFixedSize(size, size)
             widgets.append(self.step_bottom_widget)
 
@@ -18640,7 +18641,7 @@ class QAudioLevelMeter(QWidget):
 
 
 class QVolumeKnob(QWidget):
-    """A painted 0–100 volume knob
+    """A painted 0\u2013100 volume knob
 
     Controls:
       * Drag up/down or left/right to adjust.

@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -86,7 +84,7 @@ def _coerce_palette_color(value: Any, fallback: Any = "#ffffff") -> Any:
     if is_gradient(value):
         return normalize_gradient(value)
     if isinstance(value, dict):
-        # Unknown structured color — fall back rather than str(dict).
+        # Unknown structured color â€” fall back rather than str(dict).
         value = fallback if not isinstance(fallback, dict) else "#ffffff"
     return str(value or "#ffffff")
 
@@ -113,7 +111,7 @@ def _builtin_palettes(widget_type: str) -> list[dict[str, Any]]:
 def palettes_path() -> str:
     root = gremlin.shared_state.data_path
     if not root:
-        root = os.path.join(os.path.expanduser("~"), "Joystick Gremlin Ex")
+        root = os.path.join(os.path.expanduser("~"), "Gremlin Ex")
     return os.path.join(root, "overlay_color_palettes.json")
 
 

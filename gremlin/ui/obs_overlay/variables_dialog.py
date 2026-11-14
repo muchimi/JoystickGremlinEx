@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Overlay label variables (%name%). OCR/label substitution comes later.
 
@@ -230,8 +229,8 @@ class OverlayVariablesDialog(QtWidgets.QDialog):
             token = overlay_variable_token(row.get("name"))
             values = (
                 token,
-                str(row.get("default") or "") or "—",
-                str(row.get("value") or "") or "—",
+                str(row.get("default") or "") or "â€”",
+                str(row.get("value") or "") or "â€”",
                 self._reset_summary(row),
             )
             for col, text in enumerate(values):
@@ -264,7 +263,7 @@ class OverlayVariablesDialog(QtWidgets.QDialog):
         menu = QtWidgets.QMenu(self)
         copy_act = menu.addAction("Copy %name%")
         copy_act.setText(f"Copy {overlay_variable_token(row.get('name'))}")
-        edit_act = menu.addAction("Edit…")
+        edit_act = menu.addAction("Editâ€¦")
         delete_act = menu.addAction("Delete")
         chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
         if chosen is copy_act:

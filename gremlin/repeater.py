@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -163,14 +162,14 @@ class Repeater(QtCore.QObject):
             event = self._events[index]
             if event.event_type == common.InputType.Keyboard:
                 if verbose:
-                    syslog.info(f"REPEATER: send keyboard event: {str(event)}")
+                    syslog.info(f"REPEATER: send keyboard event: {event!s}")
                 el.keyboard_event.emit(event)
             else:
                 if verbose:
-                    syslog.info(f"REPEATER: send joystick event: {str(event)}")
+                    syslog.info(f"REPEATER: send joystick event: {event!s}")
                 el.joystick_event.emit(event)
 
-            self._update_func(f"{common.InputType.to_string(event.event_type).capitalize()} {str(event.identifier)}")
+            self._update_func(f"{common.InputType.to_string(event.event_type).capitalize()} {event.identifier!s}")
 
             index = (index + 1) % len(self._events)
             time.sleep(0.25)

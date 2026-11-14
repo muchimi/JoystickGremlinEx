@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based on original Joystick Gremlin work by Lionel Ott and other contributors - GremlinEx is (C) EMCS 2026
 #

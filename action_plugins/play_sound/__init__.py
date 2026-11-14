@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -759,7 +758,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                             prompt=f"Unable to delete existing file: {file_path}", informative_text=str(e), parent=gremlin.shared_state.ui
                         )
                         syslog.error(f"PLAY: unable to delete existing file: {file_path}")
-                        syslog.error(f"Error: {str(e)}")
+                        syslog.error(f"Error: {e!s}")
                         self._update_status_ui("Error: Unable to delete existing file.", "error")
                         return
                 try:
@@ -775,7 +774,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 except Exception as e:
                     MessageBoxWarning(prompt=f"Unable to save file: {file_path}", informative_text=str(e), parent=gremlin.shared_state.ui)
                     syslog.error(f"PLAY: unable to save file: {file_path}")
-                    syslog.error(f"Error: {str(e)}")
+                    syslog.error(f"Error: {e!s}")
                     self._update_status_ui("Error: Unable to save file.", "error")
                     return
                 return
@@ -810,7 +809,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                             prompt=f"Unable to delete existing file: {file_path}", informative_text=str(e), parent=gremlin.shared_state.ui
                         )
                         syslog.error(f"PLAY: unable to delete existing file: {file_path}")
-                        syslog.error(f"Error: {str(e)}")
+                        syslog.error(f"Error: {e!s}")
                         self._update_status_ui("Error: Unable to delete existing file.", "error")
                         return
                 try:
@@ -818,7 +817,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 except Exception as e:
                     MessageBoxWarning(prompt=f"Unable to save file: {file_path}", informative_text=str(e), parent=gremlin.shared_state.ui)
                     syslog.error(f"PLAY: unable to save file: {file_path}")
-                    syslog.error(f"Error: {str(e)}")
+                    syslog.error(f"Error: {e!s}")
                     self._update_status_ui("Error: Unable to save file.", "error")
                     return
 
@@ -1065,7 +1064,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     os.unlink(wav)
                 except Exception as e:
                     syslog.error(f"PLAY: unable to delete file: {wav}")
-                    syslog.error(f"Error: {str(e)}")
+                    syslog.error(f"Error: {e!s}")
                     return
                 self.action_data.tts_file = None
                 self.tts_file_widget.setText("")
@@ -1913,8 +1912,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
                         os.unlink(new_name)
                     os.rename(wav, new_name)
                 except Exception as e:
-                    syslog.error(f"PLAY: unable to rename the file: {str(e)}")
-                    MessageBoxWarning(prompt=f"An error occured when renaming the file:\n{str(e)}", parent=ui)
+                    syslog.error(f"PLAY: unable to rename the file: {e!s}")
+                    MessageBoxWarning(prompt=f"An error occured when renaming the file:\n{e!s}", parent=ui)
                     return
                 self.tts_file = new_name
                 self.tts_file_widget.setText(new_name)

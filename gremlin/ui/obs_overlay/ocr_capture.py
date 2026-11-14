@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Screen capture helpers for the overlay OCR widget (widget ROI or fullscreen).
 #
@@ -87,7 +86,7 @@ def _widget_screen_rect_from_overlay(item: dict[str, Any], *, require_visible: b
         if window is None or not Shiboken.isValid(window):
             return None
         # App-share SetParent makes Qt report isVisible()==False while the child
-        # HWND is live — still map through it when attached.
+        # HWND is live â€” still map through it when attached.
         live = bool(window.isVisible()) or bool(getattr(window, "_host_attached", False))
         if require_visible and not live:
             return None
@@ -102,7 +101,7 @@ def _widget_screen_rect_from_overlay(item: dict[str, Any], *, require_visible: b
 
 
 def _widget_screen_rect_from_monitor(item: dict[str, Any]) -> QtCore.QRect | None:
-    """On-screen mode: canvas is 1:1 with the chosen monitor — map widget → desktop."""
+    """On-screen mode: canvas is 1:1 with the chosen monitor â€” map widget â†’ desktop."""
     try:
         from gremlin.ui.obs_overlay import OverlayManager
         from .overlay_window import resolve_overlay_screen
@@ -257,14 +256,14 @@ def capture_for_item(
     corruption. Pass ``hide_overlay=True`` for one-shot Test captures when a
     clean grab without the HUD is preferred.
 
-    Hide/show + processEvents must run on the UI thread — callers on a worker
+    Hide/show + processEvents must run on the UI thread â€” callers on a worker
     should use ``capture_for_item_sync`` which marshals here via InvokeUiMethod.
     """
     from gremlin.remote_video import grab_screen_image, grab_screen_rect
 
     style = item.get("style") or {}
     region = normalize_ocr_region(style.get("ocr_region"))
-    # Resolve geometry *before* hiding — a hidden overlay window made the old
+    # Resolve geometry *before* hiding â€” a hidden overlay window made the old
     # path fall back to primary-monitor grab (wrong screen in multi-monitor setups).
     if rect is None:
         rect, region = resolve_capture_rect(item)
@@ -323,7 +322,7 @@ def capture_for_item(
             _assert_overlays_topmost(force=True)
         else:
             # Armed scans leave the HUD up; BitBlt can still knock the HWND out of
-            # the TOPMOST band. Re-pin only — no update()/hide (those reopen-flash).
+            # the TOPMOST band. Re-pin only â€” no update()/hide (those reopen-flash).
             _assert_overlays_topmost(force=False)
 
 
@@ -347,7 +346,7 @@ def _capture_armed_on_worker(
     """Armed-scan capture: resolve geometry on UI (fast), BitBlt on the worker.
 
     The previous path marshaled the entire GDI grab onto the UI thread and
-    blocked the OCR worker until it finished — that stalled AFCS / input while
+    blocked the OCR worker until it finished â€” that stalled AFCS / input while
     detection was armed.
     """
     import threading
@@ -554,7 +553,7 @@ class OcrRegionCountdown(QtWidgets.QWidget):
     def paintEvent(self, _event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        # Hollow frame — leave the interior fully clear so the user can place text.
+        # Hollow frame â€” leave the interior fully clear so the user can place text.
         border = QtCore.QRect(2, 2, self.width() - 4, self.height() - 4)
         pen = QtGui.QPen(QtGui.QColor(0, 200, 255, 230), 3)
         painter.setPen(pen)
@@ -693,13 +692,13 @@ def run_test_capture_countdown(
     # Resolve before hiding so on-screen multi-monitor mapping stays correct.
     rect, _region = resolve_capture_rect(item)
     if rect is None or rect.width() <= 0 or rect.height() <= 0:
-        syslog.warning("OBS OVERLAY OCR: Test once — could not resolve capture region")
+        syslog.warning("OBS OVERLAY OCR: Test once â€” could not resolve capture region")
         return None
 
     handle = OcrTestCapture(item, rect, seconds, on_done, cancelled)
     handle.start()
     syslog.info(
-        f"OBS OVERLAY OCR: Test once — region {rect.x()},{rect.y()} "
+        f"OBS OVERLAY OCR: Test once â€” region {rect.x()},{rect.y()} "
         f"{rect.width()}x{rect.height()}, countdown {seconds}s"
     )
     return handle

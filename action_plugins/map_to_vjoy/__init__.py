@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based on original concept / code by Lionel Ott - Copyright (C) 2015 - 2019 Lionel Ott
 #
@@ -5274,6 +5273,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         return self.action_data.virtual_device.device_guid if self._is_maestro_target() else device_id
 
     def _target_device(self, device_id):
+        target = joystick_handling.get_output_target(self._output_key(device_id))
+        if target is not None:
+            return target.device
+        # Keep configured metadata available for remote-only output.
         if self._is_maestro_target():
             device = self.action_data.virtual_device
             return joystick_handling.getDevice(device.device_guid)
@@ -5646,6 +5649,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """occurs on profile start"""
         # Rebuild topology-derived curve metadata for every profile run.
         self.curve_actions = None
+
         # setup initial state
 
         is_local, is_remote = self._send_flags()
@@ -5661,6 +5665,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.encoder_timer = None
         self.device = self._target_device(self.action_data.vjoy_id)
         key = self.getSteppedIndexDataKey()
+        if not self.device:
+            self._valid = False # mark the mapping as invalid
+            syslog.error(f"VJOYRemap: profile start:  target device with vjoy id [{self.action_data.vjoy_id}] not found and unable to locate a failover device.  Mapping disabled.")
+            return
         if key in self.device.data:
             # force a re-read of the data
             del self.device.data[key]
@@ -5736,7 +5744,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     trigger = False
 
                     if verbose:
-                        assert self.device is not None, f"Unable to find device for {str(self.hardware_device_guid)}"
+                        assert self.device is not None, f"Unable to find device for {self.hardware_device_guid!s}"
                         vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
                         device_stub = f"{self.device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
@@ -6766,7 +6774,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 )
                             if auto_release:
                                 if verbose:
-                                    syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+                                    syslog.info(f"VjoyRemap: autorelease enabled for {event!s}")
                                 self._register_button_release(
                                     (self.vjoy_id, self.vjoy_input_id),
                                     event,
@@ -7709,30 +7717,6 @@ class MergeData:
                 curve_data._parse_xml(child)
                 self.curve_data = curve_data
 
-    # def compute(self, value: float):
-    #     """applies the transform"""
-    #     current = joystick_handling.get_axis(self.device_id, self.input_id)
-    #     assert isinstance(value, float), "invalid value: should be a float"
-    #     match self.operation:
-    #         case MergeOperationType.Add:
-    #             new_value = value + current
-    #         # case MergeOperationType.Substract:
-    #         #     new_value = value - current
-    #         case MergeOperationType.Average:
-    #             new_value = (value + current) / 2
-    #         case MergeOperationType.Center:
-    #             new_value = (value - current) / 2
-    #         case MergeOperationType.ScaleHalf:
-    #             scale = abs(current)
-    #             new_value = value * scale
-    #         case MergeOperationType.ScaleFull:
-    #             scale = gremlin.util.scale_to_range(current, target_min=0, target_max=1)
-    #             new_value = value * scale
-    #         case _:
-    #             # no change
-    #             return value
-
-    #     return gremlin.util.clamp(new_value)
 
 
 class VjoyRemap(gremlin.input_item.AbstractAction):
@@ -8387,7 +8371,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if v1 is None or v2 is None:
                     # something wasn't found
                     syslog.error(
-                        f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{str(merge_device_guid)}] axis: [{merge_input_id}] "
+                        f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{merge_device_guid!s}] axis: [{merge_input_id}] "
                     )
                     if channels:
                         return gremlin.event_handler.AxisValues(actual=0.0, raw=raw_value, merged=merged_values)

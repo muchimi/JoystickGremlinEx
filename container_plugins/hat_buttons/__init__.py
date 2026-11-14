@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -252,7 +251,7 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
 
         if not container_node:
             # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
-            syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
+            syslog.error(f"Unable to find this action in the execution tree: {self.action_data!s}")
             self.valid = False
             return
 

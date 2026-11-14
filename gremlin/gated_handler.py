@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -1195,7 +1194,7 @@ class TriggerTracking:
                 del self._tracking_map[owner][mode]
                 verbose = gremlin.config.Configuration().verbose_mode_gate
                 if verbose:
-                    syslog.info(f"CLEAR TRIGGER: clear {str(owner)} trigger mode: {mode} ")
+                    syslog.info(f"CLEAR TRIGGER: clear {owner!s} trigger mode: {mode} ")
 
     def clear(self):
         self._tracking_map.clear()
@@ -2401,7 +2400,7 @@ class GateData:
         range_list = self.getRanges()
         if range_list:
             for r in range_list:
-                syslog.info(f"\tRange: {str(r)}")
+                syslog.info(f"\tRange: {r!s}")
         else:
             syslog.info("\tNo ranges found")
 
@@ -3285,7 +3284,7 @@ class GateData:
                 # dump the triggerrs
                 syslog.info(f"Trigger results for value {current_value}:")
                 for trigger in tt.triggers:
-                    syslog.info(f"\t{str(trigger)}")
+                    syslog.info(f"\t{trigger!s}")
 
             return tt.triggers
 
@@ -3571,7 +3570,7 @@ class GateData:
 
                     gate_info.item_data_map[condition] = new_input_item
                     if verbose:
-                        syslog.info(f"\tLoading condition: {condition.name}: {str(new_input_item)}")
+                        syslog.info(f"\tLoading condition: {condition.name}: {new_input_item!s}")
 
             # remember added gate
             gate_list.append(gate_info)
@@ -3717,10 +3716,10 @@ class GateData:
         if verbose:
             syslog.info("GATE: loaded gate list:")
             for gate in used_gate_list:
-                syslog.info(f"\t{str(gate)}")
+                syslog.info(f"\t{gate!s}")
             syslog.info("GATE: loaded range list:")
             for rng in used_range_list:
-                syslog.info(f"\t{str(rng)}")
+                syslog.info(f"\t{rng!s}")
 
         # filter
         filter_node = gremlin.util.get_xml_child(node, "filter")
@@ -4885,7 +4884,7 @@ class InputConfigurationWidgetCache:
             if not current_device_guid or current_device_guid != item.device_guid:
                 device_name = gremlin.shared_state.get_device_name(item.device_guid)
                 current_device_guid = item.device_guid
-                syslog.info(f"\tDevice {device_name} id {str(item.device_guid)}:")
+                syslog.info(f"\tDevice {device_name} id {item.device_guid!s}:")
             if not current_input_type or current_input_type != item.input_type:
                 current_input_type = item.input_type
                 syslog.info(f"\t\tInput Type: {InputType.to_display_name(item.input_type)}")

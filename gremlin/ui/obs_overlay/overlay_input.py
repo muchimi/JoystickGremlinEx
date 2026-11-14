@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Overlay HUD buttons as profile inputs (Stream Deck pattern).
 # Events use InputType.OverlayButton; mapping UI uses JoystickButton override
@@ -90,9 +89,9 @@ class OverlayInputItem(gremlin.input_item.InputItem):
     def display_name(self) -> str:
         title = (self._title or "").strip()
         if title:
-            return f"Overlay · {title}"
+            return f"Overlay Â· {title}"
         key = self._widget_id[:8] if self._widget_id else "?"
-        return f"Overlay · Button {key}"
+        return f"Overlay Â· Button {key}"
 
     def getDisplayName(self, full: bool = True) -> str:
         return self.display_name if full else (self._title or self._widget_id or "Overlay button")
@@ -438,7 +437,7 @@ def restore_overlay_mappings_from_widgets(scene) -> None:
                 for rule in normalize_ocr_rules(widget.get("ocr_rules")):
                     rule_id = str(rule.get("id") or "")
                     input_id = ocr_rule_input_id(widget_id, rule_id)
-                    title = f"OCR · {rule.get('name') or rule.get('display_name') or 'Rule'}"
+                    title = f"OCR Â· {rule.get('name') or rule.get('display_name') or 'Rule'}"
                     xml = rule.get("mapping_xml")
                     if xml:
                         apply_overlay_mapping_xml(input_id, title, str(xml))
@@ -593,7 +592,7 @@ def _event_button_id(event) -> int | None:
 
 
 class OverlayLookForwarder:
-    """While the profile runs, Follow-input look sources fire overlay Map… actions."""
+    """While the profile runs, Follow-input look sources fire overlay Mapâ€¦ actions."""
 
     def __init__(self):
         self._hooked = False

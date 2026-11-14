@@ -117,7 +117,7 @@ for name in ("_normalize_axis_value_key", "QProgressBar", "QJoystickListener", "
     load("gremlin/ui/ui_common.py", name)
 Maestro = load("gremlin/maestro.py", "Maestro", {
     "_control", "_notify_output", "_set_axis", "_set_button", "_set_hat", "setAxis", "setButton", "setHat",
-    "_read_axis_raw", "_read_button", "_read_hat", "markOutputUsed", "getController", "syncDinput",
+    "_read_axis_raw", "_read_button", "_read_hat", "markOutputUsed", "getController", "syncDinput", "_scan_hid_order",
 }, "object")
 for name in ("MaestroAxis", "MaestroButton", "MaestroHat", "MaestroOutputDevice"):
     load("gremlin/maestro.py", name)
@@ -311,6 +311,39 @@ class MaestroRepeaterTests(unittest.TestCase):
         pump_until(lambda: listener.value()[0] == -0.25)
         listener._trigger_update_ui()
         self.assertAlmostEqual(listener.value()[0], -0.25, places=3)
+
+    def test_input_axis_repeater_constructor_registers_for_live_updates(self):
+        changed = Mock()
+        listener = ENV["QAxisRepeaterProgressbar"](
+            input_item=InputItem(self.maestro, macro.InputType.JoystickAxis, 1),
+            values=AxisValues(-0.5),
+            state_change_callback=changed,
+        )
+        self.widgets.append(listener)
+        self.assertTrue(listener.connected)
+        self.assertIn(listener._handle_update_ui, self.processor._callback_map)
+        self.assertEqual(listener.value(), [-0.5])
+
+        # DirectInput uses Any; virtual output uses Virtual. Input rows accept both.
+        self.processor._fireCallbacks_ui(self.event(value=0.25, source=EventSourceType.Any))
+        self.assertEqual(listener.value(), [0.25])
+        self.assertEqual(changed.call_args.args[0].actual, 0.25)
+        self.output.axis(1).value = 0.75
+        self.assertEqual(listener.value(), [0.75])
+        self.assertEqual(changed.call_count, 2)
+
+    def test_input_axis_repeater_parent_destruction_unregisters_callback(self):
+        parent = QtWidgets.QWidget()
+        listener = ENV["QAxisRepeaterProgressbar"](
+            input_item=InputItem(self.maestro, macro.InputType.JoystickAxis, 1),
+        )
+        listener.setParent(parent)
+        self.widgets.append(listener)
+        callback = listener._handle_update_ui
+        self.assertIn(callback, self.processor._callback_map)
+        Shiboken.delete(parent)
+        self.assertNotIn(callback, self.processor._callback_map)
+        self.output.axis(1).value = 0.75
 
     def test_button_and_hat_repeaters_default_to_any_source(self):
         for kind, input_id in ((macro.InputType.JoystickButton, 40), (macro.InputType.JoystickHat, 2)):

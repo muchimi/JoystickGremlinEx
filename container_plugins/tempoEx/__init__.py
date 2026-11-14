@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -650,7 +649,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         if not container_node:
             # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
             syslog.error(
-                f"TEMPOEX: Disabled: Unable to find the container in the execution tree: [{str(self.container)}] - missing container ID: [{self.container.id}]"
+                f"TEMPOEX: Disabled: Unable to find the container in the execution tree: [{self.container!s}] - missing container ID: [{self.container.id}]"
             )
             self.valid = False
 
@@ -675,7 +674,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         if not container_node.children:
             # this indicates a build or configuration error
-            syslog.warning(f"TEMPOEX: Disabled: The container node has no children: [{str(self.container)}] ")
+            syslog.warning(f"TEMPOEX: Disabled: The container node has no children: [{self.container!s}] ")
             self.valid = False
             return
 

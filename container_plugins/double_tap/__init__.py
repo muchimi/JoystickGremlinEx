@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -502,7 +501,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
         if not container_node:
             # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
             syslog.error(
-                f"DOUBLETAP: Disabled: Unable to find the container in the execution tree: [{str(self.container)}] - missing container ID: [{self.container.id}]"
+                f"DOUBLETAP: Disabled: Unable to find the container in the execution tree: [{self.container!s}] - missing container ID: [{self.container.id}]"
             )
             self._valid = False
 
@@ -512,7 +511,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
 
         if not container_node.children:
             # this indicates a build or configuration error
-            syslog.warning(f"DOUBLETAP: Disabled: The container node has no children: [{str(self.container)}] ")
+            syslog.warning(f"DOUBLETAP: Disabled: The container node has no children: [{self.container!s}] ")
             self._valid = False
             return
 

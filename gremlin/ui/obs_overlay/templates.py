@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -13,8 +11,6 @@ import copy
 import json
 import os
 import re
-
-import gremlin.shared_state
 
 from .model import new_widget
 
@@ -73,7 +69,13 @@ def gamepad_controller():
     body = {"fill": "#2b313a", "border": "#111418", "border_width": 2.0, "opacity": 1.0}
     stick = {"show_axis_labels": False, "indicator_size": 14, "fill": "#161b22", "border": "#3a424c"}
     pill = {"shape": "pill", "font_size": 10, "fill": "#1a1f26", "fill_on": "#c44a2a", "border": "#5a221c"}
-    trigger = {"orientation": "horizontal", "show_label": False, "indicator_size": 8, "fill": "#1a1f26", "border": "#5a221c"}
+    trigger = {
+        "orientation": "horizontal",
+        "show_label": False,
+        "indicator_size": 8,
+        "fill": "#1a1f26",
+        "border": "#5a221c",
+    }
     face = {"shape": "circle", "font_size": 12, "fill": "#1a1f26", "border": "#3a424c"}
     items = [
         # Two hanging grips + a wider face so the outline reads as a controller, not a pill.
@@ -88,7 +90,15 @@ def gamepad_controller():
         # Left stick (upper left) and d-pad (lower left).
         _at("axis_stick_circle", 116, 140, 132, 132, group=group, style=stick),
         _at("button", 160, 276, 44, 20, label="L3", group=group, style={**pill, "font_size": 9}),
-        _at("hat", 144, 312, 100, 100, group=group, style={"show_axis_labels": False, "fill": "#161b22", "border": "#3a424c"}),
+        _at(
+            "hat",
+            144,
+            312,
+            100,
+            100,
+            group=group,
+            style={"show_axis_labels": False, "fill": "#161b22", "border": "#3a424c"},
+        ),
         # View / Menu in the center spine.
         _at("button", 332, 196, 52, 22, label="View", group=group, style={**pill, "font_size": 9}),
         _at("button", 416, 196, 52, 22, label="Menu", group=group, style={**pill, "font_size": 9}),
@@ -102,16 +112,16 @@ def gamepad_controller():
         ("B", 618, 164, "#c42f2f"),
         ("A", 572, 210, "#2f8a44"),
     ):
-        items.append(
-            _at("button", x, y, 46, 46, label=label, group=group, style={**face, "fill_on": color})
-        )
+        items.append(_at("button", x, y, 46, 46, label=label, group=group, style={**face, "fill_on": color}))
     return items
 
 
 def throttle_pair():
     group = "throttles"
     left = _at("axis_bar", 40, 40, 36, 220, label="L", group=group, style={"orientation": "vertical"})
-    right = _at("axis_bar", 88, 40, 36, 220, label="R", group=group, style={"orientation": "vertical", "fill_bar": "#3dff9a"})
+    right = _at(
+        "axis_bar", 88, 40, 36, 220, label="R", group=group, style={"orientation": "vertical", "fill_bar": "#3dff9a"}
+    )
     return [left, right]
 
 
@@ -124,9 +134,11 @@ TEMPLATES = (
 
 def overlay_template_dir() -> str:
     """Global (not profile-specific) folder for user-saved overlay templates."""
+    import gremlin.config
+
     root = gremlin.shared_state.data_path
     if not root:
-        root = os.path.join(os.path.expanduser("~"), "Joystick Gremlin Ex")
+        root = os.path.join(os.path.expanduser("~"), gremlin.config.GEX_PROFILE_FOLDER)
     path = os.path.join(root, "overlay_templates")
     os.makedirs(path, exist_ok=True)
     return path

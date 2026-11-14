@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -218,23 +216,22 @@ def userprofile_path():
 
     _user_profile_path = path
 
-    # path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
     if not os.path.isdir(path):
         # profile folder does not exist - see if we can create it from the original profile
-        source_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin"))
+        source_path = os.path.abspath(os.path.join(os.getenv("userprofile"), config.GEX_PROFILE_FOLDER))
         if os.path.isdir(source_path):
             try:
                 # copy from original profile
                 shutil.copytree(source_path, path)
-                syslog.info("First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
+                syslog.info(f"First run - copied {config.GEX_PROFILE_FOLDER} profiles to {config.GEX_PROFILE_FOLDER}")
             except Exception as error:
-                syslog.error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
+                syslog.error(f"Unable to copy profile from Joystick Gremlin to {config.GEX_PROFILE_FOLDER}:\n{error}")
         if not os.path.isdir(path):
             try:
                 # just create it
                 os.mkdir(path)
             except Exception as error:
-                syslog.error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
+                syslog.error(f"Unable to create profile folder for {config.GEX_PROFILE_FOLDER}:\n{error}")
 
         if not os.path.isdir(path):
             from gremlin.error import GremlinError
@@ -596,7 +593,7 @@ def delete_widget(widget: QtWidgets.QWidget):
             widget.unhook()
         if hasattr(widget, "_cleanup_ui"):
             widget._cleanup_ui()
-        # Do not setParent(None) — that creates a transient top-level HWND flash.
+        # Do not setParent(None) â€” that creates a transient top-level HWND flash.
         widget.deleteLater()  # tell QT to free the widget from memory
 
 
@@ -1147,7 +1144,9 @@ def load_pixmap(path, size=24, qta_color=None):
             icon = QtGui.QIcon(qta.icon(path, color=qta_color))
         except Exception as e:
             icon = gremlin.util.get_generic_icon()
-            syslog.error(f"ICON: (load pixmap) QTA reported load error for [{path}] color [{qta_color}], using generic icon")
+            syslog.error(
+                f"ICON: (load pixmap) QTA reported load error for [{path}] color [{qta_color}], using generic icon"
+            )
             syslog.error(traceback.format_exc())
 
         if icon:
@@ -1228,7 +1227,9 @@ def _load_icon(*paths, use_qta=False, qta_color=None):
             try:
                 icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
             except Exception:
-                syslog.error(f"ICON: (_load_icon) QTA reported load error for [{the_path}] color [{qta_color}], using generic icon")
+                syslog.error(
+                    f"ICON: (_load_icon) QTA reported load error for [{the_path}] color [{qta_color}], using generic icon"
+                )
                 syslog.error(traceback.format_exc())
                 icon = get_generic_icon()
 
@@ -1388,11 +1389,13 @@ def safe_read(node, key, type_cast, default_value, unescape: bool = False):
                         else:
                             value = type_cast(value)
                     except Exception:
-                        syslog.error(f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}")
+                        syslog.error(
+                            f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}"
+                        )
                         value = default_value
 
         except ValueError:
-            msg = f"XML: Failed casting '{value}' to type '{str(type_cast)}'"
+            msg = f"XML: Failed casting '{value}' to type '{type_cast!s}'"
             syslog.error(msg)
             raise error.ProfileError(msg)
     return value
@@ -2076,7 +2079,7 @@ class InvokeUiMethod:
         try:
             sig = inspect.signature(method)
             pcount = len(sig.parameters)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             # built in C function, signature cannot be inspected
             pcount = 0
 
@@ -2105,7 +2108,7 @@ def is_ui_thread():
     """true if the current thread is the UI thread"""
     app = QtWidgets.QApplication.instance()
     if app is None:
-        # Import / early init — no Qt app yet; treat as safe for sync work
+        # Import / early init â€” no Qt app yet; treat as safe for sync work
         return True
     try:
         # Stable across PySide wrapper identity; `currentThread() == app.thread()`
@@ -2217,6 +2220,7 @@ def is_binary_string(data):
     if data is None:
         return False
     return isinstance(data, bytes)
+
 
 def getHostName() -> str:
     """gets the current machine's host name"""
@@ -2521,7 +2525,9 @@ def isNumeric(input_string):
         return False
 
     if (len(input_string) > 1) and (
-        ((input_string[0] == "0") and (input_string[1] != "."))  # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
+        (
+            (input_string[0] == "0") and (input_string[1] != ".")
+        )  # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
         or (len(input_string) > 2)
         and ((input_string[0] == "-") and (input_string[1] == "0") and (input_string[2] != "."))
     ):  # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
@@ -2778,7 +2784,7 @@ def save(file_name, text):
     if isinstance(text, bytes):
         text = text.decode()
     if not isinstance(text, str):
-        text = f"{str(text)}"
+        text = f"{text!s}"
 
     dir_name = os.path.dirname(file_name)
     if not dir_name:
@@ -3143,7 +3149,9 @@ class jsonDictEncoder(json.JSONEncoder):
 
 def hashDict(d: dict):
     """computes a hash of a dictionary - all keys and items in the dict must be json serializable"""
-    dump = json.dumps(d, sort_keys=True).encode("utf-8")  # sort keys so they are in the same sequence between dictionaries
+    dump = json.dumps(d, sort_keys=True).encode(
+        "utf-8"
+    )  # sort keys so they are in the same sequence between dictionaries
     return hash(dump)
 
 
@@ -3273,7 +3281,7 @@ def clearFolder(folder_path: str):
             os.makedirs(folder_path, exist_ok=True)
             return True
         except Exception as ex:
-            syslog.error(f"Unable to clear folder: {folder_path} - {str(ex)}")
+            syslog.error(f"Unable to clear folder: {folder_path} - {ex!s}")
     return False
 
 

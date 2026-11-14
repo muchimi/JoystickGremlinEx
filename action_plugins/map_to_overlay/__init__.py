@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -7,7 +6,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-"""Map to Overlay — drive overlay visibility, interactive mode, control panel, and variables."""
+"""Map to Overlay â€” drive overlay visibility, interactive mode, control panel, and variables."""
 
 from __future__ import annotations
 
@@ -601,7 +600,7 @@ class MapToOverlayWidget(gremlin.input_item.AbstractActionWidget):
         var_form.addRow("Write:", self._write_mode_box)
 
         self._use_detection = QtWidgets.QCheckBox(
-            "Use detection label from OCR event (e.g. Quantainium ×2)",
+            "Use detection label from OCR event (e.g. Quantainium Ã—2)",
             self,
         )
         self._use_detection.setToolTip(
@@ -658,7 +657,7 @@ class MapToOverlayWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._image_box)
 
         hint = QtWidgets.QLabel(
-            "Local only — uses the overlay layout stored with this profile. "
+            "Local only â€” uses the overlay layout stored with this profile. "
             "Contribute mode joins simultaneous active values into one variable (e.g. %rock%). "
             "Set image / RSI citizen lookup are used by SC EFB and SC Intelligence OCR packs.",
             self,
@@ -886,13 +885,13 @@ _variable_contributions: dict[tuple[str, str], str] = {}
 def _set_overlay_variable_value(name: str, value: str):
     scene = _overlay_scene()
     if scene is None:
-        syslog.warning("OBS OVERLAY VAR: set %%%s%% SKIP — no overlay scene", name)
+        syslog.warning("OBS OVERLAY VAR: set %%%s%% SKIP â€” no overlay scene", name)
         return
     from gremlin.ui.obs_overlay.model import overlay_variable_name
 
     cleaned = overlay_variable_name(name)
     if not cleaned:
-        syslog.warning("OBS OVERLAY VAR: set SKIP — empty variable name (raw=%r)", name)
+        syslog.warning("OBS OVERLAY VAR: set SKIP â€” empty variable name (raw=%r)", name)
         return
     # Runtime path: no undo stack, no scene.changed (that rebuilt the whole overlay).
     changed = False
@@ -909,7 +908,7 @@ def _set_overlay_variable_value(name: str, value: str):
         row = scene.overlay_variable_by_name(cleaned)
         cur = "" if row is None else str(row.get("value") if row.get("value") is not None else "")
         syslog.info(
-            "OBS OVERLAY VAR: set %%%s%% unchanged (already %r) — no label refresh",
+            "OBS OVERLAY VAR: set %%%s%% unchanged (already %r) â€” no label refresh",
             cleaned,
             cur,
         )
@@ -1008,14 +1007,14 @@ def _apply_set_image(action_data: "MapToOverlay", is_pressed: bool, event=None):
 def _apply_set_variable(action_data: "MapToOverlay", is_pressed: bool, event=None):
     scene = _overlay_scene()
     if scene is None:
-        syslog.warning("OBS OVERLAY VAR: Map to Overlay set_variable — no scene")
+        syslog.warning("OBS OVERLAY VAR: Map to Overlay set_variable â€” no scene")
         return
     from gremlin.ui.obs_overlay.model import overlay_variable_name
 
     name = overlay_variable_name(action_data.variable_name)
     if not name:
         syslog.warning(
-            "OBS OVERLAY VAR: Map to Overlay set_variable — no variable selected on action"
+            "OBS OVERLAY VAR: Map to Overlay set_variable â€” no variable selected on action"
         )
         return
     row = scene.overlay_variable_by_name(name)
@@ -1059,7 +1058,7 @@ def _apply_set_variable(action_data: "MapToOverlay", is_pressed: bool, event=Non
                 _variable_contributions.pop(key, None)
                 syslog.warning(
                     "OBS OVERLAY VAR: contribute press with empty value "
-                    "(use_detection=%s detection=%r press_value=%r) — contribution cleared",
+                    "(use_detection=%s detection=%r press_value=%r) â€” contribution cleared",
                     bool(action_data.use_detection_label),
                     detection,
                     action_data.press_value,
@@ -1088,7 +1087,7 @@ def _apply_set_variable(action_data: "MapToOverlay", is_pressed: bool, event=Non
             value = ""
         else:
             value = str(action_data.release_value or "")
-    syslog.info("OBS OVERLAY VAR: replace %%%s%% → %r", name, value)
+    syslog.info("OBS OVERLAY VAR: replace %%%s%% â†’ %r", name, value)
     gremlin.util.InvokeUiMethod(_set_overlay_variable_value, name, value)
 
 
@@ -1383,7 +1382,7 @@ class MapToOverlayFunctor(gremlin.base_profile.AbstractFunctor):
         mode = self.action_data.button_mode
 
         if mode == VjoyAction.VJoyButton:
-            # Hold: pressed → write / contribute; released → clear / release value.
+            # Hold: pressed â†’ write / contribute; released â†’ clear / release value.
             self._activate(is_pressed, event=event)
             return True
         if mode == VjoyAction.VJoyButtonInverted:
@@ -1468,15 +1467,15 @@ class MapToOverlay(gremlin.input_item.AbstractAction):
         if self.overlay_action == "set_variable":
             write = str(self.variable_write or "replace")
             var = f"%{self.variable_name}%" if self.variable_name else "(none)"
-            return f"{label} · {write} · {var} · {mode}"
+            return f"{label} Â· {write} Â· {var} Â· {mode}"
         if self.overlay_action == "set_image":
-            return f"{label} · {self.image_widget_name or 'SC EFB Chart'} · {mode}"
+            return f"{label} Â· {self.image_widget_name or 'SC EFB Chart'} Â· {mode}"
         if self.overlay_action == "citizen_lookup":
-            return f"{label} · {mode}"
+            return f"{label} Â· {mode}"
         n = len(self.selected_ids or [])
         if self.overlay_action == "control_panel":
-            return f"{label} · {mode}"
-        return f"{label} · {self.target_kind}×{n} · {mode}"
+            return f"{label} Â· {mode}"
+        return f"{label} Â· {self.target_kind}Ã—{n} Â· {mode}"
 
     def _parse_xml(self, node, data=None, extra_data=None):
         action = safe_read(node, "overlay-action", str, "visibility").casefold()

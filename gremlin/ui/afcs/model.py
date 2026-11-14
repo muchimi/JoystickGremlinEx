@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 """AFCS document: flight modes, DAG nodes, sidecar JSON."""
 

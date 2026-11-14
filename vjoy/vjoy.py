@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -294,7 +293,7 @@ class Axis:
         el.vjoy_output_event_ui.emit(event)
 
         # Loopback only for "virtual as input" devices. Needed so mappings on the
-        # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis — DINPUT
+        # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis â€” DINPUT
         # echo is unreliable. Gated to avoid flooding normal output-only devices.
         profile = shared_state.current_profile
         if profile is not None and profile.settings.getVirtualAsInput(self.vjoy_id):
@@ -1186,7 +1185,7 @@ class VjoyDebug:
 
     def _event_handler(self, event):
         """event handler:  type of event: gremlin.event_handler.VjoyEvent"""
-        syslog.info(f"VJOY DEBUG: vjoy event received: {str(event)}")
+        syslog.info(f"VJOY DEBUG: vjoy event received: {event!s}")
 
 
 # primary instance

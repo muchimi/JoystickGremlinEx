@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 """Evaluate the AFCS DAG and write vJoy. Live meters share the last pass."""
 

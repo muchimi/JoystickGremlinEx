@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Runtime tracker for overlay OCR widgets: arm gate, scan, match rules, emit as buttons.
 #
@@ -32,7 +31,7 @@ from .model import (
 
 syslog = logging.getLogger("system")
 
-# Prefer thousands-grouped forms (3,170 / 3.170), then bare 4–5 digit runs.
+# Prefer thousands-grouped forms (3,170 / 3.170), then bare 4â€“5 digit runs.
 _SIG_GROUPED = re.compile(r"(?<!\d)(\d{1,2})[.,](\d{3})(?!\d)")
 _SIG_BARE = re.compile(r"(?<!\d)(\d{4,5})(?!\d)")
 
@@ -237,7 +236,7 @@ def rule_match_result(text: str, rule: dict[str, Any]) -> tuple[bool, int | None
         if capture == "handle":
             label = clean_citizen_handle(hay) or hay.splitlines()[0].strip()
         else:
-            # Full OCR blob — EFB matches locations inside a multi-line list.
+            # Full OCR blob â€” EFB matches locations inside a multi-line list.
             label = hay
         if not label:
             return False, None, ""
@@ -537,7 +536,7 @@ class OcrOverlayTracker:
                     if slot.get("status") != "Cancelled" and not (session and session.kind == "test" and not session.cancelled.is_set()):
                         slot["status"] = "Idle"
             # Live paint only needs armed (border on/off style). Matched/status
-            # belong in the designer marker — including them here repainted the
+            # belong in the designer marker â€” including them here repainted the
             # whole layered overlay on every detection.
             armed = bool(slot.get("armed"))
             fingerprint = armed
@@ -630,7 +629,7 @@ class OcrOverlayTracker:
             slot["item"] = item
             slot["armed"] = False
             slot["manual_stop"] = True
-            slot["status"] = "Test countdown…"
+            slot["status"] = "Test countdownâ€¦"
             slot["last_text"] = ""
 
         def _after_capture(image):
@@ -638,7 +637,7 @@ class OcrOverlayTracker:
             with self._lock:
                 if not self._session_current(session):
                     return
-                slot["status"] = "Recognizing…"
+                slot["status"] = "Recognizingâ€¦"
                 self._test_jobs.append((widget_id, item, session, image, on_done))
             self._ensure_thread()
 
@@ -654,7 +653,7 @@ class OcrOverlayTracker:
             handle.cancel()
             return "Cancelled"
         session.countdown = handle
-        return "Test countdown…"
+        return "Test countdownâ€¦"
 
     def _emit_rule(self, widget_id: str, rule: dict[str, Any], is_pressed: bool, label: str, signature: int | None):
         """Emit press/release on the UI thread (scanner may run in a worker)."""
@@ -680,10 +679,10 @@ class OcrOverlayTracker:
             rule_id = str(rule.get("id") or "")
             input_id = ocr_rule_input_id(widget_id, rule_id)
             title = str(rule.get("name") or rule.get("display_name") or "OCR rule")
-            item = find_overlay_input(input_id) or ensure_overlay_input(input_id, f"OCR · {title}")
+            item = find_overlay_input(input_id) or ensure_overlay_input(input_id, f"OCR Â· {title}")
             if item is None:
                 syslog.warning(
-                    "OBS OVERLAY OCR: emit SKIP — no overlay input input_id=%s rule=%s",
+                    "OBS OVERLAY OCR: emit SKIP â€” no overlay input input_id=%s rule=%s",
                     input_id,
                     title,
                 )
@@ -714,7 +713,7 @@ class OcrOverlayTracker:
             has_runtime = bool(extra.get("ocr_runtime_kind") or runtime.get("kind"))
             if not has_map and not has_xml and not has_runtime:
                 syslog.warning(
-                    "OBS OVERLAY OCR: emit SKIP — rule has no Map… actions "
+                    "OBS OVERLAY OCR: emit SKIP â€” rule has no Mapâ€¦ actions "
                     "input_id=%s rule=%s press=%s label=%r (open Map on the rule)",
                     input_id,
                     title,
@@ -853,9 +852,9 @@ class OcrOverlayTracker:
                         return
                     st["held"] = True
                 elif label != prev_label or signature != prev_sig:
-                    # Still held — refresh contribute/replace with the new detection label.
+                    # Still held â€” refresh contribute/replace with the new detection label.
                     syslog.info(
-                        "OBS OVERLAY OCR: MATCH update rule=%s label=%r→%r sig=%s→%s",
+                        "OBS OVERLAY OCR: MATCH update rule=%s label=%râ†’%r sig=%sâ†’%s",
                         rule_name,
                         prev_label,
                         label,
@@ -911,7 +910,7 @@ class OcrOverlayTracker:
         """Skip OCR when nothing useful is on screen (app suspended / all windows minimized).
 
         Keep scanning while a live overlay window is visible even if the main
-        JG Ex window is minimized — that is the normal HUD-over-game case.
+        JG Ex window is minimized â€” that is the normal HUD-over-game case.
         """
         try:
             from PySide6 import QtCore, QtWidgets
@@ -925,7 +924,7 @@ class OcrOverlayTracker:
                 QtCore.Qt.ApplicationState.ApplicationHidden,
             ):
                 return False
-            # Live overlay up → keep scanning.
+            # Live overlay up â†’ keep scanning.
             try:
                 from gremlin.ui.obs_overlay.ocr_capture import _overlay_windows
 
@@ -1002,7 +1001,7 @@ class OcrOverlayTracker:
                 self._run_test_job(test_job, stop)
                 continue
             if not self._profile_running():
-                # Profile stopped while the scanner was live — exit cleanly.
+                # Profile stopped while the scanner was live â€” exit cleanly.
                 with self._lock:
                     for slot in self._slots.values():
                         slot["armed"] = False
@@ -1099,7 +1098,7 @@ class OcrOverlayTracker:
                         rules = normalize_ocr_rules(item.get("ocr_rules"))
                         if not rules:
                             syslog.warning(
-                                "OBS OVERLAY OCR: widget=%s has ZERO rules — nothing to fire",
+                                "OBS OVERLAY OCR: widget=%s has ZERO rules â€” nothing to fire",
                                 widget_id,
                             )
                         self._apply_rules(item, text, slot)

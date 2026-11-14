@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Clipboard / file helpers for overlay Image widgets (Windows Snipping Tool paste).
 #

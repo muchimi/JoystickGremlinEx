@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Form implementation generated from reading ui file 'ui_gremlin.ui'
 #
 # Created by: PySide6 UI code generator 5.11.2
@@ -24,8 +22,6 @@ syslog = logging.getLogger("system")
 class Ui_Gremlin(object):
     def build(self, main_window: QRememberMainWindow):
 
-
-
         # main content panel - holds the device tabs
         self.tab_bar_widget = QtWidgets.QWidget()
         self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
@@ -39,7 +35,9 @@ class Ui_Gremlin(object):
         self.tab_content_layout.setContentsMargins(0, 0, 0, 0)
         self.tab_content_layout.setSpacing(0)
 
-        self.tab_filter_widget = Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
+        self.tab_filter_widget = Buttons.getTabFilterWidget(
+            callback=self._handle_tab_filter, tooltip="Device display Options"
+        )
 
         # tab header for the device selection
         self.devices_tab_header_widget = QTabHeader()
@@ -55,7 +53,9 @@ class Ui_Gremlin(object):
 
         self.tab_content_layout.addLayout(tab_header_layout)
 
-        self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
+        self.device_page_widget = (
+            QtWidgets.QStackedWidget()
+        )  # holds the device widgets for each device - the index changes with the tab
         self.device_page_widget.setContentsMargins(0, 0, 0, 0)
 
         # tab_content_layout.addWidget(self.tab_container_widget)
@@ -231,7 +231,9 @@ class Ui_Gremlin(object):
 
         self.actionConvertTTS = QtGui.QAction(main_window)
         self.actionConvertTTS.setText("Convert Legacy TTS to Play Sound...")
-        self.actionConvertTTS.setToolTip("Converts the legacy Map to TTS actions to Play Sound actions and the updated audio engine")
+        self.actionConvertTTS.setToolTip(
+            "Converts the legacy Map to TTS actions to Play Sound actions and the updated audio engine"
+        )
         self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
 
         # self.actionGenerateTTS = QtGui.QAction(main_window)
@@ -346,8 +348,6 @@ class Ui_Gremlin(object):
         profile = gremlin.shared_state.current_profile
         profile_converter.convert_legacy(profile.profile_file)
 
-
-
     def _handle_convert_tts(self):
         import gremlin.util
         import gremlin.profile
@@ -376,7 +376,7 @@ class Ui_Gremlin(object):
 
     def retranslateUi(self, Gremlin):
         _translate = QtCore.QCoreApplication.translate
-        Gremlin.setWindowTitle(_translate("GremlinEx", "Joystick Gremlin Ex"))
+        Gremlin.setWindowTitle(_translate("GremlinEx", "Gremlin Ex"))
 
         self.menuFile.setTitle(_translate("GremlinEx", "&File"))
         self.menuRecent.setTitle(_translate("GremlinEx", "Recent"))

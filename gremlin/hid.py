@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -43,6 +42,11 @@ ctypes.CDLL(dll_path)
 import hid
 
 
+def enumerate_devices():
+    """Read a fresh HIDAPI snapshot, preserving Windows' enumeration order."""
+    return list(hid.enumerate())
+
+
 from gremlin.singleton_decorator import SingletonDecorator
 
 
@@ -77,7 +81,7 @@ class Hid:
         index = 0
         if enabled:
             syslog.info("HID: locate HID devices...")
-            hid_devices = hid.enumerate()
+            hid_devices = enumerate_devices()
             syslog.info("HID: done locating HID devices")
             for device_map in hid_devices:
                 keys = list(device_map.keys())
@@ -96,6 +100,8 @@ class Hid:
                             device.VendorId = data
                         case "product_id":
                             device.ProductId = data
+                        case "product_string":
+                            device.ProductString = data
                         case "release_number":
                             device.ReleaseNumber = data
                         case "manufacturer_string":

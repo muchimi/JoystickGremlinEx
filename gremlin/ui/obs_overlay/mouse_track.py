@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Live mouse tracking for the overlay Mouse widget.
 #

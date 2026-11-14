@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Keyboard / Mouse overlay widget: picker layout, presets, and live press tracking.
 #
@@ -61,7 +60,7 @@ _SHORT_LABELS = {
     "rightalt2": "ALT",
     "leftwin": "WIN",
     "rightwin": "WIN",
-    "backspace": "←",
+    "backspace": "â†",
     "enter": "ENTER",
     "space": "SPACE",
     "printscreen": "PrtSc",
@@ -90,10 +89,10 @@ _SHORT_LABELS = {
     "np8": "8",
     "np9": "9",
     "npdelete": ".",
-    "up": "↑",
-    "down": "↓",
-    "left": "←",
-    "right": "→",
+    "up": "â†‘",
+    "down": "â†“",
+    "left": "â†",
+    "right": "â†’",
 }
 
 # Same grid as InputKeyboardDialog._get_keyboard_widget (keyboard picker).

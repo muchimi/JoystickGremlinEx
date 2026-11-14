@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -506,7 +505,7 @@ class MacroManager(QtCore.QObject):
             action: MacroAbstractAction
             for action in macro.sequence:
                 if self.verbose:
-                    syslog.info(f"\t{str(action)}")
+                    syslog.info(f"\t{action!s}")
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
@@ -753,7 +752,7 @@ class MacroManager(QtCore.QObject):
                             if macro.aborted or abort_flag.is_set():
                                 break
                             if verbose:
-                                syslog.info(f"\tAction: {str(action)}")
+                                syslog.info(f"\tAction: {action!s}")
                             action(is_local, is_remote, macro.force_remote, client_list=client_list)
                         count += 1
                         abort_flag.wait(delay)
@@ -770,7 +769,7 @@ class MacroManager(QtCore.QObject):
             # Handle simple one shot macros
             else:
                 if verbose:
-                    msg = "".join(f"{str(a)} " for a in macro.sequence)
+                    msg = "".join(f"{a!s} " for a in macro.sequence)
                     syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
                 for action in macro.sequence:
                     if macro.aborted or abort_flag.is_set():
@@ -835,7 +834,7 @@ class MacroManager(QtCore.QObject):
                 action: MacroAbstractAction
                 for action in macro.sequence:
                     if self.verbose:
-                        syslog.info(f"\t{str(action)}")
+                        syslog.info(f"\t{action!s}")
 
             if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
                 self.terminate_macro_v2(macro)
@@ -970,7 +969,7 @@ class MacroManager(QtCore.QObject):
                             if macro.aborted or abort_flag.is_set():
                                 break
                             if verbose:
-                                syslog.info(f"\tAction: {str(action)}")
+                                syslog.info(f"\tAction: {action!s}")
                             action(is_local, is_remote, macro.force_remote, client_list=client_list)
                         count += 1
                         abort_flag.wait(delay)
@@ -987,7 +986,7 @@ class MacroManager(QtCore.QObject):
             # Handle simple one shot macros
             else:
                 if verbose:
-                    msg = "".join(f"{str(a)} " for a in macro.sequence)
+                    msg = "".join(f"{a!s} " for a in macro.sequence)
                     syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
                 for action in macro.sequence:
                     if macro.aborted or abort_flag.is_set():
@@ -2024,11 +2023,11 @@ class StreamDeckAction(MacroAbstractAction):
             if len(devices) == 1:
                 device_id = next(iter(devices.keys()))
             elif not devices:
-                syslog.warning("MACRO: Stream Deck — no deck connected")
+                syslog.warning("MACRO: Stream Deck â€” no deck connected")
                 return
             else:
                 syslog.warning(
-                    "MACRO: Stream Deck — no device selected and multiple decks connected"
+                    "MACRO: Stream Deck â€” no device selected and multiple decks connected"
                 )
                 return
 

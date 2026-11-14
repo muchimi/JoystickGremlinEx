@@ -52,6 +52,32 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T101)
+- New: new mechanism to update **both** profile input and output device references to new devices.  The updated device remaper is in the Tools > Remap Devices... menu.  The default selection attempts to match devices with changed IDs based on hardware attributes scanned by GEX.  The dialog is split in two groups - one for inputs, one for outputs.  The output section is specific to mapping vJoy entries to the new Maestro entries.  The input section is what to use when you have ID changes with your controllers.  The logic is updated to use new HIDAPI data to do device matching to provide suitable defaults, but it is not always going to work as expected and a manual selection may be needed. This action will change data in the profile automatically and alter IDs.  After confirming the changes via the apply button, a backup is made and the profile is reloaded with the changed data.  **MAKE PROFILE BACKUPS FIRST**
+- Fix: very long load time when loading a profile referencing a disconnected device
+- Fix: disconnected device tab could be missing the disconnect icon due to QT refactor
+- Fix: failover mapping could miss some items.  There may still be some work to do on the device display to clear ghost devices.
+- Fix: API: Axis state data could refer to a non existing device on profile reload if that device changed.
+
+### (m77T100)
+
+
+#### `**Important** This update requires a companion update to GEX bridge 0.1.2. if you are no longer using vJoy.`
+
+ 
+- Change: UI (Device Information): add failover state on device information window if the vjoy device is a failover device (a failover device is a vjoy device that does not exist on the machine but is mapped to a corresponding Maestro joystick by GEX so profile references to vJoy still work without changing the profile). 
+- Change: UI (Device Information): color code devices referenced in a profile but not currently detected.
+- Change: API (Maestro): aligned device number with HID Maestro logic for enumerating HIDAPI devices so WIndows looks at them in sequence. This is an attempt at ensuring that the Maestro devices created by GEX are in the same sequence number as the device listing in Windows. **Requires Bridge 0.1.2 or higher** if you are running in Maestro mode.
+- Fix: API (Maestro): resolve internal cache and DINPUT sync issue that could cause duplicate entries depending on the detection method, and when in time the detection occurs. 
+- Fix: API (detection): correct virtual flag determination logic that could flag a device as virtual when it should be reported as physical.
+- Fix: API (detection): check HIDAPI, XINPUT and DINPUT for cross-interface device duplication and check for stale entries.  This could cause duplicate devices, stale devices, device order enumeration issues.
+- Fix: API (vJoy): reviewed older code sections that check for vJOY devices by index/ID to ensure the device is consistent across all calls and correctly pulls an automatic failover device if it exists.
+- Fix: Pause Action: XML parsing of mode could result in an incorrect value.
+- Fix: Chain Container: API compatibility for new m77 data structures, added QT memory management guardrail, step CRUD (create/remove/update/delete) and re-order behavior fixed for new API, timeout and restart handling and empty chain handling.
+- Fix: Sequence Container: XML parsing bug fix that could result in a blank sequence and parameter issue.
+- Fix: API (audio): pydub dependency not finding ffmpeg encoder due to a load order issue.
+
+
 ### (m77T99)
 - Change: UI (Device Information): device information dialog adds a device type column.
 - Change: Map to Vjoy action has been renamed to "Virtual Remap" as it supports mapping to virtual joysticks (and Maestro gamepads created by GEX).  This is a visual name only - profiles are unchanged.

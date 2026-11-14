@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # RSI citizen dossier lookup for SC Intelligence OCR packs.
 #
@@ -184,7 +183,7 @@ def parse_citizen_html(html: str) -> dict[str, str]:
         display = handle_name
 
     org = _after("Main organization")
-    # Org block often includes SID / rank — keep the first line-ish token.
+    # Org block often includes SID / rank â€” keep the first line-ish token.
     if org:
         org = re.split(
             r"\s+(?:Spectrum Identification|Organization rank)\b",
@@ -201,7 +200,7 @@ def parse_citizen_html(html: str) -> dict[str, str]:
     location = _after("Location")
     fluency = _after("Fluency")
 
-    # Clean location commas ("Canada , Ontario" → "Canada, Ontario")
+    # Clean location commas ("Canada , Ontario" â†’ "Canada, Ontario")
     location = re.sub(r"\s*,\s*", ", ", location)
 
     return {

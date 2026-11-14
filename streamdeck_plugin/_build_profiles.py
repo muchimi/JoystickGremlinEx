@@ -1,4 +1,4 @@
-# Build JG Ex Stream Deck profile package(s) — one profile per device class.
+# Build JG Ex Stream Deck profile package(s) â€” one profile per device class.
 import argparse
 import json
 import shutil
@@ -14,7 +14,7 @@ BUTTON_UUID = "com.joystickgremlin.ex.button"
 PLUGIN_VERSION = "1.0.16"
 
 # Elgato DeviceType -> package / grid / DeviceModel for AutoInstall profiles.
-# Pages live inside each profile — never one profile per page.
+# Pages live inside each profile â€” never one profile per page.
 DEVICE_SPECS = {
     "xl": {
         "out_name": "jgex-xl",
@@ -64,11 +64,19 @@ def _button_action(col: int, row: int, title: str, page: int = 1) -> dict:
         "Name": "JG Ex Button",
         "Settings": {"buttonId": f"{row}:{col}", "page": int(page), "title": title},
         "State": 0,
-        "States": [{
-            "FFamily": "", "FSize": "12", "FStyle": "", "FUnderline": "off",
-            "Image": "", "Title": title, "TitleAlignment": "middle",
-            "TitleColor": "#ffffff", "TitleShow": "",
-        }],
+        "States": [
+            {
+                "FFamily": "",
+                "FSize": "12",
+                "FStyle": "",
+                "FUnderline": "off",
+                "Image": "",
+                "Title": title,
+                "TitleAlignment": "middle",
+                "TitleColor": "#ffffff",
+                "TitleShow": "",
+            }
+        ],
         "UUID": BUTTON_UUID,
     }
 
@@ -207,7 +215,7 @@ def seed_profile_for_spec(spec_key: str, device_model: str, device_uuid: str, nu
                     "LinkedTitle": True,
                     "Name": "JG Ex Button",
                     "Plugin": {
-                        "Name": "Joystick Gremlin Ex",
+                        "Name": "GremlinEx (GEX)",
                         "UUID": "com.joystickgremlin.ex",
                         "Version": PLUGIN_VERSION,
                     },
@@ -218,12 +226,19 @@ def seed_profile_for_spec(spec_key: str, device_model: str, device_uuid: str, nu
                         "title": title,
                     },
                     "State": 0,
-                    "States": [{
-                        "FontFamily": "", "FontSize": 12, "FontStyle": "",
-                        "FontUnderline": False, "OutlineThickness": 2,
-                        "ShowTitle": True, "Title": title,
-                        "TitleAlignment": "middle", "TitleColor": "#ffffff",
-                    }],
+                    "States": [
+                        {
+                            "FontFamily": "",
+                            "FontSize": 12,
+                            "FontStyle": "",
+                            "FontUnderline": False,
+                            "OutlineThickness": 2,
+                            "ShowTitle": True,
+                            "Title": title,
+                            "TitleAlignment": "middle",
+                            "TitleColor": "#ffffff",
+                        }
+                    ],
                     "UUID": BUTTON_UUID,
                 }
         marker = "1,0" if cols > 1 else "0,0"
@@ -256,10 +271,7 @@ def seed_profile_for_spec(spec_key: str, device_model: str, device_uuid: str, nu
         "Version": "3.0",
     }
     (root / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
-    print(
-        f"Seeded '{spec['display_name']}' ({spec_key}) model={device_model} "
-        f"pages={num_pages} ({root.name})"
-    )
+    print(f"Seeded '{spec['display_name']}' ({spec_key}) model={device_model} pages={num_pages} ({root.name})")
 
 
 def seed_connected_profiles(num_pages: int = 5):
@@ -275,7 +287,9 @@ def seed_connected_profiles(num_pages: int = 5):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pages", type=int, default=5, help="Pages inside each seeded JG Ex profile")
-    parser.add_argument("--seed", action="store_true", help="Install JG Ex profiles into ProfilesV3 for connected decks")
+    parser.add_argument(
+        "--seed", action="store_true", help="Install JG Ex profiles into ProfilesV3 for connected decks"
+    )
     args = parser.parse_args()
     n = max(1, int(args.pages))
 

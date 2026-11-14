@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Start / stop elapsed time for the overlay Stopwatch widget.
 #

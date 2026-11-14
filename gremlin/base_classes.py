@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,29 +13,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-from collections.abc import MutableSequence
-import collections
-import time
-import threading
-from abc import abstractmethod, ABCMeta
+import _collections_abc
 import inspect
+import logging
+import traceback
+import uuid
+from abc import ABCMeta, abstractmethod
+from collections.abc import MutableSequence
+from typing import Callable
 
+from psygnal import Signal
 from PySide6 import QtCore
-from typing import Callable, List, Any, Generic, TypeVar, Iterator
 
-from attr import filters
+import dinput
+import gremlin.joystick_handling
 from gremlin.input_types import InputType
 from gremlin.types import DeviceType
-from psygnal import Signal
-import logging
-import uuid
-import dinput
 from gremlin.util import TriggerDict
-import _collections_abc
-import gremlin.joystick_handling
-import traceback
-
 
 syslog = logging.getLogger("system")
 
@@ -277,7 +270,9 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     """base class for input items for MIDI, OSC, KEYBOARD and STATE items"""
 
-    input_type_change = Signal(object)  # fires when an input item needs to refresh the output mapping due to input type changed
+    input_type_change = Signal(
+        object
+    )  # fires when an input item needs to refresh the output mapping due to input type changed
 
     def __init__(self, mode: str | object, device_guid: dinput.GUID | str, input_type: InputType):
 
@@ -293,7 +288,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._device_guid = device.device_guid
         self._device_id = device.device_id
         self._device_name = device.name
-        self._device_type  = device.device_type
+        self._device_type = device.device_type
 
         assert isinstance(input_type, InputType), "input_type must be an InputType enum value"
 
@@ -400,7 +395,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
                 case _:
                     raise ValueError(f"Unsupported source type: {value}")
         else:
-            raise ValueError(f"Unsupported source type: {value}")
+            raise TypeError(f"Unsupported source type: {value}")
 
         assert isinstance(input_type, InputType), "Invalid input type"
         self._input_type = input_type
@@ -507,7 +502,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
                 assert value in device.axis_id_map, "invalid axis for device"
 
         if value != self._input_id:
-            assert isinstance(value, int) or isinstance(value, AbstractInputItem), f"Invalid input id: {value}"
+            assert isinstance(value, (int, AbstractInputItem)), f"Invalid input id: {value}"
             assert isinstance(value, _collections_abc.Hashable), f"Invalid input id - must be hashable:  {value} "
 
             self._input_id = value
@@ -543,12 +538,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @abstractmethod
     def to_xml(self):
         """must implement"""
-        pass
 
     @abstractmethod
     def parse_xml(self, data=None):
         """must implement"""
-        pass
 
     def __getstate__(self):
         """manual pickle to XML"""
@@ -659,7 +652,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
     configuration and to easily load and store them.
     """
 
-    def __init__(self, parent, extra_data: dict = None):
+    def __init__(self, parent, extra_data: dict | None = None):
         """Creates a new instance.
 
         :param: parent the parent item of this instance in the profile tree (type: InputItem)
@@ -686,7 +679,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             self.override_input_type = None
             self.override_input_id = None
 
-    def notifyContentChanged(self, extra_data: dict = None, force: bool = False):
+    def notifyContentChanged(self, extra_data: dict | None = None, force: bool = False):
         if self._input_item:
             self._input_item.notifyContentChanged(extra_data=extra_data, force=force)
 
@@ -754,7 +747,6 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             syslog.warning("Failed to update input item from item_data due to AttributeError")
             syslog.debug(f"Item data: {item_data}")
             syslog.warning(traceback.format_exc())
-
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
@@ -902,7 +894,6 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
         :return XML representation of this instance
         """
-        pass
 
     @abstractmethod
     def _is_valid(self):
@@ -914,7 +905,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
     # @abstractmethod
     def _sanitize(self):
-        pass
+        """Sanitizes the instance, ensuring all required variables are set and valid."""
 
 
 class AbstractModel(QtCore.QAbstractItemModel):
@@ -931,7 +922,6 @@ class AbstractModel(QtCore.QAbstractItemModel):
 
         :return number of rows
         """
-        pass
 
     def count(self):
         return self.rows()
@@ -984,16 +974,16 @@ class AbstractCallbackModel(AbstractModel):
 
     def __init__(
         self,
-        change_callback: Callable = None,
-        filter_callback: Callable = None,
-        sort_callback: Callable = None,
-        added_callback: Callable = None,
-        removed_callback: Callable = None,
-        content_callback: Callable = None,
-        allowed_types: tuple = None,
-        model_description: str = None,
-        filtered_data_change_callback: Callable = None,
-        item_changed_callback: Callable = None,
+        change_callback: Callable | None = None,
+        filter_callback: Callable | None = None,
+        sort_callback: Callable | None = None,
+        added_callback: Callable | None = None,
+        removed_callback: Callable | None = None,
+        content_callback: Callable | None = None,
+        allowed_types: tuple | None = None,
+        model_description: str | None = None,
+        filtered_data_change_callback: Callable | None = None,
+        item_changed_callback: Callable | None = None,
         data=None,
     ):
         """callback enabled model
@@ -1020,7 +1010,9 @@ class AbstractCallbackModel(AbstractModel):
         self._initializing = True
 
         self._index_map = TriggerDict()  # map of input_id to index
-        self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
+        self._index_map.addCallback(
+            self._handle_data_changed
+        )  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
         self._extra_data = data
 
@@ -1045,7 +1037,9 @@ class AbstractCallbackModel(AbstractModel):
         assert isinstance(allowed_types, tuple) if allowed_types is not None else True, "allowed types must be a tuple"
 
         assert isinstance(added_callback, Callable) if added_callback is not None else True, "Invalid add callback"
-        assert isinstance(removed_callback, Callable) if removed_callback is not None else True, "Invalid remove callback"
+        assert isinstance(removed_callback, Callable) if removed_callback is not None else True, (
+            "Invalid remove callback"
+        )
 
         self._add_callback = added_callback
         self._remove_callback = removed_callback
@@ -1065,7 +1059,7 @@ class AbstractCallbackModel(AbstractModel):
         self._suspend_stack = 0  # allow change events to be processed
         self._initializing = False
 
-    def registerFilter(self, filter: str, callback: Callable = None):
+    def registerFilter(self, filter: str, callback: Callable | None = None):
         """registers a new filtered data set in the model
         if the filter exists, the request is ignored
 
@@ -1106,7 +1100,6 @@ class AbstractCallbackModel(AbstractModel):
             del self._filtered_callback_map[filter]  # clear any callbacks for that filter
             self._filtered_enabled = bool(self._filtered_callback_map)  # disable filtering if no callbacks remain
 
-
     def registerFilteredDataChangeCallback(self, callback: Callable):
         """registers a callback for when filtered data changes"""
         if callback and callback not in self._filter_data_changed_callbacks:
@@ -1138,18 +1131,16 @@ class AbstractCallbackModel(AbstractModel):
 
     def setContentCallback(self, callback: Callable):
         """sets the content changed callback for this model"""
-        if __debug__:
-            if callback:
-                assert isinstance(callback, Callable), "invalid callback"
-                sig = inspect.signature(callback)
-                if len(sig.parameters) != 3:
-                    raise TypeError("Content callback must accept exactly three parameters: data, force, and operation")
+        if __debug__ and callback:
+            assert isinstance(callback, Callable), "invalid callback"
+            sig = inspect.signature(callback)
+            if len(sig.parameters) != 3:
+                raise TypeError("Content callback must accept exactly three parameters: data, force, and operation")
 
         current_callback = self._content_callback
-        if current_callback != callback:
+        if current_callback and current_callback != callback:
             # remove the old
-            if current_callback is not None:
-                self.removeCallback(current_callback)
+            self.removeCallback(current_callback)
         if not callback:
             pass
         self._content_callback = callback
@@ -1182,7 +1173,7 @@ class AbstractCallbackModel(AbstractModel):
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
         assert isinstance(index, int), "Index must be an integer"
 
-        old_item = self._index_map[index] if index in self._index_map else None
+        old_item = self._index_map.get(index, None)
 
         self._index_map[index] = item
         self._item_map[item] = index
@@ -1248,8 +1239,6 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
             self._fireChanged()
 
-
-
     def append(self, item) -> int:
         """
         Appends an item to the model
@@ -1280,13 +1269,15 @@ class AbstractCallbackModel(AbstractModel):
             self._set_item_at(index, item, emit=emit, operation="replace")
             return index
 
-        for item in items:
+        for data in items:
             if self._allowed_types:
-                if not isinstance(item, self._allowed_types):
-                    raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
-                assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
+                if not isinstance(data, self._allowed_types):
+                    raise ValueError(
+                        f"invalid data type for model - got [{type(data).__name__}] - expected one of {self._allowed_types}"
+                    )
+                assert isinstance(data, _collections_abc.Hashable), "item must be hashable"
 
-            if item not in self._index_map:
+            if data not in self._index_map:
                 # not in the map
                 self.markDirty()
                 if index == -1:
@@ -1294,14 +1285,14 @@ class AbstractCallbackModel(AbstractModel):
                     index = 0
                     while index in self._index_map:
                         index += 1
-                self._set_item_at(index, item, emit=emit, operation="add")
+                self._set_item_at(index, data, emit=emit, operation="add")
 
             else:
                 # item is already in the map - this is a move
-                old_index = self._index_map[item]
+                old_index = self._index_map[data]
                 if old_index != index:
                     self.markDirty()
-                    self._set_item_at(index, item, emit=emit, operation="move")
+                    self._set_item_at(index, data, emit=emit, operation="move")
 
             return index
         return -1  # if the item was not added
@@ -1320,9 +1311,11 @@ class AbstractCallbackModel(AbstractModel):
         :param item: the item to append to the model
         :param callback: optional, filtering callback, takes an item as a parameter and returns true if the item should be included in the filtered data
         """
-        if self._allowed_types:
-            if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        if self._allowed_types and not isinstance(item, self._allowed_types):
+            raise ValueError(
+                f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
+            )
+
         old_item = self.itemAt(i)
         if i in self._index_map:
             # bump all the items down 1
@@ -1374,7 +1367,9 @@ class AbstractCallbackModel(AbstractModel):
         """reorders the indices in the model to be consecutive starting from 0"""
         for new_index, item in enumerate(self._index_map.values()):
             self._item_map[item] = new_index
-        self._index_map = TriggerDict.copyFrom({new_index: item for new_index, item in enumerate(self._index_map.values())})
+        self._index_map = TriggerDict.copyFrom(
+            {new_index: item for new_index, item in enumerate(self._index_map.values())}
+        )
         self.applyFilter(emit=False, filter=filter)  # update filtered data as well
         verbose = gremlin.config.Configuration().verbose_mode_execution
         if verbose:
@@ -1417,11 +1412,8 @@ class AbstractCallbackModel(AbstractModel):
             if __debug__:
                 syslog.info(f"MODEL: Item not found in remove: {item} hash[{hash(item)}]")
                 syslog.info(f"  Current item map: model size: {len(self._item_map)}")
-                index = 0
-                for key, item in self._item_map.items():
-                    syslog.info(f"  [{index}] Item map key [{str(key)}] hash[{hash(key)}] maps to item [{str(item)}]")
-                    index += 1
-                pass
+                for index, (key, item) in enumerate(self._item_map.items()):
+                    syslog.info(f"  [{index}] Item map key [{key!s}] hash[{hash(key)}] maps to item [{item!s}]")
 
     def removeAt(self, index: int, emit=True, filter=DEFAULT_FILTER):
         """removes the entry at the given filteredmodel index"""
@@ -1563,7 +1555,7 @@ class AbstractCallbackModel(AbstractModel):
         """returns the size of the unfiltered model"""
         return len(self._index_map)
 
-    def rowCount(self, filter = DEFAULT_FILTER) -> int:
+    def rowCount(self, filter=DEFAULT_FILTER) -> int:
         """returns the number of rows in the model"""
         return len(self._filtered_index_map[filter])
 
@@ -1587,12 +1579,12 @@ class AbstractCallbackModel(AbstractModel):
         else:
             filters_to_clear = [filter] if filter in self._filtered_index_map else []
 
-        for filter in filters_to_clear:
-            if self._filtered_index_map[filter].id != self._index_map.id:
-                self._filtered_index_map[filter].clearCallbacks()
-                self._filtered_item_map[filter].clearCallbacks()
-                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
-                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
+        for fltr in filters_to_clear:
+            if self._filtered_index_map[fltr].id != self._index_map.id:
+                self._filtered_index_map[fltr].clearCallbacks()
+                self._filtered_item_map[fltr].clearCallbacks()
+                self._filtered_index_map[fltr] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[fltr] = TriggerDict.copyFrom(self._item_map)
 
     @property
     def allowedInputTypes(self) -> tuple:
@@ -1616,25 +1608,29 @@ class AbstractCallbackModel(AbstractModel):
 
         if not self._can_filter():
             # model is not filtered
-            for filter in filters:
-                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
-                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
+            for fltr in filters:
+                self._filtered_index_map[fltr] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[fltr] = TriggerDict.copyFrom(self._item_map)
 
-            self._fire_filtered_data_changed_callbacks() # fire data changed callbacks
+            self._fire_filtered_data_changed_callbacks()  # fire data changed callbacks
             return
 
         if not self._filtered_enabled:
             # filters are not enabled - reset the filters
 
-            for filter in filters:
+            for fltr in filters:
                 if verbose:
-                    syslog.info(f"MODEL INPUT FILTER: resetting filter [{filter}]")
-                if self._filtered_index_map[filter].id != self._index_map.id:
+                    syslog.info(f"MODEL INPUT FILTER: resetting filter [{fltr}]")
+                if self._filtered_index_map[fltr].id != self._index_map.id:
                     # reset filters if previously enabled
-                    self._filtered_index_map[filter] = TriggerDict.copyFrom({key: value for key, value in self._index_map.items()})
-                    self._filtered_item_map[filter] = TriggerDict.copyFrom({key: value for key, value in self._item_map.items()})
+                    self._filtered_index_map[fltr] = TriggerDict.copyFrom(
+                        {key: value for key, value in self._index_map.items()}
+                    )
+                    self._filtered_item_map[fltr] = TriggerDict.copyFrom(
+                        {key: value for key, value in self._item_map.items()}
+                    )
 
-            self._fire_filtered_data_changed_callbacks() # fire data changed callbacks
+            self._fire_filtered_data_changed_callbacks()  # fire data changed callbacks
             if emit:
                 self._fireChanged()
                 # fire the filter operation
@@ -1672,24 +1668,24 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info("\tall inputs are filtered for this device")
 
         old_hashes = {f: self.hashKey(filter=f) for f in filters}  # before the maps are replaced
-        maps_changed =  self._maps_different(self._index_map, new_index_map)
+        maps_changed = self._maps_different(self._index_map, new_index_map)
         has_changed = maps_changed or filter != self.DEFAULT_FILTER
         if has_changed:
-            for filter in filters:
-                self._filtered_index_map[filter] = new_index_map
-                self._filtered_index_map[filter].addCallback(self._handle_data_changed)
-                self._filtered_item_map[filter] = new_item_map
+            for fltr in filters:
+                self._filtered_index_map[fltr] = new_index_map
+                self._filtered_index_map[fltr].addCallback(self._handle_data_changed)
+                self._filtered_item_map[fltr] = new_item_map
                 force = True
         else:
-            for filter in filters:
-                self._filtered_index_map[filter] = TriggerDict.copyFrom(self._index_map)
-                self._filtered_item_map[filter] = TriggerDict.copyFrom(self._item_map)
+            for fltr in filters:
+                self._filtered_index_map[fltr] = TriggerDict.copyFrom(self._index_map)
+                self._filtered_item_map[fltr] = TriggerDict.copyFrom(self._item_map)
                 force = True
 
-        for filter in filters:
-            self.applySort(emit=False, filter=filter)
-            new_hash = self.hashKey(filter=filter)
-            if old_hashes[filter] != new_hash or has_changed:
+        for fltr in filters:
+            self.applySort(emit=False, filter=fltr)
+            new_hash = self.hashKey(filter=fltr)
+            if old_hashes[fltr] != new_hash or has_changed:
                 # filter or sort changed the visible items
                 has_changed = True
 
@@ -1858,16 +1854,20 @@ class AbstractCallbackModel(AbstractModel):
 
     def isFiltered(self) -> bool:
         """true if the model is currently filtered"""
-        return self._filtered_enabled and bool(self._filtered_callback_map) and self._maps_different(self._index_map, self._filtered_index_map)
+        return (
+            self._filtered_enabled
+            and bool(self._filtered_callback_map)
+            and self._maps_different(self._index_map, self._filtered_index_map)
+        )
 
     def getFilterCallbacks(self, filter=DEFAULT_FILTER) -> list[Callable]:
         """gets the model's filtering callbacks"""
-        return self._filtered_callback_map[filter] if filter in self._filtered_callback_map else []
+        return self._filtered_callback_map.get(filter, [])
 
     def _maps_different(self, m1: TriggerDict, m2: TriggerDict):
-        """ compare two trigger dicts looking for differences in the stored values
+        """compare two trigger dicts looking for differences in the stored values
 
-            returns False if the two trigger dicts are considered equal, True otherwise
+        returns False if the two trigger dicts are considered equal, True otherwise
         """
         if isinstance(m1, TriggerDict) and isinstance(m2, TriggerDict):
             if m1.id == m2.id:
@@ -1876,7 +1876,7 @@ class AbstractCallbackModel(AbstractModel):
 
             if len(m1) != len(m2):
                 # fast comparison on counts
-                return True # different length
+                return True  # different length
 
             # same count = compare actual contents
             diff = set(m1.items()) - set(m2.items())
@@ -1954,7 +1954,12 @@ class AbstractCallbackModel(AbstractModel):
         """returns a hash key representing the current state of the model"""
         if filter not in self._filtered_item_map:
             return 0
-        return hash(tuple(self._filtered_item_map[filter].keys()))
+        return hash(
+            tuple(
+                (item.id, item.hashKey()) if isinstance(item, AbstractCallbackModel) else item
+                for item in self._filtered_item_map[filter]
+            )
+        )
 
     def resetChanges(self):
         """resets any changes to the model"""
@@ -1997,7 +2002,9 @@ class AbstractCallbackModel(AbstractModel):
             if callback:
                 sig = inspect.signature(callback)
                 if len(sig.parameters) != 5:
-                    raise TypeError("Callback must accept exactly five parameters: source, index, old_value, new_value, and operation")
+                    raise TypeError(
+                        "Callback must accept exactly five parameters: source, index, old_value, new_value, and operation"
+                    )
 
         if callback and callback not in self._item_changed_callbacks:
             self._item_changed_callbacks.append(callback)
@@ -2013,7 +2020,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def modelChanged(self) -> bool:
         """true if data has changed"""
-        return self._change_pending or hash(self) != self._old_hash
+        return self._change_pending or self.hashKey() != self._old_hash
 
     def _handle_data_changed(self, source, index, old_value, new_value, filter=DEFAULT_FILTER):
         """called when a storage data is changed"""
@@ -2109,13 +2116,12 @@ class AbstractCallbackModel(AbstractModel):
         raise KeyError(f"Key {key} not found in model")
 
     def __hash__(self):
-        """unique hash value of model contents"""
-        return hash((self.id, frozenset(self._index_map.values())))
+        """Keep dictionary keys stable while model contents are edited."""
+        return hash(self.id)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return NotImplemented
         if self.id != other.id:
             return False
-        return  self._index_map == other._index_map
-
+        return self._index_map == other._index_map

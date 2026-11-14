@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Stream Deck plugin bridge for Joystick Gremlin Ex.
 # Elgato Stream Deck software owns USB; a companion plugin talks to GEX over localhost WebSocket.
@@ -186,9 +185,9 @@ def normalize_button_id(button_id: str) -> str:
 
 
 def normalize_page(page) -> int:
-    """1-based GEX virtual page (Companion-style bank). Missing/invalid → 1.
+    """1-based GEX virtual page (Companion-style bank). Missing/invalid â†’ 1.
 
-    Not limited to Elgato's ~10 profile pages — GEX owns unlimited banks.
+    Not limited to Elgato's ~10 profile pages â€” GEX owns unlimited banks.
     """
     try:
         n = int(page)
@@ -199,7 +198,7 @@ def normalize_page(page) -> int:
     return n
 
 
-# Elgato DeviceType → (columns, rows) for the key grid (Companion viewport).
+# Elgato DeviceType â†’ (columns, rows) for the key grid (Companion viewport).
 # Only types listed here are treated as supported in the designer.
 DEVICE_GRID_LAYOUTS = {
     0: (5, 3),  # Stream Deck / MK.2
@@ -305,7 +304,7 @@ def _slot_key_of(item_or_meta) -> str:
 
 
 def _same_live_slot(a, b) -> bool:
-    """Physical viewport slot (ignore GEX page) — context or device+kind+coords/id."""
+    """Physical viewport slot (ignore GEX page) â€” context or device+kind+coords/id."""
     a_ctx = (a.get("context") if isinstance(a, dict) else getattr(a, "context", "")) or ""
     b_ctx = (b.get("context") if isinstance(b, dict) else getattr(b, "context", "")) or ""
     if a_ctx and b_ctx and a_ctx == b_ctx:
@@ -406,7 +405,7 @@ def should_show_streamdeck_tab(device_guid, profile=None) -> bool:
     bridge = StreamDeckBridge()
     if bridge.is_guid_connected(device_guid):
         return True
-    # Profile XML / sidecar already know this deck — don't wait for the plugin
+    # Profile XML / sidecar already know this deck â€” don't wait for the plugin
     # handshake (that handshake used to force a full device-tab rebuild).
     if bridge.device_id_for_guid(device_guid):
         return True
@@ -430,7 +429,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
     """
 
     def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode = None, device_guid=None):
-        # Fields used by display_name / setters — must exist before InputItem.__init__ runs.
+        # Fields used by display_name / setters â€” must exist before InputItem.__init__ runs.
         self._elgato_device_id = ""
         self._button_id = ""
         self._page = 1  # 1-based GEX virtual page (Companion-style bank)
@@ -468,7 +467,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         self._icon_v_align_pressed = "middle"
         self._bg_color_pressed = ""
         # How the "active" look is chosen: hardware press vs a GEX state.
-        # "press" → released/pressed; "state" → state OFF/ON (same field sets).
+        # "press" â†’ released/pressed; "state" â†’ state OFF/ON (same field sets).
         self._appearance_mode = "press"  # press | state
         self._appearance_state = ""  # GEX state name when mode == state
         self._appearance_state_id = ""  # unique GEX state id (name is a cache)
@@ -956,7 +955,7 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         for key, value in data.items():
             if key in allowed and hasattr(self, key):
                 setattr(self, key, value)
-        # Older clipboards omit linked_page — treat as unlinked.
+        # Older clipboards omit linked_page â€” treat as unlinked.
         if "linked_page" not in data:
             self.linked_page = 0
         if "appearance_state" in data or "appearance_state_id" in data:
@@ -999,9 +998,9 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
 
     @property
     def display_name(self) -> str:
-        prefix = f"P{self.page} · "
+        prefix = f"P{self.page} Â· "
         if self.is_linked:
-            return f"{prefix}↗ Page {self.linked_page}"
+            return f"{prefix}â†— Page {self.linked_page}"
         if self._title:
             return prefix + self._title
         if self._kind == "dial":
@@ -1261,7 +1260,7 @@ class StreamDeckBridge(QtCore.QObject):
         # Coalesce inputs_changed / paint during willAppear storms
         self._inputs_changed_pending: set = set()
         self._paint_pending: set[str] = set()
-        # Keys currently held on hardware — paint must keep pressed appearance until keyUp.
+        # Keys currently held on hardware â€” paint must keep pressed appearance until keyUp.
         # Entries: (device_id, "ctx", context) or (device_id, "slot", slot_key)
         self._held_slots: set[tuple] = set()
         # Bumped when overlay widgets should redraw (paint, hold, appearance).
@@ -1357,7 +1356,7 @@ class StreamDeckBridge(QtCore.QObject):
         """Human-readable bridge/plugin status for the device tab."""
         config = gremlin.config.Configuration()
         if not config.startup_streamdeck_enabled:
-            return "Bridge: disabled (enable Stream Deck bridge in Options → Stream Deck)"
+            return "Bridge: disabled (enable Stream Deck bridge in Options â†’ Stream Deck)"
         port = config.streamdeck_bridge_port or DEFAULT_BRIDGE_PORT
         if not self._started:
             return f"Bridge: not listening on {port} (Apply bridge settings in Options, or reload tabs)"
@@ -1467,7 +1466,7 @@ class StreamDeckBridge(QtCore.QObject):
 
     def _load_page_metadata(self, *_args, emit: bool = True):
         """Restore GEX virtual page names/order from the profile sidecar JSON."""
-        # Always replace — stale names from a previously loaded profile must not linger.
+        # Always replace â€” stale names from a previously loaded profile must not linger.
         self._page_names = {}
         self._page_order = {}
         profile = gremlin.shared_state.current_profile
@@ -1536,7 +1535,7 @@ class StreamDeckBridge(QtCore.QObject):
         self._dedupe_live_page_metadata(live_ids)
         if not emit:
             return
-        # profile_loaded is psygnal (may fire on the worker) — refresh designers on UI thread.
+        # profile_loaded is psygnal (may fire on the worker) â€” refresh designers on UI thread.
         gremlin.util.InvokeUiMethod(self._emit_page_metadata_changed)
 
     def _emit_page_metadata_changed(self):
@@ -1601,7 +1600,7 @@ class StreamDeckBridge(QtCore.QObject):
             self._page_names[live_id] = dict(self._page_names.get(best) or {})
             if best in self._page_order:
                 self._page_order[live_id] = list(self._page_order[best])
-            syslog.info(f"STREAMDECK: adopted page metadata {best[:12]}… → {live_id[:12]}…")
+            syslog.info(f"STREAMDECK: adopted page metadata {best[:12]}â€¦ â†’ {live_id[:12]}â€¦")
 
     def _dedupe_live_page_metadata(self, live_ids: list[str] | None = None):
         """Keep page banks per device: undo shared copies between connected decks."""
@@ -1643,7 +1642,7 @@ class StreamDeckBridge(QtCore.QObject):
                 self._page_order[drop] = list(drop_pages)
                 self._page_names[drop] = {}
                 changed = True
-                syslog.info(f"STREAMDECK: split shared page metadata; reset {drop[:12]}… to pages {drop_pages}")
+                syslog.info(f"STREAMDECK: split shared page metadata; reset {drop[:12]}â€¦ to pages {drop_pages}")
         if changed:
             try:
                 self._persist_page_metadata()
@@ -1786,15 +1785,15 @@ class StreamDeckBridge(QtCore.QObject):
         device_id = device_id or ""
         page = normalize_page(page)
         if not device_id:
-            syslog.warning("STREAMDECK: set_virtual_page — empty device_id")
+            syslog.warning("STREAMDECK: set_virtual_page â€” empty device_id")
             return False
         if self.devices and device_id not in self.devices:
-            syslog.warning(f"STREAMDECK: set_virtual_page — unknown device [{device_id[:12]}…] (not in connected decks)")
+            syslog.warning(f"STREAMDECK: set_virtual_page â€” unknown device [{device_id[:12]}â€¦] (not in connected decks)")
             return False
         previous = normalize_page(self._active_page.get(device_id, 1))
         if previous != page:
             self._last_page[device_id] = previous
-            # Drop press-hold visuals — they belong to the old bank and would
+            # Drop press-hold visuals â€” they belong to the old bank and would
             # ghost over the new page until keyUp (Change Page under the finger).
             self._clear_held_for_device(device_id)
         self._ensure_page_listed(device_id, page)
@@ -1808,7 +1807,7 @@ class StreamDeckBridge(QtCore.QObject):
         device_id = device_id or ""
         last = self.get_last_page(device_id)
         if last is None:
-            syslog.info(f"STREAMDECK: Return to Last — no previous page for device={device_id[:12] if device_id else '?'}")
+            syslog.info(f"STREAMDECK: Return to Last â€” no previous page for device={device_id[:12] if device_id else '?'}")
             return False
         current = self.get_active_page(device_id)
         if last == current:
@@ -1817,9 +1816,9 @@ class StreamDeckBridge(QtCore.QObject):
         return self.set_virtual_page(device_id, last)
 
     def change_page(self, device_id: str, page: int, profile: str = "") -> bool:
-        """Map to Stream Deck Change Page — GEX virtual bank (0-based page arg from action).
+        """Map to Stream Deck Change Page â€” GEX virtual bank (0-based page arg from action).
 
-        ``page`` is 0-based from Map to Stream Deck (page 0 → GEX bank 1).
+        ``page`` is 0-based from Map to Stream Deck (page 0 â†’ GEX bank 1).
         ``profile`` is ignored for virtual banks (kept for API compatibility).
         """
         try:
@@ -1946,7 +1945,7 @@ class StreamDeckBridge(QtCore.QObject):
         return frozenset(str(k[2]) for k in self._held_slots if k[0] == device_id and k[1] == "slot" and k[2])
 
     def overlay_slots(self, device_id: str, page: int) -> dict[tuple, object]:
-        """Map (kind, row, col) → StreamDeckInputItem for overlay paint.
+        """Map (kind, row, col) â†’ StreamDeckInputItem for overlay paint.
 
         Linked keys resolve to their source-page item so the overlay mirrors
         the hardware paint (empty proxies would otherwise draw blank).
@@ -2005,10 +2004,10 @@ class StreamDeckBridge(QtCore.QObject):
         """Locate profile input for GEX page + physical slot.
 
         Live JG Ex Dial instances are kind ``dial``; designer appearance lives on
-        ``dial_press``. Painting resolves dial → dial_press so LCD backgrounds apply.
+        ``dial_press``. Painting resolves dial â†’ dial_press so LCD backgrounds apply.
 
         Dial Button IDs from the plugin are often ``row:col`` (e.g. ``0:2``). Do **not**
-        treat the left side of ``:`` as the dial index — that wrongly maps every dial
+        treat the left side of ``:`` as the dial index â€” that wrongly maps every dial
         on row 0 to dial_press ``0``.
         """
         page = normalize_page(page)
@@ -2346,7 +2345,7 @@ class StreamDeckBridge(QtCore.QObject):
         for device_id, info in self._devices.items():
             if compare_guid(info.get("guid"), device_guid):
                 return device_id
-        # Plugin may not be connected yet — reverse uuid5 from known sidecar / profile ids.
+        # Plugin may not be connected yet â€” reverse uuid5 from known sidecar / profile ids.
         candidates = set(list(self._page_names.keys()) + list(self._page_order.keys()))
         try:
             profile = gremlin.shared_state.current_profile
@@ -2436,7 +2435,7 @@ class StreamDeckBridge(QtCore.QObject):
                 self._dedupe_live_page_metadata()
             except Exception:
                 pass
-            # First connect often arrives after profile_loaded — refresh page names now.
+            # First connect often arrives after profile_loaded â€” refresh page names now.
             if previous is None:
                 try:
                     gremlin.util.InvokeUiMethod(self._emit_page_metadata_changed)
@@ -2481,7 +2480,7 @@ class StreamDeckBridge(QtCore.QObject):
         row = data.get("row")
         column = data.get("column")
         slot_key = make_slot_key(kind, row, column, button_id)
-        # Live viewport is physical only — GEX page comes from active bank, not Elgato.
+        # Live viewport is physical only â€” GEX page comes from active bank, not Elgato.
         meta = {
             "device_id": device_id,
             "button_id": button_id,
@@ -2821,7 +2820,7 @@ class StreamDeckBridge(QtCore.QObject):
                         f"(was page={old_page} title={old_title!r} buttonId={old_button!r})"
                     )
                 elif new_title is not None:
-                    # Title forced equal after prune — still log when plugin asserts a value.
+                    # Title forced equal after prune â€” still log when plugin asserts a value.
                     syslog.info(f"STREAMDECK: sync title={item.title!r} page={item.page} buttonId={item.button_id!r}")
             if hasattr(item, "setOverrideInputType"):
                 item.setOverrideInputType(InputType.JoystickButton)
@@ -3037,7 +3036,7 @@ class StreamDeckBridge(QtCore.QObject):
     def _emit_event(self, event: gremlin.event_handler.Event):
         """Dispatch a Stream Deck input event (OSC-style).
 
-        When the profile is running, code_runner connects streamdeck_event → execute_event.
+        When the profile is running, code_runner connects streamdeck_event â†’ execute_event.
         Always emit UI joystick feedback so repeaters update while editing.
         """
         el = gremlin.event_handler.EventListener()
@@ -3282,7 +3281,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             title.setText("Linked key")
             body.setText(
                 f"This key mirrors {src_name} at the same position.\n\n"
-                f"It shows and runs that page’s button. Edit icon, style, "
+                f"It shows and runs that pageâ€™s button. Edit icon, style, "
                 f"and mappings on {src_name}.\n\n"
                 "Use Unlink in the designer if you want a separate button here."
             )
@@ -3297,7 +3296,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         else:
             title.setText("Dial LCD")
             body.setText(
-                "This is the touch-strip window for the dial — not a button.\n\n"
+                "This is the touch-strip window for the dial â€” not a button.\n\n"
                 "Edit icon, title, and background in the LCD settings under the deck.\n"
                 "Add press / rotate mappings on the dial: circle = press, "
                 "arrows = clockwise / counterclockwise."
@@ -3308,7 +3307,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.is_running:
             return
         if input_item is None:
-            # Page change / look-only selection — blank or no-mapping hint.
+            # Page change / look-only selection â€” blank or no-mapping hint.
             try:
                 self.setLastSelectedInputItem(None)
                 if not getattr(self, "_designer_mappings_enabled", True):
@@ -3334,7 +3333,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     widget.redraw()
                 except Exception as redraw_err:
                     # Failed redraw can leave the mapping pane on the blank
-                    # "Please select an input" page — rebuild and retry once.
+                    # "Please select an input" page â€” rebuild and retry once.
                     syslog.error(f"STREAMDECK: mapping redraw failed, rebuilding: {redraw_err}")
                     widget = self._ensure_mapping_widget(input_item, force_new=True)
                     if widget is not None:
@@ -3563,7 +3562,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             item = data.input_item if hasattr(data, "input_item") else data
         if isinstance(item, StreamDeckInputItem):
             input_widget.setTitle(item.display_name)
-            input_widget.setInputDescription(f"Page {item.page} · ID {item.button_id} ({item.kind})")
+            input_widget.setInputDescription(f"Page {item.page} Â· ID {item.button_id} ({item.kind})")
         elif item is not None:
             input_widget.setTitle(str(getattr(item, "display_name", getattr(item, "input_id", item))))
 

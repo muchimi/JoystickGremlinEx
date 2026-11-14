@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 """AFCS designer: flight-mode tabs, OdenGraphQt canvas, inspector, live meters."""
 
 from __future__ import annotations
@@ -81,7 +79,7 @@ from gremlin.ui.ui_common import (
 syslog = logging.getLogger("system")
 
 _NODE_CLIPBOARD: dict | None = None
-_AFCS_UI_SETTINGS = ("Joystick Gremlin Ex", "AFCS")
+_AFCS_UI_SETTINGS = ("Gremlin Ex", "AFCS")
 _AFCS_HINTS_KEY = "show_action_banner"
 _AFCS_PANE_KEY = "show_selection_pane"
 _AFCS_INTRO_KEY = "afcs_intro"
@@ -201,7 +199,7 @@ else:
     def _afcs_set_node_property(self, name, value) -> None:
         model = self.node.model
         # Built-in fields live on the model. AFCS fields (source_name, device_guid,
-        # axis_id, curve, …) are custom properties. Unknown names still no-op so a
+        # axis_id, curve, â€¦) are custom properties. Unknown names still no-op so a
         # missing live field cannot raise NodePropertyError.
         if name not in model.properties and name not in model.custom_properties:
             return
@@ -560,13 +558,13 @@ def _condition_phrase(cond: dict) -> str:
         return f"{combo} is {'pressed' if on else 'released'}"
     try:
         input_id = int(cond.get("input_id") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         input_id = 0
     device = str(cond.get("device_name") or "").strip()
     if kind == "vjoy":
         try:
             vjoy_id = overlay_virtual_key(cond)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             vjoy_id = 0
         source = device or (f"vJoy {vjoy_id}" if isinstance(vjoy_id, int) and vjoy_id else "Virtual Device")
     else:
@@ -660,7 +658,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             expr.editingFinished.connect(self._on_expression_finished)
             self._expression_edit = expr
             preview = QDataPushButton(
-                "Preview", tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.", clicked=self._preview_expression
+                "Preview",
+                tooltip="Show a Venn diagram, boolean algebra, and truth table for this expression.",
+                clicked=self._preview_expression,
             )
             expr_row = QtWidgets.QWidget()
             expr_layout = QtWidgets.QHBoxLayout(expr_row)
@@ -739,7 +739,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
         self._emit(rebuild=True)
 
     def _remove_condition(self, cond_id: str) -> None:
-        self._vis["conditions"] = [c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)]
+        self._vis["conditions"] = [
+            c for c in (self._vis.get("conditions") or []) if str(c.get("id") or "") != str(cond_id)
+        ]
         self._vis["conditions"] = assign_condition_letters(list(self._vis.get("conditions") or []))
         self._emit(rebuild=True)
 
@@ -754,7 +756,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
     def _condition_box(self, cond: dict) -> QtWidgets.QGroupBox:
         letter = str(cond.get("letter") or "").strip().upper()
         phrase = _condition_phrase(cond)
-        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
+        box = QtWidgets.QGroupBox(f"{letter} â€” {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
         form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
@@ -766,10 +768,16 @@ class NodeConditionWidget(QtWidgets.QWidget):
         index = kind_box.findData(kind)
         kind_box.setCurrentIndex(index if index >= 0 else 0)
         kind_box.currentIndexChanged.connect(
-            lambda _i, combo=kind_box, cid=cond_id: self._set_condition(cid, rebuild=True, kind=str(combo.currentData() or "mode"))
+            lambda _i, combo=kind_box, cid=cond_id: self._set_condition(
+                cid, rebuild=True, kind=str(combo.currentData() or "mode")
+            )
         )
         form.addRow("If", kind_box)
-        when_opts = [("is current", "on"), ("is not current", "off")] if kind == "mode" else [("is on", "on"), ("is off", "off")]
+        when_opts = (
+            [("is current", "on"), ("is not current", "off")]
+            if kind == "mode"
+            else [("is on", "on"), ("is off", "off")]
+        )
         when_cur = "off" if str(cond.get("when") or "on").casefold() == "off" else "on"
         when = QDataRadioButtonGroup(
             when_opts,
@@ -799,7 +807,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             form.addRow("State", combo)
         elif kind == "keyboard":
             picker = OverlayKeyCombinationWidget(cond.get("keys") or [])
-            picker.keys_changed.connect(lambda keys, cid=cond_id: self._set_condition(cid, keys=normalize_overlay_keys(keys)))
+            picker.keys_changed.connect(
+                lambda keys, cid=cond_id: self._set_condition(cid, keys=normalize_overlay_keys(keys))
+            )
             form.addRow(picker)
         else:
             self._fill_button(form, cond)
@@ -866,7 +876,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
         id_box.addItem("(none)", 0)
         try:
             current_id = int(cond.get("input_id") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             current_id = 0
         found = current_id <= 0
         if found:
@@ -880,7 +890,9 @@ class NodeConditionWidget(QtWidgets.QWidget):
             id_box.addItem(f"Button {current_id}", current_id)
             id_box.setCurrentIndex(id_box.count() - 1)
         id_box.currentIndexChanged.connect(
-            lambda _i, cid=cond_id, combo=id_box: self._set_condition(cid, input_id=int(combo.currentData() if combo.currentData() is not None else 0))
+            lambda _i, cid=cond_id, combo=id_box: self._set_condition(
+                cid, input_id=int(combo.currentData() if combo.currentData() is not None else 0)
+            )
         )
         form.addRow("Button", id_box)
 
@@ -921,8 +933,11 @@ class NodeConditionWidget(QtWidgets.QWidget):
 
 
 def _vjoy_output_devices() -> list:
-    devices = [device for device in gremlin.joystick_handling.virtual_devices(connected_only=False)
-               if device is not None and not device.disabled and device.axis_count > 0]
+    devices = [
+        device
+        for device in gremlin.joystick_handling.virtual_devices(connected_only=False)
+        if device is not None and not device.disabled and device.axis_count > 0
+    ]
     return sorted(devices, key=lambda device: (device.name, str(device.device_guid)))
 
 
@@ -1205,7 +1220,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if self._graph is None:
             return []
         try:
-            return [node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")]
+            return [
+                node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")
+            ]
         except Exception:
             return []
 
@@ -1269,14 +1286,14 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         selected = self._selected_afcs_nodes()
         if not selected:
             return "Canvas", (
-                "<b>Mouse</b> — Click empty space to deselect. Hold the middle mouse button to pan. "
+                "<b>Mouse</b> â€” Click empty space to deselect. Hold the middle mouse button to pan. "
                 "Ctrl+wheel zooms at the cursor. Drag a node to move it. "
                 "Right-click empty space for Center, or Center and fit. Right-click a node to copy, paste, or delete.<br>"
-                "<b>Keys</b> — Delete removes the selected node. Ctrl+C / Ctrl+V copy and paste. "
+                "<b>Keys</b> â€” Delete removes the selected node. Ctrl+C / Ctrl+V copy and paste. "
                 "Ctrl+Z / Ctrl+Y undo and redo. The toolbar Undo, Redo, Zoom, and Fit do the same.<br>"
-                "<b>Modes</b> — Each tab is a flight mode. Double-click a tab to rename. "
+                "<b>Modes</b> â€” Each tab is a flight mode. Double-click a tab to rename. "
                 "Right-click to add, duplicate, or delete. Drag a tab to reorder.<br>"
-                "<b>Nodes</b> — Click a type to add it at the center of the view. "
+                "<b>Nodes</b> â€” Click a type to add it at the center of the view. "
                 "List shows one button per row. Wrap flows them across the panel."
             )
         node = selected[0]
@@ -1284,14 +1301,16 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         label = _NODE_SECTION.get(kind, kind)
         title = node.name() if len(selected) == 1 else f"{len(selected)} nodes selected"
         if len(selected) == 1:
-            title = f"{title} — {label}"
-        help_text = inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
+            title = f"{title} â€” {label}"
+        help_text = inspector_help(
+            kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None
+        )
         help_text = help_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         return title, (
-            f"<b>This module</b> — {help_text}<br>"
-            "<b>Mouse</b> — Drag to move. Middle button pans. Ctrl+wheel zooms. "
+            f"<b>This module</b> â€” {help_text}<br>"
+            "<b>Mouse</b> â€” Drag to move. Middle button pans. Ctrl+wheel zooms. "
             "Double-click a curve or limiter node to edit its response.<br>"
-            "<b>Keys</b> — Delete removes it. Ctrl+C / Ctrl+V copy and paste. Ctrl+Z / Ctrl+Y undo and redo."
+            "<b>Keys</b> â€” Delete removes it. Ctrl+C / Ctrl+V copy and paste. Ctrl+Z / Ctrl+Y undo and redo."
         )
 
     def _maybe_show_intro(self) -> None:
@@ -1360,11 +1379,15 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self._show_live_box = QtWidgets.QCheckBox("Show live values while profile is active")
         self._show_live_box.setChecked(bool(gremlin.config.Configuration().afcs_show_live_while_running))
-        self._show_live_box.setToolTip("When a profile is running, live meters stay off unless this is checked. They always show while the profile is stopped.")
+        self._show_live_box.setToolTip(
+            "When a profile is running, live meters stay off unless this is checked. They always show while the profile is stopped."
+        )
         self._show_live_box.toggled.connect(self._on_show_live_toggled)
         self._snap_box = QtWidgets.QCheckBox("Snap to grid")
         self._snap_box.setChecked(bool(gremlin.config.Configuration().afcs_snap_to_grid))
-        self._snap_box.setToolTip("When checked, dragging a node snaps its top-left corner to the nearest canvas grid point.")
+        self._snap_box.setToolTip(
+            "When checked, dragging a node snaps its top-left corner to the nearest canvas grid point."
+        )
         self._snap_box.toggled.connect(self._on_snap_toggled)
         self._segment_box = QtWidgets.QCheckBox("Show selected segment only")
         self._segment_box.setChecked(bool(gremlin.config.Configuration().afcs_show_selected_segment_only))
@@ -1378,7 +1401,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._hints_box.setChecked(_afcs_hints_visible())
         self._hints_box.toggled.connect(self._set_hints_visible)
         self._pane_box = QtWidgets.QCheckBox("Selection pane")
-        self._pane_box.setToolTip("Show a list of nodes on this flight mode: name and type. Click a row to select it on the canvas.")
+        self._pane_box.setToolTip(
+            "Show a list of nodes on this flight mode: name and type. Click a row to select it on the canvas."
+        )
         self._pane_box.setChecked(_afcs_pane_visible())
         self._pane_box.toggled.connect(self._set_pane_visible)
         for box in (self._show_live_box, self._snap_box, self._segment_box, self._pane_box):
@@ -1419,7 +1444,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._mode_tabs.setUsesScrollButtons(True)
         self._mode_tabs.setObjectName("afcs_modes")
         self._mode_tabs.setStyleSheet(Color().cssTab())
-        self._mode_tabs.setToolTip("Each tab is a flight mode. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder.")
+        self._mode_tabs.setToolTip(
+            "Each tab is a flight mode. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder."
+        )
         self._mode_tabs.currentChanged.connect(self._on_mode_tab)
         self._mode_tabs.tabBarDoubleClicked.connect(self._rename_mode_tab)
         self._mode_tabs.tabContextMenu.connect(self._mode_context_menu)
@@ -1922,7 +1949,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         if self._graph is None:
             return []
         try:
-            selected = [node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")]
+            selected = [
+                node for node in (self._graph.selected_nodes() or []) if node is not None and hasattr(node, "AFCS_KIND")
+            ]
         except Exception:
             selected = []
         if selected:
@@ -1979,7 +2008,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                     try:
                         vid = gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1)
                         aid = int(props.get("axis_id") or 1)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         vid, aid = 1, 1
                     original_label = _output_target_label(vid, aid)
                     if (vid, aid) in used:
@@ -2097,7 +2126,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             self._assign_spec_property(graph_node, "device_name", props.get("device_name") or "")
             self._assign_spec_property(graph_node, "axis_id", int(props.get("axis_id") or 0))
             self._assign_spec_property(graph_node, "invert", bool(props.get("invert")))
-            self._assign_spec_property(graph_node, "display_range", normalize_input_display_range(props.get("display_range")))
+            self._assign_spec_property(
+                graph_node, "display_range", normalize_input_display_range(props.get("display_range"))
+            )
         elif kind == "merge":
             self._assign_spec_property(graph_node, "operation", operation_label(props.get("operation")))
         elif kind == "curve":
@@ -2105,20 +2136,32 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         elif kind == "limiter":
             self._assign_spec_property(graph_node, "curve_xml", props.get("curve_xml") or "")
             self._assign_spec_property(
-                graph_node, "range_mode", normalize_limiter_range(props.get("range_mode") if props.get("range_mode") is not None else props.get("centered"))
+                graph_node,
+                "range_mode",
+                normalize_limiter_range(
+                    props.get("range_mode") if props.get("range_mode") is not None else props.get("centered")
+                ),
             )
             self._assign_spec_property(graph_node, "shape", normalize_limiter_shape(props.get("shape")))
             self._update_limiter_preview(graph_node)
         elif kind == "deadzone":
-            self._assign_spec_property(graph_node, "center", float(props.get("center") if props.get("center") is not None else 0.05))
+            self._assign_spec_property(
+                graph_node, "center", float(props.get("center") if props.get("center") is not None else 0.05)
+            )
             self._assign_spec_property(graph_node, "outer", float(props.get("outer") or 0.0))
         elif kind == "override":
-            self._assign_spec_property(graph_node, "threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.01))
-            self._assign_spec_property(graph_node, "release", float(props.get("release") if props.get("release") is not None else 0.03))
+            self._assign_spec_property(
+                graph_node, "threshold", float(props.get("threshold") if props.get("threshold") is not None else 0.01)
+            )
+            self._assign_spec_property(
+                graph_node, "release", float(props.get("release") if props.get("release") is not None else 0.03)
+            )
             self._assign_spec_property(graph_node, "release_ms", float(props.get("release_ms") or 0.0))
             self._assign_spec_property(graph_node, "hold_until_in", bool(props.get("hold_until_in")))
         elif kind == "laglead":
-            self._assign_spec_property(graph_node, "lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0))
+            self._assign_spec_property(
+                graph_node, "lag_ms", float(props.get("lag_ms") if props.get("lag_ms") is not None else 80.0)
+            )
             self._assign_spec_property(graph_node, "lead_ms", float(props.get("lead_ms") or 0.0))
         elif kind == "output":
             vjoy_id = gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1)
@@ -2242,7 +2285,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             props["lag_ms"] = float(graph_node.get_property("lag_ms") or 0.0)
             props["lead_ms"] = float(graph_node.get_property("lead_ms") or 0.0)
         elif kind == "output":
-            props["vjoy_id"] = gremlin.joystick_handling.parse_virtual_device_key(graph_node.get_property("vjoy_id") or 1)
+            props["vjoy_id"] = gremlin.joystick_handling.parse_virtual_device_key(
+                graph_node.get_property("vjoy_id") or 1
+            )
             props["axis_id"] = int(graph_node.get_property("axis_id") or 1)
         props["when"] = decode_when(graph_node.get_property("when_json"))
         return spec
@@ -2406,7 +2451,9 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         self._help_label = QtWidgets.QLabel()
         self._help_label.setWordWrap(True)
         self._inspector_form.addRow(self._help_label)
-        self._set_inspector_help(kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None)
+        self._set_inspector_help(
+            kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None
+        )
         self._inspector_form = self._section(_NODE_SECTION.get(kind, "Settings"))
         if kind == "input":
             source = QDataComboBox()
@@ -2434,8 +2481,8 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             if display.layout() is not None:
                 display.layout().setContentsMargins(0, 0, 0, 0)
             display.setToolTip(
-                "Invert first, then this range is the node's output. Hardware is always −1..+1. "
-                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps ±1. Auto uses throttle/slider names like GEX."
+                "Invert first, then this range is the node's output. Hardware is always âˆ’1..+1. "
+                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps Â±1. Auto uses throttle/slider names like GEX."
             )
             self._inspector_form.addRow("Display", display)
             listen = Buttons.getListenWidget(
@@ -2480,25 +2527,40 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             )
             if combo.layout() is not None:
                 combo.layout().setContentsMargins(0, 0, 0, 0)
-            combo.setToolTip("0 to 100%: slider or throttle over full travel. Centered (−100 to +100): stick; negative inverts the output.")
+            combo.setToolTip(
+                "0 to 100%: slider or throttle over full travel. Centered (âˆ’100 to +100): stick; negative inverts the output."
+            )
             self._inspector_form.addRow("Limit axis", combo)
             edit = QDataPushButton("Edit full-throw curve...", clicked=lambda n=node: self._on_double_click(n))
             self._inspector_form.addRow(edit)
         elif kind == "deadzone":
-            center = self._percent_spin(self._prop_float(node, "center", 0.05), lambda value, n=node: self._set_node_prop(n, "center", value / 100.0))
-            outer = self._percent_spin(self._prop_float(node, "outer", 0.0), lambda value, n=node: self._set_node_prop(n, "outer", value / 100.0))
+            center = self._percent_spin(
+                self._prop_float(node, "center", 0.05),
+                lambda value, n=node: self._set_node_prop(n, "center", value / 100.0),
+            )
+            outer = self._percent_spin(
+                self._prop_float(node, "outer", 0.0),
+                lambda value, n=node: self._set_node_prop(n, "outer", value / 100.0),
+            )
             self._inspector_form.addRow("Center deadzone", center)
             self._inspector_form.addRow("End deadzone", outer)
         elif kind == "override":
-            grab = self._percent_spin(self._prop_float(node, "threshold", 0.01), lambda value, n=node: self._set_node_prop(n, "threshold", value / 100.0))
+            grab = self._percent_spin(
+                self._prop_float(node, "threshold", 0.01),
+                lambda value, n=node: self._set_node_prop(n, "threshold", value / 100.0),
+            )
             grab.setToolTip(
                 "How far an axis must move to become the one sending. "
                 "The other axis stays at its last value until you move it by this amount, even if it is sitting away from center."
             )
             self._inspector_form.addRow("Grab when moved", grab)
         elif kind == "laglead":
-            lag = self._ms_spin(self._prop_float(node, "lag_ms", 80.0), lambda value, n=node: self._set_node_prop(n, "lag_ms", value))
-            lead = self._ms_spin(self._prop_float(node, "lead_ms", 0.0), lambda value, n=node: self._set_node_prop(n, "lead_ms", value))
+            lag = self._ms_spin(
+                self._prop_float(node, "lag_ms", 80.0), lambda value, n=node: self._set_node_prop(n, "lag_ms", value)
+            )
+            lead = self._ms_spin(
+                self._prop_float(node, "lead_ms", 0.0), lambda value, n=node: self._set_node_prop(n, "lead_ms", value)
+            )
             self._inspector_form.addRow("Lag", lag)
             self._inspector_form.addRow("Lead", lead)
         elif kind == "output":
@@ -2551,8 +2613,13 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                 continue
             props = spec.get("props") or {}
             try:
-                used.add((gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1), int(props.get("axis_id") or 0)))
-            except (TypeError, ValueError):
+                used.add(
+                    (
+                        gremlin.joystick_handling.parse_virtual_device_key(props.get("vjoy_id") or 1),
+                        int(props.get("axis_id") or 0),
+                    )
+                )
+            except TypeError, ValueError:
                 continue
         return used
 
@@ -2585,6 +2652,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             device_combo.addItem(f"Virtual output {current_key} (missing)", current_key)
             index = device_combo.count() - 1
         device_combo.setCurrentIndex(index)
+
         def fill_axes(key, selected_axis, preserve_missing=False):
             device = gremlin.joystick_handling.get_virtual_device(key)
             with QtCore.QSignalBlocker(axis_combo):
@@ -2596,16 +2664,20 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
                     axis_combo.addItem(f"Axis {selected_axis} (missing)", selected_axis)
                     index = axis_combo.count() - 1
                 axis_combo.setCurrentIndex(index if index >= 0 else 0)
+
         fill_axes(current_key, current_axis, preserve_missing=True)
+
         def on_device():
             key = device_combo.currentData()
             if key is None:
                 return
             fill_axes(key, int(axis_combo.currentData() or 1))
             self._set_output_target(node, key, int(axis_combo.currentData() or 1))
+
         device_combo.currentIndexChanged.connect(lambda _index: on_device())
-        axis_combo.currentIndexChanged.connect(lambda _index: self._set_output_target(
-            node, device_combo.currentData(), int(axis_combo.currentData() or 1)))
+        axis_combo.currentIndexChanged.connect(
+            lambda _index: self._set_output_target(node, device_combo.currentData(), int(axis_combo.currentData() or 1))
+        )
         self._inspector_form.addRow("Virtual Device", device_combo)
         self._inspector_form.addRow("Axis", axis_combo)
 

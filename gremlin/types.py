@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Copyright (C) 2015 - 2020 Lionel Ott
 #
@@ -698,7 +697,7 @@ class LogicalOperator(Enum):
         lookup = {LogicalOperator.Any: "Any", LogicalOperator.All: "All"}
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(instance)}")
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {instance!s}")
         return value
 
     @staticmethod
@@ -706,7 +705,7 @@ class LogicalOperator(Enum):
         lookup = {LogicalOperator.Any: "any", LogicalOperator.All: "all"}
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(instance)}")
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {instance!s}")
         return value
 
     @staticmethod
@@ -714,7 +713,7 @@ class LogicalOperator(Enum):
         lookup = {"any": LogicalOperator.Any, "all": LogicalOperator.All}
         value = lookup.get(string, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(string)}")
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {string!s}")
         return value
 
 
@@ -734,7 +733,7 @@ class ConditionType(Enum):
         }
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(instance)}")
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {instance!s}")
         return value
 
     @staticmethod
@@ -746,7 +745,7 @@ class ConditionType(Enum):
         }
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(instance)}")
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {instance!s}")
         return value
 
     @staticmethod
@@ -758,7 +757,7 @@ class ConditionType(Enum):
         }
         value = lookup.get(string, None)
         if value is None:
-            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(string)}")
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {string!s}")
         return value
 
 

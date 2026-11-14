@@ -153,6 +153,7 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         ENV["getDevice"] = find
         ENV["vjoy_devices"] = lambda connected_only=True: [dev for dev in self.devices if dev.device_type == macro.DeviceType.VJoy
                                                           and (dev.connected or not connected_only)]
+        ENV["_native_vjoy_devices"] = ENV["vjoy_devices"]
         ENV["virtual_devices"] = lambda connected_only=True: [dev for dev in self.devices if dev.connected or not connected_only]
         macro.gremlin.joystick_handling.getDevice = find
         macro.gremlin.joystick_handling.virtual_devices = ENV["virtual_devices"]

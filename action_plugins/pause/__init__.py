@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -171,7 +170,7 @@ do not pause even if the profile is paused."""
 
     def _parse_xml(self, node, data=None, extra_data=None):
         if "mode" in node.attrib:
-            mode = node.get("mode")
+            mode = safe_read(node, "mode", int, PauseMode.Delay)
             match mode:
                 case 0:
                     self.mode = PauseMode.Delay

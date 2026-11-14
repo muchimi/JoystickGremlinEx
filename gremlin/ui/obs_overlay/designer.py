@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -155,7 +153,7 @@ WIDGET_TOOLTIPS = {
     "axis_xyz": "Three-axis frame. X right, Y up, Z down-left. Drop to the horizontal plane, then project to X and Z. Appearance: dot, path, vector, grid, sphere, axis length/direction, bounds box.",
     "axis_polar": "Spherical tip from azimuth, elevation, and range. Same 3D frame as 3D axes, with a customizable vector and optional unit sphere.",
     "axis_ternary": "Power triangle. Center is 0,0,0. Top / left / right are full X / Y / Z. Fill and border apply to the triangle (no square). Dot is customizable.",
-    "axis_radar": "Plan-position radar FoV. Angle off (slew), field of regard (±10°…±180°), and range. No tip dot — the wedge is the live value.",
+    "axis_radar": "Plan-position radar FoV. Angle off (slew), field of regard (Â±10Â°â€¦Â±180Â°), and range. No tip dot â€” the wedge is the live value.",
     "axis_graph": "Scrolling temporal graph of one or more axes.",
     "axis_bars": "Bar graph of several axis datasets.",
     "sys_stats": "Counter / stats (time, FPS, temperature, manual).",
@@ -172,7 +170,7 @@ WIDGET_TOOLTIPS = {
     "ocr": "Detect on-screen text in the widget region (or full screen) and fire bindings.",
 }
 
-_BANNER_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
+_BANNER_SETTINGS = ("Gremlin Ex", "Overlay")
 _BANNER_PREF_KEY = "show_action_banner"
 _PANE_PREF_KEY = "show_selection_pane"
 _PALETTE_VIEW_KEY = "palette_view"
@@ -182,14 +180,14 @@ _PANE_MAX_WIDTH = 280
 _PALETTE_DEFAULT_WIDTH = 280
 _PALETTE_MIN_WIDTH = 220
 _PALETTE_MAX_WIDTH = 320
-# Inspector (right column): default = max so it never opens at the old 320/420 ≈ 75% width.
+# Inspector (right column): default = max so it never opens at the old 320/420 â‰ˆ 75% width.
 _INSPECTOR_MIN_WIDTH = 300
 _INSPECTOR_WIDTH = 420
 
 _COMMON_WIDGET_MOUSE = (
     "Drag to move (snaps to grid, guides, and other widgets). Drag corner/edge handles to resize; hold Shift to keep aspect ratio. "
     "Crop: Geometry, Sliders or Handles. Amber handles sit inside the border and crop one widget; the hidden part shows at 50% while it is selected. "
-    "Drag the round handle above the widget to rotate; hold Shift to snap to 15°. "
+    "Drag the round handle above the widget to rotate; hold Shift to snap to 15Â°. "
     "Hold the middle mouse button to pan the canvas. "
     "Shift+click adds to the selection. Right-click: Copy, Duplicate, Copy properties, Paste properties, Delete, Bring forward, Send backward, Group, Ungroup."
 )
@@ -239,15 +237,19 @@ def _banner_type_help(item: dict) -> list[str]:
     widget_type = item.get("type")
     lines: list[str] = []
     if widget_type == "label":
-        lines.append("Inspector: type the caption, or check Show current mode to follow the active profile mode live. Fill, border, and font are in Label.")
+        lines.append(
+            "Inspector: type the caption, or check Show current mode to follow the active profile mode live. Fill, border, and font are in Label."
+        )
     elif is_shape_widget(item):
-        lines.append("Inspector: pick Rectangle, Circle, Triangle, Diamond, Line, Freeform, or a saved custom shape. Uncheck Closed for an open path.")
+        lines.append(
+            "Inspector: pick Rectangle, Circle, Triangle, Diamond, Line, Freeform, or a saved custom shape. Uncheck Closed for an open path."
+        )
         if uses_editable_points(item):
             if uses_bezier_edit(item):
                 lines.append(
                     "Mouse: double-click the outline to add a point, then drag points to move them. "
-                    "Yellow handles are Bézier controls — drag them to curve a corner. "
-                    "Hold Ctrl to snap a handle to 15° steps. Hold Alt and drag a handle to move it independently. "
+                    "Yellow handles are BÃ©zier controls â€” drag them to curve a corner. "
+                    "Hold Ctrl to snap a handle to 15Â° steps. Hold Alt and drag a handle to move it independently. "
                     "Dragging a handle past the widget edge grows the shape. "
                     "Delete removes the selected point. Right-click Add point / Delete point."
                 )
@@ -257,8 +259,12 @@ def _banner_type_help(item: dict) -> list[str]:
                     "Delete removes the selected point. Right-click Add point / Delete point."
                 )
         else:
-            lines.append("Mouse: resize from the handles. Switch to Freeform, Line, Triangle, or Diamond to edit points on the canvas.")
-        lines.append("Right-click: Turn into button to bind the same outline. Save as custom shape to add it to the Shape list.")
+            lines.append(
+                "Mouse: resize from the handles. Switch to Freeform, Line, Triangle, or Diamond to edit points on the canvas."
+            )
+        lines.append(
+            "Right-click: Turn into button to bind the same outline. Save as custom shape to add it to the Shape list."
+        )
     elif button_uses_shape_path(item):
         lines.append(
             "This button uses a shape outline. Off/On fill follow press. Bind it like any button. Right-click: Turn into shape, or Save as custom shape."
@@ -277,7 +283,9 @@ def _banner_type_help(item: dict) -> list[str]:
             "Keep aspect ratio is under Appearance. This widget has no joystick binding."
         )
     elif widget_type == "remote_view":
-        lines.append("Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding.")
+        lines.append(
+            "Inspector Remote section: pick the remote client and Refresh clients. Keep aspect ratio is under Appearance. No joystick binding."
+        )
     elif widget_type == "streamdeck":
         lines.append(
             "Inspector Stream Deck section: pick the deck (or First connected), follow the GEX page or set a page, Fit to device. Bezel and fill are under Appearance. No joystick binding."
@@ -299,17 +307,17 @@ def _banner_type_help(item: dict) -> list[str]:
     elif widget_type == "ocr":
         lines.append(
             "Inspector OCR section: widget region or full screen, min confidence, RapidOCR/Windows engine. "
-            "Arming (Continuous Toggle/Hold, or Single/Multiple pulses) starts scanning. Rules: Exact/Contain and Map… "
-            "for the output. Not shown as a filled widget on the live overlay — the designer box marks the capture region."
+            "Arming (Continuous Toggle/Hold, or Single/Multiple pulses) starts scanning. Rules: Exact/Contain and Mapâ€¦ "
+            "for the output. Not shown as a filled widget on the live overlay â€” the designer box marks the capture region."
         )
     elif widget_type == "axis_graph":
         lines.append(
-            "Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listen…). Period, Min/Max, and Unit set the time plot. No single binding."
+            "Inspector Graph and Datasets sections (under Geometry): add/remove physical or vJoy axes (Listenâ€¦). Period, Min/Max, and Unit set the time plot. No single binding."
         )
     elif widget_type == "axis_bars":
         lines.append(
-            "Inspector: Orientation (vertical/horizontal). Datasets are the bars — color and Range per axis "
-            "(Auto, Centered −100…+100, or 0…100%). Auto range uses negatives only when a centered axis is selected."
+            "Inspector: Orientation (vertical/horizontal). Datasets are the bars â€” color and Range per axis "
+            "(Auto, Centered âˆ’100â€¦+100, or 0â€¦100%). Auto range uses negatives only when a centered axis is selected."
         )
     elif widget_type == "sys_stats":
         lines.append(
@@ -323,13 +331,17 @@ def _banner_type_help(item: dict) -> list[str]:
         )
     elif widget_type == "input_display":
         lines.append(
-            "Inspector: pick a preset (WASD + mouse, full keyboard, mouse only) or Select keys… on the virtual keyboard. "
+            "Inspector: pick a preset (WASD + mouse, full keyboard, mouse only) or Select keysâ€¦ on the virtual keyboard. "
             "Select all / Deselect all. Off/On fill, mouse Silhouette or Button map. Live presses light the selected keys and mouse buttons."
         )
     elif widget_type == "axis_mouse":
-        lines.append("Inspector: VJoy (arrow from rest) or Standard (mouse icon). Max displacement and idle recenter apply to Standard.")
+        lines.append(
+            "Inspector: VJoy (arrow from rest) or Standard (mouse icon). Max displacement and idle recenter apply to Standard."
+        )
     elif widget_type == "button":
-        lines.append("Inspector: shape, off/on fill. Binding is a physical, vJoy, state, mode, or keyboard/mouse button (Listen or Select…).")
+        lines.append(
+            "Inspector: shape, off/on fill. Binding is a physical, vJoy, state, mode, or keyboard/mouse button (Listen or Selectâ€¦)."
+        )
     elif widget_type == "toggle":
         lines.append(
             "Inspector: horizontal or vertical track, corner radius, circle or square knob. "
@@ -337,7 +349,9 @@ def _banner_type_help(item: dict) -> list[str]:
             "On latches until Off is pressed (and the reverse). Interactive: tap a side to latch it."
         )
     elif widget_type == "hat":
-        lines.append("Inspector: 4- or 8-position, axis labels. Binding is a hat. Drag on an Interactive overlay if bound to vJoy.")
+        lines.append(
+            "Inspector: 4- or 8-position, axis labels. Binding is a hat. Drag on an Interactive overlay if bound to vJoy."
+        )
     elif widget_type == "switch_4way":
         lines.append(
             "Inspector: Style Arrows or Arcs. Center size grows/shrinks the middle button and keeps a gap to the directions. "
@@ -359,28 +373,32 @@ def _banner_type_help(item: dict) -> list[str]:
             "Appearance: dot, path, vector, grid, sphere, axis length/invert, bounds box."
         )
     elif widget_type == "axis_polar":
-        lines.append("Inspector: Azimuth (−180°…180°), Elevation (−90°…90°), and Range (0…1 from −1…1). Same Look as 3D axes, plus vector and sphere.")
+        lines.append(
+            "Inspector: Azimuth (âˆ’180Â°â€¦180Â°), Elevation (âˆ’90Â°â€¦90Â°), and Range (0â€¦1 from âˆ’1â€¦1). Same Look as 3D axes, plus vector and sphere."
+        )
     elif widget_type == "axis_ternary":
-        lines.append("Inspector: Axis X, Axis Y, and Axis Z are independent (mix devices). The drawing is the live value. 100 is full axis, 0 is center.")
+        lines.append(
+            "Inspector: Axis X, Axis Y, and Axis Z are independent (mix devices). The drawing is the live value. 100 is full axis, 0 is center."
+        )
     elif widget_type == "axis_radar":
         lines.append(
-            "Inspector: Angle off, FoR, and Range. Set slew L/R limits, FoR ±10°…±180°, and range min/max with ring count. "
-            "The wedge is the live FoV — no tip dot."
+            "Inspector: Angle off, FoR, and Range. Set slew L/R limits, FoR Â±10Â°â€¦Â±180Â°, and range min/max with ring count. "
+            "The wedge is the live FoV â€” no tip dot."
         )
     elif widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair"):
         lines.append(
             "Inspector: Axis X and Axis Y are independent (mix devices). Dot, grid, and crosshair options. Drag on an Interactive overlay if bound to vJoy."
         )
     elif widget_type in ("axis_bar", "axis_radio", "axis_fader"):
-        lines.append("Inspector: Orientation, binding (Listen…). Drag on an Interactive overlay if bound to vJoy.")
+        lines.append("Inspector: Orientation, binding (Listenâ€¦). Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type == "axis_paddle":
         lines.append(
-            "Inspector: Start/End angles (0° = tip up), CW or CCW travel, Off/On fills. "
-            "Optional Custom image (PNG) replaces the built-in silhouette — pivot is the image center. "
+            "Inspector: Start/End angles (0Â° = tip up), CW or CCW travel, Off/On fills. "
+            "Optional Custom image (PNG) replaces the built-in silhouette â€” pivot is the image center. "
             "Axis at start shows Off; moving toward end rotates and uses On fill. Drag on an Interactive overlay if bound to vJoy."
         )
     elif widget_type in ("axis_radial", "axis_encoder", "axis_dial"):
-        lines.append("Inspector: ticks/arc, binding (Listen…). Drag on an Interactive overlay if bound to vJoy.")
+        lines.append("Inspector: ticks/arc, binding (Listenâ€¦). Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type:
         lines.append("Inspector: size, visibility, appearance, and binding for this widget.")
     return lines
@@ -392,17 +410,17 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
     if not items:
         page = scene.page_by_id(scene.active_page_id) or {}
         name = str(page.get("name") or "Overlay")
-        title = f"Canvas — {name}"
+        title = f"Canvas â€” {name}"
         body = (
-            "<b>Mouse</b> — Click empty space to deselect. Drag empty space for a rubber-band (Shift adds). "
+            "<b>Mouse</b> â€” Click empty space to deselect. Drag empty space for a rubber-band (Shift adds). "
             "Hold the middle mouse button to pan. Drag a guide to move it. Ctrl+wheel zooms the designer (does not change overlay resolution).<br>"
-            "<b>Keys</b> — Ctrl+A select all. Ctrl+C / Ctrl+V copy and paste widgets. "
+            "<b>Keys</b> â€” Ctrl+A select all. Ctrl+C / Ctrl+V copy and paste widgets. "
             "Ctrl+V also pastes a screenshot as an Image when no widgets were copied. "
-            "Ctrl+Z / Ctrl+Y undo/redo. Ctrl+0 reset zoom. Ctrl++ / Ctrl+− zoom.<br>"
-            "<b>Pages</b> — Double-click a tab to rename. Right-click a tab to duplicate or delete. + adds a page. "
+            "Ctrl+Z / Ctrl+Y undo/redo. Ctrl+0 reset zoom. Ctrl++ / Ctrl+âˆ’ zoom.<br>"
+            "<b>Pages</b> â€” Double-click a tab to rename. Right-click a tab to duplicate or delete. + adds a page. "
             "Show overlay and Interactive apply to the selected page.<br>"
-            "<b>Palette</b> — Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
-            "<b>Inspector</b> — Mode (Windowed / On-screen), Visible, Interactive, Toggle overlay, "
+            "<b>Palette</b> â€” Click a type to add it at the center of the current view. Templates add a ready layout.<br>"
+            "<b>Inspector</b> â€” Mode (Windowed / On-screen), Visible, Interactive, Toggle overlay, "
             "Show at profile start, Guides, and canvas size. Variables defines %name% tokens for labels."
         )
         return title, body
@@ -414,8 +432,8 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
         kind = WIDGET_TITLES.get(item.get("type"), str(item.get("type") or "Widget").replace("_", " "))
         title = f"{kind} selected"
         extras = _banner_type_help(item)
-        extra_html = "".join(f"<br><b>This widget</b> — {line}" for line in extras)
-        body = f"<b>Mouse</b> — {_COMMON_WIDGET_MOUSE}<br><b>Keys</b> — {_COMMON_WIDGET_KEYS}<br><b>Palette</b> — {_COMMON_WIDGET_PALETTE}{extra_html}"
+        extra_html = "".join(f"<br><b>This widget</b> â€” {line}" for line in extras)
+        body = f"<b>Mouse</b> â€” {_COMMON_WIDGET_MOUSE}<br><b>Keys</b> â€” {_COMMON_WIDGET_KEYS}<br><b>Palette</b> â€” {_COMMON_WIDGET_PALETTE}{extra_html}"
         return title, body
 
     type_names = ", ".join(sorted(WIDGET_TITLES.get(t, str(t or "").replace("_", " ")) for t in types))
@@ -424,13 +442,13 @@ def action_banner_content(scene: OverlayScene) -> tuple[str, str]:
         title += " (grouped)"
     extra = ""
     if len(types) == 1:
-        extra = "".join(f"<br><b>This type</b> — {line}" for line in _banner_type_help(items[0]))
+        extra = "".join(f"<br><b>This type</b> â€” {line}" for line in _banner_type_help(items[0]))
     body = (
-        f"<b>Mouse</b> — Drag moves every selected widget. Drag the dashed bounding-box handles to resize them together "
+        f"<b>Mouse</b> â€” Drag moves every selected widget. Drag the dashed bounding-box handles to resize them together "
         f"(Shift keeps aspect). {_COMMON_WIDGET_MOUSE}<br>"
-        f"<b>Keys</b> — {_COMMON_WIDGET_KEYS}<br>"
-        f"<b>Palette</b> — A palette click converts every selected widget to that type when settings are compatible.<br>"
-        f"<b>Inspector</b> — Shared properties only; edits apply to all selected widgets. Types: {type_names}."
+        f"<b>Keys</b> â€” {_COMMON_WIDGET_KEYS}<br>"
+        f"<b>Palette</b> â€” A palette click converts every selected widget to that type when settings are compatible.<br>"
+        f"<b>Inspector</b> â€” Shared properties only; edits apply to all selected widgets. Types: {type_names}."
         f"{extra}"
     )
     return title, body
@@ -459,7 +477,7 @@ class ActionBanner(QtWidgets.QFrame):
         col.addWidget(self._body)
         layout.addLayout(col, 1)
         close = QtWidgets.QToolButton()
-        close.setText("×")
+        close.setText("Ã—")
         close.setAutoRaise(True)
         close.setToolTip("Hide this banner. Use Hints on the toolbar to show it again.")
         close.setFixedSize(22, 22)
@@ -582,7 +600,7 @@ class DesignerCanvas(OverlayView):
             self.update()
 
     def _runtime_locked(self) -> bool:
-        """True while a profile is running — designer must not edit or show live input."""
+        """True while a profile is running â€” designer must not edit or show live input."""
         return bool(gremlin.shared_state.is_running)
 
     def _scroll_area(self) -> QtWidgets.QScrollArea | None:
@@ -667,7 +685,9 @@ class DesignerCanvas(OverlayView):
         if handle >= CROP_HANDLE_BASE:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             if widget_is_locked(item):
-                self.scene.set_selection(self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids))
+                self.scene.set_selection(
+                    self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids)
+                )
                 return
             self.scene.push_undo()
             self._mode = "crop"
@@ -678,7 +698,9 @@ class DesignerCanvas(OverlayView):
         if handle == ROTATE_HANDLE:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             if widget_is_locked(item):
-                self.scene.set_selection(self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids))
+                self.scene.set_selection(
+                    self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids)
+                )
                 return
             self.scene.push_undo()
             self._mode = "rotate"
@@ -692,7 +714,9 @@ class DesignerCanvas(OverlayView):
                 self._rotate_center = widget_center(item)
             else:
                 self._rotate_center = pos
-            self._rotate_start_mouse = math.degrees(math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x()))
+            self._rotate_start_mouse = math.degrees(
+                math.atan2(pos.y() - self._rotate_center.y(), pos.x() - self._rotate_center.x())
+            )
             self._start_rotations = {}
             self._start_geoms = {}
             for sid in self.scene.selected_ids:
@@ -711,7 +735,9 @@ class DesignerCanvas(OverlayView):
         if handle >= 0:
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             if widget_is_locked(item):
-                self.scene.set_selection(self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids))
+                self.scene.set_selection(
+                    self.scene.expand_group_ids([widget_id] if widget_id else self.scene.selected_ids)
+                )
                 return
             self.scene.push_undo()
             self._mode = "resize"
@@ -729,7 +755,11 @@ class DesignerCanvas(OverlayView):
                         "h": float(it.get("h") or 1),
                     }
             bounds = self._selected_bounds()
-            self._start_bounds = {"x": bounds.x(), "y": bounds.y(), "w": bounds.width(), "h": bounds.height()} if bounds is not None else {}
+            self._start_bounds = (
+                {"x": bounds.x(), "y": bounds.y(), "w": bounds.width(), "h": bounds.height()}
+                if bounds is not None
+                else {}
+            )
             item = self.scene.widget_by_id(widget_id) or self.scene.primary_selection()
             self._start_geom = dict(item) if item else {}
             return
@@ -790,7 +820,7 @@ class DesignerCanvas(OverlayView):
             self.scene.move_selected(int(dx), int(dy), snap=True)
             # Only advance the drag anchor by how far the widget actually moved.
             # If snap held it in place, keep _last so further mouse travel accumulates
-            # until the magnet releases — otherwise the cursor drifts while the widget stays put.
+            # until the magnet releases â€” otherwise the cursor drifts while the widget stays put.
             if before is not None:
                 primary = self.scene.primary_selection()
                 if primary:
@@ -852,7 +882,9 @@ class DesignerCanvas(OverlayView):
             event.accept()
             return
         if self._mode == "rubber":
-            ids = self.scene.widgets_in_rect(self._rubber.x(), self._rubber.y(), self._rubber.width(), self._rubber.height())
+            ids = self.scene.widgets_in_rect(
+                self._rubber.x(), self._rubber.y(), self._rubber.width(), self._rubber.height()
+            )
             ids = self.scene.expand_group_ids(ids)
             self.scene.set_selection(ids, additive=bool(event.modifiers() & QtCore.Qt.ShiftModifier))
             if event.modifiers() & QtCore.Qt.ShiftModifier:
@@ -1007,7 +1039,7 @@ class DesignerCanvas(OverlayView):
                 turn_button = menu.addAction("Turn into button")
             if button_uses_shape_path(item):
                 turn_shape = menu.addAction("Turn into shape")
-            save_custom = menu.addAction("Save as custom shape…")
+            save_custom = menu.addAction("Save as custom shapeâ€¦")
         images = [w for w in self.scene.selected_widgets() if (w.get("type") or "") == "image"]
         if images:
             menu.addSeparator()
@@ -1181,7 +1213,7 @@ class DesignerCanvas(OverlayView):
                 item["rotation"] = normalize_rotation(start + delta)
         self.scene._dirty = True
         # During a gesture, repaint this canvas immediately and coalesce geometry
-        # notifies — critical for large image groups with drop shadows.
+        # notifies â€” critical for large image groups with drop shadows.
         if getattr(self.scene, "geometry_gesture", False):
             self.update()
             self.scene._geometry_pending = True
@@ -1251,7 +1283,9 @@ class DesignerCanvas(OverlayView):
             y_edges = ("bottom",)
         return x_edges, y_edges
 
-    def _bounds_from_handle(self, x0: float, y0: float, w0: float, h0: float, pos: QtCore.QPointF) -> tuple[float, float, float, float]:
+    def _bounds_from_handle(
+        self, x0: float, y0: float, w0: float, h0: float, pos: QtCore.QPointF
+    ) -> tuple[float, float, float, float]:
         x1, y1 = x0 + w0, y0 + h0
         px, py = pos.x(), pos.y()
         handle = self._handle
@@ -1327,7 +1361,9 @@ class DesignerCanvas(OverlayView):
             nx, ny, nw, nh = self._lock_aspect(nx, ny, nw, nh, ox, oy, ow, oh)
         else:
             x_edges, y_edges = self._handle_edges()
-            nx, ny, nw, nh = self.scene.snap_geom_to_guides(nx, ny, nw, nh, x_edges=x_edges, y_edges=y_edges, mode="resize")
+            nx, ny, nw, nh = self.scene.snap_geom_to_guides(
+                nx, ny, nw, nh, x_edges=x_edges, y_edges=y_edges, mode="resize"
+            )
         min_w = min((max(1.0, g["w"]) for g in self._start_geoms.values()), default=8.0)
         min_h = min((max(1.0, g["h"]) for g in self._start_geoms.values()), default=8.0)
         if keep_aspect:
@@ -1522,7 +1558,9 @@ class DesignerCanvas(OverlayView):
                 y = int(canvas_h / 2 - height / 2)
         return max(0, min(canvas_w - width, x)), max(0, min(canvas_h - height, y))
 
-    def _place_image(self, path: str, image: QtGui.QImage | None = None, scene_pos: QtCore.QPointF | None = None, hit=None) -> bool:
+    def _place_image(
+        self, path: str, image: QtGui.QImage | None = None, scene_pos: QtCore.QPointF | None = None, hit=None
+    ) -> bool:
         if not path:
             return False
         from .images import image_intrinsic_size
@@ -1743,7 +1781,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
     def _focus_wants_text_paste(self) -> bool:
         widget = QtWidgets.QApplication.focusWidget()
         while widget is not None:
-            if isinstance(widget, (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit, QtWidgets.QAbstractSpinBox)):
+            if isinstance(
+                widget, (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit, QtWidgets.QAbstractSpinBox)
+            ):
                 return True
             if isinstance(widget, QtWidgets.QComboBox) and widget.isEditable():
                 return True
@@ -1896,19 +1936,21 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         )
         self._overlay_button_base_tip = self._overlay_button.toolTip()
         self._control_button = QDataPushButton(
-            "Runtime control…",
+            "Runtime controlâ€¦",
             tooltip="Open the overlay control panel. Controls are active while the profile is running.",
             clicked=self._open_runtime_control,
         )
         self._interactive_box = QtWidgets.QCheckBox("Interactive")
         self._interactive_box.setToolTip(
-            "On this page’s live overlay, touch or click widgets bound to vJoy or GEX states. "
+            "On this pageâ€™s live overlay, touch or click widgets bound to vJoy or GEX states. "
             "Physical bindings stay display-only. Empty space stays click-through."
         )
         self._interactive_box.setChecked(bool(self.scene.canvas.get("interactive")))
         self._interactive_box.toggled.connect(self._set_interactive)
         self._hints_box = QtWidgets.QCheckBox("Hints")
-        self._hints_box.setToolTip("Show or hide the action banner at the top of the canvas. The banner lists mouse and key actions for the current selection.")
+        self._hints_box.setToolTip(
+            "Show or hide the action banner at the top of the canvas. The banner lists mouse and key actions for the current selection."
+        )
         self._hints_box.setChecked(_banner_pref_visible())
         self._pane_box = QtWidgets.QCheckBox("Selection pane")
         self._pane_box.setToolTip("Show a PowerPoint-style list of widgets: name, type, show/hide, lock, group.")
@@ -1921,7 +1963,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._export_btn = export
         import_btn = QDataPushButton(
             "Import overlay...",
-            tooltip="Replace this profile’s overlay with a JSON file.",
+            tooltip="Replace this profileâ€™s overlay with a JSON file.",
             clicked=self._import_overlay,
         )
         self._import_btn = import_btn
@@ -1954,7 +1996,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._zoom_slider.setRange(25, 400)
         self._zoom_slider.setValue(100)
         self._zoom_slider.setFixedWidth(140)
-        self._zoom_slider.setToolTip("Scale the designer canvas. Does not change the overlay resolution. Ctrl+wheel, Ctrl+0 reset.")
+        self._zoom_slider.setToolTip(
+            "Scale the designer canvas. Does not change the overlay resolution. Ctrl+wheel, Ctrl+0 reset."
+        )
         self._zoom_slider.valueChanged.connect(self._on_zoom_slider)
         self._zoom_value = QtWidgets.QLabel("100%")
         self._zoom_value.setMinimumWidth(44)
@@ -1978,7 +2022,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._page_tabs.setUsesScrollButtons(True)
         self._page_tabs.setObjectName("overlay_pages")
         self._page_tabs.setStyleSheet(Color().cssTab())
-        self._page_tabs.setToolTip("Each tab is a separate overlay. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder.")
+        self._page_tabs.setToolTip(
+            "Each tab is a separate overlay. Double-click to rename. Right-click to add, duplicate, or delete. Drag to reorder."
+        )
         self._page_tabs.currentChanged.connect(self._on_page_tab_changed)
         self._page_tabs.tabBarDoubleClicked.connect(self._rename_page_tab)
         self._page_tabs.tabContextMenu.connect(self._page_tab_context)
@@ -2126,7 +2172,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
     def _initial_layout_pass(self):
         """Full side panels + autofit canvas once the Overlay tab is shown."""
         self._ensure_splitter_layout()
-        self._apply_splitter_sizes(bool(self._pane_box.isChecked()) if getattr(self, "_pane_box", None) is not None else True)
+        self._apply_splitter_sizes(
+            bool(self._pane_box.isChecked()) if getattr(self, "_pane_box", None) is not None else True
+        )
         self._fit_canvas_to_viewport()
         self._did_initial_fit = True
 
@@ -2155,7 +2203,10 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         if getattr(tabs, "moveInProgress", False):
             return
-        sig = (self.scene.active_page_id, tuple((page["id"], page.get("name") or "Overlay") for page in self.scene.pages))
+        sig = (
+            self.scene.active_page_id,
+            tuple((page["id"], page.get("name") or "Overlay") for page in self.scene.pages),
+        )
         if getattr(self, "_page_tabs_sig", None) == sig:
             return
         self._page_tabs_sig = sig
@@ -2186,7 +2237,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         page = self.scene.page_by_id(page_id)
         if page is None:
             return
-        name, ok = QtWidgets.QInputDialog.getText(self, "Rename overlay page", "Name:", text=str(page.get("name") or ""))
+        name, ok = QtWidgets.QInputDialog.getText(
+            self, "Rename overlay page", "Name:", text=str(page.get("name") or "")
+        )
         if ok:
             self.scene.rename_page(name, page_id)
 
@@ -2234,7 +2287,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         confirm = QtWidgets.QMessageBox.question(
             self,
             "Delete overlay page",
-            f"Delete “{name}”? Widgets on this page are removed from the layout.",
+            f"Delete â€œ{name}â€? Widgets on this page are removed from the layout.",
         )
         if confirm == QtWidgets.QMessageBox.Yes:
             self.scene.delete_page(page_id)
@@ -2421,7 +2474,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
                 gremlin.util.delete_widget(widget)
         entries = list_user_templates()
         if not entries:
-            hint = QtWidgets.QLabel("None yet — use + to save the current widgets.")
+            hint = QtWidgets.QLabel("None yet â€” use + to save the current widgets.")
             hint.setWordWrap(True)
             layout.addWidget(hint)
             return
@@ -2526,10 +2579,15 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         try:
             from .model import is_websocket_mode
 
-            if visible and page_id and is_websocket_mode(self.scene.canvas_for(page_id)) and self._overlay_manager is not None:
+            if (
+                visible
+                and page_id
+                and is_websocket_mode(self.scene.canvas_for(page_id))
+                and self._overlay_manager is not None
+            ):
                 n = self._overlay_manager.websocket_client_count(page_id)
                 if n > 0:
-                    button.setToolTip(f"Websocket live — {n} client{'s' if n != 1 else ''} connected.")
+                    button.setToolTip(f"Websocket live â€” {n} client{'s' if n != 1 else ''} connected.")
                 else:
                     button.setToolTip("Websocket page is live (waiting for LAN clients).")
                 return
@@ -2545,7 +2603,7 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         title = getattr(self, "_title", None)
         if title is not None and alive(title):
-            title.setText(f"Overlay — {profile_display_name()}")
+            title.setText(f"Overlay â€” {profile_display_name()}")
         self._refresh_overlay_button()
         # Profile switch replaces scene contents; force panes/canvas to catch up.
         pane = getattr(self, "_selection_pane", None)
@@ -2667,7 +2725,9 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         control = getattr(self, "_control_button", None)
         if control is not None and alive(control):
             control.setEnabled(True)
-            control.setToolTip("Open the overlay control panel. Controls inside are active while the profile is running.")
+            control.setToolTip(
+                "Open the overlay control panel. Controls inside are active while the profile is running."
+            )
         banner = getattr(self, "_action_banner", None)
         if locked:
             if banner is not None and alive(banner):

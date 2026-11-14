@@ -1,6 +1,4 @@
-# -*- coding: utf-8; -*-
-
-# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2026
+﻿# Based on original Joystick Gremlin work by Lionel Ott and other contributors - Joystick Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,45 +13,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
 from typing import Callable
+
+from lxml import etree
+from psygnal import Signal
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtWidgets import QAbstractItemView, QListWidget, QLabel, QListWidgetItem
-from PySide6.QtCore import Qt, QMimeData, QPoint
+from PySide6.QtCore import QMimeData, QPoint, Qt
 from PySide6.QtGui import QDrag, QPixmap
+from PySide6.QtWidgets import QAbstractItemView, QLabel, QListWidget, QListWidgetItem
 
 import dinput
-from dinput import DeviceSummary
-
 import gremlin
-from gremlin.clipboard import Clipboard
+import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.process
 import gremlin.shared_state
 import gremlin.types
-
-from gremlin.types import DeviceType
-import json
 import gremlin.ui.ui_about as ui_about
-
-
+import gremlin.util
+from dinput import DeviceSummary
+from gremlin.clipboard import Clipboard
+from gremlin.input_types import InputType
+from gremlin.tabstate import TabData
+from gremlin.types import DeviceType
 from gremlin.ui.ui_common import (
     BaseDialogUi,
     Buttons,
-    clear_layout,
     Color,
     ConfirmBox,
-    get_mode_list,
-    get_text_width,
-    getFlowContainer,
-    getGridContainer,
-    getHContainer,
-    getVContainer,
     Icons,
     InputListenerWidget,
     MessageBox,
@@ -79,18 +74,16 @@ from gremlin.ui.ui_common import (
     QRememberDialog,
     QScrollableWidget,
     QWarningWidget,
+    clear_layout,
+    get_mode_list,
+    get_text_width,
+    getFlowContainer,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
     synchronize_grids,
 )
-
 from gremlin.util import load_icon
-import logging
-from gremlin.input_types import InputType
-import gremlin.base_profile
-from lxml import etree
-import gremlin.util
-from psygnal import Signal
-from gremlin.tabstate import TabData
-
 
 # autostart registry key
 REG_KEY = "GremlinEx"
@@ -1114,7 +1107,7 @@ class OptionsDialog(BaseDialogUi):
         self.client_name_widget.textChanged.connect(self._client_name_changed_cb)
         page_layout.addWidget(getHContainer(self.client_name_widget, "Client name:", widget_only=True))
 
-        # Video return (client → master) — gated under remote control of this client.
+        # Video return (client â†’ master) â€” gated under remote control of this client.
         self._remote_video_group = QtWidgets.QGroupBox("Video return to master")
         video_layout = QtWidgets.QVBoxLayout(self._remote_video_group)
         self.enable_remote_video_widget = QDataCheckbox(
@@ -1126,7 +1119,7 @@ class OptionsDialog(BaseDialogUi):
         self.enable_remote_video_widget.setToolTip(
             "When enabled, this client publishes a screen or application capture for Overlay Remote View widgets on the master. "
             "Publishing runs only while a profile is active and stops when the profile is deactivated. "
-            "Requires remote control of this client. Opens TCP port 6013 while running — allow it in the firewall."
+            "Requires remote control of this client. Opens TCP port 6013 while running â€” allow it in the firewall."
         )
         self.enable_remote_video_widget.clicked.connect(self._enable_remote_video)
         video_layout.addWidget(self.enable_remote_video_widget)
@@ -1168,7 +1161,7 @@ class OptionsDialog(BaseDialogUi):
             callback=self._remote_video_fps_changed,
             min_range=1,
             max_range=30,
-            tooltip="Target frames per second (1–30). Lower values reduce load on the client PC.",
+            tooltip="Target frames per second (1â€“30). Lower values reduce load on the client PC.",
         )
         video_layout.addWidget(getHContainer(self.remote_video_fps_widget, "FPS:", widget_only=True))
 
@@ -1177,7 +1170,7 @@ class OptionsDialog(BaseDialogUi):
             callback=self._remote_video_quality_changed,
             min_range=1,
             max_range=100,
-            tooltip="JPEG quality (1–100). Lower = less CPU/bandwidth on the client.",
+            tooltip="JPEG quality (1â€“100). Lower = less CPU/bandwidth on the client.",
         )
         video_layout.addWidget(getHContainer(self.remote_video_quality_widget, "Quality:", widget_only=True))
 
@@ -2252,9 +2245,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         install_layout = QtWidgets.QHBoxLayout(install_row)
         install_layout.setContentsMargins(0, 0, 0, 0)
         self.streamdeck_install_plugin_btn = QDataPushButton(
-            "Install Stream Deck plugin…",
+            "Install Stream Deck pluginâ€¦",
             callback=self._streamdeck_install_plugin,
-            tooltip="Copy the JG Ex plugin into Elgato Stream Deck’s Plugins folder.\nQuit Stream Deck software first, then relaunch it after install.",
+            tooltip="Copy the JG Ex plugin into Elgato Stream Deckâ€™s Plugins folder.\nQuit Stream Deck software first, then relaunch it after install.",
         )
 
         install_layout.addWidget(self.streamdeck_install_plugin_btn)
@@ -2907,7 +2900,7 @@ Enabled modules may not show until the device filter is updated.
                 "Could not find the usual Elgato Stream Deck Plugins folder.\n\n"
                 "Please select the Plugins folder. It is normally located at:\n\n"
                 f"{hint}\n\n"
-                "(AppData → Roaming → Elgato → StreamDeck → Plugins)",
+                "(AppData â†’ Roaming â†’ Elgato â†’ StreamDeck â†’ Plugins)",
             )
             start_dir = os.path.dirname(hint) if hint else ""
             chosen = QtWidgets.QFileDialog.getExistingDirectory(
@@ -3026,8 +3019,6 @@ Enabled modules may not show until the device filter is updated.
 
     def _is_scheduled_task(self) -> bool:
         """true if the task is scheduled"""
-
-        # subprocess.run('reg delete "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /F /V "Joystick Gremlin"')
 
         result = subprocess.run(
             ["schtasks", "/Query", "/TN", REG_KEY],
@@ -4464,7 +4455,11 @@ class DeviceInformationDialog(BaseDialogUi):
         config = gremlin.config.Configuration()
         show_disconnected = config.show_disconnected
 
-        devices = gremlin.joystick_handling.all_joystick_devices()
+        devices = [
+            device
+            for device in gremlin.joystick_handling.display_devices(self.profile, refresh=True)
+            if device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro) and not device.disabled
+        ]
 
         connected_devices = [
             d for d in devices if d.connected and not d.is_virtual
@@ -4484,15 +4479,21 @@ class DeviceInformationDialog(BaseDialogUi):
 
         self.devices = connected_devices + connected_vjoy_devices + disconnected_devices
 
+        sorting_enabled = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+        self.table.clearContents()
         self.table.setRowCount(len(self.devices))
 
         device: dinput.DeviceSummary
-        row = 0
-        for device in self.devices:
-            if device.disabled:
-                continue
+        for row, device in enumerate(self.devices):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(device.name))
-            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(f"{device.device_type.name}{'/gamepad' if device.is_gamepad else ''}"))
+            self.table.setItem(
+                row,
+                1,
+                QtWidgets.QTableWidgetItem(
+                    f"{device.device_type.name}{'/gamepad' if device.is_gamepad else ''}{'/failover' if device.data.get('failover') else ''}"
+                ),
+            )
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(device.axis_count)))
             self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(device.button_count)))
             self.table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(device.hat_count)))
@@ -4516,10 +4517,12 @@ class DeviceInformationDialog(BaseDialogUi):
                 else:
                     color = "#7BAC5A" if device.connected else "#B38255"
             qc = QtGui.QColor(color)
-            for col in range(9):
+
+            for col in range(10):
                 self.table.item(row, col).setBackground(qc)
-            row += 1
+
         # resize
+        self.table.setSortingEnabled(sorting_enabled)
         self.table.resizeColumnsToContents()
 
     def eventFilter(self, source, event):
@@ -4579,7 +4582,7 @@ class DeviceInformationDialog(BaseDialogUi):
         # sync the profile with the profile registy to ensure we have the full device list
         self.profile.sync()
 
-        device : DeviceSummary
+        device: DeviceSummary
 
         for device in self.profile.devices.values():
             for mode in device.modes.values():
@@ -4808,10 +4811,10 @@ class SubstituteDialog(QRememberDialog):
         # sort
         self._hardware_devices.sort(key=lambda x: x.name.casefold())
         for info in self._hardware_devices:
-            self.hardware_device_widget.addItem(f"[{str(info.device_guid)}] {info.name}", info)
+            self.hardware_device_widget.addItem(f"[{info.device_guid!s}] {info.name}", info)
 
         for info in self._profile_devices:
-            self.profile_device_widget.addItem(f"[{str(info.device_guid)}] {info.name}", info)
+            self.profile_device_widget.addItem(f"[{info.device_guid!s}] {info.name}", info)
 
         self.hardware_device_widget.currentIndexChanged.connect(self._validate)
         self.profile_device_widget.currentIndexChanged.connect(self._validate)
@@ -5059,6 +5062,12 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
             callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self
         )
         self.name_widget = QLabel(name)
+        joystick = data.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro)
+        disconnected = joystick and not data.connected
+        self.name_widget.setProperty("deviceDisconnected", disconnected)
+        if disconnected:
+            self.name_widget.setText(f"{name} (disconnected)")
+            self.name_widget.setToolTip("Disconnected device referenced by the current profile")
         self.visible_widget.setAccessibleName(name)
         self.name_widget.setBuddy(self.visible_widget)
         self.visible_widget.toggled.connect(self._update_text_color)
@@ -5112,6 +5121,9 @@ class ReorderListWidget(QListWidget):
             QLabel[deviceVisible="true"] {{
                 color: {Color().alternateActiveColor()};
             }}
+            QLabel[deviceDisconnected="true"] {{
+                color: {Color().disconnectedColor()};
+            }}
         """)
 
 
@@ -5136,7 +5148,7 @@ class DeviceDisplayDialog(QRememberDialog):
 
         list_widget = ReorderListWidget(self)
 
-        all_devices = gremlin.joystick_handling.getAllDevicesMap()
+        all_devices = {device.device_guid: device for device in gremlin.joystick_handling.display_devices(refresh=True)}
 
         device: TabData
         self.visible_map = self.config.device_visible_map
@@ -5373,6 +5385,11 @@ class DeviceDisplayDialog(QRememberDialog):
         self._populate_list_widget(tab_map)
 
     def _device_enabled(self, device):
+        if not device.connected and device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro):
+            profile = gremlin.shared_state.current_profile
+            if profile is None:
+                return False
+            return device.device_guid in profile.devices or device.device_guid in profile.vjoy_devices
         if device.is_virtual:
             return any(
                 dev.device_guid == device.device_guid for dev in gremlin.joystick_handling.virtual_input_devices()

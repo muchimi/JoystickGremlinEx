@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Live local window capture for overlay Application widgets.
 #
@@ -232,7 +231,7 @@ class ApplicationViewTracker:
                 return
             self._clear_capture(slot)
             if slot.get("title") or slot.get("exe") or slot.get("launch_path"):
-                slot["status"] = "Looking for window…"
+                slot["status"] = "Looking for windowâ€¦"
             slot["generation"] = int(slot.get("generation") or 0) + 1
         self._wake.set()
 
@@ -270,7 +269,7 @@ class ApplicationViewTracker:
                     "status": (
                         "Select a running application"
                         if not (title or exe or launch_path)
-                        else "Looking for window…"
+                        else "Looking for windowâ€¦"
                     ),
                 }
                 self._slots[widget_id] = slot
@@ -288,7 +287,7 @@ class ApplicationViewTracker:
                 slot["status"] = (
                     "Select a running application"
                     if not (title or exe or launch_path)
-                    else "Looking for window…"
+                    else "Looking for windowâ€¦"
                 )
                 slot["generation"] = int(slot.get("generation") or 0) + 1
             elif not title and not exe and not launch_path:
@@ -335,7 +334,7 @@ class ApplicationViewTracker:
                 style = (item.get("style") or {}) if item else {}
                 if not (style.get("window_title") or style.get("window_exe") or style.get("launch_path")):
                     return "Select a running application"
-                return "Looking for window…"
+                return "Looking for windowâ€¦"
             return str(slot.get("status") or "")
 
     def _ensure_thread(self):
@@ -343,7 +342,7 @@ class ApplicationViewTracker:
         if thread is not None and thread.is_alive():
             self._wake.set()
             return
-        # paintEvent is a C++ → Python callback. On Python 3.14, constructing or
+        # paintEvent is a C++ â†’ Python callback. On Python 3.14, constructing or
         # starting threading.Thread there raises RuntimeError("thread.__init__()
         # not called") and Qt reports it as a QWidget.paintEvent override error.
         if self._start_queued:
@@ -455,7 +454,7 @@ class ApplicationViewTracker:
                         slot["status"] = ""
                     elif not slot.get("image"):
                         if not hwnd and launch_path:
-                            status = "Launching…" if (now - launched_at) < _LAUNCH_COOLDOWN_S else "Window not found"
+                            status = "Launchingâ€¦" if (now - launched_at) < _LAUNCH_COOLDOWN_S else "Window not found"
                         else:
                             status = "Window not found" if not hwnd else "Unable to capture"
                         if slot.get("status") != status:

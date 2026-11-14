@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -176,6 +175,7 @@ class CodeRunner:
         # this enables missing vjoy devices to output to maestro devices if they exist
         # mapping is done by the name of the output device to vjoy id
         gremlin.joystick_handling.resolve_output_targets()
+        
         self._warn_missing_virtual_outputs(profile)
 
         ec = gremlin.execution_graph.ExecutionContext()
@@ -324,12 +324,12 @@ class CodeRunner:
                 if not device or device.disabled:
                     if verbose:
                         syslog.info("CALLBACK: skipping a device (this is normal if the device is disabled):")
-                        syslog.info(f"\t{str(device_node)}")
+                        syslog.info(f"\t{device_node!s}")
                     continue
 
                 device_name = device.name
                 if verbose:
-                    syslog.info(f"CALLBACK: device: {str(device_node)}")
+                    syslog.info(f"CALLBACK: device: {device_node!s}")
 
                 profile_mode_node: gremlin.base_profile.ProfileModeNode
                 for mode_name, profile_mode_node in device_node.modes.items():
@@ -738,22 +738,7 @@ class CodeRunner:
 
             ec.registerCallbacks(eh.callbacks)
 
-            # apply global start values
-            for vjoy_id, vjoy_input_id, value in profile.settings.get_initial_vjoy_axis_value_list():
-                vs.setStartValue(vjoy_id, vjoy_input_id, value)
-
-            # applies profile start data
-            # this will override global settings
-            for vjoy_device in gremlin.joystick_handling.vjoy_devices():
-                vjoy_device_guid = vjoy_device.device_guid
-                vjoy_id = vjoy_device.vjoy_id
-                for vjoy_input_id in range(1, vjoy_device.axis_count + 1):
-                    if profile.getStartAxisEnabled(vjoy_device_guid, vjoy_input_id):
-                        value = profile.getStartAxisValue(vjoy_id, vjoy_input_id)
-                        vs.setStartValue(vjoy_id, vjoy_input_id, value)
-                for vjoy_input_id in range(1, vjoy_device.button_count + 1):
-                    state = profile.getStartButtonState(vjoy_device_guid, vjoy_input_id)
-                    vs.setStartState(vjoy_id, vjoy_input_id, state)
+            self._configure_startup_outputs(profile)
 
             # hook profiles - this tells all functors to hook runtime events
             el.profile_hook.emit()
@@ -789,6 +774,32 @@ class CodeRunner:
 
             gremlin.util.display_error(f"Unable to launch profile due to an error: {tb_msg}")
             return False
+
+    def _configure_startup_outputs(self, profile):
+        """Queue startup state using saved provider identities, including failover.
+
+        Legacy global axis defaults are applied first; explicit profile state
+        overrides them. The startup writer resolves each output at apply time.
+        """
+        handling = gremlin.joystick_handling
+        startup = handling.VjoyStart()
+        # Preserve the existing button reset for connected vJoy requests,
+        # including requests currently served by a failover output.
+        for key, output in handling.vjoy_device_map(connected_only=True).items():
+            for button_id in range(1, output.button_count + 1):
+                startup.setStartState(key, button_id, False)
+
+        for key, axis_id, value in profile.settings.get_initial_vjoy_axis_value_list():
+            startup.setStartValue(key, axis_id, value)
+
+        for device_id, state in profile._start_state.items():
+            device = handling.get_virtual_device(device_id)
+            key = handling.virtual_device_key(device) if device is not None else handling.parse_virtual_device_key(device_id)
+            for axis_id, value in state.get("axis", {}).items():
+                if state.get("enabled", {}).get(axis_id, False):
+                    startup.setStartValue(key, axis_id, value)
+            for button_id, pressed in state.get("buttons", {}).items():
+                startup.setStartState(key, button_id, pressed)
 
     def _register_merge_axes(self, profile, master_mode):
         """Register each merge through normal mode-aware event dispatch."""
@@ -979,7 +990,7 @@ class MergeAxis:
         elif self.operation == gremlin.types.MergeAxisOperation.Sum:
             value = gremlin.util.clamp(self.axis_values[0] + self.axis_values[1], -1.0, 1.0)
         else:
-            raise gremlin.error.GremlinError(f'Invalid merge axis operation detected, "{str(self.operation)}"')
+            raise gremlin.error.GremlinError(f'Invalid merge axis operation detected, "{self.operation!s}"')
 
         gremlin.joystick_handling.set_axis(self.vjoy_id, self.input_id, value)
 

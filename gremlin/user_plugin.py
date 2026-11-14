@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -678,7 +677,7 @@ class PhysicalInputVariable(AbstractVariable):
         return value
 
     def __str__(self):
-        return f"PhysicalInputVariable: device_name: {self.device_name}  device_id: {str(self.device_guid)}  input_id: {self.input_id}"
+        return f"PhysicalInputVariable: device_name: {self.device_name}  device_id: {self.device_guid!s}  input_id: {self.input_id}"
 
 
 class SelectionVariable(AbstractVariable):

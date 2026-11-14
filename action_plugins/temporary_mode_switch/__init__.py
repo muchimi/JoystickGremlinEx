@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -308,7 +307,7 @@ When the trigger is released, the mode reverts to the prior mode."""
             verbose = gremlin.config.Configuration().verbose
             if verbose:
                 input_item = self.get_input_item()
-                syslog.info(f"TEMPSWITCHMODE: mode set to: {value}  input: {str(input_item)}")
+                syslog.info(f"TEMPSWITCHMODE: mode set to: {value}  input: {input_item!s}")
 
         self.restore_mode = None
 

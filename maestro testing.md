@@ -175,7 +175,11 @@ Keyboard and mouse, and remote control are not impacted.
 
 ### Game concerns?
 
-Games will see GEX Bridge devices (gex-1, gex-2, gex-gp-1, etc...) in the order created and this order should persist between sessions because Maestro devices are deterministic (unlike kernel mode USB devices).
+The updated GEX Bridge gives `gex-1` through `gex-16` stable identity keys whose Maestro instance tokens and HID parent prefixes sort in numeric order. Saved devices are also restored numerically, so `gex-2` is created before `gex-10`. GremlinEx checks a fresh local HIDAPI scan by instance identity, including active bridge joysticks that are not selected in Gremlin. Each `gex-N` must follow active GEX devices with lower IDs; other controllers may occur between them. The failover mapping stays `vJoy N -> gex-N`. Maestro transport indexes and Gremlin's saved slots are separate from the Windows enumeration position.
+
+Inactive IDs may leave gaps without changing the remaining failover IDs. For example, active `gex-2` and `gex-4` are valid if they enumerate in that order and continue to map to vJoy 2 and 4. With the updated bridge, GremlinEx prevents automatic failover when an active controller is missing from the HID scan or the observed order is ambiguous or incorrect; explicit Maestro mappings remain available. Gamepads use separate identities. Remote bridge devices cannot be checked against the local machine's HID order.
+
+Rebuild and restart the bridge after upgrading to the ordered identity policy. Existing managed joysticks receive new Windows instance paths once; game bindings or HIDHide rules using the old paths may need to be updated. Later restarts retain the new identities. Older bridges lack the token metadata required for order verification.
 
 Your game should see the devices as normal joysticks or gamepads. Gamepads use XINPUT and DINPUT as far as the game goes so should be visible as either device.
 

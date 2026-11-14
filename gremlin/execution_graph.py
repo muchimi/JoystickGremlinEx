@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -285,7 +284,7 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
         if self.conditions:
             stub = ""
             for index, condition in enumerate(self.conditions):
-                stub += f" [{index + 1}] {str(condition)}"
+                stub += f" [{index + 1}] {condition!s}"
         else:
             stub = "No Conditions"
         return f"{self.node_string()} {stub}"
@@ -404,7 +403,7 @@ class ExecutionGraphContainerNode(ExecutionGraphNode):
             verbose = gremlin.config.Configuration().verbose_mode_exec
             if verbose:
                 if self.id != node.id:
-                    syslog.info(f"EXEC: entry node for container [{self.id}]: [{node.id}] {str(node)}")
+                    syslog.info(f"EXEC: entry node for container [{self.id}]: [{node.id}] {node!s}")
                 else:
                     syslog.info(f"EXEC: entry node for container [{self.id}]: same ")
         return self._exec_node
@@ -1101,7 +1100,7 @@ class ExecutionContext:
             node: ExecutionGraphNode
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 if node.has_actions:
-                    syslog.info(f"{pre}{str(node)} {node.comment}")
+                    syslog.info(f"{pre}{node!s} {node.comment}")
 
     def dumpActive(self):
         """dumps active execution nodes ONLY"""
@@ -1110,7 +1109,7 @@ class ExecutionContext:
         if self.graph:
             for pre, fill, node in anytree.RenderTree(self.graph, style=anytree.AsciiStyle()):
                 if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
-                    syslog.info(f"{pre}{str(node)}")
+                    syslog.info(f"{pre}{node!s}")
 
     def dumpModeTree(self):
         # syslog = logging.getLogger("system")
@@ -1144,7 +1143,7 @@ class ExecutionContext:
         condition_node = ExecutionGraphConditionNode()
         condition_node.container = owner
         condition_node.parent = parent
-        condition_node.description = f"Condition node for parent owner: {str(owner)} "
+        condition_node.description = f"Condition node for parent owner: {owner!s} "
         conditions = None
         root_node = condition_node
         if isinstance(owner, gremlin.input_item.AbstractContainer):
@@ -1165,7 +1164,7 @@ class ExecutionContext:
                 # create a condition nexus node for the ANY rule (any condition that passes means the action is good to go)
                 condition_nexus = ExecutionGraphActivationConditionNexusNode()
                 condition_nexus.parent = condition_node
-                condition_nexus.description = f"ActivationConditionNexus: {str(owner)}"
+                condition_nexus.description = f"ActivationConditionNexus: {owner!s}"
                 condition_nexus.container = owner
                 condition_nexus.rule = rule
                 node = condition_nexus
@@ -1173,7 +1172,7 @@ class ExecutionContext:
                     functor = self._convert_condition(condition)
                     condition_nexus.functors.append(functor)
                     condition_nexus.addCondition(condition)
-                    condition_nexus.description += f"[{index + 1}] {str(condition)} "
+                    condition_nexus.description += f"[{index + 1}] {condition!s} "
 
             case ActivationRule.All:
                 # no nexus created for the all condition - conditions in ALL mode are nested so they are all evaluated
@@ -1190,7 +1189,7 @@ class ExecutionContext:
                         sub_node.functors.append(functor)
                         if not sub_node:
                             sub_node.addCondition(condition)
-                            sub_node.description += f"[{index + 1}] {str(condition)} "
+                            sub_node.description += f"[{index + 1}] {condition!s} "
 
                         node = sub_node  # first node
 
@@ -1273,7 +1272,7 @@ class ExecutionContext:
                                     return
                                 elif isinstance(condition, gremlin.input_item.BaseAbstractCondition):
                                     if self._verbose_detailed:
-                                        syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
+                                        syslog.info(f"{logTabs}\tadding functor for condition: {condition!s}")
                                     functor = self._convert_condition(condition)
                                     node_functors.append(functor)
                                     functors.append([functors])
@@ -1334,7 +1333,7 @@ class ExecutionContext:
                                 functor = self._convert_condition(condition)
                             logtabs = gremlin.shared_state.logTabs()
                             if self._verbose_exec:
-                                syslog.info(f"{logtabs}\tAdding activation container condition: {str(condition)}")
+                                syslog.info(f"{logtabs}\tAdding activation container condition: {condition!s}")
                             functors.append(functor)
 
             if n.nodeType == ExecutionGraphNodeType.InputItem:
@@ -1588,7 +1587,7 @@ class ExecutionContext:
                         action_node.container = container
                         functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data=extra_data)
                         action_node.functors.append(functor)
-                        action_node.description = f"Action node: [{str(action)}]"
+                        action_node.description = f"Action node: [{action!s}]"
 
                         # build gate action execution subtree
                         if action.name == "Gated Axis":
@@ -2380,7 +2379,7 @@ class ContainerCallback:
             verbose = gremlin.config.Configuration().verbose_mode_exec
             if self.first_run:
                 node = ec.find(self.container, ExecutionGraphNodeType.Container)
-                assert node is not None, f"Missing container node: container: {str(self.container)}"
+                assert node is not None, f"Missing container node: container: {self.container!s}"
                 self.container_node = node
                 self.first_run = False
 
@@ -2705,7 +2704,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
             ordered_action_set.append((priority, action))
             if verbose:
-                syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}")
+                syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {action!s}")
 
             node = ExecutionGraphActionNode()
             node.parent = action_set_node
@@ -2728,7 +2727,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                     input_item = action.input_item  # get_input_item()
                     input_id = input_item.input_id
                     input_stub = str(input_id)
-                    syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+                    syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {action!s} ")
                 pass
 
         # Create functors
@@ -2769,7 +2768,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                     verbose = gremlin.config.Configuration().verbose_mode_exec
                     if verbose:
                         device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                        syslog.info(f"LATCH: (_build_graph) added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
+                        syslog.info(f"LATCH: (_build_graph) added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {event!s} ")
                     eh.add_latched_functor(device_guid, mode, event, functor)
 
             action.setEnabled(True)

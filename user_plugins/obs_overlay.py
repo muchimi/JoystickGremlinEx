@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Optional overlay helper plugin for Joystick Gremlin Ex.
 # The Overlay tab is always available. This plugin only adds a button

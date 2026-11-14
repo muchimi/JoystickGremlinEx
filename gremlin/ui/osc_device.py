@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
 #

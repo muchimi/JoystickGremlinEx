@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -927,13 +926,13 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         if len(input_list) > 0:
             input_list.sort(key=lambda x: x.sortKey)
-            # model.pushFilter()
+            # Populate first: filtering after each insertion repeatedly checks
+            # the entire growing list (especially large for offline devices).
             for index, input_item in enumerate(input_list):
                 assert input_item.device_guid is not None, "input_item.device_guid should not be None"
-                model.setItemAt(index, input_item)
+                model.place(input_item, index, apply_filter=False, emit=False)
 
-            # model.popFilter()
-            # filter the inputs
+            # Filter once after all inputs have been added.
             model.applyFilter(emit=False)
 
         model.popSuspend()  # resume triggers
@@ -1184,7 +1183,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # not ours
             return
 
-        # One Curve Editor at a time — stale curve_edit slots must not stack dialogs
+        # One Curve Editor at a time â€” stale curve_edit slots must not stack dialogs
         if _active_curve_dialog is not None and Shiboken.isValid(_active_curve_dialog):
             return
 

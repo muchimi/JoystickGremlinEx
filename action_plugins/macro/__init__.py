@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -747,7 +746,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
         page_widget = QDataComboBox()
         page_widget.setMinimumWidth(220)
-        page_widget.setToolTip("GEX virtual page (Companion-style bank). Unlimited — not limited by Elgato's profile pages.")
+        page_widget.setToolTip("GEX virtual page (Companion-style bank). Unlimited â€” not limited by Elgato's profile pages.")
 
         auto_return_widget = QtWidgets.QCheckBox("Auto-return to previous page")
         auto_return_widget.setChecked(bool(action.auto_return))
@@ -1479,7 +1478,7 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
         self._populate_ui()
 
     def _update_state(self):
-        # update the sequence — never rebuild Macro UI during profile load or
+        # update the sequence â€” never rebuild Macro UI during profile load or
         # off the UI thread (StateData.crud can fire while XML is parsed).
         if gremlin.shared_state.profile_loading:
             return
@@ -1988,7 +1987,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         verbose = self.verbose
 
         if verbose:
-            syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} trigger: [{trigger}] event: [{str(event)}")
+            syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} trigger: [{trigger}] event: [{event!s}")
 
         if not trigger:  # event.is_pressed:
             if self.action_data.auto_stop and self.macro.state == gremlin.macro.MacroState.Running:
@@ -2408,11 +2407,11 @@ To send complex sequences, please look at the sequence container."""
                 label = dict(FUNCTIONS).get(entry.command or "changePage", entry.command)
                 detail = label
                 if (entry.command or "changePage") == "changePage":
-                    detail += f" → page {int(entry.page or 0) + 1}"
+                    detail += f" â†’ page {int(entry.page or 0) + 1}"
                 if entry.auto_return:
                     detail += f" (auto-return {float(entry.auto_return_seconds or 5):g}s)"
                 if entry.device_id:
-                    detail += f" [{entry.device_id[:8]}…]"
+                    detail += f" [{entry.device_id[:8]}â€¦]"
                 table.addField("Stream Deck", detail)
 
         return table.to_html()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Qt UI-thread / Shiboken helpers for the overlay designer.
 # psygnal delivers on the emitting thread; Qt widgets must not be touched there,

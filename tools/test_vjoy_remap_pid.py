@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from gremlin.pid import PIDAxisTransition  # noqa: E402
+from gremlin import execution_guard  # noqa: E402
 from gremlin.input_types import InputType  # noqa: E402
 from gremlin.types import VjoyAction, SyncMode, ButtonOutputMode  # noqa: E402
 
@@ -52,8 +53,16 @@ action_fixture = ast.ClassDef(
 )
 encoder = next(n for n in ast.parse((ROOT / 'gremlin/repeater.py').read_bytes()).body if isinstance(n, ast.ClassDef) and n.name == 'AcceleratedEncoder')
 device, axis = NS(data={}), NS(value=0.0)
+output_device = NS(axis=lambda _: axis)
+output_target = NS(device=device, kind='vjoy', out_id=1, remote_id=1)
 remote_control = NS(paired=False)
-joystick_handling = NS(is_vjoy_connected=lambda _: True, VJoyProxy=lambda: {1: NS(axis=lambda _: axis)}, getDeviceFromVjoyId=lambda _: device)
+joystick_handling = NS(
+    is_vjoy_connected=lambda _: True,
+    VJoyProxy=lambda: {1: output_device},
+    getDeviceFromVjoyId=lambda key: device if key == 1 else None,
+    get_output_target=lambda key: output_target if key == 1 else None,
+    get_output_device=lambda key: output_device if key == 1 else None,
+)
 gremlin = NS(pid=NS(PIDAxisTransition=PIDAxisTransition), util=NS(clamp=lambda value, low, high: max(low, min(high, value))), joystick_handling=joystick_handling, remote=NS(remote_control=remote_control), config=NS(Configuration=lambda: NS(verbose_mode_outputs=False, verbose_mode_vjoy=False)), keyboard=NS(sort_keys=lambda keys: keys), shared_state=NS(keyboard_tab_guid='keyboard'))
 namespace = dict(enum=enum, threading=threading, time=time, math=math, gremlin=gremlin, joystick_handling=joystick_handling, remote_control=remote_control, InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, ButtonOutputMode=ButtonOutputMode, syslog=logging.getLogger('pid-check'), VJoyRemapWidget=NS(input_type_buttons=[InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched]))
 namespace['ActionDataFixture'] = ActionDataFixture
@@ -322,9 +331,21 @@ class CheckKey:
     def getKeys(self):
         return [self, *self.modifiers]
 
+    @staticmethod
+    def fromKeys(keys):
+        # Fixture chords use modifier keys followed by their primary key.
+        keys = list(dict.fromkeys(keys))
+        if not keys:
+            return None
+        key = keys[-1]
+        key.modifiers = keys[:-1]
+        return key
+
     @property
     def latched(self):
         return all(self.state.get(key.key_tuple, False) for key in self.getKeys())
+
+gremlin.keyboard.Key = CheckKey
 
 class CheckKeyboardInput:
     def __init__(self, primary, secondary):
@@ -395,7 +416,7 @@ class FixtureChecks(unittest.TestCase):
         self.action.stepped_input_type = InputType.KeyboardLatched
         self.action.hardware_raw_input_type = InputType.KeyboardLatched
         self.action.hardware_input_id = CheckKeyboardInput(primary, secondary)
-        self.action.setKeys([secondary])
+        self.action.setKeys([shift, secondary])
         self.assertEqual(self.action.latched_keys, [secondary])
         self.assertEqual(self.action.stepped_device_guid, 'keyboard')
         CheckKeyboardEvent(primary.key_tuple, data={primary.key_tuple: True, shift.key_tuple: True})
@@ -417,9 +438,9 @@ class NoAppImports(ast.NodeTransformer):
         return ast.Pass() if all(a.name.startswith('gremlin') for a in node.names) else node
 methods = [NoAppImports().visit(n) for n in methods]
 handler_definition = ast.ClassDef(name='CheckHandler', bases=[], keywords=[], body=methods, decorator_list=[])
-handler_config = NS(verbose_mode_inputs=False, verbose_mode_exec=False, verbose_mode_extra=False, voice_enabled=False)
+handler_config = NS(verbose_mode_inputs=False, verbose_mode_exec=False, verbose_mode_extra=False, startup_voice_enabled=False)
 handler_gremlin = NS(config=NS(Configuration=lambda: handler_config), keyboard=NS(Key=CheckKey, KeyMap=NS(reverse_translate=lambda key: key)), ui=NS(keyboard_device=NS(KeyboardInputItem=CheckKeyboardInput)), joystick_handling=NS(getValidJoystickDevicesMap=lambda: {}), shared_state=NS(), types=NS(MouseButton=type('MouseButton', (), {})), event_handler=NS(EventListener=lambda: NS(get_key_state=lambda key: False)))
-handler_namespace = dict(gremlin=handler_gremlin, dinput=NS(GUID=str), Event=CheckKeyboardEvent, InputType=InputType, Callable=Callable, syslog=logging.getLogger('keyboard-check'), traceback=traceback)
+handler_namespace = dict(gremlin=handler_gremlin, execution_guard=execution_guard, dinput=NS(GUID=str), Event=CheckKeyboardEvent, InputType=InputType, Callable=Callable, syslog=logging.getLogger('keyboard-check'), traceback=traceback)
 handler_namespace['EventListener'] = handler_gremlin.event_handler.EventListener
 handler_code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), copy.deepcopy(latched_class), handler_definition], type_ignores=[])
 exec(compile(ast.fix_missing_locations(handler_code), 'gremlin/event_handler.py', 'exec'), handler_namespace)

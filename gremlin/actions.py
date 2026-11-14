@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -622,7 +621,7 @@ class VirtualButtonCondition(AbstractCondition):
         return result
 
     def condition_name(self) -> str:
-        return f"VirtualButtonCondition: {str(self.virtual_button)}]"
+        return f"VirtualButtonCondition: {self.virtual_button!s}]"
 
     def __str__(self):
         return self.condition_name()
@@ -935,7 +934,7 @@ def convert_condition(condition):
     import gremlin.input_item
 
     # Already a runtime condition (e.g. VirtualButtonCondition created during
-    # tree build) — converting again would fail the type checks below.
+    # tree build) â€” converting again would fail the type checks below.
     if isinstance(condition, AbstractCondition):
         return condition
 

@@ -1,4 +1,3 @@
-# # -*- coding: utf-8; -*-
 
 # # Gremlin Ex is (C) EMCS 2026
 # #

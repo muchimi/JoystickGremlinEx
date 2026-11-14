@@ -62,6 +62,9 @@ def source_definitions(path, names, namespace):
     exec(compile(ast.fix_missing_locations(ast.Module(body=[future, *nodes], type_ignores=[])), path, "exec"), namespace)
 
 
+source_definitions("gremlin/joystick_handling.py", {"_maestro_failover_id"}, GREMLIN.joystick_handling.__dict__)
+
+
 type_namespace = dict(IntEnum=enum.IntEnum, enum=enum)
 source_definitions("gremlin/types.py", {"DeviceType", "DeviceCategory"}, type_namespace)
 GREMLIN.types.DeviceType, GREMLIN.types.DeviceCategory = type_namespace["DeviceType"], type_namespace["DeviceCategory"]
@@ -584,15 +587,16 @@ class RegistryTests(unittest.TestCase):
         self.modules = patch.dict(sys.modules, MODULES)
         self.modules.start()
         self.addCleanup(self.modules.stop)
-        self.registry = dict(DeviceType=GREMLIN.types.DeviceType, threading=threading,
-                             _device_registry_lock=threading.RLock())
+        self.registry = dict(DeviceType=GREMLIN.types.DeviceType, threading=threading, dinput=DINPUT,
+                             _device_registry_lock=threading.RLock(), _output_targets={})
         for key in ("_all_devices_map", "_joystick_device_guid_map", "_maestro_service_devices", "_maestro_replaced_devices",
                     "_maestro_devices_map", "_vjoy_devices_map", "_all_vjoy_devices_map", "_disconnected_devices_map",
                     "_all_virtual_devices_map"):
             self.registry[key] = {}
+        self.registry["_maestro_excluded_native_guids"] = set()
         source_definitions("gremlin/joystick_handling.py", {
-            "set_maestro_devices", "_apply_maestro_service_devices", "_update_joystick_device_maps", "_update_virtual_map",
-            "maestro_device_map", "all_maestro_devices", "virtual_devices", "vjoy_devices", "maestro_devices",
+            "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
+            "maestro_device_map", "all_maestro_devices", "virtual_devices", "vjoy_devices", "_native_vjoy_devices", "maestro_devices",
         }, self.registry)
 
     def summary(self, device_id, name="Maestro target", kind=None):
@@ -602,6 +606,8 @@ class RegistryTests(unittest.TestCase):
         device.virtual_id = 0
         device.axis_count, device.button_count, device.hat_count = 8, 128, 4
         device.device_type = kind or GREMLIN.types.DeviceType.Maestro
+        if device.device_type == GREMLIN.types.DeviceType.Maestro:
+            device.data["maestro_key"] = f"maestro://127.0.0.1:8010/{device_id}"
         device.setVirtual(True)
         device.setConnected(True)
         return device
@@ -631,8 +637,11 @@ class RegistryTests(unittest.TestCase):
         self.registry["_all_devices_map"] = {native.device_guid: refreshed_native}
         self.registry["_update_joystick_device_maps"]()
         self.assertIs(self.registry["maestro_device_map"]()[0], overlay)
-        self.registry["set_maestro_devices"]([])
+        with patch.object(DINPUT.DILL, "getDevices", return_value=[refreshed_native]):
+            self.registry["set_maestro_devices"]([])
         self.assertIs(self.registry["_all_devices_map"][native.device_guid], refreshed_native)
+        self.assertEqual(refreshed_native.device_type, GREMLIN.types.DeviceType.Maestro)
+        self.assertEqual(refreshed_native.virtual_id, -1)
 
 
 class RemapRoutingTests(unittest.TestCase):

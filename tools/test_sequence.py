@@ -26,6 +26,11 @@ from gremlin.singleton_decorator import SingletonDecorator  # noqa: E402
 from gremlin.types import Interactions, SyncMode  # noqa: E402
 
 
+value_node = next(node for node in ast.parse((ROOT / "gremlin/actions.py").read_bytes()).body
+                  if getattr(node, "name", None) == "Value")
+exec(compile(ast.Module(body=[value_node], type_ignores=[]), "gremlin/actions.py", "exec"))
+
+
 class Signal:
     def __init__(self):
         self.callbacks = []
@@ -78,6 +83,7 @@ def load_sequence(source=None):
     listener = NS(profile_start=Signal())
     services = NS(
         config=NS(Configuration=lambda: config),
+        actions=NS(Value=Value),
         base_profile=NS(AbstractSelfTriggerFunctor=BaseFunctor),
         input_item=NS(BaseInputActionCondition=type("InputCondition", (), {})),
         event_handler=NS(EventListener=lambda: listener, Event=Event, EventHandler=Mock()),
@@ -135,7 +141,12 @@ class SequenceChecks(unittest.TestCase):
         container.wiggle_min_delay = container.wiggle_max_delay = 0
         functor = self.ns["SequenceContainerFunctor"](container)
         functor.action_set_nodes = [NS(id=index) for index in range(count)]
-        functor._ec = NS(execute_node=lambda node, event, pressed, extra: self.calls.append((node.id, pressed, bool(extra and extra.get("sequence_end")))))
+        def execute(node, event, value, extra):
+            self.assertIsInstance(value, Value)
+            self.assertEqual(value.current, event.is_pressed)
+            self.calls.append((node.id, value.is_pressed, bool(extra and extra.get("sequence_end"))))
+
+        functor._ec = NS(execute_node=execute)
         self.functors.append(functor)
         return functor
 
@@ -365,7 +376,8 @@ class SequenceChecks(unittest.TestCase):
                 functor.action_data.resume_mode = True
                 functor.action_data.last_step = 99
 
-                def execute(node, event, pressed, extra):
+                def execute(node, event, value, extra):
+                    pressed = value.is_pressed
                     self.calls.append((node.id, pressed))
                     if pressed:
                         functor._stop_runner()
@@ -408,7 +420,8 @@ class SequenceChecks(unittest.TestCase):
                 functor.action_data.normal_autorelease_delay = 30_000
                 functor.action_data.wiggle_exec_delay = 30_000
 
-                def execute(node, event, pressed, extra):
+                def execute(node, event, value, extra):
+                    pressed = value.is_pressed
                     self.calls.append((node.id, pressed, bool(extra and extra.get("sequence_end"))))
                     if pressed:
                         functor._stop_runner()  # Called by an action on the worker itself.

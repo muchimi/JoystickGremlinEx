@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -77,7 +76,7 @@ def _open_remote_vjoy(device_id):
     Maestro output device; both expose the same button/axis/hat interface.
 
     Membership checks against VJoyProxy.vjoy_devices fail after profile stop
-    (reset) or on receive-only clients that never wrote locally — silently
+    (reset) or on receive-only clients that never wrote locally â€” silently
     dropping remote button/axis/hat commands. Always resolve and open via
     VJoyProxy.__getitem__ instead.
     """
@@ -706,7 +705,7 @@ class RemoteClient:
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 ttl = struct.pack("b", RPCGremlin.MULTICAST_TTL)
                 self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-                # Never bind the *send* socket to server_port — that collides with the
+                # Never bind the *send* socket to server_port â€” that collides with the
                 # UDP listener and produces RPC socket errors / missed identify replies.
                 # Optionally pin the outbound multicast interface instead.
                 bind_all = config.broadcast_bind_all_ips
@@ -1084,7 +1083,7 @@ class RemoteClient:
 
         with self._socket_lock:
             if self._sock is None and not self.ensure_socket():
-                syslog.warning("RPC: send aborted — no outbound socket")
+                syslog.warning("RPC: send aborted â€” no outbound socket")
                 return False
             try:
                 self._sock.sendto(raw_data, self._address)
@@ -1385,7 +1384,7 @@ class RemoteClient:
                     return
                 cd = ClientData.fromPayload(payload)
                 if verbose:
-                    syslog.info(f"RPC: disconnect received: {str(cd)}")
+                    syslog.info(f"RPC: disconnect received: {cd!s}")
 
                 self.remote_control.unregisterClient(cd.client_id)
 
@@ -1442,7 +1441,7 @@ class RemoteClient:
                     vigem.update()
 
             case "button" | "axis" | "hat" | "relative_axis" | "relative_Axis" | "toggle":
-                # joystick button / axis / hat — open vJoy on demand (do not require prior local claim)
+                # joystick button / axis / hat â€” open vJoy on demand (do not require prior local claim)
 
                 payload = data["data"]
                 device = payload["device"]

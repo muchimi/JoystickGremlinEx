@@ -1,6 +1,5 @@
-# -*- coding: utf-8; -*-
 
-"""AFCS merge operators — same math as Map to VJoy, owned by the AFCS graph."""
+"""AFCS merge operators â€” same math as Map to VJoy, owned by the AFCS graph."""
 
 from __future__ import annotations
 
@@ -101,7 +100,7 @@ LIMITER_RANGES = ("unipolar", "bipolar")
 
 LIMITER_RANGE_LABELS = {
     "unipolar": "0 to 100%",
-    "bipolar": "Centered (−100 to +100)",
+    "bipolar": "Centered (âˆ’100 to +100)",
 }
 
 LIMITER_SHAPES = ("linear", "bezier", "minmax")
@@ -112,7 +111,7 @@ LIMITER_SHAPE_LABELS = {
     "minmax": "Min-max",
 }
 
-# Identity cubic-bezier (handles on the diagonal) → GEX Bezier 1 (handles pulled to center).
+# Identity cubic-bezier (handles on the diagonal) â†’ GEX Bezier 1 (handles pulled to center).
 _BEZIER_LINEAR = (
     (-1.0, -1.0),
     (-2.0 / 3.0, -2.0 / 3.0),
@@ -138,7 +137,7 @@ INPUT_DISPLAY_RANGES = ("auto", "unipolar", "centered")
 INPUT_DISPLAY_LABELS = {
     "auto": "Auto (match GEX)",
     "unipolar": "0 to 100%",
-    "centered": "Centered (−100 to +100)",
+    "centered": "Centered (âˆ’100 to +100)",
 }
 
 _UNIPOLAR_NAME_HINTS = ("throttle", "slider", "brake", "accelerator", "pedal", "collective")
@@ -160,7 +159,7 @@ def names_look_unipolar(*parts) -> bool:
 
 
 def meter_is_centered(kind: str, props: dict | None = None, names=()) -> bool:
-    """True when an input stays −1..+1 (stick). False remaps to 0..1 (throttle)."""
+    """True when an input stays âˆ’1..+1 (stick). False remaps to 0..1 (throttle)."""
     props = props or {}
     key = str(kind or "").casefold()
     if key == "limiter":
@@ -176,7 +175,7 @@ def meter_is_centered(kind: str, props: dict | None = None, names=()) -> bool:
 
 
 def apply_input_display_range(value: float, props: dict | None = None, names=()) -> float:
-    """Invert the GEX −1..+1 axis, then remap to 0..1 when Display is unipolar."""
+    """Invert the GEX âˆ’1..+1 axis, then remap to 0..1 when Display is unipolar."""
     current = clamp(float(value))
     props = props or {}
     if props.get("invert"):
@@ -188,7 +187,7 @@ def apply_input_display_range(value: float, props: dict | None = None, names=())
 
 
 def normalize_limiter_shape(value) -> str:
-    key = str(value or "linear").strip().casefold().replace("é", "e").replace("_", "").replace("-", "")
+    key = str(value or "linear").strip().casefold().replace("Ã©", "e").replace("_", "").replace("-", "")
     if key in ("bezier", "bez", "curve"):
         return "bezier"
     if key in ("minmax", "min", "max", "clip", "clamp"):
@@ -223,7 +222,7 @@ def bezier_limiter_spline(amount: float):
 
 
 def sample_limiter_curve(curve, gain: float, shape: str = "linear") -> list[tuple[float, float]]:
-    """Preview points in −1..+1. Linear leaves amplitude to the widget gain; Bezier and min-max bake the shape."""
+    """Preview points in âˆ’1..+1. Linear leaves amplitude to the widget gain; Bezier and min-max bake the shape."""
     xs = [i / 16.0 - 1.0 for i in range(33)]
 
     def mapped(x: float) -> float:
@@ -249,7 +248,7 @@ def sample_limiter_curve(curve, gain: float, shape: str = "linear") -> list[tupl
 
 
 def normalize_limiter_range(value) -> str:
-    """Limiter control range: 0–100% (unipolar) or −100..100% (signed, inverts)."""
+    """Limiter control range: 0â€“100% (unipolar) or âˆ’100..100% (signed, inverts)."""
     if value is True or value is False or value is None:
         return "unipolar"
     key = str(value).strip().casefold().replace("_", " ").replace("%", "")
@@ -262,8 +261,8 @@ def normalize_limiter_range(value) -> str:
 def limiter_gain(limit: float, range_mode: str = "unipolar") -> float:
     """Map the limiter control to a scale factor.
 
-    0 to 100%: GEX axes are −1..1 across that travel, so 0%→0, 50%→0.5, 100%→1.
-    −100 to 100%: signed −1..1; negative inverts the limited output.
+    0 to 100%: GEX axes are âˆ’1..1 across that travel, so 0%â†’0, 50%â†’0.5, 100%â†’1.
+    âˆ’100 to 100%: signed âˆ’1..1; negative inverts the limited output.
     """
     mode = normalize_limiter_range(range_mode)
     if mode == "bipolar":
@@ -380,10 +379,10 @@ class LagLeadState:
 
 
 NODE_HELP = {
-    "input": "Named AFCS axis from Map to AFCS, or a listened physical axis. Invert flips the GEX −1..+1 sign first. Display then sets the node output: 0 to 100% remaps to 0..1 (idle at 0), Centered keeps −1..+1, Auto follows throttle/slider names like GEX.",
+    "input": "Named AFCS axis from Map to AFCS, or a listened physical axis. Invert flips the GEX âˆ’1..+1 sign first. Display then sets the node output: 0 to 100% remaps to 0..1 (idle at 0), Centered keeps âˆ’1..+1, Auto follows throttle/slider names like GEX.",
     "merge": "Combines two axes with the same math as Map to VJoy.",
     "curve": "Remaps the axis with the GEX response-curve editor. Double-click the node to edit.",
-    "limiter": "Shapes throw from a limiter axis. Linear scales the slope with the live limiter. Bezier keeps full corners and pulls the handles toward a flat center as the limiter drops. Min-max follows 1:1 through the center, then clips at whatever the limiter axis is reading — 100% is full travel, 0% is locked at center, and every value in between is a live ceiling. Wire the signal to in and the controller to limit. 0 to 100% uses a slider or throttle; −100 to 100% inverts when the limiter is negative.",
+    "limiter": "Shapes throw from a limiter axis. Linear scales the slope with the live limiter. Bezier keeps full corners and pulls the handles toward a flat center as the limiter drops. Min-max follows 1:1 through the center, then clips at whatever the limiter axis is reading â€” 100% is full travel, 0% is locked at center, and every value in between is a live ceiling. Wire the signal to in and the controller to limit. 0 to 100% uses a slider or throttle; âˆ’100 to 100% inverts when the limiter is negative.",
     "deadzone": "Removes noise around center and optionally at the ends, then rescales the remaining travel to full range.",
     "override": "Two axes, one output. The axis you move sends the value. The other keeps its last reading and stays quiet until you move it by the grab amount, even when that axis is not centered. A throttle left at 50% does not block the stick.",
     "laglead": "Lag smooths low-frequency jitter. Lead restores or boosts faster motion. Equal lag and lead is a pass-through; lead above lag anticipates.",
@@ -391,17 +390,17 @@ NODE_HELP = {
 }
 
 MERGE_HELP = {
-    "add": "A + B, then clamped to ±1.",
+    "add": "A + B, then clamped to Â±1.",
     "average": "Mean of A and B.",
-    "center": "Centered difference (A − B) / 2.",
+    "center": "Centered difference (A âˆ’ B) / 2.",
     "min": "More negative of A and B.",
     "max": "More positive of A and B.",
-    "scalefull": "A × B using the full ±1 range of B.",
+    "scalefull": "A Ã— B using the full Â±1 range of B.",
     "scalehalf": "A scaled by B, with negative B reversing direction.",
-    "multiply": "A × B.",
+    "multiply": "A Ã— B.",
     "trim": "B is a 0..1 trim offset. 0 is no trim.",
     "trimcentered": "Centered-stick trim (B at 0 is 50% trim).",
-    "scalefullc": "A scaled by B mapped from ±1 into 0..1.",
+    "scalefullc": "A scaled by B mapped from Â±1 into 0..1.",
     "scalehalfc": "A scaled by |B|.",
 }
 

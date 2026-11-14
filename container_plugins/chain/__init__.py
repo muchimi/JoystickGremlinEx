@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -54,7 +53,7 @@ class ChainContainerWidget(AbstractContainerWidget):
 
     def _create(self, container):
         assert isinstance(container, ChainContainer), "invalid container"
-        assert len(container.action_sets) > 0, "container missing action sets"
+        container.ensureActionSet(1)
         self.container: ChainContainer = container
         self.input_item = self.container.input_item
 
@@ -102,16 +101,23 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         # Clear existing action set widgets
         for widget in self._action_set_widgets.values():
+            if not Shiboken.isValid(widget):
+                continue
+            try:
+                widget.model.data_changed.disconnect(self.container_modified.emit)
+            except (RuntimeError, TypeError):
+                pass
             widget.hide()
             self.action_set_layout.removeWidget(widget)
             gremlin.util.delete_widget(widget)
         self._action_set_widgets.clear()
 
         # Recreate action set widgets
-        action_sets = [action_set for action_set in self.container.action_sets if action_set]
-        for i, action_set in enumerate(action_sets):
+        for i, action_set in enumerate(self.container.action_sets):
+            if not action_set:
+                continue
             widget = self._create_action_set_widget(action_set,
-                                                    f"Step {i + 1:d}",
+                                                    f"Step {len(self._action_set_widgets) + 1:d}",
                                                     ContainerViewTypes.Action,
                                                     interact_callback=self._handle_interaction,
                                                     allowed_interactions=self.container.interaction_types,
@@ -137,9 +143,10 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.container)
-        self.container.add_action(action_item)
+        self.container.add_action(action_item, self._new_step_index())
         if Shiboken.isValid(self):
             self.container_modified.emit()
+            self._update_action_sets()
 
     def _paste_action(self, action, container):
         """pastes an action"""
@@ -148,9 +155,17 @@ class ChainContainerWidget(AbstractContainerWidget):
         action_item = plugin_manager.duplicate_for_paste(action, self.container)
         if action_item is None:
             return
-        self.container.add_action(action_item)
+        self.container.add_action(action_item, self._new_step_index())
         if Shiboken.isValid(self):
             self.container_modified.emit()
+            self._update_action_sets()
+
+    def _new_step_index(self):
+        """Reuse the initial empty set; subsequent additions create a new step."""
+        action_sets = self.container.action_sets
+        if len(action_sets) == 1 and not action_sets[0]:
+            return 0
+        return len(action_sets)
 
     def _timeout_changed_cb(self, value):
         """Stores changes to the timeout element.
@@ -166,40 +181,35 @@ class ChainContainerWidget(AbstractContainerWidget):
         :param index the index of the action widget
         :param interaction the type of action being invoked
         """
-        # Find the index of the widget that gets modified
-        # index = self._get_widget_index(widget)
-
-        if index == -1:
+        action_sets = self.container.action_sets
+        visible_indices = [i for i, action_set in enumerate(action_sets) if action_set]
+        if index not in visible_indices:
             syslog.warning("Unable to find widget specified for interaction, not doing anything.")
             return
+
+        position = visible_indices.index(index)
 
         # Perform action
         match interaction:
             case Interactions.Up:
-                if index > 0:
-                    self.container.action_sets.swap(index, index - 1)
+                if position > 0:
+                    action_sets.swap(index, visible_indices[position - 1])
             case Interactions.Down:
-                if index < len(self.container.action_sets) - 1:
-                    self.container.action_sets.swap(index, index + 1)
+                if position < len(visible_indices) - 1:
+                    action_sets.swap(index, visible_indices[position + 1])
             case Interactions.Top:
-                if index > 0:
-                    self.container.action_sets.swap(index, 0)
+                if position > 0:
+                    action_sets.swap(index, visible_indices[0])
 
             case Interactions.Bottom:
-                if index < len(self.container.action_sets) - 1:
-                    self.container.action_sets.swap(index, len(self.container.action_sets) - 1)
+                if position < len(visible_indices) - 1:
+                    action_sets.swap(index, visible_indices[-1])
 
             case Interactions.Delete:
-                del self.container.action_sets[index]
-        if interaction == Interactions.Up:
-            if index > 0:
-                self.container.action_sets.swap(index, index - 1)
-        if interaction == Interactions.Down:
-            if index < len(self.container.action_sets) - 1:
-                self.container.action_sets.swap(index, index + 1)
-
-        if interaction == Interactions.Delete:
-            self.container.action_sets.removeAt(index)
+                action_sets.removeAt(index)
+                self.container.ensureActionSet(1)
+            case _:
+                return
 
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -235,7 +245,17 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
+    def profile_started(self):
+        super().profile_started()
+        self.index = 0
+        self.last_execution = 0.0
+        self.last_value = None
+
     def process_event(self, event, value, extra_data=None):
+        step_count = len(self.action_set_nodes) if self.valid else 0
+        if not step_count:
+            return False
+
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
@@ -244,10 +264,14 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         else:
             is_pressed = value.current
 
+        now = time.monotonic()
         if self.timeout > 0.0:
-            if self.last_execution + self.timeout < time.time():
+            # Keep a held button's release paired with its original step.
+            if (is_pressed or self.last_value is not True) and self.last_execution + self.timeout < now:
                 self.index = 0
-            self.last_execution = time.time()
+        self.last_execution = now
+        self.last_value = is_pressed
+        self.index %= step_count
 
         verbose = gremlin.config.Configuration().verbose_mode_container
         if verbose:
@@ -255,8 +279,8 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._trigger(self.index, event, value, extra_data)
         # result = self.container.action_sets[self.index].process_event(event, value)
 
-        if (self.switch_on_press and is_pressed) or not is_pressed:
-            self.index = (self.index + 1) % len(self.container.action_sets)
+        if is_pressed == self.switch_on_press:
+            self.index = (self.index + 1) % step_count
 
         return False  # stop execution as the logic is internal to trigger the other nodes
 
@@ -342,7 +366,7 @@ Unlike a macro or sequence container, only one step is executed for each trigger
 
         table = ReportTable(cellpadding=4)
 
-        count = len(self.action_sets[0]) if self.action_sets else 0
+        count = sum(bool(action_set) for action_set in self.action_sets)
         table.addField("Steps", f"{count}")
         table.addField("Timeout", f"{self.timeout:.2f} seconds")
 

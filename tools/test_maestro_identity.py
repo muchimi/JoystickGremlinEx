@@ -39,14 +39,17 @@ class MaestroIdentityChecks(unittest.TestCase):
         normalize = patch.object(GREMLIN.util, "normalize_guid", str, create=True)
         normalize.start()
         self.addCleanup(normalize.stop)
-        self.registry = dict(DeviceType=GREMLIN.types.DeviceType, _device_registry_lock=threading.RLock())
+        self.registry = dict(DeviceType=GREMLIN.types.DeviceType, dinput=MAESTRO.dinput,
+                             _device_registry_lock=threading.RLock())
         for key in ("_all_devices_map", "_joystick_device_guid_map", "_maestro_service_devices",
                     "_maestro_replaced_devices", "_maestro_devices_map", "_vjoy_devices_map",
                     "_all_vjoy_devices_map", "_disconnected_devices_map", "_all_virtual_devices_map", "_output_targets"):
             self.registry[key] = {}
+        self.registry["_maestro_excluded_native_guids"] = set()
+        self.registry["updateFailoverMap"] = Mock()
         source_definitions("gremlin/joystick_handling.py", {
-            "set_maestro_devices", "_apply_maestro_service_devices", "_update_joystick_device_maps", "_update_virtual_map",
-            "virtual_devices", "vjoy_devices", "maestro_devices", "maestro_device_map",
+            "display_devices", "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
+            "virtual_devices", "vjoy_devices", "_native_vjoy_devices", "maestro_devices", "maestro_device_map", "all_joystick_devices",
         }, self.registry)
         publish = patch.object(GREMLIN.joystick_handling, "set_maestro_devices", self.registry["set_maestro_devices"])
         publish.start()
@@ -69,7 +72,7 @@ class MaestroIdentityChecks(unittest.TestCase):
             info = self.definitions[device_id]
             if address == "/maestro_capabilities":
                 data = dict(axes=list(MAESTRO.AXIS_NAMES[:info["axes"]]), addressableButtons=info["buttons"],
-                            hatCount=info["hats"], productId=0x8010, vendorId=0xFEED,
+                            hatCount=info["hats"], productId=info.get("productId", 0x8010), vendorId=info.get("vendorId", 0xFEED),
                             type=info.get("type", "gamepad" if info["kind"] == "gamepad" else "joystick"))
             elif address == "/maestro_state":
                 data = dict(axes={}, pressedButtons=[], hats=[0] * info["hats"], hat=0)
@@ -122,13 +125,17 @@ class MaestroIdentityChecks(unittest.TestCase):
                 native.device_guid = MAESTRO.dinput.GUID(MAESTRO.uuid.uuid4())
                 native.name, native.vendor_id, native.product_id = device_id, 0xFEED, 0x8010
                 native.axis_count, native.button_count, native.hat_count = row["axes"], row["buttons"], row["hats"]
+                native.input_enabled = True
                 # Exercise both setting the flag and clearing stale metadata.
                 native.setGamepad(device_id == "gex-1")
                 self.maestro._local_service = True
                 with patch.object(MAESTRO.dinput.DILL, "getDevices", return_value=[native]):
                     self.load()
                     published = self.published()[device_id]
-                self.assertIs(published, native)
+                expected_guid = native.device_guid
+                if device_id == "gex-gp-1":
+                    expected_guid = self.maestro.controllerGuid(next(c for c in self.maestro._controller_map.values() if c.id == device_id))
+                self.assertEqual(published.device_guid, expected_guid)
                 self.assertEqual(published.is_gamepad, device_id == "gex-gp-1")
 
     def test_service_enumeration_order_does_not_choose_the_winner(self):

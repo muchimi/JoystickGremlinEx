@@ -1,6 +1,5 @@
-# -*- coding: utf-8; -*-
 #
-# Overlay visibility boolean expressions (A AND (B OR C), XOR, …).
+# Overlay visibility boolean expressions (A AND (B OR C), XOR, â€¦).
 #
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 
@@ -33,30 +32,30 @@ _OPS = {
 }
 
 _SYMBOL_OP = {
-    "·": "AND",
-    "⋅": "AND",
+    "Â·": "AND",
+    "â‹…": "AND",
     "*": "AND",
     "&": "AND",
-    "∧": "AND",
+    "âˆ§": "AND",
     "+": "OR",
     "|": "OR",
-    "∨": "OR",
+    "âˆ¨": "OR",
     "^": "XOR",
-    "⊕": "XOR",
-    "⊻": "XOR",
-    "¬": "NOT",
+    "âŠ•": "XOR",
+    "âŠ»": "XOR",
+    "Â¬": "NOT",
     "~": "NOT",
     "!": "NOT",
 }
 
 _PRETTY = {
-    "AND": "·",
+    "AND": "Â·",
     "OR": "+",
-    "XOR": "⊕",
+    "XOR": "âŠ•",
     "NAND": "NAND",
     "NOR": "NOR",
-    "XNOR": "⊙",
-    "NOT": "¬",
+    "XNOR": "âŠ™",
+    "NOT": "Â¬",
 }
 
 
@@ -167,10 +166,10 @@ def _tokenize(text: str) -> list[tuple[str, str]]:
             elif len(word) == 1:
                 tokens.append(("letter", word))
             else:
-                raise VisibilityExprError(f"Unknown name “{text[i:j]}”. Use A–Z or AND, OR, XOR, NAND, NOR, XNOR, NOT.")
+                raise VisibilityExprError(f"Unknown name â€œ{text[i:j]}â€. Use Aâ€“Z or AND, OR, XOR, NAND, NOR, XNOR, NOT.")
             i = j
             continue
-        raise VisibilityExprError(f"Unexpected “{ch}” in the expression.")
+        raise VisibilityExprError(f"Unexpected â€œ{ch}â€ in the expression.")
     return tokens
 
 
@@ -214,7 +213,7 @@ def parse_visibility_expression(text: str):
             continue
         if kind == "paren" and value == "(":
             if prev in ("letter", "paren_close"):
-                raise VisibilityExprError("Put an operator before “(”.")
+                raise VisibilityExprError("Put an operator before â€œ(â€.")
             ops.append("(")
             prev = "paren_open"
             continue
@@ -222,7 +221,7 @@ def parse_visibility_expression(text: str):
             while ops and ops[-1] != "(":
                 _reduce(ops.pop())
             if not ops:
-                raise VisibilityExprError("Unmatched “)”.")
+                raise VisibilityExprError("Unmatched â€œ)â€.")
             ops.pop()
             prev = "paren_close"
             continue
@@ -244,7 +243,7 @@ def parse_visibility_expression(text: str):
     while ops:
         op = ops.pop()
         if op == "(":
-            raise VisibilityExprError("Unmatched “(”.")
+            raise VisibilityExprError("Unmatched â€œ(â€.")
         _reduce(op)
     if len(output) != 1:
         raise VisibilityExprError("The expression is incomplete.")
@@ -309,7 +308,7 @@ def pretty_visibility_expression(node) -> str:
         inner = pretty_visibility_expression(node.a)
         if isinstance(node.a, _Lit):
             return f"{inner}\u0305"
-        return f"¬({inner})"
+        return f"Â¬({inner})"
     left = pretty_visibility_expression(node.a)
     right = pretty_visibility_expression(node.b)
     if isinstance(node.a, _Binary) and _OPS[node.a.op][0] < _OPS[node.op][0]:
@@ -320,11 +319,11 @@ def pretty_visibility_expression(node) -> str:
         right = f"({right})"
     symbol = _PRETTY.get(node.op, node.op)
     if node.op == "NAND":
-        return f"¬({left} · {right})"
+        return f"Â¬({left} Â· {right})"
     if node.op == "NOR":
-        return f"¬({left} + {right})"
+        return f"Â¬({left} + {right})"
     if node.op == "XNOR":
-        return f"¬({left} ⊕ {right})"
+        return f"Â¬({left} âŠ• {right})"
     return f"{left} {symbol} {right}"
 
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -7,7 +6,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-"""Live overlay touch / mouse → vJoy and GEX state writes."""
+"""Live overlay touch / mouse â†’ vJoy and GEX state writes."""
 
 from __future__ import annotations
 
@@ -275,7 +274,7 @@ class OverlayTouchHandler:
         if bus is not None:
             bus.poke(item.get("id"), value, lock=True)
         else:
-            # Never partial-update a layered/onscreen view — leaves ghost trails.
+            # Never partial-update a layered/onscreen view â€” leaves ghost trails.
             schedule = getattr(view, "_schedule_update", None)
             if callable(schedule):
                 schedule(None)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Live system counters for the overlay Counter widget (time, FPS, CPU, GPU, RAM, tally).
 #
@@ -133,17 +132,17 @@ class SysStatsSampler:
             return f"{self._fps:.0f} FPS" if named else f"{self._fps:.0f}"
         if kind == "cpu":
             if self._cpu is None:
-                return "CPU —" if named else "—"
+                return "CPU â€”" if named else "â€”"
             return f"{self._cpu:.0f} %" if not named else f"CPU {self._cpu:.0f} %"
         if kind == "cpu_clock":
             if self._cpu_mhz is None or self._cpu_mhz <= 0:
-                return "CPU —" if named else "—"
+                return "CPU â€”" if named else "â€”"
             ghz = self._cpu_mhz / 1000.0
             clock = f"{ghz:.2f} GHz" if ghz >= 1.0 else f"{self._cpu_mhz:.0f} MHz"
             return f"CPU {clock}" if named else clock
         if kind == "ram":
             if self._ram is None:
-                return "RAM —" if named else "—"
+                return "RAM â€”" if named else "â€”"
             return f"{self._ram:.0f} %" if not named else f"RAM {self._ram:.0f} %"
         if kind == "gpu":
             if self._gpu_load is None:
@@ -219,7 +218,7 @@ def _format_temp(celsius, unit: str, prefix: str) -> str:
     if celsius is None:
         return f"{prefix} n/a".strip() if prefix else "n/a"
     value = float(celsius)
-    text = f"{value * 9.0 / 5.0 + 32.0:.0f} °F" if unit == "f" else f"{value:.0f} °C"
+    text = f"{value * 9.0 / 5.0 + 32.0:.0f} Â°F" if unit == "f" else f"{value:.0f} Â°C"
     return f"{prefix} {text}" if prefix else text
 
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 """OdenGraphQt node types for the AFCS canvas."""
 

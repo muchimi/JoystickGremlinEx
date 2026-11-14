@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 # Based on example at: https://github.com/theomessin/jetbridge
 # (C) EMCS 2024 and other contributors
 #

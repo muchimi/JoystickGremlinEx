@@ -83,7 +83,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gremlinex-overview" class="md-skip">
+        <a href="#gremlinex-gex-overview-updated-for-gex-m77-series" class="md-skip">
           Skip to content
         </a>
       
@@ -512,16 +512,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
       
         <li class="md-nav__item">
-  <a href="#key-features-what-can-gremlinex-do" class="md-nav__link">
+  <a href="#key-features-what-is-gremlinex" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Features: What can GremlinEx do?
+        Key Features: What is GremlinEx?
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features: What can GremlinEx do?">
+    <nav class="md-nav" aria-label="Key Features: What is GremlinEx?">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#programming-virtual-joystick-and-gamepad-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programming virtual joystick and gamepad devices
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#mapping-and-transforms" class="md-nav__link">
@@ -557,10 +568,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-output" class="md-nav__link">
+  <a href="#virtual-output" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy output
+        Virtual output
       
     </span>
   </a>
@@ -568,10 +579,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-as-input" class="md-nav__link">
+  <a href="#virtual-as-input" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy as input
+        Virtual as input
       
     </span>
   </a>
@@ -1646,16 +1657,27 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
       
         <li class="md-nav__item">
-  <a href="#key-features-what-can-gremlinex-do" class="md-nav__link">
+  <a href="#key-features-what-is-gremlinex" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Features: What can GremlinEx do?
+        Key Features: What is GremlinEx?
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features: What can GremlinEx do?">
+    <nav class="md-nav" aria-label="Key Features: What is GremlinEx?">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#programming-virtual-joystick-and-gamepad-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programming virtual joystick and gamepad devices
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#mapping-and-transforms" class="md-nav__link">
@@ -1691,10 +1713,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-output" class="md-nav__link">
+  <a href="#virtual-output" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy output
+        Virtual output
       
     </span>
   </a>
@@ -1702,10 +1724,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-as-input" class="md-nav__link">
+  <a href="#virtual-as-input" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy as input
+        Virtual as input
       
     </span>
   </a>
@@ -2573,16 +2595,38 @@
 
 
 
-<h1 id="gremlinex-overview">GremlinEx Overview<a class="headerlink" href="#gremlinex-overview" title="Permanent link">¶</a></h1>
-<p>GremlinEx (GEX) combines inputs from joysticks, gamepads, keyboards, mice, hardware panels, and networked controls into mappings for games and other applications. Outputs include vJoy, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.</p>
+<h1 id="gremlinex-gex-overview-updated-for-gex-m77-series">GremlinEx (GEX) Overview - updated for GEX m77 series<a class="headerlink" href="#gremlinex-gex-overview-updated-for-gex-m77-series" title="Permanent link">¶</a></h1>
+<pre><code> THIS DOCUMENTATION IS A WORK IN PROGRESS
+</code></pre>
+<p>GremlinEx (GEX) is an integrator software specifically targetting game and simulator controls.</p>
+<p>GEX combines inputs from joysticks, gamepads, keyboards, mice, hardware panels (some of which can be networked), into mappings for games, simulators, and other applications. Output support features include virtual joysticks, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.  These are used by the target application and look like any regular hardware device connected to the machine.</p>
 <p>This overview covers the <strong>m77 development series</strong>, including its Overlay, Stream Deck, Voice, and AFCS modules. Enable the modules you need in <strong>Options → Modules</strong>; availability can depend on the build and installed dependencies.</p>
-<p>The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.</p>
+<p>By integration, we mean that GEX can combine inputs together from multiple excletic devices into a single, consolidated logical output set, featuring advanced transformations via filters and transformations, and output this to applications running on the same, or different system.</p>
 <p>The project's <a href="https://github.com/muchimi/JoystickGremlinEx">home is on GitHub</a> from where you can download the latest releases and view patch notes.</p>
 <p>The project has a dedicated <a href="https://discord.com/channels/1279461873317707827">Discord server</a> where you can lookup solutions to typical mapping questions, how-to, ask questions and report any issues.</p>
-<h2 id="key-features-what-can-gremlinex-do">Key Features: What can GremlinEx do?<a class="headerlink" href="#key-features-what-can-gremlinex-do" title="Permanent link">¶</a></h2>
-<p>Choose the inputs, outputs, and optional modules needed by your profile.</p>
+<p>GEX is in active development and testing, and relies on feedback from the user community.</p>
+<h2 id="key-features-what-is-gremlinex">Key Features: What is GremlinEx?<a class="headerlink" href="#key-features-what-is-gremlinex" title="Permanent link">¶</a></h2>
+<p>GEX is an open source application, distributed as source code, or a packaged application (.exe), and an installation package for ease of use.</p>
+<p>GEX currently only supports the Windows 10 or 11 x64 operating system due to underlying dependencies, so targets the Windows gaming/simulation platform.</p>
+<p>GEX transforms, applies decision logic using a state machine or conditions, nested modes and concurrent, real time, input from multiple devices to program a profile.  The profile's mappings and design results in a consolidated set of virtual axis, button, hat and keyboard and mouse sent to the target applications based on your preferences.  As such, multiple behaviors can be achieved, from curving an axis, to merging multiple inputs together, to changing the behavior on the fly with modes, states and conditions.  You can output macros, create actions from specific positions on an axis or directional movement, to specifically design the input data seen by the target game or simulator.</p>
+<p>GEX lets you use non traditional inputs, such as input from Streamdeck devices, touch (glass) surfaces, and sound stage controllers (faders, encoders), including over local netowrk, as input into a game that does not support these devices.</p>
+<p>GEX supports remote output to other GEX instances on the local network, and use inputs from devices connected to other computers as well, and fully supports environments like simpits.</p>
+<p>With m77, GEX also gained the ability to manage graphical overlays for in-game for streaming or educational use, optical character recognition, and also has support for web inputs to support non Windows devices like smartphones and touch-enabled tablets.</p>
+<p>To augment the gaming experience, GEX also supports high quality AI based text to speech (TTS), and AI based voice recognition that can be mapped to trigger profile actions you have mapped.  It can also playback multiple audio streams concurrently and perform basic audio filtering like fade-in and fade-out, volume and playback rate manipulations.</p>
+<p>GEX supports custom modules, such as the support for Microsoft Flight Simulator's SDK and API (SimConnect) including support of internal expressions to manage MSFS aircraft, incuding third party add-on products, from within a GEX profile.  This lets you manage MSFS without mapping devices in MSFS.</p>
+<p>GEX is vendor agnostic.  It is compatible with any Windows compatible game controller, keyboard and mouse.  It relies on published hardware API standards that all controllers must follow to be recognized as a Windows controller.  It is not dependent on third party proprietary software.  GEX only uses open source components and works with any application that uses standard keyboard, mouse, DINPUT (and for gamepads, XINPUT) standards, and indeed implements many features of payware applications.</p>
+<h3 id="programming-virtual-joystick-and-gamepad-devices">Programming virtual joystick and gamepad devices<a class="headerlink" href="#programming-virtual-joystick-and-gamepad-devices" title="Permanent link">¶</a></h3>
+<p>The primary purpose of GEX is to take input from joystick, gamepad, keyboard, mouse connected to the computer, and other inputs like OSC or MIDI devices and map them to one or more virtual joysticks (or gamepads) used by games and simulators.  GEX supports the older vJoy/VIGEM virtual devices, and the newer HID Maestro devices.</p>
+<p>GEX supports the following virtual devices that are seen by an application as regular Windows controllers:</p>
+<ul>
+<li><a href="https://github.com/shauleiz/vJoy">vJoy</a> (and derivatives for Windows 11 support) for virtual joysticks - this driver is no longer actively supported by the developer</li>
+<li><a href="https://github.com/nefarius/vigembus">VIGEM</a> for virtual gamepads - this driver is no longer actively supported by the developer</li>
+<li>(recommended) <a href="https://github.com/hifihedgehog/HIDMaestro">HID Maestro</a> for joystick and virtual gamepads via the <a href="https://github.com/muchimi/JoystickGremlinBridge">GEX Maestro Bridge</a> - this driver is actively supported by the developer and does not run in kernel mode.  No additional software is needed as GEX includes all that is needed.</li>
+</ul>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> The bridge software replaces vJoy/VIGEM and may not be used concurrently with vJoy/VIGEM.</p>
+<p>GEX meant to be used in conjunction with <a href="https://github.com/nefarius/hidhide">HID Hide</a>.  This is so the target application only see the virtual devices, not the real devices.</p>
 <h3 id="mapping-and-transforms">Mapping and transforms<a class="headerlink" href="#mapping-and-transforms" title="Permanent link">¶</a></h3>
-<p>GremlinEx (GEX) takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input. GEX also understands network inputs that come from other devices on the network via the OSC protocol.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).  GEX can also remote control other GEX clients on the network, including output of axis, button, keyboard and mouse, as well as two-way controls of hardware panels and glass surfaces via the OSC protocol.</p>
+<p>GremlinEx (GEX) takes input from physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages.  GEX can also optionally read from virtual devices as well.  GEX lets you design a profile to apply a mapping, also known as a transform, to each input on a supported input device.  GEX also understands network inputs that come from other devices on the network via the OSC protocol.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).  GEX can also remote control other GEX clients on the network, including output of axis, button, keyboard and mouse, as well as two-way controls of hardware panels and glass surfaces via the OSC protocol.</p>
 <p>The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.</p>
 <p>Axis (linear) input can be curved and calibrated.  In fact, multiple curves can be applied, and the curves can be conditional as well.  For example, you can invert an axis but only if a condition is true, and when the condition is false, the axis will not be inverted.</p>
 <p>GremlinEx handles multiple inputs and outputs concurrently.  Routing can change mappings based on conditions, modes and states, and this can be changed dynamically on the fly.</p>
@@ -2593,13 +2637,13 @@
 <p>GremlinEx can combine inputs from multiple types of devices:  GremlinEx lets you merge data from different devices (such as axes on two or more controllers), or use controller button and axis values as conditions to decide if other output should go through or not.</p>
 <h3 id="dynamic-routing">Dynamic routing<a class="headerlink" href="#dynamic-routing" title="Permanent link">¶</a></h3>
 <p>Because GremlinEx has conditions and modes and states, you can "route" the input to different outputs, as well as modify the output in a dynamic way. You can take a single input and map it to different outputs depending on what you need.  So a toe brake on a rudder can become an accelerator or brake pedal for a vehicle on the ground, or an up/down strafe if you are in a spaceship, or plain toe brakes if you are in an airplane with differential left and right brakes.   You can have a button that is normally your primary trigger button control different weapon groups depending on the mode GremlinEx is in.  An axis can inverted dynamically, or different response curves applied to control, for example sensitivity.</p>
-<h3 id="vjoy-output">VJoy output<a class="headerlink" href="#vjoy-output" title="Permanent link">¶</a></h3>
+<h3 id="virtual-output">Virtual output<a class="headerlink" href="#virtual-output" title="Permanent link">¶</a></h3>
 <p>The <a href="../actions/map_to_vjoy_user_guide/">Map to vJoy action</a> maps controls to virtual axes, buttons, and hats. It includes output curves, scaling, axis merging, axis-to-button ranges, pulses, and toggles. A game can bind these virtual outputs while HidHide keeps the original hardware out of its input list.</p>
 <p>m77 also expands button-to-axis control with presets, accelerated encoder input, and smooth PID transitions. These controls can adjust trim, flap positions, or a speed limiter without requiring another physical axis.</p>
-<h3 id="vjoy-as-input">VJoy as input<a class="headerlink" href="#vjoy-as-input" title="Permanent link">¶</a></h3>
-<p>GremlinEx supports concurrently VJoy as an output device, as well as VJoy as an input device in the same profile.  When a VJoy device is configured as an input, it will add a new VJoy device to the list of input devices that can be mapped to in GremlinEx. When the VJoy button, hat or axis is set, either by another GremlinEx mapping, or a third party application, the input will trigger and GremlinEx will generate output based on the mappings for that input.</p>
+<h3 id="virtual-as-input">Virtual as input<a class="headerlink" href="#virtual-as-input" title="Permanent link">¶</a></h3>
+<p>GremlinEx supports vJoy and <a href="https://github.com/muchimi/GEXMaestroBridgeService">GEX Maestro Bridge Service</a> virtual joysticks as inputs. Select them under <strong>Profile Settings &gt; Virtual as Input &gt; Configure...</strong>. Each enabled joystick gets its own input tab, where axes, buttons and hats can trigger mappings just like a physical joystick. Maestro input requires a local joystick available through DirectInput; remote output-only devices and virtual output failover devices are not listed.</p>
 <p>By design a mapping that triggers a VJoy output will also trigger that VJoy's input, if mapped and enabled, from the same profile.  This allows VJoy to be used as a bank of axes, hats and buttons for multiple parts of a profile to interact with.  A common scenario is to setup extra VJoy devices to increase the number of buttons, hats and axes GremlinEx can use to keep track of states without having to use custom plugins, or the GremlinEx state machine.</p>
-<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> It is generally discouraged to use the same VJOY device both as input and output in the same profile due to API limitations that can lead to race conditions, execution loops and deadlocks where VJOY devices could become "locked".  This is because the VJOY software is designed for it to be used per process as either input or output, not both (while possible as we work around this in GEX).  VJOY as input is meant to be used as a way to capture VJOY input data set from a different process (application).  It is supported in GEX, but has caveats that need to be considered when designing the profile to avoid these issues.</p>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> It is generally discouraged to use the same VJOY device both as input and output in the same profile due to API limitations that can lead to race conditions, execution loops and deadlocks where VJOY devices could become "locked".  This is because the VJOY software is designed for it to be used per process as either input or output, not both (while possible as we work around this in GEX).  Virtual input on vJoy is meant to be used as a way to capture VJOY input data set from a different process (application).  It is supported in GEX, but has caveats that need to be considered when designing the profile to avoid these issues.</p>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> VJOY input devices tend to create a significant number of inputs that GEX needs to track - up to 140 inputs per VJOY device used as input.  This can degrade user interface (UI) performance and increase the memory footprint at design time because of the need to visualize and track all these inputs.  Use the input filtering option available as of m76T115 to reduce the number of inputs visible in VJOY devices to keep the input count to a reasonable level.  The impact level is based on hardware capabilities, and the total number of inputs managed by GEX.  It is usually not an issue until you start getting into 400 to 500 inputs GEX has to track at the same time at edit time.  This does not impact runtime performance at all.  If you start noticing edit time performance degradation, it is likely due to the number of inputs and filtering should be used to keep that to a reasonable level.</p>
 <h3 id="vjoy-manual-control">VJoy manual control<a class="headerlink" href="#vjoy-manual-control" title="Permanent link">¶</a></h3>
 <p>GremlinEx's Input Viewer can manually set vJoy buttons, hats, and axes to help design and test mappings. The m77 viewer also offers <strong>Select Used</strong> to select inputs and outputs referenced by the current profile. Its state display supports category and attribute filters, including saved state-filter selections.</p>

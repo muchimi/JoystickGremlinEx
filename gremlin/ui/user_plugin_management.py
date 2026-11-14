@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -257,7 +256,7 @@ class ModuleManagementController(QtCore.QObject):
                     instance.set_variable(var.label, profile_var)
 
                 if verbose:
-                    log.info(f"\t{str(profile_var)}")
+                    log.info(f"\t{profile_var!s}")
 
                 ui_element = var.create_ui_element(profile_var.value)
                 var.value_changed.connect(self._create_value_changed_cb(profile_var, ui_element, self._update_value_variable))
@@ -265,7 +264,7 @@ class ModuleManagementController(QtCore.QObject):
             else:
                 syslog.error(f"Invalid variable type encountered in user plugin {instance.parent.file_name} : {var.label}")
                 layout.addWidget(QtWidgets.QLabel(var.label))
-        # Do not addStretch() — it fights the scroll area and hides overflow.
+        # Do not addStretch() â€” it fights the scroll area and hides overflow.
 
     @QtCore.Slot()
     def _update_instance_name_cb(self):
@@ -399,7 +398,7 @@ This is due to the way dynamic module loading and packaging works in Python.
         self.left_panel_widget, self.left_panel_layout = getVContainer(widgets, no_stretch=True)
 
         # Create the right panel which will show the parameters of a
-        # selected module instance (scrollable — plugins can have many rows)
+        # selected module instance (scrollable â€” plugins can have many rows)
         self.right_panel_widget = QtWidgets.QWidget()
         right_layout = QtWidgets.QVBoxLayout(self.right_panel_widget)
         right_layout.setContentsMargins(8, 8, 8, 8)

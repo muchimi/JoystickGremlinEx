@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 #
 # Live axis history for the overlay Temporal graph widget.
 #

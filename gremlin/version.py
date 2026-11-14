@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based on original Joystick Gremlin work by Lionel Ott and other contributors - GremlinEx is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,7 +16,7 @@
 from gremlin.singleton_decorator import SingletonDecorator
 
 APPLICATION_NAME = "GremlinEx"
-APPLICATION_BASE = "m77T99"
+APPLICATION_BASE = "m77T101"
 APPLICATION_MAIN = "1.0ex"
 APPLICATION_EXE = "gremlinex.exe"
 

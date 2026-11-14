@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -229,12 +228,12 @@ class CommandTree:
         for i, key in enumerate(keys):
             # Check if this is the last item at the current depth for formatting lines
             is_last = i == len(keys) - 1
-            marker = "└── " if is_last else "├── "
-            next_indent = indent + ("    " if is_last else "│   ")
+            marker = "â””â”€â”€ " if is_last else "â”œâ”€â”€ "
+            next_indent = indent + ("    " if is_last else "â”‚   ")
 
             if key == self.COMMAND_END:
                 # Highlight the command terminal node
-                syslog.info(f"{indent}{marker}🌟 Trigger -> {current_node[key]}")
+                syslog.info(f"{indent}{marker}ðŸŒŸ Trigger -> {current_node[key]}")
             else:
                 # Print the word node and step deeper into the tree
                 syslog.info(f"{indent}{marker}[{key}]")
@@ -607,7 +606,7 @@ class SpeechRecognizer:
         self.verbose = gremlin.config.Configuration().verbose_mode_voice
 
         if WhisperModel is None:
-            raise RuntimeError("faster_whisper is not installed — cannot start speech recognition")
+            raise RuntimeError("faster_whisper is not installed â€” cannot start speech recognition")
 
         voice = Voice()
 

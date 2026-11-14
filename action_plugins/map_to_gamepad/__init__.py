@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -179,7 +178,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
 
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose:
-            syslog.error(f"VIGEM: event: {str(event)}")
+            syslog.error(f"VIGEM: event: {event!s}")
 
         (is_local, is_remote) = self.action_data.sendFlags()
         if event.force_remote:
@@ -271,7 +270,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                     auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl]
                     if auto_release:
                         if verbose:
-                            syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+                            syslog.info(f"VjoyRemap: autorelease enabled for {event!s}")
                         event_release = event.clone()
                         event_release.is_pressed = False
                         def callback():

@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -49,6 +47,7 @@ import gremlin.singleton_decorator
 
 # import queue
 from gremlin.fastqueue import FastQueue
+from gremlin.ffmpeg import configure_ffmpeg
 import enum
 import time
 from psygnal import Signal
@@ -95,7 +94,15 @@ if USE_SD:
     import numpy as np  # for sound device library
     import concurrent.futures  # for thread pool of concurrent playback
     import pyrubberband as pyrb  # for sound sample rate modification
+
+    # pydub resolves its converter during import; make bundled tools visible first.
+    _audio_data_path = getattr(getattr(gremlin, "shared_state", None), "data_path", None)
+    _audio_tool_dirs = [os.path.join(_audio_data_path, "ffmpeg")] if _audio_data_path else []
+    _pydub_converter = configure_ffmpeg(extra_dirs=_audio_tool_dirs)
     from pydub import AudioSegment  # for audio format conversion
+
+    if _pydub_converter:
+        AudioSegment.converter = _pydub_converter
 
     from scipy import signal  # for audio resampling if needed
 
@@ -752,10 +759,6 @@ class Sound:
         self.monitor.start()
 
         self._active_sounds = 0  # number of active sounds
-
-        # If running in a PyInstaller bundle, add the temporary folder to the PATH
-        if hasattr(sys, "_MEIPASS"):
-            os.environ["PATH"] = sys._MEIPASS + os.pathsep + os.environ["PATH"]
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
@@ -2441,53 +2444,25 @@ class Sound:
     def convertMp3ToWav_pydub(self, mp3_file: str, wav_file: str) -> bool:
         """Converts an MP3 file to WAV format."""
         try:
+            if not self.ensureFFmpeg():
+                return False
             audio = AudioSegment.from_mp3(mp3_file)
             audio.export(wav_file, format="wav")
             return True
         except Exception as e:
-            syslog.error(f"Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
+            syslog.error(f"Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {e!s}")
             return False
 
     def ensureFFmpeg(self) -> bool:
         try:
+            self._ffmpeg_exe = configure_ffmpeg(self._ffmpeg_exe, extra_dirs=[self._ffmpeg_download_dir()])
             if self._ffmpeg_exe:
-                return True
-
-            candidates = []
-
-            if getattr(sys, "frozen", False):
-                # Packaged exe: ffmpeg ships next to the binary under _internal
-                current_dir = os.path.dirname(sys.executable)
-                candidates.append(os.path.join(current_dir, "_internal", "ffmpeg.exe"))
-                candidates.append(os.path.join(current_dir, "ffmpeg", "ffmpeg.exe"))
-                # look for the usual ffmpeg installation folders
-                folders = ["c:\\ffmpeg", "C:\\ffmpeg\\bin", "C:\\Program Files\\ffmpeg\\bin"]
-                for folder in folders:
-                    if os.path.isdir(folder):
-                        candidates.append(os.path.join(folder, "ffmpeg.exe"))
-            else:
-                # Script mode: look next to gremlinEx.py
-                main_module = sys.modules.get("__main__")
-                if main_module is not None and hasattr(main_module, "__file__") and main_module.__file__:
-                    current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
-                    candidates.append(os.path.join(current_dir, "ffmpeg", "ffmpeg.exe"))
-
-            for ffmpeg_exe in candidates:
-                if os.path.isfile(ffmpeg_exe):
-                    self._ffmpeg_exe = ffmpeg_exe
-                    return True
-
-            # Fall back to ffmpeg on the system PATH
-            path_ffmpeg = shutil.which("ffmpeg")
-            if path_ffmpeg:
-                self._ffmpeg_exe = path_ffmpeg
-                syslog.info(f"FFmpeg found on PATH: {path_ffmpeg}")
                 return True
 
             # Last resort: auto-download a static build into a writable folder
             downloaded = self._downloadFFmpeg()
             if downloaded and os.path.isfile(downloaded):
-                self._ffmpeg_exe = downloaded
+                self._ffmpeg_exe = configure_ffmpeg(downloaded)
                 syslog.info(f"FFmpeg auto-downloaded: {downloaded}")
                 return True
 
@@ -2663,7 +2638,6 @@ class Sound:
                 syslog.error(f"ETTS: Failed to remove temporary file: {str(e)}")
 
         return os.path.isfile(wav)
-
 
 
 class GenerateDialog(QtWidgets.QDialog):

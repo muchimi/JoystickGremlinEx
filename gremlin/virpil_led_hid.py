@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -118,7 +117,7 @@ class VirpilLedHid:
         self._lock = threading.RLock()
         # key: (vid, pid) -> hid.Device
         self._devices: dict[tuple[int, int], hid.Device] = {}
-        # paths that failed recently — avoid hammering logs
+        # paths that failed recently â€” avoid hammering logs
         self._fail_logged: set[tuple[int, int]] = set()
 
     def close_all(self):

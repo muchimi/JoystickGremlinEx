@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 """AFCS visual axis-flow designer and runtime."""
 

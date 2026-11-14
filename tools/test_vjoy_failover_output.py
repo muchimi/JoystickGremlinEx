@@ -35,8 +35,8 @@ def load(path, names, namespace, methods=None):
 
 
 def device(kind, *, connected=True, failover=False):
-    return NS(device_guid=f"{kind.name}-1", name=f"{kind.name} 1", device_type=kind, is_virtual=True,
-              vjoy_id=1 if kind == DeviceType.VJoy else -1, virtual_id=1,
+    return NS(device_guid=f"{kind.name}-1", name="gex-1" if kind == DeviceType.Maestro else "VJoy 1", device_type=kind, is_virtual=True,
+              vjoy_id=1 if kind == DeviceType.VJoy else -1, virtual_id=0 if kind == DeviceType.Maestro else 1,
               connected=connected, button_count=128, data={"failover": failover})
 
 
@@ -74,15 +74,15 @@ class FailoverOutputChecks(unittest.TestCase):
             InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, time=time,
             syslog=logging.getLogger("failover-output-checks"), VJoyProxy=self.native,
             MessageBoxWarning=self.warning,
-            getDevice=self.handling.getDevice, _output_targets={}, _OUTPUT_MISSING=object(),
+            getDevice=self.handling.getDevice, _output_targets={}, _output_targets_failover=None, _OUTPUT_MISSING=object(),
             _all_devices_map={dev.device_guid: dev for dev in self.devices},
-            vjoy_devices=lambda connected_only=True: [dev for dev in self.devices
+            _native_vjoy_devices=lambda connected_only=True: [dev for dev in self.devices
                 if dev.device_type == DeviceType.VJoy and (dev.connected or not connected_only)],
             maestro_devices=lambda: [dev for dev in self.devices if dev.device_type == DeviceType.Maestro],
             VJoyRemapWidget=NS(input_type_buttons=[InputType.JoystickButton]),
         )
         load("gremlin/joystick_handling.py", {
-            "OutputTarget", "_find_output_target", "get_output_target", "get_output_device", "parse_virtual_device_key",
+            "OutputTarget", "_maestro_failover_id", "_maestro_output_summary", "_find_output_target", "get_output_target", "get_output_device", "parse_virtual_device_key",
             "get_virtual_device", "virtual_device_key", "resolve_output_targets",
         }, self.namespace)
         for name in ("get_output_target", "get_output_device", "get_virtual_device", "virtual_device_key",
@@ -95,6 +95,7 @@ class FailoverOutputChecks(unittest.TestCase):
         })
         self.functor = self.namespace["VJoyRemapFunctor"]()
         f = self.functor
+        f._valid = True
         f.verbose = f.verbose_extra = False
         f.input_type = InputType.JoystickButton
         f.action_mode = VjoyAction.VJoyButton
@@ -145,15 +146,74 @@ class FailoverOutputChecks(unittest.TestCase):
         self.remote.send_button.assert_called_once_with(1, 1, True, client_list=[0], force_remote=False)
         self.native.assert_not_called()
 
-    def test_profile_start_uses_same_index_maestro(self):
+    def test_profile_start_uses_failover_maestro_summary_and_backend(self):
         self.assertEqual(self.use_maestro().kind, "maestro")
+        self.assertIs(self.functor._target_device(1), self.maestro)
+        key = self.functor.getSteppedIndexDataKey()
+        self.maestro.data[key] = "Previous run"
+        self.vjoy.data[key] = "Placeholder metadata"
         self.functor.profile_start()
+        self.assertIs(self.functor.device, self.maestro)
+        self.assertNotIn(key, self.maestro.data)
+        self.assertIn(key, self.vjoy.data)
         self.assertTrue(self.button.is_pressed)
+        self.start.setStartState.assert_called_once_with(1, 1, True)
+        self.remote.send_button.assert_called_once_with(1, 1, True, client_list=[0], force_remote=False)
         self.native.assert_not_called()
+
+    def test_target_device_returns_failover_instead_of_vjoy_placeholder(self):
+        self.maestro.virtual_id = 1
+        self.use_maestro()
+        self.assertIs(self.functor._target_device(1), self.maestro)
+
+    def test_profile_start_finds_maestro_without_registered_vjoy_placeholder(self):
+        self.devices.clear()
+        self.handling.getDeviceFromVjoyId = lambda index: None
+        self.use_maestro()
+        self.functor.profile_start()
+        self.assertIs(self.functor.device, self.maestro)
+        self.assertTrue(self.button.is_pressed)
+        self.assertTrue(self.functor._valid)
+        self.native.assert_not_called()
+
+    def test_failover_uses_gex_identity_for_all_vjoy_ids_despite_slot_order(self):
+        self.devices.clear()
+        for device_id in range(1, 17):
+            maestro = device(DeviceType.Maestro)
+            maestro.name = f"gex-{device_id}"
+            maestro.device_guid = f"Maestro-{device_id}"
+            maestro.virtual_id = 16 - device_id
+            maestro.data["maestro_key"] = f"maestro://127.0.0.1:8010/gex-{device_id}"
+            self.devices.append(maestro)
+        for device_id in range(1, 17):
+            with self.subTest(vjoy_id=device_id):
+                target = self.target(device_id)
+                self.assertIs(target.device, self.devices[device_id - 1])
+                self.assertIs(self.functor._target_device(device_id), target.device)
+                self.assertEqual(target.out_id, 16 - device_id)
+                self.assertEqual(target.remote_id, device_id)
+
+    def test_renamed_maestro_keeps_failover_identity_and_gamepad_does_not_take_it(self):
+        self.maestro.name = "Pilot controls"
+        self.maestro.virtual_id = 7
+        self.maestro.data["maestro_key"] = "maestro://127.0.0.1:8010/gex-1"
+        gamepad = device(DeviceType.Maestro)
+        gamepad.name, gamepad.virtual_id = "gex-gp-1", 0
+        gamepad.data["maestro_key"] = "maestro://127.0.0.1:8010/gex-gp-1"
+        self.devices.append(gamepad)
+        self.assertIs(self.use_maestro().device, self.maestro)
+        self.assertIs(self.functor._target_device(1), self.maestro)
+        self.assertEqual(self.target().out_id, 7)
+
+    def test_gamepad_alone_does_not_impersonate_gex_joystick(self):
+        self.maestro.name = "gex-gp-1"
+        self.maestro.data["maestro_key"] = "maestro://127.0.0.1:8010/gex-gp-1"
+        self.assertIsNone(self.use_maestro())
 
     def test_disabled_failover_does_not_use_maestro(self):
         self.config.virtual_output_failover = False
         self.assertIsNone(self.use_maestro())
+        self.assertIs(self.functor._target_device(1), self.vjoy)
         self.functor.profile_start()
         self.assertFalse(self.button.is_pressed)
         self.native.assert_not_called()
@@ -170,15 +230,19 @@ class FailoverOutputChecks(unittest.TestCase):
     def test_missing_maestro_can_fall_back_to_real_vjoy(self):
         self.vjoy.data.clear()
         self.maestro.connected = False
+        self.maestro.virtual_id = 7
+        self.maestro.data["maestro_key"] = "maestro://127.0.0.1:8010/gex-1"
         self.devices.append(self.maestro)
         self.functor.action_data.virtual_device = self.maestro
         self.assertEqual(self.target(self.maestro.device_guid).kind, "vjoy")
+        self.assertIs(self.functor._target_device(7), self.vjoy)
         self.assertTrue(self.functor._is_output_connected(1))
         self.assertIs(self.functor._output_device(1), self.backend)
 
     def test_native_vjoy_still_takes_precedence(self):
         self.vjoy.data.clear()
         self.assertEqual(self.use_maestro().kind, "vjoy")
+        self.assertIs(self.functor._target_device(1), self.vjoy)
         self.functor.profile_start()
         self.assertTrue(self.button.is_pressed)
         self.native.assert_called()
@@ -260,7 +324,7 @@ class FailoverOutputChecks(unittest.TestCase):
         self.actions.extend([self.remap(self.vjoy), self.remap(self.maestro)])
         self.runner._warn_missing_virtual_outputs(self.profile)
         self.warning.assert_called_once()
-        self.assertIn("- Maestro 1", self.warning.call_args.kwargs["prompt"])
+        self.assertIn("- gex-1", self.warning.call_args.kwargs["prompt"])
         self.assertNotIn("- VJoy 1", self.warning.call_args.kwargs["prompt"])
 
     def test_macro_split_merge_and_start_values_are_checked(self):
@@ -314,6 +378,34 @@ class FailoverOutputChecks(unittest.TestCase):
         self.warning.assert_called_once()
         context.reset.assert_called_once_with(force_rebuild=True)
         self.runner.stop.assert_called_once()
+
+    def test_start_resolves_maestro_before_building_profile_functors(self):
+        self.assertIsNone(self.target())  # A missing target was cached before startup.
+        self.devices.append(self.maestro)
+        self.actions.append(self.remap(self.vjoy))
+        services = self.namespace["gremlin"]
+        services.event_handler = NS(EventListener=Mock(), EventHandler=Mock())
+
+        class BuildBoundary(Exception):
+            pass
+
+        context = Mock(getLastBuildError=Mock(side_effect=BuildBoundary))
+        services.execution_graph = NS(ExecutionContext=lambda: context)
+
+        def build_functors(**options):
+            target = self.target()
+            self.assertIs(target.device, self.maestro)
+            target._maestro = self.backend
+            self.functor.profile_start()
+
+        context.reset.side_effect = build_functors
+        with self.assertRaises(BuildBoundary):
+            self.runner.start({}, self.profile.settings, "Default", self.profile)
+        self.assertIs(self.functor.device, self.maestro)
+        self.assertTrue(self.button.is_pressed)
+        self.assertTrue(self.functor._valid)
+        self.warning.assert_not_called()
+        self.native.assert_not_called()
 
 
 if __name__ == "__main__":

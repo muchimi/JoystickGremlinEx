@@ -1,3 +1,19 @@
+
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 VGamepad API (Windows)  adapted from Yann Boutellier's vgamepad libary and Nefarius' VIGEM SDK samples
 
@@ -14,7 +30,10 @@ syslog = logging.getLogger("system")
 
 def check_err(err):
     if err != vcom.VIGEM_ERRORS.VIGEM_ERROR_NONE:
-        syslog.warning(f"VIGEM error: {vcom.VIGEM_ERRORS(err).name}")
+        if err == vcom.VIGEM_ERRORS.VIGEM_ERROR_BUS_NOT_FOUND:
+            syslog.info("VIGEM bus not found") # normal error if not installed
+        else:
+            syslog.warning(f"VIGEM error: {vcom.VIGEM_ERRORS(err).name}")
         return False
     return True
 
@@ -254,7 +273,7 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbRY = value
-        
+
 
     def right_joystick_float(self, x_value_float, y_value_float):
         """
@@ -290,7 +309,7 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbLY = value
-                
+
 
     def right_joystick_float_x(self, value_float):
         """
@@ -309,7 +328,7 @@ class VX360Gamepad(VGamepad):
         """
         value = round(value_float * 32767)
         self.report.sThumbRY = value
-        
+
 
     def update(self):
         """

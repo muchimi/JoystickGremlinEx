@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # MaptoState - maps to a state
 

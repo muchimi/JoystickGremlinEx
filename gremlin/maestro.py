@@ -1,5 +1,4 @@
-﻿# -*- coding: utf-8; -*-
-
+﻿
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -872,6 +871,14 @@ class MaestroController:
     axis_names: tuple = AXIS_NAMES
     kind: str = "custom"
     profile_type: str = ""
+    identity_key: str | None = None
+    instance_token: str | None = None
+    hid_parent_id_prefix: str | None = None
+    hid_path: str | None = None
+    hid_index: int | None = None  # zero-based position in the complete HIDAPI scan
+    windows_order: int | None = None  # one-based position among active GEX joysticks
+    hid_order_valid: bool | None = None
+    native_guids: tuple = ()  # HID/XUSB aliases verified against this instance
 
     @property
     def is_gamepad(self) -> bool:
@@ -990,6 +997,9 @@ class Maestro:
         self._controller_map = {}  # holds index to MaestroController mapping [int] -> MaestroController
         self._name_map = {}  # holds lower case controller names to the controller value [str] -> MaestroController
         self._device_map = {}  # holds dinput DeviceSummary map for the Maestro devices [index] -> DeviceSummary
+        self._known_service_devices = None  # authoritative saved definitions, keyed by endpoint/device identity
+        self._active_service_devices = {}
+        self._native_gamepad_inputs = []
         self._buffer_map = {}
         self._lock = threading.RLock()
         self._sync_lock = threading.Lock()
@@ -1000,6 +1010,7 @@ class Maestro:
         self._initialized = False
         self._shutdown_connected = False
         self._local_service = True
+        self._last_hid_order_report = None
         self._default_devices_prompted = False # flag that tracks if the user should be prompted for default devices if no maestro devices are found
         self._no_connection_warning_issued = False  # flag to issue log file warnings on initial connect
 
@@ -1382,6 +1393,9 @@ class Maestro:
                 self._controller_map.clear()
                 self._device_map.clear()
                 self._buffer_map.clear()
+                self._known_service_devices = None
+                self._active_service_devices.clear()
+                self._native_gamepad_inputs.clear()
                 from gremlin import joystick_handling
 
                 joystick_handling.set_maestro_devices([])
@@ -1502,6 +1516,9 @@ class Maestro:
             profile_type=capabilities.get("type") or "",
             host=self.client.host,
             port=self.client.port,
+            identity_key=info.get("identityKey"),
+            instance_token=info.get("instanceToken"),
+            hid_parent_id_prefix=info.get("hidParentIdPrefix"),
         )
         with self._lock:
             self._controller_map[index] = controller
@@ -1519,15 +1536,17 @@ class Maestro:
             self._dirty = True
         return controller
 
-    def LoadActiveControllers(self, device_map=None):
+    def LoadActiveControllers(self, device_map=None, *, snapshot=None):
         """Attach selected active definitions without recreating hardware."""
         if not self.initialized:
             return
         config = gremlin.config.Configuration()
         if device_map is None:
             device_map = config.maestro_device_map
-        definitions = {d["id"]: d for d in self.client.list("/maestro_definitions")}
-        host_devices = {d["id"]: d for d in self.client.list("/maestro_devices")}
+        if snapshot is None:
+            snapshot = dict(definitions=self.client.list("/maestro_definitions"), devices=self.client.list("/maestro_devices"))
+        definitions = {d["id"]: d for d in snapshot["definitions"] if is_valid_gex_id(d["id"])}
+        host_devices = {d["id"]: d for d in snapshot["devices"]}
 
         devices = {}
         for info in host_devices.values():
@@ -1568,7 +1587,16 @@ class Maestro:
                 name_map[controller.name.casefold()] = controller
         with self._lock:
             self._controller_map = active
-            self._device_map = {i: d for i, d in self._device_map.items() if i in active}
+            self._active_service_devices = host_devices
+            self._known_service_devices = {
+                f"maestro://{self.client.host}:{self.client.port}/{device_id}": dict(definition, active=device_id in host_devices)
+                for device_id, definition in definitions.items()
+            }
+            previous_devices = {d.data.get("maestro_key"): d for d in self._device_map.values()}
+            self._device_map = {
+                index: previous_devices[controller.key]
+                for index, controller in active.items() if controller.key in previous_devices
+            }
             self._buffer_map = {i: b for i, b in self._buffer_map.items() if i in active}
             self._name_map = name_map
             self._dirty = True
@@ -1720,45 +1748,243 @@ class Maestro:
         with self._lock:
             if not self._local_service:
                 return False
-            return self._controller_map.keys() != self._device_map.keys()
+            return any(
+                index not in self._device_map or not self._device_map[index].input_enabled
+                or (getattr(controller, "instance_token", None)
+                    and re.fullmatch(r"gex-([1-9]|1[0-6])", controller.id) and controller.windows_order is None)
+                or getattr(controller, "hid_order_valid", None) is False
+                for index, controller in self._controller_map.items()
+            )
+
+    def _scan_hid_order(self):
+        """Correlate actual HID paths to bridge instance tokens, not transport slots."""
+        verbose = gremlin.config.Configuration().verbose_mode_maestro
+        with self._lock:
+            controllers = [controller for controller in self._controller_map.values()
+                           if getattr(controller, "instance_token", None)
+                           and re.fullmatch(r"gex-([1-9]|1[0-6])", controller.id)]
+        if not self._local_service or not controllers:
+            return
+        from gremlin.maestro_identity import inspect_hid_order
+        scan_error = None
+        try:
+            from gremlin.hid import enumerate_devices
+
+            # Unselected bridge devices still occupy positions in Windows.
+            identities = self.client.list("/maestro_devices")
+            rows = enumerate_devices()
+        except (OSError, RuntimeError, TimeoutError, ValueError) as error:
+            scan_error = str(error)
+            identities = [dict(id=c.id, instanceToken=c.instance_token) for c in controllers]
+            rows = []
+        report = inspect_hid_order(identities, rows)
+        with self._lock:
+            for controller in controllers:
+                match = report["devices"].get(controller.id, {})
+                controller.hid_path = match.get("path")
+                controller.hid_index = match.get("hid_index")
+                controller.windows_order = match.get("windows_order")
+                # Missing/pending HID identities must not reuse an earlier
+                # successful scan or permit an unverified automatic alias.
+                controller.hid_order_valid = report["verified"] and controller.id in report["devices"]
+            if verbose:
+                syslog.info(f"MAESTRO: HID order scan report: {report}")
+                device = self._device_map.get(controller.index)
+                if device is not None and device.data.get("maestro_key") == controller.key:
+                    device.data.update(maestro_hid_path=controller.hid_path,
+                                       maestro_hid_index=controller.hid_index,
+                                       maestro_windows_order=controller.windows_order,
+                                       maestro_hid_order_valid=controller.hid_order_valid)
+        signature = (tuple(report["order"]), tuple(report["expected_order"]), report["verified"],
+                     bool(report["ambiguous"]), scan_error)
+        changed = signature != self._last_hid_order_report
+        self._last_hid_order_report = signature
+        if changed:
+            from gremlin import joystick_handling
+            joystick_handling._output_targets.clear()
+        if changed and scan_error:
+            syslog.warning(f"MAESTRO: unable to verify Windows HID order; automatic vJoy failover is unavailable: {scan_error}")
+        elif changed and (report["mismatch"] or report["ambiguous"]):
+            syslog.error(f"MAESTRO: Windows HID order {report['order']} does not match {report['expected_order']}; automatic vJoy failover is unavailable. "
+                         "Use the updated bridge to recreate controllers with ordered identities.")
+        elif changed and report["verified"]:
+            if verbose:
+                syslog.info(f"MAESTRO: Windows HID order verified: {', '.join(report['order'])}")
 
     def syncDinput(self):
-        """Retain known native GUIDs, then match new devices by name and capabilities."""
+        """Match native instance identities before cached GUIDs and display names."""
         if not self._local_service:
             with self._lock:
                 self._device_map.clear()
+                self._native_gamepad_inputs = []
+                for controller in self._controller_map.values():
+                    controller.native_guids = ()
             return
+        self._scan_hid_order()
         devices = dinput.DILL.getDevices()
         with self._lock:
+            owners = {c.key: c for c in self._controller_map.values()}
+            for row in self._active_service_devices.values():
+                if not is_valid_gex_id(row["id"]):
+                    continue
+                key = f"maestro://{self.client.host}:{self.client.port}/{row['id']}"
+                definition = (self._known_service_devices or {}).get(key, {})
+                if key in owners or not (definition.get("kind") == "gamepad" or str(row.get("type", "")).casefold() == "gamepad"):
+                    continue
+                profile = row.get("maestroProfile") or {}
+                owners[key] = SimpleNamespace(
+                    key=key, id=row["id"], name=row["name"], instance_token=row.get("instanceToken"),
+                    identity_key=row.get("identityKey"),
+                    profile=SimpleNamespace(VendorId=profile.get("vendorId", row.get("vendorId", -1)),
+                                            ProductId=profile.get("productId", row.get("productId", -1))),
+                )
+        identities = {}
+        if owners:
+            read_identities = getattr(dinput.DILL, "get_device_identities", None)
+            if read_identities is not None:
+                try:
+                    identities = read_identities([d.device_guid for d in devices])
+                except (OSError, RuntimeError):
+                    syslog.exception("MAESTRO: unable to read native gamepad identities")
+        from gremlin.maestro_identity import instance_token_for_key, matches_instance
+
+        def native_identity(device):
+            return identities.get(str(device.device_guid).strip("{}").replace("-", "").casefold(), {})
+
+        def native_container(device):
+            return str(native_identity(device).get("container_id") or "").strip("{}").casefold()
+
+        def native_priority(device, owner):
+            return (device.vendor_id != owner.profile.VendorId or device.product_id != owner.profile.ProductId,
+                    str(device.device_guid))
+
+        with self._lock:
             mapped = {}
+            claimed_guids = set()
+            candidates_by_index = {}
+            identity_groups = {}
+            for key, owner in owners.items():
+                if owner.instance_token:
+                    identity_groups[key] = [d for d in devices if matches_instance(native_identity(d), owner.instance_token)]
+                else:
+                    # GEX service keys predate the OSC identity fields.
+                    # Recover that exact SDK identity before falling back to names.
+                    legacy_key = owner.identity_key or "MaestroOscService:" + owner.id
+                    token = instance_token_for_key(legacy_key)
+                    identity_groups[key] = [d for d in devices if matches_instance(native_identity(d), token)]
+                    if identity_groups[key]:
+                        continue
+                    # Older bridges omit the token. Require a uniquely named
+                    # Maestro container, rather than merging unrelated controllers.
+                    containers = {
+                        native_container(d)
+                        for d in devices if d.name == owner.name
+                        and d.vendor_id == owner.profile.VendorId and d.product_id == owner.profile.ProductId
+                    }
+                    containers = {value for value in containers if value.startswith("48494430-4d41-4553-")}
+                    identity_groups[key] = [d for d in devices if native_container(d) in containers] if len(containers) == 1 else []
+            # Never claim an interface whose identity matches multiple owners.
+            ambiguous_guids = {d.device_guid for d in devices
+                               if sum(d in group for group in identity_groups.values()) > 1}
+            verified_owners = {d.device_guid: key for key, group in identity_groups.items() for d in group
+                               if d.device_guid not in ambiguous_guids}
             for index, controller in self._controller_map.items():
+                verified = [d for d in identity_groups.get(controller.key, []) if d.device_guid not in ambiguous_guids]
+                controller.native_guids = tuple(d.device_guid for d in verified)
                 candidates = [
                     d
                     for d in devices
                     if d.vendor_id == controller.profile.VendorId
                     and d.product_id == controller.profile.ProductId
-                    and (d.axis_count, d.button_count, d.hat_count)
-                    == (controller.axis_count, controller.button_count, controller.hat_count)
+                    and d.device_guid not in ambiguous_guids
+                    and verified_owners.get(d.device_guid, controller.key) == controller.key
+                    and not (native_identity(d) and d not in verified)
+                    and ((d.axis_count, d.button_count, d.hat_count)
+                         == (controller.axis_count, controller.button_count, controller.hat_count)
+                         or (controller.is_gamepad and not controller.instance_token and d.name == controller.name))
                 ]
+                candidates_by_index[index] = verified or candidates
                 previous = self._device_map.get(index)
                 if previous is not None and previous.data.get("maestro_key") == controller.key:
-                    matches = [d for d in candidates if d.device_guid == previous.device_guid]
+                    matches = [
+                        d for d in candidates_by_index[index]
+                        if d.device_guid == previous.device_guid and d.device_guid not in claimed_guids
+                    ]
                     if len(matches) == 1:
                         mapped[index] = matches[0]
-                        continue
-                matches = [d for d in candidates if d.name == controller.name]
+                        claimed_guids.add(matches[0].device_guid)
+            # Reserve all known identities before matching new controllers by name.
+            for index, controller in self._controller_map.items():
+                if index in mapped:
+                    continue
+                if identity_groups.get(controller.key) and controller.native_guids:
+                    matches = [d for d in candidates_by_index[index] if d.device_guid not in claimed_guids]
+                    matches.sort(key=lambda d: native_priority(d, controller))
+                    if matches:
+                        mapped[index] = matches[0]
+                        claimed_guids.add(matches[0].device_guid)
+                    continue
+                matches = [
+                    d for d in candidates_by_index[index]
+                    if d.name == controller.name and d.device_guid not in claimed_guids
+                ]
                 if len(matches) == 1:
                     mapped[index] = matches[0]
+                    claimed_guids.add(matches[0].device_guid)
             self._device_map = mapped
+            # Unselected local gamepads are still real input devices. Publish
+            # their single native identity without assigning an output slot.
+            attached_keys = {c.key for c in self._controller_map.values()}
+            previous_inputs = {d.data["maestro_key"]: d.device_guid for d in self._native_gamepad_inputs}
+            self._native_gamepad_inputs = []
+            for key, owner in owners.items():
+                if key in attached_keys:
+                    continue
+                group = [d for d in identity_groups[key] if d.device_guid not in ambiguous_guids]
+                group.sort(key=lambda d: (d.device_guid != previous_inputs.get(key),
+                                          *native_priority(d, owner)))
+                if not group:
+                    continue
+                native = group[0]
+                native.data.pop("maestro_output_summary", None)
+                native.data.update(maestro_key=key, maestro_native_guids=tuple(d.device_guid for d in group),
+                                   maestro_native_input=True)
+                native.name = owner.name
+                native.device_type = gremlin.types.DeviceType.Maestro
+                native.setVirtual(True)
+                native.setGamepad(True)
+                native.device_category = gremlin.types.DeviceCategory.Virtual
+                native.virtual_id = native.vjoy_id = -1
+                native.setAxisCallback(None)
+                native.setButtonCallback(None)
+                native.setHatCallback(None)
+                self._native_gamepad_inputs.append(native)
 
-    def syncBridge(self) -> list[DeviceSummary]:
+    def syncBridge(self, *, snapshot=None) -> list[DeviceSummary]:
         """Load the bridge's active devices (JSON) into the controller map and publish them to the device list."""
         if not self.enabled:
+            if snapshot is not None:
+                from gremlin import joystick_handling
+
+                known_devices = {
+                    f"maestro://{self.client.host}:{self.client.port}/{row['id']}": dict(
+                        row, active=any(device["id"] == row["id"] for device in snapshot["devices"]))
+                    for row in snapshot["definitions"] if is_valid_gex_id(row["id"])
+                }
+                with self._lock:
+                    self._controller_map.clear()
+                    self._device_map.clear()
+                    self._buffer_map.clear()
+                    self._name_map.clear()
+                    self._known_service_devices = known_devices
+                    self._active_service_devices = {row["id"]: row for row in snapshot["devices"]}
+                self.syncDinput()
+                joystick_handling.set_maestro_devices(self._native_gamepad_inputs, known_devices=known_devices)
             return []
-        self.LoadActiveControllers()
+        self.LoadActiveControllers(snapshot=snapshot)
         self.populateDeviceList()
         with self._lock:
-            return [self._device_map[c.key] for c in self._controller_map.values() if c.key in self._device_map]
+            return list(self._device_map.values())
 
     def controllerGuid(self, controller: MaestroController) -> dinput.GUID:
         """Generate a stable GUID for the given controller based on its ID and the host endpoint."""
@@ -1797,22 +2023,59 @@ class Maestro:
                         device.axis_names[axis] = name
                     device.setConnected(True)
                     device.input_enabled = False
-                axis_map = dict(device.axis_id_map)
-                device.setAxisCallback(
-                    lambda axis, i=index, mapping=axis_map: self._read_axis_raw(i, mapping.get(axis, axis))
-                )
-                device.setButtonCallback(lambda button, i=index: self._read_button(i, button))
-                device.setHatCallback(lambda hat, i=index: self._read_hat(i, hat))
+                if controller.is_gamepad and device.input_enabled:
+                    # Native DirectInput layouts can combine triggers and expose
+                    # fewer buttons than the bridge's addressable output state.
+                    device.setAxisCallback(None)
+                    device.setButtonCallback(None)
+                    device.setHatCallback(None)
+                else:
+                    axis_map = dict(device.axis_id_map)
+                    device.setAxisCallback(
+                        lambda axis, i=index, mapping=axis_map: self._read_axis_raw(i, mapping.get(axis, axis))
+                    )
+                    device.setButtonCallback(lambda button, i=index: self._read_button(i, button))
+                    device.setHatCallback(lambda hat, i=index: self._read_hat(i, hat))
                 device.name = controller.name
+                device.data.pop("maestro_output_summary", None)
+                device.data["maestro_key"] = controller.key
                 device.device_type = DeviceType.Maestro
                 device.device_category = DeviceCategory.Virtual
                 device.setVirtual(True)
                 device.setGamepad(controller.is_gamepad)
                 device.virtual_id = index
-                device.data["maestro_key"] = controller.key
+                device.data["maestro_instance_token"] = controller.instance_token
+                device.data["maestro_native_guids"] = controller.native_guids
+                device.data["maestro_hid_path"] = controller.hid_path
+                device.data["maestro_hid_index"] = controller.hid_index
+                device.data["maestro_windows_order"] = controller.windows_order
+                device.data["maestro_hid_order_valid"] = controller.hid_order_valid
+                device.set_vjoy_id(joystick_handling._maestro_failover_id(device) or -1)
+                if controller.is_gamepad and device.input_enabled:
+                    device.data["maestro_native_input"] = True
+                    # DirectInput's combined triggers/button layout is an input
+                    # view. Output selectors still need the full bridge layout.
+                    import copy
+
+                    output = copy.copy(device)
+                    output.data = dict(device.data)
+                    output.data.pop("maestro_native_input", None)
+                    output.input_enabled = False
+                    # Output profiles already use the stable service identity;
+                    # discovering a native interface must not change that GUID.
+                    output.device_guid = self.controllerGuid(controller)
+                    output.axis_count, output.button_count, output.hat_count = (
+                        controller.axis_count, controller.button_count, controller.hat_count)
+                    output.axis_id_map = {axis: axis for axis in range(1, controller.axis_count + 1)}
+                    output.linear_id_map = dict(output.axis_id_map)
+                    output.axis_names = dict(enumerate(controller.axis_names, 1))
+                    output.setAxisCallback(lambda axis, i=index: self._read_axis_raw(i, axis))
+                    output.setButtonCallback(lambda button, i=index: self._read_button(i, button))
+                    output.setHatCallback(lambda hat, i=index: self._read_hat(i, hat))
+                    device.data["maestro_output_summary"] = output
                 devices.append(device)
-                self._device_map[controller.key] = device
-        joystick_handling.set_maestro_devices(devices)
+                self._device_map[index] = device
+        joystick_handling.set_maestro_devices(devices + self._native_gamepad_inputs, known_devices=self._known_service_devices)
 
     def getDeviceAt(self, index: int) -> DeviceSummary:
         """Return the device at the given index, if it exists."""
@@ -1820,9 +2083,9 @@ class Maestro:
             controller = self._controller_map.get(index)
             if controller is None:
                 return None
-            if controller.key not in self._device_map:
+            if index not in self._device_map:
                 self.populateDeviceList()
-            return self._device_map.get(controller.key)
+            return self._device_map.get(index)
 
     def getMaestroControllerAt(self, index: int) -> MaestroController:
         """Return the maestro controller at the given index, if it exists."""
@@ -3063,6 +3326,14 @@ class MaestroDialog(QRememberDialog):
             if caps is not None:
                 capabilities[definition["id"]] = caps
         snapshot["capabilities"] = capabilities
+        # Refresh the registry from the same authoritative inventory shown here.
+        # Keep pending selections in the dialog separate from attached targets.
+        try:
+            configured_host = socket.gethostbyname(self.config.maestro_osc_host)
+        except OSError:
+            configured_host = None
+        if self.maestro.client.destination == (configured_host, self.config.maestro_osc_port):
+            self.maestro.syncBridge(snapshot=snapshot)
         return snapshot
 
     def _refresh_devices(self):

@@ -1,6 +1,5 @@
-# -*- coding: utf-8; -*-
 #
-# Map to Stream Deck — control a connected Stream Deck via the plugin bridge.
+# Map to Stream Deck â€” control a connected Stream Deck via the plugin bridge.
 # Change / Next / Previous / Return to Last switch unlimited GEX virtual banks and paint keys.
 #
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
@@ -290,7 +289,7 @@ class MapToStreamDeckWidget(gremlin.input_item.AbstractActionWidget):
         self.page_widget = QDataComboBox()
         self.page_widget.setMinimumWidth(220)
         self.page_widget.setToolTip(
-            "GEX virtual page (Companion-style bank). Unlimited — not limited by Elgato's ~10 profile pages. "
+            "GEX virtual page (Companion-style bank). Unlimited â€” not limited by Elgato's ~10 profile pages. "
             "Populate one Elgato page with JG Ex Buttons as the hardware viewport."
         )
         self.page_widget.currentIndexChanged.connect(self._page_changed)
@@ -598,7 +597,7 @@ class MapToStreamDeckFunctor(gremlin.base_profile.AbstractFunctor):
         device_id = self.action_data.device_id or ""
         # Only Stream Deck events carry an Elgato deviceId on the identifier.
         # State/Joystick InputItem.device_id is the GEX device string (e.g. state
-        # tab GUID 72bbc0f4…) — using that here sent Change Page to a non-deck.
+        # tab GUID 72bbc0f4â€¦) â€” using that here sent Change Page to a non-deck.
         if event.event_type == InputType.StreamDeck:
             ident = event.identifier
             elgato_id = getattr(ident, "device_id", None) or getattr(ident, "_elgato_device_id", None)
@@ -608,14 +607,14 @@ class MapToStreamDeckFunctor(gremlin.base_profile.AbstractFunctor):
         devices = bridge.devices
         if device_id and device_id not in devices:
             syslog.warning(
-                f"Map to Stream Deck: device [{device_id[:12]}] is not a connected Stream Deck (src={event.event_type.name}) — check Device selection."
+                f"Map to Stream Deck: device [{device_id[:12]}] is not a connected Stream Deck (src={event.event_type.name}) â€” check Device selection."
             )
             device_id = ""
         if not device_id:
             if len(devices) == 1:
                 device_id = next(iter(devices.keys()))
             elif len(devices) > 1:
-                syslog.warning("Map to Stream Deck: no device selected and multiple decks are connected — pick a Device in the action.")
+                syslog.warning("Map to Stream Deck: no device selected and multiple decks are connected â€” pick a Device in the action.")
                 return True
             else:
                 syslog.warning("Map to Stream Deck: no Stream Deck connected (plugin bridge).")

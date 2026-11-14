@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -37,7 +36,7 @@ GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
 GEX_PID_BASE = MAESTRO_PID_BASE  # base product id (sequential) for GEX managed devices
 GEX_PID_MAX = GEX_PID_BASE + GEX_MAX_DEVICES - 1  # maximum product id for GEX managed devices
 VJOY_VID = 0x1234  # vendor ID for vJoy devices
-VJOY_PID = 0x5678  # product ID for vJoy devices
+VJOY_PID = 0xBEAD  # product ID used by the vJoy driver
 
 syslog = logging.getLogger("system")
 
@@ -485,7 +484,7 @@ class DeviceSummary:
         self.axismap_list = []
         self.axis_id_map = {}  # map of axis ID to linear ID
         self.input_enabled = False
-        self.vjoy_id = -1
+        self.vjoy_id = -1  # native vJoy ID or the matching Maestro failover ID
         self.virtual_id = -1
         self.vendor_id = 0  # vendor ID
         self.product_id = 0  # product ID
@@ -508,11 +507,12 @@ class DeviceSummary:
             self.joystick_id = data.joystick_id
 
             # map device subtypes
-            if data.vendor_id == VJOY_VID:
+            if data.vendor_id == VJOY_VID and data.product_id == VJOY_PID:
                 self._device_type = gremlin.types.DeviceType.VJoy
             elif data.vendor_id == MAESTRO_VID and self.product_id >= GEX_PID_BASE and self.product_id <= GEX_PID_MAX:
                 self._device_type = gremlin.types.DeviceType.Maestro
                 self.virtual_id = self.product_id - GEX_PID_BASE  # index of maestro is kept in the product ID
+                self.data["maestro_native_input"] = True
             else:
                 self._device_type = gremlin.types.DeviceType.Joystick
 
@@ -531,10 +531,12 @@ class DeviceSummary:
                 self.name = f"Unable to decode {self.device_id} "
 
             # Older/custom Maestro drivers may expose cached product names and
-            # placeholder VID/PID values. The reserved GEX product name still
-            # identifies a virtual joystick, but does not identify a bridge slot.
+            # placeholder VID/PID values. Only recognized legacy GEX descriptors
+            # get this fallback; the name alone cannot classify other hardware.
             suffix = self.name.removeprefix(GEX_PRODUCT_STRING).strip()
-            if self._device_type == DeviceType.Joystick and (
+            if self._device_type == DeviceType.Joystick and (self.vendor_id, self.product_id) in (
+                (0x0001, 0x0001), (0xFEED, 0x8010)
+            ) and (
                 self.name == GEX_PRODUCT_STRING
                 or (self.name.startswith(GEX_PRODUCT_STRING + " ") and suffix.isdecimal())
             ):
@@ -689,15 +691,23 @@ class DeviceSummary:
 
     @device_type.setter
     def device_type(self, value):
-        self._device_type = value
+        if self._device_type != value:
+            self._device_type = value
+            self._is_virtual = None
+            if self._device_category == DeviceCategory.Virtual and not self.is_virtual:
+                self._device_category = DeviceCategory.Physical
 
     @property
     def device_category(self):
         """device category"""
+        if self._device_category == DeviceCategory.Virtual and not self.is_virtual:
+            return DeviceCategory.Physical
         return self._device_category
 
     @device_category.setter
     def device_category(self, value):
+        if value == DeviceCategory.Virtual and not self.is_virtual:
+            value = DeviceCategory.Physical
         self._device_category = value
 
     @property
@@ -740,19 +750,21 @@ class DeviceSummary:
 
     @property
     def is_virtual(self):
-        """determins if a device is virtual.
+        """Only vJoy and GEX-owned Maestro devices can be virtual."""
+        return self._supports_virtual() and self._is_virtual is not False
 
-        Returns
-        =======
-        bool
-            True if the device is a virtual vJoy device, False otherwise
-        """
-        if self._is_virtual is None:
-            self._is_virtual = self.vendor_id in (VJOY_VID, GEX_VID)
-        return self._is_virtual
+    def _supports_virtual(self):
+        """Require GEX native recognition or bridge ownership for Maestro."""
+        return self.device_type == DeviceType.VJoy or (
+            self.device_type == DeviceType.Maestro
+            and bool(self.data.get("maestro_native_input") or self.data.get("maestro_key"))
+        )
 
     def setVirtual(self, is_virtual: bool):
-        self._is_virtual = is_virtual
+        """Only supported GEX output providers can enable the virtual flag."""
+        self._is_virtual = bool(is_virtual) and self._supports_virtual()
+        if not self._is_virtual and self._device_category == DeviceCategory.Virtual:
+            self._device_category = DeviceCategory.Physical
 
     def set_vjoy_id(self, vjoy_id: int):
         """Sets the vJoy id for this device summary.
@@ -762,7 +774,8 @@ class DeviceSummary:
         vJoy devices are linked.
 
         A value of -1 indicates that the vJoy device id is not used for this device.
-        Also sets the virtual_id.
+        For native vJoy devices, also sets virtual_id and the display name.
+        Maestro devices retain their own slot and name; only the failover ID changes.
 
         Parameters
         ==========
@@ -771,8 +784,9 @@ class DeviceSummary:
         """
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
-        self.virtual_id = vjoy_id
-        self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
+        if self.device_type != DeviceType.Maestro:
+            self.virtual_id = vjoy_id
+            self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
     def get_axis_name(self, index: int, is_linear=False, short_name=False):
         """gets the axis name based on the input #"""
@@ -910,7 +924,7 @@ class DeviceSummary:
                     return f"(disc. device) axis {index}"
         except Exception as e:
             syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
-            syslog.error(f"{str(e)}")
+            syslog.error(f"{e!s}")
             syslog.error(f"{traceback.format_exc()}")
 
         return None
@@ -1111,8 +1125,15 @@ class DILL:
         syslog.info("DILL: device detection summary")
         for index in range(device_count):
             dev = DILL.get_device_information_by_index(index)
-            syslog.info(f"\tIndex: [{index}] {str(dev)}")
+            syslog.info(f"\tIndex: [{index}] {dev!s}")
         syslog.info("DILL: end device detection summary")
+
+    @staticmethod
+    def get_device_identities(device_guids):
+        """Read the Windows interface/container identities for native devices."""
+        from .device_identity import get_device_identities
+
+        return get_device_identities(device_guids)
 
     @staticmethod
     def getDevices() -> list[DeviceSummary]:

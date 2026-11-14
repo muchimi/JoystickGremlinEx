@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -1389,7 +1388,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     break
                 if verbose:
                     syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-                execute_node(node, event_press, True, None)  # issue press
+                execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
                 # autorelease delay computation
                 delay = options.getAutoreleaseDelay(autorelease_delay_ms)
                 if delay > 0:
@@ -1399,7 +1398,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
                 if verbose:
                     syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-                execute_node(node, event_release, False, None)  # issue release
+                execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
                 if not self.action_data._is_running:
                     break
@@ -1443,7 +1442,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # send special end of sequence event to steps so they can stop whatever they are doing
         extra_data = {"sequence_end": True}
         for node in nodes:
-            execute_node(node, event_release, False, extra_data)  # issue release for end of sequence
+            execute_node(node, event_release, gremlin.actions.Value(False), extra_data)  # issue release for end of sequence
 
         if verbose:
             syslog.info(f"SEQUENCE: normal runner: exiting runner {self.id}")
@@ -1501,7 +1500,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 break
             if verbose:
                 syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-            execute_node(node, event_press, True, None)  # issue press
+            execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
             # autorelease delay computation
             delay = options.getAutoreleaseDelay(autorelease_delay_ms)
             if delay > 0:
@@ -1511,7 +1510,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
             if verbose:
                 syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-            execute_node(node, event_release, False, None)  # issue release
+            execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
             if not self.action_data._is_running:
                 break
@@ -1614,12 +1613,12 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     break
                 if verbose:
                     syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: loop [{repeat_index}] executes step [{index}] node: [{node.id}]")
-                execute_node(node, event_press, True, None)  # issue press
+                execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
                 # autorelease delay
                 delay = options.getAutoreleaseDelay(exec_delay_ms)
                 if delay > 0:
                     self._wait(delay)
-                execute_node(node, event_release, False, None)  # issue release
+                execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
                 # delay between steps
                 if not self.action_data._is_running:

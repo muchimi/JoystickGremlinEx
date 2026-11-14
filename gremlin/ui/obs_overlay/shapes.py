@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 from __future__ import annotations
 
 import copy
@@ -40,8 +38,8 @@ _SHAPE_KIND_TOOLTIPS = {
     "line": "Open or closed polyline. Double-click the outline to add a point, then drag points to move them.",
     "freeform": (
         "Double-click the outline to add a point, then drag points to move them. "
-        "Yellow handles are Bézier controls — drag them to curve a corner. "
-        "Hold Ctrl to snap a handle to 15° steps (0, 15, 30, 45…). "
+        "Yellow handles are BÃ©zier controls â€” drag them to curve a corner. "
+        "Hold Ctrl to snap a handle to 15Â° steps (0, 15, 30, 45â€¦). "
         "Hold Alt and drag a handle to move it independently of the opposite handle."
     ),
 }
@@ -58,11 +56,12 @@ def is_custom_kind(kind) -> bool:
 def custom_shapes_path() -> str:
     try:
         import gremlin.shared_state
+
         root = gremlin.shared_state.data_path
     except Exception:
         root = None
     if not root:
-        root = os.path.join(os.path.expanduser("~"), "Joystick Gremlin Ex")
+        root = os.path.join(os.path.expanduser("~"), "GremlinEx (GEX)")
     return os.path.join(root, "overlay_custom_shapes.json")
 
 
@@ -91,12 +90,14 @@ def list_custom_shapes() -> list[dict[str, Any]]:
             points = _library_points(entry.get("points"))
             if len(points) < 2:
                 continue
-            cleaned.append({
-                "id": kind,
-                "label": label,
-                "closed": bool(entry.get("closed", True)),
-                "points": points,
-            })
+            cleaned.append(
+                {
+                    "id": kind,
+                    "label": label,
+                    "closed": bool(entry.get("closed", True)),
+                    "points": points,
+                }
+            )
         _CUSTOM_SHAPES_CACHE = cleaned
     except Exception:
         _CUSTOM_SHAPES_CACHE = []
@@ -113,14 +114,14 @@ def _library_points(raw: Any) -> list[dict[str, float]]:
         try:
             x = max(0.0, min(1.0, float(item.get("x", 0.0))))
             y = max(0.0, min(1.0, float(item.get("y", 0.0))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         try:
             in_x = float(item.get("in_x") or 0)
             in_y = float(item.get("in_y") or 0)
             out_x = float(item.get("out_x") or 0)
             out_y = float(item.get("out_y") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             in_x = in_y = out_x = out_y = 0.0
         points.append({"x": x, "y": y, "in_x": in_x, "in_y": in_y, "out_x": out_x, "out_y": out_y})
     return points
@@ -159,12 +160,14 @@ def save_custom_shape(label: str, points: list[dict[str, Any]], closed: bool = T
     )
     if existing is None:
         kind = f"{CUSTOM_KIND_PREFIX}{uuid.uuid4().hex[:12]}"
-        shapes.append({
-            "id": kind,
-            "label": label,
-            "closed": bool(closed),
-            "points": points,
-        })
+        shapes.append(
+            {
+                "id": kind,
+                "label": label,
+                "closed": bool(closed),
+                "points": points,
+            }
+        )
         _write_custom_shapes(shapes)
         return kind
     existing["label"] = label
@@ -235,7 +238,9 @@ def uses_bezier_edit(item: dict[str, Any] | None) -> bool:
     return kind == "freeform" or is_custom_kind(kind)
 
 
-def _point(x: float, y: float, in_x: float = 0.0, in_y: float = 0.0, out_x: float = 0.0, out_y: float = 0.0) -> dict[str, float]:
+def _point(
+    x: float, y: float, in_x: float = 0.0, in_y: float = 0.0, out_x: float = 0.0, out_y: float = 0.0
+) -> dict[str, float]:
     return {
         "x": float(x),
         "y": float(y),
@@ -302,14 +307,14 @@ def normalize_shape_points(raw, kind: str | None = None) -> list[dict[str, float
         try:
             x = max(0.0, min(1.0, float(entry.get("x", 0))))
             y = max(0.0, min(1.0, float(entry.get("y", 0))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         try:
             in_x = float(entry.get("in_x") or 0)
             in_y = float(entry.get("in_y") or 0)
             out_x = float(entry.get("out_x") or 0)
             out_y = float(entry.get("out_y") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             in_x = in_y = out_x = out_y = 0.0
         points.append({"x": x, "y": y, "in_x": in_x, "in_y": in_y, "out_x": out_x, "out_y": out_y})
     if len(points) < 2:
@@ -353,8 +358,10 @@ def _handle_point(item: dict[str, Any], point: dict[str, float], prefix: str) ->
     )
 
 
-def snap_handle_offset(dx: float, dy: float, width: float, height: float, step_deg: float = 15.0) -> tuple[float, float]:
-    """Snap a Bézier handle offset to the nearest visual angle step (default 15°)."""
+def snap_handle_offset(
+    dx: float, dy: float, width: float, height: float, step_deg: float = 15.0
+) -> tuple[float, float]:
+    """Snap a BÃ©zier handle offset to the nearest visual angle step (default 15Â°)."""
     px = float(dx) * max(1.0, float(width))
     py = float(dy) * max(1.0, float(height))
     length = math.hypot(px, py)
@@ -484,7 +491,7 @@ def _remap_shape_points(
 
 
 def expand_shape_widget_to_controls(item: dict[str, Any], points: list[dict[str, float]]) -> bool:
-    """Grow the widget so vertices and Bézier handles stay inside. Scene positions stay put."""
+    """Grow the widget so vertices and BÃ©zier handles stay inside. Scene positions stay put."""
     if not uses_bezier_edit(item) or not points:
         return False
     old_x = float(item["x"])

@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based on original concept / code by Lionel Ott - Copyright (C) 2015 - 2019 Lionel Ott
 #

@@ -1,5 +1,3 @@
-# -*- coding: utf-8; -*-
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -50,7 +48,7 @@ def qcolor(value, default="#ffffff") -> QtGui.QColor:
             value = default
     try:
         color = QtGui.QColor(value if value not in (None, "") else default)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         color = QtGui.QColor()
     if not color.isValid():
         color = QtGui.QColor(default)
@@ -104,7 +102,9 @@ def effective_font_size(item: dict[str, Any] | None, key: str = "font_size", def
     return _scaled_font_px(style, key, item, default)
 
 
-def _make_font(family: str | None, size, bold: bool, italic: bool = False, underline: bool = False, strike: bool = False) -> QtGui.QFont:
+def _make_font(
+    family: str | None, size, bold: bool, italic: bool = False, underline: bool = False, strike: bool = False
+) -> QtGui.QFont:
     font = QtGui.QFont()
     font.setFamily(family or "Segoe UI")
     font.setPixelSize(max(6, int(size or 11)))
@@ -161,7 +161,7 @@ def _outline_pen(
     """Pen for a shape. Designer-only ghost when fill and border are both transparent."""
     try:
         w = float(width)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         w = 2.0
     border_c = qcolor(border, default_border)
     if border_c.alpha() <= 0:
@@ -210,7 +210,7 @@ def set_fill_and_outline(
 
 
 def _shadow_offset_xy(angle_deg: float, distance: float) -> tuple[float, float]:
-    """0° = right, 90° = up (screen Y is down)."""
+    """0Â° = right, 90Â° = up (screen Y is down)."""
     rad = math.radians(float(angle_deg) % 360.0)
     dist = max(0.0, float(distance))
     return dist * math.cos(rad), -dist * math.sin(rad)
@@ -225,11 +225,11 @@ def resolve_font_shadow(style: dict[str, Any] | None, prefix: str = "") -> dict[
     distance_raw = _font_flag(style, "font_shadow_distance", prefix, None)
     try:
         dx_legacy = float(_font_flag(style, "font_shadow_dx", prefix, 2) or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         dx_legacy = 2.0
     try:
         dy_legacy = float(_font_flag(style, "font_shadow_dy", prefix, 2) or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         dy_legacy = 2.0
 
     if angle_raw is None or distance_raw is None:
@@ -238,20 +238,20 @@ def resolve_font_shadow(style: dict[str, Any] | None, prefix: str = "") -> dict[
     else:
         try:
             angle = float(angle_raw) % 360.0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             angle = 135.0
         try:
             distance = max(0.0, float(distance_raw))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             distance = 3.0
 
     try:
         spread = max(0.0, min(100.0, float(_font_flag(style, "font_shadow_spread", prefix, 0) or 0)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         spread = 0.0
     try:
         size = max(0.0, float(_font_flag(style, "font_shadow_size", prefix, 0) or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         size = 0.0
 
     dx, dy = _shadow_offset_xy(angle, distance)
@@ -301,7 +301,7 @@ def _paint_font_shadow(
     """Drop shadow.
 
     Size = blur radius (px). Spread = modest silhouette growth before blur
-    (0–100% of Size, capped). Softness is approximated by faint offset stamps —
+    (0â€“100% of Size, capped). Softness is approximated by faint offset stamps â€”
     never by scaling the shape up (that created a huge black slab).
     """
     if not shadow.get("on"):
@@ -467,7 +467,7 @@ def _draw_text_ex(
     shadow = resolve_font_shadow(style, prefix)
     try:
         stroke_w = float(_font_flag(style, "font_stroke_width", prefix, 0) or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         stroke_w = 0.0
     stroke_color = qcolor(_font_flag(style, "font_stroke_color", prefix, "#000000"), "#000000")
     painter.save()
@@ -525,7 +525,7 @@ def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
     wtype = str(item.get("type") or "")
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     circular = wtype in {
         "axis_stick_circle",
@@ -552,7 +552,7 @@ def widget_body_path(item: dict[str, Any]) -> QtGui.QPainterPath:
 
 
 def _widget_shadow_image_path(item: dict[str, Any]) -> str:
-    """File path whose alpha should mask the drop shadow (empty → geometric body)."""
+    """File path whose alpha should mask the drop shadow (empty â†’ geometric body)."""
     style = item.get("style") or {}
     # Prefer off/base image; any widget with a raster/SVG asset shadows that silhouette.
     for key in ("image_path", "paddle_image", "image_path_on"):
@@ -653,7 +653,7 @@ def _paint_image_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any], path
         return
     width = max(1, int(math.ceil(content.width())))
     height = max(1, int(math.ceil(content.height())))
-    # Opaque RGB silhouette; stamp strength comes from painter opacity × base alpha.
+    # Opaque RGB silhouette; stamp strength comes from painter opacity Ã— base alpha.
     tint = QtGui.QColor(base)
     tint.setAlpha(255)
     silhouette = _image_shadow_silhouette(path, width, height, tint)
@@ -679,7 +679,7 @@ def _paint_image_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any], path
         painter.restore()
         return
 
-    # Compose soft stamps once into a pixmap, then blit — keeps live shadows without
+    # Compose soft stamps once into a pixmap, then blit â€” keeps live shadows without
     # re-running dozens of stamps every frame (that was starving vJoy).
     try:
         mtime = os.path.getmtime(path)
@@ -745,7 +745,7 @@ def paint_widget_drop_shadow(painter: QtGui.QPainter, item: dict[str, Any]):
         if usable:
             _paint_image_drop_shadow(painter, item, image_path, shadow)
             return
-        # Asset configured but unloadable — never fall back to a solid rectangle slab.
+        # Asset configured but unloadable â€” never fall back to a solid rectangle slab.
         return
     path = widget_body_path(item)
     if path.isEmpty():
@@ -765,7 +765,7 @@ def _border_w(style: dict[str, Any] | None, default: float = 2.0) -> float:
         return float(default)
     try:
         return max(0.0, float(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(default)
 
 
@@ -777,14 +777,14 @@ def border_is_enabled(style: dict[str, Any] | None) -> bool:
         return bool(style.get("border_enabled"))
     try:
         return float(style.get("border_width") or 0) > 0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return True
 
 
 def _pen(color, width=1.0) -> QtGui.QPen:
     try:
         w = float(width)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         w = 1.0
     if w <= 0:
         return QtGui.QPen(QtCore.Qt.NoPen)
@@ -808,7 +808,7 @@ def _opacity(style: dict[str, Any]) -> float:
         if value is None:
             return 1.0
         return max(0.0, min(1.0, float(value)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 1.0
 
 
@@ -827,23 +827,23 @@ def _xyz(value) -> tuple[float, float, float]:
 
 
 def _ternary_contrib(value: float) -> float:
-    """Map a centered axis (-1…1) onto a corner contribution (0…1). -1→0, 0→0.5, +1→1."""
+    """Map a centered axis (-1â€¦1) onto a corner contribution (0â€¦1). -1â†’0, 0â†’0.5, +1â†’1."""
     try:
         return max(0.0, min(1.0, (float(value) + 1.0) * 0.5))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0.0
 
 
 def _ternary_to_axis(share: float) -> float:
-    """Map a corner contribution (0…1) back onto a centered axis (-1…1)."""
+    """Map a corner contribution (0â€¦1) back onto a centered axis (-1â€¦1)."""
     try:
         return _clamp(float(share) * 2.0 - 1.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return -1.0
 
 
 def _ternary_values(x: float, y: float, z: float) -> tuple[float, float, float]:
-    """Contributions after -1…1→0…1. Keep ≥0 and sum ≤ 1 so the indicator stays inside."""
+    """Contributions after -1â€¦1â†’0â€¦1. Keep â‰¥0 and sum â‰¤ 1 so the indicator stays inside."""
     sx, sy, sz = _ternary_contrib(x), _ternary_contrib(y), _ternary_contrib(z)
     total = sx + sy + sz
     if total > 1.0:
@@ -907,7 +907,7 @@ def _point_to_ternary_values(
     left: QtCore.QPointF,
     right: QtCore.QPointF,
 ) -> tuple[float, float, float]:
-    """Map a point in the triangle to centered axis values (-1…1)."""
+    """Map a point in the triangle to centered axis values (-1â€¦1)."""
     a, b, c = _point_to_barycentric(point, top, left, right)
     m = min(a, b, c)
     return _ternary_to_axis(a - m), _ternary_to_axis(b - m), _ternary_to_axis(c - m)
@@ -921,7 +921,7 @@ def _ternary_point(
     y: float,
     z: float,
 ) -> QtCore.QPointF:
-    """Centered axes (-1…1) map to 0…1 contributions; the indicator stays inside the triangle."""
+    """Centered axes (-1â€¦1) map to 0â€¦1 contributions; the indicator stays inside the triangle."""
     sx, sy, sz = _ternary_values(x, y, z)
     centroid = _ternary_centroid(top, left, right)
     return QtCore.QPointF(
@@ -960,7 +960,7 @@ def widget_rect(item: dict[str, Any]) -> QtCore.QRectF:
     return QtCore.QRectF(item["x"], item["y"], item["w"], item["h"])
 
 
-_CROP_SETTINGS = ("Joystick Gremlin Ex", "Overlay")
+_CROP_SETTINGS = ("GremlinEx (GEX)", "Overlay")
 _CROP_EDIT_KEY = "crop_edit"
 _CROP_MIN_VISIBLE = 8
 
@@ -971,17 +971,17 @@ def clamp_crop(width, height, left, top, right, bottom, minimum: int = _CROP_MIN
     def _n(value) -> int:
         try:
             return max(0, int(round(float(value or 0))))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0
 
     left, top, right, bottom = _n(left), _n(top), _n(right), _n(bottom)
     try:
         width = max(minimum, int(round(float(width or minimum))))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         width = minimum
     try:
         height = max(minimum, int(round(float(height or minimum))))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         height = minimum
     if left + right > width - minimum:
         extra = left + right - (width - minimum)
@@ -1043,7 +1043,7 @@ def _clip_path_to_crop(item: dict[str, Any], path: QtGui.QPainterPath) -> QtGui.
 def normalize_rotation(value) -> float:
     try:
         angle = float(value or 0.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0.0
     angle = (angle + 180.0) % 360.0 - 180.0
     if abs(angle) < 1e-9:
@@ -1083,7 +1083,7 @@ def apply_group_rotation_delta(
 ):
     """Orbit widget centers around a shared pivot and add *delta_deg* to each rotation.
 
-    ``start_geoms`` maps widget id → ``{x, y, w, h, rotation}`` captured before the gesture.
+    ``start_geoms`` maps widget id â†’ ``{x, y, w, h, rotation}`` captured before the gesture.
     """
     for item in items:
         wid = str(item.get("id") or "")
@@ -1222,7 +1222,7 @@ def _corner_radius(style: dict[str, Any], default: float = 6.0) -> float:
         if value is None:
             return default
         return max(0.0, float(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -1299,8 +1299,12 @@ def _draw_crosshairs(painter: QtGui.QPainter, bounds: QtCore.QRectF, style: dict
     if not style.get("show_center_line", True):
         return
     painter.setPen(_pen(style.get("crosshair"), max(1.0, float(style.get("grid_width") or 1.2))))
-    painter.drawLine(QtCore.QPointF(bounds.center().x(), bounds.top()), QtCore.QPointF(bounds.center().x(), bounds.bottom()))
-    painter.drawLine(QtCore.QPointF(bounds.left(), bounds.center().y()), QtCore.QPointF(bounds.right(), bounds.center().y()))
+    painter.drawLine(
+        QtCore.QPointF(bounds.center().x(), bounds.top()), QtCore.QPointF(bounds.center().x(), bounds.bottom())
+    )
+    painter.drawLine(
+        QtCore.QPointF(bounds.left(), bounds.center().y()), QtCore.QPointF(bounds.right(), bounds.center().y())
+    )
 
 
 def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
@@ -1320,8 +1324,12 @@ def widget_dirty_rect(item: dict[str, Any]) -> QtCore.QRect:
     if style.get("shadow"):
         extra = max(extra, float(resolve_widget_shadow(style).get("extent") or 0))
     try:
-        extra = max(extra, float(_font_flag(style, "font_stroke_width", "", 0) or 0), float(_font_flag(style, "font_stroke_width", "axis_label_", 0) or 0))
-    except (TypeError, ValueError):
+        extra = max(
+            extra,
+            float(_font_flag(style, "font_stroke_width", "", 0) or 0),
+            float(_font_flag(style, "font_stroke_width", "axis_label_", 0) or 0),
+        )
+    except TypeError, ValueError:
         pass
     pad = max(pad, int(extra) + 12)
     return rect.adjusted(-pad, -pad, pad, pad)
@@ -1523,7 +1531,7 @@ def _draw_image_path_with_fill(
 
 
 def _draw_image_path(painter: QtGui.QPainter, path: str, rect: QtCore.QRectF, keep_aspect: bool) -> bool:
-    """Paint a file path into rect — SVG via QSvgRenderer (vector-sharp), else pixmap."""
+    """Paint a file path into rect â€” SVG via QSvgRenderer (vector-sharp), else pixmap."""
     if not path or rect.isEmpty():
         return False
     from .images import is_svg_path, render_svg
@@ -1537,7 +1545,9 @@ def _draw_image_path(painter: QtGui.QPainter, path: str, rect: QtCore.QRectF, ke
     return True
 
 
-def _fitted_pixmap_rect(pixmap: QtGui.QPixmap, rect: QtCore.QRectF, keep_aspect: bool) -> tuple[QtCore.QRectF, QtGui.QPixmap]:
+def _fitted_pixmap_rect(
+    pixmap: QtGui.QPixmap, rect: QtCore.QRectF, keep_aspect: bool
+) -> tuple[QtCore.QRectF, QtGui.QPixmap]:
     mode = QtCore.Qt.KeepAspectRatio if keep_aspect else QtCore.Qt.IgnoreAspectRatio
     scaled = pixmap.scaled(rect.size().toSize(), mode, QtCore.Qt.SmoothTransformation)
     return QtCore.QRectF(
@@ -1591,7 +1601,10 @@ def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawRect(rect)
     path = style.get("image_path") or ""
     keep_aspect = bool(style.get("image_keep_aspect", True))
-    has_content = bool(path) and ((is_svg_path(path) and svg_renderer(path) is not None) or (not is_svg_path(path) and not _widget_image_pixmap(path).isNull()))
+    has_content = bool(path) and (
+        (is_svg_path(path) and svg_renderer(path) is not None)
+        or (not is_svg_path(path) and not _widget_image_pixmap(path).isNull())
+    )
     if not has_content:
         painter.setPen(_pen(style.get("border"), border_w))
         painter.setBrush(QtCore.Qt.NoBrush)
@@ -1620,7 +1633,7 @@ def paint_remote_view(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     border_w = _border_w(style)
     painter.setPen(_pen(style.get("border"), border_w))
@@ -1632,7 +1645,7 @@ def paint_remote_view(painter: QtGui.QPainter, item: dict[str, Any], value):
 
     try:
         client_id = int(style.get("remote_client_id") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         client_id = 0
     hub = RemoteVideoHub()
     pixmap = hub.pixmap(client_id) if client_id else None
@@ -1674,7 +1687,7 @@ def paint_browser(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     painter.setPen(_pen(style.get("border"), _border_w(style)))
     painter.setBrush(fill_brush(style.get("fill"), "#121418", rect=rect))
@@ -1700,7 +1713,7 @@ def paint_efb(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     painter.setPen(_pen(style.get("border"), _border_w(style)))
     painter.setBrush(fill_brush(style.get("fill"), "#121418", rect=rect))
@@ -1713,7 +1726,7 @@ def paint_efb(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.drawText(
         rect,
         int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap),
-        root or "SC EFB — set install folder in the inspector",
+        root or "SC EFB â€” set install folder in the inspector",
     )
     painter.restore()
 
@@ -1728,7 +1741,7 @@ def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     border_w = _border_w(style)
     painter.setPen(_pen(style.get("border"), border_w))
@@ -1770,7 +1783,7 @@ def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) 
     width_key = "border_width_on" if armed else "border_width"
     try:
         width = float(style.get(width_key) if style.get(width_key) is not None else style.get("border_width") or 2.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         width = 2.0
     width = max(0.5, width)
     color = style.get("border_on" if armed else "border") or ("#6ecf8e" if armed else "#3a6ea5")
@@ -1778,7 +1791,9 @@ def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) 
     if pen.style() == QtCore.Qt.NoPen:
         return pen
 
-    kind = normalize_ocr_border_style(style.get("border_style_on" if armed else "border_style") or style.get("border_style"))
+    kind = normalize_ocr_border_style(
+        style.get("border_style_on" if armed else "border_style") or style.get("border_style")
+    )
     if kind == "solid":
         pen.setStyle(QtCore.Qt.SolidLine)
         return pen
@@ -1788,15 +1803,15 @@ def _ocr_border_pen(style: dict[str, Any], rect: QtCore.QRectF, *, armed: bool) 
     spacing_key = "border_dash_spacing_on" if armed else "border_dash_spacing"
     try:
         size = float(style.get(size_key) or 8.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         size = 8.0
     try:
         spacing = float(style.get(spacing_key) or 4.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         spacing = 4.0
     try:
         amount = int(style.get(amount_key) or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         amount = 0
     size = max(1.0, size)
     spacing = max(0.0, spacing)
@@ -1825,7 +1840,7 @@ def paint_ocr(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setOpacity(_opacity(style))
     try:
         radius = max(0.0, float(style.get("corner_radius") or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 0.0
     tracker = OcrOverlayTracker()
     armed = tracker.armed(item)
@@ -1847,17 +1862,17 @@ def paint_ocr(painter: QtGui.QPainter, item: dict[str, Any], value):
     status = tracker.status(item) or ("Armed" if armed else "Idle")
     last = tracker.last_text(item)
     matched = tracker.matched_names(item)
-    lines = [f"OCR · {region}", status]
+    lines = [f"OCR Â· {region}", status]
     if matched:
         lines.append("Hit: " + ", ".join(matched[:3]))
     elif last:
-        preview = last if len(last) <= 48 else last[:45] + "…"
+        preview = last if len(last) <= 48 else last[:45] + "â€¦"
         lines.append(preview)
     painter.setPen(qcolor(style.get("font_color"), "#d7e3f4"))
     font = painter.font()
     try:
         font.setPointSizeF(max(8.0, float(style.get("font_size") or 12)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         font.setPointSize(12)
     painter.setFont(font)
     painter.drawText(
@@ -2109,7 +2124,9 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
                     path.addRoundedRect(cell, key_r, key_r)
                     painter.save()
                     painter.setClipPath(path)
-                    scaled = pixmap.scaled(cell.size().toSize(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
+                    scaled = pixmap.scaled(
+                        cell.size().toSize(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation
+                    )
                     painter.drawPixmap(cell.toRect(), scaled)
                     painter.restore()
                     if pressed:
@@ -2131,7 +2148,9 @@ def paint_streamdeck(painter: QtGui.QPainter, item: dict[str, Any], value):
                 painter.setBrush(empty_fill)
                 painter.drawRoundedRect(lcd, 3, 3)
                 if not pixmap.isNull():
-                    scaled = pixmap.scaled(lcd.size().toSize(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation)
+                    scaled = pixmap.scaled(
+                        lcd.size().toSize(), QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation
+                    )
                     painter.drawPixmap(lcd.toRect(), scaled)
                 dial_r = min(key, dial_h) * 0.42
                 center = QtCore.QPointF(cx, dial_y + dial_h / 2.0)
@@ -2188,7 +2207,8 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     image_path = on_path if (on and on_path) else off_path
     keep_aspect = bool(style.get("image_keep_aspect", True))
     has_image = bool(image_path) and (
-        (is_svg_path(image_path) and svg_renderer(image_path) is not None) or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
+        (is_svg_path(image_path) and svg_renderer(image_path) is not None)
+        or (not is_svg_path(image_path) and not _widget_image_pixmap(image_path).isNull())
     )
     use_shape = button_uses_shape_path(item)
     painter.save()
@@ -2263,7 +2283,7 @@ def paint_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
         cy = inner.center().y()
         cx = (inner.right() - margin - kn * 0.5) if on else (inner.left() + margin + kn * 0.5)
 
-    # Solid knob — no bloom/glint. Temporarily size the shared indicator helper.
+    # Solid knob â€” no bloom/glint. Temporarily size the shared indicator helper.
     knob_style = dict(style)
     knob_style.setdefault("indicator", "#e8eaed")
     knob_style["indicator_size"] = kn
@@ -2281,11 +2301,19 @@ def _axis_label_spread(style: dict[str, Any]) -> float:
         if value is None:
             return 1.0
         return max(0.0, min(100.0, float(value))) / 100.0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 1.0
 
 
-def _draw_axis_label_at(painter: QtGui.QPainter, text: str, x: float, y: float, font: QtGui.QFont, style: dict[str, Any], item: dict[str, Any] | None = None):
+def _draw_axis_label_at(
+    painter: QtGui.QPainter,
+    text: str,
+    x: float,
+    y: float,
+    font: QtGui.QFont,
+    style: dict[str, Any],
+    item: dict[str, Any] | None = None,
+):
     if not text:
         return
     block_w, block_h, _widths = _multiline_text_size(font, text)
@@ -2346,7 +2374,11 @@ def _indicator(painter: QtGui.QPainter, center: QtCore.QPointF, style: dict[str,
         painter.setBrush(glow_color)
         extra = size * 0.45
         if shape == "square":
-            painter.drawRect(QtCore.QRectF(center.x() - size / 2 - extra / 2, center.y() - size / 2 - extra / 2, size + extra, size + extra))
+            painter.drawRect(
+                QtCore.QRectF(
+                    center.x() - size / 2 - extra / 2, center.y() - size / 2 - extra / 2, size + extra, size + extra
+                )
+            )
         else:
             painter.drawEllipse(center, size * 0.95, size * 0.95)
     painter.setBrush(color)
@@ -2356,7 +2388,9 @@ def _indicator(painter: QtGui.QPainter, center: QtCore.QPointF, style: dict[str,
         painter.drawEllipse(center, size / 2, size / 2)
 
 
-def _draw_dot_crosshair(painter: QtGui.QPainter, bounds: QtCore.QRectF, cx: float, cy: float, style: dict[str, Any], circular: bool = False):
+def _draw_dot_crosshair(
+    painter: QtGui.QPainter, bounds: QtCore.QRectF, cx: float, cy: float, style: dict[str, Any], circular: bool = False
+):
     """Horizontal/vertical lines through the moving dot, in the dot color."""
     if not style.get("show_dot_crosshair"):
         return
@@ -2380,7 +2414,7 @@ def _draw_dot_crosshair(painter: QtGui.QPainter, bounds: QtCore.QRectF, cx: floa
 def _angle_step(style: dict[str, Any]) -> int:
     try:
         step = int(style.get("angle_step") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
     return step if step in (15, 30, 45) else 0
 
@@ -2392,7 +2426,9 @@ def _draw_angle_lines(painter: QtGui.QPainter, center: QtCore.QPointF, radius: f
     painter.setPen(_pen(style.get("grid"), style.get("grid_width") or 1))
     for deg in range(0, 360, step):
         angle = math.radians(deg)
-        painter.drawLine(center, QtCore.QPointF(center.x() + math.cos(angle) * radius, center.y() + math.sin(angle) * radius))
+        painter.drawLine(
+            center, QtCore.QPointF(center.x() + math.cos(angle) * radius, center.y() + math.sin(angle) * radius)
+        )
 
 
 def _caption(painter: QtGui.QPainter, item: dict[str, Any], rect: QtCore.QRectF, vertical: bool):
@@ -2442,9 +2478,13 @@ def paint_axis_bar(painter: QtGui.QPainter, item: dict[str, Any], value):
     if style.get("show_center_line", True):
         painter.setPen(_pen(style.get("crosshair"), 1.2))
         if vertical:
-            painter.drawLine(QtCore.QPointF(inner.center().x(), inner.top()), QtCore.QPointF(inner.center().x(), inner.bottom()))
+            painter.drawLine(
+                QtCore.QPointF(inner.center().x(), inner.top()), QtCore.QPointF(inner.center().x(), inner.bottom())
+            )
         else:
-            painter.drawLine(QtCore.QPointF(inner.left(), inner.center().y()), QtCore.QPointF(inner.right(), inner.center().y()))
+            painter.drawLine(
+                QtCore.QPointF(inner.left(), inner.center().y()), QtCore.QPointF(inner.right(), inner.center().y())
+            )
     if vertical:
         t = (axis + 1.0) / 2.0
         cx = inner.center().x()
@@ -2552,7 +2592,7 @@ def paint_axis_fader(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 def paint_axis_radial(painter: QtGui.QPainter, item: dict[str, Any], value):
-    """Touch OSC radial: 270° arc with ticks and value fill."""
+    """Touch OSC radial: 270Â° arc with ticks and value fill."""
     style = item.get("style") or {}
     rect = widget_rect(item)
     axis = _deadzone(_axis(value), style)
@@ -2580,7 +2620,11 @@ def paint_axis_radial(painter: QtGui.QPainter, item: dict[str, Any], value):
         inner_r_track = max(1.0, track_r - width / 2.0)
         painter.setPen(_pen(style.get("border"), border_w))
         painter.drawArc(QtCore.QRectF(cx_track - outer_r, cy_track - outer_r, outer_r * 2, outer_r * 2), start, span)
-        painter.drawArc(QtCore.QRectF(cx_track - inner_r_track, cy_track - inner_r_track, inner_r_track * 2, inner_r_track * 2), start, span)
+        painter.drawArc(
+            QtCore.QRectF(cx_track - inner_r_track, cy_track - inner_r_track, inner_r_track * 2, inner_r_track * 2),
+            start,
+            span,
+        )
         for deg in (225.0, -45.0):
             rad = math.radians(deg)
             c, s = math.cos(rad), math.sin(rad)
@@ -2604,7 +2648,9 @@ def paint_axis_radial(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
-def _donut_slice(cx: float, cy: float, inner_r: float, outer_r: float, start_deg: float, span_deg: float) -> QtGui.QPainterPath:
+def _donut_slice(
+    cx: float, cy: float, inner_r: float, outer_r: float, start_deg: float, span_deg: float
+) -> QtGui.QPainterPath:
     path = QtGui.QPainterPath()
     outer = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
     inner = QtCore.QRectF(cx - inner_r, cy - inner_r, inner_r * 2, inner_r * 2)
@@ -2641,7 +2687,7 @@ def paint_axis_encoder(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setPen(QtCore.Qt.NoPen)
     for i in range(ticks):
         painter.setBrush(lit if i == idx else dim)
-        # Qt 0° = 3 o'clock, positive CCW; start at 12 o'clock and walk clockwise.
+        # Qt 0Â° = 3 o'clock, positive CCW; start at 12 o'clock and walk clockwise.
         start = 90.0 - i * span
         painter.drawPath(_donut_slice(cx, cy, inner_r, outer_r, start, -span))
     painter.setPen(_pen(style.get("grid") or style.get("border"), style.get("grid_width") or 1.2))
@@ -2665,12 +2711,12 @@ def paint_axis_encoder(painter: QtGui.QPainter, item: dict[str, Any], value):
 def _paddle_deg(value, fallback: float) -> float:
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return float(fallback)
 
 
 def _paddle_axis_t(value, style: dict) -> float:
-    """Map axis [-1, 1] to travel 0..1 (start→end)."""
+    """Map axis [-1, 1] to travel 0..1 (startâ†’end)."""
     axis = _deadzone(_axis(value), style)
     if style.get("invert_display"):
         axis = -axis
@@ -2678,7 +2724,7 @@ def _paddle_axis_t(value, style: dict) -> float:
 
 
 def _paddle_angle_at(start_deg: float, end_deg: float, t: float, direction: str) -> float:
-    """Clockwise-positive degrees from tip-up (0°). Interpolate start→end along CW or CCW."""
+    """Clockwise-positive degrees from tip-up (0Â°). Interpolate startâ†’end along CW or CCW."""
     start = start_deg % 360.0
     end = end_deg % 360.0
     t = max(0.0, min(1.0, float(t)))
@@ -2800,7 +2846,7 @@ def _tint_paddle_pixmap(pm: QtGui.QPixmap, body: QtGui.QColor, size: int) -> QtG
 
 
 def paint_axis_paddle(painter: QtGui.QPainter, item: dict[str, Any], value):
-    """Single-axis paddle: rotates from start° to end° (CW or CCW); off at start, on when moved."""
+    """Single-axis paddle: rotates from startÂ° to endÂ° (CW or CCW); off at start, on when moved."""
     style = item.get("style") or {}
     rect = widget_rect(item)
     t = _paddle_axis_t(value, style)
@@ -2824,7 +2870,7 @@ def paint_axis_paddle(painter: QtGui.QPainter, item: dict[str, Any], value):
 
     painter.save()
     painter.translate(cx, cy)
-    # 0° = tip up; positive degrees rotate clockwise (matches QPainter).
+    # 0Â° = tip up; positive degrees rotate clockwise (matches QPainter).
     painter.rotate(angle)
 
     if source is not None:
@@ -2873,7 +2919,7 @@ def paint_axis_stick_square(painter: QtGui.QPainter, item: dict[str, Any], value
     painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     try:
         radius = max(0.0, float(style.get("corner_radius")))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 6.0
     painter.drawRoundedRect(rect, radius, radius)
     inner = _inner_rect(rect, style)
@@ -2962,7 +3008,7 @@ def _draw_vector_arrow(painter: QtGui.QPainter, origin: QtCore.QPointF, tip: QtC
     color = qcolor(style.get("indicator") or style.get("needle"), "#ff5a3c")
     try:
         width = max(1.5, float(style.get("needle_width") or 4.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         width = 4.0
     dx = tip.x() - origin.x()
     dy = tip.y() - origin.y()
@@ -2986,7 +3032,7 @@ def _draw_mouse_icon(painter: QtGui.QPainter, center: QtCore.QPointF, nx: float,
     """Top-down mouse silhouette; faces the movement direction."""
     try:
         size = max(14.0, float(style.get("indicator_size") or 28.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         size = 28.0
     color = qcolor(style.get("indicator"), "#ff5a3c")
     fill = QtGui.QColor(color)
@@ -3163,7 +3209,9 @@ def paint_axis_graph(painter: QtGui.QPainter, item: dict[str, Any], value):
                 break
             painter.setPen(qcolor(series_item.get("color") or "#e41a1c"))
             painter.setFont(font)
-            painter.drawText(QtCore.QRectF(lx, ly, width, legend_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), text)
+            painter.drawText(
+                QtCore.QRectF(lx, ly, width, legend_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), text
+            )
             lx += width + 8
 
     painter.setClipping(False)
@@ -3298,7 +3346,9 @@ def paint_axis_bars(painter: QtGui.QPainter, item: dict[str, Any], value):
                 break
             painter.setPen(qcolor(series_item.get("color") or "#e41a1c"))
             painter.setFont(font)
-            painter.drawText(QtCore.QRectF(lx, ly, width, legend_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), text)
+            painter.drawText(
+                QtCore.QRectF(lx, ly, width, legend_h - 2), int(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter), text
+            )
             lx += width + 8
 
     painter.setClipping(False)
@@ -3331,7 +3381,7 @@ def paint_sys_stats(painter: QtGui.QPainter, item: dict[str, Any], value):
         def _valid_rows(raw) -> bool:
             if not isinstance(raw, (tuple, list)) or not raw:
                 return False
-            # Each row must be a sequence (id, text, color, caption) — not a bare int/str.
+            # Each row must be a sequence (id, text, color, caption) â€” not a bare int/str.
             first = raw[0]
             return isinstance(first, (tuple, list)) and not isinstance(first, (str, bytes))
 
@@ -3394,7 +3444,9 @@ def _watch_point(cx: float, cy: float, length: float, clock_deg: float) -> QtCor
     return QtCore.QPointF(cx + math.cos(math_rad) * length, cy - math.sin(math_rad) * length)
 
 
-def _draw_watch_needle(painter: QtGui.QPainter, cx: float, cy: float, length: float, clock_deg: float, color, width: float, arrow: bool):
+def _draw_watch_needle(
+    painter: QtGui.QPainter, cx: float, cy: float, length: float, clock_deg: float, color, width: float, arrow: bool
+):
     width = max(0.5, float(width or 2.0))
     tip = _watch_point(cx, cy, length, clock_deg)
     tail = _watch_point(cx, cy, -length * 0.16, clock_deg)
@@ -3441,7 +3493,11 @@ def paint_stopwatch(painter: QtGui.QPainter, item: dict[str, Any], value):
     if label_font is not None:
         label_h = float(QtGui.QFontMetricsF(label_font).height()) + 6.0
         label_h = min(label_h, max(12.0, rect.height() * 0.45))
-    content = QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h)) if label_h > 0 else QtCore.QRectF(rect)
+    content = (
+        QtCore.QRectF(rect.left(), rect.top() + label_h, rect.width(), max(1.0, rect.height() - label_h))
+        if label_h > 0
+        else QtCore.QRectF(rect)
+    )
     painter.save()
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     painter.setOpacity(_opacity(style))
@@ -3592,7 +3648,9 @@ def paint_hat(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 def _switch_fill_colors(style: dict[str, Any], active: bool):
     if active:
-        return qcolor(style.get("fill_on"), "#ff6b35"), qcolor(style.get("border_on") or style.get("fill_on"), "#ffcc66")
+        return qcolor(style.get("fill_on"), "#ff6b35"), qcolor(
+            style.get("border_on") or style.get("fill_on"), "#ffcc66"
+        )
     return qcolor(style.get("fill"), "#1a2230"), qcolor(style.get("border"), "#3a4a62")
 
 
@@ -3623,7 +3681,9 @@ def _switch_4way_geometry(item: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def _cardinal_arrow_path(cx: float, cy: float, slot: str, inner: float, outer: float, half_w: float) -> QtGui.QPainterPath:
+def _cardinal_arrow_path(
+    cx: float, cy: float, slot: str, inner: float, outer: float, half_w: float
+) -> QtGui.QPainterPath:
     """Blocky cardinal arrow pointing outward; tip at `outer`, base near `inner`."""
     tip_len = max(6.0, (outer - inner) * 0.42)
     body_outer = outer - tip_len
@@ -3819,7 +3879,9 @@ def _map_unit_rect(bounds: QtCore.QRectF, x: float, y: float, w: float, h: float
     )
 
 
-def _paint_input_keycap(painter: QtGui.QPainter, rect: QtCore.QRectF, style: dict[str, Any], label: str, pressed: bool, font: QtGui.QFont):
+def _paint_input_keycap(
+    painter: QtGui.QPainter, rect: QtCore.QRectF, style: dict[str, Any], label: str, pressed: bool, font: QtGui.QFont
+):
     radius = min(_corner_radius(style, 6.0), rect.width() * 0.28, rect.height() * 0.28)
     fill, border = _input_key_colors(style, pressed)
     set_fill_and_outline(painter, fill, border, max(1.0, _border_w(style)), rect=rect)
@@ -3832,7 +3894,15 @@ def _paint_input_keycap(painter: QtGui.QPainter, rect: QtCore.QRectF, style: dic
     _draw_text_ex(painter, label, rect, font, style.get("font_color"), style)
 
 
-def _paint_mouse_region(painter: QtGui.QPainter, path: QtGui.QPainterPath, style: dict[str, Any], pressed: bool, selected: bool, label: str, font: QtGui.QFont):
+def _paint_mouse_region(
+    painter: QtGui.QPainter,
+    path: QtGui.QPainterPath,
+    style: dict[str, Any],
+    pressed: bool,
+    selected: bool,
+    label: str,
+    font: QtGui.QFont,
+):
     fill, border = _input_key_colors(style, pressed and selected)
     if not selected:
         fill.setAlpha(max(30, int(fill.alpha() * 0.35)))
@@ -3856,7 +3926,14 @@ def _mouse_region_path(rect: QtCore.QRectF, kind: str) -> QtGui.QPainterPath:
     return path
 
 
-def _paint_mouse_silhouette(painter: QtGui.QPainter, bounds: QtCore.QRectF, style: dict[str, Any], selected: set[str], pressed: set[str], font: QtGui.QFont):
+def _paint_mouse_silhouette(
+    painter: QtGui.QPainter,
+    bounds: QtCore.QRectF,
+    style: dict[str, Any],
+    selected: set[str],
+    pressed: set[str],
+    font: QtGui.QFont,
+):
     body = _map_unit_rect(bounds, 0.16, 0.04, 0.68, 0.92)
     body_path = QtGui.QPainterPath()
     body_path.addRoundedRect(body, body.width() * 0.42, body.height() * 0.22)
@@ -3870,15 +3947,15 @@ def _paint_mouse_silhouette(painter: QtGui.QPainter, bounds: QtCore.QRectF, styl
         ("mouse_1", _map_unit_rect(bounds, 0.20, 0.08, 0.28, 0.30), "L"),
         ("mouse_2", _map_unit_rect(bounds, 0.52, 0.08, 0.28, 0.30), "R"),
         ("mouse_3", _map_unit_rect(bounds, 0.44, 0.16, 0.12, 0.16), ""),
-        ("wheel_up", _map_unit_rect(bounds, 0.45, 0.10, 0.10, 0.08), "▲"),
-        ("wheel_down", _map_unit_rect(bounds, 0.45, 0.30, 0.10, 0.08), "▼"),
+        ("wheel_up", _map_unit_rect(bounds, 0.45, 0.10, 0.10, 0.08), "â–²"),
+        ("wheel_down", _map_unit_rect(bounds, 0.45, 0.30, 0.10, 0.08), "â–¼"),
         ("mouse_5", _map_unit_rect(bounds, 0.08, 0.40, 0.12, 0.14), "M5"),
         ("mouse_4", _map_unit_rect(bounds, 0.08, 0.56, 0.12, 0.14), "M4"),
-        ("wheel_left", _map_unit_rect(bounds, 0.40, 0.18, 0.06, 0.10), "◀"),
-        ("wheel_right", _map_unit_rect(bounds, 0.54, 0.18, 0.06, 0.10), "▶"),
-        ("mouse_d_1", _map_unit_rect(bounds, 0.22, 0.40, 0.18, 0.08), "2×"),
-        ("mouse_d_2", _map_unit_rect(bounds, 0.60, 0.40, 0.18, 0.08), "2×"),
-        ("mouse_d_3", _map_unit_rect(bounds, 0.42, 0.42, 0.16, 0.08), "2×"),
+        ("wheel_left", _map_unit_rect(bounds, 0.40, 0.18, 0.06, 0.10), "â—€"),
+        ("wheel_right", _map_unit_rect(bounds, 0.54, 0.18, 0.06, 0.10), "â–¶"),
+        ("mouse_d_1", _map_unit_rect(bounds, 0.22, 0.40, 0.18, 0.08), "2Ã—"),
+        ("mouse_d_2", _map_unit_rect(bounds, 0.60, 0.40, 0.18, 0.08), "2Ã—"),
+        ("mouse_d_3", _map_unit_rect(bounds, 0.42, 0.42, 0.16, 0.08), "2Ã—"),
     )
     for lookup, rect, label in regions:
         if lookup not in selected and lookup not in ("mouse_1", "mouse_2", "mouse_3"):
@@ -3895,7 +3972,14 @@ def _paint_mouse_silhouette(painter: QtGui.QPainter, bounds: QtCore.QRectF, styl
         )
 
 
-def _paint_mouse_buttons(painter: QtGui.QPainter, bounds: QtCore.QRectF, style: dict[str, Any], selected: set[str], pressed: set[str], font: QtGui.QFont):
+def _paint_mouse_buttons(
+    painter: QtGui.QPainter,
+    bounds: QtCore.QRectF,
+    style: dict[str, Any],
+    selected: set[str],
+    pressed: set[str],
+    font: QtGui.QFont,
+):
     regions = (
         ("mouse_1", _map_unit_rect(bounds, 0.02, 0.08, 0.22, 0.44), "M1", "rect"),
         ("wheel_up", _map_unit_rect(bounds, 0.28, 0.02, 0.26, 0.16), "ScU", "rect"),
@@ -3970,7 +4054,9 @@ def paint_input_display(painter: QtGui.QPainter, item: dict[str, Any], value):
     if show_mouse:
         mouse_area = QtCore.QRectF(inner.right() - mouse_width, inner.top(), mouse_width, inner.height())
         if show_keyboard:
-            key_area = QtCore.QRectF(inner.left(), inner.top(), max(12.0, inner.width() - mouse_width - 8.0), inner.height())
+            key_area = QtCore.QRectF(
+                inner.left(), inner.top(), max(12.0, inner.width() - mouse_width - 8.0), inner.height()
+            )
 
     if show_keyboard:
         cells = []
@@ -4003,12 +4089,16 @@ def paint_input_display(painter: QtGui.QPainter, item: dict[str, Any], value):
                 kw = cell.colspan * unit - gap
                 kh = cell.rowspan * unit - gap
                 cap = QtCore.QRectF(kx, ky, max(4.0, kw), max(4.0, kh))
-                _paint_input_keycap(painter, cap, style, cell_display_label(cell, key), key_lookup(key) in pressed, key_font)
+                _paint_input_keycap(
+                    painter, cap, style, cell_display_label(cell, key), key_lookup(key) in pressed, key_font
+                )
             if extra:
                 extra_unit = min(unit, (used_w - gap) / max(1, len(extra)))
                 ey = oy + (max_r - min_r) * unit + gap * 0.5
                 for index, key in enumerate(extra):
-                    cap = QtCore.QRectF(ox + index * extra_unit + gap * 0.5, ey, max(4.0, extra_unit - gap), max(4.0, unit - gap))
+                    cap = QtCore.QRectF(
+                        ox + index * extra_unit + gap * 0.5, ey, max(4.0, extra_unit - gap), max(4.0, unit - gap)
+                    )
                     _paint_input_keycap(painter, cap, style, display_label(key), key_lookup(key) in pressed, key_font)
         elif extra:
             count = max(1, len(extra))
@@ -4062,7 +4152,7 @@ def _draw_axis_arrow(
     ux, uy = dx / length, dy / length
     try:
         head = float(arrow_size) if arrow_size is not None else 7.0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         head = 7.0
     head = max(0.0, head)
     # Stop the shaft short of the tip so the head does not sit under a thick line.
@@ -4083,7 +4173,7 @@ def _axis_arrow_size(style: dict[str, Any], width: float) -> float:
     try:
         if style.get("arrow_size") is not None:
             return max(0.0, float(style.get("arrow_size")))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         pass
     return 7.0
 
@@ -4095,13 +4185,13 @@ def _xyz_axis_sign(style: dict[str, Any], key: str) -> float:
 def _xyz_axis_span(style: dict[str, Any]) -> float:
     try:
         span = float(style.get("axis_length") if style.get("axis_length") is not None else 0.30)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         span = 0.30
     return max(0.12, min(0.48, span))
 
 
 def _draw_xyz_bounds_box(painter: QtGui.QPainter, project, style: dict[str, Any]):
-    """Wire cube for axis space −1…1 on each axis (optional translucent faces)."""
+    """Wire cube for axis space âˆ’1â€¦1 on each axis (optional translucent faces)."""
     if not style.get("show_bounds_box"):
         return
 
@@ -4141,7 +4231,7 @@ def _draw_xyz_bounds_box(painter: QtGui.QPainter, project, style: dict[str, Any]
                 painter.drawPolygon(QtGui.QPolygonF([corner(*p) for p in face]))
     try:
         width = max(0.5, float(style.get("box_width") or 1.2))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         width = 1.2
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.setPen(_pen(style.get("box") or style.get("grid") or "#5a6a84", width))
@@ -4155,22 +4245,22 @@ def _draw_xyz_plane_grid(
     style: dict[str, Any],
     half_extent: float = 1.0,
 ):
-    """Grid on the horizontal plane (y = 0). Cartesian uses ±1; polar uses ±sphere R."""
+    """Grid on the horizontal plane (y = 0). Cartesian uses Â±1; polar uses Â±sphere R."""
     if not style.get("show_grid"):
         return
     try:
         half = float(half_extent)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         half = 1.0
     half = max(1e-3, half)
     try:
         divisions = int(style.get("grid_divisions") or 4)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         divisions = 4
     divisions = max(2, min(12, divisions))
     try:
         width = max(0.5, float(style.get("grid_width") or 1.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         width = 1.0
     painter.setBrush(QtCore.Qt.NoBrush)
     painter.setPen(_pen(style.get("grid") or "#2a3a55", width))
@@ -4183,7 +4273,7 @@ def _draw_xyz_plane_grid(
 
 
 def _default_sphere_gradient(seed: str | None = None) -> dict[str, Any]:
-    """Radial shading: light highlight → mid → dark rim (matte ball look)."""
+    """Radial shading: light highlight â†’ mid â†’ dark rim (matte ball look)."""
     from .gradient import GRADIENT_TYPE
 
     base = qcolor(seed, "#b0b0b0")
@@ -4233,11 +4323,11 @@ def _unit(vx: float, vy: float, vz: float) -> tuple[float, float, float]:
 
 def _polar_oblique_coeffs():
     """Cabinet oblique: +X screen-horizontal, +Y vertical, +Z toward bottom-left (Bloch-style)."""
-    # True ortho with X horizontal and Y vertical collapses +Z onto the vertical —
+    # True ortho with X horizontal and Y vertical collapses +Z onto the vertical â€”
     # that stacked +Y/+Z into one bipolar line. Oblique keeps all three readable.
     angle = math.radians(35.0)
     z_scale = 0.5  # cabinet foreshortening (far depth reads shorter)
-    # −cos → +Z goes left; +sin → +Z goes down (toward the viewer in the diagram).
+    # âˆ’cos â†’ +Z goes left; +sin â†’ +Z goes down (toward the viewer in the diagram).
     return -z_scale * math.cos(angle), z_scale * math.sin(angle)
 
 
@@ -4253,7 +4343,7 @@ def _slerp_dirs(
     if dot > 0.9995:
         return [(ax, ay, az), (bx, by, bz)]
     if dot < -0.9995:
-        # Opposite — pick an arbitrary perpendicular pivot.
+        # Opposite â€” pick an arbitrary perpendicular pivot.
         if abs(ax) < 0.9:
             px, py, pz = _unit(0.0, -az, ay)
         else:
@@ -4339,7 +4429,7 @@ def _draw_xyz_sphere(
         return
     try:
         radius = float(radius)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 1.0
     if radius < 1e-4:
         return
@@ -4403,11 +4493,11 @@ def _draw_xyz_sphere(
         grad.setColorAt(1.0, shadow)
         painter.setBrush(QtGui.QBrush(grad))
         painter.drawPath(path)
-    # Equator on the sphere: y = 0, x² + z² = R² (same R as the silhouette).
+    # Equator on the sphere: y = 0, xÂ² + zÂ² = RÂ² (same R as the silhouette).
     if draw_equator and style.get("show_sphere_equator", True):
         try:
             eq_w = max(0.8, float(style.get("sphere_width") or 1.2))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             eq_w = 1.2
         eq_color = style.get("sphere_border") or style.get("axis") or "#2c4a6e"
         if qcolor(eq_color, "#00000000").alpha() <= 0:
@@ -4434,7 +4524,7 @@ def _draw_xyz_sphere(
     if rim not in (None, "") and qcolor(rim, "#00000000").alpha() > 0:
         try:
             rim_w = max(0.5, float(style.get("sphere_width") or 1.0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             rim_w = 1.0
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.setPen(_pen(rim, rim_w))
@@ -4499,25 +4589,32 @@ def _draw_polar_projections(
         return
     origin = project(0.0, 0.0, 0.0)
     try:
-        path_w = float(style.get("projection_width") if style.get("projection_width") is not None else (style.get("needle_width") or 2.0))
-    except (TypeError, ValueError):
+        path_w = float(
+            style.get("projection_width")
+            if style.get("projection_width") is not None
+            else (style.get("needle_width") or 2.0)
+        )
+    except TypeError, ValueError:
         path_w = 2.0
     path_w = max(0.8, path_w)
     color = style.get("projection") or style.get("indicator") or "#ff5a3c"
     painter.setBrush(QtCore.Qt.NoBrush)
 
-    # Meridian on the sphere through the tip (north → tip → equator).
+    # Meridian on the sphere through the tip (north â†’ tip â†’ equator).
     north = (0.0, 1.0, 0.0)
     tip_dir = _unit(x, y, z)
     eq_dir = _unit(x, 0.0, z)
     if eq_dir[0] == 0.0 and eq_dir[2] == 0.0:
         eq_dir = (1.0, 0.0, 0.0)
     eq_on = (eq_dir[0] * tip_radius, 0.0, eq_dir[2] * tip_radius)
-    meridian = [(d[0] * tip_radius, d[1] * tip_radius, d[2] * tip_radius) for d in (_slerp_dirs(north, tip_dir, 20) + _slerp_dirs(tip_dir, eq_dir, 14)[1:])]
+    meridian = [
+        (d[0] * tip_radius, d[1] * tip_radius, d[2] * tip_radius)
+        for d in (_slerp_dirs(north, tip_dir, 20) + _slerp_dirs(tip_dir, eq_dir, 14)[1:])
+    ]
     _draw_front_back_polyline(painter, origin, meridian, project, color, path_w, screen_radius)
 
     if style.get("show_projection", True):
-        # Plane radial to the equator (same azimuth) — clamp so it cannot leave the ball.
+        # Plane radial to the equator (same azimuth) â€” clamp so it cannot leave the ball.
         end = project(*eq_on)
         if screen_radius is not None:
             end = _clamp_to_screen_disk(origin, end, screen_radius)
@@ -4528,7 +4625,7 @@ def _draw_polar_projections(
 
 
 def _polar_to_cartesian(azimuth: float, elevation: float, range_v: float) -> tuple[float, float, float]:
-    """Map centered axes to Cartesian. Azimuth ±180°, elevation ±90°, range −1…1 → 0…1."""
+    """Map centered axes to Cartesian. Azimuth Â±180Â°, elevation Â±90Â°, range âˆ’1â€¦1 â†’ 0â€¦1."""
     az = float(azimuth) * math.pi
     el = float(elevation) * (math.pi / 2.0)
     r = max(0.0, min(1.0, (float(range_v) + 1.0) * 0.5))
@@ -4555,7 +4652,7 @@ def _paint_3d_axes_body(
     painter.setBrush(fill_brush(style.get("fill"), "#121826", rect=rect))
     try:
         radius = max(0.0, float(style.get("corner_radius")))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         radius = 6.0
     painter.drawRoundedRect(rect, radius, radius)
     inner = _inner_rect(rect, style)
@@ -4594,7 +4691,7 @@ def _paint_3d_axes_body(
 
     if not polar:
         _draw_xyz_bounds_box(painter, project, style)
-    # Polar: draw a true circle (projected oblique sphere is an ellipse — looks wrong).
+    # Polar: draw a true circle (projected oblique sphere is an ellipse â€” looks wrong).
     _draw_xyz_sphere(
         painter,
         project,
@@ -4609,7 +4706,7 @@ def _paint_3d_axes_body(
 
     try:
         axis_width = float(style.get("axis_width") if style.get("axis_width") is not None else 0.5)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         axis_width = 0.5
     axis_width = max(0.5, axis_width)
     axis_color = style.get("axis") or style.get("border") or "#e6e8ec"
@@ -4621,7 +4718,7 @@ def _paint_3d_axes_body(
         ((0.0, 0.0, 1.0), sz),
     ):
         if polar:
-            # Positive rays on the fixed unit frame — not scaled by range.
+            # Positive rays on the fixed unit frame â€” not scaled by range.
             tail = origin
             head = project(*(frame_r * sign * part for part in axis))
         else:
@@ -4654,8 +4751,12 @@ def _paint_3d_axes_body(
         on_x = project(x, 0.0, 0.0)
         on_z = project(0.0, 0.0, z)
         try:
-            path_w = float(style.get("projection_width") if style.get("projection_width") is not None else (style.get("needle_width") or 2.5))
-        except (TypeError, ValueError):
+            path_w = float(
+                style.get("projection_width")
+                if style.get("projection_width") is not None
+                else (style.get("needle_width") or 2.5)
+            )
+        except TypeError, ValueError:
             path_w = 2.5
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.setPen(
@@ -4670,9 +4771,11 @@ def _paint_3d_axes_body(
     if style.get("show_vector", False) or polar:
         try:
             vec_w = float(
-                style.get("vector_width") if style.get("vector_width") is not None else (style.get("projection_width") or style.get("needle_width") or 2.5)
+                style.get("vector_width")
+                if style.get("vector_width") is not None
+                else (style.get("projection_width") or style.get("needle_width") or 2.5)
             )
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             vec_w = 2.5
         vec_color = style.get("vector") or style.get("indicator") or "#ff5a3c"
         _draw_axis_arrow(
@@ -4723,12 +4826,12 @@ def paint_axis_polar(painter: QtGui.QPainter, item: dict[str, Any], value):
 def _radar_style_float(style: dict[str, Any], key: str, default: float) -> float:
     try:
         return float(style.get(key) if style.get(key) is not None else default)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
 def _radar_map_axis(value: float, lo: float, hi: float) -> float:
-    """Map a centered axis (−1…1) onto [lo, hi]."""
+    """Map a centered axis (âˆ’1â€¦1) onto [lo, hi]."""
     t = max(0.0, min(1.0, (_clamp(value) + 1.0) * 0.5))
     return lo + (hi - lo) * t
 
@@ -4743,7 +4846,7 @@ def _radar_axis_from_mapped(mapped: float, lo: float, hi: float) -> float:
 
 
 def _radar_point(origin: QtCore.QPointF, travel: float, angle_off_deg: float) -> QtCore.QPointF:
-    """0° = up (nose), positive = right (clockwise)."""
+    """0Â° = up (nose), positive = right (clockwise)."""
     rad = math.radians(angle_off_deg)
     return QtCore.QPointF(
         origin.x() + travel * math.sin(rad),
@@ -4788,15 +4891,15 @@ def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
     travel = max(8.0, min(circle.width(), circle.height()) / 2.0 - 2.0)
     try:
         rings = max(1, min(12, int(style.get("ring_count") or 5)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         rings = 5
     _draw_ring_grid(painter, circle, style, rings)
     _draw_crosshairs(painter, circle, style)
 
-    # Cardinal rays (nose up) with optional end arrows — positive only from center.
+    # Cardinal rays (nose up) with optional end arrows â€” positive only from center.
     try:
         axis_w = max(0.5, float(style.get("axis_width") if style.get("axis_width") is not None else 0.5))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         axis_w = 0.5
     axis_color = style.get("axis") or style.get("border") or "#e6e8ec"
     show_arrows = bool(style.get("show_axis_arrows", True))
@@ -4813,7 +4916,9 @@ def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
         )
 
     if style.get("show_slew_limits", True):
-        lim_pen = _pen(style.get("projection") or "#ff5a3c", max(1.0, _radar_style_float(style, "projection_width", 1.5)))
+        lim_pen = _pen(
+            style.get("projection") or "#ff5a3c", max(1.0, _radar_style_float(style, "projection_width", 1.5))
+        )
         lim_pen.setStyle(QtCore.Qt.DotLine)
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.setPen(lim_pen)
@@ -4825,7 +4930,7 @@ def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
     fov_r = max(4.0, travel * range_t)
     left_deg = angle_off - for_half
     right_deg = angle_off + for_half
-    # Qt arc: 0° = east, positive = CCW. Our 0° = up → Qt 90°; CW right → negative span.
+    # Qt arc: 0Â° = east, positive = CCW. Our 0Â° = up â†’ Qt 90Â°; CW right â†’ negative span.
     start_qt = 90.0 - left_deg
     span_qt = -(right_deg - left_deg)
 
@@ -4856,7 +4961,7 @@ def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
 
     try:
         fov_w = max(1.0, float(style.get("fov_width") if style.get("fov_width") is not None else 2.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         fov_w = 2.0
     fov_color = style.get("fov") or style.get("indicator") or "#ff5a3c"
     painter.setBrush(QtCore.Qt.NoBrush)
@@ -4880,7 +4985,7 @@ def paint_axis_radar(painter: QtGui.QPainter, item: dict[str, Any], value):
 
 
 def paint_axis_ternary(painter: QtGui.QPainter, item: dict[str, Any], value):
-    """Power triangle. No square chrome — fill/border apply to the triangle. Dot uses shared indicator style."""
+    """Power triangle. No square chrome â€” fill/border apply to the triangle. Dot uses shared indicator style."""
     from .gradient import is_gradient
 
     style = item.get("style") or {}
@@ -4893,7 +4998,7 @@ def paint_axis_ternary(painter: QtGui.QPainter, item: dict[str, Any], value):
     tri = QtGui.QPolygonF([top, left, right])
     fill = style.get("fill")
     brush = fill_brush(fill, "#00000000", rect=rect)
-    # Transparent fill → no triangle body; border still outlines the edges.
+    # Transparent fill â†’ no triangle body; border still outlines the edges.
     if not is_gradient(fill) and qcolor(fill, "#00000000").alpha() <= 0:
         painter.setBrush(QtCore.Qt.NoBrush)
     else:
@@ -4906,7 +5011,7 @@ def paint_axis_ternary(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.drawPolygon(tri)
     try:
         axis_width = float(style.get("axis_width") if style.get("axis_width") is not None else 0.5)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         axis_width = 0.5
     axis_width = max(0.5, axis_width)
     axis_color = style.get("axis") or style.get("crosshair") or style.get("border") or "#e6e8ec"
@@ -5016,7 +5121,7 @@ def paint_widget(
 
 
 def _math_angle_deg(px: float, py: float, cx: float, cy: float) -> float:
-    """0° = east, counter-clockwise, Y up (matches paint_axis_radial / encoder)."""
+    """0Â° = east, counter-clockwise, Y up (matches paint_axis_radial / encoder)."""
     return math.degrees(math.atan2(-(py - cy), px - cx))
 
 
@@ -5140,7 +5245,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
                 ay /= mag
         return (_clamp(ax), _clamp(ay))
     if widget_type == "axis_radar":
-        # Drag sets angle off + range; FoR stays at mid (0) — use the axis binding for FoR width.
+        # Drag sets angle off + range; FoR stays at mid (0) â€” use the axis binding for FoR width.
         style = item.get("style") or {}
         cx, cy = rect.center().x(), rect.center().y()
         side = min(rect.width(), rect.height())
@@ -5148,7 +5253,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
         dx = x - cx
         dy = cy - y
         dist = math.hypot(dx, dy)
-        # 0° = up, positive = right (CW)
+        # 0Â° = up, positive = right (CW)
         angle_off = math.degrees(math.atan2(dx, -dy)) if dist > 1e-6 else 0.0
         slew_l = _radar_style_float(style, "slew_left_deg", -60.0)
         slew_r = _radar_style_float(style, "slew_right_deg", 60.0)

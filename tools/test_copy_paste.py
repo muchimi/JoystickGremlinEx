@@ -590,7 +590,8 @@ class CopyPasteTests(unittest.TestCase):
                            and method.name.startswith("_paste_") and method.name.endswith("action")]
                 if not methods:
                     continue
-                widget_type = load(path.relative_to(ROOT), cls.name, {m.name for m in methods}, "QtWidgets.QWidget")
+                helpers = {m.name for m in cls.body if isinstance(m, ast.FunctionDef) and m.name == "_new_step_index"}
+                widget_type = load(path.relative_to(ROOT), cls.name, {m.name for m in methods} | helpers, "QtWidgets.QWidget")
                 for method in methods:
                     with self.subTest(container=path.parent.name, method=method.name):
                         widget = widget_type()

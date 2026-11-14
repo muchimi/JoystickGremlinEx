@@ -1,6 +1,5 @@
-# -*- coding: utf-8; -*-
 #
-# Overlay color gradients (linear / radial) — Photoshop-like limited editor.
+# Overlay color gradients (linear / radial) â€” Photoshop-like limited editor.
 #
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 
@@ -214,7 +213,7 @@ def swatch_gradient_brush(gradient: dict[str, Any], rect: QtCore.QRectF | None =
 
 
 def paint_gradient_spectrum(painter: QtGui.QPainter, rect: QtCore.QRectF, gradient: dict[str, Any]):
-    """Paint a horizontal spectrum of the gradient stops (pixel columns — always visible)."""
+    """Paint a horizontal spectrum of the gradient stops (pixel columns â€” always visible)."""
     if rect.width() <= 0 or rect.height() <= 0:
         return
     grad = normalize_gradient(gradient)
@@ -456,7 +455,7 @@ class GradientEditorDialog(QRememberDialog):
         self._dial.setValue(int(round(float(self._gradient.get("angle") or 90))) % 360)
         self._angle = QtWidgets.QSpinBox()
         self._angle.setRange(0, 359)
-        self._angle.setSuffix("°")
+        self._angle.setSuffix("Â°")
         self._angle.setValue(int(round(float(self._gradient.get("angle") or 90))) % 360)
         self._dial.valueChanged.connect(self._on_angle)
         self._angle.valueChanged.connect(self._on_angle)

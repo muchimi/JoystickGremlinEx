@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -95,7 +94,7 @@ def _screen_point_from_lparam(lparam) -> QtCore.QPoint:
 
     Prefer Qt's logical cursor position. WM_NCHITTEST's lParam is often in
     physical pixels under Per-Monitor DPI, while ``mapFromGlobal`` expects
-    device-independent coords — a mismatch makes hit-tests miss painted
+    device-independent coords â€” a mismatch makes hit-tests miss painted
     widgets so the whole overlay stays click-through (keyboard nudge still
     works). Falling back to lParam only when Qt has no cursor.
     """
@@ -238,7 +237,7 @@ def list_overlay_screens() -> list[dict]:
                 "height": int(geo.height()),
                 "x": int(geo.x()),
                 "y": int(geo.y()),
-                "label": f"{index + 1}: {name} — {geo.width()}×{geo.height()}{tag}",
+                "label": f"{index + 1}: {name} â€” {geo.width()}Ã—{geo.height()}{tag}",
             }
         )
     return screens
@@ -532,7 +531,7 @@ class OverlayView(QtWidgets.QWidget):
         if not widget_ids:
             self._dirty_body_ids = None
         elif self._dirty_body_ids is None and self._frame_pm is None:
-            # First frame not built yet — full rebuild on paint.
+            # First frame not built yet â€” full rebuild on paint.
             self._dirty_body_ids = None
         else:
             if self._dirty_body_ids is None:
@@ -578,7 +577,7 @@ class OverlayView(QtWidgets.QWidget):
         delay_ms = 0
         if not self.interactive:
             # Cap live paint rate. Full-scene layered redraws were starving the
-            # Python GIL and delaying joystick→vJoy on the event thread.
+            # Python GIL and delaying joystickâ†’vJoy on the event thread.
             elapsed_ms = (time.monotonic() - self._last_flush_mono) * 1000.0
             min_ms = 33.0  # ~30 Hz
             if elapsed_ms < min_ms:
@@ -620,13 +619,13 @@ class OverlayView(QtWidgets.QWidget):
         self._sync_browsers()
 
     def _on_geometry_changed(self):
-        """Move/resize only — full invalidate so layered overlays do not smear."""
+        """Move/resize only â€” full invalidate so layered overlays do not smear."""
         if not Shiboken.isValid(self):
             return
         if QtCore.QThread.currentThread() is not self.thread():
             QtCore.QTimer.singleShot(0, self, self._on_geometry_changed)
             return
-        # Direct full update (not a sub-rect) — critical for onscreen translucency.
+        # Direct full update (not a sub-rect) â€” critical for onscreen translucency.
         self._invalidate_static_layer()
         self._pending_full = True
         self._pending_rect = QtCore.QRect()
@@ -718,7 +717,7 @@ class OverlayView(QtWidgets.QWidget):
         self._dirty_body_ids = None
 
     def _static_layer_key(self):
-        """Geometry / style fingerprint — value ticks must not rebuild shadows."""
+        """Geometry / style fingerprint â€” value ticks must not rebuild shadows."""
         canvas = self.page_canvas
         cw, ch = self.canvas_size()
         parts = [
@@ -801,7 +800,7 @@ class OverlayView(QtWidgets.QWidget):
                 painter.end()
         self._static_pm = pm
         self._static_key = key
-        # Static rebuilt ⇒ frame must be rebuilt too.
+        # Static rebuilt â‡’ frame must be rebuilt too.
         self._frame_pm = None
         self._dirty_body_ids = None
         return pm
@@ -1440,7 +1439,7 @@ class OverlayView(QtWidgets.QWidget):
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
         if self._reposition_last is not None:
             if not (event.buttons() & QtCore.Qt.LeftButton):
-                # Button state lost (alt-tab / click-through) — never leave grab stuck.
+                # Button state lost (alt-tab / click-through) â€” never leave grab stuck.
                 self._end_reposition_drag()
                 event.accept()
                 return
@@ -1521,7 +1520,7 @@ class OverlayView(QtWidgets.QWidget):
 
 
 class OverlayWindow(QtWidgets.QWidget):
-    """Bordered-or-frameless capture window titled GEX Overlay — {page}."""
+    """Bordered-or-frameless capture window titled GEX Overlay â€” {page}."""
 
     def __init__(self, scene: OverlayScene, parent=None, page_id: str | None = None):
         super().__init__(parent)
@@ -1538,7 +1537,7 @@ class OverlayWindow(QtWidgets.QWidget):
         self.drag_bar = QtWidgets.QWidget(self)
         self.drag_bar.setFixedHeight(22)
         self.drag_bar.setCursor(QtCore.Qt.SizeAllCursor)
-        self._drag_label = QtWidgets.QLabel("GEX Overlay  —  hide this bar before capturing")
+        self._drag_label = QtWidgets.QLabel("GEX Overlay  â€”  hide this bar before capturing")
         self._drag_label.setAlignment(QtCore.Qt.AlignCenter)
         bar_layout = QtWidgets.QHBoxLayout(self.drag_bar)
         bar_layout.setContentsMargins(6, 0, 6, 0)
@@ -1760,7 +1759,7 @@ class OverlayWindow(QtWidgets.QWidget):
         self.setWindowTitle(title)
         if getattr(self, "_drag_label", None) is not None:
             name = (page or {}).get("name") or "Overlay"
-            self._drag_label.setText(f"{OVERLAY_WINDOW_TITLE} — {name}  —  hide this bar before capturing")
+            self._drag_label.setText(f"{OVERLAY_WINDOW_TITLE} â€” {name}  â€”  hide this bar before capturing")
 
     def _open_control_panel(self):
         try:
@@ -1921,7 +1920,7 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, not interactive or reposition)
                 self.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, interactive and not reposition)
                 if flags_changed:
-                    # Never change flags while visible — Windows HWND UAF risk.
+                    # Never change flags while visible â€” Windows HWND UAF risk.
                     if visible:
                         self.hide()
                     self.setWindowFlags(flags_preview)

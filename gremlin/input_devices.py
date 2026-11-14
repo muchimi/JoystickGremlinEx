@@ -1,4 +1,3 @@
-# -*- coding: utf-8; -*-
 
 # Copyright (C) 2015 - 2022 Lionel Ott
 #
@@ -834,7 +833,7 @@ class CallbackActions:
         key = release_evt.callbackKey
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose:
-            syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
+            syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {release_evt!s}")
         if release_evt not in self._registry:
             self._registry[key] = []
             # self._registry_key_map[key] = release_evt
@@ -877,7 +876,7 @@ class CallbackActions:
                     try:
                         entry.callback()
                     except Exception as e:
-                        syslog.error(f"AUTORELEASE CALLBACK: FAILED: {str(e)}")
+                        syslog.error(f"AUTORELEASE CALLBACK: FAILED: {e!s}")
                 else:
                     new_list.append(entry)
             if new_list:
@@ -1256,7 +1255,7 @@ def format_input(event) -> str:
     # Retrieve device name
     label = ""
     if device is None:
-        logging.warning(f"Unable to find a device with GUID {str(event.device_guid)}")
+        logging.warning(f"Unable to find a device with GUID {event.device_guid!s}")
         label = "Unknown"
     else:
         label = device.name
