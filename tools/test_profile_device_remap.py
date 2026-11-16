@@ -127,6 +127,42 @@ def maestro(slot=7, **kwargs):
 
 
 class OutputRemapChecks(unittest.TestCase):
+    def test_missing_output_guid_without_declaration_is_offered_and_remapped_everywhere(self):
+        old = "dde8a0111f5251cca3315b66849e9991"
+        target = maestro(data={"maestro_key": "maestro://127.0.0.1:8010/gex-1"})
+        root = etree.fromstring(f'''<profile>
+            <remap vjoy="{old}" axis="3"/>
+            <split-axis device-low-vjoy-id="{old}" device-high-vjoy-id="{old}"/>
+            <macro><actions><vjoy device-guid="{old}" vjoy-id="0" input-type="button" input-id="2"/></actions></macro>
+            <variable type="VirtualInput" vjoy-id="{old}"/>
+            <start><devices><device device-guid="{old}"><axis id="1" value="0.5"/></device></devices></start>
+        </profile>''')
+        rows = remap.output_device_sources(root, [target])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["key"], old)
+        self.assertEqual(rows[0]["suggested-guid"], NEW)
+        result, changes = remap.remap_output_devices(root, [target], {old: target})
+        self.assertTrue(changes)
+        self.assertNotIn(old, etree.tostring(result).decode())
+        self.assertEqual(result.find("remap").get("vjoy"), NEW)
+        self.assertEqual(result.find("./start/devices/device").get("device-guid"), NEW)
+        self.assertIn(old, etree.tostring(root).decode())
+
+    def test_unknown_output_guid_can_be_manually_mapped_without_guessing(self):
+        root = etree.fromstring(f'<profile><remap vjoy="{OLD}" button="4"/></profile>')
+        rows = remap.output_device_sources(root, [maestro()])
+        self.assertEqual(rows[0]["key"], OLD)
+        self.assertNotIn("suggested-guid", rows[0])
+        result, _ = remap.remap_output_devices(root, [maestro()], {OLD: maestro()})
+        self.assertEqual(result[0].get("vjoy"), NEW)
+
+    def test_maestro_guid_stored_in_virtual_id_is_offered_and_replaced(self):
+        root = etree.fromstring(f'<profile><vjoyremap device-type="Maestro" virtual-id="{OLD}" axis="3"/></profile>')
+        rows = remap.output_device_sources(root, [maestro()])
+        self.assertEqual(rows[0]["key"], OLD)
+        result, _ = remap.remap_output_devices(root, [maestro()], {OLD: maestro()})
+        self.assertEqual(result[0].get("virtual-id"), "7")
+
     def test_modern_outputs_use_stable_identity_and_actual_slot(self):
         root = etree.fromstring('<profile><vjoyremap device-type="VJoy" virtual-id="1" axis="3"/><vjoyremap device-type="Maestro" virtual-id="2" button="5"/></profile>')
         original = etree.tostring(root)
@@ -387,6 +423,7 @@ class DialogChecks(unittest.TestCase):
                 layout.addWidget(widget)
             return result
         common.QInfoBox = QtWidgets.QLabel
+        common.Color = Mock()
         common.MessageBoxYesNo = Mock()
         common.QRememberDialog = RememberDialog
         common.QDataCheckbox = QtWidgets.QCheckBox
@@ -394,7 +431,11 @@ class DialogChecks(unittest.TestCase):
         common.QDataPushButton = QtWidgets.QPushButton
         common.getHContainer = container
         common.getVContainer = lambda widget, **kwargs: container([widget])
-        with patch.dict(sys.modules, {"gremlin.device_remap": remap, "gremlin.ui.ui_common": common}):
+        services = ModuleType("gremlin")
+        services.__path__ = []
+        services.shared_state = NS(is_dark_theme=True)
+        with patch.dict(sys.modules, {"gremlin": services, "gremlin.shared_state": services.shared_state,
+                                      "gremlin.device_remap": remap, "gremlin.ui.ui_common": common}):
             cls.dialog_type = load("device_remap_dialog_checks", ROOT / "gremlin/ui/device_remap.py").ProfileDeviceRemapDialog
 
     def setUp(self):
@@ -413,6 +454,20 @@ class DialogChecks(unittest.TestCase):
         self.dialog._apply(True)
         self.apply.assert_called_once()
         self.assertEqual(self.dialog.result(), 1)
+
+    def test_missing_old_maestro_guid_is_visible_with_native_guid_suggested(self):
+        old = "dde8a0111f5251cca3315b66849e9991"
+        target = maestro(data={"maestro_key": "maestro://127.0.0.1:8010/gex-1"})
+        root = etree.fromstring(f'<profile><remap vjoy="{old}" axis="3"/></profile>')
+        dialog = self.dialog_type(etree.tostring(root), [target], self.apply)
+        self.addCleanup(dialog.close)
+        self.assertEqual(len(dialog._output_rows), 1)
+        source, check, combo = dialog._output_rows[0]
+        self.assertEqual(source["device-guid"], old)
+        self.assertIs(combo.currentData(), target)
+        check.setChecked(True)
+        result = dialog._replacement_root()
+        self.assertEqual(result[0].get("vjoy"), NEW)
 
     def test_output_only_conversion_is_optional_and_previewed(self):
         root = etree.fromstring('<profile><devices/><vjoyremap device-type="VJoy" virtual-id="1" button="4"/></profile>')

@@ -24,9 +24,11 @@ def osc_string(value):
     return data + b"\0" * (-len(data) % 4)
 
 
-def pong(request_id, name="MaestroOscService", version=1):
-    return (osc_string("/maestro_pong") + osc_string(",isi") + struct.pack(">i", request_id)
-            + osc_string(name) + struct.pack(">i", version))
+def pong(request_id, name="MaestroOscService", version=1, service_version=None):
+    tags = ",isi" if service_version is None else ",isis"
+    return (osc_string("/maestro_pong") + osc_string(tags) + struct.pack(">i", request_id)
+            + osc_string(name) + struct.pack(">i", version)
+            + (b"" if service_version is None else osc_string(service_version)))
 
 
 @unittest.skipUnless(POWERSHELL, "Requires Windows PowerShell")
@@ -76,6 +78,12 @@ class InstallerBridgePingTests(unittest.TestCase):
                             response = pong(request_id, version=2)
                         elif mode == "truncated":
                             response = pong(request_id)[:-1]
+                        elif mode == "versioned":
+                            response = pong(request_id, service_version="0.1.3")
+                        elif mode == "truncated_version":
+                            response = pong(request_id, service_version="0.1.3")[:-1]
+                        elif mode == "wrong_protocol_versioned":
+                            response = pong(request_id, version=2, service_version="0.1.3")
                         else:
                             response = pong(request_id)
                         sender.sendto(response, ("127.0.0.1", reply_port))
@@ -120,6 +128,14 @@ class InstallerBridgePingTests(unittest.TestCase):
         result = self.probe(through_connection=True)
         self.assertEqual(result["State"], "connected")
         self.assertIn("127.0.0.1", result["Message"])
+
+    def test_versioned_pong_is_accepted(self):
+        self.assertEqual(self.probe("versioned")["State"], "connected")
+
+    def test_invalid_versioned_pongs_are_rejected(self):
+        for mode in ("truncated_version", "wrong_protocol_versioned"):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.probe(mode)["State"], "failed")
 
     def test_wrong_request_id_is_rejected(self):
         self.assertEqual(self.probe("wrong_request")["State"], "failed")

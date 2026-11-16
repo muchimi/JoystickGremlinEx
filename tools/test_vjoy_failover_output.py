@@ -4,6 +4,7 @@ import ast
 import logging
 from pathlib import Path
 import sys
+import threading
 import time
 from types import SimpleNamespace as NS
 import unittest
@@ -72,12 +73,13 @@ class FailoverOutputChecks(unittest.TestCase):
             ui=NS(ui_common=NS(MessageBoxWarning=self.warning)), macro=NS(VJoyMacroAction=MacroOutput),
         )
         self.namespace = dict(
-            gremlin=services, joystick_handling=self.handling, DeviceType=DeviceType,
+            gremlin=services, dinput=NS(GEX_MAX_DEVICES=256), joystick_handling=self.handling, DeviceType=DeviceType,
             InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, time=time,
             syslog=logging.getLogger("failover-output-checks"), VJoyProxy=self.native,
             MessageBoxWarning=self.warning,
             getDevice=self.handling.getDevice, _output_targets={}, _output_targets_failover=None, _OUTPUT_MISSING=object(),
             _raw_vjoy_target_map={}, _maestro_failover_map={}, _maestro_devices=[],
+            _device_registry_lock=threading.RLock(),
             _native_vjoy_devices={1: self.vjoy},
             _all_devices_map={dev.device_guid: dev for dev in self.devices},
             get_native_vjoy_devices=lambda connected_only=True: [dev for dev in self.devices
@@ -153,6 +155,20 @@ class FailoverOutputChecks(unittest.TestCase):
         if target is not None and target.kind == "maestro":
             target._maestro = self.backend
         return target
+
+    def test_high_maestro_slots_route_directly_without_vjoy_aliases(self):
+        for slot in (16, 31, 127, 255):
+            with self.subTest(slot=slot):
+                self.maestro.virtual_id = slot
+                self.maestro.name = f"gex-{slot + 1}"
+                self.maestro.data["maestro_key"] = f"maestro://localhost:8010/gex-{slot + 1}"
+                self.devices = [self.maestro]
+                target = self.target(self.maestro.device_guid)
+                self.assertIsNotNone(target)
+                self.assertEqual(target.kind, "maestro")
+                self.assertEqual(target.out_id, slot)
+                self.assertIsNone(self.namespace["_maestro_failover_id"](self.maestro))
+                self.assertNotIn(slot + 1, self.namespace["_maestro_failover_map"])
 
     def test_failover_placeholder_is_not_a_native_output(self):
         for key in (1, self.vjoy.device_guid):

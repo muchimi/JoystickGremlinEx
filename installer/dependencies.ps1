@@ -204,10 +204,13 @@ function Get-BridgeProbeSettings {
 }
 
 function New-BridgeOscPacket {
-    param([int]$RequestId, [switch]$Pong)
+    param([int]$RequestId, [switch]$Pong, [string]$ServiceVersion)
     $stream = New-Object IO.MemoryStream
     try {
-        $strings = if ($Pong) { @('/maestro_pong', ',isi') } else { @('/maestro_ping', ',i') }
+        $versioned = $Pong -and $PSBoundParameters.ContainsKey('ServiceVersion')
+        $strings = if ($versioned) { @('/maestro_pong', ',isis') }
+                   elseif ($Pong) { @('/maestro_pong', ',isi') }
+                   else { @('/maestro_ping', ',i') }
         foreach ($value in $strings) {
             $bytes = [Text.Encoding]::UTF8.GetBytes($value)
             $stream.Write($bytes, 0, $bytes.Length)
@@ -221,6 +224,11 @@ function New-BridgeOscPacket {
             $stream.Write($bytes, 0, $bytes.Length)
             do { $stream.WriteByte(0) } while ($stream.Length % 4 -ne 0)
             $stream.Write([byte[]]@(0, 0, 0, 1), 0, 4)
+            if ($versioned) {
+                $bytes = [Text.Encoding]::UTF8.GetBytes($ServiceVersion)
+                $stream.Write($bytes, 0, $bytes.Length)
+                do { $stream.WriteByte(0) } while ($stream.Length % 4 -ne 0)
+            }
         }
         return ,$stream.ToArray()
     } finally { $stream.Dispose() }
@@ -241,6 +249,8 @@ function Test-BridgeOscPing {
         $requestId = Get-Random -Minimum 1 -Maximum 2147483647
         $packet = New-BridgeOscPacket $requestId
         $expected = [Convert]::ToBase64String((New-BridgeOscPacket $requestId -Pong))
+        $versionOffset = (New-BridgeOscPacket $requestId -Pong -ServiceVersion '').Length - 4
+        $utf8 = New-Object Text.UTF8Encoding($false, $true)
         $sender = New-Object Net.Sockets.UdpClient([Net.Sockets.AddressFamily]::InterNetwork)
         [void]$sender.Send($packet, $packet.Length, $Address, $ReceivePort)
         $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -250,7 +260,18 @@ function Test-BridgeOscPing {
             $remote = New-Object Net.IPEndPoint([Net.IPAddress]::Any, 0)
             try { $reply = $receiver.Receive([ref]$remote) } catch { break }
             if ($remote.Address.ToString() -ne $Address) { continue }
-            if ([Convert]::ToBase64String($reply) -ceq $expected) {
+            $validPong = [Convert]::ToBase64String($reply) -ceq $expected
+            if (-not $validPong -and $reply.Length -ge $versionOffset + 4) {
+                $versionEnd = [Array]::IndexOf($reply, [byte]0, $versionOffset)
+                if ($versionEnd -ge $versionOffset) {
+                    try {
+                        $version = $utf8.GetString($reply, $versionOffset, $versionEnd - $versionOffset)
+                        $versionedPong = New-BridgeOscPacket $requestId -Pong -ServiceVersion $version
+                        $validPong = [Convert]::ToBase64String($reply) -ceq [Convert]::ToBase64String($versionedPong)
+                    } catch { }
+                }
+            }
+            if ($validPong) {
                 return [pscustomobject]@{State = 'connected'; Message = "Connected to GEX Maestro Bridge on localhost (${Address}:$ReceivePort; OSC protocol 1; reply UDP $SendPort)."}
             }
             if ([Text.Encoding]::ASCII.GetString($reply).StartsWith("/maestro_pong`0")) { $invalidPong = $true }

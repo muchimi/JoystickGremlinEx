@@ -101,6 +101,8 @@ def _scan_maestro_network(network_str, port, reply_port, timeout):
     ping = _osc_string("/maestro_ping") + _osc_string(",i") + request_id
     pong = (_osc_string("/maestro_pong") + _osc_string(",isi") + request_id
             + _osc_string("MaestroOscService") + struct.pack(">i", 1))
+    versioned_pong = (_osc_string("/maestro_pong") + _osc_string(",isis") + request_id
+                      + _osc_string("MaestroOscService") + struct.pack(">i", 1))
     try:
         with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver,
               socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender):
@@ -127,7 +129,16 @@ def _scan_maestro_network(network_str, port, reply_port, timeout):
                         break
                     except ConnectionResetError:
                         continue
-                    if source[0] in targets and data == pong:
+                    if source[0] not in targets:
+                        continue
+                    valid_pong = data == pong
+                    if data.startswith(versioned_pong):
+                        try:
+                            version = data[len(versioned_pong):].split(b"\0", 1)[0].decode("utf-8")
+                        except UnicodeDecodeError:
+                            continue
+                        valid_pong = data == versioned_pong + _osc_string(version)
+                    if valid_pong:
                         if source[0] not in hosts:
                             syslog.info("NET: Active Maestro UDP service found on %s:%s", source[0], port)
                         hosts.add(source[0])

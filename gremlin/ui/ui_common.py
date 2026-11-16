@@ -9004,6 +9004,10 @@ class JoystickDeviceWidget(QWidget):
             return
         if self._hooked:
             return
+        # Rehooking rebuilds the controls. Dispose of the previous controls
+        # first so axes and their event subscriptions are not duplicated.
+        if self._widgets:
+            self._cleanup_ui()
         vis_type = self.vis_type
         # el = gremlin.event_handler.EventListener()
         jep = gremlin.event_handler.JoystickEventProcessor()

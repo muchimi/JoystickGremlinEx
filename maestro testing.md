@@ -213,5 +213,38 @@ All included items are open source, or from open source repositories/projects.  
 Usage is subject the terms of these licenses that you agree to by installing or using the software.
 
 
+## Stable GEX hardware identities (November 16, 2026)
+
+The GEX client and bridge now use separate hardware product IDs for each managed controller.
+The HID vendor ID remains the existing project-local `0001`; `47`, `48`, and `49` are GEX product-family conventions, not globally assigned USB identifiers.
+
+| Service IDs | HID product IDs | Policy |
+| --- | --- | --- |
+| `gex-1` through `gex-256` | `4701` through `4800` | PID is `4700 + N`; device 256 carries into the high byte. |
+| `gex-gp-1` through `gex-gp-4` | `4801` through `4804` | Separate prefix keeps gamepad IDs distinct. |
+| Named custom joysticks | `4901` through `49FF` | Allocated once and saved in the bridge definition. |
+
+The bridge migrates saved managed definitions before activating them on startup, including disabled definitions. The dedicated gamepads retain the Xbox wireless XUSB companion information/capability block; only their HID/OEM identity changes. Unrelated catalog profiles retain their original hardware identity. Names, layout edits and client output-slot assignments do not change an assigned product ID.
+
+Build and install the updated bridge as well as updating GEX. On its next startup the bridge saves migrated product IDs and creates enabled devices in numeric joystick order followed by numeric gamepad order. Existing instance keys are preserved. Changing HID VID/PID can still change native DirectInput identities and require rebinding in games. Back up the bridge definitions before upgrading if a rollback is needed.
+
+After reboot, close and reopen `joy.cpl`, confirm each device has its own name, and compare the list with GEX's Maestro management dialog. In the bridge source tree, run `python tests/verify_dinput.py --gex-order` to print the observed GEX DirectInput names, VID/PIDs and capability counts and reject a nonnumeric order. This reads the real enumeration; it does not reorder Windows devices. Confirm XInput still sees the gamepads and that a second restart retains the same IDs. The diagnostic covers active devices, so also check that the expected number of controllers is present.
+
+Windows does not guarantee DirectInput enumeration order (https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee417804(v=vs.85)). Sequential PIDs, stable instance keys and numeric activation order improve consistency, but cannot guarantee `joy.cpl` UI order or XInput player numbers. The GEX dialog uses numeric service-ID order, and its existing HID-order verification continues to report observed mismatches rather than hiding them by sorting the scan.
+
+Validation for this change: 148 bridge identity/real-SDK checks passed without creating HID hardware. The focused Python suites passed 7 product-ID checks, 19 startup/dialog checks, 40 management-dialog checks and 25 virtual-input checks. Broader order/identity suites retain the same failures when run against the original Maestro source (one order-test failure and four failures/five errors in the older identity suite). The full bridge `--test` entry point stops in the unchanged `PortSettingsTests` receive-only configuration case, before identity tests; the dedicated `IdentityChecks` runner passes. No live device migration, service installation, XInput player assignment or reboot/joy.cpl order was tested in this execution environment.
 
 
+## Expanded bridge capacity
+
+GEX now supports creating and attaching up to 256 total Maestro devices, the current bridge configuration/protocol ceiling. HIDMaestro itself has no fixed joystick ceiling; this is not an SDK maximum. XInput gamepads remain limited to four, and only gex-1 through gex-16 receive numeric vJoy failover aliases. Higher devices are mapped directly by their GUID/service identity.
+
+The updated bridge defaults Osc:MaxDevices to 256. An existing installation retaining a custom appsettings.json with MaxDevices set to 16 must raise that setting (up to 256) and restart the bridge. This change does not overwrite a running installation or its intentional lower capacity. The first sixteen instance keys and PIDs are preserved; additional keys are derived lazily with ordered hash prefixes.
+
+Capacity validation: the dedicated bridge checks create and restore 256 mock devices, verify all instance-token/HID-prefix orderings and PID uniqueness, and reject device 257. Client tests cover creation and attachment beyond 16, the 256-slot boundary, high-slot direct output, and the separate XInput/vJoy limits. Live creation of 256 Windows controllers has not been tested.
+
+### Checking Windows visibility
+
+Creating a bridge definition and its HID device does not guarantee that DirectInput or `joy.cpl` exposes it. The live 20-device setup on November 16, 2026 had all 20 GEX joysticks in the bridge, HIDAPI and Windows raw input, but only ten in DirectInput and `joy.cpl`. Five vJoy devices and another controller were present, and WinMM reported 16 slots. Removing a visible GEX device admitted the next one. The bridge's 256-device capacity does not increase Windows' legacy joystick slots.
+
+Run `python tests/verify_dinput.py --gex-order --count 20` from the bridge repository, substituting your expected active GEX count. The updated check compares raw input against DirectInput and names missing product IDs; a numerically ordered subset now fails verification. `--count` can also be combined with `--name`. HidHide applies per application, so account for the verifier and the target game's visibility. This check diagnoses the Windows cutoff; it does not change device identities, disable other controllers or increase the Windows API limit.

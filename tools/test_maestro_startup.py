@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 from test_qt_marshalling import APP, flush_deletes
+from test_device_change_suppression import listener_fixture
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,8 @@ GREMLIN = NS(config=NS(Configuration=lambda: CONFIG), util=NS(
     valid_integer_string=lambda value: value.lstrip("-").isdigit(),
     clamp=lambda value, low, high: max(low, min(high, value)),
 ))
+DEVICE_LISTENER = listener_fixture()
+GREMLIN.event_handler = NS(EventListener=lambda: DEVICE_LISTENER)
 
 
 def load_definitions(path, names, namespace):
@@ -57,9 +60,11 @@ class WarningLabel(QtWidgets.QLabel):
 
 
 NAMESPACE = dict(COMMON, SingletonDecorator=lambda cls: cls, Signal=lambda *args: Mock(),
-                 threading=threading, GEX_MAX_DEVICES=16, QWarningWidget=WarningLabel,
+                 threading=threading, re=re, GEX_MAX_DEVICES=256, MAX_GAMEPADS=4,
+                 GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1, GEX_JOYSTICK_PID_BASE=0x4700, GEX_GAMEPAD_PID_BASE=0x4800,
+                 QWarningWidget=WarningLabel,
                  MessageBoxWarning=Mock(), _GEX_ID_PATTERN=re.compile(r"gex-(?:gp-)?(\d+)"))
-load_definitions("gremlin/maestro.py", {"is_valid_gex_id", "Maestro", "MaestroDefaultDevicesDialog"}, NAMESPACE)
+load_definitions("gremlin/maestro.py", {"is_valid_gex_id", "gex_product_id", "gex_device_sort_key", "MaestroResult", "Maestro", "MaestroDefaultDevicesDialog"}, NAMESPACE)
 Maestro = NAMESPACE["Maestro"]
 Dialog = NAMESPACE["MaestroDefaultDevicesDialog"]
 
@@ -77,6 +82,8 @@ class DefaultDeviceChecks(unittest.TestCase):
         self.maestro.refreshDevices = Mock()
         self.maestro._client = Mock()
         self.maestro.client.list.return_value = []
+        self.listener = listener_fixture()
+        GREMLIN.event_handler = NS(EventListener=lambda: self.listener)
         self.dialog = Mock(device_count=4)
         self.dialog.exec.return_value = QtWidgets.QDialog.DialogCode.Accepted
         self.dialog_factory = patch.dict(NAMESPACE, MaestroDefaultDevicesDialog=Mock(return_value=self.dialog))
@@ -141,6 +148,7 @@ class DefaultDeviceChecks(unittest.TestCase):
                 self.maestro.refreshDevices.reset_mock()
                 self.maestro.refreshDevices.side_effect = lambda: self.assertFalse(self.maestro.offerDefaultJoysticks())
                 if delete_all:
+                    self.maestro.client.list.return_value = [{"id": "gex-1"}]
                     self.maestro.deleteAll()
                 else:
                     self.maestro.deleteDevice("gex-1")
@@ -158,6 +166,7 @@ class DefaultDeviceChecks(unittest.TestCase):
                 result.__bool__.return_value = False
                 self.maestro.client.request.return_value = result
                 if delete_all:
+                    self.maestro.client.list.return_value = [{"id": "gex-1"}]
                     self.maestro.deleteAll()
                 else:
                     self.maestro.deleteDevice("gex-1")
@@ -171,7 +180,7 @@ class DefaultDeviceChecks(unittest.TestCase):
         return controller
 
     def test_creation_range_layout_ids_and_publish(self):
-        for count in (1, 4, 16):
+        for count in (1, 4, 16, 32, 256):
             with self.subTest(count=count):
                 self.maestro._controller_map.clear()
                 CONFIG.maestro_device_map = None
@@ -185,9 +194,25 @@ class DefaultDeviceChecks(unittest.TestCase):
                 self.assertEqual(CONFIG.maestro_device_map, {f"gex-{i+1}": i for i in range(count)})
                 self.maestro.refreshDevices.assert_called_once_with()
 
+    def test_default_batch_defers_all_native_updates_until_completion(self):
+        device = NS(vendor_id=1, product_id=1, button_count=128, name=b"gex")
+
+        def create(**kwargs):
+            self.assertGreater(self.listener._device_change_suppressed, 0)
+            self.listener._dinput_device_change_handler(device, 1)
+            self.assertIsNone(self.listener._device_update_timer)
+            return self.create(**kwargs)
+
+        self.maestro.createJoystickController = Mock(side_effect=create)
+        self.assertEqual(self.maestro.createDefaultJoysticks(4), 4)
+        self.assertEqual(self.listener._device_change_suppressed, 0)
+        self.listener.reset_devices.assert_not_called()
+        self.listener._device_update_timer.fire()
+        self.listener.reset_devices.assert_called_once_with(force=False)
+
     def test_invalid_counts_do_not_create(self):
         self.maestro.createJoystickController = Mock()
-        for count in (0, 17, -1, True, 2.5):
+        for count in (0, 257, -1, True, 2.5):
             with self.subTest(count=count), self.assertRaises(ValueError):
                 self.maestro.createDefaultJoysticks(count)
         self.maestro.createJoystickController.assert_not_called()
@@ -201,7 +226,7 @@ class DefaultDeviceChecks(unittest.TestCase):
               patch.object(self.maestro, "_cache_controller", return_value=NS(id="gex-1", index=0))):
             self.assertEqual(self.maestro.createDefaultJoysticks(1), 1)
         self.maestro.client.request.assert_called_once_with(
-            "/maestro_create_custom", "gex-1", "gex-1", 128, 8, 4, 1, 1, True
+            "/maestro_create_custom", "gex-1", "gex-1", 128, 8, 4, 1, 0x4701, True
         )
 
     def test_existing_gamepad_slots_and_saved_joysticks_are_preserved(self):
@@ -216,8 +241,8 @@ class DefaultDeviceChecks(unittest.TestCase):
     def test_insufficient_slots_fails_before_creating_anything(self):
         CONFIG.maestro_device_map = {"custom": 0}
         self.maestro.createJoystickController = Mock()
-        with self.assertRaisesRegex(RuntimeError, "15 Maestro slots"):
-            self.maestro.createDefaultJoysticks(16)
+        with self.assertRaisesRegex(RuntimeError, "255 Maestro slots"):
+            self.maestro.createDefaultJoysticks(256)
         self.maestro.createJoystickController.assert_not_called()
         self.assertEqual(CONFIG.maestro_device_map, {"custom": 0})
 
@@ -231,6 +256,7 @@ class DefaultDeviceChecks(unittest.TestCase):
     def test_enabled_constructor_attaches_without_creating_devices(self):
         CONFIG.maestro_enabled = True
         CONFIG.maestro_osc_reply_host = "192.0.2.1"
+        CONFIG.maestro_configured = True
         with (patch.object(Maestro, "connect"), patch.object(Maestro, "LoadActiveControllers"),
               patch.object(Maestro, "populateDeviceList"), patch.object(Maestro, "sync"),
               patch.object(Maestro, "createJoystickController") as create):
@@ -361,12 +387,12 @@ class DefaultDialogChecks(unittest.TestCase):
 
     def test_default_four_and_explicit_range_validation(self):
         self.assertEqual(self.dialog.device_count, 4)
-        for value in ("", "0", "17", "-1"):
+        for value in ("", "0", "257", "-1"):
             self.dialog.count_widget.setText(value)
             self.dialog.create_button.click()
             self.assertNotEqual(self.dialog.result(), QtWidgets.QDialog.DialogCode.Accepted)
             self.assertTrue(self.dialog.warning_widget.text())
-        self.dialog.count_widget.setText("16")
+        self.dialog.count_widget.setText("256")
         self.dialog.create_button.click()
         self.assertEqual(self.dialog.result(), QtWidgets.QDialog.DialogCode.Accepted)
 

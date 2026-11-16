@@ -16,7 +16,8 @@ from test_maestro_osc import GREMLIN, MAESTRO, CONFIG
 
 
 def service_row(number):
-    token = f"HM_{0x0f + number:02X}{number:014X}"
+    token = (f"HM_{0x0f + number:02X}{number:014X}" if number <= 16
+             else f"HM_{0x2000 + ((number - 17) << 4):04X}{number:012X}")
     return dict(id=f"gex-{number}", instanceToken=token, identityKey=f"ordered-key-{number}",
                 hidParentIdPrefix=f"1&{int(token[3:11], 16):x}&0")
 
@@ -34,6 +35,13 @@ class HidOrderChecks(unittest.TestCase):
         self.assertTrue(report["verified"])
         self.assertEqual(report["order"], [f"gex-{n}" for n in range(1, 17)])
         self.assertEqual([report["devices"][d["id"]]["windows_order"] for d in devices], list(range(1, 17)))
+
+    def test_full_bridge_capacity_preserves_observed_numeric_order(self):
+        devices = [service_row(n) for n in range(1, 257)]
+        report = inspect_hid_order(list(reversed(devices)), [hid_row(d) for d in devices])
+        self.assertTrue(report["verified"])
+        self.assertEqual(report["order"], [d["id"] for d in devices])
+        self.assertEqual(report["devices"]["gex-256"]["windows_order"], 256)
 
     def test_wrong_windows_order_is_reported_without_sorting_it_away(self):
         first, second = service_row(1), service_row(2)
@@ -177,6 +185,24 @@ class PublishedHidOrderChecks(unittest.TestCase):
         log.warning.assert_not_called()
         self.assertFalse(self.maestro._dirty)
         self.assertIsNone(self.maestro._sync_worker)
+
+    def test_worker_defers_registry_rebuild_until_creation_request_finishes(self):
+        from test_device_change_suppression import listener_fixture
+
+        self.controller_rows()
+        self.map_native_inputs()
+        listener = listener_fixture()
+        listener.pushDeviceChangeSuppression()
+        with patch.object(self.maestro, "syncDinput"), patch.object(self.maestro, "populateDeviceList") as publish, patch.object(
+            GREMLIN.event_handler, "EventListener", return_value=listener
+        ), patch.object(GREMLIN.joystick_handling, "joystick_devices_initialization", create=True) as initialize:
+            self.maestro._sync_worker_runner()
+        initialize.assert_not_called()
+        publish.assert_not_called()
+        self.assertTrue(listener._device_change_pending)
+        listener.popDeviceChangeSuppression()
+        listener._device_update_timer.fire()
+        listener.reset_devices.assert_called_once_with(force=False)
 
     def test_published_windows_order_uses_instance_token_not_transport_or_saved_slot(self):
         self.controller_rows()

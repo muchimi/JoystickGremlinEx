@@ -154,7 +154,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
                 if (
                     maestro_output_id(device) == source["key"]
                     if source["provider"] == "vjoy"
-                    else guid_key(device.device_guid) == guid_key(source["device-guid"])
+                    else guid_key(device.device_guid) == guid_key(source.get("suggested-guid", source["device-guid"]))
                 )
             ]
             if len(matches) == 1:

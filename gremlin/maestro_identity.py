@@ -5,8 +5,8 @@ import re
 
 
 def joystick_number(device_id):
-    match = re.fullmatch(r"gex-([1-9]|1[0-6])", str(device_id))
-    return int(match[1]) if match else None
+    match = re.fullmatch(r"gex-([1-9][0-9]*)", str(device_id))
+    return int(match[1]) if match and int(match[1]) <= 256 else None
 
 
 def _path(value):
@@ -42,7 +42,8 @@ def matches_instance(row, token):
 def inspect_hid_order(devices, hid_rows):
     """Keep the observed scan order; never sort rows to manufacture a pass.
 
-    Only canonical GEX joystick service IDs take vJoy failover IDs. Other
+    Canonical GEX joystick IDs are inspected in numeric order. Only IDs 1..16
+    are eligible for vJoy failover. Other
     Maestro clients, physical controllers and gamepads are separate identities.
     Multiple HID collections of one controller count as one device.
     """

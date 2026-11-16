@@ -1,9 +1,11 @@
 """Hardware-free device-list checks: python tools/test_maestro_dialog.py."""
 
 from dataclasses import dataclass
+import json
 import re
 import socket
 import threading
+import time
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
@@ -11,6 +13,7 @@ from unittest.mock import Mock, patch
 from PySide6 import QtCore, QtTest, QtWidgets
 from test_maestro_startup import COMMON, GREMLIN, NAMESPACE, Maestro as MaestroService, load_definitions
 from test_qt_marshalling import APP, flush_deletes, pump_until
+from test_device_change_suppression import listener_fixture
 
 
 def clear_layout(layout):
@@ -27,13 +30,15 @@ GREMLIN.shared_state = NS(is_dark_theme=True)
 UI = dict(COMMON)
 load_definitions("gremlin/ui/ui_common.py", {"QDataCheckbox", "QScrollableWidget"}, UI)
 UI["Buttons"] = NS(getDeleteWidget=lambda data, callback: UI["QDataPushButton"]("Delete", data=data, callback=callback))
-UI.update(dataclass=dataclass, threading=threading, re=re, socket=socket, Slot=QtCore.Slot, GEX_MAX_DEVICES=16,
+UI.update(dataclass=dataclass, threading=threading, re=re, socket=socket, Slot=QtCore.Slot, GEX_MAX_DEVICES=256,
           AXIS_NAMES=("X", "Y", "Z", "Rx", "Ry", "Rz", "Slider", "Dial"),
+          GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1, GEX_JOYSTICK_PID_BASE=0x4700, GEX_GAMEPAD_PID_BASE=0x4800,
+          MAX_GAMEPADS=4, WorkManager=lambda: NS(pushCursor=lambda: None, popCursor=lambda: None),
           _GEX_ID_PATTERN=re.compile(r"gex-(?:gp-)?(\d+)"),
           Maestro=NS(klass=NS(_service_index=MaestroService._service_index)))
 load_definitions("gremlin/maestro.py", {
     "MaestroProfileInfo", "_MaestroDialogSignals", "MaestroDialog", "service_snapshot",
-    "is_valid_gex_id", "save_device_definition", "MaestroServiceError", "MaestroResult",
+    "is_valid_gex_id", "gex_product_id", "gex_device_sort_key", "save_device_definition", "MaestroServiceError", "MaestroResult",
 }, UI)
 
 
@@ -66,8 +71,12 @@ class Bridge:
         self.requests.append((address, args))
         self.request_threads.append(threading.get_ident())
         if address == "/maestro_create_custom":
-            device_id, name, buttons, axes, hats = args
-            self.definitions[device_id] = joystick(device_id) | dict(name=name, buttons=buttons, axes=axes, hats=hats)
+            device_id, name, buttons, axes, hats, vendor_id, product_id = args
+            self.definitions[device_id] = joystick(device_id) | dict(name=name, buttons=buttons, axes=axes, hats=hats, vendorId=vendor_id, productId=product_id)
+        elif address == "/maestro_create_gamepad":
+            device_id, name = args
+            self.definitions[device_id] = dict(id=device_id, name=name, kind="gamepad",
+                profileId="xbox-360-wireless", axes=6, buttons=16, hats=1, enabled=True)
         elif address == "/maestro_create":
             service_device_id, profile_id, display_name = args
             if service_device_id in self.definitions or service_device_id in self.active_only:
@@ -125,7 +134,8 @@ class MaestroFixture:
         if row["kind"] == "profile":
             data = dict(self.client.profiles[row["profileId"]], name=row["name"], kind="profile")
         else:
-            data = dict(id=row["profileId"], name=row["name"], kind=row["kind"], type="joystick",
+            data = dict(id=row["profileId"], name=row["name"], kind=row["kind"],
+                        type="gamepad" if row["kind"] == "gamepad" else "joystick",
                         axes=list(UI["AXIS_NAMES"][:row["axes"]]), addressableButtons=row["buttons"], hatCount=row["hats"])
         return UI["MaestroProfileInfo"].from_dict(data, device_id)
 
@@ -140,6 +150,8 @@ class DialogHarness(UI["MaestroDialog"]):
                          maestro_osc_host="127.0.0.1", maestro_osc_port=8010,
                          maestro_osc_reply_host="127.0.0.1", maestro_osc_reply_port=8011, save=Mock())
         self.maestro = MaestroFixture(Bridge(definitions))
+        self.listener = listener_fixture()
+        GREMLIN.event_handler = NS(EventListener=lambda: self.listener)
         GREMLIN.joystick_handling = NS(get_maestro_failover_devices=lambda: [
             NS(device_name=row["name"], data={
                 "maestro_key": f"maestro://{self.maestro.client.destination[0]}:{self.maestro.client.destination[1]}/{row['id']}"
@@ -253,6 +265,222 @@ class DeviceListChecks(unittest.TestCase):
         self.assertEqual(len(reads), 1)
         self.assertNotEqual(reads[0], threading.get_ident())
         self.assertEqual(loads, [threading.get_ident()])
+
+    def preset(self, count=8, kind="joystick"):
+        self.dialog._handle_preset_selected("Test preset", dict(type=kind, count=count, axes=8, buttons=128, hats=4))
+        pump_until(lambda: not self.dialog._busy)
+
+    def test_preset_defers_native_changes_through_apply_and_refreshes_once(self):
+        listener = self.dialog.listener
+        bridge = self.dialog.maestro.client
+        request = bridge.request
+        applying, release = threading.Event(), threading.Event()
+        device = NS(vendor_id=1, product_id=1, button_count=128, name=b"gex")
+
+        def create(address, *args):
+            self.assertGreater(listener._device_change_suppressed, 0)
+            result = request(address, *args)
+            listener._dinput_device_change_handler(device, 1)
+            listener.reset_devices.assert_not_called()
+            self.assertIsNone(listener._device_update_timer)
+            return result
+
+        load = self.dialog.maestro.LoadActiveControllers
+
+        def apply(device_map):
+            applying.set()
+            if not release.wait(2):
+                raise AssertionError("Apply was not released")
+            load(device_map)
+
+        bridge.request = create
+        with patch.object(self.dialog.maestro, "LoadActiveControllers", side_effect=apply):
+            try:
+                self.dialog._handle_preset_selected("Four joysticks", dict(type="joystick", count=4))
+                pump_until(applying.is_set)
+                self.assertTrue(self.dialog._busy)
+                self.assertGreater(listener._device_change_suppressed, 0)
+                self.assertIsNone(listener._device_update_timer)
+                listener.device_change_event.emit.assert_not_called()
+            finally:
+                release.set()
+                pump_until(lambda: not self.dialog._busy)
+        self.assertEqual(listener._device_change_suppressed, 0)
+        self.assertEqual(len(self.dialog.config.maestro_device_map), 5)
+        listener._device_update_timer.fire()
+        listener.reset_devices.assert_called_once_with(force=False)
+        listener.device_change_event.emit.assert_called_once_with()
+
+    def test_failed_preset_resumes_previously_queued_native_changes(self):
+        listener = self.dialog.listener
+        device = NS(vendor_id=1, product_id=1, button_count=128, name=b"gex")
+        listener._dinput_device_change_handler(device, 1)
+        before = listener._device_update_timer
+        self.dialog.maestro.ensureConnected.return_value = False
+        self.preset(4)
+        self.assertTrue(before.cancelled)
+        self.assertEqual(listener._device_change_suppressed, 0)
+        before.fire()
+        listener.reset_devices.assert_not_called()
+        listener._device_update_timer.fire()
+        listener.reset_devices.assert_called_once_with(force=False)
+
+    def test_completion_error_releases_device_change_suppression(self):
+        listener = self.dialog.listener
+        listener.pushDeviceChangeSuppression()
+        self.dialog._completion = Mock(side_effect=RuntimeError("Completion failed")), listener
+        with self.assertRaisesRegex(RuntimeError, "Completion failed"):
+            self.dialog._completed(None, None)
+        self.assertEqual(listener._device_change_suppressed, 0)
+
+    def test_worker_start_error_releases_device_change_suppression(self):
+        with patch.object(threading.Thread, "start", side_effect=RuntimeError("Worker unavailable")):
+            self.dialog._handle_preset_selected("Four joysticks", dict(type="joystick", count=4))
+        self.assertFalse(self.dialog._busy)
+        self.assertEqual(self.dialog.listener._device_change_suppressed, 0)
+        self.assertIn("Worker unavailable", self.dialog.warning_widget.text())
+
+    def test_four_device_preset_waits_for_slow_windows_creation(self):
+        from test_maestro_osc import Endpoint, MAESTRO
+
+        bridge = self.dialog.maestro.client
+        bridge.definitions.clear()
+        self.dialog._selected_service_device_ids.clear()
+        self.dialog.config.maestro_device_map = {}
+        replies = {}
+
+        def reply(endpoint, address, values):
+            request_id, *args = values
+            if address in MAESTRO._LIST_REPLIES:
+                rows = bridge.list(address)
+                for index, row in enumerate(rows):
+                    endpoint.send(MAESTRO._LIST_REPLIES[address], request_id, index, json.dumps(row))
+                endpoint.send("/maestro_done", request_id, address, len(rows), 0, len(rows))
+                return
+            if request_id not in replies:
+                if not bridge.requests:
+                    # A cold Windows create can outlast all ordinary query
+                    # retries. Scale the time down for this hardware-free test.
+                    time.sleep(0.35)
+                bridge.request(address, *args)
+                replies[request_id] = json.dumps(bridge.definitions[args[0]])
+            endpoint.send("/maestro_created", request_id, replies[request_id])
+
+        endpoint = Endpoint(reply)
+        self.addCleanup(endpoint.close)
+        self.dialog.maestro.client = endpoint.client
+        # Keep the capability fixture, while using the real UDP request path
+        # for creation and the authoritative inventory used by the dialog.
+        for name in ("definitions", "active_only", "profiles"):
+            setattr(endpoint.client, name, getattr(bridge, name))
+        self.preset(4)
+        expected = {f"gex-{n}" for n in range(1, 5)}
+        self.assertEqual(set(bridge.definitions), expected)
+        self.assertEqual(set(self.dialog.config.maestro_device_map), expected)
+        self.assertEqual(set(self.dialog._selection_widgets_by_service_id), expected)
+        self.assertEqual(len(bridge.requests), 4)
+        self.assertFalse(self.dialog.warning_widget.text())
+
+    def test_eight_device_preset_keeps_qt_responsive_and_publishes_once(self):
+        bridge = self.dialog.maestro.client
+        entered, release = threading.Event(), threading.Event()
+        request = bridge.request
+        loads = []
+        load = self.dialog._load_snapshot
+        self.dialog._load_snapshot = lambda *args: (loads.append(threading.get_ident()), load(*args))[-1]
+
+        def delayed_request(address, *args):
+            if address == "/maestro_create_custom" and not entered.is_set():
+                entered.set()
+                if not release.wait(3):
+                    raise RuntimeError("Test did not release the worker")
+            return request(address, *args)
+
+        bridge.request = delayed_request
+        try:
+            self.dialog._handle_preset_selected("Eight joysticks", dict(type="joystick", count=8, axes=8, buttons=128, hats=4))
+            self.assertTrue(entered.wait(1), "The background worker did not start")
+            self.assertTrue(self.dialog._busy)
+            self.assertFalse(self.dialog.presets_widget.isEnabled())
+            self.assertFalse(self.dialog.new_button.isEnabled())
+            ticks = []
+            QtCore.QTimer.singleShot(0, lambda: ticks.append(True))
+            APP.processEvents()
+            self.assertEqual(ticks, [True], "Qt could not process events during device creation")
+            # A queued preset action must not start a second overlapping batch.
+            self.dialog._handle_preset_selected("Eight joysticks", dict(type="joystick", count=8))
+        finally:
+            release.set()
+        pump_until(lambda: not self.dialog._busy)
+        expected = {f"gex-{n}" for n in range(1, 10)}
+        self.assertEqual(set(bridge.definitions), expected)
+        self.assertEqual(set(self.dialog.config.maestro_device_map), expected)
+        self.assertEqual(self.dialog.config.maestro_device_count, 9)
+        self.dialog.config.save.assert_called_once_with()
+        self.assertEqual(len(bridge.requests), 8)
+        self.assertTrue(all(tid != threading.get_ident() for tid in bridge.request_threads))
+        self.assertTrue(all(tid == threading.get_ident() for tid in loads))
+        self.assertFalse(self.dialog.warning_widget.text())
+        self.assertTrue(self.dialog.presets_widget.isEnabled())
+        self.dialog.maestro.refreshDevices.assert_not_called()
+
+    def test_preset_partial_failure_publishes_and_attaches_successful_devices(self):
+        bridge = self.dialog.maestro.client
+        request = bridge.request
+
+        def fail_third(address, *args):
+            if address == "/maestro_create_custom" and args[0] == "gex-4":
+                raise RuntimeError("Windows device creation failed")
+            return request(address, *args)
+
+        bridge.request = fail_third
+        self.preset()
+        self.assertEqual(set(bridge.definitions), {"gex-1", "gex-2", "gex-3"})
+        self.assertEqual(set(self.dialog.config.maestro_device_map), {"gex-1", "gex-2", "gex-3"})
+        self.assertIn("Created 2 of 8", self.dialog.warning_widget.text())
+        self.assertIn("Windows device creation failed", self.dialog.warning_widget.text())
+        self.assertEqual(set(self.dialog._selection_widgets_by_service_id), set(bridge.definitions))
+
+    def test_preset_reserves_inactive_and_active_only_service_ids(self):
+        bridge = self.dialog.maestro.client
+        bridge.definitions["gex-3"] = joystick("gex-3", enabled=False)
+        bridge.active_only["gex-2"] = joystick("gex-2")
+        self.preset(2)
+        creates = [args[0] for address, args in bridge.requests if address == "/maestro_create_custom"]
+        self.assertEqual(creates, ["gex-4", "gex-5"])
+        self.assertFalse(bridge.definitions["gex-3"]["enabled"])
+
+    def test_gamepad_preset_uses_dedicated_creation_command(self):
+        self.preset(2, "gamepad")
+        self.assertEqual(self.dialog.maestro.client.requests, [
+            ("/maestro_create_gamepad", ("gex-gp-1", "gex-gp-1")),
+            ("/maestro_create_gamepad", ("gex-gp-2", "gex-gp-2")),
+        ])
+        self.assertEqual(set(self.dialog.config.maestro_device_map), {"gex-1", "gex-gp-1", "gex-gp-2"})
+
+    def test_preset_creates_and_attaches_devices_beyond_sixteen(self):
+        bridge = self.dialog.maestro.client
+        bridge.definitions.update({f"gex-{n}": joystick(f"gex-{n}") for n in range(2, 17)})
+        self.preset(8)
+        created = [args[0] for address, args in bridge.requests if address == "/maestro_create_custom"]
+        self.assertEqual(created, [f"gex-{n}" for n in range(17, 25)])
+        self.assertTrue(set(created).issubset(self.dialog.config.maestro_device_map))
+        self.assertEqual([self.dialog.config.maestro_device_map[id] for id in created], list(range(16, 24)))
+        self.assertFalse(self.dialog.warning_widget.text())
+
+    def test_preset_with_insufficient_ids_creates_nothing(self):
+        bridge = self.dialog.maestro.client
+        bridge.definitions.update({f"gex-{n}": joystick(f"gex-{n}") for n in range(2, 253)})
+        self.preset()
+        self.assertFalse(bridge.requests)
+        self.assertIn("only 4 are available", self.dialog.warning_widget.text())
+        self.dialog.config.save.assert_not_called()
+
+    def test_preset_with_insufficient_target_slots_creates_nothing(self):
+        self.dialog._selected_service_device_ids = {f"gex-{n}" for n in range(1, 250)}
+        self.preset()
+        self.assertFalse(self.dialog.maestro.client.requests)
+        self.assertIn("including the preset", self.dialog.warning_widget.text())
 
     def test_test_device_dialog_creates_on_worker_and_publishes_rows_on_ui_thread(self):
         self.add_test_profiles()

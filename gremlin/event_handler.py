@@ -873,6 +873,8 @@ class EventListener(QtCore.QObject):
         self._device_update_timer = None
         self._device_change_suppressed = 0  # suppression counter for device change events
         self._device_change_pending = False  # true if a device change occured while suppressed
+        self._device_change_state_lock = threading.Lock()
+        self._device_change_generation = 0
 
         self._running = True
         self._run_thread = None
@@ -953,18 +955,45 @@ class EventListener(QtCore.QObject):
         self.startEventThread()
 
     def pushDeviceChangeSuppression(self):
-        """increments the device change suppression counter"""
-        self._device_change_suppressed += 1
+        """Defer native changes, including an update already waiting on its timer."""
+        with self._device_change_state_lock:
+            self._device_change_suppressed += 1
+            self._device_change_generation += 1
+            if self._device_update_timer is not None:
+                self._device_update_timer.cancel()
+                self._device_update_timer = None
+                self._device_change_pending = True
 
     def popDeviceChangeSuppression(self, force=False):
-        """decrements the device change suppression counter"""
-        if force:
-            self._device_change_suppressed = 0
-        elif self._device_change_suppressed > 0:
-            self._device_change_suppressed -= 1
-        if self._device_change_suppressed == 0 and self._device_change_pending:
-            self._device_change_pending = False
-            self.device_change_event.emit()  # trigger the pending device change event
+        """Resume with one debounced inventory rebuild after the outer request."""
+        with self._device_change_state_lock:
+            if force:
+                self._device_change_suppressed = 0
+            elif self._device_change_suppressed > 0:
+                self._device_change_suppressed -= 1
+            if self._device_change_suppressed == 0 and self._device_change_pending:
+                self._queue_device_change_locked()
+
+    def deferDeviceChanges(self):
+        """Mark an explicit refresh pending when a device request is in progress."""
+        with self._device_change_state_lock:
+            if self._device_change_suppressed:
+                self._device_change_pending = True
+                return True
+        return False
+
+    def _queue_device_change_locked(self):
+        """Schedule while holding only the change-state lock, never the registry."""
+        self._device_change_pending = True
+        if self._device_change_suppressed:
+            return
+        if self._device_update_timer is not None:
+            self._device_update_timer.cancel()
+        self._device_change_generation += 1
+        generation = self._device_change_generation
+        self._device_update_timer = Timer(0.5, self._run_device_list_update, args=(generation,))
+        self._device_update_timer.daemon = True
+        self._device_update_timer.start()
 
     def addUIJoystickEventCallback(self, callback):
         """adds a callback to update UI when a joystick event arrives"""
@@ -2294,31 +2323,40 @@ class EventListener(QtCore.QObject):
         :param action whether the device was added or removed
         """
 
-        if self._device_change_suppressed:
-            self._device_change_pending = True  # mark that a device change occurred while suppressed
-            return
-
         # ignore if a VIGEM device - these are handled, for the moment, directly by the action
         if data.vendor_id == 0x045E and data.product_id == 0x28E and data.button_count == 10 and data.name == b"Controller (XBOX 360 For Windows)":
             return
 
-        self.device_change_event.emit()
+        # Never invoke registry/UI consumers from DILL's native callback. They
+        # can wait for a rebuild that is itself waiting on DirectInput.
+        with self._device_change_state_lock:
+            self._queue_device_change_locked()
 
-        if self._device_update_timer is not None:
-            self._device_update_timer.cancel()
-        self._device_update_timer = Timer(0.5, self._run_device_list_update)
-        self._device_update_timer.start()
-
-    def _run_device_list_update(self):
+    def _run_device_list_update(self, generation=None):
         """Performs the update of the devices connected."""
+        with self._device_change_state_lock:
+            if generation is not None and generation != self._device_change_generation:
+                return
+            self._device_update_timer = None
+            if self._device_change_suppressed:
+                self._device_change_pending = True
+                return
+            self._device_change_pending = False
         self._process_device_change.emit()
 
     def _process_device_change_cb(self):
+        if self.deferDeviceChanges():
+            return
         if not self._process_device_change_lock.acquire(blocking=False):
+            with self._device_change_state_lock:
+                self._queue_device_change_locked()
             return
         # syslog = logging.getLogger("system")
 
         try:
+            # A timer/signal may already have been queued when suppression began.
+            if self.deferDeviceChanges():
+                return
             is_running = gremlin.shared_state.is_running
             gremlin.shared_state.has_device_changes = True
             if is_running:

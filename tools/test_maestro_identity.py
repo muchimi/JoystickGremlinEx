@@ -1,6 +1,7 @@
 """Hardware-free Maestro identity checks: python tools/test_maestro_identity.py."""
 
 import sys
+import copy
 import threading
 from types import SimpleNamespace as NS
 import unittest
@@ -40,6 +41,7 @@ class MaestroIdentityChecks(unittest.TestCase):
         normalize.start()
         self.addCleanup(normalize.stop)
         self.registry = dict(DeviceType=GREMLIN.types.DeviceType, dinput=MAESTRO.dinput,
+                             gremlin=GREMLIN, copy=copy, syslog=MAESTRO.syslog,
                              _device_registry_lock=threading.RLock())
         for key in ("_all_devices_map", "_joystick_device_guid_map", "_maestro_service_devices",
                     "_maestro_replaced_devices", "_maestro_devices_map", "_vjoy_devices_map",
@@ -49,6 +51,7 @@ class MaestroIdentityChecks(unittest.TestCase):
         self.registry["updateFailoverMap"] = Mock()
         source_definitions("gremlin/joystick_handling.py", {
             "isDeviceValid", "_is_excluded_native_joystick",
+            "_replace_device_registry", "_log_output_map",
             "display_devices", "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
             "virtual_devices", "vjoy_devices", "get_native_vjoy_devices", "maestro_devices", "maestro_device_map", "all_joystick_devices",
         }, self.registry)

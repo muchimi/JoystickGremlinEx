@@ -121,6 +121,7 @@ SERVICES = NS(
     shared_state=NS(ui=NS(_get_tab_map=lambda: {})),
 )
 NAMESPACE = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets,
+                 Buttons=COMMON.Buttons, QHorizontalLine=QtWidgets.QFrame,
                  QWidget=QtWidgets.QWidget, Qt=QtCore.Qt, Shiboken=Shiboken,
                  Signal=QtCore.Signal, Callable=Callable, IntEnum=IntEnum, DeviceSummary=DeviceSummary,
                  gremlin=SERVICES, ui_common=COMMON, inspect=inspect, time=time,
@@ -146,7 +147,7 @@ load("gremlin/ui/ui_common.py", {"QActionCheckbox", "AxesTimeline", "TimeLinePlo
 COMMON.QActionCheckbox = NAMESPACE["QActionCheckbox"]
 COMMON.resetWidgetSize = NAMESPACE["resetWidgetSize"]
 load("gremlin/ui/ui_common.py", {"JoystickDeviceWidget"}, {
-    "__init__", "_handle_shutdown", "device_guid", "hook", "unhook", "_cleanup_ui", "_create_temporal_axis",
+    "__init__", "_handle_shutdown", "device_guid", "hook", "unhook", "_cleanup_ui", "_create_temporal_axis", "_create_current_axis",
 })
 COMMON.JoystickDeviceWidget = NAMESPACE["JoystickDeviceWidget"]
 load("gremlin/ui/input_viewer.py", {"VisualizerWidget", "VisualizationSelector"})
@@ -213,6 +214,113 @@ class InputViewerTests(unittest.TestCase):
         self.assertTrue(all(not timer.isActive() for timer in timers))
         flush_deletes()
         self.assertFalse(Shiboken.isValid(content))
+
+    def test_axis_repeater_rehook_and_repeated_add_keep_one_control(self):
+        key = (DEVICES[0].key, VisualizationType.AxisCurrent)
+        with patch.dict(NAMESPACE, JoystickDeviceAxisStateWidget=lambda device: QtWidgets.QWidget()):
+            self.viewer._add_remove_visualization_widget(DEVICES[0], VisualizationType.AxisCurrent, True)
+            content = self.viewer._visualizer_widgets[key]
+            previous = content._widgets[0]
+            content.unhook()
+            content.hook()
+            flush_deletes()
+            self.assertFalse(Shiboken.isValid(previous))
+            self.assertEqual(len(content._widgets), 1)
+            self.assertEqual(content.main_layout.count(), 1)
+            self.viewer._add_remove_visualization_widget(DEVICES[0], VisualizationType.AxisCurrent, True)
+            self.assertIs(self.viewer._visualizer_widgets[key], content)
+            self.assertEqual(content.main_layout.count(), 1)
+
+    def test_add_selected_device_then_axis_selection_reuses_displayed_content(self):
+        device = DEVICES[0]
+        key = (device.key, VisualizationType.AxisCurrent)
+        with patch.object(SERVICES.joystick_handling, "get_virtual_device", return_value=device, create=True), patch.dict(
+            NAMESPACE, JoystickDeviceAxisStateWidget=lambda device: QtWidgets.QWidget()
+        ):
+            self.selector.selectVirtualDevice(device.device_guid)
+            wrapper = self.viewer._viewer_widget_map[key]
+            content = wrapper.widget
+            # A refreshed selector/cache must not cause a second displayed panel.
+            self.viewer._visualizer_widgets.pop(key)
+            self.selector._create_callback(device, VisualizationType.AxisCurrent,
+                                           self.selector._selector_widgets[key])()
+            self.assertIs(wrapper.widget, content)
+            self.assertIs(self.viewer._visualizer_widgets[key], content)
+            self.assertEqual(wrapper.main_layout.count(), 1)
+            self.assertEqual(content.main_layout.count(), 1)
+
+    def test_initial_saved_axis_visualizers_are_restored_once_each(self):
+        for device in DEVICES:
+            VC.setValue((device.key, VisualizationType.AxisCurrent), device, VisualizationType.AxisCurrent, True)
+        with patch.dict(NAMESPACE, JoystickDeviceAxisStateWidget=lambda device: QtWidgets.QWidget()), patch.object(
+            self.selector, "_change_callback", wraps=self.viewer._add_remove_visualization_widget
+        ) as changed:
+            self.selector.updateSelector()
+        keys = [(args[0].key, args[1]) for args, kwargs in changed.call_args_list]
+        self.assertEqual(len(keys), len(set(keys)))
+        for device in DEVICES:
+            key = (device.key, VisualizationType.AxisCurrent)
+            self.assertEqual(keys.count(key), 1)
+            self.assertEqual(self.viewer._viewer_widget_map[key].main_layout.count(), 1)
+
+    def test_initial_inventory_prefers_one_native_gex_axis_view(self):
+        native = DeviceSummary("native-guid")
+        native.name = "gex-1"
+        native.input_enabled = True
+        native.data = {"maestro_key": "maestro://127.0.0.1:8010/gex-1",
+                       "maestro_native_guids": ("alias-guid",)}
+        output = DeviceSummary("output-guid")
+        output.name = "gex-1"
+        output.data = {"maestro_key": native.data["maestro_key"]}
+        alias = DeviceSummary("alias-guid")
+        alias.name = "gex-1"
+        other = DeviceSummary("other-guid")
+        other.name = "gex-1"  # A name alone never establishes duplication.
+        with patch.object(SERVICES.joystick_handling, "all_joystick_devices", return_value=[output, alias, other, native]):
+            self.assertCountEqual(self.selector._available_devices(), [native, other])
+            self.selector.updateSelector()
+            with patch.object(SERVICES.joystick_handling, "get_virtual_device", return_value=output, create=True), patch.dict(
+                NAMESPACE, JoystickDeviceAxisStateWidget=lambda device: QtWidgets.QWidget()
+            ):
+                self.selector.selectVirtualDevice(output.device_guid)
+        key = (native.key, VisualizationType.AxisCurrent)
+        self.assertIn(key, self.viewer._visualizer_widgets)
+        self.assertNotIn((output.key, VisualizationType.AxisCurrent), self.viewer._viewer_widget_map)
+
+    def test_initial_gex_rows_without_alias_metadata_share_one_current_axis_panel(self):
+        native = DeviceSummary("58f0f8b0e1ba11f18001444553540000")
+        output = DeviceSummary("dde8a0111f5251cca3315b66849e9991")
+        remote = DeviceSummary("remote-guid")
+        physical = DeviceSummary("physical-guid")
+        for device in (native, output, remote, physical):
+            device.name = "gex-1"
+            device.vendor_id, device.product_id = 1, 0x4701
+            device.is_virtual = device is not physical
+        output.data = {"maestro_key": "maestro://127.0.0.1:8010/gex-1", "maestro_local_service": True}
+        native.input_enabled = True
+        remote.data = {"maestro_key": "maestro://192.0.2.1:8010/gex-1", "maestro_local_service": False}
+        VC.setValue((native.key, VisualizationType.AxisCurrent), native, VisualizationType.AxisCurrent, True)
+        VC.setValue((output.key, VisualizationType.AxisCurrent), output, VisualizationType.AxisCurrent, True)
+        with patch.object(SERVICES.joystick_handling, "all_joystick_devices", return_value=[native, output, remote, physical]), patch.dict(
+            NAMESPACE, JoystickDeviceAxisStateWidget=lambda device: QtWidgets.QWidget()
+        ):
+            self.selector.updateSelector()
+        self.assertCountEqual(self.selector._devices, [native, remote, physical])
+        self.assertNotIn((output.key, VisualizationType.AxisCurrent), self.viewer._viewer_widget_map)
+        self.assertEqual(self.viewer._viewer_widget_map[(native.key, VisualizationType.AxisCurrent)].main_layout.count(), 1)
+
+    def test_replacing_visible_content_removes_previous_panel(self):
+        wrapper = self.viewer._viewer_widget_map[self.key]
+        previous = wrapper.widget
+        replacement = QtWidgets.QWidget()
+        wrapper.setWidget(replacement)
+        self.assertEqual(wrapper.main_layout.count(), 1)
+        wrapper.setWidget(replacement)
+        self.assertEqual(wrapper.main_layout.count(), 1)
+        wrapper.setWidget(None)
+        flush_deletes()
+        self.assertFalse(Shiboken.isValid(previous))
+        self.assertFalse(Shiboken.isValid(replacement))
 
     def test_trash_closes_timeline_after_selector_rebuild(self):
         old_selector = self.selector._selector_widgets[self.key]
@@ -303,6 +411,10 @@ class SelectUsedTests(unittest.TestCase):
             if visualization == VisualizationType.AxisTemporal:
                 return real_joystick_widget(device, visualization)
             return StaticVisualizer()
+
+        visualizer_patch = patch.dict(NAMESPACE, JoystickDeviceWidget=create_visualizer)
+        visualizer_patch.start()
+        self.addCleanup(visualizer_patch.stop)
 
         for target, values in (
             (SERVICES.joystick_handling, dict(all_joystick_devices=lambda: self.devices,

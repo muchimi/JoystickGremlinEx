@@ -318,8 +318,47 @@ class VisualizationSelector(QtWidgets.QWidget):
         """Include connected inputs and outputs, retaining the user's tab order."""
         devices = [device for device in gremlin.joystick_handling.all_joystick_devices()
                    if device.connected and not device.disabled]
+        # Prefer the native input row carrying bridge metadata over its output
+        # summary or another native interface for the same Maestro service.
+        devices.sort(key=lambda device: (
+            bool(getattr(device, "input_enabled", False)),
+            bool(getattr(device, "data", {}).get("maestro_key")),
+        ), reverse=True)
+        unique, service_keys, identities, local_products = [], set(), set(), set()
+
+        def identity(guid):
+            return str(guid).strip("{}").replace("-", "").casefold()
+
+        for device in devices:
+            data = getattr(device, "data", {})
+            service_key = data.get("maestro_key")
+            # Native rows can precede GUID/token matching and have no service
+            # key yet. GEX assigns a distinct PID to each managed controller.
+            # Only merge local GEX virtual hardware, never remote bridge rows.
+            local_service = data.get("maestro_local_service", bool(service_key and (
+                service_key.startswith("maestro://127.") or service_key.startswith("maestro://0.0.0.0:")
+            )))
+            product = None
+            if (device.is_virtual and getattr(device, "vendor_id", None) == 1
+                    and 0x4701 <= getattr(device, "product_id", 0) <= 0x4804
+                    and (not service_key or local_service)):
+                product = (device.vendor_id, device.product_id)
+            guids = {identity(device.device_guid)}
+            guids.update(identity(guid) for guid in data.get("maestro_native_guids", ()))
+            output = data.get("maestro_output_summary")
+            if output is not None:
+                guids.add(identity(output.device_guid))
+            if ((service_key and service_key in service_keys) or guids & identities
+                    or (product is not None and product in local_products)):
+                continue
+            unique.append(device)
+            identities.update(guids)
+            if product is not None:
+                local_products.add(product)
+            if service_key:
+                service_keys.add(service_key)
         tab_ids = list(gremlin.shared_state.ui._get_tab_map())
-        return sorted(devices, key=lambda dev: (
+        return sorted(unique, key=lambda dev: (
             tab_ids.index(dev.device_id) if dev.device_id in tab_ids else len(tab_ids),
             dev.is_virtual, dev.virtual_id, dev.name.casefold(), str(dev.device_guid),
         ))
@@ -483,13 +522,12 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             self.main_layout.addWidget(box)
 
-            for key, widget in self._selector_widgets.items():
-                if Shiboken.isValid(widget):
-                    checked = widget.isChecked()
-                    if checked:
-                        callback = self._selector_callbacks.get(key, None)
-                        if callback:
-                            callback()
+        # Restore each saved visualizer once, after all selectors exist.
+        for key, widget in self._selector_widgets.items():
+            if Shiboken.isValid(widget) and widget.isChecked():
+                callback = self._selector_callbacks.get(key, None)
+                if callback:
+                    callback()
 
     def _handle_visualizer_action(self, widget):
         if not Shiboken.isValid(widget):
@@ -567,6 +605,10 @@ class VisualizationSelector(QtWidgets.QWidget):
         device = gremlin.joystick_handling.get_virtual_device(device_id)
         if device is None or not device.connected or device.disabled:
             return
+        service_key = getattr(device, "data", {}).get("maestro_key")
+        if service_key:
+            device = next((candidate for candidate in self._devices
+                           if getattr(candidate, "data", {}).get("maestro_key") == service_key), device)
         for key, widget in self._selector_widgets.items():
             if key[0] != device.key or not Shiboken.isValid(widget):
                 continue
@@ -753,21 +795,24 @@ class VisualizerWidget(QtWidgets.QWidget):
     def setWidget(self, widget: QtWidgets.QWidget):
         """sets the widget to display - returns True if success"""
 
+        if widget is self._widget and (widget is None or Shiboken.isValid(widget)):
+            return True
         result = True
         if widget and not Shiboken.isValid(widget):
-            self._widget = None
             result = False
             widget = None
 
-        if widget is None:
-            # hide the widget
-            if self._container:
-                self._container.hide()
-                self.main_layout.removeWidget(self._container)
-                gremlin.util.delete_widget(self._container)
-                self._container = None
+        if self._container is not None:
+            previous = self._widget
+            if previous is not None and Shiboken.isValid(previous):
+                unhook = getattr(previous, "unhook", None)
+                if callable(unhook):
+                    unhook()
+            self.main_layout.removeWidget(self._container)
+            gremlin.util.delete_widget(self._container)
+            self._container = None
 
-        else:
+        if widget is not None:
             # show the widget
 
             close_widget = Buttons.getDeleteWidget(size=20, tooltip="Close")
@@ -1199,7 +1244,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._add_widget(device, VisualizationType.Keyboard, description="Keyboard")
 
         # joystic visualizers
-        devices = gremlin.joystick_handling.all_joystick_devices()
+        devices = self.vis_selector._available_devices()
 
         # filter disconnected/disabled
         devices = [device for device in devices if device.connected and not device.disabled]
@@ -1546,7 +1591,14 @@ States can be toggled by clicking on the state button.  Expression states will u
                 enabled = False
 
         if enabled:
-            widget = self._visualizer_widgets.get(key, None)
+            visualizer_widget = self._viewer_widget_map[key]
+            # The displayed content is authoritative if a selector refresh has
+            # invalidated its cache. Reuse it instead of adding another panel.
+            widget = visualizer_widget.widget
+            if widget is not None and Shiboken.isValid(widget):
+                self._visualizer_widgets[key] = widget
+            else:
+                widget = self._visualizer_widgets.get(key, None)
             if widget is None or not Shiboken.isValid(widget):
                 # widget does not exist, create
                 if verbose:
@@ -1559,11 +1611,10 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose:
                     syslog.info(f"Setting widget for {device.name}: {visualization.name} key: {key}  viewer widget key: [{visualizer_widget.key}]")
 
+                self._visualizer_widgets[key] = widget
                 widget.hook()
                 if verbose:
                     syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
-
-                self._visualizer_widgets[key] = widget
 
         else:
             if verbose:

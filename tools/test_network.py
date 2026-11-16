@@ -74,6 +74,7 @@ class MaestroDiscoveryChecks(unittest.TestCase):
         self.receiver.recvfrom.side_effect = self.receive
         self.sender.sendto.side_effect = self.reply
         self.deliver = True
+        self.service_version = None
         self.requests = []
         self.addCleanup(patch.stopall)
         patch.object(NETWORK, "syslog", Mock()).start()
@@ -92,7 +93,10 @@ class MaestroDiscoveryChecks(unittest.TestCase):
         if destination == ("192.168.1.111", 8010):
             self.requests.append(args[0])
             if self.deliver:
-                pong = OSC["_encode_message"]("/maestro_pong", [args[0], "MaestroOscService", 1])
+                values = [args[0], "MaestroOscService", 1]
+                if self.service_version is not None:
+                    values.append(self.service_version)
+                pong = OSC["_encode_message"]("/maestro_pong", values)
                 self.packets.append((pong, ("192.168.1.111", 63975)))
 
     def test_udp_only_maestro_at_expected_host_is_discovered(self):
@@ -107,6 +111,29 @@ class MaestroDiscoveryChecks(unittest.TestCase):
         self.assertEqual(NETWORK.scan_local_network(), [])
         self.assertEqual(len(self.requests), 2)  # one retry for a lost datagram
         self.assertEqual(self.requests[0], self.requests[1])
+
+    def test_pong_with_service_version_is_discovered(self):
+        for version in ("0.1.3", "12.34.5678"):
+            with (self.subTest(version=version),
+                  patch.object(NETWORK.socket, "socket", side_effect=[self.receiver, self.sender])):
+                self.service_version = version
+                self.assertEqual(NETWORK.scan_local_network(), ["192.168.1.111"])
+
+    def test_malformed_versioned_pongs_are_ignored(self):
+        def reply(packet, destination):
+            if destination[0] != "192.168.1.111":
+                return
+            request_id = OSC["_decode_message"](packet)[1][0]
+            valid = OSC["_encode_message"]("/maestro_pong", [request_id, "MaestroOscService", 1, "0.1.3"])
+            invalid = (
+                valid[:-1], valid + b"\0\0\0\0", valid[:-8] + b"\xff.1.3\0\0\0",
+                OSC["_encode_message"]("/maestro_pong", [request_id, "MaestroOscService", 1, 3]),
+                OSC["_encode_message"]("/maestro_pong", [request_id, "MaestroOscService", 2, "0.1.3"]),
+            )
+            self.packets.extend((data, ("192.168.1.111", 49152)) for data in invalid)
+
+        self.sender.sendto.side_effect = reply
+        self.assertEqual(NETWORK.scan_local_network(), [])
 
     def test_mismatched_requests_and_unrelated_services_are_ignored(self):
         self.deliver = False

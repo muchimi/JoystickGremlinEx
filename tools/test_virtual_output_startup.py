@@ -704,7 +704,8 @@ class StartupWindowChecks(unittest.TestCase):
 class EnumerationChecks(unittest.TestCase):
     def test_no_vjoy_or_physical_devices_does_not_exit_or_query_vjoy(self):
         tree = ast.parse((ROOT / 'gremlin/joystick_handling.py').read_bytes())
-        node = next(node for node in tree.body if getattr(node, 'name', None) == 'joystick_devices_initialization')
+        nodes = [node for node in tree.body if getattr(node, 'name', None) in {
+            'joystick_devices_initialization', '_publish_joystick_devices', '_replace_device_registry'}]
         config = NS(verbose_mode_inputs=False, verbose_mode_vjoy=False, verbose_mode_extra=False,
                     hid_list_enabled=False, vjoy_installed=False)
         services = ModuleType('gremlin')
@@ -715,11 +716,11 @@ class EnumerationChecks(unittest.TestCase):
         monitor = NS(start=Mock(), stop=Mock())
         driver = NS(valid=False, vJoyEnabled=Mock())
         vjoy = NS(VJoyMonitor=lambda: monitor, device_available=Mock())
-        listener = NS(device_initialized=Mock())
+        listener = NS(device_initialized=Mock(), deferDeviceChanges=Mock(return_value=False))
         services.event_handler = NS(EventListener=lambda: listener)
         services.ui = NS(axis_calibration=NS(CalibrationManager=lambda: NS(reload=Mock())))
         services.hid = NS(Hid=Mock())
-        namespace = dict(gremlin=services, dinput=NS(DILL=NS(init=Mock(), get_device_count=lambda: 0),
+        namespace = dict(gremlin=services, dinput=NS(DILL=NS(init=Mock(), get_device_count=lambda: 0, getDevices=lambda: []),
             AxisMap=lambda: NS(getName=lambda: '')), vjoy=vjoy, vjoy_installed=STARTUP.vjoy_installed,
             syslog=logging.getLogger('startup-checks'), VJoyProxy=lambda: NS(reset=Mock()),
             _joystick_initialized=False, _last_device_signature=None,
@@ -727,11 +728,13 @@ class EnumerationChecks(unittest.TestCase):
             _joystick_devices=[], _all_joystick_devices=[], _disconnected_devices=[], _special_devices=[],
             _joystick_device_guid_map={}, _all_vjoy_devices_map={}, _vjoy_devices_map={},
             _all_devices_map={}, _maestro_devices_map={}, _maestro_devices=[], _vjoy_devices=[],
+            _native_vjoy_devices={}, _raw_vjoy_target_map={}, _maestro_replaced_devices={},
+            DeviceType=NS(Joystick=1, VJoy=2, Maestro=3), _log_output_map=Mock(),
             _apply_maestro_service_devices=Mock(), _update_joystick_device_maps=Mock(),
             registerSpecialDevices=Mock(), _update_virtual_map=Mock(), _device_list_signature=lambda: ())
         namespace['_create_vjoy_device'] = lambda vid: NS(device_guid=f'vjoy-{vid}', button_count=128,
             axis_count=8, hat_count=4, axismap_list=[], axis_names={})
-        exec(compile(ast.Module(body=[node], type_ignores=[]), 'joystick_handling.py', 'exec'), namespace)
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), 'joystick_handling.py', 'exec'), namespace)
         with (patch.dict(sys.modules, {'gremlin': services, 'gremlin.util': services.util}),
               patch.object(STARTUP, 'VJoyInterface', driver),
               patch.object(STARTUP, '_machine_key_exists', return_value=False)):

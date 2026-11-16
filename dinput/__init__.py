@@ -33,9 +33,9 @@ MAESTRO_PID_BASE = 0x1000  # base product ID for Maestro devices
 GEX_ID_STRING = "GEX"
 GEX_VENDOR_STRING = "GEX"  # vendor string for GEX managed devices
 GEX_PRODUCT_STRING = "GEX Custom Device"
-GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
+GEX_MAX_DEVICES = 256  # bridge device/target capacity; native vJoy remains limited to 16
 GEX_PID_BASE = MAESTRO_PID_BASE  # base product id (sequential) for GEX managed devices
-GEX_PID_MAX = GEX_PID_BASE + GEX_MAX_DEVICES - 1  # maximum product id for GEX managed devices
+GEX_PID_MAX = GEX_PID_BASE + 16 - 1  # maximum product id for GEX managed devices
 VJOY_VID = 0x1234  # vendor ID for vJoy devices
 VJOY_PID = 0xBEAD  # product ID used by the vJoy driver
 
@@ -510,6 +510,16 @@ class DeviceSummary:
             # map device subtypes
             if data.vendor_id == VJOY_VID and data.product_id == VJOY_PID:
                 self._device_type = gremlin.types.DeviceType.VJoy
+            elif self.vendor_id == 0x0001 and (
+                0x4701 <= self.product_id <= 0x4800
+                or 0x4801 <= self.product_id <= 0x4804
+                or 0x4901 <= self.product_id <= 0x49FF
+            ):
+                # Current GEX joystick/gamepad/named-custom hardware families.
+                # PID identifies a service device, not its assigned output slot.
+                self._device_type = gremlin.types.DeviceType.Maestro
+                self._is_virtual = True
+                self.data["maestro_native_input"] = True
             elif data.vendor_id == MAESTRO_VID and self.product_id >= GEX_PID_BASE and self.product_id <= GEX_PID_MAX:
                 self._device_type = gremlin.types.DeviceType.Maestro
                 self.virtual_id = self.product_id - GEX_PID_BASE  # index of maestro is kept in the product ID
@@ -580,8 +590,12 @@ class DeviceSummary:
 
             # auto disable invalid joystick devices that are not in spec
             self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
+
             if self._hard_disabled:
-                syslog.warning(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
+                config = gremlin.config.Configuration()
+                verbose = config.verbose_mode_inputs
+                if verbose:
+                    syslog.info(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
 
             # Fresh native summaries also feed the device tabs directly,
             # before joystick registry initialization assigns categories.

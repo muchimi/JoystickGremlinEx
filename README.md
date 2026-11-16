@@ -52,6 +52,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T103)
+- Change: API (Maestro): allow GEX to create up to 256 devices - up from 16.  The first 16 will be the failover devices for vJoy.  **Requires bridge version 0.1.3**.
+- Fix: API (Maestro): changed usage of HID descriptors to account for some applications including joy.cpl requiring some metadata to be unique to distinguish between devices.
+- Fix: API (Maestro): fixed several potential deadlocks when tearing down, adding or removing devices as a batch operation could cause a deadlock due to concurrent updates/sync with DINPUT.  This could cause the UI to become unresponsive.
+- Fix: API (Maestro): fix an issue with potential aliasing of older GUIDs that would not make them visible in the profile device GUID remapper, prompting a runtime warning a virtual device could not be found.
+- Fix: UI (Input Viewer): possible duplicated panels for some devices due to aliases making it look like a different device when it is the same.  If this occurs, the additional devices will be discarded.  The API now checkes for the product/vendor HID descriptor to determine which GUID to use, and ensure the GUID is the one reported through DINPUT.
+- Fix: UI (Maestro): preset creation could create a refresh race condition.
+- Fix: BRIDGE: allow installer to re-install same version of the service.
+
+
 ### (m77T102)
 - Change: PLATFORM: Python 3.14.10 (3.15 not yet supported due to underlying dependencies not all yet supporting 3.15). Update to the GEX dill library 1.6.1 (adds new optimizations and additional functionality specific to GEX at the C++ level).
 - Change: UI (Maestro): allow all joystick and gamepad Maestro devices on the display list and allow GEX to delete them if needed (this is to view and clear any stale entries or entries not created by GEX).

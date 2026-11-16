@@ -25,6 +25,144 @@ class MaestroCacheChecks(unittest.TestCase):
     load = identity.MaestroIdentityChecks.load
     published = identity.MaestroIdentityChecks.published
 
+    def test_updated_product_id_merges_native_guids_despite_stale_identity_metadata(self):
+        self.definitions = {"gex-1": identity.definition("gex-1") | dict(vendorId=1, productId=0x4701)}
+        self.active_ids = ["gex-1"]
+        native = self.native("gex-1", MAESTRO.dinput.GUID(uuid.UUID(int=1)))
+        alias = self.native("stale Windows label", MAESTRO.dinput.GUID(uuid.UUID(int=2)))
+        for device in (native, alias):
+            device.vendor_id, device.product_id = 1, 0x4701
+        self.local_devices([alias, native])
+        with patch.object(self.maestro, "_scan_hid_order"), patch.object(
+            MAESTRO.dinput.DILL, "get_device_identities", return_value={
+                uuid.UUID(int=1).hex: {"path": "stale-instance"},
+                uuid.UUID(int=2).hex: {"path": "another-stale-instance"},
+            }, create=True
+        ):
+            self.load()
+            self.published()
+        self.assertIs(self.maestro._device_map[0], native)
+        self.assertEqual(set(native.data["maestro_native_guids"]), {native.device_guid, alias.device_guid})
+        self.assertEqual(list(self.registry["_all_devices_map"]), [native.device_guid])
+        self.assertEqual(self.registry["maestro_device_map"]()[0].device_guid, native.device_guid)
+
+    def test_registry_discards_temporary_guid_for_matching_native_product(self):
+        native = self.native("gex-1")
+        temporary = self.native("gex-1")
+        for device in (native, temporary):
+            device.vendor_id, device.product_id = 1, 0x4701
+        temporary.input_enabled = False
+        temporary.virtual_id = 3
+        temporary.device_type = DeviceType.Maestro
+        temporary.data.update(maestro_key="maestro://127.0.0.1:8010/gex-1", maestro_local_service=True)
+        temporary.setVirtual(True)
+        self.registry["_all_devices_map"][native.device_guid] = native
+        self.registry["set_maestro_devices"]([temporary])
+        self.assertEqual(list(self.registry["_all_devices_map"]), [native.device_guid])
+        self.assertEqual(list(self.registry["_maestro_service_devices"]), [native.device_guid])
+        self.assertEqual(self.registry["maestro_device_map"]()[3].device_guid, native.device_guid)
+        self.assertEqual(native.data["maestro_key"], temporary.data["maestro_key"])
+        self.assertNotIn(temporary.device_guid, native.data["maestro_native_guids"])
+
+    def test_native_guid_replaces_temporary_guid_in_maestro_cache_too(self):
+        self.definitions = {"gex-1": identity.definition("gex-1") | dict(vendorId=1, productId=0x4701)}
+        self.active_ids = ["gex-1"]
+        native = self.native("gex-1")
+        native.vendor_id, native.product_id = 1, 0x4701
+        self.local_devices([native])
+        self.load()
+        self.registry["_all_devices_map"][native.device_guid] = native
+        # Native enumeration completed after the bridge's synchronization pass.
+        with patch.object(self.maestro, "syncDinput"):
+            self.published()
+        self.assertIs(self.maestro.getDeviceAt(0), native)
+        self.assertEqual(self.registry["maestro_device_map"]()[0].device_guid, native.device_guid)
+
+    def test_sync_dinput_skips_teardown_without_discovery_or_cache_changes(self):
+        existing = object()
+        self.maestro._device_map = {7: existing}
+        self.maestro._stopping.set()
+        for local in (False, True):
+            with self.subTest(local=local):
+                self.maestro._local_service = local
+                with patch.object(self.maestro, "_scan_hid_order") as scan, patch.object(
+                    MAESTRO.dinput.DILL, "getDevices"
+                ) as discover:
+                    self.maestro.syncDinput()
+                scan.assert_not_called()
+                discover.assert_not_called()
+                self.assertEqual(self.maestro._device_map, {7: existing})
+
+    def test_sync_dinput_skips_application_teardown_before_maestro_shutdown(self):
+        with patch.object(GREMLIN, "shared_state", NS(terminating=True), create=True), patch.object(
+            self.maestro, "_scan_hid_order"
+        ) as scan, patch.object(MAESTRO.dinput.DILL, "getDevices") as discover:
+            self.maestro.syncDinput()
+        scan.assert_not_called()
+        discover.assert_not_called()
+
+    def test_sync_dinput_stops_if_teardown_begins_during_hid_scan(self):
+        self.maestro._local_service = True
+        with patch.object(self.maestro, "_scan_hid_order", side_effect=self.maestro._stopping.set), patch.object(
+            MAESTRO.dinput.DILL, "getDevices"
+        ) as discover:
+            self.maestro.syncDinput()
+        discover.assert_not_called()
+
+    def test_sync_dinput_does_not_commit_discovery_after_teardown(self):
+        self.maestro._local_service = True
+        existing = object()
+        self.maestro._device_map = {7: existing}
+
+        def discover():
+            self.maestro._stopping.set()
+            return []
+
+        with patch.object(self.maestro, "_scan_hid_order"), patch.object(
+            MAESTRO.dinput.DILL, "getDevices", side_effect=discover
+        ):
+            self.maestro.syncDinput()
+        self.assertEqual(self.maestro._device_map, {7: existing})
+
+    def test_native_refresh_does_not_duplicate_gex_one_in_viewer_inventory(self):
+        self.active_ids = ["gex-1"]
+        native = self.native("gex-1")
+        self.local_devices([native])
+        self.load()
+        self.published()
+        alias = self.native("gex-1")
+        stale_output = self.native("gex-1")
+        stale_output.data["maestro_key"] = native.data["maestro_key"]
+        unrelated = self.native("gex-1")
+        native.data["maestro_native_guids"] = (native.device_guid, alias.device_guid)
+        # Reproduce a subsequent native registry rebuild restoring an alias.
+        self.registry["_all_devices_map"][alias.device_guid] = alias
+        self.registry["_all_devices_map"][stale_output.device_guid] = stale_output
+        self.registry["_all_devices_map"][unrelated.device_guid] = unrelated
+        self.registry["_update_joystick_device_maps"]()
+        shown = self.registry["all_joystick_devices"]()
+        self.assertCountEqual([device.device_guid for device in shown], [native.device_guid, unrelated.device_guid])
+        self.assertEqual(self.registry["_maestro_devices_map"], {native.virtual_id: native})
+
+    def test_stale_native_discovery_cannot_resurrect_a_deleted_service_device(self):
+        self.active_ids = ["gex-1"]
+        native = self.native()
+        self.local_devices([native])
+        self.load()
+        self.published()
+        old_discovery = {native.device_guid: native}
+        # A second service snapshot must not discard the deletion while an
+        # earlier native enumeration is still finishing.
+        self.registry["set_maestro_devices"]([], known_devices={})
+        self.registry["set_maestro_devices"]([], known_devices={})
+        source_definitions("gremlin/joystick_handling.py", {"_publish_joystick_devices"}, self.registry)
+        self.registry["_publish_joystick_devices"](old_discovery, {}, {}, ())
+        self.assertNotIn(native.device_guid, self.registry["_all_devices_map"])
+        self.assertEqual(self.registry["_maestro_devices_map"], {})
+        # Recreating the same service identity explicitly makes it eligible again.
+        self.published()
+        self.assertIn(native.device_guid, self.registry["_all_devices_map"])
+
     def native(self, name="gex-1", guid=None):
         device = MAESTRO.dinput.DeviceSummary()
         device.device_guid = guid or MAESTRO.dinput.GUID(uuid.uuid4())
@@ -104,6 +242,7 @@ class MaestroCacheChecks(unittest.TestCase):
         namespace = dict(self.registry, gremlin=NS(config=NS(Configuration=lambda: NS(verbose_mode_maestro=False, virtual_output_failover=True))),
                          _native_vjoy_devices={1: source}, _maestro_devices=[target],
                          _maestro_failover_map={}, _raw_vjoy_target_map={}, _output_targets={}, _all_devices_map={})
+        namespace["dinput"] = NS(GEX_MAX_DEVICES=256)
         source_definitions("gremlin/joystick_handling.py", {"updateFailoverMap", "OutputTarget"}, namespace)
         namespace["updateFailoverMap"]()
         self.assertEqual(namespace["_maestro_failover_map"][1].out_id, 7)
@@ -711,7 +850,7 @@ class MaestroGamepadCacheChecks(unittest.TestCase):
         self.assertEqual(self.maestro._controller_map[native.virtual_id].button_count, 32)
         output = self.registry["maestro_device_map"]()[native.virtual_id]
         self.assertEqual((output.axis_count, output.button_count), (7, 32))
-        self.assertEqual(output.device_guid, self.maestro.controllerGuid(self.maestro._controller_map[native.virtual_id]))
+        self.assertEqual(output.device_guid, native.device_guid)
         self.assertIsNot(output, native)
         self.assertFalse(output.input_enabled)
         self.assertTrue(native.data["maestro_native_input"])
@@ -760,7 +899,7 @@ class MaestroGamepadCacheChecks(unittest.TestCase):
         self.interface(1, companion=True)
         self.assertEqual(self.refresh(), [hid])
         self.assertNotIn(synthetic.device_guid, self.registry["_all_devices_map"])
-        self.assertEqual(self.registry["maestro_device_map"]()[hid.virtual_id].device_guid, synthetic.device_guid)
+        self.assertEqual(self.registry["maestro_device_map"]()[hid.virtual_id].device_guid, hid.device_guid)
 
     def test_two_gamepads_with_cached_identical_names_remain_distinct_and_stable(self):
         self.gamepads(2)

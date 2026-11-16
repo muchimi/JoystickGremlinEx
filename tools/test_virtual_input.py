@@ -259,6 +259,23 @@ class VirtualInputChecks(unittest.TestCase):
                 native = self.native_summary("Controller", usage_page=usage_page, usage=usage)
                 self.assertFalse(native.is_gamepad)
 
+    def test_sequential_gex_hardware_ids_are_native_virtual_inputs(self):
+        for pid in (*range(0x4701, 0x4801), *range(0x4801, 0x4805), 0x4901, 0x49FF):
+            with self.subTest(pid=pid):
+                native = self.native_summary("Pilot controls", vendor=1, product=pid,
+                                             usage=5 if 0x4801 <= pid <= 0x4804 else 4)
+                self.assertEqual(native.device_type, DeviceType.Maestro)
+                self.assertTrue(native.is_virtual)
+                self.assertTrue(native.input_enabled)
+                self.assertTrue(native.data["maestro_native_input"])
+                self.assertEqual(native.virtual_id, -1)
+                self.assertEqual(native.is_gamepad, 0x4801 <= pid <= 0x4804)
+        for vid, pid in ((2, 0x4701), (1, 0x4700), (1, 0x4805), (1, 0x4900)):
+            with self.subTest(vid=vid, pid=pid):
+                native = self.native_summary("gex-1", vendor=vid, product=pid)
+                self.assertEqual(native.device_type, DeviceType.Joystick)
+                self.assertFalse(native.is_virtual)
+
     def test_native_gex_classification_with_placeholder_vid_pid(self):
         native = self.native_summary()
         self.assertEqual(native.device_type, DeviceType.Maestro)
@@ -424,6 +441,7 @@ class VirtualInputChecks(unittest.TestCase):
                 "_update_joystick_device_maps",
                 "_update_virtual_map",
                 "_apply_maestro_service_devices",
+                "_replace_device_registry",
                 "_maestro_output_summary",
             },
             namespace,

@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import copy
 import logging
 import re
 import threading
@@ -111,8 +112,9 @@ def set_maestro_devices(devices, *, known_devices=None):
     native_devices = None
     if getattr(dinput.DILL, "initialized", True):
         native_devices = {device.device_guid: device for device in dinput.DILL.getDevices()}
+    devices = {device.device_guid: device for device in devices}
     with _device_registry_lock:
-        devices = {device.device_guid: device for device in devices}
+        registry = dict(_all_devices_map)
         selected_keys = {device.data["maestro_key"] for device in devices.values() if device.data.get("maestro_key")}
         alias_owners = {}
         for guid, device in devices.items():
@@ -122,9 +124,12 @@ def set_maestro_devices(devices, *, known_devices=None):
         # Old 0001:0001 GEX controllers can remain attached after migration to
         # the bridge's current devices. A native descriptor is not proof that
         # they still belong to an active service definition.
-        _maestro_excluded_native_guids = set()
+        # Keep deletion tombstones until the same identity is explicitly
+        # attached again. A native discovery snapshot may predate this update.
+        _maestro_excluded_native_guids = set(_maestro_excluded_native_guids)
+        _maestro_excluded_native_guids.difference_update(devices, aliases)
         if known_devices is not None:
-            candidates = dict(_all_devices_map)
+            candidates = dict(registry)
             candidates.update(native_devices or {})
             for guid, native in candidates.items():
                 if guid in devices or guid in aliases:
@@ -135,10 +140,11 @@ def set_maestro_devices(devices, *, known_devices=None):
                 prefix = dinput.GEX_PRODUCT_STRING
                 if name != prefix and not (name.startswith(prefix + " ") and name[len(prefix) :].strip().isdecimal()):
                     continue
-                key = native.data.get("maestro_key") or getattr(_all_devices_map.get(guid), "data", {}).get(
+                key = native.data.get("maestro_key") or getattr(registry.get(guid), "data", {}).get(
                     "maestro_key"
                 )
                 if key in known_devices and known_devices[key].get("active") is not False:
+                    _maestro_excluded_native_guids.discard(guid)
                     continue
                 _maestro_excluded_native_guids.add(guid)
         # An overlay may outlive the native controller it originally replaced.
@@ -153,10 +159,10 @@ def set_maestro_devices(devices, *, known_devices=None):
             if deleted:
                 deleted_guids.add(guid)
                 deleted_guids.update(previous.data.get("maestro_native_guids", ()))
-            if _all_devices_map.get(guid) is previous:
+            if registry.get(guid) is previous:
                 native = (native_devices or {}).get(guid) if original is not None and not deleted else None
                 if native is None:
-                    _all_devices_map.pop(guid, None)
+                    registry.pop(guid, None)
                     _joystick_device_guid_map.pop(guid, None)
                 else:
                     # It remains a Maestro input, but is no longer an output slot.
@@ -165,15 +171,15 @@ def set_maestro_devices(devices, *, known_devices=None):
                     native.setVirtual(True)
                     native.virtual_id = -1
                     native.vjoy_id = -1
-                    _all_devices_map[guid] = native
+                    registry[guid] = native
                     _joystick_device_guid_map[guid] = native
             if original is not None and guid in devices:
                 _maestro_replaced_devices[guid] = original
         # Older native/profile caches may never have been registered as service
         # overlays. Reconcile those too, including entries still marked connected.
-        for guid, cached in list(_all_devices_map.items()):
+        for guid, cached in list(registry.items()):
             if guid in aliases:
-                _all_devices_map.pop(guid, None)
+                registry.pop(guid, None)
                 _joystick_device_guid_map.pop(guid, None)
                 _maestro_replaced_devices.pop(guid, None)
                 continue
@@ -205,7 +211,7 @@ def set_maestro_devices(devices, *, known_devices=None):
                     native.setVirtual(True)
                     native.virtual_id = -1
                     native.vjoy_id = -1
-                _all_devices_map[guid] = native
+                registry[guid] = native
                 _joystick_device_guid_map[guid] = native
             elif not deleted and not cached.connected and key and known_devices is not None and key in known_devices:
                 # A saved inactive definition is real metadata, not a live target.
@@ -214,7 +220,7 @@ def set_maestro_devices(devices, *, known_devices=None):
                 cached.virtual_id = -1
                 cached.vjoy_id = -1
             elif native_devices is not None or deleted:
-                _all_devices_map.pop(guid, None)
+                registry.pop(guid, None)
                 _joystick_device_guid_map.pop(guid, None)
                 _maestro_replaced_devices.pop(guid, None)
         for vid, cached in list(_all_vjoy_devices_map.items()):
@@ -224,23 +230,114 @@ def set_maestro_devices(devices, *, known_devices=None):
                 or cached.device_guid in deleted_guids
             ):
                 _all_vjoy_devices_map.pop(vid, None)
+        _maestro_excluded_native_guids.update(deleted_guids)
         _maestro_service_devices = devices
+        _replace_device_registry(registry)
         _update_joystick_device_maps()
+        published = dict(_maestro_service_devices)
+    _log_output_map()
+    return published
 
 
 def _apply_maestro_service_devices():
     """Reapply service metadata after native hot-plug enumeration."""
+    devices = dict(_all_devices_map)
+    service_keys = {device.data["maestro_key"] for device in _maestro_service_devices.values()
+                    if device.data.get("maestro_key")}
+    aliases = {guid for device in _maestro_service_devices.values()
+               for guid in device.data.get("maestro_native_guids", ())}
+    for device in _maestro_service_devices.values():
+        output = device.data.get("maestro_output_summary")
+        if output is not None:
+            aliases.add(output.device_guid)
+    # Native enumeration can reintroduce interfaces removed by the last bridge
+    # snapshot. Keep one canonical input row per service when rebuilding maps.
+    for guid, device in tuple(devices.items()):
+        if guid in _maestro_service_devices:
+            continue
+        if guid in aliases or device.data.get("maestro_key") in service_keys:
+            devices.pop(guid, None)
+            _joystick_device_guid_map.pop(guid, None)
+            _maestro_replaced_devices.pop(guid, None)
     for guid in _maestro_excluded_native_guids:
-        _all_devices_map.pop(guid, None)
+        devices.pop(guid, None)
         _joystick_device_guid_map.pop(guid, None)
         _maestro_replaced_devices.pop(guid, None)
     for guid, device in _maestro_service_devices.items():
         device.set_vjoy_id(_maestro_failover_id(device) or -1)
-        native = _all_devices_map.get(guid)
+        native = devices.get(guid)
         if native is not None and native is not device:
             _maestro_replaced_devices[guid] = native
-        _all_devices_map[guid] = device
+        devices[guid] = device
         _joystick_device_guid_map[guid] = device
+    # Updated GEX VID/PIDs are unique per device, unlike legacy shared PIDs or
+    # ordinary physical controllers. Discard extra GUID rows in every registry
+    # consumer, rather than hiding duplicates only in the input viewer.
+    products = {}
+    candidates = sorted(devices.items(), key=lambda item: (
+        bool(getattr(item[1], "input_enabled", False)),
+        bool(getattr(item[1], "connected", False)),
+        item[0] in _maestro_service_devices,
+    ), reverse=True)
+    for guid, device in candidates:
+        vendor = getattr(device, "vendor_id", 0)
+        product = getattr(device, "product_id", 0)
+        if vendor != 1 or not (0x4701 <= product <= 0x4804 or 0x4901 <= product <= 0x49FF):
+            continue
+        key = (vendor, product)
+        if key not in products:
+            products[key] = device
+            continue
+        canonical = products[key]
+        if device.data.get("maestro_key") and (
+                not canonical.data.get("maestro_key") or (canonical.virtual_id < 0 <= device.virtual_id)):
+            # Keep the DirectInput GUID and input layout, while attaching the
+            # bridge's output metadata to that native identity.
+            canonical.data.update(device.data)
+            canonical.name = device.name
+            canonical.device_type = DeviceType.Maestro
+            canonical.setVirtual(True)
+            canonical.virtual_id = device.virtual_id
+            canonical.vjoy_id = device.vjoy_id
+            if (canonical.axis_count, canonical.button_count, canonical.hat_count) != (
+                    device.axis_count, device.button_count, device.hat_count):
+                output = copy.copy(device)
+                output.data = dict(device.data)
+                output.device_guid = canonical.device_guid
+                canonical.data["maestro_output_summary"] = output
+            _maestro_service_devices[canonical.device_guid] = canonical
+        output = canonical.data.get("maestro_output_summary")
+        if output is not None and output.device_guid != canonical.device_guid:
+            output = copy.copy(output)
+            output.data = dict(output.data)
+            output.device_guid = canonical.device_guid
+            canonical.data["maestro_output_summary"] = output
+        aliases = set(canonical.data.get("maestro_native_guids", ()))
+        if getattr(device, "input_enabled", False):
+            aliases.add(device.device_guid)
+        aliases.update(device.data.get("maestro_native_guids", ()))
+        aliases.discard(canonical.device_guid)
+        canonical.data["maestro_native_guids"] = tuple(aliases)
+        devices.pop(guid, None)
+        _maestro_service_devices.pop(guid, None)
+        _joystick_device_guid_map.pop(guid, None)
+        _maestro_replaced_devices.pop(guid, None)
+    _replace_device_registry(devices)
+
+
+def _replace_device_registry(devices):
+    """Swap registry storage under its lock, without invoking per-item callbacks.
+
+    Device initialization/change signals notify consumers after publication.
+    Readers retaining an older TriggerDict or its views keep that generation.
+    """
+    global _all_devices_map
+    if isinstance(_all_devices_map, dict):
+        _all_devices_map = devices
+    else:
+        registry = copy.copy(_all_devices_map)
+        registry.data = devices
+        _all_devices_map = registry
 
 
 def display_devices(profile=None, *, refresh=False):
@@ -330,10 +427,10 @@ def getAllDevices() -> list:
 def dumpDevices():
     """dumps the list of all devices to the log"""
     global _all_devices_map
-    # with _device_registry_lock:
-    device_list = list(_all_devices_map.values())
+    with _device_registry_lock:
+        device_list = list(_all_devices_map.values())
     device_list.sort(key=lambda d: d.name.casefold())
-    syslog.info(f"All devices: {len(_all_devices_map)}")
+    syslog.info(f"All devices: {len(device_list)}")
     for device in device_list:
         syslog.info(
             f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}"
@@ -1001,63 +1098,73 @@ def _maestro_failover_id(device, *, require_active=True) -> int | None:
 
 def updateFailoverMap():
     """Index live output targets by vJoy ID and both providers' GUIDs."""
-    global _output_targets_failover
+    global _output_targets_failover, _maestro_failover_map, _raw_vjoy_target_map
     failover = gremlin.config.Configuration().virtual_output_failover
-    _maestro_failover_map.clear()
-    _raw_vjoy_target_map.clear()
-    _output_targets.clear()
-    _output_targets_failover = failover
 
-    for vid, device in _native_vjoy_devices.items():
-        if device.connected and not getattr(device, "disabled", False) and not device.data.get("failover", False):
-            target = OutputTarget(device, "vjoy", vid, vid, device)
-            _raw_vjoy_target_map[vid] = target
-            _raw_vjoy_target_map[device.device_guid] = target
-            _maestro_failover_map[vid] = target
-            _maestro_failover_map[device.device_guid] = target
+    with _device_registry_lock:
+        targets = {}
+        native_targets = {}
+        for vid, device in _native_vjoy_devices.items():
+            if device.connected and not getattr(device, "disabled", False) and not device.data.get("failover", False):
+                target = OutputTarget(device, "vjoy", vid, vid, device)
+                native_targets[vid] = target
+                native_targets[device.device_guid] = target
+                targets[vid] = target
+                targets[device.device_guid] = target
 
-    for device in _maestro_devices:
-        if (not device.connected or getattr(device, "disabled", False)
-                or type(device.virtual_id) is not int or not 0 <= device.virtual_id < 16):
-            continue
-        output = _maestro_output_summary(device)
-        direct = OutputTarget(output, "maestro", device.virtual_id, device.virtual_id, device)
-        # Direct bridge output does not depend on HID discovery or failover.
-        for guid in (device.device_guid, output.device_guid):
-            _maestro_failover_map[guid] = direct
-        vid = _maestro_failover_id(device)
-        if (not failover or getattr(device, "is_gamepad", False) or vid is None
-                or device.data.get("maestro_hid_order_valid") is False):
-            continue
-        source = _native_vjoy_devices.get(vid)
-        target = OutputTarget(output, "maestro", device.virtual_id, vid, source)
-        _maestro_failover_map.setdefault(vid, target)
-        if source is not None:
-            _maestro_failover_map.setdefault(source.device_guid, target)
-
-    # Internally created disconnected vJoy summaries can have their own GUID,
-    # distinct from the native summary for this ID. Every known alias follows
-    # the same resolved target as the numeric vJoy ID.
-    for device in list(_all_devices_map.values()):
-        if device.device_type == DeviceType.VJoy:
-            target = _maestro_failover_map.get(device.vjoy_id)
-            if target is not None:
-                _maestro_failover_map[device.device_guid] = target
-
-    # Preserve reverse failover for profiles targeting an offline Maestro GUID.
-    if failover:
-        for device in list(_all_devices_map.values()):
-            if device.device_type != DeviceType.Maestro or device.device_guid in _maestro_failover_map:
+        for device in _maestro_devices:
+            if (not device.connected or getattr(device, "disabled", False)
+                    or type(device.virtual_id) is not int or not 0 <= device.virtual_id < dinput.GEX_MAX_DEVICES):
                 continue
-            vid = _maestro_failover_id(device, require_active=False)
-            target = _raw_vjoy_target_map.get(vid)
-            if target is not None:
-                _maestro_failover_map[device.device_guid] = OutputTarget(
-                    target.device, "vjoy", target.out_id, device.virtual_id, device)
+            output = _maestro_output_summary(device)
+            direct = OutputTarget(output, "maestro", device.virtual_id, device.virtual_id, device)
+            # Direct bridge output does not depend on HID discovery or failover.
+            for guid in (device.device_guid, output.device_guid):
+                targets[guid] = direct
+            vid = _maestro_failover_id(device)
+            if (not failover or getattr(device, "is_gamepad", False) or vid is None
+                    or device.data.get("maestro_hid_order_valid") is False):
+                continue
+            source = _native_vjoy_devices.get(vid)
+            target = OutputTarget(output, "maestro", device.virtual_id, vid, source)
+            targets.setdefault(vid, target)
+            if source is not None:
+                targets.setdefault(source.device_guid, target)
 
+        # Internally created disconnected vJoy summaries can have their own GUID,
+        # distinct from the native summary for this ID. Every known alias follows
+        # the same resolved target as the numeric vJoy ID.
+        for device in list(_all_devices_map.values()):
+            if device.device_type == DeviceType.VJoy:
+                target = targets.get(device.vjoy_id)
+                if target is not None:
+                    targets[device.device_guid] = target
+
+        # Preserve reverse failover for profiles targeting an offline Maestro GUID.
+        if failover:
+            for device in list(_all_devices_map.values()):
+                if device.device_type != DeviceType.Maestro or device.device_guid in targets:
+                    continue
+                vid = _maestro_failover_id(device, require_active=False)
+                target = native_targets.get(vid)
+                if target is not None:
+                    targets[device.device_guid] = OutputTarget(
+                        target.device, "vjoy", target.out_id, device.virtual_id, device)
+        # Readers see complete routing generations rather than a cleared map
+        # progressively filled by another thread.
+        _maestro_failover_map = targets
+        _raw_vjoy_target_map = native_targets
+        _output_targets.clear()
+        _output_targets_failover = failover
+
+
+def _log_output_map():
+    """Log a published routing snapshot without holding the registry lock."""
     if gremlin.config.Configuration().verbose_mode_maestro:
+        with _device_registry_lock:
+            targets = tuple(_maestro_failover_map.items())
         syslog.info("MAESTRO: output map:")
-        for key, target in _maestro_failover_map.items():
+        for key, target in targets:
             syslog.info(f"  [{key}] -> {target.device.name} ({target.kind}, slot {target.out_id})")
 
 
@@ -1472,43 +1579,35 @@ def getPhysicalDevices() -> list[DeviceSummary]:
 
 
 def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceSummary | None:
-    """gets the device for the given ID - issues error message if not found"""
+    """Read registry metadata; resolve outputs and log after releasing its lock."""
     global _all_devices_map, _joystick_initialized, _maestro_failover_map
 
     key = parse_virtual_device_key(device_guid)
     if isinstance(key, int):
-        return getDeviceFromVjoyId(key) if _joystick_initialized else None
+        with _device_registry_lock:
+            initialized = _joystick_initialized
+        return getDeviceFromVjoyId(key) if initialized else None
 
+    if device_guid and not isinstance(device_guid, dinput.GUID):
+        device_guid = gremlin.util.to_guid(device_guid)
     with _device_registry_lock:
-        if not _joystick_initialized:
-            syslog.warning(f"Device: devices not initialized in getDevice() - device id: [{device_guid}]")
-            return None
+        initialized = _joystick_initialized
+        device = _all_devices_map.get(device_guid) if initialized and device_guid else None
+        if initialized and device_guid and device is None:
+            target = _maestro_failover_map.get(device_guid)
+            if target is not None:
+                device = target.device
+            else:
+                # Bridge output GUIDs remain valid alongside native input GUIDs.
+                device = next((d for d in _maestro_devices_map.values() if d.device_guid == device_guid), None)
 
-        if device_guid:
-            if not isinstance(device_guid, dinput.GUID):
-                device_guid = gremlin.util.to_guid(device_guid)  # ensure a dinput.GUID
-            if device_guid in _all_devices_map:
-                return _all_devices_map[device_guid]
-
-            # check failover devices
-            if device_guid in _maestro_failover_map:
-                # contains an OutputTarget
-                return _maestro_failover_map[device_guid].device
-
-            # A native gamepad row and its bridge output share a logical device,
-            # while output profiles retain their stable endpoint/device GUID.
-            for device in tuple(_maestro_devices_map.values()):
-                if device.device_guid == device_guid:
-                    return device
-
-            verbose = gremlin.config.Configuration().verbose_mode_joystick
-            if verbose:
-                syslog.warning(f"Device not found for GUID: [{device_guid}]")
-                # available devices
-                syslog.warning("Available devices:")
-                dumpDevices()
-
-        return None
+    if not initialized:
+        syslog.warning(f"Device: devices not initialized in getDevice() - device id: [{device_guid}]")
+    elif device_guid and device is None and gremlin.config.Configuration().verbose_mode_joystick:
+        syslog.warning(f"Device not found for GUID: [{device_guid}]")
+        syslog.warning("Available devices:")
+        dumpDevices()
+    return device
 
 
 def getDeviceName(device_guid: int | str | dinput.GUID):
@@ -1718,10 +1817,8 @@ def refresh_devices() -> bool:
 
     :return: True if the device list changed and was re-initialized
     """
-    # Missing devices are expected while parsing an offline profile. Reuse
-    # the inventory until loading finishes; the loader defers hot-plug
-    # changes and processes them afterwards.
     if gremlin.shared_state.profile_loading:
+        # defer device refresh until profile loading completes
         return False
     return reset_devices(False, force=False)
 
@@ -1732,8 +1829,6 @@ def refresh_device_inventory():
 
     dinput.DILL.init()
     changed = reset_devices(False, force=True)
-    # Apply the authoritative bridge snapshot last so native enumeration cannot
-    # resurrect a deleted GEX controller while Windows finishes removing it.
     maestro = Maestro()
     if maestro.enabled:
         try:
@@ -1762,12 +1857,9 @@ def registerSpecialDevices():
 
     # import gremlin.ui.osc_device
     # import gremlin.ui.midi_device
-    global _special_devices_map, _special_devices
-    # with _device_registry_lock:
-    _special_devices_map.clear()
-    _special_devices.clear()
-    _config_devices_map.clear()
-    _config_devices.clear()
+    global _special_devices_map, _special_devices, _config_devices_map, _config_devices
+    special_devices = []
+    config_devices = []
 
     syslog.info("Special devices:")
 
@@ -1780,7 +1872,7 @@ def registerSpecialDevices():
     device.device_guid = gremlin.shared_state.keyboard_tab_guid
     device.device_type = DeviceType.Keyboard
     device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    special_devices.append(device)
 
     # state
 
@@ -1789,7 +1881,7 @@ def registerSpecialDevices():
     device.device_guid = gremlin.shared_state.state_tab_guid
     device.device_type = DeviceType.State
     device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    special_devices.append(device)
 
     # OSC
     if config.startup_osc_enabled:
@@ -1798,7 +1890,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.osc_tab_guid
         device.device_type = DeviceType.Osc
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
+        special_devices.append(device)
 
     # MIDI
     if config.startup_midi_enabled:
@@ -1807,7 +1899,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.midi_tab_guid
         device.device_type = DeviceType.Midi
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
+        special_devices.append(device)
 
     # Octavi IFR1
 
@@ -1820,7 +1912,7 @@ def registerSpecialDevices():
     device.setHatCallback(noOpHatCallback)
     oo = gremlin.ui.octavi_device.OctaviInterface()
     device.setButtonCallback(oo.get_button)
-    registerSpecialDevice(device)
+    special_devices.append(device)
 
     # Stream Deck legacy tab GUID (old profiles). Live decks register per deviceId.
     if config.startup_streamdeck_enabled:
@@ -1829,15 +1921,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.streamdeck_tab_guid
         device.device_type = DeviceType.StreamDeck
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
-
-        # Re-attach any Stream Decks the bridge already knows about (after a rescan).
-        try:
-            from gremlin.ui import streamdeck_device as streamdeck_ui
-
-            streamdeck_ui.resync_streamdeck_special_devices()
-        except Exception:
-            pass
+        special_devices.append(device)
 
     # voice
     if config.startup_voice_enabled:
@@ -1846,7 +1930,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.voice_tab_guid
         device.device_type = DeviceType.Voice
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
+        special_devices.append(device)
 
     # mode
     device = DeviceSummary()
@@ -1854,7 +1938,7 @@ def registerSpecialDevices():
     device.device_guid = gremlin.shared_state.mode_tab_guid
     device.device_type = DeviceType.ModeControl
     device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
+    special_devices.append(device)
 
     # overlay designer
     if config.startup_overlay_enabled:
@@ -1863,7 +1947,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.overlay_tab_guid
         device.device_type = DeviceType.Overlay
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
+        special_devices.append(device)
 
     if config.afcs_enabled:
         # AFCS visual axis-flow designer
@@ -1872,7 +1956,7 @@ def registerSpecialDevices():
         device.device_guid = gremlin.shared_state.afcs_tab_guid
         device.device_type = DeviceType.Afcs
         device.device_category = DeviceCategory.Special
-        registerSpecialDevice(device)
+        special_devices.append(device)
 
     # THESE SHOULD BE LAST
     # plugin
@@ -1882,7 +1966,7 @@ def registerSpecialDevices():
     device.device_guid = gremlin.shared_state.plugins_tab_guid
     device.device_type = DeviceType.Plugins
     device.device_category = DeviceCategory.Config
-    registerConfigDevice(device)
+    config_devices.append(device)
 
     # settings
     device = DeviceSummary()
@@ -1890,7 +1974,30 @@ def registerSpecialDevices():
     device.device_guid = gremlin.shared_state.settings_tab_guid
     device.device_type = DeviceType.Settings
     device.device_category = DeviceCategory.Config
-    registerConfigDevice(device)
+    config_devices.append(device)
+
+    # Constructors and plugin callbacks above may query devices or start
+    # threads. Only the completed metadata is published under the lock.
+    with _device_registry_lock:
+        devices = dict(_all_devices_map)
+        for previous in _special_devices + _config_devices:
+            if devices.get(previous.device_guid) is previous:
+                devices.pop(previous.device_guid, None)
+        devices.update((device.device_guid, device) for device in special_devices + config_devices)
+        _special_devices = special_devices
+        _config_devices = config_devices
+        _special_devices_map = {device.device_guid: device for device in special_devices}
+        _config_devices_map = {device.device_guid: device for device in config_devices}
+        _replace_device_registry(devices)
+
+    if config.startup_streamdeck_enabled:
+        # Re-attach any Stream Decks the bridge already knows about (after a rescan).
+        try:
+            from gremlin.ui import streamdeck_device as streamdeck_ui
+
+            streamdeck_ui.resync_streamdeck_special_devices()
+        except Exception:
+            pass
 
 
 def getSpecialDevices() -> list:
@@ -2026,6 +2133,29 @@ def _device_list_signature(devices=None) -> tuple:
                  for device in devices)
 
 
+def _publish_joystick_devices(devices, vjoy_devices, native_vjoy_devices, signature):
+    """Commit discovered metadata, rebasing on the latest service/special devices.
+
+    No driver calls, logging, plugin setup, or UI notifications belong in this
+    section: input callbacks need this lock while those operations can wait.
+    """
+    global _all_vjoy_devices_map, _native_vjoy_devices, _last_device_signature, _joystick_initialized
+    with _device_registry_lock:
+        published = {device.device_guid: device for device in _disconnected_devices}
+        published.update(devices)
+        joystick_types = (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro)
+        published.update((guid, device) for guid, device in _all_devices_map.items()
+                         if device.device_type not in joystick_types)
+        _replace_device_registry(published)
+        _all_vjoy_devices_map = vjoy_devices
+        _native_vjoy_devices = native_vjoy_devices
+        _maestro_replaced_devices.clear()
+        _update_joystick_device_maps()
+        _last_device_signature = signature
+        _joystick_initialized = True
+        return tuple(_joystick_devices)
+
+
 def joystick_devices_initialization(force: bool = True) -> bool:
     """Initializes joystick device information.
 
@@ -2041,19 +2171,9 @@ def joystick_devices_initialization(force: bool = True) -> bool:
 
     import gremlin.util
 
-    global \
-        _joystick_devices, \
-        _joystick_init_lock, \
-        _joystick_initialized, \
-        _joystick_device_guid_map, \
-        _vjoy_devices_map, \
-        _all_joystick_devices, \
-        _invalid_device_guid, \
-        _all_vjoy_devices_map, \
-        _all_devices_map, \
-        _maestro_devices_map, \
-        _last_device_signature, \
-        _raw_vjoy_target_map
+    if gremlin.event_handler.EventListener().deferDeviceChanges():
+        # updates are defered due to a pending update to devices
+        return False
 
     if not force and _joystick_initialized and _last_device_signature is not None:
         dinput.DILL.init()
@@ -2064,8 +2184,8 @@ def joystick_devices_initialization(force: bool = True) -> bool:
         except Exception:
             pass  # fall through to a full initialization
 
-    # Keep the published inventory usable while discovery runs. Registry
-    # lookups wait on _device_registry_lock during the rebuild below.
+    # Discover into local maps. Driver calls, logging and device constructors
+    # must never hold the lock needed by native input callbacks.
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_inputs or config.verbose_mode_vjoy
     verbose_detailed = verbose and config.verbose_mode_extra
@@ -2125,308 +2245,261 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                         break
 
             native_devices = dinput.DILL.getDevices()
-            with _device_registry_lock:
-                # Process all connected devices in order to properly initialize the device registry
-                devices = []
+            # Process all connected devices in order to properly initialize the device registry
+            devices = []
+            _joystick_device_guid_map = {}
+            configured_vjoy_devices = {}
+            _vjoy_devices_map = {}
+            _raw_vjoy_target_map = {}
+            _maestro_devices_map = {}
+            native_vjoy_devices = {}
+            _all_joystick_devices = []
+            discovered_devices = {}
 
-                _joystick_device_guid_map.clear()
-                _all_vjoy_devices_map.clear()
-                _vjoy_devices_map.clear()
-                _raw_vjoy_target_map.clear()
-                _maestro_devices_map.clear()  # connected maestro devices (int) -> device
+            virtual_count = 0
+            real_count = 0
+            virtual_devices = {}
+            dinput_vjoy_device_map = {}  # map of vjoy devices by vjoy ID
 
-                _all_devices_map.clear()
-                _maestro_replaced_devices.clear()
-                # copy over any disconnected devices
-                for dev in _disconnected_devices:
-                    _all_devices_map[dev.device_guid] = dev
-                    if dev.device_type == DeviceType.Joystick:
-                        _joystick_device_guid_map[dev.device_guid] = dev
+            try:
+                syslog.info("DINPUT device list:")
+                for device_index, dev in enumerate(native_devices):
+                    # All entries belong to the same native inventory generation.
+                    if not isDeviceValid(dev):
+                        syslog.warning(f"\t\tInvalid device detected: {dev!s}")
+                        continue  # ghost device
 
-                virtual_count = 0
-                real_count = 0
-                virtual_devices = {}
-                dinput_vjoy_device_map = {}  # map of vjoy devices by vjoy ID
+                    syslog.info(f"\tDevice: {dev.name} ID {dev.device_id}  Type: {dev.device_type.name}")
+                    if dev.vendor_id == 0x4D8 and dev.product_id == 0xE6D6 and dev.button_count == 35:
+                        # IFR1 device, disable
+                        syslog.warning(
+                            "\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level."
+                        )
+                    if _is_excluded_native_joystick(dev):
+                        dev.disabled = True
 
-                try:
-                    syslog.info("DINPUT device list:")
-                    for device_index, dev in enumerate(native_devices):
-                        # All entries belong to the same native inventory generation.
-                        if not isDeviceValid(dev):
-                            syslog.warning(f"\t\tInvalid device detected: {dev!s}")
-                            continue  # ghost device
+                    dev.device_category = DeviceCategory.Physical
 
-                        syslog.info(f"\tDevice: {dev.name} ID {dev.device_id}  Type: {dev.device_type.name}")
-                        if dev.vendor_id == 0x4D8 and dev.product_id == 0xE6D6 and dev.button_count == 35:
-                            # IFR1 device, disable
-                            syslog.warning(
-                                "\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level."
+                    if dev.axis_count:
+                        syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")
+                        for i in range(dev.axis_count):
+                            linear = i + 1
+                            axis_id = dev.linear_id_map[linear]
+                            axis_name = dev.get_axis_name(axis_id)
+                            syslog.info(
+                                f"\t\t\tAxis {axis_name} A{axis_id} L{linear} {'(sequential)' if linear == axis_id else '(non-sequential)'}"
                             )
-                        if _is_excluded_native_joystick(dev):
-                            dev.disabled = True
 
-                        dev.device_category = DeviceCategory.Physical
+                    devices.append(dev)
+                    syslog.info(f"\t\tIndex: [{device_index}] {dev!s}")
 
-                        if dev.axis_count:
-                            syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")
-                            for i in range(dev.axis_count):
-                                linear = i + 1
-                                axis_id = dev.linear_id_map[linear]
-                                axis_name = dev.get_axis_name(axis_id)
-                                syslog.info(
-                                    f"\t\t\tAxis {axis_name} A{axis_id} L{linear} {'(sequential)' if linear == axis_id else '(non-sequential)'}"
+                    if dev.device_type in (DeviceType.Joystick, DeviceType.Maestro, DeviceType.VJoy):
+                        _joystick_device_guid_map[dev.device_guid] = dev  # key by GUID
+
+                    discovered_devices[dev.device_guid] = dev  # key by GUID
+
+                    if dev.is_virtual:
+                        virtual_count += 1
+                        virtual_devices[dev.hashkey] = dev
+                        dev.device_category = DeviceCategory.Virtual
+                        match dev.device_type:
+                            case DeviceType.VJoy:
+                                dinput_vjoy_device_map[dev.hashkey] = dev
+                            case DeviceType.Maestro:
+                                if dev.virtual_id >= 0:
+                                    _maestro_devices_map[dev.virtual_id] = dev
+                            case _:
+                                syslog.warning(
+                                    f"\tWarning: Unknown virtual device [{dev.name}] with vendor ID: [0x{dev.vendor_id:X}] product ID: [0x{dev.product_id:X}]"
                                 )
 
-                        devices.append(dev)
-                        syslog.info(f"\t\tIndex: [{device_index}] {dev!s}")
-
-                        if dev.device_type in (DeviceType.Joystick, DeviceType.Maestro, DeviceType.VJoy):
-                            _joystick_device_guid_map[dev.device_guid] = dev  # key by GUID
-
-                        _all_devices_map[dev.device_guid] = dev  # key by GUID
-
-                        if dev.is_virtual:
-                            virtual_count += 1
-                            virtual_devices[dev.hashkey] = dev
-                            dev.device_category = DeviceCategory.Virtual
-                            match dev.device_type:
-                                case DeviceType.VJoy:
-                                    dinput_vjoy_device_map[dev.hashkey] = dev
-                                case DeviceType.Maestro:
-                                    if dev.virtual_id >= 0:
-                                        _maestro_devices_map[dev.virtual_id] = dev
-                                case _:
-                                    syslog.warning(
-                                        f"\tWarning: Unknown virtual device [{dev.name}] with vendor ID: [0x{dev.vendor_id:X}] product ID: [0x{dev.product_id:X}]"
-                                    )
-
-                        else:
-                            real_count += 1
-
-                    syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
-                except Exception as ex:
-                    syslog.error(f"INIT: Error while initializing devices: {ex}")
-                    syslog.error(traceback.format_exc())
-
-                vjoy_lookup = {}
-                vjoy_wheel_lookup = {}
-
-                should_terminate = False
-
-                # Query all vJoy devices in sequence until all have been processed and
-                # their matching SDL counterparts have been found.
-                vjoy_hash_list = []
-                vjoy_proxy = VJoyProxy()
-                config_map = {}
-                disconnected_vid_list = []
-                used_counts = []
-
-                config.vjoy_installed = vjoy_installed(config)
-
-                for vid in range(1, 17):  # index 1 up to 16
-                    # Only process devices that actually exist
-                    is_connected = config.vjoy_installed and vjoy.device_available(vid)
-                    if is_connected:
-                        # device reports as available via the VJOY interface
-                        axis_count = vjoy.axis_count(vid)
-                        button_count = vjoy.button_count(vid)
-                        hat_count = vjoy.hat_count(vid)
-                        if button_count not in used_counts:
-                            used_counts.append(button_count)
-                        config_map[vid] = (is_connected, axis_count, button_count, hat_count)
-                        vjoy.ensure_released(vid)
-
-                        dinput_key = (axis_count, button_count, hat_count)  # (input_vjoy_device_map[dev.vjoy_id] = dev
-                        # see if the device was detected in DINPUT
-                        if dinput_key not in dinput_vjoy_device_map:
-                            syslog.warning(
-                                f"VJOY device [{vid}] exists in the VJOY API but was not detected by DINPUT indicating a possible configuration or conflict problem.  This VJOY will be disabled."
-                            )
-                            disconnected_vid_list.append(vid)
-                            # fake device
-                            device = _create_vjoy_device(vid)
-                            # update the default name
-                            _all_vjoy_devices_map[vid] = device
-                            _joystick_device_guid_map[device.device_guid] = device  # key by GUID
-
-                        else:
-                            device: DeviceSummary = dinput_vjoy_device_map[dinput_key]
-                            device.set_vjoy_id(vid)
-                            device.setConnected(
-                                True
-                            )  # connected means the VJOY device is not only shown in the API but also with DINPUT.
-                            syslog.info(f"VJOY device [{vid}] matched to DINPUT device [{device.device_id}]")
-                            _all_vjoy_devices_map[vid] = device
-                            _vjoy_devices_map[vid] = device
-                            _joystick_device_guid_map[device.device_guid] = device  # key by GUID
-                            _all_devices_map[device.device_guid] = device  # key by GUID
-
-                        # keep a reference to the raw vjoy device as other lists may contain failover data instead
-                        target = OutputTarget(device, "vjoy", vid, vid, source_device=device)
-                        _raw_vjoy_target_map[vid] = target
                     else:
-                        # device reports as not available from the vjoy interface
+                        real_count += 1
+
+                syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
+            except Exception as ex:
+                syslog.error(f"INIT: Error while initializing devices: {ex}")
+                syslog.error(traceback.format_exc())
+
+            vjoy_lookup = {}
+            vjoy_wheel_lookup = {}
+
+            should_terminate = False
+
+            # Query all vJoy devices in sequence until all have been processed and
+            # their matching SDL counterparts have been found.
+            vjoy_hash_list = []
+            vjoy_proxy = VJoyProxy()
+            config_map = {}
+            disconnected_vid_list = []
+            used_counts = []
+
+            config.vjoy_installed = vjoy_installed(config)
+
+            for vid in range(1, 17):  # index 1 up to 16
+                # Only process devices that actually exist
+                is_connected = config.vjoy_installed and vjoy.device_available(vid)
+                if is_connected:
+                    # device reports as available via the VJOY interface
+                    axis_count = vjoy.axis_count(vid)
+                    button_count = vjoy.button_count(vid)
+                    hat_count = vjoy.hat_count(vid)
+                    if button_count not in used_counts:
+                        used_counts.append(button_count)
+                    config_map[vid] = (is_connected, axis_count, button_count, hat_count)
+                    vjoy.ensure_released(vid)
+
+                    dinput_key = (axis_count, button_count, hat_count)  # (input_vjoy_device_map[dev.vjoy_id] = dev
+                    # see if the device was detected in DINPUT
+                    if dinput_key not in dinput_vjoy_device_map:
+                        syslog.warning(
+                            f"VJOY device [{vid}] exists in the VJOY API but was not detected by DINPUT indicating a possible configuration or conflict problem.  This VJOY will be disabled."
+                        )
                         disconnected_vid_list.append(vid)
+                        # fake device
                         device = _create_vjoy_device(vid)
-                        _all_vjoy_devices_map[vid] = device
+                        # update the default name
+                        configured_vjoy_devices[vid] = device
                         _joystick_device_guid_map[device.device_guid] = device  # key by GUID
-                        _all_devices_map[device.device_guid] = device
-                        config_map[vid] = (False, device.axis_count, device.button_count, device.hat_count)
 
-                        if verbose:
-                            syslog.warning(
-                                f"VJOY device [{vid}] is not detected or not enabled in the VJOY API. This VJOY will be disabled."
-                            )
+                    else:
+                        device: DeviceSummary = dinput_vjoy_device_map[dinput_key]
+                        device.set_vjoy_id(vid)
+                        device.setConnected(
+                            True
+                        )  # connected means the VJOY device is not only shown in the API but also with DINPUT.
+                        syslog.info(f"VJOY device [{vid}] matched to DINPUT device [{device.device_id}]")
+                        configured_vjoy_devices[vid] = device
+                        _vjoy_devices_map[vid] = device
+                        _joystick_device_guid_map[device.device_guid] = device  # key by GUID
+                        discovered_devices[device.device_guid] = device  # key by GUID
 
-                    # register in the native vjoy devices map
-                    _native_vjoy_devices[vid] = device
-
-                for vid in range(1, 17):  # list all possible vjoy devices index 1 up to 16
-                    is_connected, axis_count, button_count, hat_count = config_map[vid]
-
-                    hash_value = (axis_count, button_count, hat_count)
-                    hash_wheel_value = (axis_count + 1, button_count, hat_count)
+                    # keep a reference to the raw vjoy device as other lists may contain failover data instead
+                    target = OutputTarget(device, "vjoy", vid, vid, source_device=device)
+                    _raw_vjoy_target_map[vid] = target
+                else:
+                    # device reports as not available from the vjoy interface
+                    disconnected_vid_list.append(vid)
+                    device = _create_vjoy_device(vid)
+                    configured_vjoy_devices[vid] = device
+                    _joystick_device_guid_map[device.device_guid] = device  # key by GUID
+                    discovered_devices[device.device_guid] = device
+                    config_map[vid] = (False, device.axis_count, device.button_count, device.hat_count)
 
                     if verbose:
-                        syslog.info(
-                            f"Vjoy Interface: device index [{vid}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}  Connected: {is_connected}"
-                        )
-
-                    if hash_value in vjoy_hash_list:
-                        syslog.error("Fatal error: This device is not unique in terms of axis/button/hat counts.")
-                        should_terminate = True
-
-                    if is_connected and hat_count > 0 and not vjoy.hat_configuration_valid(vid):
-                        import sys
-
-                        import gremlin.event_handler
-                        import gremlin.ui.ui_common
-
-                        error_string = f"VJoy id {vid:d}: Hats are set to discrete but have to be set as continuous."
-                        syslog.error(error_string)
-                        el = gremlin.event_handler.EventListener()
-                        el.terminate()  # terminates and sends the relevant shutdown triggers
-                        util.display_error(error_string)
-                        sys.exit(1)
-
-                # As we are ensured that no duplicate vJoy devices exist from
-                # the previous step we can directly link the SDL and vJoy device
-                if hash_value in vjoy_lookup:
-                    # found the vjoy interface index
-                    vjoy_lookup[hash_value].set_vjoy_id(vid)
-                    syslog.info(
-                        f"\tVjoy id {vid}: {'connected' if is_connected else ' disconnected'} in vjoy interface"
-                    )
-                elif hash_wheel_value in vjoy_wheel_lookup:
-                    vjoy_lookup[hash_value] = vjoy_wheel_lookup[hash_value]
-                    vjoy_lookup[hash_value].set_vjoy_id(vid)
-                    syslog.info(f"\tVjoy id {vid}: found in vjoy interface (as a wheel)")
-                elif hash_value in virtual_devices:
-                    dev = virtual_devices[hash_value]
-                    vjoy_lookup[hash_value] = dev
-                    vjoy_lookup[hash_value].set_vjoy_id(vid)
-                else:
-                    # not found
-                    hash_value = (axis_count, button_count, hat_count)
-                    hash_wheel_value = (axis_count + 1, button_count, hat_count)
-                    if verbose_detailed:
-                        syslog.info(
-                            f"vjoy id {vid:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.  This message is normal if the device is not configured in VJOY."
-                        )
-
-                    dev = _all_vjoy_devices_map[vid]
-                    logical_count = 0
-                    for i in range(8):
-                        axis_map = dinput.AxisMap()
-                        axis_map.axis_index = i
-                        dev.axismap_list.append(axis_map)
-                        axis_name = axis_map.getName()
-                        if not axis_name:
-                            axis_name = f"({i + 1})"
-                        else:
-                            logical_count += 1
-                        dev.axis_names[i] = axis_name
-                        dev.axismap_list.append(axis_name)
-
-                    vjoy_lookup[hash_value] = dev
-                    _all_joystick_devices.append(dev)
-                    device_guid = gremlin.util.normalize_guid(dev.device_guid)
-                    _joystick_device_guid_map[device_guid] = dev
-                    if verbose_detailed:
-                        syslog.info(f"Adding undetected VJOY device: [{vid}] {dev!s}")
-
-                if not should_terminate:
-                    _apply_maestro_service_devices()
-
-                if should_terminate:
-                    # exit gracefully
-                    syslog.error(
-                        "A fatal error was encountered during the detection and mapping of input devices - see the log for errors."
-                    )
-                    app = QtWidgets.QApplication.instance()
-                    if app:
-                        gremlin.util.InvokeUiMethod(app.exit)
-                    sys.exit(1)
-                    return
-
-                # Reset all devices so we don't hog the ones we aren't actually using
-                vjoy_proxy.reset()
-
-                # update final lists
-                _update_joystick_device_maps()
-
-                # device: dinput.DILL.DeviceSummary
-                syslog.info("Input device summary:")
-                regular_devices_list = [dev for dev in _joystick_devices if not dev.is_virtual]
-                vjoy_devices_list = [dev for dev in _joystick_devices if dev.device_type == DeviceType.VJoy]
-                vjoy_devices_list.sort(key=lambda x: x.vjoy_id)
-                maestro_devices_list = [dev for dev in _joystick_devices if dev.device_type == DeviceType.Maestro]
-
-                # register special devices
-                registerSpecialDevices()
-
-                _update_virtual_map()
-                for dev in regular_devices_list:
-                    syslog.info(f"\tDevice: (regular) {dev!s}")
-                for dev in vjoy_devices_list:
-                    syslog.info(f"\tDevice: (vjoy) {dev!s}")
-                for dev in maestro_devices_list:
-                    syslog.info(f"\tDevice: (maestro) {dev!s}")
-
-                # m77 - validate all devices in all tracking structures are in the list
-                for dev in _joystick_devices:
-                    if dev.device_guid not in _all_devices_map:
-                        syslog.warning(f"JOYSTICK: Device [{dev}] is in _joystick_devices but not in _all_devices_map")
-                        _all_devices_map[dev.device_guid] = dev
-                for dev in _vjoy_devices:
-                    if dev.device_guid not in _all_devices_map:
-                        syslog.warning(f"JOYSTICK: Device [{dev}] is in _vjoy_devices but not in _all_devices_map")
-                        _all_devices_map[dev.device_guid] = dev
-                for dev in _maestro_devices:
-                    if dev.device_guid not in _all_devices_map:
-                        syslog.warning(f"JOYSTICK: Device [{dev}] is in _maestro_devices but not in _all_devices_map")
-                        _all_devices_map[dev.device_guid] = dev
-                for dev in _disconnected_devices:
-                    if dev.device_guid not in _all_devices_map:
                         syslog.warning(
-                            f"JOYSTICK: Device [{dev}] is in _disconnected_devices but not in _all_devices_map"
+                            f"VJOY device [{vid}] is not detected or not enabled in the VJOY API. This VJOY will be disabled."
                         )
-                        _all_devices_map[dev.device_guid] = dev
-                for dev in _special_devices:
-                    if dev.device_guid not in _all_devices_map:
-                        syslog.warning(f"JOYSTICK: Device [{dev}] is in _special_devices but not in _all_devices_map")
-                        _all_devices_map[dev.device_guid] = dev
 
-                try:
-                    _last_device_signature = _device_list_signature(native_devices)
-                except Exception:
-                    _last_device_signature = None
-                _joystick_initialized = True
-                syslog.info("Joystick input initialized")
+                # register in the native vjoy devices map
+                native_vjoy_devices[vid] = device
 
-                # update calibration on initial joystick device load
-                mgr = gremlin.ui.axis_calibration.CalibrationManager()
-                gremlin.util.InvokeUiMethod(mgr.reload)
+            for vid in range(1, 17):  # list all possible vjoy devices index 1 up to 16
+                is_connected, axis_count, button_count, hat_count = config_map[vid]
+
+                hash_value = (axis_count, button_count, hat_count)
+                hash_wheel_value = (axis_count + 1, button_count, hat_count)
+
+                if verbose:
+                    syslog.info(
+                        f"Vjoy Interface: device index [{vid}] Hash: {hash_value} Hash wheel: {hash_wheel_value} Axis Count: {axis_count} Button count: {button_count} Hat count: {hat_count}  Connected: {is_connected}"
+                    )
+
+                if hash_value in vjoy_hash_list:
+                    syslog.error("Fatal error: This device is not unique in terms of axis/button/hat counts.")
+                    should_terminate = True
+
+                if is_connected and hat_count > 0 and not vjoy.hat_configuration_valid(vid):
+                    import sys
+
+                    import gremlin.event_handler
+                    import gremlin.ui.ui_common
+
+                    error_string = f"VJoy id {vid:d}: Hats are set to discrete but have to be set as continuous."
+                    syslog.error(error_string)
+                    el = gremlin.event_handler.EventListener()
+                    el.terminate()  # terminates and sends the relevant shutdown triggers
+                    util.display_error(error_string)
+                    sys.exit(1)
+
+            # As we are ensured that no duplicate vJoy devices exist from
+            # the previous step we can directly link the SDL and vJoy device
+            if hash_value in vjoy_lookup:
+                # found the vjoy interface index
+                vjoy_lookup[hash_value].set_vjoy_id(vid)
+                syslog.info(
+                    f"\tVjoy id {vid}: {'connected' if is_connected else ' disconnected'} in vjoy interface"
+                )
+            elif hash_wheel_value in vjoy_wheel_lookup:
+                vjoy_lookup[hash_value] = vjoy_wheel_lookup[hash_value]
+                vjoy_lookup[hash_value].set_vjoy_id(vid)
+                syslog.info(f"\tVjoy id {vid}: found in vjoy interface (as a wheel)")
+            elif hash_value in virtual_devices:
+                dev = virtual_devices[hash_value]
+                vjoy_lookup[hash_value] = dev
+                vjoy_lookup[hash_value].set_vjoy_id(vid)
+            else:
+                # not found
+                hash_value = (axis_count, button_count, hat_count)
+                hash_wheel_value = (axis_count + 1, button_count, hat_count)
+                if verbose_detailed:
+                    syslog.info(
+                        f"vjoy id {vid:d}: {hash_value} vJoy device exists but DILL does not see it - check HIDHide config if enabled and process is whitelisted.  This device cannot be used as input.  This message is normal if the device is not configured in VJOY."
+                    )
+
+                dev = configured_vjoy_devices[vid]
+                logical_count = 0
+                for i in range(8):
+                    axis_map = dinput.AxisMap()
+                    axis_map.axis_index = i
+                    dev.axismap_list.append(axis_map)
+                    axis_name = axis_map.getName()
+                    if not axis_name:
+                        axis_name = f"({i + 1})"
+                    else:
+                        logical_count += 1
+                    dev.axis_names[i] = axis_name
+                    dev.axismap_list.append(axis_name)
+
+                vjoy_lookup[hash_value] = dev
+                _all_joystick_devices.append(dev)
+                device_guid = gremlin.util.normalize_guid(dev.device_guid)
+                _joystick_device_guid_map[device_guid] = dev
+                if verbose_detailed:
+                    syslog.info(f"Adding undetected VJOY device: [{vid}] {dev!s}")
+
+            if should_terminate:
+                # exit gracefully
+                syslog.error(
+                    "A fatal error was encountered during the detection and mapping of input devices - see the log for errors."
+                )
+                app = QtWidgets.QApplication.instance()
+                if app:
+                    gremlin.util.InvokeUiMethod(app.exit)
+                sys.exit(1)
+                return
+
+            # Reset all devices so we don't hog the ones we aren't actually using
+            vjoy_proxy.reset()
+
+            # Construct special devices without a registry lock too. Their current
+            # entries, plus Maestro updates that arrived during discovery, are merged
+            # with this native snapshot only when publishing.
+            registerSpecialDevices()
+            try:
+                signature = _device_list_signature(native_devices)
+            except Exception:
+                signature = None
+            published = _publish_joystick_devices(discovered_devices, configured_vjoy_devices, native_vjoy_devices, signature)
+            _log_output_map()
+            syslog.info("Input device summary:")
+            for device in published:
+                syslog.info(f"\tDevice: {device!s}")
+            syslog.info("Joystick input initialized")
+
+            # Post UI work after releasing the registry used by input lookups.
+            mgr = gremlin.ui.axis_calibration.CalibrationManager()
+            gremlin.util.InvokeUiMethod(mgr.reload)
 
     finally:
         # turn on vjoy monitoring

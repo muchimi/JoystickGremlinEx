@@ -415,11 +415,14 @@ def maestro_output_id(device):
 def output_device_sources(root, devices):
     """Describe saved output identities once per device for the remapping grid."""
     devices = list(devices)
+    input_guids = {guid_key(node.get("device-guid")) for node in root.findall("./devices/device")
+                   if node.get("type", "").casefold() == "joystick"}
     sources = {
         index: {"key": index, "name": f"vJoy {index}", "device-guid": guid or "", "provider": "vjoy"}
         for index, guid in vjoy_references(root).items()
     }
     maestros = {}
+    legacy_guids = {}
     slots = {}
     native = {}
     for device in devices:
@@ -429,6 +432,9 @@ def output_device_sources(root, devices):
             source = {"key": key, "name": device.name, "device-guid": str(device.device_guid),
                       "virtual-id": str(device.virtual_id), "provider": "maestro"}
             maestros[key] = source
+            service_key = device.data.get("maestro_key")
+            if service_key:
+                legacy_guids[uuid.uuid5(uuid.NAMESPACE_URL, service_key).hex] = source
             slots.setdefault(str(device.virtual_id), source)
         elif kind == "vjoy":
             native[key] = device.vjoy_id
@@ -445,8 +451,10 @@ def output_device_sources(root, devices):
             continue
         if node.tag == "vjoyremap" and node.get("device-type", "").casefold() == "maestro":
             slot = node.get("virtual-id", "-1")
-            source = slots.get(slot) or {"key": f"maestro-slot:{slot}", "name": f"Maestro slot {slot}",
-                                         "device-guid": "", "virtual-id": slot, "provider": "maestro"}
+            saved_guid = guid_key(slot)
+            source = maestros.get(saved_guid) if saved_guid else slots.get(slot)
+            source = source or {"key": saved_guid or f"maestro-slot:{slot}", "name": f"Maestro {slot}",
+                               "device-guid": slot if saved_guid else "", "virtual-id": slot, "provider": "maestro"}
             sources[source["key"]] = source
         values = []
         if node.tag == "remap":
@@ -459,11 +467,26 @@ def output_device_sources(root, devices):
             values.append(node.get("device-guid"))
         for value in values:
             key = guid_key(value)
+            if node.tag == "device" and key in input_guids:
+                # Input remapping already handles startup references to a
+                # declared physical input; don't add a spurious output row.
+                continue
             if key in maestros:
                 sources[key] = maestros[key]
             elif key in native:
                 index = native[key]
                 sources.setdefault(index, {"key": index, "name": f"vJoy {index}", "device-guid": value, "provider": "vjoy"})
+            elif key is not None:
+                # An action/startup reference can outlive its device declaration
+                # or a temporary GEX GUID. It still needs an editable output row.
+                sources.setdefault(key, {"key": key, "name": "Unavailable output", "device-guid": value,
+                                         "provider": "maestro"})
+    for source in sources.values():
+        previous = legacy_guids.get(guid_key(source["device-guid"]))
+        if previous and source["key"] != previous["key"]:
+            source["suggested-guid"] = previous["device-guid"]
+            if source["name"] == "Unavailable output":
+                source["name"] = previous["name"] + " (previous GUID)"
     return sorted(sources.values(), key=lambda source: (source["provider"], source["name"].casefold(), str(source["key"])))
 
 

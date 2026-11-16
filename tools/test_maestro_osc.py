@@ -34,7 +34,7 @@ from test_qt_marshalling import APP, pump_until, flush_deletes
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = NS(maestro_enabled=True, maestro_device_count=0, maestro_device_map=None, maestro_osc_host="127.0.0.1",
             maestro_osc_port=8010, maestro_osc_reply_host="127.0.0.1", maestro_osc_reply_port=8011,
-            verbose_mode_maestro=False)
+            verbose_mode_maestro=False, virtual_output_failover=False, verbose_mode_outputs=False)
 CONFIG.getWindowSize = CONFIG.getWindowLocation = lambda *args: None
 CONFIG.setWindowSize = CONFIG.setWindowLocation = CONFIG.save = Mock()
 CONFIG.dropdown_use_mouse_wheel = False
@@ -43,13 +43,16 @@ GREMLIN.__path__ = [str(ROOT / "gremlin")]
 GREMLIN.config = ModuleType("gremlin.config")
 GREMLIN.config.Configuration = lambda: CONFIG
 GREMLIN.event_handler = ModuleType("gremlin.event_handler")
-GREMLIN.event_handler.EventListener = Mock(return_value=NS(shutdown=Mock()))
+GREMLIN.event_handler.EventListener = Mock(return_value=NS(
+    shutdown=Mock(), pushDeviceChangeSuppression=Mock(), popDeviceChangeSuppression=Mock(),
+    deferDeviceChanges=Mock(return_value=False)))
 GREMLIN.event_handler.JoystickState = lambda: NS(outputIgnored=lambda guid: False)
 GREMLIN.remote = ModuleType("gremlin.remote")
 GREMLIN.joystick_handling = ModuleType("gremlin.joystick_handling")
 GREMLIN.joystick_handling.set_maestro_devices = Mock()
 GREMLIN.util = ModuleType("gremlin.util")
 GREMLIN.util.InvokeUiMethod = lambda callback, *args: callback(*args)
+GREMLIN.util.normalize_guid = lambda guid: str(guid)
 GREMLIN.util.getHostIpSingle = lambda: "127.0.0.1"
 GREMLIN.util.valid_integer_string = lambda value: value.lstrip("-").isdigit()
 GREMLIN.util.clamp = lambda value, low, high: max(low, min(high, value))
@@ -66,8 +69,10 @@ source_definitions("gremlin/joystick_handling.py", {"_maestro_failover_id"}, GRE
 
 
 type_namespace = dict(IntEnum=enum.IntEnum, enum=enum)
-source_definitions("gremlin/types.py", {"DeviceType", "DeviceCategory"}, type_namespace)
+source_definitions("gremlin/types.py", {"DeviceType", "DeviceCategory", "EventSourceType"}, type_namespace)
 GREMLIN.types.DeviceType, GREMLIN.types.DeviceCategory = type_namespace["DeviceType"], type_namespace["DeviceCategory"]
+GREMLIN.types.EventSourceType = type_namespace["EventSourceType"]
+GREMLIN.joystick_handling.maestro_devices = lambda **kwargs: []
 GREMLIN.joystick_handling.DeviceType = GREMLIN.types.DeviceType
 
 
@@ -120,7 +125,7 @@ class TestGUID(uuid.UUID):
 
 
 DINPUT.GUID = TestGUID
-for key, value in dict(GEX_ID_STRING="GEX", GEX_MAX_DEVICES=16, GEX_PID_BASE=0x1000,
+for key, value in dict(GEX_ID_STRING="GEX", GEX_MAX_DEVICES=256, GEX_PID_BASE=0x1000,
                        GEX_PRODUCT_STRING="GEX Custom Device").items():
     setattr(DINPUT, key, value)
 DINPUT.DILL = NS(getDevices=Mock(return_value=[]))
@@ -210,8 +215,8 @@ class TransportTests(unittest.TestCase):
     def test_osc_encoding_matches_wire_format(self):
         expected = b"/maestro_ping\0\0\0,i\0\0\x00\x00\x00\x2a"
         self.assertEqual(MAESTRO._encode_message("/maestro_ping", [42]), expected)
-        self.assertEqual(MAESTRO._decode_message(packet("/maestro_axis/gex-0/X", 0.75)),
-                         ("/maestro_axis/gex-0/X", [0.75]))
+        self.assertEqual(MAESTRO._decode_message(packet("/maestro_axis/gex-1/X", 0.75)),
+                         ("/maestro_axis/gex-1/X", [0.75]))
 
     def test_retry_keeps_request_id_packet_and_source_socket(self):
         def reply(endpoint, address, values):
@@ -221,6 +226,22 @@ class TransportTests(unittest.TestCase):
         result = endpoint.client.request("/maestro_ping")
         self.assertEqual(list(result.args), ["MaestroOscService", 1])
         self.assertEqual(endpoint.received[0], endpoint.received[1])
+
+    def test_ping_exposes_service_version_string(self):
+        endpoint = self.endpoint(lambda e, a, v: e.send("/maestro_pong", v[0], "MaestroOscService", 1, "0.1.3"))
+        with patch.object(MAESTRO.json, "loads", side_effect=AssertionError("Pong is not JSON")) as loads:
+            result = endpoint.client.request("/maestro_ping")
+        self.assertTrue(result)
+        self.assertEqual(list(result.args), ["MaestroOscService", 1, "0.1.3"])
+        self.assertIsNone(result.data)
+        loads.assert_not_called()
+
+    def test_json_replies_still_decode_payloads(self):
+        for address in ("/maestro_create", "/maestro_create_custom", "/maestro_create_gamepad",
+                        "/maestro_activate", "/maestro_rename", "/maestro_capabilities", "/maestro_state"):
+            with self.subTest(address=address):
+                result = MAESTRO.MaestroResult.from_reply(address, [42, '{"id":"gex-1"}'])
+                self.assertEqual(result.data, {"id": "gex-1"})
 
     def test_list_collects_rows_after_done_and_recovers_missing_row_on_retry(self):
         def reply(endpoint, address, values):
@@ -254,7 +275,7 @@ class TransportTests(unittest.TestCase):
 
     def test_control_echo_does_not_satisfy_management_request(self):
         def reply(endpoint, address, values):
-            endpoint.send("/maestro_button/gex-0/1", values[0])
+            endpoint.send("/maestro_button/gex-1/1", values[0])
             endpoint.send("/maestro_pong", values[0] - 1, "Wrong request", 1)
             endpoint.send("/maestro_pong", values[0], "MaestroOscService", 1)
         endpoint = self.endpoint(reply)
@@ -290,7 +311,7 @@ class TransportTests(unittest.TestCase):
         endpoint.client.close()
         self.assertFalse(endpoint.client._receiver.is_alive())
         with self.assertRaises(OSError):
-            endpoint.client.write("/maestro_button/gex-0/1", 1)
+            endpoint.client.write("/maestro_button/gex-1/1", 1)
 
     def test_reply_port_is_exclusive(self):
         endpoint = self.endpoint(lambda *args: None)
@@ -313,8 +334,31 @@ class LocalhostProbeTests(unittest.TestCase):
         self.client.close.assert_called_once()
         self.assertIsNone(self.maestro.client)
 
+    def test_service_version_does_not_prevent_connection_checks(self):
+        self.client.request.return_value = NS(args=("MaestroOscService", 1, "0.1.3"))
+        self.assertTrue(self.maestro._check_localhost_connect())
+        self.maestro._client = self.client
+        self.maestro._initialized = True
+        self.assertTrue(self.maestro.connected())
+
+    def test_connect_accepts_service_version(self):
+        result = MAESTRO.MaestroResult(True, "/maestro_ping", "/maestro_pong", ("MaestroOscService", 1, "0.1.3"))
+        self.client.request.return_value = result
+        self.maestro._shutdown_connected = True
+        self.assertIs(self.maestro._connect("127.0.0.1", 8010, "127.0.0.1", 8011, throw_on_error=True), result)
+        self.assertEqual(self.client._version, "0.1.3")
+        self.assertTrue(self.maestro.connected())
+
+    def test_connect_without_service_version(self):
+        result = MAESTRO.MaestroResult(True, "/maestro_ping", "/maestro_pong", ("MaestroOscService", 1))
+        self.client.request.return_value = result
+        self.maestro._shutdown_connected = True
+        self.assertIs(self.maestro._connect("127.0.0.1", 8010, "127.0.0.1", 8011, throw_on_error=True), result)
+        self.assertIsNone(self.client._version)
+
     def test_unsuccessful_temporary_probe_closes_its_transport(self):
-        for result in (False, NS(args=("UnexpectedService", 1))):
+        for result in (False, NS(args=("UnexpectedService", 1)),
+                       NS(args=("UnexpectedService", 1, "0.1.3")), NS(args=("MaestroOscService", 2, "0.1.3"))):
             with self.subTest(result=result):
                 self.client.close.reset_mock()
                 self.client.request.return_value = result
@@ -377,13 +421,17 @@ class OutputTests(unittest.TestCase):
         self.maestro = MAESTRO.Maestro.klass()
         CONFIG.maestro_enabled = True
         self.maestro._initialized = True
-        self.maestro.ctx = Mock()
-        self.maestro.ctx.destination = ("127.0.0.1", 8010)
+        self.maestro._client = Mock()
+        self.maestro.client.list.return_value = []
+        # HID discovery is outside this UDP/output fixture.
+        self.maestro._scan_hid_order = Mock()
+        self.maestro.client.destination = ("127.0.0.1", 8010)
         self.controller(0, 8, 128, 4)
 
     def controller(self, index, axes, buttons, hats):
-        controller = MAESTRO.MaestroController(index, f"gex-{index}", f"GEX Custom Device {index}",
-                                               axes, buttons, hats, NS(VendorId=0xFEED, ProductId=0x8010))
+        controller = MAESTRO.MaestroController(index, f"gex-{index + 1}", f"GEX Custom Device {index}",
+                                               axes, buttons, hats, NS(VendorId=0xFEED, ProductId=0x8010),
+                                               *self.maestro.client.destination)
         self.maestro._controller_map[index] = controller
         self.maestro._buffer_map[index] = self.maestro._neutral_buffer(controller)
         return controller
@@ -392,7 +440,7 @@ class OutputTests(unittest.TestCase):
         for axis in (1, 8):
             for value, expected in ((-1, 0.0), (0, 0.5), (1, 1.0), (2, 1.0)):
                 self.maestro.setAxis(0, axis, value)
-                self.maestro.ctx.write.assert_called_with(f"/maestro_axis/gex-0/{MAESTRO.AXIS_NAMES[axis - 1]}", expected)
+                self.maestro.client.write.assert_called_with(f"/maestro_axis/gex-1/{MAESTRO.AXIS_NAMES[axis - 1]}", expected)
                 self.assertEqual(struct.unpack_from("<h", self.maestro.getBuffer(0), 16 + (axis - 1) * 2)[0],
                                  {-1: -32767, 0: 0, 1: 32767, 2: 32767}[value])
         for value in (float("nan"), float("inf")):
@@ -402,7 +450,7 @@ class OutputTests(unittest.TestCase):
     def test_buttons_1_and_128_and_all_hat_directions_are_independent(self):
         self.maestro.setButton(0, 1, True)
         self.maestro.setButton(0, 128, True)
-        self.maestro.ctx.write.assert_called_with("/maestro_button/gex-0/128", 1)
+        self.maestro.client.write.assert_called_with("/maestro_button/gex-1/128", 1)
         self.maestro.setButton(0, 1, False)
         buffer = self.maestro.getBuffer(0)
         self.assertEqual(buffer[0], 0)
@@ -410,7 +458,7 @@ class OutputTests(unittest.TestCase):
         for hat in range(1, 5):
             for position, value in MAESTRO.HAT_POSITIONS.items():
                 self.maestro.setHat(0, hat, position)
-                self.maestro.ctx.write.assert_called_with(f"/maestro_hat/gex-0/{hat}", value)
+                self.maestro.client.write.assert_called_with(f"/maestro_hat/gex-1/{hat}", value)
                 self.assertEqual(buffer[31 + hat], value - 1 if value else 255)
         self.assertEqual(buffer[15], 128)
 
@@ -428,23 +476,24 @@ class OutputTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 method(0, index, value)
             method(15, index, value)
-        self.maestro.ctx.write.assert_not_called()
+        self.maestro.client.write.assert_not_called()
 
     def test_device_matching_disambiguates_shared_pid_and_rejects_duplicates(self):
         self.controller(1, 8, 128, 4)
         devices = [NS(name=f"GEX Custom Device {i}", vendor_id=0xFEED, product_id=0x8010,
-                      axis_count=8, button_count=128, hat_count=4) for i in (0, 1)]
+                      axis_count=8, button_count=128, hat_count=4,
+                      device_guid=TestGUID(uuid.uuid4()), data={}) for i in (0, 1)]
         with patch.object(DINPUT.DILL, "getDevices", return_value=list(reversed(devices))):
-            self.maestro.syncControllers()
+            self.maestro.syncDinput()
             self.assertIs(self.maestro.getDevice(0x1001), devices[1])
         with patch.object(DINPUT.DILL, "getDevices", return_value=[devices[0], devices[0]]):
-            self.maestro.syncControllers()
+            self.maestro.syncDinput()
             self.assertIsNone(self.maestro.getDevice(0x1000))
 
     def test_shutdown_resets_owned_controllers_and_closes_transport(self):
-        context = self.maestro.ctx
+        context = self.maestro.client
         self.maestro._handle_shutdown()
-        context.request.assert_called_once_with("/maestro_reset", "gex-0", timeout=0.3, attempts=1)
+        context.request.assert_called_once_with("/maestro_reset", "gex-1", timeout=0.3, attempts=1)
         context.close.assert_called_once()
         self.assertFalse(self.maestro.initialized)
         self.maestro.setButton(0, 1, True)
@@ -453,14 +502,14 @@ class OutputTests(unittest.TestCase):
     def test_vjoy_style_output_api_uses_osc_and_retains_state(self):
         output = MAESTRO.MaestroOutputDevice(0, self.maestro)
         output.axis(8).value = 0.5
-        self.maestro.ctx.write.assert_called_with("/maestro_axis/gex-0/Dial", 0.75)
+        self.maestro.client.write.assert_called_with("/maestro_axis/gex-1/Dial", 0.75)
         self.assertAlmostEqual(output.axis(linear_index=8).value, 0.5, places=4)
         output.button(128).is_pressed = True
         self.assertTrue(output.button(128).is_pressed)
-        self.maestro.ctx.write.assert_called_with("/maestro_button/gex-0/128", 1)
+        self.maestro.client.write.assert_called_with("/maestro_button/gex-1/128", 1)
         output.hat(4).direction = (-1, 1)
         self.assertEqual(output.hat(4).direction, (-1, 1))
-        self.maestro.ctx.write.assert_called_with("/maestro_hat/gex-0/4", 8)
+        self.maestro.client.write.assert_called_with("/maestro_hat/gex-1/4", 8)
         self.assertTrue(output.is_axis_valid(linear_index=8))
         self.assertFalse(output.is_button_valid(129))
         with self.assertRaises(ValueError):
@@ -475,7 +524,7 @@ class OutputTests(unittest.TestCase):
         self.assertTrue(summary.connected)
         self.assertEqual((summary.virtual_id, summary.axis_count, summary.button_count, summary.hat_count), (0, 8, 128, 4))
         guid = summary.device_guid
-        self.controller(0, 2, 9, 1).Name = "Changed layout"
+        self.controller(0, 2, 9, 1).name = "Changed layout"
         self.maestro.populateDeviceList()
         updated = GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0][0]
         self.assertEqual(updated.device_guid, guid)
@@ -508,15 +557,17 @@ class OutputTests(unittest.TestCase):
         self.maestro.populateDeviceList()
         summary = GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0][0]
         namespace = dict(DeviceType=GREMLIN.types.DeviceType, dinput=DINPUT, gremlin=GREMLIN,
-                         getDevice=lambda guid: summary, syslog=logging.getLogger("system"))
+                         getDevice=lambda guid: summary,
+                         get_output_target=lambda guid: NS(device=summary, kind="maestro",
+                             maestro=MAESTRO.MaestroOutputDevice(0, self.maestro)), syslog=logging.getLogger("system"))
         source_definitions("gremlin/joystick_handling.py", {"set_axis", "set_button", "set_hat"}, namespace)
         with patch.object(MAESTRO.Maestro, "instance", self.maestro):
             namespace["set_axis"](summary.device_guid, 8, 0.5)
-            self.maestro.ctx.write.assert_called_with("/maestro_axis/gex-0/Dial", 0.75)
+            self.maestro.client.write.assert_called_with("/maestro_axis/gex-1/Dial", 0.75)
             namespace["set_button"](summary.device_guid, 128, True)
-            self.maestro.ctx.write.assert_called_with("/maestro_button/gex-0/128", 1)
+            self.maestro.client.write.assert_called_with("/maestro_button/gex-1/128", 1)
             namespace["set_hat"](summary.device_guid, 4, (-1, 1))
-            self.maestro.ctx.write.assert_called_with("/maestro_hat/gex-0/4", 8)
+            self.maestro.client.write.assert_called_with("/maestro_hat/gex-1/4", 8)
 
     def test_native_device_axis_callbacks_translate_assigned_axis_ids(self):
         self.controller(0, 2, 9, 1)
@@ -533,32 +584,40 @@ class OutputTests(unittest.TestCase):
 
     def test_remote_host_does_not_claim_a_matching_local_device(self):
         self.maestro._local_service = False
-        self.maestro.ctx.destination = ("192.0.2.1", 8010)
+        self.maestro.client.destination = ("192.0.2.1", 8010)
         with patch.object(DINPUT.DILL, "getDevices", side_effect=AssertionError("Remote host queried local hardware")):
             self.maestro.populateDeviceList()
-        self.assertEqual(self.maestro._device_map, {})
+        self.assertFalse(self.maestro._device_map[0].input_enabled)
         self.assertFalse(self.maestro._compare_list())
         summary = GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0][0]
-        self.assertEqual(summary.data["maestro_service_id"], "gex-0")
+        self.assertEqual(summary.data["maestro_key"], "maestro://127.0.0.1:8010/gex-1")
 
     def test_create_uses_first_free_index_and_does_not_require_admin(self):
         self.controller(2, 8, 128, 4)
-        info = dict(id="gex-1", name="GEX Custom Device 1")
-        self.maestro.ctx.request.return_value = [123, json.dumps(info)]
-        with patch.object(self.maestro, "_cache_controller", return_value="controller"):
-            self.assertEqual(self.maestro.createJoystickController(), "controller")
-        self.maestro.ctx.request.assert_called_once_with("/maestro_create_custom", "gex-1", "GEX Custom Device 1", 128, 8, 4)
+        info = dict(id="gex-2", name="gex-2")
+        self.maestro.client.request.return_value = MAESTRO.MaestroResult(
+            True, "/maestro_create_custom", data=info)
+        controller = NS(id="gex-2", index=1)
+        with (patch.object(self.maestro, "_cache_controller", return_value=controller) as cache,
+              patch.object(self.maestro, "refreshDevices") as refresh):
+            self.assertIs(self.maestro.createJoystickController(), controller)
+        self.maestro.client.request.assert_called_once_with(
+            "/maestro_create_custom", "gex-2", "gex-2", 128, 8, 4,
+            MAESTRO.GEX_VENDOR_ID, MAESTRO.gex_product_id("gex-2"), True)
+        cache.assert_called_once_with(info, {"kind": "custom", "axes": 8, "buttons": 128, "hats": 4}, 1)
+        refresh.assert_called_once_with(reload=False)
 
     def test_create_gamepad_uses_first_free_index(self):
-        client = Mock()
-        client.request.return_value = [123, json.dumps({"id": "gex-gp-2", "name": "gex-gp-2"})]
-        self.maestro.client = client
-        with patch.object(self.maestro, "_cache_controller", return_value="controller") as cache:
-            with patch.object(self.maestro, "populateDeviceList") as populate:
-                self.assertEqual(self.maestro.createGamepadController("gex-gp-2"), "controller")
-        client.request.assert_called_once_with("/maestro_create_gamepad", "gex-gp-2", 1, True)
-        cache.assert_called_once_with({"id": "gex-gp-2", "name": "gex-gp-2"}, {"kind": "gamepad"}, 1)
-        populate.assert_called_once_with()
+        info = {"id": "gex-gp-2", "name": "gex-gp-2"}
+        self.maestro.client.request.return_value = MAESTRO.MaestroResult(
+            True, "/maestro_create_gamepad", data=info)
+        controller = NS(id="gex-gp-2", index=1)
+        with (patch.object(self.maestro, "_cache_controller", return_value=controller) as cache,
+              patch.object(self.maestro, "refreshDevices") as refresh):
+            self.assertIs(self.maestro.createGamepadController("gex-gp-2"), controller)
+        self.maestro.client.request.assert_called_once_with("/maestro_create_gamepad", "gex-gp-2", "gex-gp-2", True)
+        cache.assert_called_once_with(info, {"kind": "gamepad"}, 1)
+        refresh.assert_called_once_with(reload=False)
 
     def test_qdata_push_button_opens_assigned_menu(self):
         button = GREMLIN.ui.ui_common.QDataPushButton("Presets")
@@ -589,15 +648,18 @@ class RegistryTests(unittest.TestCase):
         self.modules.start()
         self.addCleanup(self.modules.stop)
         self.registry = dict(DeviceType=GREMLIN.types.DeviceType, threading=threading, dinput=DINPUT,
-                             _device_registry_lock=threading.RLock(), _output_targets={})
+                             _device_registry_lock=threading.RLock(), _output_targets={},
+                             gremlin=GREMLIN, _maestro_failover_map={}, _raw_vjoy_target_map={},
+                             _native_vjoy_devices={})
         for key in ("_all_devices_map", "_joystick_device_guid_map", "_maestro_service_devices", "_maestro_replaced_devices",
                     "_maestro_devices_map", "_vjoy_devices_map", "_all_vjoy_devices_map", "_disconnected_devices_map",
                     "_all_virtual_devices_map"):
             self.registry[key] = {}
         self.registry["_maestro_excluded_native_guids"] = set()
         source_definitions("gremlin/joystick_handling.py", {
-            "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
-            "maestro_device_map", "all_maestro_devices", "virtual_devices", "vjoy_devices", "_native_vjoy_devices", "maestro_devices",
+            "_replace_device_registry", "_log_output_map",
+            "OutputTarget", "updateFailoverMap", "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
+            "maestro_device_map", "all_maestro_devices", "virtual_devices", "vjoy_devices", "get_native_vjoy_devices", "maestro_devices",
         }, self.registry)
 
     def summary(self, device_id, name="Maestro target", kind=None):
@@ -663,6 +725,21 @@ class RemapRoutingTests(unittest.TestCase):
         functor = namespace["VJoyRemapFunctor"]()
         functor.action_data = NS(virtual_device=NS(device_type=GREMLIN.types.DeviceType.Maestro, device_guid="maestro", connected=True),
                                  sendFlags=Mock(return_value=(False, True)))
+        routing = dict(VJoyProxy=lambda: GREMLIN.joystick_handling.VJoyProxy(),
+                       parse_virtual_device_key=lambda key: key)
+        source_definitions("gremlin/joystick_handling.py", {"OutputTarget", "get_output_device"}, routing)
+        device = NS(virtual_id=0, device_guid="maestro")
+        target = routing["OutputTarget"](device, "maestro", 0, 0)
+        target._maestro = MAESTRO.MaestroOutputDevice(0, self.maestro)
+        def resolve_target(key):
+            if key == "maestro":
+                return target
+            return routing["OutputTarget"](device, "vjoy", key, key)
+
+        routing["get_output_target"] = resolve_target
+        patcher = patch.object(GREMLIN.joystick_handling, "get_output_device", routing["get_output_device"], create=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         functor.verbose = False
         functor.remote_client = Mock()
         functor.usage_data = NS(is_inverted=lambda *args: False)
@@ -673,7 +750,7 @@ class RemapRoutingTests(unittest.TestCase):
         functor, namespace = self.load_functor()
         with patch.object(MAESTRO.Maestro, "instance", self.maestro):
             functor._set_axis(0, 8, 0.5, send_flags=(False, True), force_remote=True)
-            self.maestro.ctx.write.assert_called_with("/maestro_axis/gex-0/Dial", 0.75)
+            self.maestro.client.write.assert_called_with("/maestro_axis/gex-1/Dial", 0.75)
             self.assertAlmostEqual(functor._get_axis(0, 8), 0.5, places=4)
             functor._output_device(0).button(128).is_pressed = True
             functor._output_device(0).hat(4).direction = (0, -1)
@@ -695,7 +772,7 @@ class RemapRoutingTests(unittest.TestCase):
             callback, event = callbacks.register_callback.call_args.args
             self.assertEqual(event, "physical press")
             callback()
-        self.maestro.ctx.write.assert_called_with("/maestro_button/gex-0/128", 0)
+        self.maestro.client.write.assert_called_with("/maestro_button/gex-1/128", 0)
         callbacks.register_button_release.assert_not_called()
 
 
@@ -750,13 +827,13 @@ class CSharpIntegrationTests(unittest.TestCase):
         self.addCleanup(self.cleanup_devices)
 
     def cleanup_devices(self):
-        for info in self.maestro.ctx.list("/maestro_definitions"):
-            self.maestro.ctx.request("/maestro_delete", info["id"])
+        for info in self.maestro.client.list("/maestro_definitions"):
+            self.maestro.client.request("/maestro_delete", info["id"])
         self.maestro._controller_map.clear()
         self.maestro._handle_shutdown()
 
     def state(self, device_id="gex-0"):
-        return self.maestro.ctx.request("/maestro_state", device_id).raise_for_error().data
+        return self.maestro.client.request("/maestro_state", device_id).raise_for_error().data
 
     def test_full_controller_lifecycle_against_csharp(self):
         controller = self.maestro.createJoystickController(at_index=0)
@@ -775,15 +852,15 @@ class CSharpIntegrationTests(unittest.TestCase):
         self.maestro.LoadActiveControllers()
         self.assertEqual(self.maestro.getBuffer(0)[15], 128)
         self.assertEqual(self.maestro.getBuffer(0)[32:], bytearray([0, 2, 4, 7]))
-        self.maestro.ctx.request("/maestro_create_custom", "other-client", "Other client", 1, 1, 0)
+        self.maestro.client.request("/maestro_create_custom", "other-client", "Other client", 1, 1, 0)
         self.maestro.removeAllControllers()
         self.assertEqual([d["id"] for d in self.maestro.getAllDevices()], ["other-client"])
-        self.assertEqual(len(self.maestro.ctx.list("/maestro_definitions")), 2)
+        self.assertEqual(len(self.maestro.client.list("/maestro_definitions")), 2)
         self.assertIsNotNone(self.maestro.createJoystickController(at_index=0))
         self.assertEqual(self.state()["pressedButtons"], [])
         self.assertEqual(self.state()["hats"], [0, 0, 0, 0])
         with self.assertRaises(MAESTRO.MaestroServiceError):
-            self.maestro.ctx.request("/maestro_state", "missing").raise_for_error()
+            self.maestro.client.request("/maestro_state", "missing").raise_for_error()
 
     def test_odd_layout_and_shutdown_reset_against_csharp(self):
         self.assertIsNotNone(self.maestro.createJoystickController(axis_count=1, button_count=9, hat_count=1))
@@ -802,19 +879,19 @@ class CSharpIntegrationTests(unittest.TestCase):
 
     def test_definition_layout_failure_restores_existing_controller(self):
         self.maestro.createJoystickController(axis_count=2, button_count=9, hat_count=1)
-        previous = self.maestro.ctx.list("/maestro_definitions")[0]
+        previous = self.maestro.client.list("/maestro_definitions")[0]
         with self.assertRaisesRegex(RuntimeError, "previous device definition was restored"):
-            MAESTRO.save_device_definition(self.maestro.ctx, previous | dict(axes=9), previous)
-        self.assertEqual(self.maestro.ctx.list("/maestro_definitions"), [previous])
+            MAESTRO.save_device_definition(self.maestro.client, previous | dict(axes=9), previous)
+        self.assertEqual(self.maestro.client.list("/maestro_definitions"), [previous])
         renamed = previous | dict(name="Updated layout", axes=3, buttons=128, hats=4)
-        MAESTRO.save_device_definition(self.maestro.ctx, renamed, previous)
+        MAESTRO.save_device_definition(self.maestro.client, renamed, previous)
         self.maestro.LoadActiveControllers()
         self.maestro.populateDeviceList()
         summary = GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0][0]
         self.assertEqual((summary.name, summary.axis_count, summary.button_count, summary.hat_count), ("Updated layout", 3, 128, 4))
 
     def test_catalog_profile_uses_its_axis_order_and_button_mask(self):
-        self.maestro.ctx.request("/maestro_create", "catalog", "mock-gamepad", "Catalog pad")
+        self.maestro.client.request("/maestro_create", "catalog", "mock-gamepad", "Catalog pad")
         self.maestro.LoadActiveControllers({"catalog": 3})
         output = MAESTRO.MaestroOutputDevice(3, self.maestro)
         output.axis(3).value = 0.5
@@ -874,7 +951,7 @@ class CSharpIntegrationTests(unittest.TestCase):
             dialog.apply_button.click()
             pump_until(lambda: not dialog._busy)
             self.assertFalse(self.maestro.enabled)
-            self.assertIsNotNone(self.maestro.ctx)
+            self.assertIsNotNone(self.maestro.client)
             self.assertEqual(GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0], [])
             dialog.enabled_widget.setChecked(True)
             dialog.apply_button.click()

@@ -57,5 +57,6 @@
       "packageManager": "ms-python.python:pip"
     }
   ],
+   "security.allowedUNCHosts": ["tsclient"],
 
 }
