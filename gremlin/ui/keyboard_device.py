@@ -1430,7 +1430,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _cleanup_ui(self):
         """called when the keyboard device UI is being cleaned up"""
-        super()._cleanup_ui()
 
 
         el = gremlin.event_handler.EventListener()
@@ -1444,3 +1443,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 signal.disconnect(slot)
             except Exception:
                 pass
+
+        super()._cleanup_ui()
+

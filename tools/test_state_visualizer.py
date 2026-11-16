@@ -249,12 +249,16 @@ class StateVisualizerTests(unittest.TestCase):
         widget = self.viewer()
         state = STORE.states["alpha"]
         self.assertEqual(len(state.changed), 1)
+        model = widget.model
         widget._cleanup_ui()
+        self.assertIsNone(widget.model)
+        self.assertIsNone(widget._state_filter_widget.model)
+        self.assertIsNone(widget._state_filter_widget.count_widget._model)
         self.widgets.remove(widget)
         self.assertEqual(len(state.changed), 0)
         self.assertEqual(len(STORE.crud), 0)
         self.assertEqual(len(CONFIG.changed), 0)
-        self.assertEqual(widget.model._data_changed_callbacks, [])
+        self.assertEqual(model._data_changed_callbacks, [])
         widget.deleteLater()
         flush_deletes()
         STORE.crud.emit()

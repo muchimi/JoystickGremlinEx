@@ -308,6 +308,40 @@ class VirtualInputChecks(unittest.TestCase):
         self.settings.setVirtualAsInput(selected, False)
         self.assertFalse(self.state.inputEnabled(selected.device_id))
 
+    def test_display_filter_order_keeps_fixed_tabs_after_new_devices(self):
+        plugins = Device("Plugins", DeviceType.Plugins)
+        settings = Device("Settings", DeviceType.Settings)
+        wheel = Device("WingMan Formula GP", DeviceType.Joystick)
+        stick = Device("T.16000M", DeviceType.Joystick)
+        self.devices.extend([plugins, settings, wheel, stick])
+        self.services.joystick_handling.getConfigDevices = lambda: [plugins, settings]
+        selected = self.devices[2]
+        self.settings.setVirtualAsInput(selected, True)
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config, window.profile = self.config, self.profile
+        for saved in (
+            {"9": (selected.device_id, True), "2": (settings.device_id, False),
+             "6": (self.devices[3].device_id, True), "3": (plugins.device_id, False),
+             "8": (wheel.device_id, True), "4": (self.devices[1].device_id, True)},
+            {"9": selected.device_id, "2": settings.device_id, "6": self.devices[3].device_id,
+             "3": plugins.device_id, "8": wheel.device_id, "4": self.devices[1].device_id},
+        ):
+            with self.subTest(saved=saved):
+                self.config.tab_list = saved
+                result = window._get_sorted_tab_map()
+                expected = [self.devices[3], wheel, selected, stick, plugins, settings]
+                self.assertEqual(result["sorted"], expected)
+                expected_ids = [dev.device_id for dev in expected]
+                self.assertEqual(list(result["tab_map"].values()), expected_ids)
+                self.assertEqual(list(result["index_map"].values()), expected_ids)
+                self.assertEqual([row[0] for row in result["sorted_tuples"]], expected_ids)
+                self.assertTrue(plugins.visible and settings.visible)
+                self.assertNotIn(self.devices[1], result["sorted"])
+        self.config.tab_list = {}
+        self.assertEqual(window._get_sorted_tab_map()["sorted"][-2:], [plugins, settings])
+
     def test_profile_only_disconnected_device_gets_a_tab_in_default_and_saved_order(self):
         missing = Device("Old left VPC", DeviceType.Joystick, connected=False)
         # Profile-only placeholders are registered in the general device map,
@@ -694,7 +728,11 @@ class VirtualInputChecks(unittest.TestCase):
         self.config.device_visible_map = {}
         self.config.last_device_guid = "Maestro 0"
         self.config.get_last_input = lambda guid: (guid, None, None)
-        self.profile.getLastInput = lambda: ("Maestro 0", None, None)
+        selection_cleanup_counts = []
+        self.profile.getLastInput = lambda: (
+            selection_cleanup_counts.append(window._unregister_all_widgets_ui.call_count)
+            or ("Maestro 0", None, None)
+        )
         self.profile.get_device_modes = Mock(return_value=NS())
         self.profile.first_input = Mock(return_value=None)
         self.profile.isRemovedDevice = lambda guid: False
@@ -753,6 +791,7 @@ class VirtualInputChecks(unittest.TestCase):
             setattr(window, name, Mock())
         for _ in range(2):
             window._create_tabs_ui()
+            self.assertEqual(selection_cleanup_counts, list(range(_ + 1)))
             self.assertEqual(header.count(), 2)
             self.assertEqual(registered["vJoy 1"].data, (TabDeviceType.VjoyInput, "vJoy 1", 0))
             self.assertEqual(registered["Maestro 0"].data, (TabDeviceType.MaestroInput, "Maestro 0", 1))

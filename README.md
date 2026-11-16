@@ -52,6 +52,20 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T102)
+- Change: PLATFORM: Python 3.14.10 (3.15 not yet supported due to underlying dependencies not all yet supporting 3.15). Update to the GEX dill library 1.6.1 (adds new optimizations and additional functionality specific to GEX at the C++ level).
+- Change: UI (Maestro): allow all joystick and gamepad Maestro devices on the display list and allow GEX to delete them if needed (this is to view and clear any stale entries or entries not created by GEX).
+- Fix: Device Information: removed stale cached entries.
+- Fix: API (Maestro): device lookup and failover mapping could in some cases use the incorrect slot index or use an inactive Maestro devices if it matched by name.
+- Fix: API (Maestro): revised logic for duplicated devices and clarification of service id vs name (two or more devices with the identical name but different service IDs reported by Maestro).
+- Fix: API (Maestro): DINPUT sync timeout on already synchronized devices
+- Fix: UI: device tabs do not always update when (non failover) Maestro devices are discovered.
+- Fix: API: filter call exception after device teardown for default input selection because the model was already cleared.
+- Fix: API: potential race condition when rebuilding tabs during a reload operation while devices are changing that could lead to a crash.
+- Fix: DILL: optimization when querying DINPUT data and fix for potential race condition when rapidly adding/removing devices when using Maestro. 
+
+ 
+
 ### (m77T101)
 - New: new mechanism to update **both** profile input and output device references to new devices.  The updated device remaper is in the Tools > Remap Devices... menu.  The default selection attempts to match devices with changed IDs based on hardware attributes scanned by GEX.  The dialog is split in two groups - one for inputs, one for outputs.  The output section is specific to mapping vJoy entries to the new Maestro entries.  The input section is what to use when you have ID changes with your controllers.  The logic is updated to use new HIDAPI data to do device matching to provide suitable defaults, but it is not always going to work as expected and a manual selection may be needed. This action will change data in the profile automatically and alter IDs.  After confirming the changes via the apply button, a backup is made and the profile is reloaded with the changed data.  **MAKE PROFILE BACKUPS FIRST**
 - Fix: very long load time when loading a profile referencing a disconnected device

@@ -64,8 +64,54 @@ class VirtualSummaryChecks(unittest.TestCase):
         device = DeviceSummary(NS(device_guid=str(uuid.uuid4()), vendor_id=vendor, product_id=product,
                                   joystick_id=0, name=name.encode(), axis_count=2, button_count=8,
                                   hat_count=1, usage_page=1, usage=usage, axis_map=[]))
-        device.device_category = DeviceCategory.Virtual if device.is_virtual else DeviceCategory.Physical
         return device
+
+    def test_catalog_test_joysticks_get_tabs_without_output_slot_selection(self):
+        devices = [self.native(vendor, product, name) for vendor, product, name in (
+            (0x046D, 0xC20E, "Logitech WingMan Formula GP"),
+            (0x06A3, 0x075C, "Saitek X52 Flight Control System"),
+            (0x044F, 0xB10A, "Thrustmaster T.16000M Joystick"),
+        )]
+        failover_outputs = [
+            self.native(0x1209, 0x1000, "gex-1"),
+            self.native(0xFEED, 0x8010, "GEX Custom Device 3"),
+            self.native(0x1234, 0xBEAD, "vJoy - Virtual Joystick"),
+        ]
+        shown = devices + failover_outputs
+        selected_inputs = set()
+        handling = NS(display_devices=lambda profile: shown, virtual_input_candidates=lambda: failover_outputs,
+                      getSpecialDevices=lambda: [], getConfigDevices=lambda: [])
+        tree = ast.parse((ROOT / "gremlinEx.py").read_bytes())
+        ui = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GremlinUi")
+        method = next(node for node in ui.body if isinstance(node, ast.FunctionDef)
+                      and node.name == "_get_sorted_tab_map")
+        future = ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)
+        scope = dict(gremlin=GREMLIN, DeviceType=DeviceType, DeviceCategory=DeviceCategory)
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[future, method], type_ignores=[])),
+                     "gremlinEx.py", "exec"), scope)
+        window = NS(config=NS(tab_list={}, verbose_mode_ui_level=lambda level: False,
+                              isDeviceVisible=lambda guid: True), profile=NS(settings=NS(
+                                  getVirtualAsInput=lambda device: device.device_id in selected_inputs)))
+        with patch.object(GREMLIN, "joystick_handling", handling, create=True), patch.object(
+            GREMLIN.util, "normalize_guid", str, create=True
+        ):
+            saved_order = {i: (device.device_id, True) for i, device in enumerate(shown)}
+            for selected in (None, *failover_outputs):
+                selected_inputs.clear()
+                if selected is not None:
+                    selected_inputs.add(selected.device_id)
+                for saved in ({}, saved_order):
+                    with self.subTest(selected=selected.name if selected else None, saved=bool(saved)):
+                        window.config.tab_list = saved
+                        result = scope["_get_sorted_tab_map"](window)
+                        expected_inputs = [] if selected is None else [selected]
+                        self.assertCountEqual(result["physical"], devices)
+                        self.assertCountEqual(result["sorted"], devices + expected_inputs)
+                        self.assertCountEqual(result["maestro"], [device for device in expected_inputs
+                                                               if device.device_type == DeviceType.Maestro])
+                        self.assertCountEqual(result["vjoy"], [device for device in expected_inputs
+                                                            if device.device_type == DeviceType.VJoy])
+                        self.assertTrue(all(device.virtual_id == -1 for device in devices))
 
     def test_shared_vendor_ids_and_other_hardware_remain_physical(self):
         for vendor, product in ((0x1209, 0x0FFF), (0x1209, 0x1010), (0x1209, 0x2000),

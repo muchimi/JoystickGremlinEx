@@ -68,6 +68,7 @@ source_definitions("gremlin/joystick_handling.py", {"_maestro_failover_id"}, GRE
 type_namespace = dict(IntEnum=enum.IntEnum, enum=enum)
 source_definitions("gremlin/types.py", {"DeviceType", "DeviceCategory"}, type_namespace)
 GREMLIN.types.DeviceType, GREMLIN.types.DeviceCategory = type_namespace["DeviceType"], type_namespace["DeviceCategory"]
+GREMLIN.joystick_handling.DeviceType = GREMLIN.types.DeviceType
 
 
 def clear_layout(layout):
@@ -841,7 +842,7 @@ class CSharpIntegrationTests(unittest.TestCase):
             dialog.hats_widget.setValue(2)
             dialog.save_button.click()
             pump_until(lambda: not dialog._busy)
-            self.assertIn("gex-0", dialog._definitions, dialog.warning_widget.text())
+            self.assertIn("gex-0", dialog._definitions_by_service_id, dialog.warning_widget.text())
             dialog.apply_button.click()
             pump_until(lambda: not dialog._busy)
             self.assertFalse(dialog.warning_widget.text())
@@ -864,7 +865,7 @@ class CSharpIntegrationTests(unittest.TestCase):
             dialog.apply_button.click()
             pump_until(lambda: not dialog._busy)
             self.assertEqual(GREMLIN.joystick_handling.set_maestro_devices.call_args.args[0], [])
-            self.assertFalse(dialog._definitions["gex-0"]["enabled"])
+            self.assertFalse(dialog._definitions_by_service_id["gex-0"]["enabled"])
             dialog.active_widget.setChecked(True)
             dialog.save_button.click()
             pump_until(lambda: not dialog._busy)

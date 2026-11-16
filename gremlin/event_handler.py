@@ -1733,13 +1733,13 @@ class EventListener(QtCore.QObject):
         if not dinput.DILL.initialized:
             dinput.DILL.init()
         syslog.info("DILL: start listen")
-        dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
-        dinput.DILL.set_input_event_callback(self._dinput_event_handler)  # DINPUT event handler
-        self._run_event.wait()
-
-        syslog.info("DILL: shutdown")
-        dinput.DILL.set_device_change_callback(None)
-        dinput.DILL.set_input_event_callback(None)
+        try:
+            dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
+            dinput.DILL.set_input_event_callback(self._dinput_event_handler)
+            self._run_event.wait()
+        finally:
+            syslog.info("DILL: shutdown")
+            dinput.DILL.shutdown()  # joins native workers before releasing callback references
 
     @ignore_function
     def _keep_alive(self):

@@ -71,6 +71,51 @@ class MaestroCacheChecks(unittest.TestCase):
         self.assertEqual(device.name, "Pilot controls")
         self.assertIs(self.maestro.getDeviceAt(7), device)
 
+    def test_failover_identity_requires_active_maestro_joystick_output(self):
+        device = self.native("gex-1")
+        device.device_type = DeviceType.Maestro
+        device.virtual_id = 7
+        identify = self.registry["_maestro_failover_id"]
+        self.assertEqual(identify(device), 1)
+        cases = (
+            ("disconnected", lambda d: d.setConnected(False)),
+            ("physical", lambda d: setattr(d, "device_type", DeviceType.Joystick)),
+            ("vjoy", lambda d: setattr(d, "device_type", DeviceType.VJoy)),
+            ("disabled", lambda d: setattr(d, "disabled", True)),
+            ("input only", lambda d: setattr(d, "virtual_id", -1)),
+            ("invalid slot", lambda d: setattr(d, "virtual_id", 16)),
+            ("gamepad", lambda d: d.setGamepad(True)),
+        )
+        from copy import copy
+        for name, invalidate in cases:
+            with self.subTest(name=name):
+                invalid = copy(device)
+                invalidate(invalid)
+                self.assertIsNone(identify(invalid))
+
+    def test_failover_map_rejects_inactive_devices_and_stale_vjoy_ids(self):
+        source = self.native("VJoy 1")
+        source.device_type = DeviceType.VJoy
+        source.setConnected(False)
+        target = self.native("gex-1")
+        target.device_type = DeviceType.Maestro
+        target.virtual_id = 7
+        target.vjoy_id = 1
+        namespace = dict(self.registry, gremlin=NS(config=NS(Configuration=lambda: NS(verbose_mode_maestro=False, virtual_output_failover=True))),
+                         _native_vjoy_devices={1: source}, _maestro_devices=[target],
+                         _maestro_failover_map={}, _raw_vjoy_target_map={}, _output_targets={}, _all_devices_map={})
+        source_definitions("gremlin/joystick_handling.py", {"updateFailoverMap", "OutputTarget"}, namespace)
+        namespace["updateFailoverMap"]()
+        self.assertEqual(namespace["_maestro_failover_map"][1].out_id, 7)
+        target.setConnected(False)
+        namespace["updateFailoverMap"]()
+        self.assertEqual(namespace["_maestro_failover_map"], {})
+        target.setConnected(True)
+        target.name = "gex-2"  # Cached vjoy_id=1 must not identify this as gex-1.
+        namespace["updateFailoverMap"]()
+        self.assertNotIn(1, namespace["_maestro_failover_map"])
+        self.assertIs(namespace["_maestro_failover_map"][target.device_guid].device, target)
+
     def test_native_summary_gets_failover_id_and_keeps_native_identity(self):
         self.active_ids = ["gex-1"]
         native = self.native()
@@ -183,6 +228,93 @@ class MaestroCacheChecks(unittest.TestCase):
             reconnected = self.registry["display_devices"](empty)
             self.assertEqual([d.device_guid for d in reconnected], [live.device_guid])
             self.assertTrue(reconnected[0].connected)
+
+    def test_display_inventory_reads_native_devices_without_registry_entries(self):
+        physical = self.native("Physical")
+        vjoy = self.native("vJoy Device")
+        vjoy.device_type = DeviceType.VJoy
+        vjoy.vjoy_id = 1
+        cached = self.native("Cached connected joystick")
+        cached_vjoy = self.native("Cached vJoy failover")
+        cached_vjoy.device_type = DeviceType.VJoy
+        cached_vjoy.data["failover"] = True
+        for device in (cached, cached_vjoy):
+            self.registry["_all_devices_map"][device.device_guid] = device
+        self.local_devices([physical, vjoy])
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            shown = self.registry["display_devices"](NS(devices={}, vjoy_devices={}))
+        self.assertCountEqual([d.device_guid for d in shown], [physical.device_guid, vjoy.device_guid])
+        self.assertTrue(all(d.connected for d in shown))
+
+    def test_display_inventory_rejects_invalid_and_excluded_native_interfaces(self):
+        devices = []
+        for name, vendor, product, axes, buttons, hats in (
+            ("Too many axes", 0x1234, 1, 9, 8, 1),
+            ("Too many buttons", 0x1234, 2, 2, 129, 1),
+            ("Too many hats", 0x1234, 3, 2, 8, 5),
+            ("Empty interface", 0x1234, 4, 0, 0, 0),
+            ("Wooting keyboard interface", 0x31E3, 1, 0, 674, 0),
+            ("Wooting three-button interface", 0x31E3, 1, 0, 3, 0),
+            ("Wooting empty interface", 0x31E3, 1, 0, 0, 0),
+            ("IFR1 HID interface", 0x04D8, 0xE6D6, 1, 35, 0),
+            ("Button box", 0x1234, 5, 0, 32, 0),
+            ("Wooting gamepad", 0x31E3, 1, 5, 10, 1),
+            ("Full-size joystick", 0x1234, 6, 8, 128, 4),
+        ):
+            device = self.native(name)
+            device.vendor_id, device.product_id = vendor, product
+            device.axis_count, device.button_count, device.hat_count = axes, buttons, hats
+            devices.append(device)
+        self.local_devices(devices)
+        # Profile references must not reintroduce a rejected live interface as
+        # a disconnected device, even when their saved layout is incomplete.
+        from copy import copy
+        saved = [copy(device) for device in devices]
+        for device in saved:
+            device.axis_count = device.button_count = device.hat_count = 0
+        profiles = (
+            NS(devices={}, vjoy_devices={}),
+            NS(devices={device.device_guid: NS(device=device) for device in saved}, vjoy_devices={}),
+        )
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            for profile in profiles:
+                with self.subTest(profile_references=bool(profile.devices)):
+                    shown = self.registry["display_devices"](profile)
+                    self.assertCountEqual([d.name for d in shown],
+                                          ["Button box", "Wooting gamepad", "Full-size joystick"])
+
+    def test_display_inventory_preserves_registered_disable_flags(self):
+        registered = self.native("Disabled joystick")
+        registered.disabled = True
+        self.registry["_all_devices_map"][registered.device_guid] = registered
+        fresh = self.native(registered.name, guid=registered.device_guid)
+        self.local_devices([fresh])
+        profile = NS(devices={fresh.device_guid: NS(device=fresh)}, vjoy_devices={})
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            self.assertEqual(self.registry["display_devices"](profile), [])
+
+    def test_display_inventory_preserves_unknown_disconnected_profile_placeholder(self):
+        missing = self.native("Unplugged joystick")
+        missing.axis_count = missing.button_count = missing.hat_count = 0
+        missing.setConnected(False)
+        self.local_devices([])
+        profile = NS(devices={missing.device_guid: NS(device=missing)}, vjoy_devices={})
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            shown = self.registry["display_devices"](profile)
+        self.assertEqual([d.device_guid for d in shown], [missing.device_guid])
+        self.assertFalse(shown[0].connected)
+
+    def test_display_inventory_never_trusts_connected_cache_without_native_enumeration(self):
+        cached = self.native("Cached connected joystick")
+        self.registry["_all_devices_map"][cached.device_guid] = cached
+        empty = NS(devices={}, vjoy_devices={})
+        profile = NS(devices={cached.device_guid: NS(device=cached)}, vjoy_devices={})
+        with patch.object(MAESTRO.dinput.DILL, "initialized", False, create=True):
+            self.assertEqual(self.registry["display_devices"](empty), [])
+            shown = self.registry["display_devices"](profile)
+        self.assertEqual([d.device_guid for d in shown], [cached.device_guid])
+        self.assertFalse(shown[0].connected)
+        self.assertTrue(cached.connected)
 
     def test_excluded_legacy_profile_device_is_retained_as_disconnected(self):
         legacy = self.native("GEX Custom Device 7")
@@ -604,6 +736,22 @@ class MaestroGamepadCacheChecks(unittest.TestCase):
         self.assertEqual(len(outputs), 1)
         self.assertEqual(outputs[0].data["maestro_key"], hid.data["maestro_key"])
 
+    def test_display_inventory_hides_reenumerated_and_profile_aliases(self):
+        self.gamepads()
+        hid = self.interface(1)
+        alias = self.interface(1, companion=True, name="gex-gp-1")
+        self.refresh()
+        output = hid.data["maestro_output_summary"]
+        profile = NS(devices={alias.device_guid: NS(device=alias)},
+                     vjoy_devices={output.device_guid: NS(device=output)})
+        # A later native refresh may reinsert an interface removed by syncBridge.
+        self.registry["_all_devices_map"][alias.device_guid] = alias
+        self.registry["_update_joystick_device_maps"]()
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            shown = self.registry["display_devices"](profile)
+        self.assertEqual([d.device_guid for d in shown], [hid.device_guid])
+        self.assertTrue(shown[0].connected)
+
     def test_native_arrival_replaces_the_old_synthetic_gamepad(self):
         self.gamepads()
         self.refresh()
@@ -733,6 +881,7 @@ class DeviceInformationChecks(unittest.TestCase):
         tree = ast.parse((ROOT / "gremlin/ui/dialogs.py").read_bytes())
         dialog = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "DeviceInformationDialog")
         update = next(n for n in dialog.body if isinstance(n, ast.FunctionDef) and n.name == "_update_data")
+        color = next(n for n in dialog.body if isinstance(n, ast.FunctionDef) and n.name == "_color")
         namespace = dict(
             QtWidgets=QtWidgets, QtGui=QtGui, DeviceType=DeviceType,
             gremlin=NS(config=NS(Configuration=lambda: self.config),
@@ -740,13 +889,14 @@ class DeviceInformationChecks(unittest.TestCase):
                        joystick_handling=NS(display_devices=self.query)),
         )
         future = ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0)
-        exec(compile(ast.fix_missing_locations(ast.Module(body=[future, update], type_ignores=[])),
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[future, update, color], type_ignores=[])),
                      "gremlin/ui/dialogs.py", "exec"), namespace)
         self.update = namespace["_update_data"]
         self.table = QtWidgets.QTableWidget()
         self.table.setColumnCount(10)
         self.table.setSortingEnabled(True)
         self.dialog = NS(table=self.table, profile=NS(devices={}, vjoy_devices={}))
+        self.dialog._color = lambda virtual, connected: namespace["_color"](self.dialog, virtual, connected)
         self.addCleanup(flush_deletes)
         self.addCleanup(self.table.deleteLater)
 

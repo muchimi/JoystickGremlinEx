@@ -31,9 +31,10 @@ edge-tts >= 7.3.1
 audioop-lts >= 0.2.2
 pydub >= 0.25.1
 pycountry >= 26.2.16
-faster_whisper>=1.2.1
-ctranslate2 >= 4.8.3
-huggingface_hub >= 1.33.0
+ctranslate2
+huggingface_hub
+faster_whisper
+hidapi
 onnxruntime >= 1.31.0
 rapidocr >= 3.10.0
 opencv-python >= 5.0.0.93

@@ -3610,9 +3610,11 @@ class StateFilterWidget(FilterControlWidget):
         """updates the state input model to use for the fitler"""
         if model != self.model:
             self._last_hash = None  # reset tracker
-            if self.model:
+            if self.model is not None:
                 self.model.unregisterFilteredDataChangeCallback(self.updateFilter)
             self.model = model
+            if self.count_widget is not None:
+                self.count_widget.setModel(model)
             if model:
                 items = self.model.unfilteredItemsList()
                 syslog.info(f"StateFilterWidget: setting input items [{len(items)}] found")
@@ -3626,20 +3628,28 @@ class StateFilterWidget(FilterControlWidget):
             self.setInputItems(items)
 
     def setSearchString(self, search: str):
+        if self.model is None:
+            return
         self.model.setSearchString(search, filter=self.filter, emit=False)
         self.updateFilter()
 
     def setCategory(self, category: str | StateCategory):
+        if self.model is None:
+            return
         if isinstance(category, StateCategory):
             category = category.name
         self.model.setCategory(category, filter=self.filter, emit=False)
         self.updateFilter()
 
     def setActiveAttributes(self, attributes: list[str]):
+        if self.model is None:
+            return
         self.model.setActiveAttributes(attributes, filter=self.filter, emit=False)
         self.updateFilter()
 
     def updateFilter(self, force=False):
+        if self.model is None:
+            return
         # look for a change
         current_hash = self.model.hashKey(filter=self.filter)
         if not force and current_hash == self._last_hash:
@@ -3805,7 +3815,11 @@ class StateVisualizerWidget(QWidget):
         self.unhook()
         self._state_filter_widget.changed.disconnect(self._populateState_ui)  # disconnect filter change signal
         self._clear_state_buttons()
-        self.model.dispose()
+        model = self.model
+        self._state_filter_widget.setModel(None)
+        self.model = None
+        if model is not None:
+            model.dispose()
         StateData().crud.disconnect(self._state_crud)
         config = gremlin.config.Configuration()
         config.changed.disconnect(self._config_changed)
@@ -4132,6 +4146,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self._widget_map.clear()
         self._filter_widget.changed.disconnect(self._handle_filter_changed)
+        self._filter_widget.setModel(None)
         # self._filter_widget.select.disconnect(self._select_input_item_cb)
 
         self._filter_widget = None

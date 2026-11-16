@@ -2980,9 +2980,9 @@ Enabled modules may not show until the device filter is updated.
                     "/tr",
                     f'"{path}"',
                 ],
+                check=False,
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
 
@@ -3005,8 +3005,7 @@ Enabled modules may not show until the device filter is updated.
             result = subprocess.run(
                 ["schtasks", "/Delete", "/TN", REG_KEY, "/F"],
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
             if result.returncode != 0:
@@ -3022,6 +3021,7 @@ Enabled modules may not show until the device filter is updated.
 
         result = subprocess.run(
             ["schtasks", "/Query", "/TN", REG_KEY],
+            check=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -4422,6 +4422,35 @@ class DeviceInformationDialog(BaseDialogUi):
         self.menu = None  # context menu for the table
         self.menu_item = None  # the cell item the menu applies to
 
+        # legend
+
+        color_connected = self._color(virtual=False, connected=True)
+        connected_widget = QtWidgets.QLabel("Connected")
+        connected_widget.setStyleSheet(f"background-color: {color_connected}; border-radius: 6px; padding: 5px;")
+        color_disconnected = self._color(virtual=False, connected=False)
+        disconnected_widget = QtWidgets.QLabel("Disconnected")
+        disconnected_widget.setStyleSheet(f"background-color: {color_disconnected}; border-radius: 6px; padding: 5px;")
+        color_virtual_connected = self._color(virtual=True, connected=True)
+        virtual_connected_widget = QtWidgets.QLabel("Virtual Connected")
+        virtual_connected_widget.setStyleSheet(
+            f"background-color: {color_virtual_connected}; border-radius: 6px; padding: 5px;"
+        )
+        color_virtual_disconnected = self._color(virtual=True, connected=False)
+        virtual_disconnected_widget = QtWidgets.QLabel("Virtual Disconnected")
+        virtual_disconnected_widget.setStyleSheet(
+            f"background-color: {color_virtual_disconnected}; border-radius: 6px; padding: 5px;"
+        )
+
+        legend_widgets = [
+            "Legend:",
+            connected_widget,
+            disconnected_widget,
+            virtual_connected_widget,
+            virtual_disconnected_widget,
+        ]
+        legend_container = getHContainer(legend_widgets, widget_only=True, auto_size=True)
+        self.main_layout.addWidget(legend_container)
+
         # toolbar
 
         self.script_copy_button = QDataPushButton("Generate plugin script header")
@@ -4442,6 +4471,20 @@ class DeviceInformationDialog(BaseDialogUi):
 
         # load the data
         self._update_data()
+
+    def _color(self, virtual: bool, connected: bool) -> str:
+        is_dark = gremlin.shared_state.is_dark_theme
+        if virtual:
+            if is_dark:
+                color = "#466333" if connected else "#49451D"
+            else:
+                color = "#7BAC5A" if connected else "#9C923C"
+        else:
+            if is_dark:
+                color = "#354927" if connected else "#5C432C"
+            else:
+                color = "#7BAC5A" if connected else "#B38255"
+        return color
 
     @QtCore.Slot(bool)
     def _handle_disconnected_changed(self, checked: bool):
@@ -4504,18 +4547,7 @@ class DeviceInformationDialog(BaseDialogUi):
             self.table.setItem(row, 9, QtWidgets.QTableWidgetItem(f"{'Y' if device.connected else 'N'}"))
 
             # row color
-            is_dark = gremlin.shared_state.is_dark_theme
-
-            if device.is_virtual:
-                if is_dark:
-                    color = "#466333" if device.connected else "#49451D"
-                else:
-                    color = "#7BAC5A" if device.connected else "#9C923C"
-            else:
-                if is_dark:
-                    color = "#354927" if device.connected else "#5C432C"
-                else:
-                    color = "#7BAC5A" if device.connected else "#B38255"
+            color = self._color(device.is_virtual, device.connected)
             qc = QtGui.QColor(color)
 
             for col in range(10):
@@ -4801,9 +4833,7 @@ class SubstituteDialog(QRememberDialog):
 
         # populate devices currently connected
         self._hardware_devices = []
-        device_count = dinput.DILL.get_device_count()
-        for index in range(device_count):
-            info: dinput.DeviceSummary = dinput.DILL.get_device_information_by_index(index)
+        for info in dinput.DILL.getDevices():
             if not info.is_virtual:
                 # skip vjoy devices
                 self._hardware_devices.append(info)

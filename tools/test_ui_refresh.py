@@ -16,7 +16,7 @@ import sys
 import traceback
 from types import SimpleNamespace as NS
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from PySide6 import QtCore, QtWidgets
 from shiboken6 import Shiboken
@@ -103,6 +103,8 @@ def load_methods(path, class_name, names, **extra):
                      QTimer=QtCore.QTimer, syslog=logging.getLogger("ui-refresh-checks"),
                      with_wait_cursor=lambda method: method,
                      os=os, traceback=traceback, _trace=lambda message: None, **extra)
+    for name, value in vars(SERVICES.ui.ui_common).items():
+        namespace.setdefault(name, value)
     exec(compile(ast.fix_missing_locations(module), str(ROOT / path), "exec"), namespace)
     return namespace[class_name]
 
@@ -155,7 +157,7 @@ MainWindow = load_methods("gremlinEx.py", "GremlinUi", {
     "_unregister_all_widgets_ui", "registerWidget", "_select_input", "_tab_selected_worker", "_tab_selection_complete",
     "_edit_mode_selector_changed", "_edit_mode_changed", "_edit_mode_changed_ui",
     "_edit_mode_update", "_edit_mode_update_ui", "_update_mode_status_bar", "_update_mode_status_bar_ui",
-    "setTabsDirty",
+    "setTabsDirty", "_handle_maestro_show_config", "_handle_devices_changed", "_device_change_ui",
     "_resolve_tab_selection", "getActiveTabDeviceGuid", "getActiveTabType", "_reindex_tabs",
 }, WorkManager=lambda: WORK, sys=sys, QThread=QtCore.QThread, BaseDeviceTabWidget=StartupDeviceTab)
 
@@ -163,6 +165,9 @@ MainWindow = load_methods("gremlinEx.py", "GremlinUi", {
 def main_window():
     ui = MainWindow()
     ui._creating_tabs = ui._tabs_rebuild_pending = ui._tabs_rebuild_refresh = False
+    ui._maestro_dialog_open = False
+    ui._device_change_deferred = False
+    ui.device_change_locked = False
     ui._suspend_ui_update = 0
     ui._ui_update_pending = False
     ui._ui_enable_after_refresh = False
@@ -188,6 +193,80 @@ def main_window():
     ui.clearWidgets = Mock()
     ui._do_load_profile_internal_worker = Mock()
     return ui
+
+
+class MaestroManagerRefreshTests(unittest.TestCase):
+    def setUp(self):
+        self.ui = main_window()
+        self.ui._tab_device_map = {"existing": object()}
+        self.addCleanup(lambda: (self.ui.deleteLater(), flush_deletes()))
+        self.config = patch.object(CONFIG, "maestro_enabled", True, create=True)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+        self.handling = NS(joystick_initialized=lambda: True, refresh_devices=Mock(return_value=False))
+        self.patches = patch.object(SERVICES, "joystick_handling", self.handling, create=True)
+        self.patches.start()
+        self.addCleanup(self.patches.stop)
+        native = patch.dict(self.ui._device_change_ui.__func__.__globals__, dinput=NS(DILL=NS(reset=Mock())))
+        native.start()
+        self.addCleanup(native.stop)
+
+    def dialog(self, work):
+        class Events(QtCore.QObject):
+            devices_changed = QtCore.Signal()
+        events = Events()
+        return NS(devices_changed=events.devices_changed, exec=work, deleteLater=Mock(), events=events)
+
+    def test_manager_batches_changes_and_defers_already_queued_refresh(self):
+        self.ui._create_tabs()
+        observations = []
+
+        def work():
+            for _ in range(3):
+                dialog.devices_changed.emit()
+                self.ui._handle_devices_changed()
+                self.ui._create_tabs()
+                APP.processEvents()
+                self.ui._create_tabs_ui.assert_not_called()
+                self.handling.refresh_devices.assert_not_called()
+                self.assertIn("existing", self.ui._tab_device_map)
+                observations.append(self.ui._maestro_dialog_open)
+
+        dialog = self.dialog(work)
+        with patch.object(SERVICES.maestro, "MaestroDialog", return_value=dialog, create=True):
+            self.ui._handle_maestro_show_config()
+        self.assertEqual(observations, [True, True, True])
+        self.assertFalse(self.ui._maestro_dialog_open)
+        self.assertEqual(self.ui._suspend_ui_update, 0)
+        self.handling.refresh_devices.assert_called_once_with()
+        pump_until(lambda: self.ui._create_tabs_ui.called)
+        self.ui._create_tabs_ui.assert_called_once_with()
+        self.assertEqual(self.ui._tab_device_map, {})
+        dialog.deleteLater.assert_called_once_with()
+
+    def test_unchanged_manager_does_not_rebuild_tabs(self):
+        dialog = self.dialog(lambda: APP.processEvents())
+        with patch.object(SERVICES.maestro, "MaestroDialog", return_value=dialog, create=True):
+            self.ui._handle_maestro_show_config()
+        APP.processEvents()
+        self.ui._create_tabs_ui.assert_not_called()
+        self.handling.refresh_devices.assert_not_called()
+        self.assertIn("existing", self.ui._tab_device_map)
+        self.assertEqual(self.ui._suspend_ui_update, 0)
+
+    def test_manager_error_releases_suspension_and_replays_changes(self):
+        def work():
+            dialog.devices_changed.emit()
+            raise RuntimeError("Dialog failed")
+        dialog = self.dialog(work)
+        with patch.object(SERVICES.maestro, "MaestroDialog", return_value=dialog, create=True):
+            with self.assertRaisesRegex(RuntimeError, "Dialog failed"):
+                self.ui._handle_maestro_show_config()
+        self.assertFalse(self.ui._maestro_dialog_open)
+        self.assertEqual(self.ui._suspend_ui_update, 0)
+        pump_until(lambda: self.ui._create_tabs_ui.called)
+        self.ui._create_tabs_ui.assert_called_once_with()
+        dialog.deleteLater.assert_called_once_with()
 
 
 class TabSelectionTests(unittest.TestCase):

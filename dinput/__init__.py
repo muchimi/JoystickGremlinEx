@@ -23,6 +23,7 @@ import os
 import uuid
 import logging
 import traceback
+import threading
 from gremlin.types import DeviceType, DeviceCategory
 
 MAESTRO_VID = 0x1209  # vendor ID for GEX managed devices
@@ -582,6 +583,10 @@ class DeviceSummary:
             if self._hard_disabled:
                 syslog.warning(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
 
+            # Fresh native summaries also feed the device tabs directly,
+            # before joystick registry initialization assigns categories.
+            self.device_category = DeviceCategory.Virtual if self.is_virtual else DeviceCategory.Physical
+
             self._connected = True  # if dinput data is provided, the device is marked as connected
 
     @property
@@ -995,6 +1000,15 @@ class DeviceSummary:
         return f"Device: {self.name} {self.device_id} Type: [{self.device_type.name}]  Connected: {self.connected} Axis: {self.axis_count} Buttons: {self.button_count} Hats: {self.hat_count} Vendor: {vendor_string} Product: {product_string} Virtual: {self.is_virtual} {vjoy_stub}"
 
 
+class _DillAbiInfo(ctypes.Structure):
+    """Fixed-width API 2 layout description, checked before passing structs."""
+
+    _fields_ = [(name, ctwt.DWORD) for name in (
+        "api_version", "struct_size", "guid_size", "device_summary_size", "input_data_size", "axis_map_size",
+        "usage_page_offset", "usage_offset", "input_type_offset", "input_index_offset", "input_value_offset",
+    )]
+
+
 C_EVENT_CALLBACK = ctypes.CFUNCTYPE(None, _JoystickInputData)
 C_DEVICE_CHANGE_CALLBACK = ctypes.CFUNCTYPE(None, _DeviceSummary, ctypes.c_uint8)
 
@@ -1010,6 +1024,10 @@ class DILL:
     # true if initialized
 
     initialized = False
+    API_VERSION = 0x00020000
+    snapshot_generation = 0
+    _lifecycle_lock = threading.RLock()
+    _retired_callbacks = []  # keep ctypes trampolines alive until native threads have joined
 
     # Storage for the callback functions
     device_change_callback_fn = None
@@ -1018,21 +1036,33 @@ class DILL:
     # Declare argument and return types for all the functions
     # exposed by the dll
     api_functions = {
-        "init": {"arguments": [], "returns": None},
+        "init": {"arguments": [], "returns": ctwt.BOOL},
+        "shutdown": {"arguments": [], "returns": ctwt.BOOL},
+        "is_initialized": {"arguments": [], "returns": ctwt.BOOL},
+        "is_worker_thread": {"arguments": [], "returns": ctwt.BOOL},
+        "get_api_version": {"arguments": [], "returns": ctwt.DWORD},
+        "get_abi_info": {"arguments": [ctypes.POINTER(_DillAbiInfo), ctypes.c_size_t], "returns": ctwt.BOOL},
+        "get_last_error_code": {"arguments": [], "returns": ctwt.LONG},
+        "get_last_error_message": {"arguments": [ctypes.POINTER(ctypes.c_char), ctypes.c_size_t], "returns": ctypes.c_size_t},
+        "get_device_snapshot": {
+            "arguments": [ctypes.POINTER(_DeviceSummary), ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_uint64)],
+            "returns": ctwt.BOOL,
+        },
+        "get_device_error": {"arguments": [_GUID], "returns": ctwt.LONG},
         "set_input_event_callback": {"arguments": [C_EVENT_CALLBACK], "returns": None},
         "set_device_change_callback": {
             "arguments": [C_DEVICE_CHANGE_CALLBACK],
             "returns": None,
         },
         "get_device_information_by_index": {
-            "arguments": [ctypes.c_uint],
+            "arguments": [ctypes.c_size_t],
             "returns": _DeviceSummary,
         },
         "get_device_information_by_guid": {
             "arguments": [_GUID],
             "returns": _DeviceSummary,
         },
-        "get_device_count": {"arguments": [], "returns": ctypes.c_uint},
+        "get_device_count": {"arguments": [], "returns": ctypes.c_size_t},
         "device_exists": {"arguments": [_GUID], "returns": ctypes.c_bool},
         "get_axis": {"arguments": [_GUID, ctwt.DWORD], "returns": ctwt.LONG},
         "get_button": {"arguments": [_GUID, ctwt.DWORD], "returns": ctypes.c_bool},
@@ -1040,77 +1070,93 @@ class DILL:
     }
 
     @staticmethod
+    def _ensure_owner_thread():
+        # Never wait on a Python lifecycle lock from a native callback while
+        # the owner could be joining that same callback during shutdown.
+        if DILL._dll is not None and DILL._dll.is_worker_thread():
+            raise DILLError("DILL lifecycle and callback registration must run outside native callbacks")
+
+    @staticmethod
+    def _native_error(library=None):
+        library = library if library is not None else DILL._dll
+        code = library.get_last_error_code() & 0xFFFFFFFF
+        message = ctypes.create_string_buffer(512)
+        library.get_last_error_message(message, len(message))
+        detail = message.value.decode("utf-8", errors="replace")
+        return f"{detail or 'Native DILL operation failed'} (0x{code:08X})"
+
+    @staticmethod
+    def _validate_abi(library):
+        try:
+            library.get_api_version.argtypes = []
+            library.get_api_version.restype = ctwt.DWORD
+            version = library.get_api_version()
+            if version != DILL.API_VERSION:
+                raise DILLError(f"Incompatible DILL API: expected 0x{DILL.API_VERSION:08X}, received 0x{version:08X}")
+            library.get_abi_info.argtypes = [ctypes.POINTER(_DillAbiInfo), ctypes.c_size_t]
+            library.get_abi_info.restype = ctwt.BOOL
+            info = _DillAbiInfo()
+            if not library.get_abi_info(ctypes.byref(info), ctypes.sizeof(info)):
+                raise DILLError("DILL rejected the ABI description size")
+        except AttributeError as error:
+            raise DILLError("DILL API 2 is required; rebuild dill.dll from the updated dinput repository") from error
+        expected = dict(
+            api_version=DILL.API_VERSION, struct_size=ctypes.sizeof(_DillAbiInfo), guid_size=ctypes.sizeof(_GUID),
+            device_summary_size=ctypes.sizeof(_DeviceSummary), input_data_size=ctypes.sizeof(_JoystickInputData),
+            axis_map_size=ctypes.sizeof(_AxisMap), usage_page_offset=_DeviceSummary.usage_page.offset,
+            usage_offset=_DeviceSummary.usage.offset, input_type_offset=_JoystickInputData.input_type.offset,
+            input_index_offset=_JoystickInputData.input_index.offset, input_value_offset=_JoystickInputData.value.offset,
+        )
+        mismatches = [f"{name}: expected {value}, received {getattr(info, name)}"
+                      for name, value in expected.items() if getattr(info, name) != value]
+        if mismatches:
+            raise DILLError("Incompatible DILL structure layout: " + "; ".join(mismatches))
+
+    @staticmethod
+    def _start_library(library):
+        DILL._validate_abi(library)
+        DILL.initialize_capi(library)
+        if not library.init():
+            raise DILLError(DILL._native_error(library))
+
+    @staticmethod
     def init():
-        """Initializes the DILL library.
-
-        This has to be called before any other DILL interactions can take place.
-        """
+        """Start DILL once; restart the retained library after a clean shutdown."""
         from pathlib import Path
-        from gremlin.util import display_error, get_dll_version
+        from gremlin.util import get_dll_version
 
-        syslog = logging.getLogger("system")
-
-        if DILL._dll is None:
-            dll_folder = os.path.dirname(__file__)
-            dll_file = "dill.dll"
-            _dll_path = os.path.join(dll_folder, dll_file)
-            if not os.path.isfile(_dll_path):
-                # look one level up for packaging in 3.12
-                parent = Path(dll_folder).parent
-                _dll_path = os.path.join(parent, dll_file)
-                if not os.path.isfile(_dll_path):
-                    msg = f"Unable to continue - missing dll: {_dll_path}"
-                    display_error(msg)
-                    syslog.critical(msg)
-                    os._exit(1)
-                dll_folder = parent
-
-            # truncate the debug file (it gets large otherwise)
-
-            # blits all files starting with dill_debug
-
-            debug_file = "dill_debug.txt"
-            debug_path = os.path.join(dll_folder, debug_file)
-
-            # debug_files = [f for f in Path(dll_folder).glob("**/dill_debug*.txt")]
-            # index = 1
-            # for f in debug_files:
-            #     try:
-            #         os.unlink(f)
-            #     except Exception:
-            #         syslog.error(f"DILL: unable to truncate debug file: {f}")
-
-            if os.path.isfile(debug_path):
-                # blitz it
+        DILL._ensure_owner_thread()
+        with DILL._lifecycle_lock:
+            if DILL.initialized and DILL._dll.is_initialized():
+                return
+            library = DILL._dll
+            if library is None:
+                dll_path = Path(__file__).parent / "dill.dll"
+                if not dll_path.is_file():
+                    dll_path = dll_path.parent.parent / "dill.dll"
+                if not dll_path.is_file():
+                    raise DILLError(f"Unable to continue: missing DLL {dll_path}")
+                DILL.version = get_dll_version(str(dll_path))
                 try:
-                    os.unlink(debug_path)  # @IgnoreException
-                except Exception:
-                    syslog.warning(f"DILL: unable to truncate debug file: {debug_path}")
-
-            dll_version = get_dll_version(_dll_path)
-            DILL.version = dll_version
-
-            try:
-                _di_listener_dll = ctypes.cdll.LoadLibrary(_dll_path)
-
-            except Exception as error:
-                msg = f"Unable to load DirectInput interface dll: {_dll_path}\nThis could be due to UAC (try running in Administrator mode) or {error}"
-                display_error(msg)
-                syslog.critical(msg)
-                os._exit(1)
-
-            try:
-                _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
-                _di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
-                DILL._dll = _di_listener_dll
-                DILL._dll.init()
-            except Exception as error:
-                msg = f"Unable to initialize DirectInput: {_dll_path}\n{error}"
-                display_error(msg)
-                syslog.critical(msg)
-                os._exit(1)
-
+                    library = ctypes.cdll.LoadLibrary(str(dll_path))
+                except OSError as error:
+                    raise DILLError(f"Unable to load DirectInput library {dll_path}: {error}") from error
+            DILL._start_library(library)
+            DILL._dll = library
             DILL.initialized = True
+
+    @staticmethod
+    def shutdown():
+        """Join native threads before releasing Python callback trampolines."""
+        DILL._ensure_owner_thread()
+        with DILL._lifecycle_lock:
+            if DILL._dll is not None and not DILL._dll.shutdown():
+                raise DILLError(DILL._native_error())
+            DILL.initialized = False
+            DILL.snapshot_generation = 0
+            DILL.input_event_callback_fn = None
+            DILL.device_change_callback_fn = None
+            DILL._retired_callbacks.clear()
 
     @staticmethod
     def reset():
@@ -1119,13 +1165,10 @@ class DILL:
 
     @staticmethod
     def dumpDevices():
-        """reload devices if count was 0"""
-
-        device_count = DILL.get_device_count()
+        """Log one consistent native device snapshot."""
         syslog.info("DILL: device detection summary")
-        for index in range(device_count):
-            dev = DILL.get_device_information_by_index(index)
-            syslog.info(f"\tIndex: [{index}] {dev!s}")
+        for index, device in enumerate(DILL.getDevices()):
+            syslog.info(f"\tIndex: [{index}] {device!s}")
         syslog.info("DILL: end device detection summary")
 
     @staticmethod
@@ -1137,89 +1180,59 @@ class DILL:
 
     @staticmethod
     def getDevices() -> list[DeviceSummary]:
-        """gets the maestro devices created by GEX"""
-        device_list = []
-        device_count = DILL.get_device_count()
-        for index in range(device_count):
-            dev = DILL.get_device_information_by_index(index)
-            device_list.append(dev)
-        return device_list
+        """Copy the live inventory atomically; retry if its buffer needs to grow."""
+        if not DILL.initialized:
+            return []
+        capacity = 32
+        for _ in range(4):
+            rows = (_DeviceSummary * capacity)()
+            count, generation = ctypes.c_size_t(), ctypes.c_uint64()
+            if DILL._dll.get_device_snapshot(rows, capacity, ctypes.byref(count), ctypes.byref(generation)):
+                if count.value > capacity:
+                    raise DILLError("DILL returned an invalid snapshot count")
+                DILL.snapshot_generation = generation.value
+                return [DeviceSummary(rows[index]) for index in range(count.value)]
+            if DILL._dll.get_last_error_code() & 0xFFFFFFFF != 0x8007007A:
+                raise DILLError(DILL._native_error())
+            capacity = max(capacity * 2, count.value)
+        raise DILLError("DILL device inventory kept growing while reading a snapshot; retry the refresh")
 
     @staticmethod
     def getMaestroDevices() -> list[DeviceSummary]:
-        """gets the maestro devices created by GEX"""
-        device_list = []
-        device_count = DILL.get_device_count()
-        for index in range(device_count):
-            dev = DILL.get_device_information_by_index(index)
-            if dev.device_type == DeviceType.Maestro:
-                device_list.append(dev)
-        return device_list
+        return [device for device in DILL.getDevices() if device.device_type == DeviceType.Maestro]
 
     @staticmethod
     def getVjoyDeviceMap() -> dict:
-        """does a re-read of vjoy devices from the DINPUT api
-        returns a dictionary keyed by vjoyid holding the vjoy/maestro device detected
-        """
-        device_count = DILL.get_device_count()
-        vjoy_map = {}
-        for index in range(device_count):
-            dev = DILL.get_device_information_by_index(index)
-            if dev.device_type == DeviceType.VJoy:
-                vjoy_map[dev.vjoy_id] = dev
-        return vjoy_map
+        return {device.vjoy_id: device for device in DILL.getDevices() if device.device_type == DeviceType.VJoy}
 
     @staticmethod
     def getVirtualDeviceMap() -> dict:
-        """does a re-read of virtual devices from the DINPUT api
-        returns a dictionary keyed by virtual device id holding the virtual/maestro device detected
-        """
-        device_count = DILL.get_device_count()
-        virtual_map = {}
-        for index in range(device_count):
-            dev = DILL.get_device_information_by_index(index)
-            if dev.is_virtual and dev.device_type in (DeviceType.VJoy, DeviceType.Maestro):
-                virtual_map[dev.virtual_id] = dev
-        return virtual_map
+        return {device.virtual_id: device for device in DILL.getDevices()
+                if device.is_virtual and device.device_type in (DeviceType.VJoy, DeviceType.Maestro)}
+
+    @staticmethod
+    def get_device_error(guid) -> int:
+        """Return the last native HRESULT for a device, as an unsigned code."""
+        return DILL._dll.get_device_error(guid.ctypes) & 0xFFFFFFFF
+
+    @staticmethod
+    def _set_callback(attribute, callback_type, native_setter, callback):
+        DILL._ensure_owner_thread()
+        with DILL._lifecycle_lock:
+            previous = getattr(DILL, attribute)
+            replacement = callback_type(callback) if callback is not None else None
+            if previous is not None:
+                DILL._retired_callbacks.append(previous)
+            native_setter(replacement if replacement is not None else callback_type())
+            setattr(DILL, attribute, replacement)
 
     @staticmethod
     def set_input_event_callback(callback):
-        """Sets the callback function to use for input events.
-
-        The provided callback function will be executed whenever an event
-        occurs by the DILL library providing and InputEvent object to said
-        callback.
-
-        Parameters
-        ==========
-        callback : callable
-            Function to execute when an event occurs.
-        """
-        if callback is None:
-            DILL.input_event_callback_fn = None
-            DILL._dll.set_input_event_callback(C_EVENT_CALLBACK())
-        else:
-            DILL.input_event_callback_fn = C_EVENT_CALLBACK(callback)
-            DILL._dll.set_input_event_callback(DILL.input_event_callback_fn)
+        DILL._set_callback("input_event_callback_fn", C_EVENT_CALLBACK, DILL._dll.set_input_event_callback, callback)
 
     @staticmethod
     def set_device_change_callback(callback):
-        """Sets the callback function to use for device change events.
-
-        The provided function will be executed whenever the status of a
-        device changes, providing a DeviceSummary object to the callback.
-
-        Parameters
-        ==========
-        callback : callable
-            Function to execute when an event occurs.
-        """
-        if callback is None:
-            DILL.device_change_callback_fn = None
-            DILL._dll.set_device_change_callback(C_DEVICE_CHANGE_CALLBACK())
-        else:
-            DILL.device_change_callback_fn = C_DEVICE_CHANGE_CALLBACK(callback)
-            DILL._dll.set_device_change_callback(DILL.device_change_callback_fn)
+        DILL._set_callback("device_change_callback_fn", C_DEVICE_CHANGE_CALLBACK, DILL._dll.set_device_change_callback, callback)
 
     @staticmethod
     def get_device_count():
@@ -1353,10 +1366,14 @@ class DILL:
         return DILL._dll.device_exists(guid.ctypes)
 
     @staticmethod
-    def initialize_capi():
+    def initialize_capi(library=None):
         """Initializes the functions as class methods."""
+        library = library if library is not None else DILL._dll
         for fn_name, params in DILL.api_functions.items():
-            dll_fn = getattr(DILL._dll, fn_name)
+            try:
+                dll_fn = getattr(library, fn_name)
+            except AttributeError as error:
+                raise DILLError(f"DILL API 2 export is missing: {fn_name}") from error
             if "arguments" in params:
                 dll_fn.argtypes = params["arguments"]
             if "returns" in params:

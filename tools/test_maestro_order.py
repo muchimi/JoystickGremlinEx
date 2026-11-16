@@ -2,9 +2,9 @@
 
 from pathlib import Path
 import sys
-from types import ModuleType
+from types import ModuleType, SimpleNamespace as NS
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -108,6 +108,75 @@ class PublishedHidOrderChecks(unittest.TestCase):
         output_cache.start()
         self.addCleanup(output_cache.stop)
         self.load()
+
+    def map_native_inputs(self):
+        self.maestro._device_map = {
+            index: NS(input_enabled=True, data={"maestro_key": controller.key})
+            for index, controller in self.maestro._controller_map.items()
+        }
+
+    def test_hid_order_failure_does_not_keep_native_discovery_pending(self):
+        self.controller_rows()
+        self.map_native_inputs()
+        self.rows.reverse()
+        with patch.object(MAESTRO, "syslog"):
+            self.maestro._scan_hid_order()
+        self.assertTrue(all(not c.hid_order_valid for c in self.maestro._controller_map.values()))
+        self.assertFalse(self.maestro._compare_list())
+        # An unavailable HID scan still blocks automatic failover, but is not
+        # evidence that already matched DirectInput devices are missing.
+        with patch("gremlin.hid.enumerate_devices", side_effect=OSError("scan unavailable")), patch.object(MAESTRO, "syslog"):
+            self.maestro._scan_hid_order()
+        self.assertFalse(self.maestro._compare_list())
+        self.maestro._device_map.pop(next(iter(self.maestro._device_map)))
+        self.assertTrue(self.maestro._compare_list())
+
+    def test_hid_scan_updates_every_published_device_without_verbose_logging(self):
+        self.controller_rows()
+        self.map_native_inputs()
+        with patch.object(CONFIG, "verbose_mode_maestro", False):
+            self.maestro._scan_hid_order()
+            self.assertTrue(all(d.data["maestro_hid_order_valid"] for d in self.maestro._device_map.values()))
+            self.rows.reverse()
+            with patch.object(MAESTRO, "syslog"):
+                self.maestro._scan_hid_order()
+            for index, device in self.maestro._device_map.items():
+                controller = self.maestro._controller_map[index]
+                self.assertFalse(device.data["maestro_hid_order_valid"])
+                self.assertEqual(device.data["maestro_windows_order"], controller.windows_order)
+
+    def test_real_discovery_timeout_names_only_unmatched_devices(self):
+        self.controller_rows()
+        self.map_native_inputs()
+        index = next(iter(self.maestro._device_map))
+        missing = self.maestro._controller_map[index]
+        del self.maestro._device_map[index]
+        with patch.object(self.maestro, "syncDinput"), patch.object(MAESTRO.time, "monotonic", side_effect=[0, 21]), patch.object(
+            MAESTRO, "syslog"
+        ) as log:
+            self.maestro._sync_worker_runner()
+        log.warning.assert_called_once()
+        warning, unmatched = log.warning.call_args.args
+        self.assertIn("no native input match", warning)
+        self.assertEqual(unmatched, f"{missing.id} ({missing.name})")
+        self.assertIsNone(self.maestro._sync_worker)
+
+    def test_worker_finishes_for_matched_inputs_even_when_hid_order_is_invalid(self):
+        self.controller_rows()
+        self.map_native_inputs()
+        for controller in self.maestro._controller_map.values():
+            controller.hid_order_valid = False
+        self.maestro._dirty = True
+        with patch.object(self.maestro, "syncDinput"), patch.object(self.maestro, "populateDeviceList") as publish, patch.object(
+            GREMLIN.joystick_handling, "joystick_devices_initialization", create=True
+        ) as initialize, patch.object(self.maestro._stopping, "wait") as wait, patch.object(MAESTRO, "syslog") as log:
+            self.maestro._sync_worker_runner()
+        publish.assert_called_once_with()
+        initialize.assert_called_once_with()
+        wait.assert_not_called()
+        log.warning.assert_not_called()
+        self.assertFalse(self.maestro._dirty)
+        self.assertIsNone(self.maestro._sync_worker)
 
     def test_published_windows_order_uses_instance_token_not_transport_or_saved_slot(self):
         self.controller_rows()

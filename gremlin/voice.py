@@ -1,4 +1,3 @@
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -1009,7 +1008,9 @@ class CommandMatcher:
         self.verbose = gremlin.config.Configuration().verbose_mode_voice
         self._started = False
 
-        self.filler_words = {word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)}
+        self.filler_words = {
+            word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)
+        }
 
         self._command_map = {}  # holds the commands
         if commands:
@@ -1351,7 +1352,9 @@ class CommandMatcher:
                             best_partial_len = nonfiller_seen
                             best_partial = (command, start)
                             if verbose:
-                                syslog.info(f"\tpartial exact match: [{command.phrase}] start [{start}] words [{nonfiller_seen}/{target_nonfiller_len}]")
+                                syslog.info(
+                                    f"\tpartial exact match: [{command.phrase}] start [{start}] words [{nonfiller_seen}/{target_nonfiller_len}]"
+                                )
 
         if best_partial is not None:
             return best_partial
@@ -1627,7 +1630,9 @@ class Voice:
         self._buffer_size = 1024  # example buffer size, adjust as needed
         self._audio_queue = queue.Queue()
         self._language = "en"  # default language for transcription
-        self.pool = concurrent.futures.ThreadPoolExecutor()  # supports mutliple concurrent tasks to process received words
+        self.pool = (
+            concurrent.futures.ThreadPoolExecutor()
+        )  # supports mutliple concurrent tasks to process received words
         self._words = []  # words heard
         self._new_word = False  # flag to indicate if a new word has been added
         self._volume = 0.0  # default volume level (system microphone level)
@@ -1643,7 +1648,10 @@ class Voice:
         self._callbacks = []
 
         self._rolling_matcher = CommandMatcher(
-            commands=commands, fuzzy_match=fuzzy_match, fuzzy_threshold=fuzzy_threshold, callback=self._handle_command_trigger
+            commands=commands,
+            fuzzy_match=fuzzy_match,
+            fuzzy_threshold=fuzzy_threshold,
+            callback=self._handle_command_trigger,
         )
 
         el = gremlin.event_handler.EventListener()
@@ -1672,7 +1680,9 @@ class Voice:
             if on_gui_thread:
                 parent = app.activeWindow()
                 css = Color().cssProgressDialog()
-                dialog = QtWidgets.QProgressDialog(f"Downloading {self._model_size} voice recognition model...", None, 0, 0, parent)
+                dialog = QtWidgets.QProgressDialog(
+                    f"Downloading {self._model_size} voice recognition model...", None, 0, 0, parent
+                )
                 dialog.setWindowModality(QtCore.Qt.WindowModal)
                 dialog.setCancelButton(None)
                 dialog.setAutoClose(True)
@@ -1863,7 +1873,7 @@ class Voice:
         # Capture hardware is optional. Check before loading the recognition
         # model or starting worker threads, and allow a later start to retry.
         try:
-            sd.query_devices(kind="input")
+            sd.query_devices(kind="input")  # @IgnoreExceptionk
         except (sd.PortAudioError, ValueError) as err:
             syslog.warning("VOICE: No audio capture device available; voice input will not start: %s", err)
             return False
@@ -1924,7 +1934,9 @@ class Voice:
                 self._abort_event.clear()
                 if self._listen_thread is None or not self._listen_thread.is_alive():
                     self._abort_event = threading.Event()
-                    self._listen_thread = threading.Thread(target=self._listen_runner, args=(self._abort_event,), daemon=True)
+                    self._listen_thread = threading.Thread(
+                        target=self._listen_runner, args=(self._abort_event,), daemon=True
+                    )
                     self._listen_thread.name = "VoiceListen"
                     if self.verbose:
                         syslog.info("Listen thread starting...")
@@ -2093,7 +2105,9 @@ class Voice:
 
     def setVolume(self, percent: float, target_name: str = None):
         """sets the input device volume level"""
-        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name)  # must be on UI thread to avoid COM issues
+        gremlin.util.InvokeUiMethod(
+            self._set_volume_ui, percent, target_name
+        )  # must be on UI thread to avoid COM issues
 
     def _set_volume_com(self, device_name: str, volume_scalar: float) -> bool:
         """Set the volume of a matching active input device."""

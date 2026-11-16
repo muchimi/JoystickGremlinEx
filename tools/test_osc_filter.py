@@ -11,6 +11,7 @@ import logging
 from types import SimpleNamespace as NS
 from typing import Callable
 import unittest
+from unittest.mock import Mock, patch
 import uuid
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -80,6 +81,7 @@ NAMESPACE = dict(QtCore=QtCore, QtWidgets=QtWidgets, Shiboken=Shiboken,
                  collections=collections, gremlin=SERVICES, fnmatch=fnmatch,
                  syslog=logging.getLogger("osc-filter-checks"),
                  QIconPushButton=Button, QUsedPushButton=Button, getHContainer=container,
+                 QDataLineEdit=LineEdit, Buttons=SERVICES.ui.ui_common.Buttons,
                  Icons=NS(**{name: QtGui.QIcon for name in (
                      "arrowFirst", "arrowPrevious", "arrowNext", "arrowLast")}))
 load("gremlin/util.py", {"TriggerDict", "decorate_filter"})
@@ -212,6 +214,100 @@ class OscFilterTests(unittest.TestCase):
         self.model._item_map.clear()
         self.model.applyFilter()
         self.assertEqual(self.controls._count_widget.text(), "<i>(no inputs found)</i>")
+
+
+class DeviceModelLifetimeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        NAMESPACE["SingletonDecorator"] = lambda kind: kind
+        load("gremlin/ui/osc_device.py", {"OscData"})
+        cls.OscData = NAMESPACE["OscData"]
+        NAMESPACE["CleanupBase"] = type("CleanupBase", (), {"_cleanup_ui": lambda self: None})
+        load("gremlin/input_item.py", {"BaseDeviceTabWidget"},
+             {"_cleanup_ui", "setInputItemListModel", "onInputItemChange"}, base="CleanupBase")
+        cls.DeviceTab = NAMESPACE["BaseDeviceTabWidget"]
+        cls.device_tabs = []
+        for filename, name in (("mode_device.py", "ModeDeviceTabWidget"),
+                               ("keyboard_device.py", "KeyboardDeviceTabWidget"),
+                               ("midi_device.py", "MidiDeviceTabWidget")):
+            load("gremlin/ui/" + filename, {name}, {"_cleanup_ui"}, base="BaseDeviceTabWidget")
+            cls.device_tabs.append(NAMESPACE[name])
+
+    def test_shared_device_cleanup_detaches_model_and_aliases_before_disposal(self):
+        cases = [(self.DeviceTab, alias) for alias in (None, "model", "_model")]
+        cases.extend((kind, None) for kind in self.device_tabs)
+        for kind, alias in cases:
+            with self.subTest(device=kind.__name__, alias=alias):
+                model = Model(model_description="device lifetime")
+                tab = kind()
+                tab.widget_storage = {"old": object()}
+                events = Mock()
+                tab._input_item_list_model = model
+                tab._input_item_list_view = Mock()
+                view = tab._input_item_list_view
+                tab.main_layout = None
+                tab._registered_callbacks = {}
+                for name in ("_handle_lock_inputs", "_handle_unlock_inputs", "_handle_tab_changed",
+                             "_handle_input_deleted", "_handle_input_filter_changed", "_handle_all_inputs_deleted",
+                             "_handle_jump_to_mapped_input", "_handle_device_mapping_changed", "setInputItemListView",
+                             "_handle_new_profile", "_handle_profile_mode_changed", "_mode_name_changed",
+                             "_config_changed_cb", "_handle_edit_mode_changed"):
+                    setattr(tab, name, Mock())
+                if alias:
+                    setattr(tab, alias, model)
+                dispose_model = model.dispose
+                def disposed():
+                    self.assertIsNone(tab._input_item_list_model)
+                    if alias:
+                        self.assertIsNone(getattr(tab, alias))
+                    view.setModel.assert_called_once_with(None)
+                    if kind.__name__ == "ModeDeviceTabWidget":
+                        events.edit_mode_changed.disconnect.assert_called_once_with(tab._handle_profile_mode_changed)
+                    elif kind.__name__ in ("KeyboardDeviceTabWidget", "MidiDeviceTabWidget"):
+                        events.edit_mode_changed.disconnect.assert_called_once_with(tab._handle_edit_mode_changed)
+                    dispose_model()
+                with patch.object(model, "dispose", side_effect=disposed) as dispose, patch.object(
+                    SERVICES.event_handler, "EventListener", return_value=events
+                ), patch.object(SERVICES.util, "clear_layout", create=True), patch.dict(
+                    NAMESPACE, Shiboken=NS(isValid=lambda widget: False)
+                ):
+                    tab._cleanup_ui()
+                dispose.assert_called_once_with()
+                self.assertEqual(model._filtered_index_map, {})
+                if kind.__name__ == "ModeDeviceTabWidget":
+                    self.assertEqual(tab.widget_storage, {})
+                    events.edit_mode_changed.disconnect.assert_called_once_with(tab._handle_profile_mode_changed)
+                elif kind.__name__ in ("KeyboardDeviceTabWidget", "MidiDeviceTabWidget"):
+                    events.edit_mode_changed.disconnect.assert_called_once_with(tab._handle_edit_mode_changed)
+
+    def test_osc_registration_detaches_before_disposal_and_preserves_new_owner(self):
+        data = self.OscData()
+        old = Model(model_description="old OSC")
+        new = Model(model_description="new OSC")
+        data.setModel(old)
+        data.clearModel(old)
+        old.dispose()
+        self.assertIsNone(data.model)
+        self.assertIsNone(data.getOsc("saved-input"))
+        data.setModel(new)
+        data.clearModel(old)
+        self.assertIs(data.model, new)
+        data.clearModel(new)
+        new.dispose()
+
+    def test_osc_saved_input_lookup_ignores_display_filter(self):
+        model = Model(model_description="OSC lookup", filter_callback=lambda item, filter: False)
+        item = Input("/saved")
+        item.id = "saved-input"
+        model._index_map[0] = item
+        model._item_map[item] = 0
+        model.applyFilter()
+        self.assertEqual(model.rowCount(), 0)
+        data = self.OscData()
+        data.setModel(model)
+        self.assertIs(data.getOsc(item.id), item)
+        data.clearModel(model)
+        model.dispose()
 
 
 if __name__ == "__main__":

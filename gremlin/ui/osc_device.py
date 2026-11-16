@@ -3554,7 +3554,10 @@ class OscFilterWidget(QtWidgets.QWidget):
         self._model.addCallback(self._handle_model_changed)
 
     def _cleanup_ui(self):
-        self._model.removeCallback(self._handle_model_changed)
+        model = self._model
+        self._model = None
+        if model is not None:
+            model.removeCallback(self._handle_model_changed)
 
     def _handle_model_changed(self, data=None, force=False):
         gremlin.util.InvokeUiMethod(self.updateCounts)
@@ -3619,6 +3622,8 @@ class OscFilterWidget(QtWidgets.QWidget):
 
     def _update_count(self):
         """updates the count of defined inputs"""
+        if self._model is None:
+            return
         total = self._model.rows()
         count = self._model.count()
 
@@ -3761,11 +3766,15 @@ class OscData():
     def setModel(self, model : OscInputItemModel):
         self.model = model
 
+    def clearModel(self, model):
+        """Detach a closing tab without clearing a newer tab's registration."""
+        if self.model is model:
+            self.model = None
+
     def getOsc(self, id):
         if self.model is None:
             return None
-        for row in range(self.model.rowCount()):
-            item = self.model.itemAt(row)
+        for item in self.model.getUnfilteredItems():
             if item and item.id == id:
                 return item
         return None
@@ -3909,9 +3918,12 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     def _cleanup_ui(self):
         """called when the OSC device UI is being cleaned up"""
 
+        OscData().clearModel(self.inputItemListModel)
+
         self._filter = None
         self._filter_widget.changed.disconnect(self._filter_changed)
         self._filter_widget.select.disconnect(self._select_input_item_cb)
+        self._filter_widget._cleanup_ui()
         self._filter_widget = None
 
         super()._cleanup_ui()

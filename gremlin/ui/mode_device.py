@@ -401,8 +401,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
     def _cleanup_ui(self):
-        """called when the MIDI device UI is being cleaned up"""
-        super()._cleanup_ui()
+        """called when the mode device UI is being cleaned up"""
         self.widget_storage.clear()
         el = gremlin.event_handler.EventListener()
         for signal, slot in (
@@ -416,6 +415,8 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 signal.disconnect(slot)
             except Exception:
                 pass
+
+        super()._cleanup_ui()
 
 
     def _handle_new_profile(self):

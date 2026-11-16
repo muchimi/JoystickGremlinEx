@@ -202,7 +202,8 @@ class GremlinUi(QRememberMainWindow):
         self._selection_locked = False
         self.joystick_event_lock = Lock()  # lock for joystick events
         self.device_change_locked = False
-        self._device_change_deferred = False  # device change seen while a profile was loading
+        self._device_change_deferred = False  # device change seen while profile loading or managing Maestro
+        self._maestro_dialog_open = False
         self._device_change_queue = 0  # count of device updates while the UI is already updating
         self._runtime_mode_map = {}  # map of runtime processes to their last runtime mode
         self._process_runtime_map = {}  # map of MODE to process associated with a profile - the process executable is the key
@@ -1148,9 +1149,33 @@ class GremlinUi(QRememberMainWindow):
             MessageBoxWarning(prompt="This is not currently enabled in this version of GEX")
             return
 
-        dialog = gremlin.maestro.MaestroDialog(parent=self)
-        dialog.devices_changed.connect(lambda: self.setTabsDirty(True))
-        dialog.exec()
+        if self._maestro_dialog_open:
+            return
+        changed = False
+        dialog = None
+
+        def devices_changed():
+            nonlocal changed
+            changed = True
+
+        self.pushSuspendTabUpdate()
+        self._maestro_dialog_open = True
+        try:
+            dialog = gremlin.maestro.MaestroDialog(parent=self)
+            dialog.devices_changed.connect(devices_changed)
+            dialog.exec()
+        finally:
+            self._maestro_dialog_open = False
+            try:
+                if changed:
+                    self.setTabsDirty(update=True)
+                if self._device_change_deferred:
+                    self._device_change_deferred = False
+                    self._handle_devices_changed()
+            finally:
+                self.popSuspendTabUpdate()
+                if dialog is not None:
+                    dialog.deleteLater()
 
     def _tab_context_menu_cb(self, tab_index):
         """tab context menu"""
@@ -3050,7 +3075,12 @@ class GremlinUi(QRememberMainWindow):
             self._tabs_rebuild_timer.start(0)
 
     def _flush_tabs_rebuild(self):
-        if self._creating_tabs or gremlin.shared_state.profile_loading or self.isProfileLoading():
+        if (
+            self._suspend_ui_update
+            or self._creating_tabs
+            or gremlin.shared_state.profile_loading
+            or self.isProfileLoading()
+        ):
             self._arm_tabs_rebuild_timer()
             return
         if not self._tabs_rebuild_pending:
@@ -3291,15 +3321,27 @@ class GremlinUi(QRememberMainWindow):
             sorted_device_tuples = [(device.device_id, device.name, device) for device in all_sorted_devices]
             sorted_devices = all_sorted_devices
 
-        sorted_devices_map = {device.device_id: device for device in sorted_devices}
+        # Keep the display filter's relative device order, including newly
+        # discovered inputs, ahead of the fixed configuration tabs.
+        fixed_tab_order = {
+            DeviceType.Plugins: 1,
+            DeviceType.Settings: 2,
+            DeviceType.ModeControl: 3,
+            DeviceType.Voice: 4,
+            DeviceType.Osc: 5,
+            DeviceType.Midi: 6,
+            DeviceType.State: 7,
+            DeviceType.Keyboard: 8,
+        }
+        sorted_devices.sort(key=lambda device: fixed_tab_order.get(device.device_type, 0))
+        sorted_device_tuples = [(device.device_id, device.name, device) for device in sorted_devices]
 
-        index = 0
+        sorted_devices_map = {device.device_id: device for device in sorted_devices}
 
         # update new tab map
         tab_map = {}
-        for device in sorted_devices:
+        for index, device in enumerate(sorted_devices):
             tab_map[index] = device.device_id
-            index += 1
 
         if verbose_detailed:
             syslog.info("UI: Stored device tabs ----------")
@@ -3373,6 +3415,9 @@ class GremlinUi(QRememberMainWindow):
         try:
             self.pushLoading()
 
+            # Resolve UI-backed input IDs before the old models are disposed.
+            last_input = self.profile.getLastInput()
+
             # clear all cached widgets
             self._unregister_all_widgets_ui()
             self.clearWidgets()
@@ -3442,7 +3487,7 @@ class GremlinUi(QRememberMainWindow):
 
             # get the last device selected to determine which tab should be active
             # the profile always records the last tab (config skips tabs without inputs)
-            active_device_guid = self.profile.getLastInput()[0] or config.last_device_guid
+            active_device_guid = last_input[0] or config.last_device_guid
             active_device = gremlin.joystick_handling.getDevice(active_device_guid) if active_device_guid else None
             if not active_device:
                 # not found - pick the first one by tab order
@@ -3956,7 +4001,7 @@ class GremlinUi(QRememberMainWindow):
             last_input_id = None
             try:
                 gremlin.shared_state.pop_input_selection(reset=True)  # allow selections
-                last_device_guid, last_input_type, last_input_id = self.profile.getLastInput()
+                last_device_guid, last_input_type, last_input_id = last_input
                 if (
                     last_input_id is None
                     or not active_device
@@ -5342,8 +5387,8 @@ class GremlinUi(QRememberMainWindow):
             # not initialized yet
             return
 
-        if self.isProfileLoading() or gremlin.shared_state.profile_loading:
-            # replayed once the profile load completes
+        if self._maestro_dialog_open or self.isProfileLoading() or gremlin.shared_state.profile_loading:
+            # Replay once the manager closes or the profile load completes.
             self._device_change_deferred = True
             return
 

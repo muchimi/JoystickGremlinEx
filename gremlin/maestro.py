@@ -1,5 +1,4 @@
-﻿
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+﻿# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,6 +48,16 @@ The GEX is able, via this module and the bridge service, to:
 This is managed from within GEX's Maestro devices option dialog so that GEX is aware of Maestro devices it can use.
 Mapping to Maestro devices is done via the usual vjoy remap and the bridge service handles all the necessary translations.
 This is designed so a Maestro device looks exactly like a Vjoy device.
+
+Identifier terminology used in this module:
+- service_device_id: one device's unique ID within a bridge host/port, such as "gex-1".
+  Device/definition JSON calls this "id". OSC delete and control commands use this ID.
+- profile_id: a reusable device layout/template. Many service devices can share it.
+  Profile JSON calls this "id"; device definitions refer to it as "profileId".
+- display_name: the human-readable "name". It can change and need not be unique.
+- DeviceSummary.device_id: Gremlin's normalized device GUID, separate from the service ID.
+- controller index/virtual_id: Gremlin's output slot number, separate from either ID.
+Capabilities JSON also has an "id" whose meaning depends on the device kind; see MaestroProfileInfo.
 
 Firewall rules must allow the UDP traffice on the given port.
 
@@ -432,7 +441,6 @@ zowie-gaming-mouse                         | ZOWIE Gaming Mouse                 
 
 """
 
-from dataclasses import dataclass
 import json
 import logging
 import math
@@ -443,69 +451,44 @@ import socket
 import struct
 import threading
 import time
-from types import SimpleNamespace
 import uuid
+from dataclasses import dataclass
+from types import SimpleNamespace
 
 import psutil
-from shiboken6 import Shiboken
-from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import Slot
 from psygnal import Signal
-from gremlin.worker import WorkManager, with_wait_cursor
+from PySide6 import QtCore, QtWidgets
+from PySide6.QtCore import QSignalBlocker, Slot
+from shiboken6 import Shiboken
 
 import dinput
-from dinput import GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_PRODUCT_STRING, DeviceSummary
 import gremlin.config
+import gremlin.joystick_handling
+from dinput import GEX_MAX_DEVICES, GEX_PID_BASE, DeviceSummary
 from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
-from gremlin.util import getHostIpSingle, InvokeUiMethod
-
-
 from gremlin.ui.ui_common import (
-    BaseDialogUi,
     Buttons,
-    clear_layout,
-    Color,
-    ConfirmBox,
-    get_mode_list,
-    get_text_width,
-    getFlowContainer,
-    getGridContainer,
-    getHContainer,
-    getVContainer,
     Icons,
-    InputListenerWidget,
     MessageBox,
     MessageBoxWarning,
     MessageBoxYesNo,
-    QBoxFrameLayout,
-    QCustomThemeDialog,
     QDataCheckbox,
     QDataComboBox,
     QDataIPLineEdit,
     QDataLabel,
     QDataLineEdit,
     QDataPushButton,
-    QDataRadioButton,
-    QDataRadioButtonGroup,
-    QDelayWidget,
-    QEnabledWidget,
-    QFloatLineEdit,
     QGroupBoxV,
-    QHorizontalLine,
-    QIconLabel,
-    QInfoBox,
     QIntLineEdit,
-    QLineEdit,
-    QPathLineItem,
+    QOnOffStatusfWidget,
     QRememberDialog,
     QScrollableWidget,
     QWarningWidget,
-    synchronize_grids,
-    QOnOffStatusfWidget,
+    getHContainer,
 )
-
-from PySide6.QtCore import QSignalBlocker
+from gremlin.util import getHostIpSingle
+from gremlin.worker import WorkManager
 
 syslog = logging.getLogger("system")
 AXIS_NAMES = ("X", "Y", "Z", "Rx", "Ry", "Rz", "Slider", "Dial")
@@ -857,11 +840,16 @@ class MaestroOscClient:
 
 @dataclass
 class MaestroController:
-    """Service-owned custom joystick; Index and Profile retain legacy access."""
+    """One service device attached to a Gremlin output slot.
 
-    index: int
-    id: str
-    name: str
+    ``service_device_id`` exposes the service's unique device ID; ``id`` is its
+    original storage field. ``name`` is a potentially duplicated display name.
+    ``index`` is the Gremlin output slot, not the service device ID.
+    """
+
+    index: int  # Gremlin output slot
+    id: str  # Protocol device/definition "id"; prefer service_device_id when reading it
+    name: str  # Display name only; not unique
     axis_count: int
     button_count: int
     hat_count: int
@@ -881,13 +869,18 @@ class MaestroController:
     native_guids: tuple = ()  # HID/XUSB aliases verified against this instance
 
     @property
+    def service_device_id(self) -> str:
+        """Unique device ID within this controller's bridge host/port."""
+        return self.id
+
+    @property
     def is_gamepad(self) -> bool:
         return self.kind == "gamepad" or self.profile_type.casefold() == "gamepad"
 
     @property
     def key(self) -> str:
-        """unique key for the controller based on host, port, and ID"""
-        return f"maestro://{self.host}:{self.port}/{self.id}"
+        """Device identity across bridges: host + port + service_device_id."""
+        return f"maestro://{self.host}:{self.port}/{self.service_device_id}"
 
 
 _GEX_ID_PATTERN = re.compile(r"gex-(?:gp-)?(\d+)")
@@ -900,9 +893,14 @@ def is_valid_gex_id(device_id) -> bool:
 
 
 def service_snapshot(client):
-    """Read saved definitions, active devices and the host's profile catalog, discarding 0-based GEX ids."""
-    definitions = [d for d in client.list("/maestro_definitions") if is_valid_gex_id(d["id"])]
-    devices = [d for d in client.list("/maestro_devices") if is_valid_gex_id(d["id"])]
+    """Read every host device for management, including legacy and non-GEX IDs.
+
+    In ``definitions`` and ``devices``, row["id"] is the service_device_id and
+    row["name"] is only a display name. In ``profiles``, row["id"] is a shared
+    profile_id. These are the bridge's wire field names, not interchangeable IDs.
+    """
+    definitions = client.list("/maestro_definitions")
+    devices = client.list("/maestro_devices")
     return dict(definitions=definitions, devices=devices, profiles=client.list("/maestro_profiles"))
 
 
@@ -1011,7 +1009,9 @@ class Maestro:
         self._shutdown_connected = False
         self._local_service = True
         self._last_hid_order_report = None
-        self._default_devices_prompted = False # flag that tracks if the user should be prompted for default devices if no maestro devices are found
+        self._default_devices_prompted = (
+            False  # flag that tracks if the user should be prompted for default devices if no maestro devices are found
+        )
         self._no_connection_warning_issued = False  # flag to issue log file warnings on initial connect
 
         # the connection data is stored in our config
@@ -1190,18 +1190,20 @@ class Maestro:
         """Ping through the connection handshake, which supplies a request ID."""
         return bool(self.connect())
 
-    def getCapabilities(self, device_id: str) -> "MaestroProfileInfo | None":
-        """Query /maestro_capabilities for one device and return it as a MaestroProfileInfo."""
+    def getCapabilities(self, service_device_id: str) -> "MaestroProfileInfo | None":
+        """Query one service device, retaining its ID separately from the payload's profile ID."""
         if not self.initialized or self.client is None:
             return None
-        result = self.client.request("/maestro_capabilities", device_id)
+        result = self.client.request("/maestro_capabilities", service_device_id)
         if not result or not isinstance(result.data, dict):
-            syslog.error("MAESTRO: capabilities request failed for %s: %s: %s", device_id, result.code, result.message)
+            syslog.error(
+                "MAESTRO: capabilities request failed for %s: %s: %s", service_device_id, result.code, result.message
+            )
             return None
         try:
-            return MaestroProfileInfo.from_dict(result.data, device_id)
+            return MaestroProfileInfo.from_dict(result.data, service_device_id)
         except RuntimeError, ValueError, KeyError:
-            syslog.exception("MAESTRO: invalid capabilities for %s", device_id)
+            syslog.exception("MAESTRO: invalid capabilities for %s", service_device_id)
             return None
 
     def getAllCapabilities(self) -> dict:
@@ -1544,7 +1546,10 @@ class Maestro:
         if device_map is None:
             device_map = config.maestro_device_map
         if snapshot is None:
-            snapshot = dict(definitions=self.client.list("/maestro_definitions"), devices=self.client.list("/maestro_devices"))
+            snapshot = {
+                "definitions": self.client.list("/maestro_definitions"),
+                "devices": self.client.list("/maestro_devices"),
+            }
         definitions = {d["id"]: d for d in snapshot["definitions"] if is_valid_gex_id(d["id"])}
         host_devices = {d["id"]: d for d in snapshot["devices"]}
 
@@ -1589,13 +1594,16 @@ class Maestro:
             self._controller_map = active
             self._active_service_devices = host_devices
             self._known_service_devices = {
-                f"maestro://{self.client.host}:{self.client.port}/{device_id}": dict(definition, active=device_id in host_devices)
+                f"maestro://{self.client.host}:{self.client.port}/{device_id}": dict(
+                    definition, active=device_id in host_devices
+                )
                 for device_id, definition in definitions.items()
             }
             previous_devices = {d.data.get("maestro_key"): d for d in self._device_map.values()}
             self._device_map = {
                 index: previous_devices[controller.key]
-                for index, controller in active.items() if controller.key in previous_devices
+                for index, controller in active.items()
+                if controller.key in previous_devices
             }
             self._buffer_map = {i: b for i, b in self._buffer_map.items() if i in active}
             self._name_map = name_map
@@ -1699,6 +1707,47 @@ class Maestro:
             # Publish even a partially successful batch before profile parsing.
             self.refreshDevices()
 
+    def createTestDevices(self) -> list[str]:
+        """Create missing test IDs, preserving existing active and saved devices."""
+        if not self.ensureConnected():
+            raise RuntimeError("The Maestro bridge is not connected.")
+        test_profiles = (
+            ("logitech-wingman-formula-gp", "test-wingman"),
+            ("saitek-x52", "test-saitek-x52"),
+            ("thrustmaster-t16000m", "test-t16000m"),
+        )
+        occupied_service_ids = {
+            row["id"] for address in ("/maestro_definitions", "/maestro_devices") for row in self.client.list(address)
+        }
+        missing_profiles = [
+            (profile_id, f"{service_id_prefix}-1")
+            for profile_id, service_id_prefix in test_profiles
+            if f"{service_id_prefix}-1" not in occupied_service_ids
+        ]
+        if not missing_profiles:
+            return []
+        profiles_by_profile_id = {profile["id"]: profile for profile in self.client.list("/maestro_profiles")}
+        unavailable = [
+            profile_id
+            for profile_id, _ in missing_profiles
+            if not profiles_by_profile_id.get(profile_id, {}).get("deployable")
+        ]
+        if unavailable:
+            raise RuntimeError("Maestro test profiles are missing or not deployable: " + ", ".join(unavailable))
+        created_service_device_ids = []
+        try:
+            for profile_id, service_device_id in missing_profiles:
+                display_name = profiles_by_profile_id[profile_id]["name"]
+                self.client.request("/maestro_create", service_device_id, profile_id, display_name).raise_for_error()
+                created_service_device_ids.append(service_device_id)
+                syslog.info(
+                    f"MAESTRO: created test service device {service_device_id} from {profile_id}: {display_name}"
+                )
+            return created_service_device_ids
+        finally:
+            if created_service_device_ids:
+                self.refreshDevices()
+
     def reset(self):
         """Reconnect saved active controllers and refresh DirectInput discovery."""
         if self.enabled:
@@ -1729,13 +1778,22 @@ class Maestro:
                 self.syncDinput()
                 if not self._compare_list():
                     self._dirty = False
-                    import gremlin.joystick_handling
 
                     self.populateDeviceList()
                     gremlin.joystick_handling.joystick_devices_initialization()
                     return
                 if time.monotonic() >= deadline:
-                    syslog.warning("MAESTRO: DirectInput discovery timed out (service names may be cached by Windows)")
+                    config = gremlin.config.Configuration()
+                    if config.verbose_mode_maestro:
+                        with self._lock:
+                            missing = [
+                                f"{controller.id} ({controller.name})"
+                                for index, controller in self._controller_map.items()
+                                if index not in self._device_map or not self._device_map[index].input_enabled
+                            ]
+                        syslog.warning(
+                            f"MAESTRO: DirectInput discovery timed out; no native input match for: {', '.join(missing)}."
+                        )
                     return
                 self._stopping.wait(0.2)
         except Exception:
@@ -1745,14 +1803,12 @@ class Maestro:
                 self._sync_worker = None
 
     def _compare_list(self) -> bool:
+        """Wait for native input discovery; HID order separately gates failover."""
         with self._lock:
             if not self._local_service:
                 return False
             return any(
                 index not in self._device_map or not self._device_map[index].input_enabled
-                or (getattr(controller, "instance_token", None)
-                    and re.fullmatch(r"gex-([1-9]|1[0-6])", controller.id) and controller.windows_order is None)
-                or getattr(controller, "hid_order_valid", None) is False
                 for index, controller in self._controller_map.items()
             )
 
@@ -1760,12 +1816,15 @@ class Maestro:
         """Correlate actual HID paths to bridge instance tokens, not transport slots."""
         verbose = gremlin.config.Configuration().verbose_mode_maestro
         with self._lock:
-            controllers = [controller for controller in self._controller_map.values()
-                           if getattr(controller, "instance_token", None)
-                           and re.fullmatch(r"gex-([1-9]|1[0-6])", controller.id)]
+            controllers = [
+                controller
+                for controller in self._controller_map.values()
+                if getattr(controller, "instance_token", None) and re.fullmatch(r"gex-([1-9]|1[0-6])", controller.id)
+            ]
         if not self._local_service or not controllers:
             return
         from gremlin.maestro_identity import inspect_hid_order
+
         scan_error = None
         try:
             from gremlin.hid import enumerate_devices
@@ -1775,7 +1834,7 @@ class Maestro:
             rows = enumerate_devices()
         except (OSError, RuntimeError, TimeoutError, ValueError) as error:
             scan_error = str(error)
-            identities = [dict(id=c.id, instanceToken=c.instance_token) for c in controllers]
+            identities = [{"id": c.id, "instanceToken": c.instance_token} for c in controllers]
             rows = []
         report = inspect_hid_order(identities, rows)
         with self._lock:
@@ -1787,29 +1846,40 @@ class Maestro:
                 # Missing/pending HID identities must not reuse an earlier
                 # successful scan or permit an unverified automatic alias.
                 controller.hid_order_valid = report["verified"] and controller.id in report["devices"]
-            if verbose:
-                syslog.info(f"MAESTRO: HID order scan report: {report}")
                 device = self._device_map.get(controller.index)
                 if device is not None and device.data.get("maestro_key") == controller.key:
-                    device.data.update(maestro_hid_path=controller.hid_path,
-                                       maestro_hid_index=controller.hid_index,
-                                       maestro_windows_order=controller.windows_order,
-                                       maestro_hid_order_valid=controller.hid_order_valid)
-        signature = (tuple(report["order"]), tuple(report["expected_order"]), report["verified"],
-                     bool(report["ambiguous"]), scan_error)
+                    device.data.update(
+                        maestro_hid_path=controller.hid_path,
+                        maestro_hid_index=controller.hid_index,
+                        maestro_windows_order=controller.windows_order,
+                        maestro_hid_order_valid=controller.hid_order_valid,
+                    )
+            if verbose:
+                syslog.info(f"MAESTRO: HID order scan report: {report}")
+        signature = (
+            tuple(report["order"]),
+            tuple(report["expected_order"]),
+            report["verified"],
+            bool(report["ambiguous"]),
+            scan_error,
+        )
         changed = signature != self._last_hid_order_report
         self._last_hid_order_report = signature
         if changed:
             from gremlin import joystick_handling
+
             joystick_handling._output_targets.clear()
         if changed and scan_error:
-            syslog.warning(f"MAESTRO: unable to verify Windows HID order; automatic vJoy failover is unavailable: {scan_error}")
+            syslog.warning(
+                f"MAESTRO: unable to verify Windows HID order; automatic vJoy failover is unavailable: {scan_error}"
+            )
         elif changed and (report["mismatch"] or report["ambiguous"]):
-            syslog.error(f"MAESTRO: Windows HID order {report['order']} does not match {report['expected_order']}; automatic vJoy failover is unavailable. "
-                         "Use the updated bridge to recreate controllers with ordered identities.")
-        elif changed and report["verified"]:
-            if verbose:
-                syslog.info(f"MAESTRO: Windows HID order verified: {', '.join(report['order'])}")
+            syslog.error(
+                f"MAESTRO: Windows HID order {report['order']} does not match {report['expected_order']}; automatic vJoy failover is unavailable. "
+                "Use the updated bridge to recreate controllers with ordered identities."
+            )
+        elif changed and report["verified"] and verbose:
+            syslog.info(f"MAESTRO: Windows HID order verified: {', '.join(report['order'])}")
 
     def syncDinput(self):
         """Match native instance identities before cached GUIDs and display names."""
@@ -1829,14 +1899,21 @@ class Maestro:
                     continue
                 key = f"maestro://{self.client.host}:{self.client.port}/{row['id']}"
                 definition = (self._known_service_devices or {}).get(key, {})
-                if key in owners or not (definition.get("kind") == "gamepad" or str(row.get("type", "")).casefold() == "gamepad"):
+                if key in owners or not (
+                    definition.get("kind") == "gamepad" or str(row.get("type", "")).casefold() == "gamepad"
+                ):
                     continue
                 profile = row.get("maestroProfile") or {}
                 owners[key] = SimpleNamespace(
-                    key=key, id=row["id"], name=row["name"], instance_token=row.get("instanceToken"),
+                    key=key,
+                    id=row["id"],
+                    name=row["name"],
+                    instance_token=row.get("instanceToken"),
                     identity_key=row.get("identityKey"),
-                    profile=SimpleNamespace(VendorId=profile.get("vendorId", row.get("vendorId", -1)),
-                                            ProductId=profile.get("productId", row.get("productId", -1))),
+                    profile=SimpleNamespace(
+                        VendorId=profile.get("vendorId", row.get("vendorId", -1)),
+                        ProductId=profile.get("productId", row.get("productId", -1)),
+                    ),
                 )
         identities = {}
         if owners:
@@ -1844,7 +1921,7 @@ class Maestro:
             if read_identities is not None:
                 try:
                     identities = read_identities([d.device_guid for d in devices])
-                except (OSError, RuntimeError):
+                except OSError, RuntimeError:
                     syslog.exception("MAESTRO: unable to read native gamepad identities")
         from gremlin.maestro_identity import instance_token_for_key, matches_instance
 
@@ -1855,8 +1932,10 @@ class Maestro:
             return str(native_identity(device).get("container_id") or "").strip("{}").casefold()
 
         def native_priority(device, owner):
-            return (device.vendor_id != owner.profile.VendorId or device.product_id != owner.profile.ProductId,
-                    str(device.device_guid))
+            return (
+                device.vendor_id != owner.profile.VendorId or device.product_id != owner.profile.ProductId,
+                str(device.device_guid),
+            )
 
         with self._lock:
             mapped = {}
@@ -1865,7 +1944,9 @@ class Maestro:
             identity_groups = {}
             for key, owner in owners.items():
                 if owner.instance_token:
-                    identity_groups[key] = [d for d in devices if matches_instance(native_identity(d), owner.instance_token)]
+                    identity_groups[key] = [
+                        d for d in devices if matches_instance(native_identity(d), owner.instance_token)
+                    ]
                 else:
                     # GEX service keys predate the OSC identity fields.
                     # Recover that exact SDK identity before falling back to names.
@@ -1878,16 +1959,25 @@ class Maestro:
                     # Maestro container, rather than merging unrelated controllers.
                     containers = {
                         native_container(d)
-                        for d in devices if d.name == owner.name
-                        and d.vendor_id == owner.profile.VendorId and d.product_id == owner.profile.ProductId
+                        for d in devices
+                        if d.name == owner.name
+                        and d.vendor_id == owner.profile.VendorId
+                        and d.product_id == owner.profile.ProductId
                     }
                     containers = {value for value in containers if value.startswith("48494430-4d41-4553-")}
-                    identity_groups[key] = [d for d in devices if native_container(d) in containers] if len(containers) == 1 else []
+                    identity_groups[key] = (
+                        [d for d in devices if native_container(d) in containers] if len(containers) == 1 else []
+                    )
             # Never claim an interface whose identity matches multiple owners.
-            ambiguous_guids = {d.device_guid for d in devices
-                               if sum(d in group for group in identity_groups.values()) > 1}
-            verified_owners = {d.device_guid: key for key, group in identity_groups.items() for d in group
-                               if d.device_guid not in ambiguous_guids}
+            ambiguous_guids = {
+                d.device_guid for d in devices if sum(d in group for group in identity_groups.values()) > 1
+            }
+            verified_owners = {
+                d.device_guid: key
+                for key, group in identity_groups.items()
+                for d in group
+                if d.device_guid not in ambiguous_guids
+            }
             for index, controller in self._controller_map.items():
                 verified = [d for d in identity_groups.get(controller.key, []) if d.device_guid not in ambiguous_guids]
                 controller.native_guids = tuple(d.device_guid for d in verified)
@@ -1899,15 +1989,18 @@ class Maestro:
                     and d.device_guid not in ambiguous_guids
                     and verified_owners.get(d.device_guid, controller.key) == controller.key
                     and not (native_identity(d) and d not in verified)
-                    and ((d.axis_count, d.button_count, d.hat_count)
-                         == (controller.axis_count, controller.button_count, controller.hat_count)
-                         or (controller.is_gamepad and not controller.instance_token and d.name == controller.name))
+                    and (
+                        (d.axis_count, d.button_count, d.hat_count)
+                        == (controller.axis_count, controller.button_count, controller.hat_count)
+                        or (controller.is_gamepad and not controller.instance_token and d.name == controller.name)
+                    )
                 ]
                 candidates_by_index[index] = verified or candidates
                 previous = self._device_map.get(index)
                 if previous is not None and previous.data.get("maestro_key") == controller.key:
                     matches = [
-                        d for d in candidates_by_index[index]
+                        d
+                        for d in candidates_by_index[index]
                         if d.device_guid == previous.device_guid and d.device_guid not in claimed_guids
                     ]
                     if len(matches) == 1:
@@ -1925,7 +2018,8 @@ class Maestro:
                         claimed_guids.add(matches[0].device_guid)
                     continue
                 matches = [
-                    d for d in candidates_by_index[index]
+                    d
+                    for d in candidates_by_index[index]
                     if d.name == controller.name and d.device_guid not in claimed_guids
                 ]
                 if len(matches) == 1:
@@ -1941,14 +2035,14 @@ class Maestro:
                 if key in attached_keys:
                     continue
                 group = [d for d in identity_groups[key] if d.device_guid not in ambiguous_guids]
-                group.sort(key=lambda d: (d.device_guid != previous_inputs.get(key),
-                                          *native_priority(d, owner)))
+                group.sort(key=lambda d: (d.device_guid != previous_inputs.get(key), *native_priority(d, owner)))
                 if not group:
                     continue
                 native = group[0]
                 native.data.pop("maestro_output_summary", None)
-                native.data.update(maestro_key=key, maestro_native_guids=tuple(d.device_guid for d in group),
-                                   maestro_native_input=True)
+                native.data.update(
+                    maestro_key=key, maestro_native_guids=tuple(d.device_guid for d in group), maestro_native_input=True
+                )
                 native.name = owner.name
                 native.device_type = gremlin.types.DeviceType.Maestro
                 native.setVirtual(True)
@@ -1968,8 +2062,10 @@ class Maestro:
 
                 known_devices = {
                     f"maestro://{self.client.host}:{self.client.port}/{row['id']}": dict(
-                        row, active=any(device["id"] == row["id"] for device in snapshot["devices"]))
-                    for row in snapshot["definitions"] if is_valid_gex_id(row["id"])
+                        row, active=any(device["id"] == row["id"] for device in snapshot["devices"])
+                    )
+                    for row in snapshot["definitions"]
+                    if is_valid_gex_id(row["id"])
                 }
                 with self._lock:
                     self._controller_map.clear()
@@ -1998,7 +2094,7 @@ class Maestro:
         capabilities; they do not generate local joystick input events.
         """
         from gremlin import joystick_handling
-        from gremlin.types import DeviceType, DeviceCategory
+        from gremlin.types import DeviceCategory, DeviceType
 
         self.syncDinput()
         devices = []
@@ -2008,9 +2104,10 @@ class Maestro:
                 if device is None:
                     # build a new device summary for this controller since no match was found
                     device = dinput.DeviceSummary()
-                    host, port = self.client.destination
+                    _host, _port = self.client.destination
                     # use a GUID that is unique to this device
                     device.device_guid = self.controllerGuid(controller)
+                    # DeviceSummary.device_id stores a Gremlin GUID, not controller.service_device_id.
                     device.device_id = gremlin.util.normalize_guid(device.device_guid)
                     device.axis_count = controller.axis_count
                     device.button_count = controller.button_count
@@ -2065,7 +2162,10 @@ class Maestro:
                     # discovering a native interface must not change that GUID.
                     output.device_guid = self.controllerGuid(controller)
                     output.axis_count, output.button_count, output.hat_count = (
-                        controller.axis_count, controller.button_count, controller.hat_count)
+                        controller.axis_count,
+                        controller.button_count,
+                        controller.hat_count,
+                    )
                     output.axis_id_map = {axis: axis for axis in range(1, controller.axis_count + 1)}
                     output.linear_id_map = dict(output.axis_id_map)
                     output.axis_names = dict(enumerate(controller.axis_names, 1))
@@ -2075,7 +2175,9 @@ class Maestro:
                     device.data["maestro_output_summary"] = output
                 devices.append(device)
                 self._device_map[index] = device
-        joystick_handling.set_maestro_devices(devices + self._native_gamepad_inputs, known_devices=self._known_service_devices)
+        joystick_handling.set_maestro_devices(
+            devices + self._native_gamepad_inputs, known_devices=self._known_service_devices
+        )
 
     def getDeviceAt(self, index: int) -> DeviceSummary:
         """Return the device at the given index, if it exists."""
@@ -2130,7 +2232,7 @@ class Maestro:
 
     def getAllDevices(self) -> list[DeviceSummary]:
         """Return JSON records for all active devices owned by the service."""
-        json_data = self.client.list("/maestro_devices") if self.enabled else []
+        self.client.list("/maestro_devices") if self.enabled else []
         controllers = []
         device_list = []
         for controller in controllers:
@@ -2175,7 +2277,13 @@ class Maestro:
             config.save()
 
     def createJoystickController(
-        self, name: str = None, axis_count=8, button_count=128, hat_count=4, definition: str = None, at_index=None
+        self,
+        name: str | None = None,
+        axis_count=8,
+        button_count=128,
+        hat_count=4,
+        definition: str | None = None,
+        at_index=None,
     ) -> None | MaestroController:
         """Create a service-owned custom joystick controller.
 
@@ -2210,7 +2318,7 @@ class Maestro:
                 "/maestro_create_custom", name, name, button_count, axis_count, hat_count, vendor_id, product_id, True
             ).raise_for_error()  # @IgnoreException
             controller = self._cache_controller(
-                result.data, dict(kind="custom", axes=axis_count, buttons=button_count, hats=hat_count), index
+                result.data, {"kind": "custom", "axes": axis_count, "buttons": button_count, "hats": hat_count}, index
             )
             self._register_controller(controller)
             self.refreshDevices(reload=False)
@@ -2285,7 +2393,7 @@ class Maestro:
         return renamed
 
     def createGamepadController(
-        self, name: str = None, definition: str = None, at_index=None
+        self, name: str | None = None, definition: str | None = None, at_index=None
     ) -> None | MaestroController:
         """Create a service-owned Xbox 360 gamepad controller.
 
@@ -2321,7 +2429,7 @@ class Maestro:
                 raise ValueError(f"GEX device id {name} must be 1-based")
             index = self._controller_slot(name, index)
             result = self.client.request("/maestro_create_gamepad", name, name, True).raise_for_error()
-            controller = self._cache_controller(result.data, dict(kind="gamepad"), index)
+            controller = self._cache_controller(result.data, {"kind": "gamepad"}, index)
             self._register_controller(controller)
             self.refreshDevices(reload=False)
             return controller
@@ -2341,15 +2449,18 @@ class Maestro:
         except Exception:
             syslog.exception("MAESTRO: device list refresh failed")
 
-    def deleteDevice(self, name: str) -> MaestroResult:
-        """Delete the active device and its saved definition, then publish the remaining targets."""
-        result = self.client.request("/maestro_delete", name)
+    def deleteDevice(self, service_device_id: str, *, refresh=True) -> MaestroResult:
+        """Delete by the service's unique device ID, then publish the remaining targets."""
+        result = self.client.request("/maestro_delete", service_device_id)
         if not result:
-            syslog.error(f"MAESTRO: failed to delete device {name}: {result.code}: {result.message}")
+            syslog.error(
+                f"MAESTRO: failed to delete service device {service_device_id}: {result.code}: {result.message}"
+            )
         else:
             # An intentional deletion must not trigger another default-device offer.
             self._default_devices_prompted = True
-            self.refreshDevices()
+            if refresh:
+                self.refreshDevices()
         return result
 
     def deleteAll(self) -> MaestroResult:
@@ -2628,12 +2739,22 @@ class _MaestroDialogSignals(QtCore.QObject):
     completed = QtCore.Signal(object, object)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MaestroProfileInfo:
-    """Python equivalent of ProfileInfo in the Maestro service (/maestro_capabilities_result)."""
+    """Capabilities returned for a specific service device.
 
-    id: str = ""  # Maestro device ID
-    name: str = ""  # Maestro device name
+    ``service_device_id`` is the requested device's unique ID on the bridge.
+    ``id`` copies the capabilities payload's "id": catalog devices return a
+    shared profile ID here, while custom joysticks can return a service device ID.
+    ``profile_id`` copies an explicit "profileId" if supplied by the bridge.
+    ``name`` is a display name. Only service_device_id identifies a delete target.
+
+    Example: service devices "gex-1" and "external-stick" can both have
+    id="shared-layout" and name="Shared joystick" without being the same device.
+    """
+
+    id: str = ""  # Capabilities payload ID; may be a profile shared by multiple devices
+    name: str = ""  # Display name; may be shared by unrelated devices
     type: str = ""  # Maestro device type - e.g., "joystick", "wheel", etc. or "custom" for custom joystick device
     vendor_id: int = 0  # USB vendor ID
     product_id: int = 0  # USB product ID
@@ -2650,15 +2771,21 @@ class MaestroProfileInfo:
     used_profile_name: str | None = (
         None  # Name of the used profile to build the device in Maestro (if one was used from an emulation)
     )
-    profile_id: str = ""  # Profile ID
-    device_id: str = ""  # Service device ID the capabilities were requested for
+    profile_id: str = ""  # Optional "profileId" from the capabilities payload
+    service_device_id: str = ""  # Unique ID on the bridge, supplied by the request caller
+
+    @property
+    def device_id(self) -> str:
+        """Compatibility alias for service_device_id; unrelated to DeviceSummary.device_id."""
+        return self.service_device_id
 
     @property
     def axis_count(self) -> int:
         return len(self.axis_names)
 
     @classmethod
-    def from_dict(cls, data: dict, device_id: str = ""):
+    def from_dict(cls, data: dict, service_device_id: str = ""):
+        """Decode capabilities; the caller supplies the service ID used for the request."""
         button_count = data.get("buttonCount") or 0
         button_map = data.get("buttonMap")
         return cls(
@@ -2679,7 +2806,7 @@ class MaestroProfileInfo:
             kind=data.get("kind") or "profile",
             used_profile_name=data.get("usedProfileName"),
             profile_id=data.get("profileId", ""),
-            device_id=device_id,
+            service_device_id=service_device_id,
         )
 
 
@@ -2806,25 +2933,41 @@ class MaestroNewDeviceDialog(QRememberDialog):
         return self.include_widget.isChecked()
 
     def definition(self) -> dict:
-        """The device definition in the format used by save_device_definition; ID and name are GEX-managed."""
-        device_id = self._next_id()
+        """Encode a new service device; "id" is unique and "name" is only its initial label."""
+        service_device_id = self._next_id()
         custom = not self.profile_widget.currentData()
-        return dict(
-            id=device_id,
-            kind="custom" if custom else "profile",
-            profileId=self.profile_widget.currentData() or "custom-" + device_id,
-            name=device_id,
-            axes=self.axes_widget.value() if custom else 0,
-            buttons=self.buttons_widget.value() if custom else 0,
-            hats=self.hats_widget.value() if custom else 0,
-            enabled=self.active_widget.isChecked(),
-        )
+        return {
+            "id": service_device_id,
+            "kind": "custom" if custom else "profile",
+            "profileId": self.profile_widget.currentData() or "custom-" + service_device_id,
+            "name": service_device_id,
+            "axes": self.axes_widget.value() if custom else 0,
+            "buttons": self.buttons_widget.value() if custom else 0,
+            "hats": self.hats_widget.value() if custom else 0,
+            "enabled": self.active_widget.isChecked(),
+        }
 
 
 class MaestroDialog(QRememberDialog):
-    """Configure HIDMaestro via the GEX bridge, edit service devices and update GremlinEx targets."""
+    """Manage one bridge endpoint using service_device_id as the row/selection key.
+
+    Inventory "id" fields are service device IDs; profile "id" fields are layout
+    IDs. Display names are presentation only. See the module's identifier glossary.
+    """
 
     devices_changed = QtCore.Signal()
+
+    GAMEPAD_LIGHT_COLOR = "#1CA7A7"
+    GAMEPAD_DARK_COLOR = "#2F6E66"
+
+    FAILOVER_GAMEPAD_LIGHT_COLOR = "#1C7BA7"
+    FAILOVER_GAMEPAD_DARK_COLOR = "#36647E"
+
+    FAILOVER_JOYSTICK_LIGHT_COLOR = "#1C64A7"
+    FAILOVER_JOYSTICK_DARK_COLOR = "#2F6EA8"
+
+    JOYSTICK_LIGHT_COLOR = "#1CA746"
+    JOYSTICK_DARK_COLOR = "#2B6339"
 
     def __init__(self, parent=None):
         super().__init__("MaestroDialog", width=920, height=760, parent=parent)
@@ -2837,15 +2980,15 @@ class MaestroDialog(QRememberDialog):
 
         self._busy = False
         self._tested_settings = None
-        self._definitions = {}
-        self._profiles = {}
-        self._selected_ids = set()
+        self._definitions_by_service_id = {}  # service_device_id -> device/definition JSON
+        self._profiles_by_profile_id = {}  # shared profile_id -> profile JSON
+        self._selected_service_device_ids = set()  # device IDs, never names or profile IDs
         self._previous = None
         self._completion = None
         self._signals = _MaestroDialogSignals(self)
         self._signals.completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
         layout = QtWidgets.QVBoxLayout(self)
-        self._select_widget_map = {}  # map of device ID to the selection box in the table
+        self._selection_widgets_by_service_id = {}  # service_device_id -> checkbox
 
         self.localhost_widget = QDataCheckbox(
             "LocalHost",
@@ -2891,9 +3034,9 @@ class MaestroDialog(QRememberDialog):
             "Select All", clicked=self._handle_select_all, tooltip="Select all devices"
         )
         self.delete_all_button = QDataPushButton(
-            "Delete All Devices",
-            clicked=self._handle_delete_all_devices,
-            tooltip="Delete all connected Maestro devices",
+            "Delete Selected",
+            clicked=self._handle_delete_selected_devices,
+            tooltip="Deletes selected devices",
         )
 
         self.host_container = getHContainer(
@@ -2998,11 +3141,21 @@ class MaestroDialog(QRememberDialog):
             )
         self.presets_widget.setMenu(menu)
 
+        # test devices button
+        self.test_devices_button = None
+        if __debug__:
+            self.test_devices_button = QDataPushButton(
+                "Create Test Devices",
+                clicked=self._create_test_devices,
+                tooltip="Creates sample Maestro devices for manual testing",
+            )
+
         self.devices_group.addWidget(
             getHContainer(
                 [
                     self.presets_widget,
                     self.new_button,
+                    self.test_devices_button,
                     "||",
                     self.select_none_button,
                     self.select_all_button,
@@ -3013,19 +3166,35 @@ class MaestroDialog(QRememberDialog):
         )
         layout.addWidget(self.devices_group, 1)
 
-        self.apply_button = QDataPushButton("Apply to Gremlin", clicked=self._apply)
-        self.close_button = QDataPushButton("Close", clicked=self.close)
+        # legend
+        failover_widget = QtWidgets.QLabel("Failover")
+        failover_widget.setToolTip("Device is designated as a failover for a vJoy device when vJoy is not installed")
+        failover_widget.setStyleSheet(
+            f"background-color: {self._color(failover=True, gamepad=False)}; border-radius: 6px; padding: 5px;"
+        )
+
+        mastro_widget = QtWidgets.QLabel("Normal")
+        mastro_widget.setToolTip("Device is designated as a normal (non-failover) device")
+        mastro_widget.setStyleSheet(
+            f"background-color: {self._color(failover=False, gamepad=False)}; border-radius: 6px; padding: 5px;"
+        )
+
+        gamepad_widget = QtWidgets.QLabel("Gamepad")
+        gamepad_widget.setToolTip("Device is designated as a gamepad")
+        gamepad_widget.setStyleSheet(
+            f"background-color: {self._color(failover=False, gamepad=True)}; border-radius: 6px; padding: 5px;"
+        )
+
         layout.addWidget(
             getHContainer(
-                [
-                    "||",
-                    self.apply_button,
-                    self.close_button,
-                ],
+                ["Legend:", failover_widget, mastro_widget, gamepad_widget],
                 widget_only=True,
-                auto_size=True,
             )
         )
+
+        self.apply_button = QDataPushButton("Apply to Gremlin", clicked=self._apply)
+        self.close_button = QDataPushButton("Close", clicked=self.close)
+
         for widget in (self.host_widget, self.reply_host_widget, self.port_widget, self.reply_port_widget):
             widget.textChanged.connect(self._invalidate_connection)
 
@@ -3036,12 +3205,70 @@ class MaestroDialog(QRememberDialog):
             tooltip="Maestro bridge state",
         )
 
-        layout.addWidget(getHContainer([self.status_bar_maestro_widget], widget_only=True))
+        layout.addWidget(
+            getHContainer(
+                [
+                    self.status_bar_maestro_widget,
+                    "||",
+                    getHContainer(
+                        [self.apply_button, self.close_button],
+                        widget_only=True,
+                        auto_size=True,
+                    ),
+                ],
+                widget_only=True,
+            )
+        )
 
         self._update_ui()
 
         # refresh on start if the bridge is connectable
         self._refresh_devices()
+
+    def _create_test_devices(self):
+        def operation():
+            before_ids = {row["id"] for row in self.maestro.client.list("/maestro_definitions")}
+            error = None
+            try:
+                self.maestro.createTestDevices()
+            except Exception as exc:
+                syslog.exception("MAESTRO: failed to create test devices")
+                error = str(exc)
+            # A later failure can leave earlier samples active. Read and publish
+            # the inventory even when only part of the batch was created.
+            snapshot = self._read_snapshot()
+            created_ids = {row["id"] for row in snapshot["definitions"]} - before_ids
+            return snapshot, created_ids, error
+
+        def complete(outcome):
+            snapshot, created_ids, error = outcome
+            self._load_snapshot(snapshot)
+            if created_ids:
+                self.devices_changed.emit()
+            if error:
+                self.warning_widget.setText(error)
+                self.status_widget.setText(
+                    "Test device creation did not complete. The list shows the host's current devices."
+                )
+            else:
+                self.status_widget.setText(f"Created {len(created_ids)} test devices.")
+
+        self._submit(operation, complete, "Creating test devices...")
+
+    def _color(self, failover: bool, gamepad: bool) -> str:
+        is_dark = gremlin.shared_state.is_dark_theme
+        if failover:
+            if is_dark:
+                color = self.FAILOVER_GAMEPAD_DARK_COLOR if gamepad else self.FAILOVER_JOYSTICK_DARK_COLOR
+            else:
+                color = self.FAILOVER_GAMEPAD_LIGHT_COLOR if gamepad else self.FAILOVER_JOYSTICK_LIGHT_COLOR
+        else:
+            if is_dark:
+                color = self.GAMEPAD_DARK_COLOR if gamepad else self.JOYSTICK_DARK_COLOR
+            else:
+                color = self.GAMEPAD_LIGHT_COLOR if gamepad else self.JOYSTICK_LIGHT_COLOR
+
+        return color
 
     def _handle_host_changed(self, value: str):
         # validate the host value
@@ -3077,7 +3304,7 @@ class MaestroDialog(QRememberDialog):
                     return
             if controller is None:
                 break
-            self._selected_ids.add(controller.id)
+            self._selected_service_device_ids.add(controller.service_device_id)
         self._refresh_devices()
 
     def _handle_create_device_by_preset(self, preset_name: str, preset_data: dict):
@@ -3165,7 +3392,7 @@ class MaestroDialog(QRememberDialog):
     @Slot()
     def _handle_select_none(self):
         """select none clicked"""
-        for widget in self._select_widget_map.values():
+        for widget in self._selection_widgets_by_service_id.values():
             if Shiboken.isValid(widget):
                 widget.setChecked(False)
 
@@ -3173,16 +3400,80 @@ class MaestroDialog(QRememberDialog):
     def _handle_select_all(self):
         """select all clicked"""
         # Implement the logic to select all devices
-        for widget in self._select_widget_map.values():
-            if Shiboken.isValid(widget):
+        for widget in self._selection_widgets_by_service_id.values():
+            if Shiboken.isValid(widget) and widget.isEnabled():
                 widget.setChecked(True)
 
     @Slot()
-    def _handle_delete_all_devices(self):
+    def _handle_delete_selected_devices(self):
         """delete all devices managed by GEX"""
+        # count selections
+        selected_count = sum(
+            1
+            for widget in self._selection_widgets_by_service_id.values()
+            if Shiboken.isValid(widget) and widget.isChecked()
+        )
+        if selected_count == 0:
+            MessageBoxWarning(prompt="No devices selected.")
+            return
         if not self.maestro.ensureConnected():
             return
-        MessageBoxYesNo(prompt="Are you sure you want to delete all devices?", callback=self._delete_all_devices)
+        MessageBoxYesNo(
+            prompt=f"Are you sure you want to delete {selected_count} devices? Other Maestro devices can be deleted individually.",
+            callback=self._delete_selected_devices,
+        )
+
+    def _delete_selected_devices(self, result: bool, data: tuple):
+        """Delete the selected IDs in one worker, then publish the remaining devices."""
+        if not result or self._busy:
+            return
+        # Qt widgets must be read before starting the request worker.
+        selected_service_device_ids = [
+            service_device_id
+            for service_device_id, widget in self._selection_widgets_by_service_id.items()
+            if Shiboken.isValid(widget) and widget.isChecked()
+        ]
+        if not selected_service_device_ids:
+            return
+
+        trace = getattr(gremlin.util, "_trace", lambda label: None)
+        trace(f"maestro delete selected: {len(selected_service_device_ids)} devices")
+
+        def operation():
+            deleted, error = False, None
+            try:
+                # Use explicit IDs even when every row is selected: the service's
+                # vendor/product bulk command can include unselected definitions.
+                for service_device_id in selected_service_device_ids:
+                    trace(f"maestro delete begin {service_device_id}")
+                    self.maestro.deleteDevice(service_device_id, refresh=False).raise_for_error()
+                    trace(f"maestro delete acknowledged {service_device_id}")
+                    deleted = True
+            except Exception as exc:
+                syslog.exception("MAESTRO: failed to delete selected devices")
+                error = str(exc)
+            if deleted:
+                trace("maestro delete refreshing native inventory")
+                self.maestro.refreshDevices()
+            # Reconcile successful deletions even if a later request failed.
+            snapshot = self._read_snapshot()
+            trace("maestro delete snapshot ready")
+            return snapshot, deleted, error
+
+        def complete(outcome):
+            snapshot, deleted, error = outcome
+            trace("maestro delete updating dialog rows")
+            self._load_snapshot(snapshot)
+            trace("maestro delete dialog rows updated")
+            if deleted:
+                self.devices_changed.emit()
+            if error:
+                self.warning_widget.setText(error)
+                self.status_widget.setText("Deletion did not complete. The list shows the host's current devices.")
+            else:
+                self.status_widget.setText("Selected devices have been deleted.")
+
+        self._submit(operation, complete, "Deleting selected devices...")
 
     def _delete_all_devices(self, result: bool, data: tuple):
         """deletes all devices after confirmation box is confirmed"""
@@ -3192,8 +3483,8 @@ class MaestroDialog(QRememberDialog):
             return self._read_snapshot()
 
         def complete(snapshot):
-            self._selected_ids.clear()
             self._load_snapshot(snapshot)
+            self.devices_changed.emit()
             self.status_widget.setText("All devices have been deleted.")
 
         if result:
@@ -3264,6 +3555,9 @@ class MaestroDialog(QRememberDialog):
         connected = self._tested_settings is not None
         not_localhost_mode = not self.config.maestro_use_localhost
 
+        if self.test_devices_button:
+            self.test_devices_button.setEnabled(connected)
+
         # make IP config visible only when not in local host
         self.host_container.setVisible(not_localhost_mode)
         self.reply_host_container.setVisible(not_localhost_mode)
@@ -3274,9 +3568,12 @@ class MaestroDialog(QRememberDialog):
         self.apply_button.setEnabled(connected and idle)
 
         self.close_button.setEnabled(idle)
-        has_devices = bool(self._select_widget_map)
-        self.select_all_button.setEnabled(has_devices)
-        self.delete_all_button.setEnabled(has_devices)
+        has_devices = bool(self._selection_widgets_by_service_id)
+        self.select_all_button.setEnabled(connected and idle and has_devices)
+        has_selection = any(
+            Shiboken.isValid(widget) and widget.isChecked() for widget in self._selection_widgets_by_service_id.values()
+        )
+        self.delete_all_button.setEnabled(connected and idle and has_selection)
         self.new_button.setEnabled(connected)
         self.presets_widget.setEnabled(connected)
 
@@ -3320,12 +3617,14 @@ class MaestroDialog(QRememberDialog):
     def _read_snapshot(self):
         """Read the device inventory and row capabilities on the request worker."""
         snapshot = service_snapshot(self.maestro.client)
-        capabilities = {}
-        for definition in snapshot["definitions"]:
-            caps = self.maestro.getCapabilities(definition["id"])
+        capabilities_by_service_id = {}
+        inventory_by_service_id = {d["id"]: d for d in snapshot["devices"]}
+        inventory_by_service_id.update({d["id"]: d for d in snapshot["definitions"]})
+        for service_device_id in inventory_by_service_id:
+            caps = self.maestro.getCapabilities(service_device_id)
             if caps is not None:
-                capabilities[definition["id"]] = caps
-        snapshot["capabilities"] = capabilities
+                capabilities_by_service_id[service_device_id] = caps
+        snapshot["capabilities"] = capabilities_by_service_id
         # Refresh the registry from the same authoritative inventory shown here.
         # Keep pending selections in the dialog separate from attached targets.
         try:
@@ -3361,15 +3660,19 @@ class MaestroDialog(QRememberDialog):
             self._tested_settings = settings
             if not retain_selection:
                 same_host = settings[:2] == (self.config.maestro_osc_host, self.config.maestro_osc_port)
-                selected = self.config.maestro_device_map if same_host else None
-                attached = {c.id for c in self.maestro._controller_map.values()} if same_host else set()
-                self._selected_ids = (
-                    set(selected)
-                    if selected is not None
+                selected_service_id_to_slot = self.config.maestro_device_map if same_host else None
+                attached_service_ids = (
+                    {controller.service_device_id for controller in self.maestro._controller_map.values()}
+                    if same_host
+                    else set()
+                )
+                self._selected_service_device_ids = (
+                    set(selected_service_id_to_slot)
+                    if selected_service_id_to_slot is not None
                     else {
                         d["id"]
                         for d in snapshot["definitions"]
-                        if d["id"] in attached or self.maestro._service_index(d["id"]) is not None
+                        if d["id"] in attached_service_ids or self.maestro._service_index(d["id"]) is not None
                     }
                 )
             self._load_snapshot(snapshot)
@@ -3379,95 +3682,139 @@ class MaestroDialog(QRememberDialog):
 
         self._submit(operation, complete, "Testing the connection and reading devices…")
 
-    def _load_snapshot(self, snapshot, select_id=None):
+    def _load_snapshot(self, snapshot, select_service_device_id=None):
         if not snapshot:
             # no data available (can happen if the bridge is not connected)
             return
-        self._definitions = {d["id"]: d for d in snapshot["definitions"]}
-        self._profiles = {p["id"]: p for p in snapshot["profiles"]}
-        active = {d["id"] for d in snapshot["devices"]}
-        self._selected_ids.intersection_update(self._definitions)
-        capabilities = snapshot.get("capabilities") or {}
+        # This inventory belongs to one service endpoint. Only its device IDs
+        # are unique; display names and capabilities/profile IDs can be shared.
+        self._definitions_by_service_id = {d["id"]: d for d in snapshot["devices"]}
+        self._definitions_by_service_id.update({d["id"]: d for d in snapshot["definitions"]})
+        self._profiles_by_profile_id = {p["id"]: p for p in snapshot["profiles"]}
+        active_service_ids = {d["id"] for d in snapshot["devices"]}
+        selectable_service_ids = {d["id"] for d in snapshot["definitions"] if is_valid_gex_id(d["id"])}
+        self._selected_service_device_ids.intersection_update(selectable_service_ids)
+        capabilities_by_service_id = snapshot.get("capabilities") or {}
         # clear the UI
         self.device_list.clear()
-        self._select_widget_map.clear()
+        self._selection_widgets_by_service_id.clear()
 
-        if self._definitions:
+        failover_service_keys = {
+            device.data.get("maestro_key") for device in gremlin.joystick_handling.get_maestro_failover_devices()
+        }
+        bridge_host, bridge_port = self.maestro.client.destination
+
+        if self._definitions_by_service_id:
             if self.verbose:
                 syslog.info("Maestro snapshot summary:")
-                syslog.info(f"\tAttached devices: {len(self._definitions)}")
+                syslog.info(f"\tAttached devices: {len(self._definitions_by_service_id)}")
             cap: MaestroProfileInfo
-            for device_id, definition in self._definitions.items():
-                cap = capabilities.get(device_id)
+            for service_device_id, definition in self._definitions_by_service_id.items():
+                cap = capabilities_by_service_id.get(service_device_id)
                 if cap is None:
                     # Saved devices remain manageable even when inactive or
                     # temporarily missing a capabilities response.
-                    profile = dict(self._profiles.get(definition.get("profileId"), {}))
-                    profile.update(name=definition.get("name", device_id), kind=definition.get("kind", "profile"))
+                    profile = dict(self._profiles_by_profile_id.get(definition.get("profileId"), {}))
+                    profile.update(
+                        name=definition.get("name", service_device_id), kind=definition.get("kind", "profile")
+                    )
                     if definition.get("kind") == "custom":
                         profile.update(
                             axes=AXIS_NAMES[: definition.get("axes", 0)],
                             addressableButtons=definition.get("buttons", 0),
                             hatCount=definition.get("hats", 0),
                         )
-                    cap = MaestroProfileInfo.from_dict(profile, device_id)
+                    cap = MaestroProfileInfo.from_dict(profile, service_device_id)
+                is_gamepad = cap.type == "gamepad"
                 axes = cap.axis_count
                 buttons = cap.addressable_buttons
                 hats = cap.hat_count
                 checkbox = QDataCheckbox(
-                    data=cap, checked=device_id in self._selected_ids, callbackEx=self._selection_changed
+                    data=service_device_id,
+                    checked=service_device_id in self._selected_service_device_ids,
+                    callbackEx=self._selection_changed,
                 )
-                self._select_widget_map[device_id] = checkbox
+                checkbox.setEnabled(service_device_id in selectable_service_ids)
+                if service_device_id not in selectable_service_ids:
+                    checkbox.setToolTip("This device can be deleted but cannot be attached to Gremlin.")
+                self._selection_widgets_by_service_id[service_device_id] = checkbox
 
+                gex_joystick = re.fullmatch(r"gex-([1-9]|1[0-6])", service_device_id) is not None
+                # Cross-registry identity includes the endpoint; device_name is only a display name.
+                service_device_key = f"maestro://{bridge_host}:{bridge_port}/{service_device_id}"
+                failover = gex_joystick and service_device_key in failover_service_keys
+                category = (
+                    "GEX failover (active)"
+                    if failover
+                    else (
+                        "GEX joystick (inactive)"
+                        if gex_joystick
+                        else "GEX gamepad (non-failover)"
+                        if re.fullmatch(r"gex-gp-([1-9]|1[0-6])", service_device_id)
+                        else "Other Maestro device (non-failover)"
+                    )
+                )
+                display_name = cap.name
                 label = QDataLabel(
-                    f"{cap.name}  [{device_id}/{cap.kind}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if device_id in active else 'Inactive'}"
+                    f"{display_name}  [{service_device_id}/{cap.kind}] ({category}) — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if service_device_id in active_service_ids else 'Inactive'}"
                 )
                 label.setTextFormat(QtCore.Qt.TextFormat.PlainText)
                 label.setWordWrap(True)
-                # edit = QDataPushButton("...", data=device_id, callback=self._edit_clicked)
-                delete = Buttons.getDeleteWidget(data=device_id, callback=self._delete_clicked)
+                dark = gremlin.shared_state.is_dark_theme
+                background = self._color(failover, is_gamepad)
+                border = background
+                foreground = "#F2F2F2" if dark else "#202020"
+                label.setStyleSheet(
+                    f"color: {foreground}; background-color: {background}; border: 1px solid {border}; border-radius: 6px; padding: 5px;"
+                )
+                label.setToolTip(
+                    "Green: active GEX failover devices (gex-1 to gex-16). Blue: inactive or non-failover Maestro devices."
+                )
+                delete = Buttons.getDeleteWidget(data=service_device_id, callback=self._delete_clicked)
                 self.device_list.addWidget(
                     getHContainer([checkbox, (label, 1), delete], right_stretch=False, widget_only=True)
                 )
                 if self.verbose:
                     syslog.info(
-                        f"\tDevice: {cap.name} [{device_id}] — kind: [{cap.kind}] Maestro build profile: [{cap.used_profile_name}] — type: [{cap.type}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if device_id in active else 'Inactive'}"
+                        f"\tDevice: {display_name} [{service_device_id}] — kind: [{cap.kind}] Maestro build profile: [{cap.used_profile_name}] — type: [{cap.type}] — {axes} axes, {buttons} buttons, {hats} hats — {'Active' if service_device_id in active_service_ids else 'Inactive'}"
                     )
 
         else:
             self.device_list.addWidget(QDataLabel("No devices were found. Use New Device or presets to create some."))
 
     def _selection_changed(self, widget, checked):
+        service_device_id = widget.data
         if checked:
-            self._selected_ids.add(widget.data.device_id)
+            self._selected_service_device_ids.add(service_device_id)
         else:
-            self._selected_ids.discard(widget.data.device_id)
+            self._selected_service_device_ids.discard(service_device_id)
+        self._update_ui()
 
-    def _delete_clicked(self, widget, data):
-        self._delete_device(data)
+    def _delete_clicked(self, widget, service_device_id):
+        self._delete_device(service_device_id)
 
-    def _delete_device(self, device_id):
+    def _delete_device(self, service_device_id):
         def operation():
-            self.maestro.deleteDevice(device_id).raise_for_error()
+            self.maestro.deleteDevice(service_device_id).raise_for_error()
             return self._read_snapshot()
 
         def complete(snapshot):
-            self._selected_ids.discard(device_id)
+            self._selected_service_device_ids.discard(service_device_id)
             self._load_snapshot(snapshot)
             self.devices_changed.emit()
-            self.status_widget.setText(f"Deleted Maestro device {device_id}.")
+            self.status_widget.setText(f"Deleted Maestro device {service_device_id}.")
 
         self._submit(operation, complete, "Deleting device…")
 
     def _create_new_joystick(self):
         """Prompts for all device creation parameters and creates the device on the host."""
-        dialog = MaestroNewDeviceDialog(self._profiles, self._definitions.keys(), self)
+        dialog = MaestroNewDeviceDialog(self._profiles_by_profile_id, self._definitions_by_service_id.keys(), self)
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
         definition = dialog.definition()
-        device_id = definition["id"]
+        service_device_id = definition["id"]
         include = dialog.include
-        if include and len(self._selected_ids) >= GEX_MAX_DEVICES:
+        if include and len(self._selected_service_device_ids) >= GEX_MAX_DEVICES:
             self.warning_widget.setText(
                 f"Gremlin supports at most {GEX_MAX_DEVICES} Maestro targets. Uncheck another device first."
             )
@@ -3479,7 +3826,7 @@ class MaestroDialog(QRememberDialog):
                 return
             if not save_device_definition(self.maestro.client, definition, None):
                 raise RuntimeError(
-                    f"The Maestro service could not create {device_id}. Refresh to read its current devices."
+                    f"The Maestro service could not create {service_device_id}. Refresh to read its current devices."
                 )
             return self._read_snapshot()
 
@@ -3488,8 +3835,8 @@ class MaestroDialog(QRememberDialog):
                 # no data available (can happen if the bridge is not connected)
                 return
             if include:
-                self._selected_ids.add(device_id)
-            self._load_snapshot(snapshot, device_id)
+                self._selected_service_device_ids.add(service_device_id)
+            self._load_snapshot(snapshot, service_device_id)
             self._apply()
 
         self._submit(operation, complete, "Creating device…")
@@ -3498,21 +3845,27 @@ class MaestroDialog(QRememberDialog):
         """Create a gamepad using the next free host ID."""
         controller = self.maestro.createGamepadController()
         if controller is not None:
-            self._selected_ids.add(controller.id)
+            self._selected_service_device_ids.add(controller.service_device_id)
             self._refresh_devices()
 
     def _apply(self):
-        if len(self._selected_ids) > GEX_MAX_DEVICES:
+        if len(self._selected_service_device_ids) > GEX_MAX_DEVICES:
             self.warning_widget.setText(f"Select at most {GEX_MAX_DEVICES} Maestro targets.")
             return
-        current_map = self.config.maestro_device_map or {}
-        device_map = {key: value for key, value in current_map.items() if key in self._selected_ids}
-        for device_id in sorted(self._selected_ids):
-            if device_id not in device_map:
-                preferred = Maestro.klass._service_index(device_id)
+        current_service_id_to_slot = self.config.maestro_device_map or {}
+        service_id_to_slot = {
+            service_device_id: slot
+            for service_device_id, slot in current_service_id_to_slot.items()
+            if service_device_id in self._selected_service_device_ids
+        }
+        for service_device_id in sorted(self._selected_service_device_ids):
+            if service_device_id not in service_id_to_slot:
+                preferred = Maestro.klass._service_index(service_device_id)
                 slots = [preferred] if preferred is not None else []
                 slots += list(range(GEX_MAX_DEVICES))
-                device_map[device_id] = next(index for index in slots if index not in device_map.values())
+                service_id_to_slot[service_device_id] = next(
+                    index for index in slots if index not in service_id_to_slot.values()
+                )
         settings = self._tested_settings
         connected = self.maestro.connected()
 
@@ -3524,7 +3877,7 @@ class MaestroDialog(QRememberDialog):
                 self.maestro.connect(*settings)
                 connected = self.maestro.connected()
             if connected:
-                self.maestro.LoadActiveControllers(device_map)
+                self.maestro.LoadActiveControllers(service_id_to_slot)
                 self.maestro.populateDeviceList()
             else:
                 # Keep the management connection usable while output is off.
@@ -3532,9 +3885,12 @@ class MaestroDialog(QRememberDialog):
                 self.maestro._stopping.set()
                 with self.maestro._lock:
                     for controller in self.maestro._controller_map.values():
-                        result = self.maestro.client.request("/maestro_reset", controller.id, timeout=0.3, attempts=1)
+                        service_device_id = controller.service_device_id
+                        result = self.maestro.client.request(
+                            "/maestro_reset", service_device_id, timeout=0.3, attempts=1
+                        )
                         if not result:
-                            syslog.error(f"MAESTRO: failed to reset controller {controller.id}: {result.message}")
+                            syslog.error(f"MAESTRO: failed to reset controller {service_device_id}: {result.message}")
                     self.maestro._controller_map.clear()
                     self.maestro._device_map.clear()
                     self.maestro._buffer_map.clear()
@@ -3551,8 +3907,8 @@ class MaestroDialog(QRememberDialog):
                 self.config.maestro_osc_reply_host,
                 self.config.maestro_osc_reply_port,
             ) = settings
-            self.config.maestro_device_map = device_map
-            self.config.maestro_device_count = len(device_map)
+            self.config.maestro_device_map = service_id_to_slot
+            self.config.maestro_device_count = len(service_id_to_slot)
             self.config.maestro_enabled = connected
             self.config.save()
             if snapshot is not None:

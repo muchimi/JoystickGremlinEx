@@ -48,8 +48,9 @@ class MaestroIdentityChecks(unittest.TestCase):
         self.registry["_maestro_excluded_native_guids"] = set()
         self.registry["updateFailoverMap"] = Mock()
         source_definitions("gremlin/joystick_handling.py", {
+            "isDeviceValid", "_is_excluded_native_joystick",
             "display_devices", "set_maestro_devices", "_is_cached_maestro_device", "_maestro_output_summary", "_apply_maestro_service_devices", "_maestro_failover_id", "_update_joystick_device_maps", "_update_virtual_map",
-            "virtual_devices", "vjoy_devices", "_native_vjoy_devices", "maestro_devices", "maestro_device_map", "all_joystick_devices",
+            "virtual_devices", "vjoy_devices", "get_native_vjoy_devices", "maestro_devices", "maestro_device_map", "all_joystick_devices",
         }, self.registry)
         publish = patch.object(GREMLIN.joystick_handling, "set_maestro_devices", self.registry["set_maestro_devices"])
         publish.start()
@@ -381,22 +382,22 @@ class MaestroIdentityChecks(unittest.TestCase):
                 self.client.request.assert_not_called()
 
     def test_repeated_presets_append_sequential_devices(self):
-        dialog = NS(maestro=self.maestro, _selected_ids=set(), _refresh_devices=Mock())
+        dialog = NS(maestro=self.maestro, _selected_service_device_ids=set(), _refresh_devices=Mock())
         for _ in range(2):
             MAESTRO.MaestroDialog._handle_preset_selected(dialog, "Joysticks", dict(
                 type="joystick", count=2, axes=8, buttons=128, hats=4,
             ))
             MAESTRO.MaestroDialog._handle_preset_selected(dialog, "Gamepad", dict(type="gamepad"))
         expected = {"gex-2", "gex-3", "gex-4", "gex-5", "gex-gp-2", "gex-gp-3"}
-        self.assertEqual(dialog._selected_ids, expected)
+        self.assertEqual(dialog._selected_service_device_ids, expected)
         self.assertEqual(set(self.definitions), expected | {"gex-1", "gex-gp-1"})
         self.assertEqual(dialog._refresh_devices.call_count, 4)
 
     def test_gamepad_action_skips_host_devices_outside_controller_map(self):
-        dialog = NS(maestro=self.maestro, _selected_ids=set(), _refresh_devices=Mock())
+        dialog = NS(maestro=self.maestro, _selected_service_device_ids=set(), _refresh_devices=Mock())
         for _ in range(2):
             MAESTRO.MaestroDialog._create_new_gamepad(dialog)
-        self.assertEqual(dialog._selected_ids, {"gex-gp-2", "gex-gp-3"})
+        self.assertEqual(dialog._selected_service_device_ids, {"gex-gp-2", "gex-gp-3"})
         self.assertEqual(dialog._refresh_devices.call_count, 2)
 
     def test_each_device_writes_to_its_own_osc_address(self):

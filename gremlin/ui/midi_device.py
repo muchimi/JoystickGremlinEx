@@ -1857,13 +1857,15 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
 
     def _cleanup_ui(self):
         """called when the MIDI device UI is being cleaned up"""
-        super()._cleanup_ui()
         el = gremlin.event_handler.EventListener()
-        for signal, slot in (el.edit_mode_changed, self._handle_edit_mode_changed):
+        for signal, slot in ((el.edit_mode_changed, self._handle_edit_mode_changed),):
             try:
                 signal.disconnect(slot)
             except Exception:
                 pass
+
+        super()._cleanup_ui()
+
 
     def _load_handler(self, model: MidiInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""

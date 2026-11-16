@@ -115,5 +115,48 @@ class StartupOutputChecks(unittest.TestCase):
         self.assertEqual(self.axis, {("native-guid", 5): 0.4})
 
 
+class MaestroSlotStartupChecks(unittest.TestCase):
+    def test_vjoy_one_startup_uses_matching_maestro_slot(self):
+        handling = ast.parse((ROOT / "gremlin/joystick_handling.py").read_bytes())
+        maestro = ast.parse((ROOT / "gremlin/maestro.py").read_bytes())
+        nodes = [node for node in handling.body if getattr(node, "name", None) in {"OutputTarget", "set_button"}]
+        startup = next(node for node in handling.body if isinstance(node, ast.ClassDef) and node.name == "VjoyStart")
+        startup.decorator_list = []
+        startup.body = [node for node in startup.body if getattr(node, "name", None) == "apply"]
+        nodes.append(startup)
+        nodes.extend(node for node in maestro.body if getattr(node, "name", None) in {"MaestroOutputDevice", "MaestroButton"})
+        remote = NS(remote_client=NS(send_button=Mock()))
+        events = NS(JoystickState=lambda: NS(outputIgnored=lambda key: False))
+        services = NS(event_handler=events, remote=remote)
+        namespace = dict(gremlin=services)
+        future = ast.parse("from __future__ import annotations").body
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[*future, *nodes], type_ignores=[])),
+                     "slot_startup_checks", "exec"), namespace)
+        for slot in (0, 7):
+            with self.subTest(slot=slot):
+                controller = NS(button_count=128)
+                backend = NS(getController=lambda index: controller if index == slot else None,
+                             markOutputUsed=Mock(), setButton=Mock())
+                namespace["Maestro"] = lambda: backend
+                device = NS(button_count=128, virtual_id=slot)
+                source = NS(virtual_id=1)
+                target = namespace["OutputTarget"](device, "maestro", out_id=slot, virtual_id=1, source_device=source)
+                namespace["get_output_target"] = lambda key: target if key == 1 else None
+                namespace["getDeviceFromVjoyId"] = lambda key: device
+                start = namespace["VjoyStart"]()
+                start._axis_data = {}
+                start._button_data = {1: {128: True, 1: False}}
+                remote.remote_client.send_button.reset_mock()
+                with patch.dict(sys.modules, {"gremlin": services, "gremlin.event_handler": events,
+                                             "gremlin.remote": remote,
+                                             "gremlin.maestro": NS(MaestroOutputDevice=namespace["MaestroOutputDevice"])}):
+                    start.apply()
+                self.assertEqual([args.args for args in backend.setButton.call_args_list],
+                                 [(slot, 128, True), (slot, 1, False)])
+                self.assertEqual([args.args for args in remote.remote_client.send_button.call_args_list],
+                                 [(1, 128, True), (1, 1, False)])
+                self.assertEqual(target.virtual_id, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

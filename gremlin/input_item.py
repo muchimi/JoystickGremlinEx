@@ -12593,6 +12593,15 @@ class BaseDeviceTabWidget(QSplitTabWidget):
             except Exception:
                 pass
 
+        # Detach every device tab's model before callbacks or child cleanup
+        # can observe disposed filter maps. State and voice tabs keep aliases.
+        model = self._input_item_list_model
+        self.setInputItemListModel(None)
+        if model is not None:
+            for attribute in ("model", "_model"):
+                if self.__dict__.get(attribute) is model:
+                    setattr(self, attribute, None)
+
         if self._input_item_list_view is not None and Shiboken.isValid(self._input_item_list_view):
             gremlin.util.delete_widget(self._input_item_list_view)
 
@@ -12600,8 +12609,8 @@ class BaseDeviceTabWidget(QSplitTabWidget):
         gremlin.util.clear_layout(self.main_layout)
 
         self._input_item_list_view = None
-        self._input_item_list_model.dispose()
-        self._input_item_list_model = None
+        if model is not None:
+            model.dispose()
 
         self.setInputItemListView(None)
         el.input_deleted.disconnect(self._handle_input_deleted)
@@ -12949,7 +12958,7 @@ class BaseDeviceTabWidget(QSplitTabWidget):
             self._input_item_list_model = model
         if self._input_item_list_view is not None:
             self._input_item_list_view.setModel(model)
-            if model_callback is not None:
+            if model is not None and model_callback is not None:
                 self._input_item_list_model.addCallback(model_callback)
 
         # trap input item add/remove events
