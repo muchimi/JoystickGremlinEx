@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -520,7 +520,62 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features: What is GremlinEx?">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licensing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-software" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional software
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional software">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -594,17 +649,6 @@
     <span class="md-ellipsis">
       
         VJoy manual control
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hidmaestro-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        HIDMaestro development
       
     </span>
   </a>
@@ -1074,7 +1118,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
+  <a href="#installation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Installation
@@ -1665,7 +1709,62 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Key Features: What is GremlinEx?">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#licensing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Licensing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#additional-software" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional software
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Additional software">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1739,17 +1838,6 @@
     <span class="md-ellipsis">
       
         VJoy manual control
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hidmaestro-development" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        HIDMaestro development
       
     </span>
   </a>
@@ -2219,7 +2307,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
+  <a href="#installation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Installation
@@ -2596,32 +2684,195 @@
 
 
 <h1 id="gremlinex-gex-overview-updated-for-gex-m77-series">GremlinEx (GEX) Overview - updated for GEX m77 series<a class="headerlink" href="#gremlinex-gex-overview-updated-for-gex-m77-series" title="Permanent link">¶</a></h1>
-<pre><code> THIS DOCUMENTATION IS A WORK IN PROGRESS
+<pre><code> THIS DOCUMENTATION IS A WORK IN PROGRESS and M77 IS IN STABLE TESTING STATUS CURRENTLY
 </code></pre>
 <p>GremlinEx (GEX) is an integrator software specifically targetting game and simulator controls.</p>
 <p>GEX combines inputs from joysticks, gamepads, keyboards, mice, hardware panels (some of which can be networked), into mappings for games, simulators, and other applications. Output support features include virtual joysticks, virtual gamepads, keyboard and mouse commands, OSC messages, simulator commands, and audio.  These are used by the target application and look like any regular hardware device connected to the machine.</p>
-<p>This overview covers the <strong>m77 development series</strong>, including its Overlay, Stream Deck, Voice, and AFCS modules. Enable the modules you need in <strong>Options → Modules</strong>; availability can depend on the build and installed dependencies.</p>
+<p>This overview covers the <strong>m77 development series</strong>, including its Bridge, Overlay, Stream Deck, Voice, and AFCS modules. Enable the modules you need in <strong>Options → Modules</strong>; availability can depend on the build and installed dependencies.</p>
 <p>By integration, we mean that GEX can combine inputs together from multiple excletic devices into a single, consolidated logical output set, featuring advanced transformations via filters and transformations, and output this to applications running on the same, or different system.</p>
-<p>The project's <a href="https://github.com/muchimi/JoystickGremlinEx">home is on GitHub</a> from where you can download the latest releases and view patch notes.</p>
+<p>The project's <a href="https://github.com/muchimi/JoystickGremlinEx">home can be found on GitHub</a> from where you can download the latest releases and view patch notes.</p>
 <p>The project has a dedicated <a href="https://discord.com/channels/1279461873317707827">Discord server</a> where you can lookup solutions to typical mapping questions, how-to, ask questions and report any issues.</p>
 <p>GEX is in active development and testing, and relies on feedback from the user community.</p>
 <h2 id="key-features-what-is-gremlinex">Key Features: What is GremlinEx?<a class="headerlink" href="#key-features-what-is-gremlinex" title="Permanent link">¶</a></h2>
-<p>GEX is an open source application, distributed as source code, or a packaged application (.exe), and an installation package for ease of use.</p>
-<p>GEX currently only supports the Windows 10 or 11 x64 operating system due to underlying dependencies, so targets the Windows gaming/simulation platform.</p>
-<p>GEX transforms, applies decision logic using a state machine or conditions, nested modes and concurrent, real time, input from multiple devices to program a profile.  The profile's mappings and design results in a consolidated set of virtual axis, button, hat and keyboard and mouse sent to the target applications based on your preferences.  As such, multiple behaviors can be achieved, from curving an axis, to merging multiple inputs together, to changing the behavior on the fly with modes, states and conditions.  You can output macros, create actions from specific positions on an axis or directional movement, to specifically design the input data seen by the target game or simulator.</p>
-<p>GEX lets you use non traditional inputs, such as input from Streamdeck devices, touch (glass) surfaces, and sound stage controllers (faders, encoders), including over local netowrk, as input into a game that does not support these devices.</p>
-<p>GEX supports remote output to other GEX instances on the local network, and use inputs from devices connected to other computers as well, and fully supports environments like simpits.</p>
-<p>With m77, GEX also gained the ability to manage graphical overlays for in-game for streaming or educational use, optical character recognition, and also has support for web inputs to support non Windows devices like smartphones and touch-enabled tablets.</p>
-<p>To augment the gaming experience, GEX also supports high quality AI based text to speech (TTS), and AI based voice recognition that can be mapped to trigger profile actions you have mapped.  It can also playback multiple audio streams concurrently and perform basic audio filtering like fade-in and fade-out, volume and playback rate manipulations.</p>
-<p>GEX supports custom modules, such as the support for Microsoft Flight Simulator's SDK and API (SimConnect) including support of internal expressions to manage MSFS aircraft, incuding third party add-on products, from within a GEX profile.  This lets you manage MSFS without mapping devices in MSFS.</p>
-<p>GEX is vendor agnostic.  It is compatible with any Windows compatible game controller, keyboard and mouse.  It relies on published hardware API standards that all controllers must follow to be recognized as a Windows controller.  It is not dependent on third party proprietary software.  GEX only uses open source components and works with any application that uses standard keyboard, mouse, DINPUT (and for gamepads, XINPUT) standards, and indeed implements many features of payware applications.</p>
+<p>GEX is an open source application, distributed as source code, or a packaged application (.exe), and an installation package for ease of use.  It is now loosely based on a fork from Joystick Gremlin by Whitemagic v13.  As of the m77 release, GEX retains very little of that source beyond the general concept.</p>
+<table>
+<thead>
+<tr>
+<th>GEX m77 main feature set</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Virtual joystick/gamepad support</td>
+<td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.</td>
+</tr>
+<tr>
+<td>Network output support</td>
+<td>GEX can send outputs to other GEX clients on the network allowing them to accept mappings from a master GEX instance on a local network computer.  This feature can enabled on the fly via profile controls.</td>
+</tr>
+<tr>
+<td>Vendor agnostic</td>
+<td>GEX does not require any software from a hardware vendor provided the device is recognized by Windows. It thus replaces vendor specific programming/mapping software and works with any supported Windows controller.</td>
+</tr>
+<tr>
+<td>Full support for HID Hide</td>
+<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.</td>
+</tr>
+<tr>
+<td>Full support for DINPUT devices</td>
+<td>GEX works with any HID device recognized through the Microsoft DINPUT API (Windows game controllers).</td>
+</tr>
+<tr>
+<td>Full support for console controllers</td>
+<td>GEX accepts inputs from console controllers compatible with Windows.</td>
+</tr>
+<tr>
+<td>Full support for keyboard and mouse</td>
+<td>GEX accepts inputs from keyboards and mouse, including all mouse buttons and wheels.</td>
+</tr>
+<tr>
+<td>Full support for Elgato Streamdeck</td>
+<td>GEX supports the Elgato Streamdeck via the Streamdeck Bridge module or via Bitfocus Companion over OSC.</td>
+</tr>
+<tr>
+<td>Full support for virtual inputs</td>
+<td>GEX virtual output can also be used as inputs to the same profile.  This adds the ability to create virtual linear and button inputs to any profile.</td>
+</tr>
+<tr>
+<td>Full support for the OSC protocol</td>
+<td>GEX supports the OSC (Open Sound Control) network protocol used, among other things, to collect input from stage control hardware such as lighting consoles, sound and stage control.  These devices are compatible with GEX because they have buttons, encoders and faders that can be used for game input.  GEX works with any BitFocus Companion supported devices, and MIDI devices as well. OSC itself is a binary protocol with low latency and is ideal to communicate controller data real time to devices on the local network.</td>
+</tr>
+<tr>
+<td>Full support for touch (glass) surfaces.</td>
+<td>GEX supports glass surfaces either via it's touch aware web input overlay, or via graphical applications that output OSC, such as the Open Stage Control application.  This provides GEX with the ability to accept touch screen input for encoders, faders and buttons, with two way communication over the OSC protocol, or via the Overlay feature.  The web client lets smartphones and tablets like iPads send input to GEX.  Note: a current Windows limitation is touch screens have to be networked.</td>
+</tr>
+<tr>
+<td>Automatic XINPUT/XUSB output conversion</td>
+<td>GEX's joystick mapping automatically translates output to XINPUT/XUSB for games that only support console controllers if the virtual output is</td>
+</tr>
+<tr>
+<td>Simpit support</td>
+<td>GEX supports networked inputs for simpit type applications where multiple computers are used to manage very complex hardware cockpits.</td>
+</tr>
+<tr>
+<td>Game overlay</td>
+<td>Supports streamers and instructional videos via its graphical overlay module compatible with OBS.  The overlay can be customized with graphical widgets that show inputs or outputs, states and other features.</td>
+</tr>
+<tr>
+<td>OCR (character recognition)</td>
+<td>The overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
+</tr>
+<tr>
+<td>Web input/output</td>
+<td>Supports web input interfaces that can be designed in GEX to support web based touch screens like phones and tablets (non-Windows).  This is part of the overlay system.</td>
+</tr>
+<tr>
+<td>Network remote control</td>
+<td>Supports remote control and remote input from multiple local GEX clients for joystick, keyboard and mouse.  This behavior can be triggered on/off via control inputs.</td>
+</tr>
+<tr>
+<td>State machine</td>
+<td>GEX includes a state machine engine.  States can trigger actions, including other states. State expressions allow states to trigger based on other states in real-time.  States can also be exclusive or inclusive by state group (for example, only one state within a group of states can be set at a time in that group).  States can be used to implement exceedingly complex state machine grammars in mapping profiles.  This can be used for branching logic, triggering sequences or ensuring that multiple conditions are met.  States  can also be used as virtual buttons and to consolidate multiple inputs into a single action. States can be used as conditions as well.</td>
+</tr>
+<tr>
+<td>Mode support</td>
+<td>GEX profiles support hierarchical modes. Each mode can have its own mappings, and optionally carry over mappings from a parent mode if not defined at the submode level.</td>
+</tr>
+<tr>
+<td>Execution engine</td>
+<td>GEX implements a very high performance execution engine optimized for low latency mapping (as measured from the time an input changes to the time an output is generated).</td>
+</tr>
+<tr>
+<td>Advanced sound output</td>
+<td>GEX includes a sound engine able to playback multiple concurrent audio streams and includes real time audio processing as pitch corrected playback speed, volume control, and fade in/out options.   GEX can also play random sounds.</td>
+</tr>
+<tr>
+<td>High quality text to speech using AI</td>
+<td>GEX includes a text to speech engine that works with EdgeAI to generate high quality voices for text to speech in a variety of voices and localizations, as well as legacy TTS speech using the older internal Windows TTS API for compatibility purposes. GEX also supports multiple phrasing within each TTS mapping allowing to pick a phrase from several choices randomly to help with a more immersive experience.</td>
+</tr>
+<tr>
+<td>Voice recognition</td>
+<td>GEX implements the OpenAI Whisper open source engine for voice recognition to trigger commands from spoken voice.  Because this is AI based, no training is required.  Supports advanced features such as push-to-talk, reverse push-to-talk (listen unless PTTS pressed).</td>
+</tr>
+<tr>
+<td>Advanced linear input (axis) processing</td>
+<td>GEX includes advanced mapping options for linear input including directional and range based triggers, axis merging with other axes with each merge having its own computational operation such as add, substact, trim, scale, average.</td>
+</tr>
+<tr>
+<td>Advanced momentary input (button) processing</td>
+<td>GEX's mapping engine supports encoder input with acceleration and latching of companion inputs for reversed inputs (such as an input for down, and a latched input for up on the same mappping).</td>
+</tr>
+<tr>
+<td>Advanced keyboard input processing</td>
+<td>GEX's keyboard engine supports non traditional keys including F13 to F23 and multi-key latching including non standard shift states.</td>
+</tr>
+<tr>
+<td>Advanced keyboard and mouse output processing</td>
+<td>GEX can produce complex keyboard and mouse button/wheel outputs.  It can separate a make (press) or break (release), pulse and hold functions.  The keyboard output supports all extended keys including F13 to F24, all mouse buttons and wheels, and media control keys and any number of keys pressed at the same time.</td>
+</tr>
+<tr>
+<td>Macros, chains and sequences</td>
+<td>GEX supports traditional macros, and adds a higher level sequence container that can be used to sequence actions in a loop, or randomly, with various stepped modes as well.</td>
+</tr>
+<tr>
+<td>Microsoft MSFS Simconnect support</td>
+<td>Supports direct control of Microsoft FLight Simulator 2024 via the Simconnect SDK including calculated expressions to bypass any mapping done in MSFS</td>
+</tr>
+<tr>
+<td>Visual repeaters</td>
+<td>Provides visual real time input repeaters as well as an output viewer</td>
+</tr>
+<tr>
+<td>Input highlighting</td>
+<td>GEX can automatically detect inputs and jump to that device/input automatically.</td>
+</tr>
+<tr>
+<td>Device Filtering</td>
+<td>GEX can filter input devices that are not used, and also reduce the displayed inputs (axis, buttons or hats) to manage profile editing without having thousands of inputs displayed concurrently in the UI.</td>
+</tr>
+<tr>
+<td>Theme aware modern UI</td>
+<td>The UI supports the default Windows theme, custom colors, or dark/light modes</td>
+</tr>
+<tr>
+<td>Custom modules</td>
+<td>GEX exposes an API that supports custom Python modules to access GEX mapping services and events.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="platform-requirements">Platform requirements<a class="headerlink" href="#platform-requirements" title="Permanent link">¶</a></h2>
+<p>GEX currently supports the Windows 11 x64 operating system (home, pro and other editions) due to underlying dependencies.  Additional input platforms such as phones and tablets are supported via the web overlay interface, or OSC compatible applications that can run on non Windows operating systems.</p>
+<p>GEX is written in Python, C# (.NET 10) and C++.</p>
+<h2 id="licensing">Licensing<a class="headerlink" href="#licensing" title="Permanent link">¶</a></h2>
+<p>GEX is offered as a GPL 3 license.  Other open source dependencies have their own license, as do any publicly reditributable components.  By using GEX, you agree to the terms and conditions of the GPL 3 license, as well as the terms of any dependencies.  The distribution media includes a licensing folder that references all licenses.</p>
+<p>GEX is not commercial software.  Donations are however highly appreciated to support the on-going development.</p>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¶</a></h2>
+<p>As of m77, GEX is installed via standard Windows installers for convenience, although portable .ZIP archives are also supported.  The GEX installer will optionally install the bridge component (recommended).</p>
+<p>The default installation of the bridge component is to run locally (advanced networking is supported and is not meant for typical deployments).</p>
+<p>The installer for GEX will by default install GEX to a versioned folder, allowing multiple releases to co-exist.  The bridge installer is also versioned, but as only one bridge can be installed at a time, the same folder is used, and the installer will do an upgrade in place if a new version is available.</p>
+<p>Versions are usually backards compatible unless otherwise noted in the patch notes.  Note that any profile conversions make the profile incompatible with a prior release, so make backups of any current profiles.</p>
+<p>Profile compatibility with original Joystick Gremlin profiles (v13) is not a guarantee but in general has been tested to convert correctly.  It is however not recommended to use old profiles without some editing to take advantage of the features available in GEX.</p>
+<h2 id="source-code">Source code<a class="headerlink" href="#source-code" title="Permanent link">¶</a></h2>
+<p>GEX is open source and only uses open source components, and includes publicly non-commercial redistributable components as dependencies.  The source code for GEX, the bridge and the C++ components are available on GitHub.</p>
+<h2 id="additional-software">Additional software<a class="headerlink" href="#additional-software" title="Permanent link">¶</a></h2>
+<p>GEX includes all necessary software and libraries and redistributables.  If using the GEX Bridge (recommended), this includes the virtual drivers for joystick and gamepad support.  If not using the GEX Bridge, a separate installation of vJoy is required (optionally VIGEM).</p>
+<p>Please note that at this time, vJoy and VIGEM are no longer actively supported by their authors, they are much older, and require secure driver certificate and separate installation.  The GEX bridge component was created to provide identical or more advanced features, and does not require any additional software, nor the installation of kernel mode drivers.</p>
+<p><a href="https://github.com/nefarius/hidhide">HIDHide</a> is highly recommended to be used in conjunction with GEX to hide devices from a game application so it only sees the virtual outputs from GEX.</p>
+<p>No additional software beyond GEX and the GEX Bridge are needed.  vJoy / VIGEM are no longer required.  Controller specific software outside of components necessary for Windows to recognize the device (such as a device driver if needed) is not required and in fact should not be used as all programming is done in GEX.</p>
 <h3 id="programming-virtual-joystick-and-gamepad-devices">Programming virtual joystick and gamepad devices<a class="headerlink" href="#programming-virtual-joystick-and-gamepad-devices" title="Permanent link">¶</a></h3>
-<p>The primary purpose of GEX is to take input from joystick, gamepad, keyboard, mouse connected to the computer, and other inputs like OSC or MIDI devices and map them to one or more virtual joysticks (or gamepads) used by games and simulators.  GEX supports the older vJoy/VIGEM virtual devices, and the newer HID Maestro devices.</p>
+<p>The primary purpose of GEX is to take input from joystick, gamepad, keyboard, mouse connected to the computer, and other virtual inputs like OSC or MIDI devices that can come from the local machine or the local network, and map them to one or more virtual joysticks (or gamepads) used by games and simulators.  GEX supports the older vJoy/VIGEM virtual devices, and the newer HID Maestro devices.</p>
 <p>GEX supports the following virtual devices that are seen by an application as regular Windows controllers:</p>
 <ul>
-<li><a href="https://github.com/shauleiz/vJoy">vJoy</a> (and derivatives for Windows 11 support) for virtual joysticks - this driver is no longer actively supported by the developer</li>
-<li><a href="https://github.com/nefarius/vigembus">VIGEM</a> for virtual gamepads - this driver is no longer actively supported by the developer</li>
-<li>(recommended) <a href="https://github.com/hifihedgehog/HIDMaestro">HID Maestro</a> for joystick and virtual gamepads via the <a href="https://github.com/muchimi/JoystickGremlinBridge">GEX Maestro Bridge</a> - this driver is actively supported by the developer and does not run in kernel mode.  No additional software is needed as GEX includes all that is needed.</li>
+<li>
+<p>(recommended) <a href="github.com/muchimi/GEXMaestroBridgeService">GEX Bridge</a> This new component part of m77 replaces older vJoy and VIGEM components.  This software implements virtual joystick and gamepad support via <a href="https://github.com/hifihedgehog/HIDMaestro">HID Maestro</a>.  This component can be installed with the main GEX installer and does not need to be installed separately, but can be.</p>
+</li>
+<li>
+<p>(optional - legacy) <a href="https://github.com/shauleiz/vJoy">vJoy</a> (and derivatives for Windows 11 support) for virtual joysticks - this driver is no longer actively supported by the developer</p>
+</li>
+<li>
+<p>(optional - legacy) <a href="https://github.com/nefarius/vigembus">VIGEM</a> for virtual gamepads - this driver is no longer actively supported by the developer</p>
+</li>
 </ul>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> The bridge software replaces vJoy/VIGEM and may not be used concurrently with vJoy/VIGEM.</p>
 <p>GEX meant to be used in conjunction with <a href="https://github.com/nefarius/hidhide">HID Hide</a>.  This is so the target application only see the virtual devices, not the real devices.</p>
@@ -2647,8 +2898,6 @@
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/warning.png" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png"></a> VJOY input devices tend to create a significant number of inputs that GEX needs to track - up to 140 inputs per VJOY device used as input.  This can degrade user interface (UI) performance and increase the memory footprint at design time because of the need to visualize and track all these inputs.  Use the input filtering option available as of m76T115 to reduce the number of inputs visible in VJOY devices to keep the input count to a reasonable level.  The impact level is based on hardware capabilities, and the total number of inputs managed by GEX.  It is usually not an issue until you start getting into 400 to 500 inputs GEX has to track at the same time at edit time.  This does not impact runtime performance at all.  If you start noticing edit time performance degradation, it is likely due to the number of inputs and filtering should be used to keep that to a reasonable level.</p>
 <h3 id="vjoy-manual-control">VJoy manual control<a class="headerlink" href="#vjoy-manual-control" title="Permanent link">¶</a></h3>
 <p>GremlinEx's Input Viewer can manually set vJoy buttons, hats, and axes to help design and test mappings. The m77 viewer also offers <strong>Select Used</strong> to select inputs and outputs referenced by the current profile. Its state display supports category and attribute filters, including saved state-filter selections.</p>
-<h3 id="hidmaestro-development">HIDMaestro development<a class="headerlink" href="#hidmaestro-development" title="Permanent link">¶</a></h3>
-<p>m77 includes initial work on a Maestro Bridge and HIDMaestro virtual-controller support through the same mapping actions used for vJoy. <strong>The current version of m77 disable this feature</strong> as it is still under devleopment and testing.  It is not a replacement for the released vJoy setup at this stage; check the release notes for the build you install before planning to use Maestro.</p>
 <h3 id="in-game-mapper-augmentation">In-game mapper augmentation<a class="headerlink" href="#in-game-mapper-augmentation" title="Permanent link">¶</a></h3>
 <p>GremlinEx can achieve very complex mappings that are not supported by a game.  It can take complicated inputs (such as from multiple controllers) and map it to something the game does support, and the game does not need to be aware of these inputs, as it will not see them.  The game will only see a supported command.</p>
 <p>For example, you can combine inputs such as a keyboard key in combination with a joystick button and map that to a unique function in the game, even if the buit-in game mapper does not support these kinds of cross-hardware combinations.</p>
@@ -3092,7 +3341,7 @@ Some outputs can only be momentary (example, SimConnect), and thus only have a p
 <h2 id="supported-environments">Supported environments<a class="headerlink" href="#supported-environments" title="Permanent link">¶</a></h2>
 <p>The main GremlinEx application runs on <strong>Windows x64</strong>. m77 uses <strong>Python 3.14</strong> and <strong>Qt 6 / PySide6</strong>. The <a href="../resources/">resource section</a> covers the platform and external components used by the project.</p>
 <p>Networked browser panels can run on phones and tablets while the Windows host performs the mappings and device output.</p>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¶</a></h2>
+<h2 id="installation_1">Installation<a class="headerlink" href="#installation_1" title="Permanent link">¶</a></h2>
 <p>The packaged application includes its Python 3.14 runtime and application libraries, so a separate Python installation is not needed to use that package. Extract the distribution to an application folder and retain its supporting files.</p>
 <p>Configure the external components required by the outputs you intend to use, such as a virtual-controller driver, HidHide, or a simulator bridge. Optional speech/OCR features can also need models or tools downloaded on first use.</p>
 <h3 id="optional-modules">Optional modules<a class="headerlink" href="#optional-modules" title="Permanent link">¶</a></h3>
@@ -3446,7 +3695,7 @@ GremlinEx is an open source project and all sources are available as an alternat
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   
