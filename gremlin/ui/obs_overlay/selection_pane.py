@@ -201,7 +201,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         self._tree.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._on_tree_context_menu)
         self._tree.setToolTip(
-            "Groups appear as folders â€” click the arrow (or double-click the name) to expand or collapse. "
+            "Groups appear as folders — click the arrow (or double-click the name) to expand or collapse. "
             "Right-click for the same actions as on the designer canvas. "
             "Eye shows or hides. Lock keeps the position. Shift/Ctrl click to select several, then Group."
         )
@@ -261,7 +261,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         self._refresh_now()
 
     def _structure_signature(self):
-        """Ids / names / groups / flags â€” ignore style and selection so color edits skip rebuilds."""
+        """Ids / names / groups / flags — ignore style and selection so color edits skip rebuilds."""
         rows = []
         for item in self.scene.widgets:
             rows.append(
@@ -323,7 +323,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         row.setFont(2, font)
         row.setToolTip(0, "Show all widgets in this group" if not visible else "Hide all widgets in this group")
         row.setToolTip(1, "Unlock all in this group" if locked else "Lock all in this group")
-        row.setToolTip(2, f"Group folder: {name} â€” click the arrow or double-click to expand/collapse")
+        row.setToolTip(2, f"Group folder: {name} — click the arrow or double-click to expand/collapse")
         row.setData(0, _ROLE_KIND, "group")
         row.setData(0, _ROLE_GID, gid)
         row.setFlags(row.flags() | QtCore.Qt.ItemFlag.ItemIsAutoTristate)
@@ -331,7 +331,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
         return row
 
     def refresh(self):
-        """Public entry â€” coalesce onto the debounce timer when connected to scene.changed."""
+        """Public entry — coalesce onto the debounce timer when connected to scene.changed."""
         self._schedule_refresh()
 
     def _remember_expanded_state(self):
@@ -403,7 +403,7 @@ class OverlaySelectionPane(QtWidgets.QWidget):
                         child.setSelected(True)
                 parent.setExpanded(expanded)
                 if any(m.get("id") in selected for m in members):
-                    # Keep parent unselected unless every member is selected â€” avoids
+                    # Keep parent unselected unless every member is selected — avoids
                     # collapsing multi-select into the group row alone.
                     parent.setSelected(all(m.get("id") in selected for m in members))
 

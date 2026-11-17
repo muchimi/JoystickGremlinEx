@@ -38,8 +38,8 @@ _SHAPE_KIND_TOOLTIPS = {
     "line": "Open or closed polyline. Double-click the outline to add a point, then drag points to move them.",
     "freeform": (
         "Double-click the outline to add a point, then drag points to move them. "
-        "Yellow handles are BÃ©zier controls â€” drag them to curve a corner. "
-        "Hold Ctrl to snap a handle to 15Â° steps (0, 15, 30, 45â€¦). "
+        "Yellow handles are Bézier controls — drag them to curve a corner. "
+        "Hold Ctrl to snap a handle to 15° steps (0, 15, 30, 45…). "
         "Hold Alt and drag a handle to move it independently of the opposite handle."
     ),
 }
@@ -361,7 +361,7 @@ def _handle_point(item: dict[str, Any], point: dict[str, float], prefix: str) ->
 def snap_handle_offset(
     dx: float, dy: float, width: float, height: float, step_deg: float = 15.0
 ) -> tuple[float, float]:
-    """Snap a BÃ©zier handle offset to the nearest visual angle step (default 15Â°)."""
+    """Snap a Bézier handle offset to the nearest visual angle step (default 15°)."""
     px = float(dx) * max(1.0, float(width))
     py = float(dy) * max(1.0, float(height))
     length = math.hypot(px, py)
@@ -491,7 +491,7 @@ def _remap_shape_points(
 
 
 def expand_shape_widget_to_controls(item: dict[str, Any], points: list[dict[str, float]]) -> bool:
-    """Grow the widget so vertices and BÃ©zier handles stay inside. Scene positions stay put."""
+    """Grow the widget so vertices and Bézier handles stay inside. Scene positions stay put."""
     if not uses_bezier_edit(item) or not points:
         return False
     old_x = float(item["x"])

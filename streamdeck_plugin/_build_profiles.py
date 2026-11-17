@@ -1,4 +1,4 @@
-# Build JG Ex Stream Deck profile package(s) â€” one profile per device class.
+# Build JG Ex Stream Deck profile package(s) — one profile per device class.
 import argparse
 import json
 import shutil
@@ -14,7 +14,7 @@ BUTTON_UUID = "com.joystickgremlin.ex.button"
 PLUGIN_VERSION = "1.0.16"
 
 # Elgato DeviceType -> package / grid / DeviceModel for AutoInstall profiles.
-# Pages live inside each profile â€” never one profile per page.
+# Pages live inside each profile — never one profile per page.
 DEVICE_SPECS = {
     "xl": {
         "out_name": "jgex-xl",

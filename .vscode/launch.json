@@ -19,7 +19,7 @@
                 "GEX_MAESTRO_ENABLED": "1",
                 "GEX_OSC_ENABLED": "1",
                 "GEX_MIDI_ENABLED": "0",
-                "GEX_OVERLAY_ENABLED": "0",
+                "GEX_OVERLAY_ENABLED": "1",
                 "GEX_AFCS_ENABLED": "0",
                 "GEX_STREAMDECK_ENABLED": "0",
                 "GEX_OCTAVI_ENABLED": "0",

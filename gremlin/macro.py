@@ -2023,11 +2023,11 @@ class StreamDeckAction(MacroAbstractAction):
             if len(devices) == 1:
                 device_id = next(iter(devices.keys()))
             elif not devices:
-                syslog.warning("MACRO: Stream Deck â€” no deck connected")
+                syslog.warning("MACRO: Stream Deck — no deck connected")
                 return
             else:
                 syslog.warning(
-                    "MACRO: Stream Deck â€” no device selected and multiple decks connected"
+                    "MACRO: Stream Deck — no device selected and multiple decks connected"
                 )
                 return
 

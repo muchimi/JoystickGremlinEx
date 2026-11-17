@@ -62,7 +62,7 @@ class MouseRepositionBanner(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         label = QtWidgets.QLabel(
-            "Mouse repositioning is ON â€” click and drag overlay widgets to move them. "
+            "Mouse repositioning is ON — click and drag overlay widgets to move them. "
             "Interactive widgets are paused until this is turned off.",
             self,
         )
@@ -217,7 +217,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._filter_box.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._filter_box, 0)
         self._search_edit = QtWidgets.QLineEdit(self)
-        self._search_edit.setPlaceholderText("Filter by nameâ€¦")
+        self._search_edit.setPlaceholderText("Filter by name…")
         self._search_edit.setClearButtonEnabled(True)
         self._search_edit.textChanged.connect(self._on_search_changed)
         filter_row.addWidget(self._search_edit, 1)
@@ -248,15 +248,15 @@ class OverlayControlPanel(QtWidgets.QWidget):
             ("br", 2, 2),
         ]
         short = {
-            "tl": "â†–",
-            "tm": "â†‘",
-            "tr": "â†—",
-            "ml": "â†",
-            "center": "â—",
-            "mr": "â†’",
-            "bl": "â†™",
-            "bm": "â†“",
-            "br": "â†˜",
+            "tl": "↖",
+            "tm": "↑",
+            "tr": "↗",
+            "ml": "←",
+            "center": "●",
+            "mr": "→",
+            "bl": "↙",
+            "bm": "↓",
+            "br": "↘",
         }
         for key, row, col in grid:
             btn = QtWidgets.QToolButton(self)
@@ -296,12 +296,12 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._nudge_buttons: list[QtWidgets.QToolButton] = []
 
         # Layout like a keyboard arrow cluster:
-        #       [â†‘]
-        #   [â†] [â†“] [â†’]
+        #       [↑]
+        #   [←] [↓] [→]
         def _nudge_btn(label: str, dx: int, dy: int) -> QtWidgets.QToolButton:
             btn = QtWidgets.QToolButton(self)
             btn.setText(label)
-            btn.setToolTip(f"Nudge {label} â€” hold to keep moving (accelerates).")
+            btn.setToolTip(f"Nudge {label} — hold to keep moving (accelerates).")
             btn.setFixedSize(40, 32)
             btn.setAutoRaise(False)
             btn.setAutoRepeat(False)
@@ -310,10 +310,10 @@ class OverlayControlPanel(QtWidgets.QWidget):
             self._nudge_buttons.append(btn)
             return btn
 
-        nudge_pad.addWidget(_nudge_btn("â†‘", 0, -1), 0, 1)
-        nudge_pad.addWidget(_nudge_btn("â†", -1, 0), 1, 0)
-        nudge_pad.addWidget(_nudge_btn("â†“", 0, 1), 1, 1)
-        nudge_pad.addWidget(_nudge_btn("â†’", 1, 0), 1, 2)
+        nudge_pad.addWidget(_nudge_btn("↑", 0, -1), 0, 1)
+        nudge_pad.addWidget(_nudge_btn("←", -1, 0), 1, 0)
+        nudge_pad.addWidget(_nudge_btn("↓", 0, 1), 1, 1)
+        nudge_pad.addWidget(_nudge_btn("→", 1, 0), 1, 2)
         nudge_outer.addLayout(nudge_pad)
         hint = QtWidgets.QLabel("Hold an arrow to keep moving; speed increases while held.", self)
         hint.setWordWrap(True)
@@ -322,7 +322,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         self._mouse_reposition.setToolTip(
             "Drag widgets on the live overlay with the mouse. "
             "Click a widget to select it, then drag. Interactive widget input is suspended while this is on. "
-            "Assign a keybind under Keybindsâ€¦ â†’ Toggle mouse repositioning."
+            "Assign a keybind under Keybinds… → Toggle mouse repositioning."
         )
         self._mouse_reposition.toggled.connect(self._on_mouse_reposition_toggled)
         nudge_outer.addWidget(self._mouse_reposition)
@@ -354,7 +354,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
             clicked=self._save,
         )
         self._save_as_btn = QDataPushButton(
-            "Save as new pageâ€¦",
+            "Save as new page…",
             parent=self,
             tooltip="Duplicate this page under a new name and save.",
             clicked=self._save_as,
@@ -365,7 +365,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         root.addLayout(save_row)
 
         self._keybinds_btn = QDataPushButton(
-            "Keybindsâ€¦",
+            "Keybinds…",
             parent=self,
             tooltip="Assign physical, vJoy, or keyboard/mouse inputs to every control action.",
             clicked=self._open_keybinds,
@@ -571,7 +571,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
     def _on_scene(self, *_args):
         if not _alive(self) or self._building:
             return
-        # Don't rebuild while hold-nudging â€” it can interrupt pressed state.
+        # Don't rebuild while hold-nudging — it can interrupt pressed state.
         # Also avoid re-pulsing the cyan box on every scene change so idle hide works.
         if self._nudge_timer.isActive():
             return
@@ -627,11 +627,11 @@ class OverlayControlPanel(QtWidgets.QWidget):
                     return
             self.scene.set_mouse_reposition(True)
             self._pulse_control_highlight()
-            self._status.setText("Mouse repositioning on â€” drag the cyan target on the live overlay.")
+            self._status.setText("Mouse repositioning on — drag the cyan target on the live overlay.")
         else:
             self.scene.set_mouse_reposition(False)
             self.scene.set_control_highlight(False)
-            self._status.setText("Mouse repositioning off â€” interactive widgets restored.")
+            self._status.setText("Mouse repositioning off — interactive widgets restored.")
 
     def _on_mouse_reposition_changed(self, *_args):
         """Keep the checkbox in sync when a keybind toggles mouse reposition."""
@@ -644,9 +644,9 @@ class OverlayControlPanel(QtWidgets.QWidget):
             self._mouse_reposition.blockSignals(False)
         if on:
             self._pulse_control_highlight()
-            self._status.setText("Mouse repositioning on â€” drag widgets on the live overlay.")
+            self._status.setText("Mouse repositioning on — drag widgets on the live overlay.")
         else:
-            self._status.setText("Mouse repositioning off â€” interactive widgets restored.")
+            self._status.setText("Mouse repositioning off — interactive widgets restored.")
 
     def _on_auto_launch_toggled(self, checked: bool):
         if self._building:
@@ -816,7 +816,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         else:
             text = "Hide on the live overlay" if shown else "Show on the live overlay"
         if override:
-            text += ". Runtime only â€” the editor visibility stays as designed"
+            text += ". Runtime only — the editor visibility stays as designed"
         return text
 
     def _refresh_eye_icons(self):
@@ -947,7 +947,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
             self._stop_nudge()
             return
         self._nudge_ticks += 1
-        # Accelerate: 8 â†’ 16 â†’ 24 â€¦ capped so it stays controllable.
+        # Accelerate: 8 → 16 → 24 … capped so it stays controllable.
         if self._nudge_ticks >= 2:
             self._nudge_step = min(48, 8 + (self._nudge_ticks - 1) * 4)
         # After first repeats, tighten the interval for smoother motion.
@@ -1028,7 +1028,7 @@ class OverlayControlPanel(QtWidgets.QWidget):
         label = str(name or "").strip() or f"{base} copy"
         self.scene.rename_page(label, page_id=dup["id"])
         self.scene.set_control_target("page", dup["id"])
-        self._status.setText(f"Created page â€œ{label}â€. Save the Gremlin Ex profile to keep it.")
+        self._status.setText(f"Created page “{label}”. Save the Gremlin Ex profile to keep it.")
         self._rebuild()
 
     def _open_keybinds(self):
@@ -1048,7 +1048,7 @@ def overlay_control_panel_is_open() -> bool:
 def open_overlay_control_panel(scene: OverlayScene | None = None, parent=None) -> OverlayControlPanel:
     """Show the singleton runtime control panel.
 
-    ``parent`` is ignored for ownership â€” the panel is always a top-level window
+    ``parent`` is ignored for ownership — the panel is always a top-level window
     so the Overlay tab's runtime lock cannot disable it.
     """
     global _panel

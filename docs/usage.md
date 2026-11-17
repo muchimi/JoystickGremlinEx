@@ -579,6 +579,10 @@ Check that the AFCS output destination does not also receive a conflicting direc
 
 Microsoft Windows does not currently offer a way to set the order of devices connected to a computer, and furthermore, this order may change depending on connections/disconnections, reboot status, and the order of detection by the operating system.  To this end, GremlinEx offers a way to manually re-order devices as displayed in GremlinEx for convenience via drag and drop of the device tabs.   The order only exists within GremlinEx and it does not change the device order in the operating system.
 
+The default order is joysticks and gamepads, enabled virtual inputs, special devices, then **Settings** and **Plugins**. New devices join their default group. User reordering is preserved, including the positions of Settings and Plugins. These two tabs are always visible and cannot be filtered out. **Default** in Order Devices restores the default order.
+
+**Save**, **Load**, and **Load Last** in Order Devices save or restore device visibility only. Loading a visibility layout or changing visibility checkboxes does not change the tab order. Dragging device rows explicitly changes the order.
+
 ## Inputs
 
 An input is a source trigger definition.  When you press a button on a controller, move an axis, or press a key or click a mouse button, all these are input source triggers that can be mapped to a series of actions.

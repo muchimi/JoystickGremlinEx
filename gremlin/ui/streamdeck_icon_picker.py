@@ -253,7 +253,7 @@ def render_icon_to_png(
 ) -> str | None:
     """Render an SVG (or raster) icon to a temporary PNG and return that path.
 
-    Optional ``color`` tints opaque glyph pixels (white library icons â†’ any color).
+    Optional ``color`` tints opaque glyph pixels (white library icons → any color).
     """
     if not path or not os.path.isfile(path):
         return None
@@ -397,7 +397,7 @@ class _PackSection(QtWidgets.QWidget):
         root.setContentsMargins(0, 0, 0, 8)
         root.setSpacing(4)
 
-        # QToolButton + setArrowType hides text on some Windows styles â€” use a
+        # QToolButton + setArrowType hides text on some Windows styles — use a
         # plain flat button with an explicit chevron in the label.
         self._header = QtWidgets.QPushButton()
         self._header.setFlat(True)
@@ -433,7 +433,7 @@ class _PackSection(QtWidgets.QWidget):
 
     def _rebuild_header(self):
         count = len(self._entries)
-        chevron = "â–¼" if self._expanded else "â–¶"
+        chevron = "▼" if self._expanded else "▶"
         self._header.setText(f"{chevron}  {self._pack_title}  ({count})")
 
     def _columns(self) -> int:
@@ -497,7 +497,7 @@ class _PackSection(QtWidgets.QWidget):
         self._tile_size = int(tile_size)
         for tile in self._tiles:
             tile.set_tile_size(self._tile_size)
-        # Reflow by filter match (isHidden), not isVisible â€” same pre-show pitfall.
+        # Reflow by filter match (isHidden), not isVisible — same pre-show pitfall.
         cols = self._columns()
         matched = [t for t in self._tiles if not t.isHidden()]
         for tile in self._tiles:
@@ -514,7 +514,7 @@ class _PackSection(QtWidgets.QWidget):
 class IconLibraryDialog(QRememberDialog):
     """Elgato-style categorized icon browser."""
 
-    def __init__(self, parent=None, title: str = "Icon Library â€” Stream Deck"):
+    def __init__(self, parent=None, title: str = "Icon Library — Stream Deck"):
         super().__init__("streamdeck_icon_library", parent=parent)
         self.setWindowTitle(title)
         self.setMinimumSize(640, 520)
@@ -560,17 +560,17 @@ class IconLibraryDialog(QRememberDialog):
 
         search_row = QtWidgets.QHBoxLayout()
         self._search = QtWidgets.QLineEdit()
-        self._search.setPlaceholderText("Search in iconsâ€¦")
+        self._search.setPlaceholderText("Search in icons…")
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._apply_filter)
         search_row.addWidget(self._search, 1)
         new_cat_btn = QDataPushButton(
-            "New categoryâ€¦",
+            "New category…",
             tooltip="Create a personal icon category (stored for your user, not in the profile)",
             clicked=self._new_category,
         )
         import_btn = QDataPushButton(
-            "Import iconsâ€¦",
+            "Import icons…",
             tooltip="Import image files into a personal category",
             clicked=lambda: self._import_icons(),
         )
@@ -579,7 +579,7 @@ class IconLibraryDialog(QRememberDialog):
         layout.addLayout(search_row)
 
         hint = QtWidgets.QLabel(
-            "Personal categories & imports are saved for your Windows user â€” not inside a profile."
+            "Personal categories & imports are saved for your Windows user — not inside a profile."
         )
         hint.setStyleSheet(f"color: {Color().inactiveColor()}; font-size: 11px;")
         hint.setWordWrap(True)
@@ -611,7 +611,7 @@ class IconLibraryDialog(QRememberDialog):
         self._update_color_swatch()
         color_row.addWidget(self._color_swatch)
         color_btn = QDataPushButton(
-            "Colorâ€¦", tooltip="Pick a tint color for the selected icon", clicked=self._pick_color
+            "Color…", tooltip="Pick a tint color for the selected icon", clicked=self._pick_color
         )
         white_btn = QDataPushButton("White", tooltip="Reset to white", clicked=self._reset_color)
         # Quick presets
@@ -633,7 +633,7 @@ class IconLibraryDialog(QRememberDialog):
 
         footer = QtWidgets.QHBoxLayout()
         zoom_down = QtWidgets.QToolButton()
-        zoom_down.setText("âˆ’")
+        zoom_down.setText("−")
         zoom_down.setToolTip("Smaller icons")
         zoom_down.clicked.connect(lambda: self._nudge_zoom(-8))
         zoom_up = QtWidgets.QToolButton()
@@ -693,14 +693,14 @@ class IconLibraryDialog(QRememberDialog):
         for pack_id, entries in by_pack.items():
             title = entries[0].pack_title if entries else _PACK_TITLES.get(pack_id, pack_id)
             if entries and entries[0].user_owned:
-                title = f"{title}  Â·  Personal"
+                title = f"{title}  ·  Personal"
             section = _PackSection(title, entries, self._tile_size, self._body)
             section.selection_changed.connect(self._on_select)
             section.activated.connect(self._on_activate)
             self._body_layout.addWidget(section)
             self._sections.append(section)
         if not icons:
-            empty = QtWidgets.QLabel("No icons found. Import some or use New categoryâ€¦")
+            empty = QtWidgets.QLabel("No icons found. Import some or use New category…")
             empty.setStyleSheet(f"color: {Color().inactiveColor()}; padding: 24px;")
             self._body_layout.addWidget(empty)
         self._body_layout.addStretch(1)
@@ -725,13 +725,13 @@ class IconLibraryDialog(QRememberDialog):
         QtWidgets.QMessageBox.information(
             self,
             "Icon Library",
-            f"Created personal category â€œ{display}â€.\nUse Import iconsâ€¦ to add images.",
+            f"Created personal category “{display}”.\nUse Import icons… to add images.",
         )
         # Offer import immediately
         reply = QtWidgets.QMessageBox.question(
             self,
             "Import icons",
-            f"Import images into â€œ{display}â€ now?",
+            f"Import images into “{display}” now?",
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
             QtWidgets.QMessageBox.StandardButton.Yes,
         )
@@ -785,7 +785,7 @@ class IconLibraryDialog(QRememberDialog):
             QtWidgets.QMessageBox.information(
                 self,
                 "Icon Library",
-                f"Imported {count} icon(s) into â€œ{cat_title}â€.",
+                f"Imported {count} icon(s) into “{cat_title}”.",
             )
         else:
             QtWidgets.QMessageBox.warning(self, "Icon Library", "No images were imported.")
@@ -862,12 +862,12 @@ class IconSourceDialog(QRememberDialog):
         layout.addWidget(QtWidgets.QLabel("Where should the icon come from?"))
 
         lib_btn = QDataPushButton(
-            "Icon Libraryâ€¦",
+            "Icon Library…",
             tooltip="Browse built-in Stream Deck style icons by category",
             clicked=self._choose_library,
         )
         custom_btn = QDataPushButton(
-            "Custom Fileâ€¦", tooltip="Open a file from disk (PNG, JPG, â€¦)", clicked=self._choose_custom
+            "Custom File…", tooltip="Open a file from disk (PNG, JPG, …)", clicked=self._choose_custom
         )
         for btn in (lib_btn, custom_btn):
             btn.setMinimumHeight(36)
@@ -900,7 +900,7 @@ class IconSourceDialog(QRememberDialog):
 
 
 def pick_icon_path(parent: QtWidgets.QWidget | None = None, *, pressed: bool = False) -> str | None:
-    """Full flow: tip + library/custom â†’ returns a filesystem image path, or None."""
+    """Full flow: tip + library/custom → returns a filesystem image path, or None."""
     chooser = IconSourceDialog(parent, pressed=pressed)
     if chooser.exec() != QtWidgets.QDialog.DialogCode.Accepted:
         return None

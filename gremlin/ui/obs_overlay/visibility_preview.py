@@ -42,7 +42,7 @@ def _truth_cell(on: bool) -> QtWidgets.QTableWidgetItem:
 
 
 class VisibilityVennWidget(QtWidgets.QWidget):
-    """Venn diagram for 1â€“3 inputs; regions follow the expressionâ€™s output."""
+    """Venn diagram for 1–3 inputs; regions follow the expression’s output."""
 
     def __init__(self, parent=None, compact: bool = False):
         super().__init__(parent)
@@ -181,14 +181,14 @@ class VisibilityPreviewDialog(QRememberDialog):
         algebra.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         algebra.setWordWrap(True)
         if error:
-            algebra.setText(f"Boolean algebra: {expression or 'â€”'}\n{error}")
+            algebra.setText(f"Boolean algebra: {expression or '—'}\n{error}")
         elif node is None:
-            algebra.setText("Boolean algebra: â€”")
+            algebra.setText("Boolean algebra: —")
         else:
             pretty = pretty_visibility_expression(node)
             unused = [letter for letter, _phrase in legend if letter and letter not in (used or [])]
             extra = f"\nUnused: {', '.join(unused)}" if unused else ""
-            algebra.setText(f"Boolean algebra: {pretty}\nEntered: {expression or 'â€”'}{extra}")
+            algebra.setText(f"Boolean algebra: {pretty}\nEntered: {expression or '—'}{extra}")
         font = algebra.font()
         font.setPointSize(font.pointSize() + 1)
         algebra.setFont(font)
@@ -364,13 +364,13 @@ class LogicGateWidget(QtWidgets.QWidget):
 
 
 _BOOLEAN_OPERATORS = (
-    ("AND", "A AND B", "A Â· B", ["A", "B"]),
+    ("AND", "A AND B", "A · B", ["A", "B"]),
     ("OR", "A OR B", "A + B", ["A", "B"]),
-    ("XOR", "A XOR B", "A âŠ• B", ["A", "B"]),
-    ("NOT", "NOT A", "Ä€", ["A"]),
-    ("NAND", "A NAND B", "Â¬(A Â· B)", ["A", "B"]),
-    ("NOR", "A NOR B", "Â¬(A + B)", ["A", "B"]),
-    ("XNOR", "A XNOR B", "Â¬(A âŠ• B)", ["A", "B"]),
+    ("XOR", "A XOR B", "A ⊕ B", ["A", "B"]),
+    ("NOT", "NOT A", "Ā", ["A"]),
+    ("NAND", "A NAND B", "¬(A · B)", ["A", "B"]),
+    ("NOR", "A NOR B", "¬(A + B)", ["A", "B"]),
+    ("XNOR", "A XNOR B", "¬(A ⊕ B)", ["A", "B"]),
 )
 
 
@@ -384,7 +384,7 @@ class BooleanOperatorsDialog(QRememberDialog):
         layout = QtWidgets.QVBoxLayout(self)
         note = QtWidgets.QLabel(
             "Use these operators in the expression, with parentheses to group. "
-            "Example: A AND (B OR C). Symbols Â· + âŠ• Â¬ also work."
+            "Example: A AND (B OR C). Symbols · + ⊕ ¬ also work."
         )
         note.setWordWrap(True)
         layout.addWidget(note)

@@ -899,7 +899,7 @@ def widget_accepts_touch(item: dict[str, Any] | None) -> bool:
         return False
     widget_type = item.get("type")
     if widget_type == "input_display":
-        # Virtual keyboard / mouse pad â€” injects OS key/mouse events while Interactive.
+        # Virtual keyboard / mouse pad — injects OS key/mouse events while Interactive.
         from .input_display import overlay_keys_from_item
 
         return bool(overlay_keys_from_item(item))
@@ -1095,7 +1095,7 @@ def read_toggle_latched(item: dict[str, Any] | None) -> str:
     on_pressed = _switch_position_pressed(switch_binding(item, "on"))
     prev_off, prev_on = _toggle_prev_pressed.get(wid, (False, False))
     latched = _toggle_latch.get(wid, "off")
-    # Rising edge of On â†’ stay On; rising edge of Off â†’ stay Off.
+    # Rising edge of On → stay On; rising edge of Off → stay Off.
     # If both rise in the same poll, Off wins so it can cancel.
     if on_pressed and not prev_on:
         latched = "on"
@@ -1122,7 +1122,7 @@ def read_switch_position(item: dict[str, Any] | None) -> str:
         center = switch_binding(item, rest)
         if binding_is_configured(center) and _switch_position_pressed(center):
             return rest
-        # Idle / spring rest â€” no slot is lit (do not treat rest as "active").
+        # Idle / spring rest — no slot is lit (do not treat rest as "active").
         return ""
     return ""
 
@@ -1417,7 +1417,7 @@ class OverlayValueBus(QtCore.QObject):
     """
 
     values_changed = QtCore.Signal(object)
-    POLL_INTERVAL_MS = 33  # ~30 Hz â€” keeps UI/GIL free for vJoy while overlay is up
+    POLL_INTERVAL_MS = 33  # ~30 Hz — keeps UI/GIL free for vJoy while overlay is up
 
     def __init__(self):
         super().__init__()
@@ -1452,7 +1452,7 @@ class OverlayValueBus(QtCore.QObject):
             self._widget_sources.pop(id(source), None)
         self._refcount = max(0, self._refcount - 1)
         if self._refcount == 0:
-            # Last live listener â€” flush any pending counter tallies to the sidecar.
+            # Last live listener — flush any pending counter tallies to the sidecar.
             try:
                 from .sys_stats import ManualCounterTracker
                 from gremlin.ui.obs_overlay import OverlayManager
@@ -1653,7 +1653,7 @@ class OverlayValueBus(QtCore.QObject):
             scene = OverlayManager().scene
             ManualCounterTracker().sync_into_scene(scene)
             scene._dirty = True
-            # Counters are runtime state â€” persist immediately so a crash/quit
+            # Counters are runtime state — persist immediately so a crash/quit
             # does not lose tallies. Designer layout still waits for profile save.
             if not scene.save_to_profile():
                 import logging

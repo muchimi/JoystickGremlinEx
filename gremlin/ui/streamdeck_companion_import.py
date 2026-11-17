@@ -1,6 +1,6 @@
 #
 # Import Bitfocus Companion Stream Deck page appearance into GEX (titles/icons/colors).
-# Mappings are left blank â€” only StreamDeckInputItem appearance is created/updated.
+# Mappings are left blank — only StreamDeckInputItem appearance is created/updated.
 #
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -28,8 +28,8 @@ syslog = logging.getLogger("system")
 
 COMPANION_EXPORT_TIP = (
     "In Bitfocus Companion, export your configuration as JSON before continuing.\n\n"
-    "Typical path: the Import/Export (or Backup) section â†’ Export configuration. "
-    "Companion may save a .companionconfig or .json file â€” both are accepted.\n\n"
+    "Typical path: the Import/Export (or Backup) section → Export configuration. "
+    "Companion may save a .companionconfig or .json file — both are accepted.\n\n"
     "Next you will pick that file and choose which pages to import. "
     "Only titles, icons, and colors are imported; action mappings stay blank."
 )
@@ -186,7 +186,7 @@ def load_companion_plan(path: str) -> CompanionImportPlan:
                         continue
                     appearance = extract_appearance(btn)
                     title = appearance.get("title") or ""
-                    # Companion paints empty keys with "col/row" placeholders â€” not real titles.
+                    # Companion paints empty keys with "col/row" placeholders — not real titles.
                     if re.fullmatch(r"\d+/\d+", str(title).strip()):
                         title = ""
                     plan.buttons.append(
@@ -443,7 +443,7 @@ def set_companion_export_tip_hidden(hidden: bool = True) -> None:
 
 
 def run_companion_import_wizard(parent: QtWidgets.QWidget, device_id: str) -> dict | None:
-    """Full Import UX: tip â†’ file â†’ page select â†’ import. Returns summary or None if cancelled."""
+    """Full Import UX: tip → file → page select → import. Returns summary or None if cancelled."""
     if not device_id:
         QtWidgets.QMessageBox.warning(parent, "Import from Companion", "No Stream Deck device is connected.")
         return None

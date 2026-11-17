@@ -971,7 +971,7 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
                         vid = int(vid)
                     except TypeError, ValueError:
                         vid = 0
-                    # vJoy IDs are 1â€“16. -1 is the DeviceSummary default and is
+                    # vJoy IDs are 1–16. -1 is the DeviceSummary default and is
                     # truthy in Python, so "if vjoy_id" is not a valid check.
                     if device.device_type == DeviceType.VJoy and 1 <= vid <= 16:
                         try:
@@ -3092,7 +3092,7 @@ class VirtualDeviceUsageState:
             )
 
         if __debug__:
-            # Snapshot keys â€” profile load / joystick re-init can mutate _action_map
+            # Snapshot keys — profile load / joystick re-init can mutate _action_map
             # while the UI is still iterating it.
             action_keys = list(self._action_map.keys())
             used_list = list(
@@ -3134,11 +3134,11 @@ class VirtualDeviceUsageState:
         if device is None:
             # Profile reload can race joystick re-init; skip rather than abort the load.
             syslog.warning(
-                f"VJOY usage: device not found for GUID [{device_guid}] (button {button_id}) â€” skipping usage update"
+                f"VJOY usage: device not found for GUID [{device_guid}] (button {button_id}) — skipping usage update"
             )
             return
         if not device.is_virtual:
-            syslog.warning(f"VJOY usage: device [{device.name}] is not virtual â€” skipping usage update")
+            syslog.warning(f"VJOY usage: device [{device.name}] is not virtual — skipping usage update")
             return
         device_type = device.device_type
         virtual_id = device.virtual_id

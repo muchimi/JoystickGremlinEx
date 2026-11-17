@@ -32,7 +32,7 @@ STEP_ALL = "all"
 STEP_ADVANCE = "advance"
 STEP_LATCH = "latch"
 
-# Solid black 72Ã—72 PNG â€” used when a live JG Ex slot has no designer icon so
+# Solid black 72×72 PNG — used when a live JG Ex slot has no designer icon so
 # Elgato does not fall back to the default blue action artwork.
 _EMPTY_KEY_PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAIAAADajyQQAAAAJklEQVR42u3BMQEAAADCoPVPbQ0PoA"
@@ -46,7 +46,7 @@ def empty_key_image(width: int = 144, height: int = 144) -> str:
     """Return a solid black PNG data-URL for an unassigned Stream Deck slot.
 
     Sending ``setImage`` with an empty string resets to the plugin's default
-    (blue) icon â€” always push a real black image instead.
+    (blue) icon — always push a real black image instead.
     """
     w = max(1, int(width or 144))
     h = max(1, int(height or 144))
@@ -186,7 +186,7 @@ def _is_coordinate_placeholder_title(title: str) -> bool:
 
 
 def text_lines_for_item(item, pressed: bool = False) -> list[str]:
-    """Up to 3 display lines for a key (title + optional lines 2â€“3).
+    """Up to 3 display lines for a key (title + optional lines 2–3).
 
     When pressed=True and any pressed title line is set, use those; otherwise
     fall back to the released title lines.
@@ -473,7 +473,7 @@ def item_needs_composite(item, pressed: bool = False) -> bool:
 def compose_key_pixmap(item, size: int = 144, pressed: bool = False, width: int | None = None, height: int | None = None):
     """Render Companion-style key (background + icon + up to 3 text lines).
 
-    Pass width/height for non-square canvases (Stream Deck + dial LCD is 200Ã—100).
+    Pass width/height for non-square canvases (Stream Deck + dial LCD is 200×100).
     """
     from PySide6 import QtCore, QtGui
 
@@ -493,7 +493,7 @@ def compose_key_pixmap(item, size: int = 144, pressed: bool = False, width: int 
     painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
 
     # Scale typography/margins against the shorter side so dial LCDs stay readable.
-    # Light inset (smaller than the old size//16 â‰ˆ 9px on a 144 key).
+    # Light inset (smaller than the old size//16 ≈ 9px on a 144 key).
     ref = min(w, h)
     margin = max(2, ref // 32)
     lines = text_lines_for_item(item, pressed=pressed)
@@ -623,7 +623,7 @@ def compose_key_image(item, size: int = 144, pressed: bool = False, width: int |
     try:
         w = width
         h = height
-        # Dial LCD windows are 200Ã—100 on Stream Deck +.
+        # Dial LCD windows are 200×100 on Stream Deck +.
         if w is None and h is None and (getattr(item, "kind", "") or "") in ("dial", "dial_press"):
             w, h = 200, 100
         pm = compose_key_pixmap(item, size=size, pressed=pressed, width=w, height=h)
@@ -867,7 +867,7 @@ def evaluate_expression(text: str) -> str:
 def resolved_title(item) -> str:
     """Title sent to Elgato. When text is baked into the composite image, clear HW title.
 
-    Do not fall back to ``button_id`` (``row:col``) â€” that painted coordinate
+    Do not fall back to ``button_id`` (``row:col``) — that painted coordinate
     strings like ``1:4`` onto empty keys that had a profile slot but no title.
     Also ignore Companion-style empty-key placeholders (``col/row``).
     """
@@ -983,7 +983,7 @@ def install_functor_step_gate():
     """Patch ExecutionContext.execute_node once so Advance/Latch skip whole container subtrees."""
     import gremlin.execution_graph as eg
 
-    # ExecutionContext is a SingletonDecorator wrapper â€” patch the real class.
+    # ExecutionContext is a SingletonDecorator wrapper — patch the real class.
     cls = getattr(eg.ExecutionContext, "klass", None) or eg.ExecutionContext
     if getattr(cls.execute_node, "_sd_step_gated", False):
         return

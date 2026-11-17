@@ -331,7 +331,7 @@ class ColorButton(QtWidgets.QPushButton):
             gradient_enable.hide()
 
         gradient_btn = QDataPushButton(
-            "Edit gradientâ€¦",
+            "Edit gradient…",
             parent=dialog,
             tooltip="Open the gradient editor (linear / radial, stops, angle, scale).",
         )
@@ -967,7 +967,7 @@ class OverlayInspector(QtWidgets.QWidget):
         """Hidden child used to hold widgets being torn down (never top-level)."""
         sink = getattr(self, "_detach_sink_widget", None)
         if sink is None or not alive(sink):
-            # Must be a child of the inspector â€” a parentless QWidget is itself a
+            # Must be a child of the inspector — a parentless QWidget is itself a
             # top-level window and reparenting into it flashes on the canvas.
             sink = QtWidgets.QWidget(self)
             sink.setObjectName("overlayInspectorDetachSink")
@@ -1012,7 +1012,7 @@ class OverlayInspector(QtWidgets.QWidget):
         return widget
 
     def _on_geometry_changed(self):
-        """Move/resize: update spin boxes only â€” never rebuild the inspector UI."""
+        """Move/resize: update spin boxes only — never rebuild the inspector UI."""
         if not self._is_alive():
             return
         if not gremlin.util.is_ui_thread():
@@ -1020,7 +1020,7 @@ class OverlayInspector(QtWidgets.QWidget):
             return
         if self._building:
             return
-        # Skip live churn during canvas drag â€” final flush on mouse release catches up.
+        # Skip live churn during canvas drag — final flush on mouse release catches up.
         if getattr(self.scene, "geometry_gesture", False):
             return
         self._refresh_live_fields()
@@ -1032,7 +1032,7 @@ class OverlayInspector(QtWidgets.QWidget):
             on_ui(self, self._maybe_rebuild)
             return
         if self._building:
-            # Mark dirty only â€” the active builder must call _schedule_rebuild()
+            # Mark dirty only — the active builder must call _schedule_rebuild()
             # when it clears _building. Setting pending without arming a timer
             # used to make the next _schedule_rebuild() a no-op (mode radios).
             self._rebuild_pending = True
@@ -1059,7 +1059,7 @@ class OverlayInspector(QtWidgets.QWidget):
             self._rebuild_pending = False
             return
         if self._building:
-            # Still inside a mode/canvas mutation â€” retry next tick.
+            # Still inside a mode/canvas mutation — retry next tick.
             self._schedule_rebuild()
             return
         self._rebuild_pending = False
@@ -1271,7 +1271,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         visible = QtWidgets.QCheckBox(self._host)
         visible.setChecked(bool(page.get("visible", True)))
-        visible.setToolTip("When off, this pageâ€™s live window is closed. Show overlay still only opens the selected page.")
+        visible.setToolTip("When off, this page’s live window is closed. Show overlay still only opens the selected page.")
         visible.toggled.connect(lambda v: self.scene.set_page_visible(bool(v)))
         form.addRow("Visible", visible)
 
@@ -1283,7 +1283,7 @@ class OverlayInspector(QtWidgets.QWidget):
         interactive = QtWidgets.QCheckBox(self._host)
         interactive.setChecked(bool(canvas.get("interactive")))
         interactive.setToolTip(
-            "On this pageâ€™s live overlay, touch or click widgets bound to vJoy or GEX states. "
+            "On this page’s live overlay, touch or click widgets bound to vJoy or GEX states. "
             "Empty space stays click-through. Physical bindings stay display-only."
         )
         interactive.toggled.connect(lambda v: self._set_canvas("interactive", bool(v)))
@@ -1545,7 +1545,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         preset = QDataComboBox(parent=self._host)
         preset.setToolTip(
-            "Sets this pageâ€™s canvas width/height in GEX to a common tablet/phone size. "
+            "Sets this page’s canvas width/height in GEX to a common tablet/phone size. "
             "The browser always shows that canvas; it does not pick a device on its own."
         )
         for ident, label, _w, _h in WS_DEVICE_PRESETS:
@@ -1580,7 +1580,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         hint = QtWidgets.QLabel(
             "No local overlay window. Show this page to start the LAN server; open the URL on a "
-            "tablet/phone. Interactive must be on for remote touch writes. Open LAN â€” anyone on "
+            "tablet/phone. Interactive must be on for remote touch writes. Open LAN — anyone on "
             "the network can connect.",
             self._host,
         )
@@ -1935,7 +1935,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 item,
                 "auto_scale_font",
                 "Scale font with size",
-                tooltip="Keep every font on this widget (label, caption, timer, axis labels, â€¦) at the same relative size when the widget is resized.",
+                tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
             )
 
         self._build_widget_core(item, widget_type)
@@ -1967,7 +1967,7 @@ class OverlayInspector(QtWidgets.QWidget):
             mode_box = QtWidgets.QCheckBox(self._host)
             mode_box.setChecked(show_mode)
             mode_box.setToolTip(
-                "Replace this labelâ€™s text with the profile mode that is currently active. "
+                "Replace this label’s text with the profile mode that is currently active. "
                 "It updates live when you change edit mode, or when the runtime mode changes while the profile is running."
             )
             mode_box.toggled.connect(lambda v, wid=item["id"]: self._set_show_current_mode(wid, bool(v)))
@@ -2255,7 +2255,7 @@ class OverlayInspector(QtWidgets.QWidget):
             item,
             "auto_scale_font",
             "Scale font with size",
-            tooltip="Keep every font on this widget (label, caption, timer, axis labels, â€¦) at the same relative size when the widget is resized.",
+            tooltip="Keep every font on this widget (label, caption, timer, axis labels, …) at the same relative size when the widget is resized.",
         )
         if len(types) == 1:
             self._build_widget_core(item, canonical_widget_type(next(iter(types))))
@@ -2466,7 +2466,7 @@ class OverlayInspector(QtWidgets.QWidget):
         expr.setText(str(vis.get("expression") or ""))
         expr.setPlaceholderText("A AND (B OR C)")
         expr.setToolTip(
-            "Use letters A, B, Câ€¦ for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
+            "Use letters A, B, C… for the conditions below. Operators: AND, OR, XOR, NAND, NOR, XNOR, NOT, and parentheses. "
             "Leave empty to require every condition (AND)."
         )
         expr.editingFinished.connect(lambda wid=item["id"], box=expr: self._set_visibility(wid, expression=box.text()))
@@ -2493,7 +2493,7 @@ class OverlayInspector(QtWidgets.QWidget):
         hint.setWordWrap(True)
         form.addRow(hint)
         note = QtWidgets.QLabel(
-            "Each condition gets a letter (A, B, Câ€¦). The live overlay hides the widget when the expression is false. The designer keeps a faded copy so you can still edit it.",
+            "Each condition gets a letter (A, B, C…). The live overlay hides the widget when the expression is false. The designer keeps a faded copy so you can still edit it.",
             self._host,
         )
         note.setWordWrap(True)
@@ -2511,7 +2511,7 @@ class OverlayInspector(QtWidgets.QWidget):
         add_kind.addItem("Keyboard/mouse", "keyboard")
         add_btn = Buttons.getAddWidget(
             label="Add condition",
-            tooltip="Add a mode, state, variable, or input. It is assigned the next letter (A, B, Câ€¦).",
+            tooltip="Add a mode, state, variable, or input. It is assigned the next letter (A, B, C…).",
             callback=button_callback(
                 lambda wid, box: self._add_visibility_condition(wid, str(box.currentData() or "mode")),
                 item["id"],
@@ -2528,7 +2528,7 @@ class OverlayInspector(QtWidgets.QWidget):
     def _visibility_condition_box(self, item: dict, cond: dict) -> QtWidgets.QGroupBox:
         letter = str(cond.get("letter") or "").strip().upper()
         phrase = self._visibility_condition_phrase(cond)
-        box = QtWidgets.QGroupBox(f"{letter} â€” {phrase}" if letter else phrase, self._host)
+        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase, self._host)
         form = QtWidgets.QFormLayout(box)
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         cond_id = str(cond.get("id") or "")
@@ -2630,7 +2630,7 @@ class OverlayInspector(QtWidgets.QWidget):
             if current_id:
                 var_box.setItemData(selected, current_id, QtCore.Qt.UserRole + 1)
         var_box.setCurrentIndex(selected)
-        var_box.setToolTip("Overlay variable from Variablesâ€¦")
+        var_box.setToolTip("Overlay variable from Variables…")
 
         def _on_var(_i=None, combo=var_box, wid=item["id"], cid=cond_id):
             name = overlay_variable_name(combo.currentData())
@@ -3074,7 +3074,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if current not in (0, 15, 30, 45):
             current = 0
         combo = _enum_radios(
-            [("Off", 0), ("15Â°", 15), ("30Â°", 30), ("45Â°", 45)],
+            [("Off", 0), ("15°", 15), ("30°", 30), ("45°", 45)],
             current,
             lambda v, wid=item["id"]: self._style(wid, angle_step=int(v)),
         )
@@ -3089,7 +3089,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 rotation = int(round(common))
         last = {"value": rotation}
         primary_id = item.get("id")
-        # Fixed pivot + start geoms for the gesture â€” incremental AABB pivots spiral groups.
+        # Fixed pivot + start geoms for the gesture — incremental AABB pivots spiral groups.
         gesture: dict[str, Any] = {"geoms": None, "pivot": None, "base": float(rotation)}
 
         def _capture_gesture():
@@ -3175,9 +3175,9 @@ class OverlayInspector(QtWidgets.QWidget):
             tooltip=(
                 "Degrees clockwise. 0 is upright. "
                 "With a group selected, the whole group turns around its center "
-                "(same as dragging the round handle on the canvas; hold Shift to snap to 15Â°)."
+                "(same as dragging the round handle on the canvas; hold Shift to snap to 15°)."
             ),
-            suffix="Â°",
+            suffix="°",
             live_getter=_live,
             return_widgets=True,
         )
@@ -3383,7 +3383,7 @@ class OverlayInspector(QtWidgets.QWidget):
             same = all(v == values[0] for v in values)
             btn = ColorButton(values[0] or "#ffffff")
             if not same:
-                btn.setToolTip("Multiple values â€” pick a color to apply to all")
+                btn.setToolTip("Multiple values — pick a color to apply to all")
             btn.color_changed.connect(lambda v, wid=item["id"], k=key: self._style(wid, **{k: v}))
             form.addRow(title, btn)
             dependents.append(btn)
@@ -3400,7 +3400,7 @@ class OverlayInspector(QtWidgets.QWidget):
         dependents.append(width)
 
         if include_radius:
-            # Corner radius shapes the fill as well â€” leave it usable when the stroke is off.
+            # Corner radius shapes the fill as well — leave it usable when the stroke is off.
             self._style_float(form, item, "corner_radius", "Corner radius", 0, 200)
 
         def _sync(on: bool):
@@ -3538,8 +3538,8 @@ class OverlayInspector(QtWidgets.QWidget):
             form.addRow(title, box)
             dependents.append(box)
 
-        _box("off_to_on", "Off â†’ On", "Blink when the widget turns on.")
-        _box("on_to_off", "On â†’ Off", "Blink when the widget turns off.")
+        _box("off_to_on", "Off → On", "Blink when the widget turns on.")
+        _box("on_to_off", "On → Off", "Blink when the widget turns off.")
         _box("while_on", "While on", "Blink for as long as the widget is on.")
         _box("while_off", "While off", "Blink for as long as the widget is off.")
         _box("state", "GEX state", "Blink while a Joystick Gremlin Ex state is on or off.")
@@ -3582,7 +3582,7 @@ class OverlayInspector(QtWidgets.QWidget):
         dur.setSingleStep(0.1)
         dur.setSuffix(" s")
         dur.setValue(float(blink.get("duration_s") or 1.0))
-        dur.setToolTip("How long a temporary blink lasts after Offâ†’On, Onâ†’Off, or a matching state change.")
+        dur.setToolTip("How long a temporary blink lasts after Off→On, On→Off, or a matching state change.")
         dur.valueChanged.connect(lambda v, wid=item["id"]: self._set_blink(wid, duration_s=float(v)))
         form.addRow("Temporary for", dur)
         dependents.append(dur)
@@ -3712,14 +3712,14 @@ class OverlayInspector(QtWidgets.QWidget):
             item,
             "show_grid",
             "Show grid",
-            tooltip="Grid on the horizontal plane (Y = 0), from âˆ’1 to 1 in X and Z.",
+            tooltip="Grid on the horizontal plane (Y = 0), from −1 to 1 in X and Z.",
         )
         self._style_color(form, item, "grid", "Grid")
         self._style_float(form, item, "grid_width", "Line width", 0.5, 12)
         divisions = QtWidgets.QSpinBox(self._host)
         divisions.setRange(2, 12)
         divisions.setValue(int(item["style"].get("grid_divisions") or 4))
-        divisions.setToolTip("Number of cells from âˆ’1 to 1 on the horizontal plane.")
+        divisions.setToolTip("Number of cells from −1 to 1 on the horizontal plane.")
         divisions.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, grid_divisions=int(v)))
         form.addRow("Divisions", divisions)
 
@@ -3743,7 +3743,7 @@ class OverlayInspector(QtWidgets.QWidget):
             item,
             "show_bounds_box",
             "Show box",
-            tooltip="Cube covering âˆ’1â€¦1 on X, Y, and Z.",
+            tooltip="Cube covering −1…1 on X, Y, and Z.",
         )
         self._style_color(form, item, "box", "Box edge")
         self._style_color(form, item, "box_fill", "Box fill")
@@ -3773,19 +3773,19 @@ class OverlayInspector(QtWidgets.QWidget):
         self._style_float(form, item, "grid_width", "Ring width", 0.5, 12, step=0.5)
 
         self._look_heading(form, "Slew limits")
-        self._style_float(form, item, "slew_left_deg", "Left limit (Â°)", -180, 180, step=1.0)
-        self._style_float(form, item, "slew_right_deg", "Right limit (Â°)", -180, 180, step=1.0)
+        self._style_float(form, item, "slew_left_deg", "Left limit (°)", -180, 180, step=1.0)
+        self._style_float(form, item, "slew_right_deg", "Right limit (°)", -180, 180, step=1.0)
         self._style_bool(
             form,
             item,
             "show_slew_limits",
             "Show limit rays",
-            tooltip="0Â° = nose up; negative = left, positive = right.",
+            tooltip="0° = nose up; negative = left, positive = right.",
         )
 
         self._look_heading(form, "Field of regard")
-        self._style_float(form, item, "for_min_deg", "FoR min (Â±Â°)", 10, 180, step=1.0)
-        self._style_float(form, item, "for_max_deg", "FoR max (Â±Â°)", 10, 180, step=1.0)
+        self._style_float(form, item, "for_min_deg", "FoR min (±°)", 10, 180, step=1.0)
+        self._style_float(form, item, "for_max_deg", "FoR max (±°)", 10, 180, step=1.0)
 
         self._look_heading(form, "FoV wedge")
         self._style_color(form, item, "fov", "Wedge")
@@ -3887,14 +3887,14 @@ class OverlayInspector(QtWidgets.QWidget):
         start = QtWidgets.QDoubleSpinBox(self._host)
         start.setRange(-360.0, 360.0)
         start.setDecimals(1)
-        start.setSuffix("Â°")
+        start.setSuffix("°")
         start.setValue(float(item["style"].get("paddle_start_deg") or 0.0))
         start.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_start_deg=float(v)))
         form.addRow("Start angle", start)
         end = QtWidgets.QDoubleSpinBox(self._host)
         end.setRange(-360.0, 360.0)
         end.setDecimals(1)
-        end.setSuffix("Â°")
+        end.setSuffix("°")
         end.setValue(float(item["style"].get("paddle_end_deg") or 70.0))
         end.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_end_deg=float(v)))
         form.addRow("End angle", end)
@@ -3909,7 +3909,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
         path_edit = QtWidgets.QLineEdit(item["style"].get("paddle_image") or "", self._host)
-        path_edit.setPlaceholderText("Optional â€” replaces built-in art (pivot = image center)")
+        path_edit.setPlaceholderText("Optional — replaces built-in art (pivot = image center)")
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip(
@@ -3998,7 +3998,7 @@ class OverlayInspector(QtWidgets.QWidget):
         path_layout = QtWidgets.QHBoxLayout(path_row)
         path_layout.setContentsMargins(0, 0, 0, 0)
         path_edit = QtWidgets.QLineEdit(str(style.get("launch_path") or ""), self._host)
-        path_edit.setPlaceholderText("Optional â€” exe to start if the window is not running")
+        path_edit.setPlaceholderText("Optional — exe to start if the window is not running")
         browse = Buttons.getFolderWidget(tooltip="Browse")
         browse.setFixedWidth(28)
         browse.setToolTip("Choose the executable to launch.")
@@ -4055,7 +4055,7 @@ class OverlayInspector(QtWidgets.QWidget):
         client_box = QDataComboBox()
         client_box.addItem("(none)", 0)
         for cid, label, video in RemoteVideoHub().feed_clients():
-            mark = " â—" if video else ""
+            mark = " ●" if video else ""
             client_box.addItem(f"{label}{mark}", cid)
         idx = client_box.findData(current_id)
         client_box.setCurrentIndex(idx if idx >= 0 else 0)
@@ -4069,7 +4069,7 @@ class OverlayInspector(QtWidgets.QWidget):
                 gremlin.remote.remote_client.requestIdentify()
             except Exception:
                 pass
-            # Defer rebuild â€” destroying this button mid-click hard-crashes Qt.
+            # Defer rebuild — destroying this button mid-click hard-crashes Qt.
             QtCore.QTimer.singleShot(0, self.rebuild)
 
         refresh = Buttons.getRefreshWidget(
@@ -4079,7 +4079,7 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow(refresh)
         hint = QtWidgets.QLabel(
-            "Clients must enable Remote Control â†’ Video return. Dot (â—) means the peer advertised a video port. Master connects to that peer over TCP (default 6013).",
+            "Clients must enable Remote Control → Video return. Dot (●) means the peer advertised a video port. Master connects to that peer over TCP (default 6013).",
             self._host,
         )
         hint.setWordWrap(True)
@@ -4181,7 +4181,7 @@ class OverlayInspector(QtWidgets.QWidget):
         vmax.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, value_max=float(v)))
         form.addRow("Max", vmax)
         unit = QtWidgets.QLineEdit(str(style.get("unit") or ""), self._host)
-        unit.setPlaceholderText("%  Â°  or leave blank")
+        unit.setPlaceholderText("%  °  or leave blank")
         unit.setToolTip("Shown next to the min / mid / max labels on the left.")
         unit.editingFinished.connect(lambda wid=item["id"], w=unit: self._style(wid, unit=w.text()))
         form.addRow("Unit", unit)
@@ -4198,7 +4198,7 @@ class OverlayInspector(QtWidgets.QWidget):
         self._orientation_combo(form, item)
         auto = QtWidgets.QCheckBox(self._host)
         auto.setChecked(bool(style.get("range_auto", True)))
-        auto.setToolTip("Use âˆ’100â€¦+100 when any selected axis is centered; 0â€¦100 when every axis is 0â€“100%.")
+        auto.setToolTip("Use −100…+100 when any selected axis is centered; 0…100 when every axis is 0–100%.")
         auto.toggled.connect(lambda v, wid=item["id"]: self._style(wid, rebuild=True, range_auto=bool(v)))
         form.addRow("Auto range", auto)
         vmin, vmax = bars_value_range(item)
@@ -4510,7 +4510,7 @@ class OverlayInspector(QtWidgets.QWidget):
         same = all(v == values[0] for v in values)
         color_btn = ColorButton(values[0] or fallback)
         if not same:
-            color_btn.setToolTip("Multiple values â€” pick a color to apply to all")
+            color_btn.setToolTip("Multiple values — pick a color to apply to all")
         color_btn.color_changed.connect(lambda v, wid=item["id"], k=color_key: self._style(wid, **{k: v}))
         form.addRow("Color", color_btn)
         dependents.append(color_btn)
@@ -4680,7 +4680,7 @@ class OverlayInspector(QtWidgets.QWidget):
         tracker = OcrOverlayTracker()
         last_text = tracker.last_text(item)
         scan_status = tracker.status(item)
-        last = QtWidgets.QLabel("\n".join(text for text in (scan_status, last_text) if text) or "â€”", self._host)
+        last = QtWidgets.QLabel("\n".join(text for text in (scan_status, last_text) if text) or "—", self._host)
         last.setWordWrap(True)
         last.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         form.addRow("Last text", last)
@@ -4706,7 +4706,7 @@ class OverlayInspector(QtWidgets.QWidget):
             "Arm scanning in Arming (Continuous Toggle/Hold, or Single/Multiple pulses). Each rule below fires its own output binding when text matches. "
             "Test once outlines the capture region on the chosen monitor for 5 seconds before OCR. "
             "The live overlay draws the Appearance border for unarmed/armed. "
-            "Designer status text (OCR Â· region, hits) is editor-only.",
+            "Designer status text (OCR · region, hits) is editor-only.",
             self._host,
         )
         hint.setWordWrap(True)
@@ -4750,7 +4750,7 @@ class OverlayInspector(QtWidgets.QWidget):
             "Contain / Exact match against Texts (semicolon-separated). "
             "Any text (region) ignores Texts and uses whatever OCR reads in the widget. "
             "While matched the rule acts as a pressed overlay button; when not matched it is released. "
-            "Use Mapâ€¦ for containers and actions.",
+            "Use Map… for containers and actions.",
             self._host,
         )
         hint.setWordWrap(True)
@@ -4759,13 +4759,13 @@ class OverlayInspector(QtWidgets.QWidget):
         pack_row = QtWidgets.QWidget(self._host)
         pack_layout = QtWidgets.QHBoxLayout(pack_row)
         pack_layout.setContentsMargins(0, 0, 0, 0)
-        load_pack = QDataPushButton("Load packâ€¦")
+        load_pack = QDataPushButton("Load pack…")
         load_pack.setToolTip("Load a built-in OCR rule pack (e.g. SC mineables).")
         load_pack.clicked.connect(button_callback(self._ocr_load_pack, item["id"]))
-        import_btn = QDataPushButton("Importâ€¦")
+        import_btn = QDataPushButton("Import…")
         import_btn.setToolTip("Import OCR rules from a .json pack file.")
         import_btn.clicked.connect(button_callback(self._ocr_import_pack, item["id"]))
-        export_btn = QDataPushButton("Exportâ€¦")
+        export_btn = QDataPushButton("Export…")
         export_btn.setToolTip("Export these OCR rules as a shareable .json pack.")
         export_btn.clicked.connect(button_callback(self._ocr_export_pack, item["id"]))
         pack_layout.addWidget(load_pack)
@@ -4800,9 +4800,9 @@ class OverlayInspector(QtWidgets.QWidget):
             "; ".join(split_ocr_texts(rule.get("texts") if rule.get("texts") is not None else rule.get("text"))),
             self._host,
         )
-        texts.setPlaceholderText("(not used â€” OCR region is the handle)" if region_mode else "3,200; 6,400")
+        texts.setPlaceholderText("(not used — OCR region is the handle)" if region_mode else "3,200; 6,400")
         texts.setToolTip(
-            "Ignored in Any text (region) mode â€” whatever OCR reads becomes the detection label. "
+            "Ignored in Any text (region) mode — whatever OCR reads becomes the detection label. "
             "For Contain/Exact: semicolon or newline separated, so a thousands comma stays in the value. "
             "The rule matches if any value is found."
         )
@@ -4812,7 +4812,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         name = QtWidgets.QLineEdit(str(rule.get("name") or rule.get("display_name") or ""), self._host)
         name.setPlaceholderText("e.g. Quantainium")
-        name.setToolTip("Rule title. For Contain/Exact with Base, also drives the detection label (Ã—count).")
+        name.setToolTip("Rule title. For Contain/Exact with Base, also drives the detection label (×count).")
         name.editingFinished.connect(lambda wid=item["id"], rid=rule_id, w=name: self._update_ocr_rule(wid, rid, name=w.text()))
         form.addRow("Name", name)
 
@@ -4826,10 +4826,10 @@ class OverlayInspector(QtWidgets.QWidget):
 
         base_spin = QtWidgets.QSpinBox(self._host)
         base_spin.setRange(0, 100000)
-        base_spin.setSpecialValueText("â€”")
+        base_spin.setSpecialValueText("—")
         base_val = normalize_ocr_base(rule.get("base"))
         base_spin.setValue(int(base_val or 0))
-        base_spin.setToolTip("Signature base for rock count (count = signature Ã· base). 0 = unused. Ignored for region capture.")
+        base_spin.setToolTip("Signature base for rock count (count = signature ÷ base). 0 = unused. Ignored for region capture.")
         base_spin.setEnabled(not region_mode)
         base_spin.valueChanged.connect(lambda v, wid=item["id"], rid=rule_id: self._update_ocr_rule(wid, rid, base=v or None))
         form.addRow("Base", base_spin)
@@ -4837,13 +4837,13 @@ class OverlayInspector(QtWidgets.QWidget):
         input_id = ocr_rule_input_id(str(item.get("id") or ""), rule_id)
         mapped = find_overlay_input(input_id)
         # Live OverlayInput can be empty after profile load even when rule.mapping_xml
-        # still has the Mapâ€¦ dump â€” rehydrate so the summary matches the Map dialog.
+        # still has the Map… dump — rehydrate so the summary matches the Map dialog.
         if not overlay_input_has_mappings(mapped):
             xml = str(rule.get("mapping_xml") or "").strip()
             if xml:
                 from .overlay_input import apply_overlay_mapping_xml
 
-                mapped = apply_overlay_mapping_xml(input_id, f"OCR Â· {title}", xml) or find_overlay_input(input_id)
+                mapped = apply_overlay_mapping_xml(input_id, f"OCR · {title}", xml) or find_overlay_input(input_id)
         for line in overlay_mapping_summary_lines(mapped):
             summary = QtWidgets.QLabel(line, self._host)
             summary.setWordWrap(True)
@@ -5049,7 +5049,7 @@ class OverlayInspector(QtWidgets.QWidget):
             [(label, key) for key, label in MOUSE_GRAPHIC_CHOICES],
             current,
             lambda v, wid=item["id"]: self._style(wid, mouse_graphic=str(v or "silhouette")),
-            tooltip="Silhouette is a top-down mouse. Button map labels every mouse button (M1â€“M5, wheel, tilt).",
+            tooltip="Silhouette is a top-down mouse. Button map labels every mouse button (M1–M5, wheel, tilt).",
         )
         form.addRow("Mouse graphic", graphic)
 
@@ -5062,7 +5062,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
         form = self._section("Keys")
         hint = QtWidgets.QLabel(
-            "Presets match common streaming layouts. Select keysâ€¦ opens the same virtual keyboard as Map to Keyboard/Mouse Ex. Only selected keys and mouse buttons are drawn.",
+            "Presets match common streaming layouts. Select keys… opens the same virtual keyboard as Map to Keyboard/Mouse Ex. Only selected keys and mouse buttons are drawn.",
             self._host,
         )
         hint.setWordWrap(True)
@@ -5165,7 +5165,7 @@ class OverlayInspector(QtWidgets.QWidget):
         form = self._section("Datasets")
         if item.get("type") == "axis_bars":
             hint = QtWidgets.QLabel(
-                "Each dataset is one physical or vJoy axis. Pick Centered (âˆ’100 to +100) or 0 to 100% per axis. Bar colors match the graph. Auto range uses negatives only when a centered axis is selected.",
+                "Each dataset is one physical or vJoy axis. Pick Centered (−100 to +100) or 0 to 100% per axis. Bar colors match the graph. Auto range uses negatives only when a centered axis is selected.",
                 self._host,
             )
         else:
@@ -5333,14 +5333,14 @@ class OverlayInspector(QtWidgets.QWidget):
             range_box = _enum_radios(
                 [
                     ("Auto", "auto"),
-                    ("Centered", "centered", "âˆ’100 to +100"),
-                    ("0â€“100%", "unipolar"),
+                    ("Centered", "centered", "−100 to +100"),
+                    ("0–100%", "unipolar"),
                 ],
                 current_mode,
                 lambda v, wid=item["id"], sid=series_id: self._set_graph_series(wid, sid, rebuild=True, range_mode=str(v or "auto")),
                 tooltip=(
-                    "Centered stick axes plot from âˆ’100 to +100. Throttles and sliders are typically 0 to 100%. "
-                    "Auto guesses from the axis name (S1/S2 and throttle-like names are 0â€“100)."
+                    "Centered stick axes plot from −100 to +100. Throttles and sliders are typically 0 to 100%. "
+                    "Auto guesses from the axis name (S1/S2 and throttle-like names are 0–100)."
                 ),
             )
             form.addRow("Range", range_box)
@@ -5671,7 +5671,7 @@ class OverlayInspector(QtWidgets.QWidget):
         )
         form.addRow(fit)
         hint = QtWidgets.QLabel(
-            "Mirrors the selected deckâ€™s keys (and Stream Deck + dials) using the current GEX page art.",
+            "Mirrors the selected deck’s keys (and Stream Deck + dials) using the current GEX page art.",
             self._host,
         )
         hint.setWordWrap(True)
@@ -5922,7 +5922,7 @@ class OverlayInspector(QtWidgets.QWidget):
         same = all(v == values[0] for v in values)
         btn = ColorButton(values[0] or "#ffffff")
         if not same:
-            btn.setToolTip("Multiple values â€” pick a color to apply to all")
+            btn.setToolTip("Multiple values — pick a color to apply to all")
         btn.color_changed.connect(lambda v, wid=item["id"], k=key: self._style(wid, **{k: v}))
         form.addRow(title, btn)
 
@@ -6173,11 +6173,11 @@ class OverlayInspector(QtWidgets.QWidget):
         dial.setWrapping(True)
         dial.setNotchesVisible(True)
         dial.setFixedSize(48, 48)
-        dial.setToolTip("Shadow direction. 0Â° = right, 90Â° = up.")
+        dial.setToolTip("Shadow direction. 0° = right, 90° = up.")
         dial.setValue(int(round(float(shadow.get("angle") or 135.0))) % 360)
         angle_spin = QtWidgets.QSpinBox(self._host)
         angle_spin.setRange(0, 359)
-        angle_spin.setSuffix("Â°")
+        angle_spin.setSuffix("°")
         angle_spin.setValue(int(round(float(shadow.get("angle") or 135.0))) % 360)
         angle_spin.setMaximumWidth(72)
         angle_layout.addWidget(dial)
@@ -6274,7 +6274,7 @@ class OverlayInspector(QtWidgets.QWidget):
             0,
             100,
             " %",
-            "How far the shadow grows outward before the blur (0â€“100% of Size).",
+            "How far the shadow grows outward before the blur (0–100% of Size).",
             "spread",
         )
         size_row, size_slider, size_spin = _shadow_slider(
@@ -6302,7 +6302,7 @@ class OverlayInspector(QtWidgets.QWidget):
 
     def _build_toggle_binding(self):
         binding = normalize_toggle_binding(self.scene.canvas.get("toggle_binding"))
-        # Canvas show/hide is a button (or state) assignment â€” not a free-form
+        # Canvas show/hide is a button (or state) assignment — not a free-form
         # axis/hat binding editor. Force button so Input type / Invert stay hidden.
         binding["input_type"] = "button"
         self.scene.canvas["toggle_binding"] = binding
@@ -6314,15 +6314,15 @@ class OverlayInspector(QtWidgets.QWidget):
             force_type="button",
             show_invert=False,
             extra_hint=(
-                "While the profile is running, this pageâ€™s overlay is shown while the state is pressed and hidden while it is released."
+                "While the profile is running, this page’s overlay is shown while the state is pressed and hidden while it is released."
                 if (binding.get("source") or "").casefold() == "state"
                 else (
-                    "While the profile is running, this pageâ€™s overlay is shown while this mode is active and hidden when another mode is selected."
+                    "While the profile is running, this page’s overlay is shown while this mode is active and hidden when another mode is selected."
                     if (binding.get("source") or "").casefold() == "mode"
                     else (
-                        "While the profile is running, press the key combination to show or hide this pageâ€™s overlay window."
+                        "While the profile is running, press the key combination to show or hide this page’s overlay window."
                         if (binding.get("source") or "").casefold() == "keyboard"
-                        else "While the profile is running, press this button to show or hide this pageâ€™s overlay window."
+                        else "While the profile is running, press this button to show or hide this page’s overlay window."
                     )
                 )
             ),
@@ -6338,13 +6338,13 @@ class OverlayInspector(QtWidgets.QWidget):
             "(page / group / widget) to an anchor, nudge it, toggle visibility, save, "
             "cycle anchors, or open the control panel. "
             "Use rising-edge button or key bindings (nudge binds repeat while held). "
-            "The Overlay control panel Keybindsâ€¦ button edits the same list.",
+            "The Overlay control panel Keybinds… button edits the same list.",
             self._host,
         )
         hint.setWordWrap(True)
         form.addRow(hint)
         open_panel = QDataPushButton(
-            "Open control panelâ€¦",
+            "Open control panel…",
             tooltip="Open the runtime overlay control panel now.",
             clicked=self._open_runtime_control_panel,
         )
@@ -6456,7 +6456,7 @@ class OverlayInspector(QtWidgets.QWidget):
             spacing.setSingleStep(50)
             spacing.setSuffix(" ms")
             spacing.setValue(normalize_ocr_arm_pulse_spacing_ms(style.get("ocr_arm_pulse_spacing_ms")))
-            spacing.setToolTip("Delay between Multiple (pulses) detections (e.g. 5 Ã— 500 ms).")
+            spacing.setToolTip("Delay between Multiple (pulses) detections (e.g. 5 × 500 ms).")
             spacing.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, ocr_arm_pulse_spacing_ms=normalize_ocr_arm_pulse_spacing_ms(v)))
             form.addRow("Spacing", spacing)
             pulse_fields.append(spacing)
@@ -6632,7 +6632,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     selected = i
                     break
             if selected == 0 and bool(current):
-                # Bound device not currently connected â€” keep it visible.
+                # Bound device not currently connected — keep it visible.
                 missing = binding.get("device_name") or f"vJoy {current}"
                 device_box.addItem(f"{missing} (missing)", current)
                 selected = device_box.count() - 1
@@ -6822,7 +6822,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     device_name = None
                 label = f"Axis {axis_id} ({axis_name})"
                 if device_name and str(device_name) not in label:
-                    label = f"{label} â€” {device_name}"
+                    label = f"{label} — {device_name}"
                 choices.append((int(axis_id), label))
             if choices:
                 return choices

@@ -2,9 +2,12 @@
 
 import ast
 from dataclasses import dataclass, field
+import json
 import logging
+import os
 from pathlib import Path
 import sys
+import tempfile
 import traceback
 import threading
 import uuid
@@ -81,7 +84,9 @@ class Device:
     enabled = property(lambda self: self.connected and not self.disabled)
     is_virtual = property(lambda self: self.device_type in (DeviceType.VJoy, DeviceType.Maestro))
     device_category = property(lambda self: DeviceCategory.Config if self.device_type in (DeviceType.Settings, DeviceType.Plugins)
-                               else DeviceCategory.Virtual if self.is_virtual else DeviceCategory.Physical)
+                               else DeviceCategory.Virtual if self.is_virtual
+                               else DeviceCategory.Physical if self.device_type == DeviceType.Joystick
+                               else DeviceCategory.Special)
 
 
 class VirtualInputChecks(unittest.TestCase):
@@ -325,13 +330,14 @@ class VirtualInputChecks(unittest.TestCase):
         self.settings.setVirtualAsInput(selected, False)
         self.assertFalse(self.state.inputEnabled(selected.device_id))
 
-    def test_display_filter_order_keeps_fixed_tabs_after_new_devices(self):
-        plugins = Device("Plugins", DeviceType.Plugins)
-        settings = Device("Settings", DeviceType.Settings)
+    def test_new_devices_join_their_group_without_moving_saved_settings_and_plugins(self):
+        plugins = Device("Plugins", DeviceType.Plugins, disabled=True, visible=False)
+        settings = Device("Settings", DeviceType.Settings, disabled=True, visible=False)
         wheel = Device("WingMan Formula GP", DeviceType.Joystick)
         stick = Device("T.16000M", DeviceType.Joystick)
         self.devices.extend([plugins, settings, wheel, stick])
         self.services.joystick_handling.getConfigDevices = lambda: [plugins, settings]
+        self.config.device_visible_map = {plugins.device_id: False, settings.device_id: False}
         selected = self.devices[2]
         self.settings.setVirtualAsInput(selected, True)
         load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
@@ -348,7 +354,7 @@ class VirtualInputChecks(unittest.TestCase):
             with self.subTest(saved=saved):
                 self.config.tab_list = saved
                 result = window._get_sorted_tab_map()
-                expected = [self.devices[3], wheel, selected, stick, plugins, settings]
+                expected = [settings, plugins, self.devices[3], wheel, stick, selected]
                 self.assertEqual(result["sorted"], expected)
                 expected_ids = [dev.device_id for dev in expected]
                 self.assertEqual(list(result["tab_map"].values()), expected_ids)
@@ -357,7 +363,196 @@ class VirtualInputChecks(unittest.TestCase):
                 self.assertTrue(plugins.visible and settings.visible)
                 self.assertNotIn(self.devices[1], result["sorted"])
         self.config.tab_list = {}
-        self.assertEqual(window._get_sorted_tab_map()["sorted"][-2:], [plugins, settings])
+        self.assertEqual(window._get_sorted_tab_map()["sorted"][-2:], [settings, plugins])
+
+    def test_default_order_groups_hardware_virtual_inputs_special_and_fixed_tabs(self):
+        special = [Device(kind.name, kind) for kind in DeviceType if kind not in (
+            DeviceType.NotSet, DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro,
+            DeviceType.Settings, DeviceType.Plugins,
+        )]
+        gamepad = Device("A gamepad", DeviceType.Joystick)
+        missing = Device("Z missing stick", DeviceType.Joystick, connected=False)
+        settings = Device("Settings", DeviceType.Settings, visible=False)
+        plugins = Device("Plugins", DeviceType.Plugins, visible=False)
+        self.devices.extend([*reversed(special), plugins, gamepad, settings, missing])
+        self.services.joystick_handling.getSpecialDevices = lambda: special
+        self.services.joystick_handling.getConfigDevices = lambda: [plugins, settings]
+        for device in self.devices[:2]:
+            self.settings.setVirtualAsInput(device)
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config, window.profile = self.config, self.profile
+        expected = [gamepad, self.devices[3], missing, self.devices[1], self.devices[0],
+                    *sorted(special, key=lambda device: device.name.casefold()), settings, plugins]
+        self.assertEqual(window._get_sorted_tab_map()["sorted"], expected)
+        self.config.tab_list = {index: (device.device_id, True) for index, device in enumerate(reversed(expected))}
+        self.assertEqual(window._get_sorted_tab_map(reset=True)["sorted"], expected)
+
+    def test_visibility_flags_do_not_replace_an_explicit_manual_tab_order(self):
+        first = Device("Z stick", DeviceType.Joystick)
+        second = Device("A stick", DeviceType.Joystick)
+        keyboard = Device("Keyboard", DeviceType.Keyboard)
+        self.devices[:] = [first, second, keyboard]
+        self.services.joystick_handling.getSpecialDevices = lambda: [keyboard]
+        saved = {0: (keyboard.device_id, True), 1: (first.device_id, True), 2: (second.device_id, False)}
+        self.config.tab_list = saved
+        self.config.device_visible_map = {first.device_id: False, second.device_id: True}
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config, window.profile = self.config, self.profile
+        result = window._get_sorted_tab_map()
+        self.assertEqual(result["sorted"], [keyboard, first, second])
+        self.assertEqual(result["invisible"], [first])
+        self.assertIs(self.config.tab_list, saved)
+
+    def test_sort_tabs_keeps_every_special_module_and_places_fixed_tabs_last(self):
+        kinds = [DeviceType.Plugins, DeviceType.State, DeviceType.Overlay, DeviceType.Keyboard,
+                 DeviceType.Maestro, DeviceType.Settings, DeviceType.Joystick, DeviceType.Voice,
+                 DeviceType.ModeControl, DeviceType.VJoy, DeviceType.Afcs, DeviceType.OctaviIFR1]
+        self.devices[:] = [Device(kind.name, kind) for kind in kinds]
+        tabs = {index: NS(device=device, device_guid=device.device_guid, tab_type=TabDeviceType.Joystick)
+                for index, device in enumerate(self.devices)}
+        load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_sort_tabs_worker"}, "Widget")
+        window = self.ui["GremlinUi"]()
+        self.addCleanup(self.delete_widget, window)
+        window.config = NS(verbose=False)
+        window._get_tab_map = lambda: tabs
+        window._reset_tab_data = Mock()
+        window.getTabCount = lambda: 0
+        window._add_tab_ui = Mock()
+        window._select_last_tab = Mock()
+        window._select_last_input = lambda **kwargs: setattr(window, "_tab_sorted_flag", True)
+        window._handle_tabs_sorted_completed = Mock()
+        window._sort_tabs_worker(None)
+        self.assertEqual([call.args[0].name for call in window._add_tab_ui.call_args_list], [
+            "Joystick", "Maestro", "VJoy", "Afcs", "Keyboard", "ModeControl", "OctaviIFR1",
+            "Overlay", "State", "Voice", "Settings", "Plugins",
+        ])
+
+    def test_visibility_layouts_ignore_positions_in_new_and_legacy_files(self):
+        physical = self.devices[3]
+        keyboard = Device("Keyboard", DeviceType.Keyboard)
+        self.devices.append(keyboard)
+        self.ui.update(json=json, os=os, MessageBoxWarning=Mock())
+        load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui, {"_load_order_file"}, "Widget")
+        dialog = self.ui["DeviceDisplayDialog"]()
+        self.addCleanup(self.delete_widget, dialog)
+        dialog.config = self.config
+        dialog._order_changed = False
+        dialog._get_current_map = lambda: {0: (keyboard.device_id, False), 1: (physical.device_id, True)}
+        dialog._populate_list_widget = Mock()
+        layouts = (
+            {physical.device_id: False, keyboard.device_id: True, "Offline": False},
+            {"9": [physical.device_id, False], "0": [keyboard.device_id, True]},
+            {"9": physical.device_id, "0": keyboard.device_id},
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "visibility.json"
+            for index, layout in enumerate(layouts):
+                with self.subTest(layout=layout):
+                    dialog.visible_map = {}
+                    path.write_text(json.dumps(layout), encoding="utf-8")
+                    dialog._load_order_file(str(path))
+                    rows = list(dialog._populate_list_widget.call_args.args[0].values())
+                    self.assertEqual(rows, [(keyboard, True), (physical, index == 2)])
+                    self.assertFalse(dialog._order_changed)
+                    if index == 0:
+                        self.assertFalse(dialog.visible_map["Offline"])
+        self.ui["MessageBoxWarning"].assert_not_called()
+
+    def test_applying_visibility_preserves_order_until_the_user_moves_a_row(self):
+        self.services.shared_state.ui = NS(_create_tabs_ui=Mock())
+        load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui,
+             {"_update_tabs", "_handle_order_changed"}, "Widget")
+        dialog = self.ui["DeviceDisplayDialog"]()
+        self.addCleanup(self.delete_widget, dialog)
+        dialog.config = self.config
+        saved = {0: ("Existing manual order", True)}
+        self.config.tab_list = saved
+        dialog.visible_map = {"Offline": False}
+        dialog._order_changed = False
+        dialog._device_enabled = lambda device: True
+        dialog._list_widget = QtWidgets.QListWidget(dialog)
+        for device, visible in ((self.devices[3], False), (self.devices[0], True)):
+            item = QtWidgets.QListWidgetItem(dialog._list_widget)
+            item.setData(QtCore.Qt.UserRole, (device, visible))
+        dialog._update_tabs()
+        self.assertIs(self.config.tab_list, saved)
+        self.assertEqual(self.config.device_visible_map, {"Offline": False, "Physical": False, "vJoy 1": True})
+        dialog._handle_order_changed()
+        dialog._update_tabs()
+        self.assertEqual(self.config.tab_list, {0: ("Physical", False), 1: ("vJoy 1", True)})
+
+    def test_saved_visibility_file_contains_device_flags_without_positions(self):
+        self.ui.update(json=json, MessageBoxWarning=Mock())
+        load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui, {"_handle_save_order"}, "Widget")
+        dialog = self.ui["DeviceDisplayDialog"]()
+        self.addCleanup(self.delete_widget, dialog)
+        dialog._get_current_map = lambda: {0: ("Physical", False), 1: ("vJoy 1", True)}
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as folder:
+            self.services.shared_state.data_path = folder
+            path = Path(folder) / "visibility.json"
+            with patch.object(QtWidgets.QFileDialog, "getSaveFileName", return_value=(str(path), "")):
+                dialog._handle_save_order(None)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"Physical": False, "vJoy 1": True})
+        self.ui["MessageBoxWarning"].assert_not_called()
+
+    def test_settings_and_plugins_cannot_be_filtered_by_rows_bulk_actions_or_layouts(self):
+        plugins = Device("Plugins", DeviceType.Plugins, disabled=True, visible=False)
+        settings = Device("Settings", DeviceType.Settings, disabled=True, visible=False)
+        self.devices.extend([plugins, settings])
+        self.services.shared_state.ui = NS(_create_tabs_ui=Mock())
+        self.ui.update(
+            json=json, os=os, MessageBoxWarning=Mock(), dinput=NS(DeviceSummary=Device),
+            QListWidgetItem=QtWidgets.QListWidgetItem, QListWidget=QtWidgets.QListWidget,
+            QAbstractItemView=QtWidgets.QAbstractItemView, QLabel=QtWidgets.QLabel,
+            Color=lambda: NS(alternateActiveColor=lambda: "#8a761c", disconnectedColor=lambda: "#db6512"),
+        )
+        self.services.util.InvokeUiMethod = lambda callback, *args: callback(*args)
+        load("gremlin/ui/dialogs.py", {"ReorderDeviceListWidget", "ReorderListWidget"}, self.ui)
+        load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui, {
+            "_device_enabled", "_populate_list_widget", "_set_all_devices_visible", "_handle_visible_changed",
+            "_get_current_map", "_load_order_file", "_update_tabs",
+        }, "Widget")
+        dialog = self.ui["DeviceDisplayDialog"]()
+        self.addCleanup(self.delete_widget, dialog)
+        dialog.config = self.config
+        dialog._order_changed = False
+        dialog.visible_map = {plugins.device_id: False, settings.device_id: False}
+        dialog._list_widget = self.ui["ReorderListWidget"](dialog)
+        original = {0: (plugins, False), 1: (self.devices[3], True), 2: (settings, False)}
+        dialog._populate_list_widget(original)
+
+        def assert_always_on():
+            self.assertEqual(list(dialog._get_current_map().values())[::2], [("Plugins", True), ("Settings", True)])
+            for index in (0, 2):
+                item = dialog._list_widget.item(index)
+                row = dialog._list_widget.itemWidget(item)
+                self.assertTrue(row.visible_widget.isChecked())
+                self.assertFalse(row.visible_widget.isEnabled())
+                self.assertTrue(item.flags() & QtCore.Qt.ItemFlag.ItemIsDragEnabled)
+                self.assertTrue(dialog.visible_map[row.data.device_id])
+
+        assert_always_on()
+        for visible in (False, True):
+            dialog._set_all_devices_visible(visible)
+            assert_always_on()
+        row = dialog._list_widget.itemWidget(dialog._list_widget.item(0))
+        dialog._handle_visible_changed(row.visible_widget, False)
+        assert_always_on()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "visibility.json"
+            path.write_text(json.dumps({"Plugins": False, "Physical": False, "Settings": False}), encoding="utf-8")
+            dialog._load_order_file(str(path))
+        assert_always_on()
+        dialog._update_tabs()
+        self.assertTrue(self.config.device_visible_map["Settings"])
+        self.assertTrue(self.config.device_visible_map["Plugins"])
+        self.assertEqual(self.config.tab_list, {})
+        self.ui["MessageBoxWarning"].assert_not_called()
 
     def test_profile_only_disconnected_device_gets_a_tab_in_default_and_saved_order(self):
         missing = Device("Old left VPC", DeviceType.Joystick, connected=False)
@@ -771,6 +966,7 @@ class VirtualInputChecks(unittest.TestCase):
         window.ui = NS(devices_tab_header_widget=header)
         registered = {}
         window.getRegisteredWidget = registered.get
+        window._has_mapping = lambda *args: False
         window.registerWidget = lambda guid, widget: registered.update({guid: widget})
         window.getTabIndexForDevice = lambda guid: window._tab_device_map.get(guid)
         window.getActiveTabDeviceGuid = lambda: "Maestro 0"
@@ -811,8 +1007,8 @@ class VirtualInputChecks(unittest.TestCase):
             window._create_tabs_ui()
             self.assertEqual(selection_cleanup_counts, list(range(_ + 1)))
             self.assertEqual(header.count(), 2)
-            self.assertEqual(registered["vJoy 1"].data, (TabDeviceType.VjoyInput, "vJoy 1", 0))
-            self.assertEqual(registered["Maestro 0"].data, (TabDeviceType.MaestroInput, "Maestro 0", 1))
+            self.assertEqual(registered["vJoy 1"].data, (TabDeviceType.VjoyInput, "vJoy 1", 1))
+            self.assertEqual(registered["Maestro 0"].data, (TabDeviceType.MaestroInput, "Maestro 0", 0))
             logger.error.assert_not_called()
         self.settings.setVirtualAsInput(self.devices[1], False)
         window._create_tabs_ui()

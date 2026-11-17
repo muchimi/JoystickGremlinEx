@@ -103,7 +103,7 @@ class VirpilDeviceFamily(Enum):
 # Other panel/throttle families use On-board indices (legacy plugin HID IDs
 # were typically On-board+4 and are wrong for this tool).
 # Alpha Prime sticks: VPC Config shows grip LEDs under Add-boards / Slave1
-# with 9 LEDs â€” those are Slave1 #01-#09 => commands 21-29.
+# with 9 LEDs — those are Slave1 #01-#09 => commands 21-29.
 VIRPIL_DEVICE_LEDS: dict[VirpilDeviceFamily, list[VirpilLedOption]] = {
     VirpilDeviceFamily.Stick: [
         VirpilLedOption("grip_01", "LED 01", 21),
@@ -160,7 +160,7 @@ VIRPIL_DEVICE_LEDS: dict[VirpilDeviceFamily, list[VirpilLedOption]] = {
     VirpilDeviceFamily.Unknown: [],
 }
 
-# USB product IDs â€” verified against this system's DirectInput device list where noted.
+# USB product IDs — verified against this system's DirectInput device list where noted.
 # Prefer name-based classification when the device name is unambiguous (see classify_virpil_device).
 VIRPIL_PRODUCT_FAMILY: dict[int, VirpilDeviceFamily] = {
     0x0259: VirpilDeviceFamily.ControlPanel1,  # classic CP1
@@ -184,12 +184,12 @@ def classify_virpil_device(device: DeviceSummary | None) -> VirpilDeviceFamily:
 
     name = (device.name or "").casefold()
 
-    # Name first â€” product IDs vary by firmware/revision and are easy to mis-map
+    # Name first — product IDs vary by firmware/revision and are easy to mis-map
     if "panel #1" in name or "panel 1" in name or "cp1" in name:
         return VirpilDeviceFamily.ControlPanel1
     if "panel #2" in name or "panel 2" in name or "cp2" in name:
         return VirpilDeviceFamily.ControlPanel2
-    # Sticks often include base names like "MT-50CM3" â€” check stick/alpha before CM3
+    # Sticks often include base names like "MT-50CM3" — check stick/alpha before CM3
     if "stick" in name or "alpha" in name:
         return VirpilDeviceFamily.Stick
     if "mongoos" in name or "throttle" in name or "cm3" in name or "cm2" in name:
@@ -1079,7 +1079,7 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
             self._update_view_widget()
 
     def _handle_delete(self, widget: VirpilButtonWidget):
-        # Remove by object â€” model indices can be sparse after prior deletes,
+        # Remove by object — model indices can be sparse after prior deletes,
         # so enumerate() widget positions are not reliable removeAt() keys.
         button = widget.button_data
         if button is not None:
@@ -1349,7 +1349,7 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         if not self.device or not self.device.enabled:
             return
 
-        # Prefer direct HID (keeps device open) â€” fall back to VPC_LED_Control.exe
+        # Prefer direct HID (keeps device open) — fall back to VPC_LED_Control.exe
         try:
             import gremlin.virpil_led_hid
 

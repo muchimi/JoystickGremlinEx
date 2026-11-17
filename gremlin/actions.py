@@ -934,7 +934,7 @@ def convert_condition(condition):
     import gremlin.input_item
 
     # Already a runtime condition (e.g. VirtualButtonCondition created during
-    # tree build) â€” converting again would fail the type checks below.
+    # tree build) — converting again would fail the type checks below.
     if isinstance(condition, AbstractCondition):
         return condition
 

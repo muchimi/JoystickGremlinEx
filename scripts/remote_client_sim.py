@@ -3,7 +3,7 @@
 Lightweight JG Ex remote-control client simulator.
 
 Joins the same UDP multicast group the master uses for discovery and answers
-`identify` with `identify_client` â€” so you can test Target Client(s) / Refresh
+`identify` with `identify_client` — so you can test Target Client(s) / Refresh
 without rebuilding gremlinEx.exe.
 
 Requires: msgpack (project .venv has it)
@@ -196,7 +196,7 @@ def open_send_socket(iface: str | None) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     ttl = struct.pack("b", MULTICAST_TTL)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-    # Do NOT bind to the RPC port â€” that collides with the listener (same bug as the real client).
+    # Do NOT bind to the RPC port — that collides with the listener (same bug as the real client).
     if iface:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(iface))
     return sock

@@ -593,7 +593,7 @@ def delete_widget(widget: QtWidgets.QWidget):
             widget.unhook()
         if hasattr(widget, "_cleanup_ui"):
             widget._cleanup_ui()
-        # Do not setParent(None) â€” that creates a transient top-level HWND flash.
+        # Do not setParent(None) — that creates a transient top-level HWND flash.
         widget.deleteLater()  # tell QT to free the widget from memory
 
 
@@ -2108,7 +2108,7 @@ def is_ui_thread():
     """true if the current thread is the UI thread"""
     app = QtWidgets.QApplication.instance()
     if app is None:
-        # Import / early init â€” no Qt app yet; treat as safe for sync work
+        # Import / early init — no Qt app yet; treat as safe for sync work
         return True
     try:
         # Stable across PySide wrapper identity; `currentThread() == app.thread()`

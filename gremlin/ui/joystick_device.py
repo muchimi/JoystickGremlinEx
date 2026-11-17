@@ -1183,7 +1183,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # not ours
             return
 
-        # One Curve Editor at a time â€” stale curve_edit slots must not stack dialogs
+        # One Curve Editor at a time — stale curve_edit slots must not stack dialogs
         if _active_curve_dialog is not None and Shiboken.isValid(_active_curve_dialog):
             return
 

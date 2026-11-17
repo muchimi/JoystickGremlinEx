@@ -2344,7 +2344,7 @@ class ProfileRegistry:
                         input_item.setSortCallback(self._handle_joystick_sort)
 
                 input_item.setInputType(input_type)
-                # OSC / MIDI / Stream Deck use the item itself as input_id â€” never assign a string key.
+                # OSC / MIDI / Stream Deck use the item itself as input_id — never assign a string key.
                 if input_type not in (
                     InputType.OpenSoundControl,
                     InputType.Midi,
@@ -2811,7 +2811,7 @@ class Profile:
 
                                         input_item = StreamDeckInputItem(self)
                                         input_item.setOverrideInputType(InputType.JoystickButton)
-                                        # Do not setInputId(string) â€” Stream Deck uses the item as input_id.
+                                        # Do not setInputId(string) — Stream Deck uses the item as input_id.
                                         if isinstance(input_id, str) and ":" in input_id:
                                             parts = input_id.split(":")
                                             if len(parts) >= 3:
@@ -3213,11 +3213,11 @@ class Profile:
         show_parent = gremlin.config.Configuration().show_parent_mode
         for child in tree.children:
             for pre, fill, node in anytree.RenderTree(child, style=anytree.ContStyle()):
-                #'â””''â”€'
-                # pre = '' if node.parent.is_root else 'â””'
-                # fill = 'â”€' * (node.depth-1)
+                #'└''─'
+                # pre = '' if node.parent.is_root else '└'
+                # fill = '─' * (node.depth-1)
                 if node.parent.name and show_parent:
-                    text = f"{pre} {node.name} (â†‘{node.parent.name})"
+                    text = f"{pre} {node.name} (↑{node.parent.name})"
                     labels.append((node.name, text))
                 else:
                     text = f"{pre} {node.name}"
@@ -3950,7 +3950,7 @@ class Profile:
 
         node.name = new_mode
 
-        # mode device objects â€” ProfileModeNode.id is unchanged; only the name moves
+        # mode device objects — ProfileModeNode.id is unchanged; only the name moves
         mode: ProfileModeNode
         for device in self.devices.values():
             for mode in device.modes.values():
@@ -4247,7 +4247,7 @@ class Profile:
         else:
             self._profile_fname = None
             self._profile_config_fname = None
-        # Path changed â€” never reuse a previous profile's in-memory sidecar cache.
+        # Path changed — never reuse a previous profile's in-memory sidecar cache.
         self._config_data_read = False
         self._read_config_data = {}
 

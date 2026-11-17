@@ -445,7 +445,7 @@ def _install_mapping_recipe(widget: dict[str, Any], rule: dict[str, Any], recipe
         from gremlin.input_types import InputType
 
         input_id = ocr_rule_input_id(str(widget.get("id") or ""), str(rule.get("id") or ""))
-        title = f"OCR Â· {rule.get('name') or rule.get('display_name') or 'Rule'}"
+        title = f"OCR · {rule.get('name') or rule.get('display_name') or 'Rule'}"
         item = ensure_overlay_input(input_id, title)
         if item is None:
             return
@@ -666,7 +666,7 @@ def build_sc_mineables_pack_from_source(source_path: str) -> dict[str, Any] | No
         "schema": PACK_SCHEMA,
         "id": "sc-mineables",
         "name": "SC mineables",
-        "description": "Star Citizen mining signature â†’ ore Ã— rock count (from sc-overlay mineables table).",
+        "description": "Star Citizen mining signature → ore × rock count (from sc-overlay mineables table).",
         "kind": "static",
         "variable": {"name": "rock", "default": ""},
         "variables": [{"name": "rock", "default": ""}],

@@ -2058,8 +2058,8 @@ class GremlinUi(QRememberMainWindow):
         self._update_status_bar()
         self._select_last_tab()
 
-        # Match file-load: modules (overlay, Stream Deck, AFCS, â€¦) listen for
-        # profile_loaded. Without this, File â†’ New only emits unload and the
+        # Match file-load: modules (overlay, Stream Deck, AFCS, …) listen for
+        # profile_loaded. Without this, File → New only emits unload and the
         # Overlay tab can keep showing the previous profile's layout.
         el.profile_loaded.emit()
 
@@ -3273,8 +3273,11 @@ class GremlinUi(QRememberMainWindow):
                         f"\tMissing device: {device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}"
                     )
 
-            # index of the last item per section
-
+            # New devices join their default group without disturbing a user's
+            # existing order. In particular, new joysticks precede special tabs.
+            missing_devices.sort(key=lambda device: (
+                DeviceType.tab_order_group(device.device_type), device.name.casefold()
+            ))
             for device in missing_devices:
                 fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
                 if fixed_tab:
@@ -3285,8 +3288,14 @@ class GremlinUi(QRememberMainWindow):
                     device.visible = self.config.isDeviceVisible(device.device_guid)
                     if device.disabled or not device.visible:
                         continue
-                sorted_device_tuples.append((device.device_id, device.name, device))
-                sorted_devices.append(device)
+                group = DeviceType.tab_order_group(device.device_type)
+                same_group = [index for index, existing in enumerate(sorted_devices)
+                              if DeviceType.tab_order_group(existing.device_type) == group]
+                index = same_group[-1] + 1 if same_group else next(
+                    (index for index, existing in enumerate(sorted_devices)
+                     if DeviceType.tab_order_group(existing.device_type) > group), len(sorted_devices)
+                )
+                sorted_devices.insert(index, device)
 
         else:
             # setup default sorting order is by name (index 1 of id, name, dev triplets)
@@ -3321,19 +3330,19 @@ class GremlinUi(QRememberMainWindow):
             sorted_device_tuples = [(device.device_id, device.name, device) for device in all_sorted_devices]
             sorted_devices = all_sorted_devices
 
-        # Keep the display filter's relative device order, including newly
-        # discovered inputs, ahead of the fixed configuration tabs.
-        fixed_tab_order = {
-            DeviceType.Plugins: 1,
-            DeviceType.Settings: 2,
-            DeviceType.ModeControl: 3,
-            DeviceType.Voice: 4,
-            DeviceType.Osc: 5,
-            DeviceType.Midi: 6,
-            DeviceType.State: 7,
-            DeviceType.Keyboard: 8,
-        }
-        sorted_devices.sort(key=lambda device: fixed_tab_order.get(device.device_type, 0))
+        if reset or not tab_map:
+            sorted_devices.sort(key=lambda device: (
+                DeviceType.tab_order_group(device.device_type), device.name.casefold()
+            ))
+
+        # Visibility layouts override old flags stored alongside manual tab order.
+        visible_map = getattr(self.config, "device_visible_map", {})
+        for device in sorted_devices:
+            if device.device_type in (DeviceType.Settings, DeviceType.Plugins):
+                device.visible = True
+            else:
+                device.visible = visible_map.get(gremlin.util.normalize_guid(device.device_id), device.visible)
+        invisible_list = [device for device in sorted_devices if not device.visible]
         sorted_device_tuples = [(device.device_id, device.name, device) for device in sorted_devices]
 
         sorted_devices_map = {device.device_id: device for device in sorted_devices}
@@ -3775,7 +3784,7 @@ class GremlinUi(QRememberMainWindow):
                         case DeviceType.StreamDeck:
                             if config.startup_streamdeck_enabled:
                                 # =======================================================
-                                # Stream Deck via Elgato plugin bridge â€” one tab per
+                                # Stream Deck via Elgato plugin bridge — one tab per
                                 # connected physical deck; legacy shared tab only if needed.
 
                                 from gremlin.ui import streamdeck_device as streamdeck_ui
@@ -5139,59 +5148,15 @@ class GremlinUi(QRememberMainWindow):
 
         self._tab_sorted_flag = False
 
-        # sorted list of item GUIDs
-        guid_list = []
         tab_map = self._get_tab_map()
         if self.config.verbose:
             syslog.info("SORT: pre sort state:")
             self._dump_tab_map(tab_map)
 
-        # add hardware joystick devices by their alphabetical name
-        joystick_devices = self._find_joystick_tab_data()
-        joystick_devices.sort(key=lambda x: x[1].casefold())
-        guid_list.extend(joystick_devices)
-
-        # add the Keyboard, OSC and MIDI
-
-        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.keyboard_tab_guid))
-
-        if self.config.startup_midi_enabled:
-            guid_list.append(self._find_tab_data_guid(gremlin.shared_state.midi_tab_guid))
-
-        if self.config.startup_osc_enabled:
-            guid_list.append(self._find_tab_data_guid(gremlin.shared_state.osc_tab_guid))
-
-        if self.config.startup_streamdeck_enabled:
-            # One tab per connected Stream Deck (+ legacy tab only when still needed)
-            from gremlin.ui import streamdeck_device as streamdeck_ui
-
-            streamdeck_ui.ensure_bridge_started()
-            bridge = streamdeck_ui.StreamDeckBridge()
-            for info in bridge.devices.values():
-                guid_list.append(self._find_tab_data_guid(info.get("guid")))
-            if streamdeck_ui.legacy_streamdeck_tab_needed(self.profile):
-                guid_list.append(self._find_tab_data_guid(gremlin.shared_state.streamdeck_tab_guid))
-
-        # add the virtual joystick input devices
-        for device_guid in self._virtual_input_device_guids:
-            guid_list.append(self._find_tab_data_guid(device_guid))
-
-        # add the settings tab
-        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.settings_tab_guid))
-
-        # add the user plugin tab
-        guid_list.append(self._find_tab_data_guid(gremlin.shared_state.plugins_tab_guid))
-
-        if self.config.startup_overlay_enabled:
-            overlay_tab = self._find_tab_data_guid(gremlin.shared_state.overlay_tab_guid)
-            if overlay_tab:
-                guid_list.append(overlay_tab)
-
-        if self.config.afcs_enabled:
-            # add the AFCS designer tab
-            afcs_tab = self._find_tab_data_guid(gremlin.shared_state.afcs_tab_guid)
-            if afcs_tab:
-                guid_list.append(afcs_tab)
+        # Sort every currently displayed tab, including all special modules.
+        guid_list = sorted(tab_map.values(), key=lambda data: (
+            DeviceType.tab_order_group(data.device.device_type), data.device.name.casefold()
+        ))
 
         # move the tabs to the correct location
         self._reset_tab_data()
@@ -5306,7 +5271,7 @@ class GremlinUi(QRememberMainWindow):
         self.ui.actionInputViewer.setCheckable(True)
         self.ui.actionInputViewer.setIcon(viewer_icon)
 
-        # Overlay control panel â€” square pad with center dot (X/Y widget motif).
+        # Overlay control panel — square pad with center dot (X/Y widget motif).
         # Checkable like Input Viewer; intentionally not disabled while the profile runs.
         # Green only when checked (On), not on hover (Active + Off).
         def _overlay_control_pixmap(qta_color):

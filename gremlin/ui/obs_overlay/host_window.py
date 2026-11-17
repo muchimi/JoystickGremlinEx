@@ -162,7 +162,7 @@ def release_input_hooks() -> None:
 
 
 def hide_overlay_hwnd(overlay_hwnd: int) -> None:
-    """Native hide â€” Qt hide() is a no-op when isVisible() is already False after SetParent."""
+    """Native hide — Qt hide() is a no-op when isVisible() is already False after SetParent."""
     if sys.platform != "win32" or not overlay_hwnd:
         return
     try:
@@ -433,7 +433,7 @@ def detach_overlay_hwnd(
     page change cannot pull the shared app or Joystick Gremlin Ex forward.
 
     *hide_window*: after SetParent(0) the HWND can remain visible while Qt still
-    thinks it is hidden â€” native SW_HIDE is required when tearing down.
+    thinks it is hidden — native SW_HIDE is required when tearing down.
     """
     if sys.platform != "win32" or not overlay_hwnd:
         return

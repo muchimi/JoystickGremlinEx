@@ -84,7 +84,7 @@ def _coerce_palette_color(value: Any, fallback: Any = "#ffffff") -> Any:
     if is_gradient(value):
         return normalize_gradient(value)
     if isinstance(value, dict):
-        # Unknown structured color â€” fall back rather than str(dict).
+        # Unknown structured color — fall back rather than str(dict).
         value = fallback if not isinstance(fallback, dict) else "#ffffff"
     return str(value or "#ffffff")
 

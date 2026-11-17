@@ -60,7 +60,7 @@ _SHORT_LABELS = {
     "rightalt2": "ALT",
     "leftwin": "WIN",
     "rightwin": "WIN",
-    "backspace": "â†",
+    "backspace": "←",
     "enter": "ENTER",
     "space": "SPACE",
     "printscreen": "PrtSc",
@@ -89,10 +89,10 @@ _SHORT_LABELS = {
     "np8": "8",
     "np9": "9",
     "npdelete": ".",
-    "up": "â†‘",
-    "down": "â†“",
-    "left": "â†",
-    "right": "â†’",
+    "up": "↑",
+    "down": "↓",
+    "left": "←",
+    "right": "→",
 }
 
 # Same grid as InputKeyboardDialog._get_keyboard_widget (keyboard picker).

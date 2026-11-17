@@ -22,21 +22,21 @@ from typing import Callable
 class EMAFilter:
     __slots__ = (
         "alpha",
-        "inverse_alpha",
-        "threshold",
-        "large_jump_threshold",
-        "min_interval_ns",
-        "settle_interval_ns",
-        "settle_tolerance",
-        "input_min",
-        "input_max",
         "clamp_input",
-        "read_value_callback",
-        "smoothed_value",
-        "last_raw_value",
-        "last_sent_value",
+        "input_max",
+        "input_min",
+        "inverse_alpha",
+        "large_jump_threshold",
         "last_input_time_ns",
         "last_process_time_ns",
+        "last_raw_value",
+        "last_sent_value",
+        "min_interval_ns",
+        "read_value_callback",
+        "settle_interval_ns",
+        "settle_tolerance",
+        "smoothed_value",
+        "threshold",
     )
 
     def __init__(

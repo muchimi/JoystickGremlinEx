@@ -142,7 +142,7 @@ RUNTIME_BINDING_GROUPS = (
 
 def overlay_window_title(page: dict[str, Any] | None = None, name: str | None = None) -> str:
     label = str(name if name is not None else (page or {}).get("name") or "Overlay").strip() or "Overlay"
-    return f"{OVERLAY_WINDOW_TITLE} â€” {label}"
+    return f"{OVERLAY_WINDOW_TITLE} — {label}"
 
 
 def _optional_int(value) -> int | None:
@@ -814,7 +814,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "border": "#3a4a62",
                 "border_on": "#ffcc66",
                 "border_width": 2.0,
-                # Large radius clamps to half the short side â†’ pill like other rounded widgets.
+                # Large radius clamps to half the short side → pill like other rounded widgets.
                 "corner_radius": 100.0,
                 "indicator": "#e8eaed",
                 "indicator_shape": "circle",
@@ -879,8 +879,8 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "show_label": False,
                 "show_axis_labels": True,
                 "axis_label_n": "+",
-                "axis_label_s": "âˆ’",
-                "axis_label_e": "âˆ’",
+                "axis_label_s": "−",
+                "axis_label_e": "−",
                 "axis_label_w": "+",
             }
         )
@@ -1116,8 +1116,8 @@ XY_WIDGET_TYPES = ("axis_stick_square", "axis_stick_circle", "axis_crosshair")
 XYZ_WIDGET_TYPES = ("axis_xyz", "axis_polar", "axis_ternary", "axis_radar")
 POLAR_WIDGET_TYPES = ("axis_polar",)
 RADAR_WIDGET_TYPES = ("axis_radar",)
-# On type convert, old style is merged onto the new defaults â€” these keys must stay
-# the destination widget's identity so e.g. axesâ†’polar does not keep show_sphere=False.
+# On type convert, old style is merged onto the new defaults — these keys must stay
+# the destination widget's identity so e.g. axes→polar does not keep show_sphere=False.
 STYLE_IDENTITY_KEYS = {
     "axis_xyz": (
         "show_sphere",
@@ -1432,7 +1432,7 @@ def normalize_overlay_keys(raw) -> list[dict[str, Any]]:
 
 
 def default_binding(axis_id: int = 0) -> dict[str, Any]:
-    """Empty binding by default â€” no device or input until the user assigns one."""
+    """Empty binding by default — no device or input until the user assigns one."""
     return {
         "source": "physical",
         "device_guid": "",
@@ -1585,7 +1585,7 @@ def normalize_series_range_mode(value) -> str:
 
 
 def series_is_centered(series: dict[str, Any] | None) -> bool:
-    """True when this axis should plot âˆ’100..+100 instead of 0..100."""
+    """True when this axis should plot −100..+100 instead of 0..100."""
     series = series or {}
     mode = normalize_series_range_mode(series.get("range_mode") or series.get("centered"))
     if mode == "centered":
@@ -1618,7 +1618,7 @@ def series_is_centered(series: dict[str, Any] | None) -> bool:
 
 
 def axis_display_percent(raw_value: float, centered: bool) -> float:
-    """Map a GEX axis (âˆ’1..+1) to percent for bar-graph display."""
+    """Map a GEX axis (−1..+1) to percent for bar-graph display."""
     try:
         value = max(-1.0, min(1.0, float(raw_value)))
     except (TypeError, ValueError):
@@ -2006,7 +2006,7 @@ def normalize_background_mode(value) -> str:
         return "onscreen"
     if mode in ("websocket", "web-socket", "ws"):
         return "websocket"
-    # Legacy names: chroma / image â†’ windowed capture window.
+    # Legacy names: chroma / image → windowed capture window.
     return "windowed"
 
 
@@ -2126,7 +2126,7 @@ def normalize_ocr_capture(value) -> str:
 
 
 def normalize_ocr_fire(value) -> str:
-    """Legacy Edge/Hold â€” ignored at runtime (detection is always press-while-matched)."""
+    """Legacy Edge/Hold — ignored at runtime (detection is always press-while-matched)."""
     raw = str(value or "edge").casefold()
     return "hold" if raw in ("hold", "level", "while", "latched") else "edge"
 
@@ -2235,13 +2235,13 @@ def ocr_rule_input_id(widget_id: str, rule_id: str) -> str:
 
 
 def detection_label_for_rule(rule: dict[str, Any], signature: int | None) -> str:
-    """Build Quantainium Ã—2 style label when base is set; otherwise display_name/name."""
+    """Build Quantainium ×2 style label when base is set; otherwise display_name/name."""
     display = str(rule.get("display_name") or rule.get("name") or "").strip() or "Match"
     base = normalize_ocr_base(rule.get("base"))
     if base and signature and signature % base == 0:
         count = signature // base
         if count >= 1:
-            return f"{display} Ã—{count}"
+            return f"{display} ×{count}"
     return display
 
 
@@ -2432,10 +2432,10 @@ class OverlayScene(QtCore.QObject):
     """Versioned overlay layout: pages of canvas + widgets. canvas/widgets alias the active page."""
 
     changed = Signal()
-    # Position/size/rotation only â€” views should repaint; do not rebuild panels/trees.
+    # Position/size/rotation only — views should repaint; do not rebuild panels/trees.
     geometry_changed = Signal()
     selection_changed = Signal()
-    # page_id, x, y â€” OverlayManager moves the live windowed OverlayWindow.
+    # page_id, x, y — OverlayManager moves the live windowed OverlayWindow.
     page_window_move_requested = Signal(str, int, int)
     control_target_changed = Signal()
     control_highlight_changed = Signal()
@@ -2476,7 +2476,7 @@ class OverlayScene(QtCore.QObject):
         self._save_later_pending = False
         self._sorted_cache: list[dict[str, Any]] | None = None
         self._identity_hooks = False
-        # True while the designer is mid move/resize/rotate â€” inspectors skip live churn.
+        # True while the designer is mid move/resize/rotate — inspectors skip live churn.
         self.geometry_gesture = False
         # Transient alignment lines while snapping to other widgets (cleared on release).
         self.active_snap_lines: list[tuple[str, float]] = []
@@ -2495,7 +2495,7 @@ class OverlayScene(QtCore.QObject):
         el.update_sidecar.connect(self._handle_save_sidecar)
 
     def _handle_save_sidecar(self):
-        """Sidecar flush is profile-save only â€” keep overlay edits in memory."""
+        """Sidecar flush is profile-save only — keep overlay edits in memory."""
         return
 
     def _bind_identity_hooks(self):
@@ -2824,7 +2824,7 @@ class OverlayScene(QtCore.QObject):
         pid = page["id"]
         snap = self._layout_baseline.get(pid)
         if not isinstance(snap, dict):
-            # No snapshot yet â€” fall back to clearing saved window offset only.
+            # No snapshot yet — fall back to clearing saved window offset only.
             self.reset_page_position(page_id=pid, emit=True)
             if not is_onscreen_mode(page.get("canvas")):
                 sx, sy, sw, sh = self._available_screen_rect(page)
@@ -3166,7 +3166,7 @@ class OverlayScene(QtCore.QObject):
                     isinstance(on_bind, dict) and (on_bind.get("device_guid") or on_bind.get("source") in ("state", "mode", "keyboard"))
                 ):
                     item["bindings"]["on"] = normalize_toggle_binding(legacy)
-                # First-ship cyan/silver palette â†’ same housing/accent as other switches.
+                # First-ship cyan/silver palette → same housing/accent as other switches.
                 _legacy_toggle = {
                     "fill": "#1a1d22",
                     "fill_on": "#2a3548",
@@ -3328,7 +3328,7 @@ class OverlayScene(QtCore.QObject):
                 if item.get("id") == widget_id:
                     return item
             return None
-        # Ids are unique across the scene â€” search every page.
+        # Ids are unique across the scene — search every page.
         for page in self.pages or []:
             for item in page.get("widgets") or []:
                 if item.get("id") == widget_id:
@@ -4744,7 +4744,7 @@ class OverlayScene(QtCore.QObject):
             self._redo.clear()
             return True
         # Keep an in-memory draft only when this scene never belonged to a saved
-        # profile and the current profile is still unsaved. After File â†’ New
+        # profile and the current profile is still unsaved. After File → New
         # (or leaving a saved profile), clear so the Overlay tab does not keep
         # showing the previous layout under "Unsaved profile".
         previous_key = self._profile_key
@@ -4807,7 +4807,7 @@ class OverlayScene(QtCore.QObject):
         data = self.to_dict()
         current = profile_xml_path(profile)
         # Prefer Profile._setConfig so we merge against the live sidecar and keep
-        # _config_data in sync â€” a direct file write can be overwritten moments
+        # _config_data in sync — a direct file write can be overwritten moments
         # later by Stream Deck / last_input using a stale in-memory cache.
         use_set_config = (
             profile is not None
@@ -4855,7 +4855,7 @@ class OverlayScene(QtCore.QObject):
             pass
 
     def save_later(self):
-        """Keep overlay edits in memory only â€” disk write happens on profile save.
+        """Keep overlay edits in memory only — disk write happens on profile save.
 
         Must not call InvokeUiMethod(self.save_later): a false-negative UI-thread
         check + DirectConnection re-enters forever (RecursionError on tab switch).
@@ -4876,11 +4876,11 @@ class OverlayScene(QtCore.QObject):
         self._sync_runtime_into_scene()
 
     def save_owned(self) -> bool:
-        """Legacy name â€” overlay disk writes are profile-save only."""
+        """Legacy name — overlay disk writes are profile-save only."""
         return False
 
     def persist_owned(self) -> bool:
-        """Legacy name â€” overlay disk writes are profile-save only."""
+        """Legacy name — overlay disk writes are profile-save only."""
         return False
 
     def _write_json_file(self, path: str, data: dict[str, Any]) -> bool:

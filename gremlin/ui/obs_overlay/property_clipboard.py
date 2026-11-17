@@ -52,7 +52,7 @@ LABEL_STYLE_KEYS = (
     "label_offset_y",
 )
 
-# Type-specific identity / wiring â€” never paste these onto another widget.
+# Type-specific identity / wiring — never paste these onto another widget.
 _IDENTITY_STYLE_KEYS = {
     "shape_kind",
     "shape_closed",
@@ -78,7 +78,7 @@ _IDENTITY_STYLE_KEYS = {
     "ocr_arm_pulse_spacing_ms",
 }
 
-# Asset paths â€” appearance is colors/borders/effects, not the widget's image files.
+# Asset paths — appearance is colors/borders/effects, not the widget's image files.
 _APPEARANCE_ASSET_KEYS = {
     "image_path",
     "image_path_on",

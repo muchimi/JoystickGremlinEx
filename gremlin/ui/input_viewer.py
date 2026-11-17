@@ -225,13 +225,12 @@ class VisualizationConfig:
         if not self._config:
             self.reload()
 
-        if key is None or key not in self._config:
-            # old style data
-            if visualization in (VisualizationType.State, VisualizationType.Keyboard):
-                for k, v in self._config.keys():
-                    if v == visualization:
-                        key = (k, v)
-                        break
+        # old style data
+        if key is None or key not in self._config and visualization in (VisualizationType.State, VisualizationType.Keyboard):
+            for k, v in self._config.keys():
+                if v == visualization:
+                    key = (k, v)
+                    break
 
         if key not in self._config:
             return default_value
@@ -1726,7 +1725,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             # layout.addWidget(self.keyboard_widget)
 
             self.keyboard_widget.hook()
-            self._keyboard_visualizer_widget = widget 
+            self._keyboard_visualizer_widget = widget
             self._keyboard_visible = True
 
             # if self._visualizer_width:

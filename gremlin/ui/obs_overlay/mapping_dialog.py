@@ -22,11 +22,11 @@ class OverlayMappingDialog(QtWidgets.QDialog):
 
         if self._rule is not None:
             rule_name = str(self._rule.get("name") or self._rule.get("display_name") or "Rule")
-            self.setWindowTitle(f"Overlay Â· OCR Â· {rule_name}")
+            self.setWindowTitle(f"Overlay · OCR · {rule_name}")
             input_id = ocr_rule_input_id(str(widget.get("id") or ""), str(self._rule.get("id") or ""))
-            title = f"OCR Â· {rule_name}"
+            title = f"OCR · {rule_name}"
         else:
-            self.setWindowTitle(f"Overlay Â· Button Â· {widget_display_name(widget)}")
+            self.setWindowTitle(f"Overlay · Button · {widget_display_name(widget)}")
             input_id = str(widget.get("id") or "")
             title = widget_display_name(widget)
 
@@ -86,7 +86,7 @@ class OverlayMappingDialog(QtWidgets.QDialog):
         xml = dump_overlay_mapping_xml(self._input_item)
         if self._rule is not None:
             write_ocr_rule_mapping_xml(self._widget, self._rule, self._input_item, persist_empty=True)
-            title = f"OCR Â· {self._rule.get('name') or self._rule.get('display_name') or 'Rule'}"
+            title = f"OCR · {self._rule.get('name') or self._rule.get('display_name') or 'Rule'}"
             input_id = ocr_rule_input_id(str(self._widget.get("id") or ""), str(self._rule.get("id") or ""))
         else:
             write_widget_mapping_xml(self._widget, self._input_item, persist_empty=True)

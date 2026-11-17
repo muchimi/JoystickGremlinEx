@@ -199,7 +199,7 @@ else:
     def _afcs_set_node_property(self, name, value) -> None:
         model = self.node.model
         # Built-in fields live on the model. AFCS fields (source_name, device_guid,
-        # axis_id, curve, â€¦) are custom properties. Unknown names still no-op so a
+        # axis_id, curve, …) are custom properties. Unknown names still no-op so a
         # missing live field cannot raise NodePropertyError.
         if name not in model.properties and name not in model.custom_properties:
             return
@@ -756,7 +756,7 @@ class NodeConditionWidget(QtWidgets.QWidget):
     def _condition_box(self, cond: dict) -> QtWidgets.QGroupBox:
         letter = str(cond.get("letter") or "").strip().upper()
         phrase = _condition_phrase(cond)
-        box = QtWidgets.QGroupBox(f"{letter} â€” {phrase}" if letter else phrase)
+        box = QtWidgets.QGroupBox(f"{letter} — {phrase}" if letter else phrase)
         form = QtWidgets.QFormLayout(box)
         form.setLabelAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
@@ -1286,14 +1286,14 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         selected = self._selected_afcs_nodes()
         if not selected:
             return "Canvas", (
-                "<b>Mouse</b> â€” Click empty space to deselect. Hold the middle mouse button to pan. "
+                "<b>Mouse</b> — Click empty space to deselect. Hold the middle mouse button to pan. "
                 "Ctrl+wheel zooms at the cursor. Drag a node to move it. "
                 "Right-click empty space for Center, or Center and fit. Right-click a node to copy, paste, or delete.<br>"
-                "<b>Keys</b> â€” Delete removes the selected node. Ctrl+C / Ctrl+V copy and paste. "
+                "<b>Keys</b> — Delete removes the selected node. Ctrl+C / Ctrl+V copy and paste. "
                 "Ctrl+Z / Ctrl+Y undo and redo. The toolbar Undo, Redo, Zoom, and Fit do the same.<br>"
-                "<b>Modes</b> â€” Each tab is a flight mode. Double-click a tab to rename. "
+                "<b>Modes</b> — Each tab is a flight mode. Double-click a tab to rename. "
                 "Right-click to add, duplicate, or delete. Drag a tab to reorder.<br>"
-                "<b>Nodes</b> â€” Click a type to add it at the center of the view. "
+                "<b>Nodes</b> — Click a type to add it at the center of the view. "
                 "List shows one button per row. Wrap flows them across the panel."
             )
         node = selected[0]
@@ -1301,16 +1301,16 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
         label = _NODE_SECTION.get(kind, kind)
         title = node.name() if len(selected) == 1 else f"{len(selected)} nodes selected"
         if len(selected) == 1:
-            title = f"{title} â€” {label}"
+            title = f"{title} — {label}"
         help_text = inspector_help(
             kind, operation_from_label(node.get_property("operation")) if kind == "merge" else None
         )
         help_text = help_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         return title, (
-            f"<b>This module</b> â€” {help_text}<br>"
-            "<b>Mouse</b> â€” Drag to move. Middle button pans. Ctrl+wheel zooms. "
+            f"<b>This module</b> — {help_text}<br>"
+            "<b>Mouse</b> — Drag to move. Middle button pans. Ctrl+wheel zooms. "
             "Double-click a curve or limiter node to edit its response.<br>"
-            "<b>Keys</b> â€” Delete removes it. Ctrl+C / Ctrl+V copy and paste. Ctrl+Z / Ctrl+Y undo and redo."
+            "<b>Keys</b> — Delete removes it. Ctrl+C / Ctrl+V copy and paste. Ctrl+Z / Ctrl+Y undo and redo."
         )
 
     def _maybe_show_intro(self) -> None:
@@ -2481,8 +2481,8 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             if display.layout() is not None:
                 display.layout().setContentsMargins(0, 0, 0, 0)
             display.setToolTip(
-                "Invert first, then this range is the node's output. Hardware is always âˆ’1..+1. "
-                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps Â±1. Auto uses throttle/slider names like GEX."
+                "Invert first, then this range is the node's output. Hardware is always −1..+1. "
+                "0 to 100% remaps that to 0..1 (idle at 0). Centered keeps ±1. Auto uses throttle/slider names like GEX."
             )
             self._inspector_form.addRow("Display", display)
             listen = Buttons.getListenWidget(
@@ -2528,7 +2528,7 @@ class AfcsDesignerWidget(QtWidgets.QWidget):
             if combo.layout() is not None:
                 combo.layout().setContentsMargins(0, 0, 0, 0)
             combo.setToolTip(
-                "0 to 100%: slider or throttle over full travel. Centered (âˆ’100 to +100): stick; negative inverts the output."
+                "0 to 100%: slider or throttle over full travel. Centered (−100 to +100): stick; negative inverts the output."
             )
             self._inspector_form.addRow("Limit axis", combo)
             edit = QDataPushButton("Edit full-throw curve...", clicked=lambda n=node: self._on_double_click(n))

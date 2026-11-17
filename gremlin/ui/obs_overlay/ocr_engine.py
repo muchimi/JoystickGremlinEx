@@ -37,12 +37,12 @@ def engine_status() -> dict[str, Any]:
 
 def _status_summary(rapid_ok: bool, rapid_msg: str, win_ok: bool, win_msg: str) -> str:
     if rapid_ok and win_ok:
-        return "RapidOCR (primary) Â· Windows OCR (fallback)"
+        return "RapidOCR (primary) · Windows OCR (fallback)"
     if rapid_ok:
         return "RapidOCR available"
     if win_ok:
-        return f"Windows OCR only â€” {rapid_msg or 'install rapidocr + onnxruntime for best results'}"
-    return f"No OCR engine â€” {rapid_msg or win_msg or 'install rapidocr + onnxruntime'}"
+        return f"Windows OCR only — {rapid_msg or 'install rapidocr + onnxruntime for best results'}"
+    return f"No OCR engine — {rapid_msg or win_msg or 'install rapidocr + onnxruntime'}"
 
 
 def _probe_rapid() -> tuple[bool, str]:
@@ -81,7 +81,7 @@ def _qimage_to_rgb_bytes(image: QtGui.QImage) -> tuple[bytes, int, int]:
     height = int(converted.height())
     ptr = converted.constBits()
     buf = bytes(ptr[: converted.sizeInBytes()])
-    # Drop alpha â†’ RGB for RapidOCR / WinOCR helpers that want 3 channels.
+    # Drop alpha → RGB for RapidOCR / WinOCR helpers that want 3 channels.
     try:
         import numpy as np
 
@@ -156,7 +156,7 @@ def _recognize_rapid(image: QtGui.QImage, min_confidence: float) -> list[dict[st
     engine = _get_rapid()
     if engine is None:
         return None
-    # RapidOCR logs WARNING "text detection result is empty" on blank frames â€”
+    # RapidOCR logs WARNING "text detection result is empty" on blank frames —
     # normal while armed over empty HUD regions or when the app is minimized.
     rapid_log = logging.getLogger("RapidOCR")
     prior_level = rapid_log.level
@@ -271,7 +271,7 @@ def _recognize_windows(image: QtGui.QImage, min_confidence: float) -> list[dict[
             finally:
                 loop.close()
         except RuntimeError:
-            # Already in an event loop â€” fall back to sync-ish polling via nest if needed.
+            # Already in an event loop — fall back to sync-ish polling via nest if needed.
             result = asyncio.get_event_loop().run_until_complete(_run())  # type: ignore
 
         hits = []

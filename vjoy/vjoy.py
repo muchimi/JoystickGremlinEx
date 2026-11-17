@@ -293,7 +293,7 @@ class Axis:
         el.vjoy_output_event_ui.emit(event)
 
         # Loopback only for "virtual as input" devices. Needed so mappings on the
-        # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis â€” DINPUT
+        # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis — DINPUT
         # echo is unreliable. Gated to avoid flooding normal output-only devices.
         profile = shared_state.current_profile
         if profile is not None and profile.settings.getVirtualAsInput(self.vjoy_id):

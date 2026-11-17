@@ -3,18 +3,18 @@
 # Separate from UDP remote control (gremlin.remote).
 #
 # Process model (client):
-#   Main JG Ex process     â€“ UDP VJoy/KVM only; supervises video worker
-#   Video helper process   â€“ TCP publish + capture/encode (gremlinEx --remote-video-worker)
+#   Main JG Ex process     – UDP VJoy/KVM only; supervises video worker
+#   Video helper process   – TCP publish + capture/encode (gremlinEx --remote-video-worker)
 #
 # Thread model (video worker process):
-#   GexRemoteVideoListen  â€“ TCP accept only
-#   GexRemoteVideo-Capture â€“ GDI grab scaled at capture (CPU), latest-frame slot
-#   GexRemoteVideo-Encode  â€“ H.264 (GPU HW preferred) or JPEG; latest-packet slot
-#   GexRemoteVideo-Send-*  â€“ TCP send of the latest encoded packet only
+#   GexRemoteVideoListen  – TCP accept only
+#   GexRemoteVideo-Capture – GDI grab scaled at capture (CPU), latest-frame slot
+#   GexRemoteVideo-Encode  – H.264 (GPU HW preferred) or JPEG; latest-packet slot
+#   GexRemoteVideo-Send-*  – TCP send of the latest encoded packet only
 #
 # Thread model (master):
-#   GexRemoteVideo-Recv-*  â€“ TCP receive + H.264 decode (GPU HW preferred)
-#   UI thread              â€“ pixmap swap only (via InvokeUiMethod)
+#   GexRemoteVideo-Recv-*  – TCP receive + H.264 decode (GPU HW preferred)
+#   UI thread              – pixmap swap only (via InvokeUiMethod)
 #
 # Based in part on original Joystick Gremlin work by Lionel Ott and other
 # contributors - Gremlin Ex is (C) EMCS 2026
@@ -110,7 +110,7 @@ def _find_hwnd_by_title(needle: str) -> int:
     if not needle:
         return 0
     windows = list_top_windows()
-    # Exact title first (avoids locking onto the first "GEX Overlay â€” â€¦").
+    # Exact title first (avoids locking onto the first "GEX Overlay — …").
     for hwnd, title in windows:
         if title.casefold() == needle:
             return hwnd
@@ -233,7 +233,7 @@ def _encode_jpeg(image: QtGui.QImage, quality: int) -> bytes:
 
 
 def _qimage_to_bgra_ndarray(image: QtGui.QImage):
-    """BGRA layout matching Qt Format_RGB32 on little-endian Windows â€” skips RGB888 copy."""
+    """BGRA layout matching Qt Format_RGB32 on little-endian Windows — skips RGB888 copy."""
     import numpy as np
 
     converted = image
@@ -265,7 +265,7 @@ def _rgb_ndarray_to_qimage(arr) -> QtGui.QImage:
 
 
 def _quality_to_crf(quality: int) -> int:
-    # Map UI quality 1..100 â†’ x264 CRF ~35..18 (lower CRF = better).
+    # Map UI quality 1..100 → x264 CRF ~35..18 (lower CRF = better).
     q = max(1, min(100, int(quality)))
     return int(round(35 - (q / 100.0) * 17))
 
@@ -477,7 +477,7 @@ class _H264Decoder:
                 try:
                     rgb = frame.to_ndarray(format="rgb24")
                 except Exception:
-                    # HW surface without download support â€” skip this decoder.
+                    # HW surface without download support — skip this decoder.
                     self._skip.add(self._codec_name)
                     self.close()
                     continue
@@ -778,7 +778,7 @@ def grab_screen_rect(left: int, top: int, width: int, height: int, max_width: in
 
 
 def _grab_frame_image() -> QtGui.QImage | None:
-    """Capture on the caller thread via GDI â€” never blocks the Qt UI loop."""
+    """Capture on the caller thread via GDI — never blocks the Qt UI loop."""
     settings = _active_video_settings()
     max_w = max(320, min(1920, int(settings.get("max_width") or 960)))
     try:
@@ -828,7 +828,7 @@ class _LatestSlot:
 
 
 class _CaptureBroker:
-    """Remote-video pipeline: Capture thread â†’ Encode thread â†’ shared packet slot.
+    """Remote-video pipeline: Capture thread → Encode thread → shared packet slot.
 
     Network send threads only copy the latest encoded packet (never capture/encode).
     """
@@ -960,7 +960,7 @@ _capture_broker = _CaptureBroker()
 
 
 class _PublisherSession(threading.Thread):
-    """One TCP subscriber â€” only ships frames produced by the shared broker."""
+    """One TCP subscriber — only ships frames produced by the shared broker."""
 
     def __init__(self, conn: socket.socket, addr, stop_event: threading.Event):
         super().__init__(daemon=True, name="GexRemoteVideo-Send")
@@ -1140,7 +1140,7 @@ def worker_main(argv: list[str] | None = None) -> int:
     def _watch_parent():
         while not stop_event.is_set():
             if not _parent_process_alive(parent_pid):
-                syslog.info("REMOTE VIDEO: parent process exited â€” stopping worker")
+                syslog.info("REMOTE VIDEO: parent process exited — stopping worker")
                 stop_event.set()
                 app.quit()
                 break
@@ -1336,7 +1336,7 @@ class RemoteVideoPublisher:
                     should_respawn = True
                     exit_code = None if proc is None else proc.poll()
             if should_respawn:
-                syslog.warning(f"REMOTE VIDEO: worker exited (code={exit_code}) â€” respawning")
+                syslog.warning(f"REMOTE VIDEO: worker exited (code={exit_code}) — respawning")
                 self._stop_monitor.wait(self._respawn_backoff_s)
                 with self._lock:
                     if self._want_running and not self._stop_monitor.is_set():
@@ -1423,7 +1423,7 @@ class RemoteVideoHub(QtCore.QObject):
                 host, port = self._endpoint_for(cid)
                 existing = self._workers.get(cid)
                 if existing is not None and (existing.host != host or existing.port != port):
-                    # Peer re-identified with a new IP/port â€” reconnect.
+                    # Peer re-identified with a new IP/port — reconnect.
                     existing.stop()
                     self._workers.pop(cid, None)
                     existing = None

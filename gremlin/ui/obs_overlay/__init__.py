@@ -95,7 +95,7 @@ class OverlayManager:
         from .ocr_track import OcrOverlayTracker
 
         OcrOverlayTracker().stop_runtime()
-        # Overlay disk writes happen only on profile save â€” sync tallies in memory.
+        # Overlay disk writes happen only on profile save — sync tallies in memory.
         try:
             self.scene.save_now()
         except Exception as err:
@@ -124,7 +124,7 @@ class OverlayManager:
 
     def _on_profile_loaded(self):
         # profile_loaded is a psygnal Signal and may fire on the profile-load
-        # worker thread â€” never touch Qt widgets / scene emits from there.
+        # worker thread — never touch Qt widgets / scene emits from there.
         gremlin.util.InvokeUiMethod(self._on_profile_loaded_ui)
 
     def _flush_dirty_scene(self) -> bool:
@@ -159,9 +159,9 @@ class OverlayManager:
         self._flush_dirty_scene()
         self._stop_runtime_toggle()
         self.hide_overlay()
-        # current_profile is often None during a swap or File â†’ New. Drop the
+        # current_profile is often None during a swap or File → New. Drop the
         # previous layout from memory so the Overlay tab does not keep showing
-        # it. Overlay edits are not flushed to disk here â€” only a profile save
+        # it. Overlay edits are not flushed to disk here — only a profile save
         # persists them. File open emits profile_loaded to replace this blank;
         # New Profile leaves the blank scene in place.
         if gremlin.shared_state.current_profile is None:
@@ -171,7 +171,7 @@ class OverlayManager:
             self.scene._dirty = False
             self._refresh_page_chrome()
             return
-        # Worker already pointed current_profile at the next file â€” load it now
+        # Worker already pointed current_profile at the next file — load it now
         # so the Overlay tab does not keep showing the previous layout.
         self._load_current_profile_scene()
 
@@ -250,7 +250,7 @@ class OverlayManager:
             for window in self._overlays.values()
         )
         self._auto_shown = False
-        # Always tear down live / app-share overlays on deactivate â€” a detached
+        # Always tear down live / app-share overlays on deactivate — a detached
         # child that Qt still thinks is hidden leaves a ghost HWND + host cursor
         # over JG Ex.
         if auto or attached or self._overlays or self._ws_sessions:
@@ -549,7 +549,7 @@ class OverlayManager:
         if window is None or not Shiboken.isValid(window):
             return False
         # After app-share SetParent, Qt can report isVisible()==False even though
-        # the child HWND is live â€” that made the 16ms toggle poll reopen forever.
+        # the child HWND is live — that made the 16ms toggle poll reopen forever.
         if window.isVisible():
             return True
         return bool(getattr(window, "_host_attached", False))
@@ -645,7 +645,7 @@ class OverlayManager:
         self._page_chrome[page_id] = self._page_chrome_tuple(page_id)
         self._emit_visibility()
         self._emit_ws_status()
-        # Port may have been remapped â€” refresh inspector without tearing the session down.
+        # Port may have been remapped — refresh inspector without tearing the session down.
         QtCore.QTimer.singleShot(0, lambda: self._emit_ws_port_sync(page_id))
         return True
 
@@ -741,7 +741,7 @@ class OverlayManager:
         window.show_without_activating()
 
     def _sync_stream_to_active_page(self):
-        """Track designer selection only â€” do not auto show/hide live windows.
+        """Track designer selection only — do not auto show/hide live windows.
 
         Forcing show on tab change fought toggle + app-share and stole focus
         (game cursor appearing over JG Ex).

@@ -16,47 +16,37 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 
-
-import functools
-import traceback
-import inspect
-import logging
-import time
-import threading
 import collections
-from typing import Optional
-from threading import  Timer
-from typing import Callable
+import functools
+import inspect
+import json
+import logging
+import threading
+import time
+import traceback
+from threading import Timer
+from typing import Callable, Optional
 
-from dinput import DeviceSummary
-from gremlin.filter import EMAFilter
-
-import gremlin.base_classes
-from gremlin import execution_guard
-from gremlin.fastqueue import FastQueue
-import gremlin.shared_state
-import gremlin.threading
-
-
+from psygnal import Signal
 from PySide6 import QtCore
 from shiboken6 import Shiboken
 
 import dinput
+import gremlin.base_classes
 import gremlin.config
-from gremlin.input_types import InputType
-from gremlin.types import DeviceType, EventSourceType
-import gremlin.shared_state
-
-import gremlin.util
-
 import gremlin.keyboard
-import gremlin.ui
+import gremlin.shared_state
 import gremlin.singleton_decorator
-import json
-
-from psygnal import Signal
+import gremlin.threading
+import gremlin.ui
+import gremlin.util
+from dinput import DeviceSummary
+from gremlin import execution_guard
+from gremlin.fastqueue import FastQueue
+from gremlin.filter import EMAFilter
+from gremlin.input_types import InputType
 from gremlin.profiler import ignore_function
-from gremlin.types import CallbackMode
+from gremlin.types import CallbackMode, DeviceType, EventSourceType
 
 syslog = logging.getLogger("system")
 
@@ -2924,7 +2914,7 @@ class EventHandler(QtCore.QObject):
                 syslog.info(f"Added latched functor: {device_name} mode: {mode} key: [{key}] input: [{input_item.display_name}] event: [{event!s}]")
 
         # m76T185-style joystick merge latch: functors list only. Do not call
-        # addCallback(latched=True) â€” that path owns latched_input_map and asserts
+        # addCallback(latched=True) — that path owns latched_input_map and asserts
         # when multiple merges share one secondary axis (unplayable / no activate).
         if is_keyboard:
             container = functor.action_data.container
@@ -3238,7 +3228,7 @@ class EventHandler(QtCore.QObject):
                 data.append((self._install_plugins(callback), permanent))
 
             elif event.event_type == InputType.StreamDeck:
-                # Stream Deck plugin bridge â€” keyed by message_key like OSC/MIDI
+                # Stream Deck plugin bridge — keyed by message_key like OSC/MIDI
                 # (not in getValidJoystickDevicesMap, so must not use the joystick path)
                 verbose = gremlin.config.Configuration().verbose_mode_streamdeck
                 sd_input = event.identifier
@@ -3254,7 +3244,7 @@ class EventHandler(QtCore.QObject):
                     syslog.info(f"STREAMDECK: register callback mode={mode} key={key}")
 
             elif event.event_type == InputType.OverlayButton:
-                # Overlay HUD / OCR rule-as-button â€” keyed by message_key (widget_id or widget_id:rule_id)
+                # Overlay HUD / OCR rule-as-button — keyed by message_key (widget_id or widget_id:rule_id)
                 ov_input = event.identifier
                 key = ov_input.message_key if hasattr(ov_input, "message_key") else str(ov_input)
                 if device_guid not in self.overlay_callbacks:
@@ -3927,7 +3917,7 @@ class EventHandler(QtCore.QObject):
                             self._execute_callbacks(event, [], f_list)
                         return [], f_list
                 # States are registered in state_callbacks (by message_key), not only
-                # input_item_map. Do not drop the event when the map lookup misses â€”
+                # input_item_map. Do not drop the event when the map lookup misses —
                 # that silently blocked Map to Stream Deck / other state mappings.
                 if event.event_type == InputType.State:
                     m_list = self._matching_state_callbacks(event)

@@ -177,7 +177,7 @@ class MacroListModel(QtCore.QAbstractListModel):
 
                 label = dict(FUNCTIONS).get(action.command or "changePage", action.command or "Change Page")
                 if (action.command or "changePage") == "changePage":
-                    display = f"Stream Deck: {label} â†’ page {int(action.page or 0) + 1}"
+                    display = f"Stream Deck: {label} → page {int(action.page or 0) + 1}"
                 else:
                     display = f"Stream Deck: {label}"
                 if action.auto_return:

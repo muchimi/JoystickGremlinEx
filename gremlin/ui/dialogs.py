@@ -1107,7 +1107,7 @@ class OptionsDialog(BaseDialogUi):
         self.client_name_widget.textChanged.connect(self._client_name_changed_cb)
         page_layout.addWidget(getHContainer(self.client_name_widget, "Client name:", widget_only=True))
 
-        # Video return (client â†’ master) â€” gated under remote control of this client.
+        # Video return (client → master) — gated under remote control of this client.
         self._remote_video_group = QtWidgets.QGroupBox("Video return to master")
         video_layout = QtWidgets.QVBoxLayout(self._remote_video_group)
         self.enable_remote_video_widget = QDataCheckbox(
@@ -1119,7 +1119,7 @@ class OptionsDialog(BaseDialogUi):
         self.enable_remote_video_widget.setToolTip(
             "When enabled, this client publishes a screen or application capture for Overlay Remote View widgets on the master. "
             "Publishing runs only while a profile is active and stops when the profile is deactivated. "
-            "Requires remote control of this client. Opens TCP port 6013 while running â€” allow it in the firewall."
+            "Requires remote control of this client. Opens TCP port 6013 while running — allow it in the firewall."
         )
         self.enable_remote_video_widget.clicked.connect(self._enable_remote_video)
         video_layout.addWidget(self.enable_remote_video_widget)
@@ -1161,7 +1161,7 @@ class OptionsDialog(BaseDialogUi):
             callback=self._remote_video_fps_changed,
             min_range=1,
             max_range=30,
-            tooltip="Target frames per second (1â€“30). Lower values reduce load on the client PC.",
+            tooltip="Target frames per second (1–30). Lower values reduce load on the client PC.",
         )
         video_layout.addWidget(getHContainer(self.remote_video_fps_widget, "FPS:", widget_only=True))
 
@@ -1170,7 +1170,7 @@ class OptionsDialog(BaseDialogUi):
             callback=self._remote_video_quality_changed,
             min_range=1,
             max_range=100,
-            tooltip="JPEG quality (1â€“100). Lower = less CPU/bandwidth on the client.",
+            tooltip="JPEG quality (1–100). Lower = less CPU/bandwidth on the client.",
         )
         video_layout.addWidget(getHContainer(self.remote_video_quality_widget, "Quality:", widget_only=True))
 
@@ -2245,9 +2245,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         install_layout = QtWidgets.QHBoxLayout(install_row)
         install_layout.setContentsMargins(0, 0, 0, 0)
         self.streamdeck_install_plugin_btn = QDataPushButton(
-            "Install Stream Deck pluginâ€¦",
+            "Install Stream Deck plugin…",
             callback=self._streamdeck_install_plugin,
-            tooltip="Copy the JG Ex plugin into Elgato Stream Deckâ€™s Plugins folder.\nQuit Stream Deck software first, then relaunch it after install.",
+            tooltip="Copy the JG Ex plugin into Elgato Stream Deck’s Plugins folder.\nQuit Stream Deck software first, then relaunch it after install.",
         )
 
         install_layout.addWidget(self.streamdeck_install_plugin_btn)
@@ -2900,7 +2900,7 @@ Enabled modules may not show until the device filter is updated.
                 "Could not find the usual Elgato Stream Deck Plugins folder.\n\n"
                 "Please select the Plugins folder. It is normally located at:\n\n"
                 f"{hint}\n\n"
-                "(AppData â†’ Roaming â†’ Elgato â†’ StreamDeck â†’ Plugins)",
+                "(AppData → Roaming → Elgato → StreamDeck → Plugins)",
             )
             start_dir = os.path.dirname(hint) if hint else ""
             chosen = QtWidgets.QFileDialog.getExistingDirectory(
@@ -5178,10 +5178,14 @@ class DeviceDisplayDialog(QRememberDialog):
 
         list_widget = ReorderListWidget(self)
 
-        all_devices = {device.device_guid: device for device in gremlin.joystick_handling.display_devices(refresh=True)}
+        all_devices = sorted(gremlin.joystick_handling.display_devices(refresh=True), key=lambda device: (
+            DeviceType.tab_order_group(device.device_type), device.name.casefold()
+        ))
 
         device: TabData
-        self.visible_map = self.config.device_visible_map
+        self.visible_map = dict(self.config.device_visible_map)
+        self._order_changed = False
+        list_widget.model().rowsMoved.connect(self._handle_order_changed)
         device: dinput.DeviceSummary
 
         midi_enabled = self.config.midi_enabled
@@ -5189,8 +5193,8 @@ class DeviceDisplayDialog(QRememberDialog):
         streamdeck_enabled = self.config.streamdeck_enabled
 
         tab_map = {}
-        for index, (key, device) in enumerate(all_devices.items()):
-            if device.disabled:
+        for index, device in enumerate(all_devices):
+            if device.disabled and device.device_type not in (DeviceType.Settings, DeviceType.Plugins):
                 # skip disabled devices
                 continue
             # hide devices associated with disabled features
@@ -5220,10 +5224,10 @@ class DeviceDisplayDialog(QRememberDialog):
         )
 
         save_order_widget = QDataPushButton(
-            "Save...", tooltip="Save a device device order", callback=self._handle_save_order
+            "Save...", tooltip="Save device visibility", callback=self._handle_save_order
         )
         load_order_widget = QDataPushButton(
-            "Load...", tooltip="Load a saved device order", callback=self._handle_load_order
+            "Load...", tooltip="Load saved device visibility", callback=self._handle_load_order
         )
         select_all_widget = QDataPushButton(
             "Select All", tooltip="Select all devices", callback=self._handle_select_all
@@ -5233,7 +5237,7 @@ class DeviceDisplayDialog(QRememberDialog):
         )
 
         self.last_order_widget = QDataPushButton(
-            "Load Last", tooltip="Load last saved device order", callback=self._handle_load_last_order
+            "Load Last", tooltip="Load last saved device visibility", callback=self._handle_load_last_order
         )
 
         action_container_widget = getHContainer(
@@ -5286,22 +5290,28 @@ class DeviceDisplayDialog(QRememberDialog):
 
     def _handle_visible_changed(self, widget, checked: bool):
         reorder_widget: ReorderDeviceListWidget = widget.data
+        if reorder_widget.data.device_type in (DeviceType.Settings, DeviceType.Plugins):
+            checked = True
+            reorder_widget.setDeviceVisible(True)
         device_id = reorder_widget.data.device_id
         self.visible_map[device_id] = checked
         list_widget: QListWidgetItem = reorder_widget.getListWidget()
         list_widget.setData(QtCore.Qt.UserRole, (reorder_widget.data, checked))
 
+    def _handle_order_changed(self, *_args):
+        """Only deliberate row movement changes the user's tab order."""
+        self._order_changed = True
+
     def _handle_save_order(self, widget):
-        """saves the order to a configuration file"""
+        """Save visibility without serializing device positions."""
         tab_map = self._get_current_map()
-        # add visibiliy data
         if tab_map:
             fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-                None, "Save Device Order", gremlin.shared_state.data_path, "JSON files (*.json)"
+                None, "Save Device Visibility", gremlin.shared_state.data_path, "JSON files (*.json)"
             )
             if fname != "":
                 try:
-                    data = json.dumps(tab_map, indent=4)
+                    data = json.dumps(dict(tab_map.values()), indent=4, sort_keys=True)
                     with open(fname, "w", encoding="utf-8") as h:
                         h.write(data)
                         h.flush()
@@ -5316,10 +5326,10 @@ class DeviceDisplayDialog(QRememberDialog):
             self._load_order_file(fname)
 
     def _handle_load_order(self, widget):
-        """loads the order from a configuration file"""
+        """Load visibility without changing the current device order."""
         fname, _ = QtWidgets.QFileDialog.getOpenFileName(
             None,
-            "Load Device Order",
+            "Load Device Visibility",
             gremlin.shared_state.data_path,
             "JSON files (*.json)",
         )
@@ -5354,45 +5364,29 @@ class DeviceDisplayDialog(QRememberDialog):
                 with open(fname, "r", encoding="utf-8") as h:
                     tab_map = json.load(h)
 
-                loaded_list = {}
-                for index, pair in tab_map.items():
-                    if isinstance(pair, str):
-                        # v1 file - no visibiliy information
+                loaded_visibility = {}
+                for key, pair in tab_map.items():
+                    if isinstance(pair, bool):
+                        device_id, visible = key, pair
+                    elif isinstance(pair, str):
+                        # Legacy layout without visibility information.
                         visible = True
                         device_id = pair
                     else:
-                        # v2 - has visibility information
+                        # Legacy indexed layout: use flags, ignore positions.
                         device_id, visible = pair
+                    loaded_visibility[gremlin.util.normalize_guid(device_id)] = visible
 
+                # Apply saved flags to the current rows without moving them.
+                rows = {}
+                for index, (device_id, visible) in self._get_current_map().items():
                     device = gremlin.joystick_handling.getDevice(device_id)
-                    loaded_list[device] = (index, device, visible)
+                    if device is not None:
+                        visible = loaded_visibility.get(gremlin.util.normalize_guid(device_id), visible)
+                        rows[index] = (device, visible)
+                self.visible_map.update(loaded_visibility)
+                self._populate_list_widget(rows)
 
-                # compare with current
-                current_map = self._get_current_map()
-                existing_map = {}
-
-                for index, (device_id, visible) in current_map.items():
-                    device = gremlin.joystick_handling.getDevice(device_id)
-                    existing_map[device] = (index, device, visible)
-                    if device in loaded_list:
-                        continue  # skip the existing
-
-                # devices in the tab list that are not in the loaded list (because they didn't exist when the data was saved)
-                missing_list = [dev for dev in existing_map if dev not in loaded_list]
-
-                for device in missing_list:
-                    index = len(loaded_list)
-                    data = list(existing_map[device])
-                    data[0] = index
-                    loaded_list[device] = tuple(data)
-
-                # loaded list now contains the loaded info with any missing devices added at the end
-                tab_map = {index: (device, visible) for index, device, visible in loaded_list.values()}
-
-                # load the list
-                self._populate_list_widget(tab_map)
-
-                # save the file
                 self.config.last_reorder_file = fname
             except Exception as err:
                 MessageBoxWarning("Error", f"Unable to read file: {err}")
@@ -5413,6 +5407,7 @@ class DeviceDisplayDialog(QRememberDialog):
         tab_map = {index: (dev, dev.visible) for index, dev in enumerate(data["sorted"])}
 
         self._populate_list_widget(tab_map)
+        self._order_changed = True
 
     def _device_enabled(self, device):
         if not device.connected and device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro):
@@ -5449,12 +5444,16 @@ class DeviceDisplayDialog(QRememberDialog):
             if not isinstance(device, dinput.DeviceSummary):
                 syslog.warning(f"DeviceDisplayDialog: got an invalid device: [{device}]")
                 continue
-            if device.disabled:
+            fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
+            if device.disabled and not fixed_tab:
                 # skip disabled devices
                 continue
             # check for disabled devices from a configuration perspective
             if not self._device_enabled(device):
                 continue
+            if fixed_tab:
+                visible = True
+                self.visible_map[device.device_id] = True
             widget = ReorderDeviceListWidget(
                 device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device
             )
@@ -5463,8 +5462,7 @@ class DeviceDisplayDialog(QRememberDialog):
             item.setSizeHint(widget.sizeHint())
             widget.setListWidget(item)
             # the only two devices that cannot be disabled are Plugins and Settings - the two system devices  - all others can be disabled by the user if they so wish
-            enabled = device.device_type not in (DeviceType.Plugins, DeviceType.Settings)
-            widget.setVisibleEnabled(enabled)
+            widget.setVisibleEnabled(not fixed_tab)
             self._list_widget.setItemWidget(item, widget)
 
     def _update_tabs(self):
@@ -5472,18 +5470,18 @@ class DeviceDisplayDialog(QRememberDialog):
 
         ui = gremlin.shared_state.ui
 
-        # visible table
-        self.config.device_visible_map = self.visible_map
-
         tab_map = {}
         items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
         for index, item in enumerate(items):
             device, visible = item.data(QtCore.Qt.UserRole)
             if self._device_enabled(device):
+                if device.device_type in (DeviceType.Settings, DeviceType.Plugins):
+                    visible = True
                 tab_map[index] = (device.device_id, visible)
-        self.config.tab_list = tab_map
-        visible_map = {device_id: visible for device_id, visible in tab_map.values()}
-        self.config.device_visible_map = visible_map
+                self.visible_map[device.device_id] = visible
+        if self._order_changed:
+            self.config.tab_list = tab_map
+        self.config.device_visible_map = dict(self.visible_map)
 
         # this will cause tab movement and/or tab redraw if devices visibility changed
         ui._create_tabs_ui()

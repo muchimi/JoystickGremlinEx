@@ -52,6 +52,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T104)
+- Fix: UI: resolve special character encoding resulting in some UI garbled text due to a code formatting change.  This impacts several UI elements across all modules but does not change functionality.
+- Fix: UI: device order may change automatically and not respect set preferences in the device filter.  
+- Fix: UI: default device order may not be respected and add discovered devices out of sequence in the device list.
+
 ### (m77T103)
 - Change: API (Maestro): allow GEX to create up to 256 devices - up from 16.  The first 16 will be the failover devices for vJoy.  **Requires bridge version 0.1.3**.
 - Fix: API (Maestro): changed usage of HID descriptors to account for some applications including joy.cpl requiring some metadata to be unique to distinguish between devices.

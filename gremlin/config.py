@@ -52,7 +52,7 @@ DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNO
 
 # general override flags for builds and execution - these override configuration settings from the config file
 # this is used to simplify diagnostics and help with development of work in progress modules
-# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options â†’ Modules
+# T62L: Overlay / AFCS / StreamDeck / Voice are unlocked (same as MIDI/OSC) so Options → Modules
 # works from a frozen exe without requiring launch_gex.cmd env vars.
 
 VOICE_ENABLED = (
@@ -787,7 +787,7 @@ class Configuration(QtCore.QObject):
             }
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
-            # on top of on-disk data before writing â€” never foreign module payloads.
+            # on top of on-disk data before writing — never foreign module payloads.
             if pending_profile_data:
                 pending = {
                     key: value
@@ -1612,7 +1612,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def remote_video_quality(self) -> int:
-        """JPEG quality 1â€“100 (also used as quality hint for future codecs)."""
+        """JPEG quality 1–100 (also used as quality hint for future codecs)."""
         try:
             return max(1, min(100, int(self._get_data("remote_video_quality", 55) or 55)))
         except TypeError, ValueError:
@@ -2421,7 +2421,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tab_list(self):  # -> dict[Any, TabData] | None:# -> dict[Any, TabData] | None:
-        """tab order for the UI devices as set by the user dict[tab_index : int, data: TabData]"""
+        """Explicit user tab order; saved visibility layouts do not change it."""
         data = self._get_data("tab_device_order", None)
         # if data:
         #     # convert to tab data

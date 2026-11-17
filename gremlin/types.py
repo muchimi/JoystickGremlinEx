@@ -305,6 +305,19 @@ class DeviceType(IntEnum):
     Afcs = 15  # AFCS visual axis-flow designer tab
 
     @staticmethod
+    def tab_order_group(value: DeviceType) -> int:
+        """Default display group for hardware, virtual inputs, and system tabs."""
+        if value == DeviceType.Joystick:
+            return 0
+        if value in (DeviceType.VJoy, DeviceType.Maestro):
+            return 1
+        if value == DeviceType.Settings:
+            return 3
+        if value == DeviceType.Plugins:
+            return 4
+        return 2
+
+    @staticmethod
     def isFixedInput(value: DeviceType) -> bool:
         """true if the input is not user defined"""
         return value in (

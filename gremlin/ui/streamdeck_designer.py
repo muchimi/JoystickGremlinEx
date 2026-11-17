@@ -306,7 +306,7 @@ class _IconPreviewSquare(QtWidgets.QLabel):
         self.setAcceptDrops(True)
         self.setCursor(QtCore.Qt.PointingHandCursor)
         self.setStyleSheet(_swatch_idle_icon_style())
-        self.setText("â€”")
+        self.setText("—")
         self.setScaledContents(False)
 
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
@@ -398,7 +398,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         self.setAcceptDrops(True)
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
-        self.setToolTip("Click Â· Ctrl+click multi-select Â· drop image Â· drag to move Â· right-click menu")
+        self.setToolTip("Click · Ctrl+click multi-select · drop image · drag to move · right-click menu")
         self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.set_side(side if kind == "button" else max(48, side - 12))
         self._apply_style()
@@ -411,7 +411,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
 
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         # Foreign keys are selectable for icon/background, but cannot be
-        # dragged â€” that would swap mappings onto a non-JG Ex hardware slot.
+        # dragged — that would swap mappings onto a non-JG Ex hardware slot.
         if event.button() == QtCore.Qt.LeftButton and not getattr(self, "_foreign", False):
             self._drag_start = event.position().toPoint()
         super().mousePressEvent(event)
@@ -454,7 +454,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         menu = QtWidgets.QMenu(self)
         multi = max(1, int(getattr(self, "_multi_count", 1) or 1))
         if getattr(self, "_foreign", False):
-            info = menu.addAction("Not a JG Ex Button â€” icon / background only")
+            info = menu.addAction("Not a JG Ex Button — icon / background only")
             info.setEnabled(False)
             menu.addSeparator()
             act_copy = menu.addAction("Copy look")
@@ -463,11 +463,11 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             menu.addSeparator()
             act_delete = menu.addAction("Clear look")
             menu.addSeparator()
-            act_wipe = menu.addAction("Wipe pageâ€¦")
+            act_wipe = menu.addAction("Wipe page…")
             act_unlink = None
             link_actions = {}
         else:
-            act_copy = menu.addAction("Copy button" if multi <= 1 else f"Copy button ({multi} selected â€” copies this one)")
+            act_copy = menu.addAction("Copy button" if multi <= 1 else f"Copy button ({multi} selected — copies this one)")
             act_paste = menu.addAction("Paste button" if multi <= 1 else f"Paste onto {multi} buttons")
             act_paste.setEnabled(_button_clipboard is not None)
             menu.addSeparator()
@@ -488,7 +488,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             if multi <= 1 and getattr(self, "_linked_page", 0):
                 act_unlink.setText(f"Unlink from page {int(self._linked_page)}")
             menu.addSeparator()
-            act_wipe = menu.addAction("Wipe pageâ€¦")
+            act_wipe = menu.addAction("Wipe page…")
         chosen = menu.exec(self.mapToGlobal(pos))
         if chosen is act_copy:
             self.context_action.emit("copy")
@@ -528,7 +528,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         if not mime:
             event.ignore()
             return
-        # Linked slots are display-only proxies â€” no icon drop / slot swap.
+        # Linked slots are display-only proxies — no icon drop / slot swap.
         if getattr(self, "_linked_page", 0):
             event.ignore()
             return
@@ -611,20 +611,20 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
         if self._foreign:
             self.setToolTip(
                 "Not a JG Ex Button on the Stream Deck.\n"
-                "Icon and background only â€” mappings cannot be added here.\n"
+                "Icon and background only — mappings cannot be added here.\n"
                 "Place a JG Ex Button in Stream Deck software to map this key."
             )
         elif self._linked_page:
             tip = self._label or f"{self.row}:{self.column}"
             self.setToolTip(
                 f"{tip}\n"
-                f"Linked to page {self._linked_page} â€” mirrors that pageâ€™s same key.\n"
+                f"Linked to page {self._linked_page} — mirrors that page’s same key.\n"
                 f"Edit icon, style, and mappings on page {self._linked_page}.\n"
-                "Ctrl+click to multi-select Â· right-click menu"
+                "Ctrl+click to multi-select · right-click menu"
             )
         else:
             tip = self._label or f"{self.row}:{self.column}"
-            self.setToolTip(f"{tip}\nCtrl+click multi-select Â· drop image Â· drag to move Â· right-click menu")
+            self.setToolTip(f"{tip}\nCtrl+click multi-select · drop image · drag to move · right-click menu")
         self._apply_style()
         self.update()
 
@@ -692,8 +692,8 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
             painter.setBrush(QtGui.QColor("#d45454"))
             painter.drawEllipse(self.width() - 14, 6, 8, 8)
         elif self._linked_page:
-            # Corner badge: â†—P# so linked keys are obvious next to mapping dots.
-            badge = f"â†—{int(self._linked_page)}"
+            # Corner badge: ↗P# so linked keys are obvious next to mapping dots.
+            badge = f"↗{int(self._linked_page)}"
             font = painter.font()
             font.setFamily("Segoe UI")
             font.setBold(True)
@@ -716,7 +716,7 @@ class StreamDeckKeyButton(QtWidgets.QPushButton):
 
 
 class StreamDeckDialScreenWidget(QtWidgets.QWidget):
-    """Stream Deck + touch-strip LCD segment above a dial (â‰ˆ200Ã—100 preview)."""
+    """Stream Deck + touch-strip LCD segment above a dial (≈200×100 preview)."""
 
     clicked = QtCore.Signal()
     icon_dropped = QtCore.Signal(str)
@@ -731,12 +731,12 @@ class StreamDeckDialScreenWidget(QtWidgets.QWidget):
         self._selected = False
         self.setAcceptDrops(True)
         self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setToolTip("Dial LCD â€” icon, title, and background for this dial window")
+        self.setToolTip("Dial LCD — icon, title, and background for this dial window")
         self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self._apply_size()
 
     def _apply_size(self):
-        # Hardware encoder canvas is 200Ã—100 â€” keep 2:1 in the designer.
+        # Hardware encoder canvas is 200×100 — keep 2:1 in the designer.
         h = max(36, int(self._w * 0.5))
         self.setFixedSize(self._w, h)
 
@@ -844,7 +844,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
         self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setToolTip("Center: dial press mappings\nâ†»: clockwise rotate mappings\nâ†º: counterclockwise rotate mappings\nLCD above: icon / title / background")
+        self.setToolTip("Center: dial press mappings\n↻: clockwise rotate mappings\n↺: counterclockwise rotate mappings\nLCD above: icon / title / background")
         self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self._apply_size()
 
@@ -877,7 +877,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
             self._sel = ""
         else:
             self.setToolTip(
-                "Center: dial press mappings\nâ†»: clockwise rotate mappings\nâ†º: counterclockwise rotate mappings\nLCD above: icon / title / background"
+                "Center: dial press mappings\n↻: clockwise rotate mappings\n↺: counterclockwise rotate mappings\nLCD above: icon / title / background"
             )
         self.update()
 
@@ -922,8 +922,8 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         # Arrows (counterclockwise left, clockwise right)
         dec_r, inc_r = self._arrow_rects()
         for rect, glyph, selected, mapped in (
-            (dec_r, "â†º", self._sel == "dec", self._has_dec),
-            (inc_r, "â†»", self._sel == "inc", self._has_inc),
+            (dec_r, "↺", self._sel == "dec", self._has_dec),
+            (inc_r, "↻", self._sel == "inc", self._has_inc),
         ):
             if selected:
                 painter.setBrush(QtGui.QColor(active))
@@ -943,7 +943,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
                 painter.setBrush(QtGui.QColor("#6ac48a"))
                 painter.drawEllipse(rect.center().x() - 3, rect.bottom() - 8, 6, 6)
 
-        # Circle face (knob) â€” LCD content lives on the strip above.
+        # Circle face (knob) — LCD content lives on the strip above.
         cr = self._circle_rect()
         border = active if self._sel == "press" else Color().normalColor()
         if self._has_press and self._sel != "press":
@@ -1022,7 +1022,7 @@ class StreamDeckDialWidget(QtWidgets.QWidget):
         menu.addSeparator()
         act_delete = menu.addAction("Delete dial press")
         menu.addSeparator()
-        act_wipe = menu.addAction("Wipe pageâ€¦")
+        act_wipe = menu.addAction("Wipe page…")
         chosen = menu.exec(self.mapToGlobal(pos))
         if chosen is act_copy:
             self.context_action.emit("copy")
@@ -1157,7 +1157,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._schedule_refresh()
 
     def _runtime_locked(self) -> bool:
-        """True while the profile is executing â€” designer must stay frozen."""
+        """True while the profile is executing — designer must stay frozen."""
         return bool(gremlin.shared_state.is_running)
 
     def _on_profile_start(self):
@@ -1200,7 +1200,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             if Shiboken.isValid(child):
                 child.setEnabled(interactive)
         if locked and getattr(self, "_status", None) is not None and Shiboken.isValid(self._status):
-            self._status.setText("Profile running â€” designer locked (actions only)")
+            self._status.setText("Profile running — designer locked (actions only)")
             self._status.setEnabled(True)
 
     def _bridge(self):
@@ -1357,7 +1357,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._preview_group.addButton(self._preview_released_btn, 0)
         self._preview_group.addButton(self._preview_pressed_btn, 1)
         self._preview_group.idClicked.connect(self._on_preview_state_changed)
-        # Segmented look â€” match Released (cool) / Pressed (warm) panel tints
+        # Segmented look — match Released (cool) / Pressed (warm) panel tints
         rel_c = _state_panel_colors("released")
         prs_c = _state_panel_colors("pressed")
         self._preview_released_btn.setStyleSheet(
@@ -1404,7 +1404,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         body_layout = QtWidgets.QVBoxLayout(scroll_body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(8)
-        # Top-align only â€” horizontal centering kept oversized panels from
+        # Top-align only — horizontal centering kept oversized panels from
         # shrinking and they spilled under the mapping pane.
         body_layout.setAlignment(QtCore.Qt.AlignTop)
         scroll_body.setMinimumWidth(0)
@@ -1528,14 +1528,14 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             clear_bg_cb,
             icon_tip: str,
         ):
-            """Icon preview | Iconâ€¦ | Clear | BG swatch | Colorâ€¦ | Clear BG"""
-            browse = QDataPushButton("Iconâ€¦", tooltip=icon_tip, clicked=browse_cb)
+            """Icon preview | Icon… | Clear | BG swatch | Color… | Clear BG"""
+            browse = QDataPushButton("Icon…", tooltip=icon_tip, clicked=browse_cb)
             clear_icon = Buttons.getClearWidget(
                 label="Clear",
                 tooltip="Clear icon",
                 callback=clear_icon_cb,
             )
-            pick_bg = QDataPushButton("Colorâ€¦", tooltip="Choose background color", clicked=pick_bg_cb)
+            pick_bg = QDataPushButton("Color…", tooltip="Choose background color", clicked=pick_bg_cb)
             clear_bg = Buttons.getClearWidget(
                 label="Clear BG",
                 tooltip="Clear background color",
@@ -1565,7 +1565,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._released_box = released_box
         released_layout = QtWidgets.QVBoxLayout(released_box)
         released_icon_row = QtWidgets.QHBoxLayout()
-        self._icon_preview = _IconPreviewSquare("Released (unpressed) icon â€” drop image or click to choose")
+        self._icon_preview = _IconPreviewSquare("Released (unpressed) icon — drop image or click to choose")
         self._icon_preview.clicked.connect(self._browse_icon)
         self._icon_preview.icon_dropped.connect(self._on_released_preview_drop)
         self._bg_swatch = _BgColorSquare("Released background color")
@@ -1588,7 +1588,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._title_edit = QtWidgets.QPlainTextEdit()
         fm = self._title_edit.fontMetrics()
         title_h = fm.lineSpacing() * 3 + 16
-        _prep_title_edit(self._title_edit, "Released title â€” up to 3 lines", title_h)
+        _prep_title_edit(self._title_edit, "Released title — up to 3 lines", title_h)
         released_extras_layout.addWidget(self._title_edit)
         self._style_rel = self._build_state_style_block(released_extras_layout, pressed=False)
         released_layout.addWidget(self._released_extras)
@@ -1599,7 +1599,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._pressed_box = pressed_box
         pressed_layout = QtWidgets.QVBoxLayout(pressed_box)
         pressed_icon_row = QtWidgets.QHBoxLayout()
-        self._pressed_preview = _IconPreviewSquare("Pressed icon â€” drop image or click to choose")
+        self._pressed_preview = _IconPreviewSquare("Pressed icon — drop image or click to choose")
         self._pressed_preview.clicked.connect(self._browse_pressed_icon)
         self._pressed_preview.icon_dropped.connect(self._on_pressed_preview_drop)
         self._bg_swatch_p = _BgColorSquare("Pressed background color")
@@ -1622,7 +1622,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._title_pressed_edit = QtWidgets.QPlainTextEdit()
         _prep_title_edit(
             self._title_pressed_edit,
-            "Pressed title â€” up to 3 lines (blank = use released)",
+            "Pressed title — up to 3 lines (blank = use released)",
             title_h,
         )
         pressed_extras_layout.addWidget(self._title_pressed_edit)
@@ -1719,22 +1719,22 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         align_row = QtWidgets.QHBoxLayout()
         text_h = QDataRadioButtonGroup(
-            [("Text â†", "left"), ("Text â†”", "center"), ("Text â†’", "right")],
+            [("Text ←", "left"), ("Text ↔", "center"), ("Text →", "right")],
             value="center",
             callback=lambda _v: self._apply_style_fields(),
         )
         text_v = QDataRadioButtonGroup(
-            [("Text â†‘", "top"), ("Text â†•", "middle"), ("Text â†“", "bottom")],
+            [("Text ↑", "top"), ("Text ↕", "middle"), ("Text ↓", "bottom")],
             value="bottom",
             callback=lambda _v: self._apply_style_fields(),
         )
         icon_h = QDataRadioButtonGroup(
-            [("Icon â†", "left"), ("Icon â†”", "center"), ("Icon â†’", "right")],
+            [("Icon ←", "left"), ("Icon ↔", "center"), ("Icon →", "right")],
             value="center",
             callback=lambda _v: self._apply_style_fields(),
         )
         icon_v = QDataRadioButtonGroup(
-            [("Icon â†‘", "top"), ("Icon â†•", "middle"), ("Icon â†“", "bottom")],
+            [("Icon ↑", "top"), ("Icon ↕", "middle"), ("Icon ↓", "bottom")],
             value="middle",
             callback=lambda _v: self._apply_style_fields(),
         )
@@ -1765,7 +1765,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         pm = _pixmap_from_source(path, data_url)
         if pm.isNull():
             label.setPixmap(QtGui.QPixmap())
-            label.setText("â€”")
+            label.setText("—")
             return
         side = min(label.width(), label.height()) - 6
         scaled = pm.scaled(side, side, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
@@ -1800,12 +1800,12 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self._page_list):
             return
         bridge = self._bridge()
-        # Load names once if this deck has none yet (do not re-emit every refresh â€”
+        # Load names once if this deck has none yet (do not re-emit every refresh —
         # that used to schedule infinite rebuilds and blank the grid).
         try:
             if self._device_id and not (bridge._page_names.get(self._device_id) or {}):
                 bridge._load_page_metadata(emit=False)
-                # Sidecar may key names under a prior Elgato id â€” bind to this deck.
+                # Sidecar may key names under a prior Elgato id — bind to this deck.
                 bridge._adopt_orphan_page_metadata([self._device_id] if self._device_id else None)
         except Exception:
             pass
@@ -1824,7 +1824,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 label = f"{page}. {name}"
             else:
                 label = name or f"Page {page}"
-            marker = " â–¶" if page == active else ""
+            marker = " ▶" if page == active else ""
             item = QtWidgets.QListWidgetItem(f"{label}{marker}")
             item.setData(QtCore.Qt.UserRole, page)
             self._page_list.addItem(item)
@@ -1833,7 +1833,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._page_list.setCurrentRow(select_row)
         self._page_list.blockSignals(False)
         if Shiboken.isValid(self._grid_title):
-            self._grid_title.setText(f"Page {self._edit_page} â€” {bridge.page_name(self._device_id, self._edit_page)}")
+            self._grid_title.setText(f"Page {self._edit_page} — {bridge.page_name(self._device_id, self._edit_page)}")
 
     def _rebuild_grid(self):
         if not Shiboken.isValid(self):
@@ -1854,7 +1854,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
             dtype = parse_streamdeck_device_type(info.get("type"))
             # If the plugin hasn't reported a type yet, infer from profile inputs
-            # (Companion import / XL is 8Ã—4) instead of blanking the designer.
+            # (Companion import / XL is 8×4) instead of blanking the designer.
             if not is_streamdeck_designer_supported(dtype):
                 inferred = None
                 try:
@@ -1869,7 +1869,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                     if max_c >= 7 and max_r >= 3:
                         inferred = 2  # XL
                     elif max_c >= 4 and max_r >= 2:
-                        inferred = 0  # standard 5Ã—3
+                        inferred = 0  # standard 5×3
                     elif max_c >= 0 and max_r >= 0:
                         inferred = 0
                 except Exception:
@@ -1885,7 +1885,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                         f"<b>{label}</b> is connected, but this device type "
                         f"(Elgato DeviceType {type_txt}) is not supported by the "
                         f"Joystick Gremlin Ex Stream Deck designer yet.<br><br>"
-                        f"No key grid is shown (a default 5Ã—3 layout would be wrong).<br><br>"
+                        f"No key grid is shown (a default 5×3 layout would be wrong).<br><br>"
                         f"Please contact the developer to request support for this device."
                     )
                     msg.setWordWrap(True)
@@ -1937,7 +1937,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             self._restore_selection_highlight()
         finally:
             self._rebuilding = False
-            # Must refresh AFTER clearing _rebuilding â€” _refresh_cell_contents
+            # Must refresh AFTER clearing _rebuilding — _refresh_cell_contents
             # no-ops while rebuild is in progress (that left blank keys on page/tab switch).
             if self._cells or self._dial_cells:
                 self._refresh_cell_contents()
@@ -2006,7 +2006,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             config = mode.getConfig(InputType.StreamDeck) if mode else {}
             for item in (config or {}).values():
                 if isinstance(item, StreamDeckInputItem) and item.page == self._edit_page:
-                    # Pages/keys are per Elgato device id â€” never mix another deck's slots.
+                    # Pages/keys are per Elgato device id — never mix another deck's slots.
                     if self._device_id and (item.device_id or "") == self._device_id:
                         result.append(item)
                     elif not self._device_id and not (item.device_id or ""):
@@ -2165,7 +2165,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             if name == f"Page {page}":
                 label = f"Page {page}"
             else:
-                label = f"Page {page} â€” {name}"
+                label = f"Page {page} — {name}"
             out.append((page, label))
         return out
 
@@ -2460,7 +2460,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 label = (lines[0] if lines else "").strip()
                 if not label and pm.isNull():
                     label = ""
-                # Mapping green is suppressed for linked keys; badge shows â†—P#
+                # Mapping green is suppressed for linked keys; badge shows ↗P#
                 btn.set_cell(
                     label,
                     has if not linked_page else False,
@@ -2494,7 +2494,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 if item is None:
                     screen.set_content("", None, "")
                 else:
-                    # LCD is not a button â€” always show the idle (released) look.
+                    # LCD is not a button — always show the idle (released) look.
                     pm = _pixmap_from_item(item, pressed=False, dial_lcd=True)
                     bg = ""
                     try:
@@ -2557,7 +2557,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 self._show_multi_selection_ui()
                 self._refresh_cell_contents()
                 return
-            # One key left after toggle â€” load it as a normal single selection.
+            # One key left after toggle — load it as a normal single selection.
             row = int(self._selected_row)
             col = int(self._selected_col)
             kind = "button"
@@ -2599,7 +2599,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 title="",
             )
         elif kind == "dial_screen":
-            # LCD strip: single appearance editor (not pressable â€” no Released/Pressed).
+            # LCD strip: single appearance editor (not pressable — no Released/Pressed).
             self._set_appearance_mode("look" if look_only else "lcd")
             item = bridge.ensure_slot_input(
                 self._device_id,
@@ -2794,15 +2794,15 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         title = getattr(self, "_title_edit", None)
         if title is not None and Shiboken.isValid(title):
             if panel_mode == "lcd":
-                title.setPlaceholderText("LCD title â€” up to 3 lines")
+                title.setPlaceholderText("LCD title — up to 3 lines")
             elif use_state:
-                title.setPlaceholderText("State OFF title â€” up to 3 lines")
+                title.setPlaceholderText("State OFF title — up to 3 lines")
             else:
-                title.setPlaceholderText("Released title â€” up to 3 lines")
+                title.setPlaceholderText("Released title — up to 3 lines")
         title_p = getattr(self, "_title_pressed_edit", None)
         if title_p is not None and Shiboken.isValid(title_p):
             title_p.setPlaceholderText(
-                "State ON title â€” up to 3 lines (blank = use State OFF)" if use_state else "Pressed title â€” up to 3 lines (blank = use released)"
+                "State ON title — up to 3 lines (blank = use State OFF)" if use_state else "Pressed title — up to 3 lines (blank = use released)"
             )
 
         preview_rel = getattr(self, "_preview_released_btn", None)
@@ -2818,10 +2818,10 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
 
         icon = getattr(self, "_icon_preview", None)
         if icon is not None and Shiboken.isValid(icon):
-            icon.setToolTip("State OFF icon â€” drop image or click to choose" if use_state else "Released (unpressed) icon â€” drop image or click to choose")
+            icon.setToolTip("State OFF icon — drop image or click to choose" if use_state else "Released (unpressed) icon — drop image or click to choose")
         icon_p = getattr(self, "_pressed_preview", None)
         if icon_p is not None and Shiboken.isValid(icon_p):
-            icon_p.setToolTip("State ON icon â€” drop image or click to choose" if use_state else "Pressed icon â€” drop image or click to choose")
+            icon_p.setToolTip("State ON icon — drop image or click to choose" if use_state else "Pressed icon — drop image or click to choose")
         bg = getattr(self, "_bg_swatch", None)
         if bg is not None and Shiboken.isValid(bg):
             bg.setToolTip("State OFF background color" if use_state else "Released background color")
@@ -3364,7 +3364,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._apply_pressed_icon_path(item, path)
 
     def _on_icon_dropped(self, row: int, col: int, kind: str, path: str):
-        """Drop an image file onto a key â†’ released (unpressed) icon."""
+        """Drop an image file onto a key → released (unpressed) icon."""
         if not path:
             return
         # Select the target cell first so the inspector matches the drop.
@@ -3600,7 +3600,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         from gremlin.util import compare_guid
 
         if compare_guid(device_guid, self._tab.device_guid):
-            # Defer â€” willAppear storms must not paint cells mid-rebuild / after deleteLater.
+            # Defer — willAppear storms must not paint cells mid-rebuild / after deleteLater.
             self._schedule_cell_refresh()
 
     def _on_slot_pressed(self, device_id, row, column, is_pressed):

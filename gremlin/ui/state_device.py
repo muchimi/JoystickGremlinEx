@@ -2963,7 +2963,7 @@ class StateExclusivePickerDialog(QShowAtCursorDialog):
         layout.addWidget(hint)
 
         self._search_widget = QDataLineEdit()
-        self._search_widget.setPlaceholderText("Searchâ€¦")
+        self._search_widget.setPlaceholderText("Search…")
         layout.addWidget(getHContainer(["Search:", self._search_widget], widget_only=True))
 
         self._list = QtWidgets.QListWidget(self)
@@ -3030,7 +3030,7 @@ class StateExclusivePickerDialog(QShowAtCursorDialog):
                 self._list.addItem(item)
                 shown += 1
         if hasattr(self, "_count_widget") and self._count_widget is not None:
-            self._count_widget.setText(f"{shown} state(s) Â· {len(self._selected)} selected")
+            self._count_widget.setText(f"{shown} state(s) · {len(self._selected)} selected")
 
     def _item_changed(self, item: QtWidgets.QListWidgetItem):
         key = item.data(QtCore.Qt.UserRole)
@@ -3040,7 +3040,7 @@ class StateExclusivePickerDialog(QShowAtCursorDialog):
             self._selected.add(key)
         else:
             self._selected.discard(key)
-        self._count_widget.setText(f"{self._list.count()} state(s) Â· {len(self._selected)} selected")
+        self._count_widget.setText(f"{self._list.count()} state(s) · {len(self._selected)} selected")
 
 
 class StateInputConfigDialog(QShowAtCursorDialog):
@@ -3180,7 +3180,7 @@ class StateInputConfigDialog(QShowAtCursorDialog):
         )
         self._exclusive_summary_widget = QtWidgets.QLabel("")
         self._exclusive_summary_widget.setWordWrap(True)
-        self._exclusive_select_widget = QtWidgets.QPushButton("Selectâ€¦")
+        self._exclusive_select_widget = QtWidgets.QPushButton("Select…")
         self._exclusive_select_widget.setToolTip("Choose which states are mutually exclusive with this one.")
         self._exclusive_select_widget.clicked.connect(self._open_exclusive_picker)
         self._exclusive_options_widget = getHContainer(
@@ -4500,7 +4500,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 self.selectInputItemIndex(new_index)
 
     def _sort_callback(self, items: list):
-        """callback for sorting inputs in this device â€” returns sorted items"""
+        """callback for sorting inputs in this device — returns sorted items"""
         items = list(items)
 
         def _key(item):

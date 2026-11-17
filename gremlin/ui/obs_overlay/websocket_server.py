@@ -70,14 +70,14 @@ def lan_ipv4_addresses() -> list[str]:
 
 
 def port_is_bindable(port: int, host: str = "0.0.0.0") -> bool:
-    """True if nothing is listening on the port (does not bind â€” avoids Windows reuse races)."""
+    """True if nothing is listening on the port (does not bind — avoids Windows reuse races)."""
     if port in WS_RESERVED_PORTS or port < 1024 or port > 65535:
         return False
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.settimeout(0.2)
         result = sock.connect_ex((host if host not in ("0.0.0.0", "") else "127.0.0.1", int(port)))
-        # 0 = something accepted the connection â†’ occupied
+        # 0 = something accepted the connection → occupied
         return result != 0
     except OSError:
         return True
@@ -110,8 +110,8 @@ class _OverlayHttpHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, **kwargs):
         super().__init__(*args, directory=directory or WEB_ROOT, **kwargs)
 
-    def log_message(self, format: str, *args):  # noqa: A003 â€” stdlib API
-        # Frame polling hits ~30/s â€” keep those out of syslog.
+    def log_message(self, format: str, *args):  # noqa: A003 — stdlib API
+        # Frame polling hits ~30/s — keep those out of syslog.
         try:
             path = urlparse(self.path).path
         except Exception:
