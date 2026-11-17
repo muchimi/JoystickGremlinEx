@@ -2760,6 +2760,10 @@
 <td>Supports streamers and instructional videos via its graphical overlay module compatible with OBS.  The overlay can be customized with graphical widgets that show inputs or outputs, states and other features.</td>
 </tr>
 <tr>
+<td>Linear data input processing</td>
+<td>GEX supports input calibration and deadzone mapping on a per input basis. Inputs are also processed through a signal processing EMA (Exponential Moving Average) filter to handle very high refresh rate devices (such as Azeron), as well as inputs that come from potentiometer based inputs that tend to be noisy.</td>
+</tr>
+<tr>
 <td>OCR (character recognition)</td>
 <td>The overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
 </tr>
@@ -2804,6 +2808,10 @@
 <td>GEX's mapping engine supports encoder input with acceleration and latching of companion inputs for reversed inputs (such as an input for down, and a latched input for up on the same mappping).</td>
 </tr>
 <tr>
+<td>Encoder support</td>
+<td>GEX supports input encoders (one can be latched for the opposite direction) with support for acceleration and PID filter for output step smoothing. An encoder is typically a device that sends two inputs for each direction such as a wheel or rotary endless knob.</td>
+</tr>
+<tr>
 <td>Advanced keyboard input processing</td>
 <td>GEX's keyboard engine supports non traditional keys including F13 to F23 and multi-key latching including non standard shift states.</td>
 </tr>
@@ -2821,11 +2829,11 @@
 </tr>
 <tr>
 <td>Visual repeaters</td>
-<td>Provides visual real time input repeaters as well as an output viewer</td>
+<td>Provides visual real time input repeaters as well as an output viewer as part of the GEX user interface.</td>
 </tr>
 <tr>
 <td>Input highlighting</td>
-<td>GEX can automatically detect inputs and jump to that device/input automatically.</td>
+<td>GEX can automatically detect inputs and jump to that device/input automatically to quickly jump to a particular input mapping.  GEX can make that input automatically visible if previously hidden.</td>
 </tr>
 <tr>
 <td>Device Filtering</td>
