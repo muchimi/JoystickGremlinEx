@@ -97,15 +97,18 @@ class CodeRunner:
         """enables UI"""
         self.setUIState(True)
 
-    def _warn_missing_virtual_outputs(self, profile):
-        """Report configured outputs without a local device or failover target."""
+    def _warn_missing_virtual_outputs(self, profile, remap_devices=None):
+        """Offer startup remaps and report unresolved outputs. Return True after applying a remap."""
         keys = set()
 
         def collect_outputs(action, extra_data):
             if action.tag in ("remap", "vjoyremap"):
                 if action.vjoy_input_id:
                     device = action.virtual_device
-                    keys.add(gremlin.joystick_handling.virtual_device_key(device) if device is not None else action.vjoy_id)
+                    keys.add(
+                        action.vjoy_id if action.tag == "remap" or device is None
+                        else gremlin.joystick_handling.virtual_device_key(device)
+                    )
             elif action.tag == "split-axis":
                 for key, axis in ((action.device_low_vjoy_id, action.device_low_axis),
                                   (action.device_high_vjoy_id, action.device_high_axis)):
@@ -127,7 +130,7 @@ class CodeRunner:
             if state.get("buttons") or any(state.get("enabled", {}).values()):
                 keys.add(key)
 
-        missing = set()
+        missing = {}
         for key in keys:
             key = gremlin.joystick_handling.parse_virtual_device_key(key)
             if key is None or (isinstance(key, int) and not 1 <= key <= 16):
@@ -136,11 +139,18 @@ class CodeRunner:
                 continue
             device = gremlin.joystick_handling.get_virtual_device(key)
             name = device.name if device is not None else (f"vJoy {key}" if isinstance(key, int) else f"Virtual device {key}")
-            missing.add(name)
+            missing[key] = name
 
         if missing:
-            devices = "\n".join(f"- {name}" for name in sorted(missing, key=str.casefold))
+            devices = "\n".join(f"- {name}" for name in sorted(set(missing.values()), key=str.casefold))
             syslog.warning(f"PROFILE START: Virtual output devices unavailable:\n{devices}")
+
+        if remap_devices is not None:
+            applied = remap_devices(profile, missing.keys())
+            if applied is not None:
+                return applied
+
+        if missing:
             MessageBoxWarning(
                 title="Virtual Output Devices Unavailable",
                 prompt=f"This profile uses virtual output devices with no corresponding device available:\n\n{devices}",
@@ -149,8 +159,9 @@ class CodeRunner:
                     "Connect or configure the devices, or enable an available failover target."
                 ),
             )
+        return False
 
-    def start(self, inheritance_tree, settings, start_mode, profile) -> bool:
+    def start(self, inheritance_tree, settings, start_mode, profile, *, remap_devices=None) -> bool:
         """Starts listening to events and loads all existing callbacks.
 
         :param inheritance_tree tree encoding inheritance between the
@@ -158,25 +169,29 @@ class CodeRunner:
         :param settings profile settings to apply at launch
         :param start_mode the mode in which to start Gremlin
         :param profile the profile to use when generating all the callbacks
+        :param remap_devices optional UI callback for offering startup device remaps
         :returns: True on success, False if the profile did not start (various reasons)
         """
 
         el = gremlin.event_handler.EventListener()
-        eh = gremlin.event_handler.EventHandler()
-
-        eh.reset()  # reset processing data before any new run
-        vs = gremlin.joystick_handling.VjoyStart()
-        vs.reset()  # reset the vjoy start data
-
-        el.profile_before_start.emit()  # tell components the profile is about to start
+        gremlin.shared_state.profile_message_issued = False
 
         # automatic failover for virtual output devices
         # build a cache of resolved failovers based on current configuration
         # this enables missing vjoy devices to output to maestro devices if they exist
         # mapping is done by the name of the output device to vjoy id
         gremlin.joystick_handling.resolve_output_targets()
-        
-        self._warn_missing_virtual_outputs(profile)
+        if self._warn_missing_virtual_outputs(profile, remap_devices):
+            gremlin.shared_state.profile_message_issued = True
+            el.profile_deactivated.emit()
+            return False
+
+        eh = gremlin.event_handler.EventHandler()
+        eh.reset()  # reset processing data before any new run
+        vs = gremlin.joystick_handling.VjoyStart()
+        vs.reset()  # reset the vjoy start data
+
+        el.profile_before_start.emit()  # tell components the profile is about to start
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild=True)  # rebuild the execution tree
@@ -191,7 +206,6 @@ class CodeRunner:
         verbose = config.verbose_mode_exec
 
         gremlin.shared_state.profile_state = True  # assume profile start ok
-        gremlin.shared_state.profile_message_issued = False  # no message issued
 
         # self.disableUi()
 

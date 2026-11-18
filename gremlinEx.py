@@ -1309,9 +1309,6 @@ class GremlinUi(QRememberMainWindow):
         self._dialog_substitute.show()
 
     def _remap_profile_devices_cb(self):
-        from gremlin.device_remap import write_remapped_profile
-        from gremlin.ui.device_remap import ProfileDeviceRemapDialog
-
         if gremlin.shared_state.is_running:
             gremlin.ui.dialogs.ok_message_box("Deactivate the profile before remapping device GUIDs.")
             return
@@ -1319,18 +1316,50 @@ class GremlinUi(QRememberMainWindow):
         if not profile or not profile.profile_file or not os.path.isfile(profile.profile_file):
             gremlin.ui.dialogs.ok_message_box("Save the profile before remapping device GUIDs.")
             return
+        self._show_profile_device_remap(profile)
+
+    def _show_profile_device_remap(self, profile, startup_missing=None):
+        """Return None when skipped, False on cancel, or True after saving and requesting a reload."""
+        from lxml import etree
+        from gremlin.device_remap import write_remapped_profile
+        from gremlin.ui.device_remap import ProfileDeviceRemapDialog
+
+        filename = profile.profile_file
+        if not filename or not os.path.isfile(filename):
+            return None
 
         def apply_changes(root):
             gremlin.event_handler.EventListener().update_sidecar.emit()
-            backup = write_remapped_profile(profile.profile_file, root)
+            backup = write_remapped_profile(filename, root)
             syslog.info(f"Device GUID remap: saved profile backup to {backup}")
-            self._do_load_profile(profile.profile_file)
 
-        dialog = ProfileDeviceRemapDialog(
-            profile.to_xml(), gremlin.joystick_handling.all_joystick_devices(), apply_changes, self
-        )
+        # Output summaries expose the bridge's actual layout and slot.
+        inventory = {device.device_guid: device for device in gremlin.joystick_handling.all_joystick_devices()}
+        inventory.update((device.device_guid, device) for device in gremlin.joystick_handling.virtual_devices())
+        saved_root = None
+        try:
+            saved_root = etree.parse(filename).getroot()
+        except (OSError, etree.XMLSyntaxError):
+            syslog.exception("Unable to read saved device identities for remapping")
+        try:
+            dialog = ProfileDeviceRemapDialog(
+                profile.to_xml(), inventory.values(), apply_changes, self,
+                startup_missing=startup_missing, saved_root=saved_root,
+            )
+        except Exception:
+            if startup_missing is None:
+                raise
+            syslog.exception("Unable to prepare startup device remapping")
+            return None
+        if startup_missing is not None and not dialog.has_matches:
+            dialog.deleteLater()
+            return None
         gremlin.util.centerDialog(dialog)
-        dialog.exec()
+        applied = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        dialog.deleteLater()
+        if applied:
+            self._do_load_profile(filename)
+        return applied
 
     def _tab_display_device_cb(self):
         """displays the device dialog"""
@@ -1759,6 +1788,7 @@ class GremlinUi(QRememberMainWindow):
                     self.profile.settings,
                     self._last_runtime_mode(),
                     self.profile,
+                    remap_devices=self._show_profile_device_remap if not is_running else None,
                 )
 
                 if not result:
@@ -1770,8 +1800,8 @@ class GremlinUi(QRememberMainWindow):
                     # with QtCore.QSignalBlocker(self.ui.actionActivate):
                     #     self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
 
-                    gremlin.diagnostics.breadcrumb("profile start failed")
                     if not gremlin.shared_state.profile_message_issued:
+                        gremlin.diagnostics.breadcrumb("profile start failed")
                         # error message not issued = issue it
                         MessageBox(
                             title="Profile Start Error",

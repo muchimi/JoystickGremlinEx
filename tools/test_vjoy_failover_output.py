@@ -580,6 +580,27 @@ class FailoverOutputChecks(unittest.TestCase):
         context.reset.assert_called_once_with(force_rebuild=True)
         self.runner.stop.assert_called_once()
 
+    def test_startup_remap_cancel_continues_and_apply_leaves_profile_inactive(self):
+        self.actions.append(self.remap(self.vjoy))
+        services = self.namespace["gremlin"]
+        for applied in (False, True):
+            with self.subTest(applied=applied):
+                listener, handler = Mock(), Mock()
+                services.event_handler = NS(EventListener=lambda: listener, EventHandler=lambda: handler)
+                services.shared_state.profile_message_issued = False
+                context = Mock(getLastBuildError=Mock(return_value="Stop at the test build boundary"))
+                services.execution_graph = NS(ExecutionContext=lambda: context)
+                remap_devices = Mock(return_value=applied)
+                self.runner.stop = Mock()
+                self.assertFalse(self.runner.start({}, self.profile.settings, "Default", self.profile,
+                                                   remap_devices=remap_devices))
+                remap_devices.assert_called_once_with(self.profile, {1})
+                self.warning.assert_not_called()
+                self.assertEqual(services.shared_state.profile_message_issued, applied)
+                self.assertEqual(listener.profile_deactivated.emit.call_count, int(applied))
+                self.assertEqual(context.reset.call_count, int(not applied))
+                self.assertEqual(handler.reset.call_count, int(not applied))
+
     def test_start_resolves_maestro_before_building_profile_functors(self):
         self.assertIsNone(self.target())  # A missing target was cached before startup.
         self.devices.append(self.maestro)

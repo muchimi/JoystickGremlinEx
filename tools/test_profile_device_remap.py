@@ -465,17 +465,15 @@ class DialogChecks(unittest.TestCase):
         source, check, combo = dialog._output_rows[0]
         self.assertEqual(source["device-guid"], old)
         self.assertIs(combo.currentData(), target)
-        check.setChecked(True)
+        self.assertTrue(check.isChecked())
         result = dialog._replacement_root()
         self.assertEqual(result[0].get("vjoy"), NEW)
 
-    def test_output_only_conversion_is_optional_and_previewed(self):
+    def test_output_only_conversion_is_preselected_and_previewed(self):
         root = etree.fromstring('<profile><devices/><vjoyremap device-type="VJoy" virtual-id="1" button="4"/></profile>')
         dialog = self.dialog_type(etree.tostring(root), [maestro()], self.apply)
         self.addCleanup(dialog.close)
-        self.assertFalse(dialog._output_rows[0][1].isChecked())
-        self.assertFalse(dialog._apply_button.isEnabled())
-        dialog._output_rows[0][1].setChecked(True)
+        self.assertTrue(dialog._output_rows[0][1].isChecked())
         self.assertTrue(dialog._apply_button.isEnabled())
         self.assertIn("vJoy 1 -> gex-1", dialog._status.text())
         dialog._output_rows[0][1].setChecked(False)
@@ -505,7 +503,7 @@ class DialogChecks(unittest.TestCase):
         self.addCleanup(dialog.close)
         dialog._output_rows[0][1].setChecked(True)
         self.assertFalse(dialog._apply_button.isEnabled())
-        self.assertIn("Choose a target gex output", dialog._status.text())
+        self.assertIn("Choose a target output", dialog._status.text())
 
     def test_output_rows_offer_other_gex_targets_and_preserve_unchecked_rows(self):
         root = etree.fromstring('<profile><devices/><vjoyremap virtual-id="1" axis="3"/><vjoyremap virtual-id="2" button="4"/></profile>')
@@ -515,7 +513,9 @@ class DialogChecks(unittest.TestCase):
         self.assertEqual(len(dialog._output_rows), 2)
         source, check, combo = next(row for row in dialog._output_rows if row[0]["key"] == 1)
         self.assertEqual(combo.currentData().name, "gex-1")
-        self.assertFalse(check.isChecked())
+        self.assertTrue(check.isChecked())
+        other_check = next(row[1] for row in dialog._output_rows if row[0]["key"] == 2)
+        other_check.setChecked(False)
         combo.setCurrentIndex(next(i for i in range(1, combo.count()) if combo.itemData(i).name == "gex-2"))
         check.setChecked(True)
         result = dialog._replacement_root()
@@ -527,6 +527,55 @@ class DialogChecks(unittest.TestCase):
         self.assertFalse(dialog._apply_button.isEnabled())  # Both selected outputs target gex-2.
         dialog._select(False)
         self.assertFalse(dialog._apply_button.isEnabled())
+
+    def test_input_and_output_rows_show_connected_suggested_and_manual_status(self):
+        from PySide6 import QtWidgets
+
+        unknown_input = "0000000000000000000000000000000a"
+        old_maestro = "0000000000000000000000000000000b"
+        unknown_output = "0000000000000000000000000000000c"
+        native_guid = "0000000000000000000000000000000d"
+        root = profile()
+        devices = root.find("devices")
+        etree.SubElement(devices, "device", type="joystick", name="Other stick", **{"device-guid": unknown_input})
+        etree.SubElement(devices, "device", type="maestro", name="Panel", **{
+            "device-guid": old_maestro, "virtual-id": "18",
+        })
+        etree.SubElement(root, "vjoyremap", **{"device-type": "Maestro", "virtual-id": "18", "button": "2"})
+        etree.SubElement(root, "vjoyremap", **{"device-type": "VJoy", "virtual-id": "1", "button": "3"})
+        etree.SubElement(root, "remap", vjoy=unknown_output, axis="1")
+        stick = NS(name="L-VPC Stick WarBRD", device_guid=NEW, connected=True, is_virtual=False)
+        native = NS(name="vJoy 1", device_guid=native_guid, device_type=NS(name="VJoy"), connected=True,
+                    is_virtual=True, vjoy_id=1, virtual_id=1, data={})
+        panel = maestro(name="Panel", device_guid=OTHER, slot=18)
+        expected = {
+            "inputDevices": {NEW: ("Connected", NEW), OLD: ("Suggested", NEW), unknown_input: ("Manual", None)},
+            "outputDevices": {
+                1: ("Connected", native_guid), old_maestro: ("Suggested", OTHER), unknown_output: ("Manual", None),
+            },
+        }
+        for startup_missing in (None, ()):
+            with self.subTest(startup=startup_missing is not None):
+                dialog = self.dialog_type(etree.tostring(root), [stick, native, panel], self.apply,
+                                          startup_missing=startup_missing, saved_root=root)
+                self.addCleanup(dialog.close)
+                for section_name, rows in (("inputDevices", dialog._rows), ("outputDevices", dialog._output_rows)):
+                    grid = dialog.findChild(QtWidgets.QGroupBox, section_name).layout()
+                    self.assertEqual(len(rows), len(expected[section_name]))
+                    for index, (source, check, combo) in enumerate(rows, 1):
+                        status = grid.itemAtPosition(index, 0).widget()
+                        key = source["key"] if section_name == "outputDevices" else source.get("device-guid")
+                        name, default = expected[section_name][key]
+                        self.assertEqual(status.objectName(), f"deviceStatus{name}")
+                        self.assertFalse(status.pixmap().isNull())
+                        self.assertTrue(status.toolTip())
+                        self.assertEqual(status.accessibleName(), status.toolTip())
+                        self.assertEqual(getattr(combo.currentData(), "device_guid", None), default)
+                        self.assertEqual(check.isChecked(), name == "Suggested")
+                self.assertTrue(dialog._apply_button.isEnabled())
+                dialog._select(True)
+                self.assertTrue(dialog._apply_button.isEnabled())
+                self.assertEqual(sum(check.isChecked() for _, check, _ in dialog._rows + dialog._output_rows), 2)
 
     def test_select_all_validates_once_for_the_entire_grid(self):
         root = profile()
@@ -635,6 +684,112 @@ class DialogChecks(unittest.TestCase):
     def test_cancel_does_not_apply(self):
         self.dialog.reject()
         self.apply.assert_not_called()
+
+    def test_startup_preselects_replacement_guids_for_native_and_maestro_outputs(self):
+        old_maestro = "dde8a0111f5251cca3315b66849e9991"
+        saved = etree.fromstring(f"""<profile><devices>
+            <vjoy-device type="vjoy" vjoy-id="1" device-guid="{OLD}"/>
+            <device type="maestro" name="Panel" virtual-id="4" device-guid="{old_maestro}"/>
+        </devices></profile>""")
+        current = etree.fromstring(f"""<profile>
+            <vjoyremap device-type="VJoy" virtual-id="1" button="2"/>
+            <vjoyremap device-type="Maestro" virtual-id="4" axis="3"/>
+            <start><devices><device device-guid="{OLD}"><button id="2" value="true"/></device></devices></start>
+        </profile>""")
+        native = NS(name="vJoy 1", device_guid=NEW, device_type=NS(name="VJoy"), connected=True,
+                    is_virtual=True, vjoy_id=1, virtual_id=1, data={})
+        panel = maestro(name="Panel", device_guid=OTHER, slot=8, data={"maestro_hid_order_valid": False})
+        dialog = self.dialog_type(etree.tostring(current), [native, panel], self.apply, startup_missing=(),
+                                  saved_root=saved)
+        self.addCleanup(dialog.close)
+        self.assertTrue(dialog.has_matches)
+        self.assertTrue(dialog._apply_button.isEnabled())
+        self.assertEqual({combo.currentData().device_guid for _, check, combo in dialog._output_rows
+                          if check.isChecked()}, {NEW, OTHER})
+        changed = dialog._replacement_root()
+        self.assertEqual([node.get("virtual-id") for node in changed.findall("vjoyremap")], ["1", "8"])
+        self.assertEqual(changed.find("./start/devices/device").get("device-guid"), NEW)
+        self.assertEqual(changed.find("./start/devices/device/button").get("id"), "2")
+
+    def test_startup_remaps_an_input_referenced_only_by_a_condition(self):
+        saved = etree.fromstring(f'''<profile><devices>
+            <device type="joystick" name="Panel" device-guid="{OLD}"/>
+        </devices></profile>''')
+        current = etree.fromstring(f'<profile><devices/><condition device-guid="{OLD}"/></profile>')
+        panel = NS(name="Panel", device_guid=NEW, connected=True, is_virtual=False)
+        dialog = self.dialog_type(etree.tostring(current), [panel], self.apply, startup_missing=(), saved_root=saved)
+        self.addCleanup(dialog.close)
+        self.assertTrue(dialog.has_matches)
+        self.assertEqual(dialog._replacement_root().find("condition").get("device-guid"), NEW)
+
+    def test_startup_ignores_ambiguous_matches_and_working_failover(self):
+        root = etree.fromstring(f"""<profile>
+            <devices><device type="joystick" name="Panel" device-guid="{OLD}"/></devices>
+            <vjoyremap device-type="VJoy" virtual-id="1" button="2"/>
+        </profile>""")
+        panels = [NS(name="Panel", device_guid=guid, connected=True, is_virtual=False) for guid in (NEW, OTHER)]
+        dialog = self.dialog_type(etree.tostring(root), [*panels, maestro()], self.apply, startup_missing=())
+        self.addCleanup(dialog.close)
+        self.assertFalse(dialog.has_matches)
+
+    def test_declining_confirmation_leaves_dialog_open_without_writing(self):
+        from PySide6 import QtWidgets
+        message = self.dialog._apply_confirmation.__globals__["MessageBoxYesNo"]
+        message.reset_mock()
+        self.dialog._apply_confirmation()
+        message.call_args.kwargs["callback"](QtWidgets.QMessageBox.StandardButton.No)
+        self.assertEqual(self.dialog.result(), QtWidgets.QDialog.DialogCode.Rejected)
+        self.apply.assert_not_called()
+
+    def test_startup_apply_backs_up_and_reloads_the_edited_profile(self):
+        from PySide6 import QtWidgets
+        method = next(
+            node for node in ast.walk(ast.parse((ROOT / "gremlinEx.py").read_bytes()))
+            if isinstance(node, ast.FunctionDef) and node.name == "_show_profile_device_remap"
+        )
+        panel = NS(name="L-VPC Stick WarBRD", device_guid=NEW, connected=True, is_virtual=False)
+        sidecar = Mock()
+        gremlin = NS(joystick_handling=NS(all_joystick_devices=lambda: [panel], virtual_devices=list),
+                     event_handler=NS(EventListener=lambda: NS(update_sidecar=sidecar)),
+                     util=NS(centerDialog=Mock()))
+        namespace = dict(os=os, gremlin=gremlin, QtWidgets=QtWidgets, syslog=logging.getLogger(__name__))
+        exec(compile(ast.Module(body=[method], type_ignores=[]), "gremlinEx.py", "exec"), namespace)
+        window = NS(_do_load_profile=Mock())
+        dialog_type = self.dialog_type
+        apply_on_exec = False
+
+        class StartupDialog(dialog_type):
+            def __init__(self, xml, devices, apply_changes, parent, **kwargs):
+                super().__init__(xml, devices, apply_changes, **kwargs)
+
+            def exec(self):
+                if apply_on_exec:
+                    self._apply(True)
+                return self.result()
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.xml"
+            original = etree.tostring(profile())
+            path.write_bytes(original)
+            edited = profile()
+            edited.set("unsaved-edit", "kept")
+            model = NS(profile_file=path, to_xml=lambda: etree.tostring(edited))
+            with patch.dict(sys.modules, {"gremlin.device_remap": remap,
+                                          "gremlin.ui.device_remap": NS(ProfileDeviceRemapDialog=StartupDialog)}):
+                self.assertFalse(namespace["_show_profile_device_remap"](window, model, ()))
+                self.assertEqual(list(path.parent.glob("*.xml")), [path])
+                self.assertEqual(path.read_bytes(), original)
+                window._do_load_profile.assert_not_called()
+                sidecar.emit.assert_not_called()
+
+                apply_on_exec = True
+                self.assertTrue(namespace["_show_profile_device_remap"](window, model, ()))
+            backup, = path.parent.glob("*.guid-remap-*.xml")
+            self.assertEqual(backup.read_bytes(), original)
+            self.assertEqual(etree.parse(path).getroot().get("unsaved-edit"), "kept")
+            self.assertEqual(etree.parse(path).find("./devices/device").get("device-guid"), NEW)
+            window._do_load_profile.assert_called_once_with(path)
+            sidecar.emit.assert_called_once()
 
     def test_missing_target_and_failure_stay_open(self):
         self.dialog._rows[0][2].setCurrentIndex(0)

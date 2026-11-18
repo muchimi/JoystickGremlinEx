@@ -128,7 +128,7 @@ def remap_profile_devices(root, replacements):
     return result
 
 
-def vjoy_references(root):
+def vjoy_references(root, *, include_filter_guids=False):
     """Return native vJoy IDs and saved GUIDs needed by profile failover.
 
     A macro's device GUID takes precedence over its legacy numeric slot.
@@ -188,10 +188,14 @@ def vjoy_references(root):
         add(node.get("guid") or node.get("id"))
     for node in root.findall("./settings/vjoy"):
         add(node.get("id"))
+    if include_filter_guids:
+        for guid, index in sources.items():
+            if index in references and not references[index]:
+                references[index] = guid
     return references
 
 
-def remap_vjoy_outputs(root, devices, replacements=None):
+def remap_vjoy_outputs(root, devices, replacements=None, *, source_guids=None):
     """Copy output references to their stable gex-N Maestro equivalents.
 
     Return the new XML and a description of each changed vJoy device. Maestro
@@ -203,7 +207,7 @@ def remap_vjoy_outputs(root, devices, replacements=None):
     result = deepcopy(root)
     devices = list(devices)
     targets = {}
-    source_ids = {}
+    source_ids = dict(source_guids or {})
     for device in devices:
         kind = getattr(getattr(device, "device_type", None), "name", "").casefold()
         if kind == "vjoy":
@@ -215,11 +219,11 @@ def remap_vjoy_outputs(root, devices, replacements=None):
             targets.setdefault(index, []).append(device)
 
     if replacements is not None:
-        available = {guid_key(device.device_guid): device for matches in targets.values() for device in matches}
+        available = {guid_key(device.device_guid): device for device in devices if is_maestro_output(device)}
         selected = {}
         for device_id, target in replacements.items():
             key = guid_key(target.device_guid)
-            if key not in available or maestro_output_id(target) is None:
+            if key not in available:
                 raise ValueError(f'Choose a connected gex output for vJoy {device_id}.')
             selected[int(device_id)] = [available[key]]
         targets = selected
@@ -382,7 +386,7 @@ def _merge_output_declarations(root, destination_guids):
     # An empty target declaration may already have been saved by enumeration.
     # Reject mapped collisions rather than silently overwriting either device.
     by_guid = {}
-    for node in root.findall("./devices/device"):
+    for node in root.xpath("./devices/device | ./devices/vjoy-device | ./vjoy-devices/vjoy-device"):
         key = guid_key(node.get("device-guid"))
         if key not in destination_guids:
             continue
@@ -398,28 +402,45 @@ def _merge_output_declarations(root, destination_guids):
         by_guid[key] = node
 
 
-def maestro_output_id(device):
-    """Canonical gex number for an available Maestro output, or None."""
+def is_maestro_output(device):
+    """Whether the device can be used as a direct Maestro output."""
     kind = getattr(getattr(device, "device_type", None), "name", "").casefold()
-    if kind != "maestro" or not device.connected or getattr(device, "disabled", False):
+    return (kind == "maestro" and device.connected and not getattr(device, "disabled", False)
+            and device.virtual_id >= 0)
+
+
+def native_vjoy_output_id(device):
+    """Return the vJoy request ID for a connected native output."""
+    kind = getattr(getattr(device, "device_type", None), "name", "").casefold()
+    if (kind == "vjoy" and device.connected and not getattr(device, "disabled", False)
+            and not device.data.get("failover", False) and 1 <= device.vjoy_id <= 16):
+        return device.vjoy_id
+    return None
+
+
+def maestro_output_id(device, *, require_hid_order=True):
+    """Return the canonical gex number for a vJoy counterpart."""
+    if not is_maestro_output(device) or getattr(device, "is_gamepad", False):
         return None
     data = device.data
     key = data.get("maestro_key")
     name = str(key).rsplit("/", 1)[-1] if key else device.name
     match = re.fullmatch(r"gex-(1[0-6]|[1-9])", name.casefold())
-    if match and device.virtual_id >= 0 and data.get("maestro_hid_order_valid") is not False:
+    if match and (not require_hid_order or data.get("maestro_hid_order_valid") is not False):
         return int(match.group(1))
     return None
 
 
-def output_device_sources(root, devices):
+def output_device_sources(root, devices, *, saved_root=None):
     """Describe saved output identities once per device for the remapping grid."""
     devices = list(devices)
     input_guids = {guid_key(node.get("device-guid")) for node in root.findall("./devices/device")
                    if node.get("type", "").casefold() == "joystick"}
+    saved_vjoy = vjoy_references(saved_root, include_filter_guids=True) if saved_root is not None else {}
     sources = {
-        index: {"key": index, "name": f"vJoy {index}", "device-guid": guid or "", "provider": "vjoy"}
-        for index, guid in vjoy_references(root).items()
+        index: {"key": index, "name": f"vJoy {index}", "device-guid": saved_vjoy.get(index) or guid or "",
+                "provider": "vjoy"}
+        for index, guid in vjoy_references(root, include_filter_guids=True).items()
     }
     maestros = {}
     legacy_guids = {}
@@ -438,13 +459,24 @@ def output_device_sources(root, devices):
             slots.setdefault(str(device.virtual_id), source)
         elif kind == "vjoy":
             native[key] = device.vjoy_id
-    for node in root.findall("./devices/device"):
-        if node.get("type", "").casefold() == "maestro":
+    for index, guid in saved_vjoy.items():
+        if guid_key(guid) is not None:
+            native.setdefault(guid_key(guid), index)
+
+    live_guids = {guid_key(device.device_guid) for device in devices if is_maestro_output(device)}
+    for document in (root, saved_root):
+        if document is None:
+            continue
+        for node in document.findall("./devices/device"):
             key = guid_key(node.get("device-guid"))
+            if node.get("type", "").casefold() != "maestro" or key is None:
+                continue
             source = {"key": key, "name": node.get("name", "Maestro"), "device-guid": node.get("device-guid"),
                       "virtual-id": node.get("virtual-id", "-1"), "provider": "maestro"}
             maestros.setdefault(key, source)
-            slots.setdefault(source["virtual-id"], source)
+            slot = source["virtual-id"]
+            if slot not in slots or (key not in live_guids and slots[slot]["key"] in live_guids):
+                slots[slot] = source
 
     for node in root.iter():
         if not isinstance(node.tag, str):
@@ -490,33 +522,33 @@ def output_device_sources(root, devices):
     return sorted(sources.values(), key=lambda source: (source["provider"], source["name"].casefold(), str(source["key"])))
 
 
-def remap_output_devices(root, devices, replacements):
+def remap_output_devices(root, devices, replacements, *, saved_root=None):
     """Apply checked output rows simultaneously, preserving unchecked outputs."""
     devices = list(devices)
-    available = {guid_key(device.device_guid): device for device in devices if maestro_output_id(device) is not None}
+    sources = {source["key"]: source for source in output_device_sources(root, devices, saved_root=saved_root)}
+    if not replacements.keys() <= sources.keys():
+        raise ValueError("A selected output device is no longer in the profile.")
+    available = {guid_key(device.device_guid) for device in devices}
     destinations = []
-    for target in replacements.values():
+    for source, target in replacements.items():
         key = guid_key(target.device_guid)
-        if key not in available or maestro_output_id(target) is None:
-            raise ValueError("Choose a connected gex output device.")
+        if key not in available or not (is_maestro_output(target) or native_vjoy_output_id(target) == source):
+            raise ValueError("Choose a connected output device.")
         destinations.append(key)
     if len(destinations) != len(set(destinations)):
         raise ValueError("Choose a different target for each selected output device.")
-    sources = {source["key"]: source for source in output_device_sources(root, devices)}
-    if not replacements.keys() <= sources.keys():
-        raise ValueError("A selected output device is no longer in the profile.")
     result = deepcopy(root)
     guid_changes, slot_changes, descriptions = {}, {}, []
     for key, target in replacements.items():
         source = sources[key]
-        if source["provider"] != "maestro":
+        if source["provider"] == "vjoy" and is_maestro_output(target):
             continue
         old_guid = guid_key(source["device-guid"])
         if old_guid == guid_key(target.device_guid):
             raise ValueError(f'Choose a different output device for "{source["name"]}" or deselect it.')
         if old_guid is not None:
             guid_changes[old_guid] = target
-        if source.get("virtual-id") is not None:
+        if source["provider"] == "maestro" and source.get("virtual-id") is not None:
             slot_changes[source["virtual-id"]] = target
         descriptions.append(f'{source["name"]} -> {target.name}')
     if guid_changes or slot_changes:
@@ -534,16 +566,18 @@ def remap_output_devices(root, devices, replacements):
                     node.set(attribute, str(target.device_guid))
             target = guid_changes.get(original)
             if target is not None:
-                if node.tag == "device":
+                if node.tag in ("device", "vjoy-device"):
                     node.set("name", target.name)
                     if node.get("type", "").casefold() == "maestro":
                         node.set("virtual-id", str(target.virtual_id))
                 elif node.tag == "vjoy" and node.get("input-type") is not None:
                     node.set("vjoy-id", str(target.virtual_id))
         _merge_output_declarations(result, {guid_key(target.device_guid) for target in guid_changes.values()})
-    native = {key: target for key, target in replacements.items() if isinstance(key, int)}
+    native = {key: target for key, target in replacements.items() if isinstance(key, int) and is_maestro_output(target)}
     if native:
-        result, changes = remap_vjoy_outputs(result, devices, native)
+        source_guids = {guid_key(sources[key]["device-guid"]): key for key in native}
+        source_guids.pop(None, None)
+        result, changes = remap_vjoy_outputs(result, devices, native, source_guids=source_guids)
         descriptions.extend(changes)
     return result, descriptions
 
