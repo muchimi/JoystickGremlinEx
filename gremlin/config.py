@@ -112,6 +112,12 @@ VJOY_ENABLED = (
     else True
 )
 
+SEQUENCE_TEXT_ENABLED = (
+    "GEX_SEQUENCE_TEXT_ENABLED" in os.environ and os.environ["GEX_SEQUENCE_TEXT_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_SEQUENCE_TEXT_ENABLED" in os.environ
+    else False
+)
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):

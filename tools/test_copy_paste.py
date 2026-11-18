@@ -478,6 +478,23 @@ class CopyPasteTests(unittest.TestCase):
         self.assertNotEqual(pasted[0]._id, pasted[1]._id)
         widget.redraw.assert_called_once_with(force=True)
 
+    def test_paste_replaces_empty_container_at_original_position(self):
+        widget = self.mapping()
+        model = widget._container_model
+        model.removeContainer = model.remove
+        before, after = FixtureContainer(self.item), FixtureContainer(self.item)
+        for container in (before, self.target, after):
+            model.addContainer(container)
+        payload = encoded(CONTAINER_XML, EncoderType.Container)
+
+        with patch.object(CONFIG, "verbose_mode_execution", False, create=True):
+            imported = widget._paste_container(payload, replace_empty=self.target)[0]
+
+        self.assertEqual(list(model), [before, imported, after])
+        self.assertEqual(model.unfilteredIndexOf(self.target), -1)
+        self.assertEqual(widget._paste_container(payload, replace_empty=imported), [])
+        widget.redraw.assert_called_once_with(force=True)
+
     def test_container_duplicate_defaults_to_owning_input(self):
         source = self.mapping()._paste_container(encoded(CONTAINER_XML, EncoderType.Container))[0]
         self.assertIs(CONTAINERS.duplicate(source).input_item, self.item)

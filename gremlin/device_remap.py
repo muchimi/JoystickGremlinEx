@@ -529,14 +529,18 @@ def remap_output_devices(root, devices, replacements, *, saved_root=None):
     if not replacements.keys() <= sources.keys():
         raise ValueError("A selected output device is no longer in the profile.")
     available = {guid_key(device.device_guid) for device in devices}
-    destinations = []
+    destinations = {}
     for source, target in replacements.items():
         key = guid_key(target.device_guid)
         if key not in available or not (is_maestro_output(target) or native_vjoy_output_id(target) == source):
             raise ValueError("Choose a connected output device.")
-        destinations.append(key)
-    if len(destinations) != len(set(destinations)):
-        raise ValueError("Choose a different target for each selected output device.")
+        if key in destinations:
+            previous_name = sources[destinations[key]]["name"]
+            raise ValueError(
+                f'"{previous_name}" and "{sources[source]["name"]}" both target "{target.name}". '
+                "Deselect one of these rows or choose another target."
+            )
+        destinations[key] = source
     result = deepcopy(root)
     guid_changes, slot_changes, descriptions = {}, {}, []
     for key, target in replacements.items():

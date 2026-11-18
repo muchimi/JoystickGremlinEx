@@ -11144,7 +11144,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             self.notify_changed()
         return containers
 
-    def _add_containers_batched(self, container_list, plugin_manager=None):
+    def _add_containers_batched(self, container_list, plugin_manager=None, replace_empty=None):
         """Add multiple containers with a single UI rebuild (avoids Qt UAF on paste)."""
         if not container_list:
             return
@@ -11162,6 +11162,11 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                     new_container.action_model = self._container_model
                 plugin_manager.set_container_data(self._input_item, new_container)
                 self._container_model.addContainer(new_container)
+            if replace_empty is not None:
+                old_index = self._container_model.unfilteredIndexOf(replace_empty)
+                new_index = self._container_model.unfilteredIndexOf(container_list[0])
+                self._container_model.swap(old_index, new_index, emit=False)
+                self._container_model.removeContainer(replace_empty)
         finally:
             self._container_model.popSuspend(emit=False)
             if view is not None and Shiboken.isValid(view):
@@ -11177,14 +11182,18 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             self.redraw(force=True)
 
     @QtCore.Slot(object)
-    def _paste_container(self, container, extra_data=None):
-        """Adds a new container to the input item.
+    def _paste_container(self, container, extra_data=None, replace_empty=None):
+        """Adds containers to the input item or replaces one empty container.
 
         :param container container to be added
         """
         if not gremlin.util.is_ui_thread():
-            gremlin.util.InvokeUiMethod(self._paste_container, container, extra_data)
+            gremlin.util.InvokeUiMethod(self._paste_container, container, extra_data, replace_empty)
             return
+        if replace_empty is not None and (
+            replace_empty not in self._container_model or any(replace_empty.action_sets)
+        ):
+            return []
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
         _trace("paste container")
@@ -11207,6 +11216,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                 nodes = [gremlin.plugin_manager.clone_xml_for_paste(container.to_xml())]
             else:
                 return []
+            if replace_empty is not None and len(nodes) != 1:
+                return []
             valid_names = self._input_item.get_valid_container_list()
             for node in nodes:
                 factory = plugin_manager.tag_map.get(node.get("type"))
@@ -11223,7 +11234,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             return []
 
         if container_list:
-            self._add_containers_batched(container_list, plugin_manager)
+            self._add_containers_batched(container_list, plugin_manager, replace_empty)
             self.notify_changed()
 
         return container_list

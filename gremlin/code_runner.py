@@ -20,36 +20,32 @@ import os
 import random
 import string
 import sys
-import json
+import traceback
 
 import dinput
-
-
-from gremlin.input_types import InputType
-import gremlin.keyboard
-import gremlin.shared_state
-import gremlin.types
-from gremlin.types import DeviceType
-import gremlin.plugin_manager
-import gremlin.ui.state_device
-import gremlin.windows_event_hook
-import vjoy as vjoy_module
-from vjoy import vjoy
+import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
-import gremlin.util
-import gremlin.joystick_handling
-import gremlin.macro
-import gremlin.input_devices
-import gremlin.user_plugin
-import gremlin.sendinput as sendinput
 import gremlin.execution_graph
-import gremlin.ui
+import gremlin.input_devices
+import gremlin.joystick_handling
+import gremlin.keyboard
+import gremlin.macro
+import gremlin.plugin_manager
 import gremlin.remote
-import gremlin.base_profile
+import gremlin.shared_state
+import gremlin.types
+import gremlin.ui
+import gremlin.ui.state_device
+import gremlin.user_plugin
+import gremlin.util
+import gremlin.windows_event_hook
+import vjoy as vjoy_module
+from gremlin import sendinput
+from gremlin.input_types import InputType
+from gremlin.types import DeviceType
 from gremlin.ui.ui_common import MessageBox, MessageBoxWarning
-
-import traceback
+from vjoy import vjoy
 
 syslog = logging.getLogger("system")
 
@@ -463,7 +459,7 @@ class CodeRunner:
             try:
                 self._register_merge_axes(profile, master_mode)
 
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 syslog.error("Error occured in CodeRunner MergeAxis - legacy merge axis disabled")
                 syslog.error(f"{err}\n{traceback.format_exc()}")
 
@@ -692,7 +688,7 @@ class CodeRunner:
                 from gremlin.remote_video import sync_publisher_with_runtime
 
                 sync_publisher_with_runtime()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             # listen to MIDI
@@ -732,10 +728,9 @@ class CodeRunner:
                     f"PROFILE START: Restoring the last active profile mode for this profile: '{mode}' - overriding profile start mode '{start_mode}' at user request"
                 )
 
-                if mode:
-                    if mode not in mode_list:
-                        syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
-                        mode = start_mode
+                if mode and mode not in mode_list:
+                    syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
+                    mode = start_mode
             else:
                 syslog.info(f"PROFILE START: Restoring the last active profile mode for this profile: '{mode}'")
 
@@ -777,7 +772,7 @@ class CodeRunner:
 
             return load_state
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             tb_msg = traceback.format_exc()
             # re-enable tabs
             el.profile_stopped.emit()
@@ -886,11 +881,11 @@ class CodeRunner:
         el.osc_event.disconnect(self.event_handler.execute_event)
         try:
             el.streamdeck_event.disconnect(self.event_handler.execute_event)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         try:
             el.overlay_event.disconnect(self.event_handler.execute_event)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         # el.state_event.disconnect(self.event_handler.execute_event)
 
@@ -922,7 +917,7 @@ class CodeRunner:
             from gremlin.remote_video import sync_publisher_with_runtime
 
             sync_publisher_with_runtime()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:

@@ -20,6 +20,7 @@ import re
 import threading
 import time
 import traceback
+from typing import ClassVar
 
 from PySide6 import QtCore, QtWidgets
 
@@ -108,7 +109,7 @@ def _maestro_output_summary(device):
 
 def set_maestro_devices(devices, *, known_devices=None):
     """Replace the Maestro service list and rebuild all virtual device maps."""
-    global _maestro_service_devices, _maestro_excluded_native_guids, _maestro_failover_map
+    global _maestro_service_devices, _maestro_excluded_native_guids, _maestro_failover_map  # noqa: PLW0602
     native_devices = None
     if getattr(dinput.DILL, "initialized", True):
         native_devices = {device.device_guid: device for device in dinput.DILL.getDevices()}
@@ -356,7 +357,7 @@ def display_devices(profile=None, *, refresh=False):
     if profile is not None:
         for bucket in (profile.devices, profile.vjoy_devices):
             for guid, node in bucket.items():
-                referenced[identity(guid)] = node.device
+                referenced[identity(guid)] = (guid, node)
     # A cached connected flag is not evidence that a joystick still exists.
     native_devices = dinput.DILL.getDevices() if getattr(dinput.DILL, "initialized", False) else []
     with _device_registry_lock:
@@ -398,7 +399,8 @@ def display_devices(profile=None, *, refresh=False):
             result[key] = device
         result.update(services)
 
-        for key, device in referenced.items():
+        for key, (guid, node) in referenced.items():
+            device = node.device
             if device is None or key in result or key in aliases or key in rejected:
                 continue
             if device.disabled or _is_excluded_native_joystick(device):
@@ -406,27 +408,40 @@ def display_devices(profile=None, *, refresh=False):
             if device.data.get("maestro_key") in service_keys:
                 continue
             missing = copy(device)
+            # A profile node can have an empty summary while its GUID and
+            # label are still available from the profile.
+            if missing.device_guid is None and guid is not None:
+                missing.device_guid = guid
+            if not missing.name:
+                missing.name = getattr(node, "name", None)
             missing.setConnected(False)
             result[key] = missing
-        return list(result.values())
+
+        devices = []
+        for key, device in result.items():
+            if not device.name:
+                device = copy(device)
+                device.name = f"Unnamed device ({key})"
+            devices.append(device)
+        return devices
 
 
 def getAllDevicesMap():
     """gets a map of all devices"""
-    global _all_devices_map
+    global _all_devices_map  # noqa: PLW0602
     return _all_devices_map
 
 
 def getAllDevices() -> list:
     """gets a list of all devices"""
-    global _all_devices_map
+    global _all_devices_map  # noqa: PLW0602
     # with _device_registry_lock:
     return list(_all_devices_map.values())
 
 
 def dumpDevices():
     """dumps the list of all devices to the log"""
-    global _all_devices_map
+    global _all_devices_map  # noqa: PLW0602
     with _device_registry_lock:
         device_list = list(_all_devices_map.values())
     device_list.sort(key=lambda d: d.name.casefold())
@@ -451,13 +466,13 @@ _joystick_init_lock = threading.Lock()
 
 
 class AxisNames:
-    joystick_linear_axis_names = ["X", "Y", "Z", "S1", "S2", "RX", "RY", "RZ"]
+    joystick_linear_axis_names: ClassVar[list[str]] = ["X", "Y", "Z", "S1", "S2", "RX", "RY", "RZ"]
 
 
 class VJoyProxy:
     """Manages the usage of vJoy and allows shared access all callbacks."""
 
-    vjoy_devices = {}
+    vjoy_devices: ClassVar[dict] = {}
     # _vjoy_proxy_lock = threading.RLock()
 
     def __getitem__(self, vid):
@@ -511,7 +526,7 @@ def joystick_devices() -> list[DeviceSummary]:
 
 def all_joystick_devices(include_disabled=True, *, refresh=False):
     """Return registered joysticks, optionally refreshing native and bridge data."""
-    global _all_joystick_devices, _joystick_devices
+    global _all_joystick_devices, _joystick_devices  # noqa: PLW0602
     if refresh:
         refresh_device_inventory()
     with _device_registry_lock:
@@ -527,7 +542,7 @@ def all_vjoy_devices() -> list[DeviceSummary]:
 
 def all_maestro_devices() -> list[DeviceSummary]:
     """gets connected Maestro devices"""
-    global _maestro_devices
+    global _maestro_devices  # noqa: PLW0602
     # with _device_registry_lock:
     return list(_maestro_devices)
 
@@ -576,7 +591,7 @@ def virtual_input_devices() -> list[DeviceSummary]:
 
 def axis_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that has axes"""
-    global _all_joystick_devices
+    global _all_joystick_devices  # noqa: PLW0602
     devices = [dev for dev in _all_joystick_devices if dev.axis_count and dev.enabled and not dev.is_virtual]
     devices.extend(dev for dev in virtual_input_devices() if dev.axis_count)
     return devices
@@ -584,7 +599,7 @@ def axis_input_devices() -> list[DeviceSummary]:
 
 def button_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that have buttons"""
-    global _all_joystick_devices
+    global _all_joystick_devices  # noqa: PLW0602
     devices = [dev for dev in _all_joystick_devices if dev.button_count and dev.enabled and not dev.is_virtual]
     devices.extend(dev for dev in virtual_input_devices() if dev.button_count)
     return devices
@@ -592,16 +607,18 @@ def button_input_devices() -> list[DeviceSummary]:
 
 def hat_input_devices() -> list[DeviceSummary]:
     """returns the list of devices that define hats"""
-    global _all_joystick_devices
+    global _all_joystick_devices  # noqa: PLW0602
     devices = [dev for dev in _all_joystick_devices if dev.hat_count and dev.enabled and not dev.is_virtual]
     devices.extend(dev for dev in virtual_input_devices() if dev.hat_count)
     return devices
 
 
 def filtered_input_devices(
-    input_type_list=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], virtual_only=False
+    input_type_list=None, virtual_only=False
 ):
     """gets a list of devices filtered by axis, button or hat"""
+    if input_type_list is None:
+        input_type_list = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
     providers = {
         InputType.JoystickAxis: axis_input_devices,
         InputType.JoystickButton: button_input_devices,
@@ -679,7 +696,7 @@ def maestro_devices(connected_only=True) -> list:
     :param connected_only: if set, filters Maestro devices that are detected only, if not, returns all devices
     :return list of [DeviceSummary] holding the device configuration for every Maestro device
     """
-    global _maestro_devices_map, _maestro_devices_map
+    global _maestro_devices_map, _maestro_devices_map  # noqa: PLW0602
     # with _device_registry_lock:
     if connected_only:
         device_list = list(_maestro_devices_map.values())
@@ -697,7 +714,7 @@ def configure_vjoy_failover(vjoy_id: int, device_guid=None):
         _joystick_devices, \
         _vjoy_devices, \
         _all_joystick_devices, \
-        _all_vjoy_devices_map
+        _all_vjoy_devices_map  # noqa: PLW0602
     # Failover metadata must retain the requested vJoy identity, not its backend.
     device = _vjoy_devices_map.get(vjoy_id)
     if not device:
@@ -729,7 +746,7 @@ def clearVjoyDevices():
         _joystick_devices, \
         _vjoy_devices, \
         _all_joystick_devices, \
-        _all_virtual_devices_map
+        _all_virtual_devices_map  # noqa: PLW0602
     for vjoy_id, device in list(_vjoy_devices_map.items()):
         if device.data.get("failover", False):
             if _all_vjoy_devices_map.get(vjoy_id) is device:
@@ -957,8 +974,8 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
         # convert to guid from vjoy ID
         device_guid = getVjoyDeviceGuid(device_guid)
     device: DeviceSummary = get_device(device_guid)
-    if __debug__:
-        if device and device.device_type in (DeviceType.VJoy, DeviceType.Maestro, DeviceType.Joystick):
+    if __debug__ and \
+        device and device.device_type in (DeviceType.VJoy, DeviceType.Maestro, DeviceType.Joystick):
             assert input_id > 0 and input_id <= device.button_count, (
                 f"Invalid button index for vjoy device [{device.name}] [{input_id}]"
             )
@@ -976,7 +993,7 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
                     if device.device_type == DeviceType.VJoy and 1 <= vid <= 16:
                         try:
                             button = VJoyProxy()[vid].button(input_id)
-                        except Exception as exc:
+                        except Exception as exc:  # noqa: BLE001
                             syslog.warning(
                                 "GetButton(): vjoy [%s] button [%s] unavailable: %s",
                                 vid,
@@ -1014,8 +1031,8 @@ def get_button(device_guid: str | dinput.GUID | int, input_id: int) -> bool:
                 return False  # not received, assume not set
             case DeviceType.ModeControl:
                 # always trigger for mode control
-                import gremlin.ui.mode_device
                 import gremlin.shared_state
+                import gremlin.ui.mode_device
 
                 mode = gremlin.shared_state.current_mode
                 mode_type = gremlin.ui.mode_device.ModeInputModeType(input_id)
@@ -1051,7 +1068,7 @@ class OutputTarget:
     so the remote machine can apply its own failover.
     """
 
-    __slots__ = ("device", "kind", "out_id", "virtual_id", "_maestro", "source_device")
+    __slots__ = ("_maestro", "device", "kind", "out_id", "source_device", "virtual_id")
 
     def __init__(self, device: DeviceSummary, kind: str, out_id: int, virtual_id: int, source_device: DeviceSummary = None):
         self.device = device
@@ -1294,7 +1311,7 @@ def physical_devices():
 
     :return list of physical devices
     """
-    global _all_devices_map
+    global _all_devices_map  # noqa: PLW0602
     # with _device_registry_lock:
     return [dev for dev in _all_devices_map.values() if not dev.is_virtual]
 
@@ -1627,7 +1644,7 @@ def getVjoyDeviceName(vid: int, axis_count: int, button_count: int, hat_count: i
 
 def getDeviceFromVjoyId(vid: int, native=False) -> DeviceSummary | None:
     """Get the resolved output, retaining configured metadata if unavailable."""
-    global _raw_vjoy_target_map
+    global _raw_vjoy_target_map  # noqa: PLW0602
     if native:
         # native vjoy device requested - not failover
         return _native_vjoy_devices.get(vid)
@@ -1714,7 +1731,7 @@ def maestro_info_from_index(mid_id: int, connected_only=True):
     :param connected_only: true to filter by connected maestros only
     """
 
-    global _maestro_devices_map, _maestro_devices_map
+    global _maestro_devices_map, _maestro_devices_map  # noqa: PLW0602
     if connected_only:
         if mid_id in _maestro_devices_map:
             return _maestro_devices_map[mid_id]
@@ -1754,14 +1771,14 @@ def vjoy_device_map(connected_only=False) -> dict[int, DeviceSummary]:
 
 def maestro_device_map() -> dict[int, DeviceSummary]:
     """returns all maestro devices indexed by maestro_id -> device"""
-    global _maestro_devices_map
+    global _maestro_devices_map  # noqa: PLW0602
     # with _device_registry_lock:
     return _maestro_devices_map.copy()
 
 
 def virtual_device_map() -> dict[DeviceType, dict[int, DeviceSummary]]:
     """returns all virtual input devices indexed by device_type:DeviceType, contains [virtual_id:int] -> device: DeviceSummary"""
-    global _all_virtual_devices_map
+    global _all_virtual_devices_map  # noqa: PLW0602
     # with _device_registry_lock:
     return _all_virtual_devices_map.copy()
 
@@ -1842,7 +1859,7 @@ def refresh_device_inventory():
 
 def noOpCallback(self, value):
     """dummy callback for special devices that don't have a particular axis, hat or button"""
-    return None
+    return
 
 
 def noOpHatCallback(self, value):
@@ -1852,8 +1869,8 @@ def noOpHatCallback(self, value):
 
 def registerSpecialDevices():
     """registers special devices"""
-    import gremlin.ui.octavi_device
     import gremlin.config
+    import gremlin.ui.octavi_device
 
     # import gremlin.ui.osc_device
     # import gremlin.ui.midi_device
@@ -1996,20 +2013,20 @@ def registerSpecialDevices():
             from gremlin.ui import streamdeck_device as streamdeck_ui
 
             streamdeck_ui.resync_streamdeck_special_devices()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
 
 def getSpecialDevices() -> list:
     """gets all special devices"""
-    global _special_devices
+    global _special_devices  # noqa: PLW0602
     # with _device_registry_lock:
     return list(_special_devices)
 
 
 def isSpecialDevice(device_guid: str) -> bool:
     """checks if a device is a special device"""
-    global _special_devices
+    global _special_devices  # noqa: PLW0602
     device_guid = gremlin.util.normalize_guid(device_guid)
     for device in _special_devices:
         if device.device_guid == device_guid:
@@ -2019,7 +2036,7 @@ def isSpecialDevice(device_guid: str) -> bool:
 
 def getConfigDevices() -> list:
     """gets all configuration devices"""
-    global _config_devices
+    global _config_devices  # noqa: PLW0602
     # with _device_registry_lock:
     return list(_config_devices)
 
@@ -2096,7 +2113,7 @@ def _create_vjoy_device(vid: int):
 
 def invalidDeviceGuid():
     """invalid device guid placeholder as a dinput.GUID"""
-    global _invalid_device_guid
+    global _invalid_device_guid  # noqa: PLW0602
     import gremlin.util
 
     return gremlin.util.parse_guid(_invalid_device_guid)
@@ -2104,7 +2121,7 @@ def invalidDeviceGuid():
 
 def getInvalidDevice() -> DeviceSummary:
     """returns the invalid device object"""
-    global _invalid_device_guid, _invalid_device
+    global _invalid_device_guid, _invalid_device  # noqa: PLW0602
     if _invalid_device is None:
         dev = DeviceSummary()
         dev.device_id = _invalid_device_guid
@@ -2120,7 +2137,7 @@ def getInvalidDevice() -> DeviceSummary:
 
 def invalidDeviceId() -> str:
     """invalid device guid placeholder as a string"""
-    global _invalid_device_guid
+    global _invalid_device_guid  # noqa: PLW0602
     return _invalid_device_guid
 
 
@@ -2181,7 +2198,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
             if _device_list_signature() == _last_device_signature:
                 syslog.info("INIT: Device list unchanged - skipping joystick re-initialization")
                 return False
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass  # fall through to a full initialization
 
     # Discover into local maps. Driver calls, logging and device constructors
@@ -2210,7 +2227,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                 # # give it some time to load data
                 # time.sleep(0.25)
 
-                device_count = 0  #
+                device_count = 0
 
                 max_retries = 5
                 attempt = 1
@@ -2317,7 +2334,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
                         real_count += 1
 
                 syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
-            except Exception as ex:
+            except Exception as ex:  # noqa: BLE001
                 syslog.error(f"INIT: Error while initializing devices: {ex}")
                 syslog.error(traceback.format_exc())
 
@@ -2488,7 +2505,7 @@ def joystick_devices_initialization(force: bool = True) -> bool:
             registerSpecialDevices()
             try:
                 signature = _device_list_signature(native_devices)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 signature = None
             published = _publish_joystick_devices(discovered_devices, configured_vjoy_devices, native_vjoy_devices, signature)
             _log_output_map()
@@ -2557,7 +2574,7 @@ def _update_joystick_device_maps():
         _vjoy_devices, \
         _all_virtual_devices_map, \
         _all_vjoy_devices_map, \
-        _maestro_failover_map
+        _maestro_failover_map  # noqa: PLW0602
 
     with _device_registry_lock:
         _apply_maestro_service_devices()
@@ -2598,14 +2615,14 @@ def _update_joystick_device_maps():
 
 
 def _update_virtual_map():
-    global _all_virtual_devices_map, _maestro_devices_map, _all_vjoy_devices_map
+    global _all_virtual_devices_map, _maestro_devices_map, _all_vjoy_devices_map  # noqa: PLW0602
     with _device_registry_lock:
         _all_virtual_devices_map[DeviceType.VJoy] = _all_vjoy_devices_map
         _all_virtual_devices_map[DeviceType.Maestro] = _maestro_devices_map
 
 
 def joystick_initialized():
-    global _joystick_initialized
+    global _joystick_initialized  # noqa: PLW0602
     return _joystick_initialized
 
 
@@ -2782,10 +2799,9 @@ class VirtualDeviceUsageState:
         if virtual_id not in self._button_usage_map[device_type]:
             self._button_usage_map[device_type][virtual_id] = {}
 
-        if input_id > 0:
+        if input_id > 0 and input_id not in self._button_usage_map[device_type][virtual_id]:
             # record button usage map if not already in the map
-            if input_id not in self._button_usage_map[device_type][virtual_id]:
-                self._button_usage_map[device_type][virtual_id][input_id] = []
+            self._button_usage_map[device_type][virtual_id][input_id] = []
 
     def ensure_device_maps(self, force_update=False):
         """ensures the inversion maps are loaded"""
@@ -2891,8 +2907,8 @@ class VirtualDeviceUsageState:
         device = getDevice(device_guid)
         device_type = device.device_type  # assuming device_guid has a device_type attribute
         virtual_id = device.virtual_id
-        if device_type in self._axis_invert_map:
-            if virtual_id in self._axis_invert_map[device_type]:
+        if device_type in self._axis_invert_map and \
+            virtual_id in self._axis_invert_map[device_type]:
                 return self._axis_invert_map[device_type][virtual_id].get(input_id, False)
         return False
 
@@ -2905,9 +2921,9 @@ class VirtualDeviceUsageState:
         device_type = device.device_type  # assuming device_guid has a device_type attribute
         virtual_id = device.virtual_id
         self._ensure_maps(device_guid, input_id)
-        if device_type in self._axis_invert_map:
-            if virtual_id in self._axis_invert_map[device_type]:
-                if input_id in self._axis_invert_map[device_type][virtual_id]:
+        if device_type in self._axis_invert_map and \
+            virtual_id in self._axis_invert_map[device_type] and \
+                input_id in self._axis_invert_map[device_type][virtual_id]:
                     self._axis_invert_map[device_type][virtual_id][input_id] = not self._axis_invert_map[device_type][
                         virtual_id
                     ][input_id]
@@ -2929,9 +2945,9 @@ class VirtualDeviceUsageState:
         device_type = device.device_type  # assuming device_guid has a device_type attribute
         virtual_id = device.virtual_id
         self._ensure_maps(device_guid, input_id)
-        if device_type in self._axis_range_map:
-            if virtual_id in self._axis_range_map[device_type]:
-                if input_id in self._axis_range_map[device_type][virtual_id]:
+        if device_type in self._axis_range_map and \
+            virtual_id in self._axis_range_map[device_type] and \
+                input_id in self._axis_range_map[device_type][virtual_id]:
                     self._axis_range_map[device_type][virtual_id][input_id] = [min_range, max_range]
                     return
 
@@ -2944,9 +2960,9 @@ class VirtualDeviceUsageState:
         device_type = device.device_type  # assuming device_guid has a device_type attribute
         virtual_id = device.virtual_id
         self._ensure_maps(device_guid, input_id)
-        if device_type in self._axis_range_map:
-            if virtual_id in self._axis_range_map[device_type]:
-                if input_id in self._axis_range_map[device_type][virtual_id]:
+        if device_type in self._axis_range_map and \
+            virtual_id in self._axis_range_map[device_type] and \
+                input_id in self._axis_range_map[device_type][virtual_id]:
                     return self._axis_range_map[device_type][virtual_id][input_id]
         return [-1.0, 1.0]
 
@@ -3028,9 +3044,9 @@ class VirtualDeviceUsageState:
         if key in self._action_map:
             del self._action_map[key]
 
-        if device_type in self._button_usage_map:
-            if virtual_id in self._button_usage_map[device_type]:
-                if input_id in self._button_usage_map[device_type][virtual_id]:
+        if device_type in self._button_usage_map and \
+            virtual_id in self._button_usage_map[device_type] and \
+                input_id in self._button_usage_map[device_type][virtual_id]:
                     usage_map = self._button_usage_map[device_type][virtual_id][input_id]
                     if key in usage_map:
                         current_state = self.get_usage_state(target_device_guid, input_id)
@@ -3184,11 +3200,11 @@ class VirtualDeviceUsageState:
         # profile load / device refresh can still register/unregister actions.
         action_keys = list(self._action_map.keys())
         used_list = list(
-            set(
+            {
                 self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None)
                 for key in action_keys
                 if self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) is not None
-            )
+            }
         )
 
         # used_list = [button_id for button_id, map_list in self._button_usage_map.get(device_type, {}).get(virtual_id, {}).items()  if map_list]

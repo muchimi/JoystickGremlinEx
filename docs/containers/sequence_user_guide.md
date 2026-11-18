@@ -9,6 +9,7 @@ The container controls when steps receive press and release events. The actions 
 - [Before you start](#before-you-start)
 - [Create your first sequence](#create-your-first-sequence)
 - [Add and arrange steps](#add-and-arrange-steps)
+- [Import and export sequence text](#import-and-export-sequence-text)
 - [Choose an execution mode](#choose-an-execution-mode)
   - [Normal: run once](#normal-run-once)
   - [Toggle: start and stop a loop](#toggle-start-and-stop-a-loop)
@@ -63,6 +64,91 @@ A step is an action set, displayed as **Step 1**, **Step 2**, and so on.
 Put commands in separate steps when their order or spacing matters. Actions grouped in one step receive the same synthetic press/release cycle; the normal action execution rules still apply within that group.
 
 Recheck repeat counts and timing after reordering or deleting steps. The current implementation stores these options by step position. Empty action sets are omitted from the runnable step list, so give every intended step an action and remove unused empty steps.
+
+## Import and export sequence text
+
+Set `GEX_SEQUENCE_TEXT_ENABLED=1` before starting GEX to show the text controls.
+
+### Import a definition
+
+1. Select the source button or hat, add a **Sequence** container, and click **Import Text…** in that container.
+2. Paste the definition below. Replace `gex-1` with the ID of an available virtual joystick if needed.
+3. Click **Check Text** to review the steps and resolved outputs. If a command is invalid, the dialog reports the line to fix.
+4. Click **Import Text** to fill the empty Sequence. If you open the dialog from a Sequence that already contains actions, click **Create Sequence** to add a separate container on the same input.
+
+```text
+sequence once
+press gex-1 b1
+pause 125ms
+release gex-1 b1
+set gex-1 a1 0.25
+```
+
+### Choose a sequence mode
+
+The first command sets the container's execution mode. Each definition contains one sequence. Blank lines and `#` comments are allowed, and `#` inside a quoted string is part of the text.
+
+| Header | Execution mode |
+| --- | --- |
+| `sequence once` | Normal. Run through the steps once. |
+| `sequence repeat while pressed` | Loop. Repeat until the source is released. |
+| `sequence toggle` | Toggle. Start on one trigger and stop on the next. |
+| `sequence step` | Step. Advance one step per trigger. |
+| `sequence wiggle` | Wiggle. Use the container's Wiggle settings to vary timing or step selection. |
+
+### Action commands
+
+A command on its own creates one step with one native action. Use `b1` for button 1 and `a1` for axis 1.
+
+| Command | Action |
+| --- | --- |
+| `press gex-1 b1` | Press a virtual button. Pair it with a `release` command. |
+| `release gex-1 b1` | Release a virtual button. |
+| `hold gex-1 b1` | Hold a virtual button until the step sends its release event. |
+| `pulse gex-1 b1 125ms` | Pulse a virtual button for the specified duration. |
+| `set gex-1 a1 0.25` | Set a virtual axis to a value between `-1` and `1`, with `0` at center. |
+| `pause 125ms` | Delay the sequence before the next command. |
+| `key tap "Left Ctrl+F13" 50ms` | Send a timed Keyboard Ex pulse for a key or combination. |
+| `key hold "F13"` | Hold a key or combination until the step sends its release event. |
+| `key press "F13"` | Send key-down for a key or combination. Pair it with `key release`. |
+| `key release "F13"` | Send key-up for a key or combination. |
+| `sound "sounds/gear-lock.wav"` | Start Play Sound/TTS in Audio file mode. Relative paths use the saved profile's folder. |
+| `say "Gear locked"` | Start Play Sound/TTS with the default local voice. |
+| `say "Gear locked" engine=edge` | Start Play Sound/TTS with Edge-TTS. |
+
+Use a Maestro service ID such as `gex-1` or a vJoy slot such as `vjoy-1`. If multiple bridges use the same Maestro ID, supply the full service address shown by export. Quote key combinations, paths, and speech text with double quotes. In a Windows path, use forward slashes or write each backslash twice. Use duration units such as `125ms` or `0.5s`.
+
+### Group actions and set step options
+
+```text
+sequence once
+step repeat=3 repeat-delay=100ms autorelease=50ms
+    hold gex-1 b1
+    key hold "F13"
+end step
+pause 250ms
+set gex-1 a1 0.25
+```
+
+Commands between `step` and `end step` share the step's press and release events. The example holds both outputs for 50 ms, releases them, and waits 100 ms before the next repetition. After three repetitions, it pauses and sets the axis. Use a block around a single action to give that step its own options.
+
+| Step option | Behavior |
+| --- | --- |
+| `repeat=none` or omitted | Run the step once using the container's timing. |
+| `repeat=3` | Run the whole step three times, including the first execution. |
+| `repeat=random:4` | Choose zero to four repetitions per visit. |
+| `repeat-delay=100ms` | Wait between repetitions. Use `100ms..250ms` for an inclusive random range. |
+| `autorelease=50ms` | Wait before sending the step's release event. Use `40ms..80ms` for an inclusive random range. |
+
+Fixed repeat counts and random repeat limits start at 2. Set `repeat-delay` and `autorelease` on steps with fixed or random repetition. Each defaults to 250 ms when omitted.
+
+New text definitions in Normal, Loop, Toggle, and Step modes start with zero container interval and autorelease delays. Use `pause` for spacing and `pulse` or `key tap` for a timed output. Sound and speech start asynchronously. Add a long enough `pause` after a final audio command if it needs time to finish before the sequence ends. For loops that can be interrupted, use a timed pulse or a grouped `hold` when the output should release automatically.
+
+### Export an existing sequence
+
+Open the Sequence editor and click **Export Text…**, then **Copy Text**. The export uses the same commands and step options as the examples above. Paste the text into **Import Text…** in a Sequence container to create an editable sequence.
+
+The export dialog lists skipped actions and flags settings that use import defaults. Review custom timing, conditions, and action settings in the editor after importing.
 
 ## Choose an execution mode
 

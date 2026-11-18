@@ -5179,7 +5179,7 @@ class DeviceDisplayDialog(QRememberDialog):
         list_widget = ReorderListWidget(self)
 
         all_devices = sorted(gremlin.joystick_handling.display_devices(refresh=True), key=lambda device: (
-            DeviceType.tab_order_group(device.device_type), device.name.casefold()
+            DeviceType.tab_order_group(device.device_type), (device.name or "").casefold()
         ))
 
         device: TabData
@@ -5444,6 +5444,8 @@ class DeviceDisplayDialog(QRememberDialog):
             if not isinstance(device, dinput.DeviceSummary):
                 syslog.warning(f"DeviceDisplayDialog: got an invalid device: [{device}]")
                 continue
+            if not device.device_id:
+                continue  # visibility is saved by device GUID
             fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
             if device.disabled and not fixed_tab:
                 # skip disabled devices
@@ -5455,7 +5457,8 @@ class DeviceDisplayDialog(QRememberDialog):
                 visible = True
                 self.visible_map[device.device_id] = True
             widget = ReorderDeviceListWidget(
-                device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device
+                device.name or f"Unnamed device ({device.device_id})",
+                visible=visible, visible_change_callback=self._handle_visible_changed, data=device,
             )
             item = QListWidgetItem(self._list_widget)
             item.setData(QtCore.Qt.UserRole, (device, visible))

@@ -15,9 +15,9 @@
 
 """Review and apply input device GUID and virtual output changes."""
 
+import qtawesome as qta
 from lxml import etree
 from PySide6 import QtCore, QtWidgets
-import qtawesome as qta
 
 import gremlin.shared_state
 from gremlin.device_remap import (
@@ -33,8 +33,8 @@ from gremlin.device_remap import (
 from gremlin.ui.ui_common import (
     MessageBoxYesNo,
     QDataCheckbox,
-    QDataComboBox,
     QDataPushButton,
+    QHtmlDataComboBox,
     QInfoBox,
     QRememberDialog,
     getHContainer,
@@ -86,8 +86,8 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             "GEX found connected replacements for these missing devices. "
             "Apply and reload to update the profile, then activate it again. "
             "Cancel to continue startup with the current mappings."
-            if startup else
-            "Remap saved input and output devices in the sections below. "
+            if startup
+            else "Remap saved input and output devices in the sections below. "
             "Connected replacements are selected when a match is found. "
             "Select Apply beside each device to change and choose its target. "
             "Output changes include startup values and preserve axis, button and hat numbers. "
@@ -116,9 +116,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         grid = QtWidgets.QGridLayout(input_section)
         for column, title in enumerate(("Status", "Apply", "Profile device / old GUID", "Connected device / new GUID")):
             grid.addWidget(QtWidgets.QLabel(title), 0, column)
-        sources = [
-            node for node in self._root.findall("./devices/device") if node.get("type", "").casefold() == "joystick"
-        ]
+        sources = [node for node in self._root.findall("./devices/device") if node.get("type", "").casefold() == "joystick"]
         if saved_root is not None:
             self._restore_referenced_inputs(sources, inputs_by_guid.keys())
         sources.sort(key=lambda node: (guid_key(node.get("device-guid")) in inputs_by_guid, node.get("name", "").casefold()))
@@ -128,8 +126,15 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             suggested = suggest_target(source, targets) if current is None else None
             choices = [current, *targets] if current is not None and current not in targets else targets
             check, combo = self._add_device_row(
-                grid, len(self._rows) + 1, f"<b>{source.get('name')}</b>\n{old}", accent,
-                "Choose a target device...", choices, current, suggested,
+                grid,
+                len(self._rows) + 1,
+                source,
+                f"<b>{source.get('name')}</b><br>[{old}]",
+                accent,
+                "Choose a target device...",
+                choices,
+                current,
+                suggested,
             )
             self._rows.append((source, check, combo))
         grid.setRowStretch(len(self._rows) + 1, 1)
@@ -152,21 +157,30 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             key=lambda device: (maestro_output_id(device) or 17, device.name.casefold(), str(device.device_guid)),
         )
         outputs = output_device_sources(self._root, self._devices, saved_root=saved_root)
+        preselected_outputs = set()
         for source in outputs:
             choices, current, suggested = self._output_choices(source, output_targets, startup_missing)
-            identity = source["device-guid"] or (
-                f"vJoy ID {source['key']}" if source["provider"] == "vjoy" else source["key"]
-            )
+            suggested_guid = guid_key(suggested.device_guid) if suggested is not None else None
+            apply_suggestion = suggested_guid not in preselected_outputs
+            if suggested_guid is not None:
+                preselected_outputs.add(suggested_guid)
+            old = source["device-guid"] or (f"vJoy ID {source['key']}" if source["provider"] == "vjoy" else source["key"])
             check, combo = self._add_device_row(
-                output_grid, len(self._output_rows) + 1, f"<b>{source['name']}</b>\n{identity}", accent,
-                "Choose a target output...", choices, current, suggested,
+                output_grid,
+                len(self._output_rows) + 1,
+                source,
+                f"<b>{source['name']}</b><br>[{old}]",
+                accent,
+                "Choose a target output...",
+                choices,
+                current,
+                suggested,
+                apply_suggestion=apply_suggestion,
             )
             check.setToolTip("Remap this output device, including its saved startup values.")
             self._output_rows.append((source, check, combo))
         if not startup and not self._output_rows:
-            output_grid.addWidget(
-                QtWidgets.QLabel("No virtual output devices are referenced in this profile."), 1, 2, 1, 2
-            )
+            output_grid.addWidget(QtWidgets.QLabel("No virtual output devices are referenced in this profile."), 1, 2, 1, 2)
         output_grid.setColumnStretch(3, 1)
         sections.addWidget(output_section)
         output_section.setVisible(not startup or bool(self._output_rows))
@@ -188,7 +202,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
     def has_matches(self):
         return any(check.isChecked() for _, check, _ in self._rows + self._output_rows)
 
-    def _add_device_row(self, grid, row, text, accent, placeholder, choices, current, suggested):
+    def _add_device_row(self, grid, row, source, text, accent, placeholder, choices, current, suggested, *, apply_suggestion=True):
         if current is not None:
             status_name = "deviceStatusConnected"
         elif suggested is not None:
@@ -198,6 +212,8 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         pixmap, description = self._device_status_icons[status_name]
         if not choices:
             description = "No replacement devices are connected."
+        elif suggested is not None and not apply_suggestion:
+            description = "Another output already has this target selected. Apply one row at a time."
         status = QtWidgets.QLabel()
         status.setObjectName(status_name)
         status.setPixmap(pixmap)
@@ -206,26 +222,32 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         grid.addWidget(status, row, 0, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
 
         check = QDataCheckbox()
-        check.setChecked(suggested is not None)
+        check.setChecked(suggested is not None and apply_suggestion)
         check.toggled.connect(self._validate)
         grid.addWidget(check, row, 1)
 
         label = QtWidgets.QLabel(text)
         label.setStyleSheet(f"color: {accent};")
-        label.setTextFormat(QtCore.Qt.TextFormat.PlainText)
+        label.setTextFormat(QtCore.Qt.TextFormat.RichText)
         label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
         grid.addWidget(label, row, 2)
 
-        combo = QDataComboBox()
+        combo = QHtmlDataComboBox()
         combo.addItem(placeholder, None)
         for device in choices:
-            combo.addItem(f"{device.name} [{device.device_guid}]", device)
+            combo.addItem(f"<b>{device.name}</b> [{device.device_guid}]", device)
         default = current if current is not None else suggested
         if default is not None:
             combo.setCurrentIndex(choices.index(default) + 1)
-        combo.currentIndexChanged.connect(self._validate)
+        combo.currentIndexChanged.connect(lambda _: self._target_changed(source, check, combo))
         grid.addWidget(combo, row, 3, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
         return check, combo
+
+    def _target_changed(self, source, check, combo):
+        target = combo.currentData()
+        with QtCore.QSignalBlocker(check):
+            check.setChecked(target is not None and not self._is_current_device(source, target))
+        self._validate()
 
     def _restore_referenced_inputs(self, sources, connected):
         # Serialization can omit device declarations that have no mappings of
@@ -238,11 +260,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
                 missing[key] = node
         if not missing:
             return
-        references = {
-            guid_key(value)
-            for node in self._root.iter() if isinstance(node.tag, str)
-            for value in node.attrib.values()
-        }
+        references = {guid_key(value) for node in self._root.iter() if isinstance(node.tag, str) for value in node.attrib.values()}
         devices = self._root.find("devices")
         if devices is not None:
             for key in missing.keys() & references:
@@ -269,9 +287,9 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             return targets, current, None
         suggested_guid = guid_key(source.get("suggested-guid"))
         matches = [
-            device for device in targets
-            if guid_key(device.device_guid) == suggested_guid
-            or any(guid_key(guid) == old_guid for guid in device.data.get("maestro_native_guids", ()))
+            device
+            for device in targets
+            if guid_key(device.device_guid) == suggested_guid or any(guid_key(guid) == old_guid for guid in device.data.get("maestro_native_guids", ()))
         ]
         if matches:
             return targets, None, matches[0] if len(matches) == 1 else None
@@ -302,7 +320,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
 
     def _replacement_root(self):
         self._output_changes = []
-        self._validation_message = "Select an input or output device and choose its target."
+        self._validation_message = "Select an input or output device and choose its target. Changes will only be applied to selected (checked) items."
         replacements = {}
         for source, check, combo in self._rows:
             if not check.isChecked():
@@ -329,9 +347,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             output_replacements[source["key"]] = target
         root = self._root
         if output_replacements:
-            root, self._output_changes = remap_output_devices(
-                root, self._devices, output_replacements, saved_root=self._saved_root
-            )
+            root, self._output_changes = remap_output_devices(root, self._devices, output_replacements, saved_root=self._saved_root)
         if replacements:
             return remap_profile_devices(root, replacements)
         if self._output_changes:
@@ -367,7 +383,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
                 self._apply_button.setEnabled(False)
                 return
             self._apply_changes(root)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             self._status.setText(f"Could not remap the profile: {error}")
             return
         self.accept()

@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 from types import ModuleType, SimpleNamespace as NS
+from typing import Callable
 import unittest
 from unittest.mock import Mock, patch
 
@@ -408,10 +409,20 @@ class DialogChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        from PySide6 import QtWidgets
+        from PySide6 import QtCore, QtGui, QtWidgets
         cls.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        # Exercise the real dialog with Qt, replacing only the application-wide
-        # ui_common imports so no joystick drivers or main window are required.
+        # Load the actual combo boxes without importing the joystick drivers.
+        tree = ast.parse((ROOT / "gremlin/ui/ui_common.py").read_bytes())
+        names = {"QDataComboBox", "HtmlItemDelegate", "QHtmlDataComboBox"}
+        widgets = ast.Module(body=[node for node in tree.body if getattr(node, "name", None) in names],
+                             type_ignores=[])
+        combo_namespace = dict(
+            QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, Qt=QtCore.Qt, QSize=QtCore.QSize, Callable=Callable,
+            QTextDocument=QtGui.QTextDocument, QComboBox=QtWidgets.QComboBox,
+            QStyledItemDelegate=QtWidgets.QStyledItemDelegate, Buttons=NS(_default_parent=None),
+            gremlin=NS(config=NS(Configuration=lambda: NS(dropdown_use_mouse_wheel=True))),
+        )
+        exec(compile(widgets, "gremlin/ui/ui_common.py", "exec"), combo_namespace)
         common = ModuleType("gremlin.ui.ui_common")
         class RememberDialog(QtWidgets.QDialog):
             def __init__(self, name, parent=None, width=None, height=None):
@@ -427,7 +438,8 @@ class DialogChecks(unittest.TestCase):
         common.MessageBoxYesNo = Mock()
         common.QRememberDialog = RememberDialog
         common.QDataCheckbox = QtWidgets.QCheckBox
-        common.QDataComboBox = QtWidgets.QComboBox
+        common.QDataComboBox = combo_namespace["QDataComboBox"]
+        common.QHtmlDataComboBox = combo_namespace["QHtmlDataComboBox"]
         common.QDataPushButton = QtWidgets.QPushButton
         common.getHContainer = container
         common.getVContainer = lambda widget, **kwargs: container([widget])
@@ -468,6 +480,44 @@ class DialogChecks(unittest.TestCase):
         self.assertTrue(check.isChecked())
         result = dialog._replacement_root()
         self.assertEqual(result[0].get("vjoy"), NEW)
+
+    def test_choosing_gex_output_for_an_unknown_guid_selects_the_row(self):
+        root = etree.fromstring(f'<profile><remap vjoy="{OLD}" axis="3"/></profile>')
+        dialog = self.dialog_type(etree.tostring(root), [maestro()], self.apply)
+        self.addCleanup(dialog.close)
+        _, check, combo = dialog._output_rows[0]
+        self.assertFalse(dialog._apply_button.isEnabled())
+        combo.setCurrentIndex(1)
+        self.assertTrue(check.isChecked())
+        self.assertTrue(dialog._apply_button.isEnabled())
+        check.setChecked(False)
+        self.assertFalse(dialog._apply_button.isEnabled())
+        combo.setCurrentIndex(0)
+        combo.setCurrentIndex(1)
+        dialog._apply(True)
+        self.assertEqual(self.apply.call_args.args[0][0].get("vjoy"), NEW)
+
+    def test_gex_output_is_automatically_checked_for_only_one_suggested_row(self):
+        root = etree.fromstring('''<profile>
+            <vjoyremap virtual-id="1" button="2"/>
+            <remap vjoy="dde8a0111f5251cca3315b66849e9991" axis="3"/>
+        </profile>''')
+        target = maestro(data={"maestro_key": "maestro://127.0.0.1:8010/gex-1"})
+        dialog = self.dialog_type(etree.tostring(root), [target], self.apply)
+        self.addCleanup(dialog.close)
+        maestro_row, vjoy_row = dialog._output_rows
+        self.assertIs(maestro_row[2].currentData(), target)
+        self.assertIs(vjoy_row[2].currentData(), target)
+        self.assertTrue(maestro_row[1].isChecked())
+        self.assertFalse(vjoy_row[1].isChecked())
+        self.assertTrue(dialog._apply_button.isEnabled())
+        vjoy_row[1].setChecked(True)
+        self.assertFalse(dialog._apply_button.isEnabled())
+        self.assertIn('both target "gex-1"', dialog._status.text())
+        vjoy_row[1].setChecked(False)
+        result = dialog._replacement_root()
+        self.assertEqual(result.find("remap").get("vjoy"), NEW)
+        self.assertIsNone(result.find("vjoyremap").get("device-type"))
 
     def test_output_only_conversion_is_preselected_and_previewed(self):
         root = etree.fromstring('<profile><devices/><vjoyremap device-type="VJoy" virtual-id="1" button="4"/></profile>')

@@ -16,32 +16,30 @@
 
 
 from __future__ import annotations  # deprecated with python 3.14+
-from PySide6 import QtWidgets
 
 import logging
+import random
+import threading
 import time
+from enum import IntEnum
 
 from lxml import etree as ElementTree
-import threading
-import random
+from PySide6 import QtCore, QtWidgets
+from shiboken6 import Shiboken
+
 import gremlin
 import gremlin.actions
-import gremlin.input_item
 import gremlin.config
 import gremlin.event_handler
+import gremlin.input_item
+import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
-import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, ActionSetView
+from gremlin.clipboard import EncoderType, ObjectEncoder
+from gremlin.input_item import AbstractAction, AbstractContainer, AbstractContainerWidget, ActionSelector, ActionSet, ActionSetView
 from gremlin.input_types import InputType
-from PySide6 import QtCore
-from gremlin.util import safe_format, safe_read
-from shiboken6 import Shiboken
 from gremlin.singleton_decorator import SingletonDecorator
-from gremlin.types import SyncMode
-import gremlin.joystick_handling
-from gremlin.types import ContainerViewTypes, Interactions
-from enum import IntEnum
+from gremlin.types import ContainerViewTypes, Interactions, SyncMode
 from gremlin.ui.ui_common import (
     QDataCheckbox,
     QDataRadioButton,
@@ -56,6 +54,7 @@ from gremlin.ui.ui_common import (
     getVContainer,
     synchronize_grids,
 )
+from gremlin.util import safe_format, safe_read
 
 syslog = logging.getLogger("system")
 
@@ -454,6 +453,16 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_selector.action_paste.connect(self._paste_action)
 
         self.widget_layout.addWidget(self.action_selector)
+        if gremlin.config.SEQUENCE_TEXT_ENABLED:
+            import_text = QtWidgets.QPushButton("Import Text…")
+            import_text.setToolTip("Load a sequence definition from text")
+            import_text.clicked.connect(self._import_text)
+            self.widget_layout.addWidget(import_text)
+
+            export_text = QtWidgets.QPushButton("Export Text…")
+            export_text.setToolTip("Show this sequence as text")
+            export_text.clicked.connect(self._export_text)
+            self.widget_layout.addWidget(export_text)
 
         self._trigger_widget = QExecuteWidget(
             self.container.exec_on_press,
@@ -685,6 +694,37 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self._update_action_sets()
         self._update_widgets()
+
+    def _import_text(self):
+        from gremlin.ui.sequence_text import import_sequence
+
+        container = self.container
+        input_item = container.input_item
+        mapping = self.parentWidget()
+        while mapping is not None and not isinstance(mapping, gremlin.input_item.InputItemMappingWidget):
+            mapping = mapping.parentWidget()
+        if mapping is None or mapping.input_item is not input_item or input_item.locked:
+            return
+
+        into_empty = not any(container.action_sets)
+
+        def install(document):
+            if (
+                not Shiboken.isValid(mapping)
+                or mapping.input_item is not input_item
+                or input_item.locked
+                or container not in input_item.containers
+            ):
+                return False
+            encoded = ObjectEncoder(input_item, ElementTree.tostring(document), container.name, EncoderType.Container)
+            return bool(mapping._paste_container(encoded, input_item.toExtraData(), replace_empty=container if into_empty else None))
+
+        import_sequence(mapping, install, into_empty=into_empty)
+
+    def _export_text(self):
+        from gremlin.ui.sequence_text import export_sequence
+
+        export_sequence(self, self.container)
 
     def _update_action_sets(self):
         """redraws action steps in the sequence - each step is an action set"""

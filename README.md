@@ -52,6 +52,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T105)
+- Change: UI:  Device Remap dialog gains a status icon indicating if the device is matched, not matched but a suitable remap was automatically map, and undetermined (no device was automatically derived).  
+- Change: UI:  Device Remap dialog: GEX will attempt to guess a device to remap for operating system GUID changes.
+- Change: UI:  Device Remap dialog: GEX will auto select a device row for remap if the  current device is different from the target device.
+- Change: API: general code housekeeping.
+- Fix: UI: Device Filter dialog: exception when sorting devices that do not report a name.
+
+
 ### (m77T104)
 - Fix: UI: resolve special character encoding resulting in some UI garbled text due to a code formatting change.  This impacts several UI elements across all modules but does not change functionality.
 - Fix: UI: device order may change automatically and not respect set preferences in the device filter.  

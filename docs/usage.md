@@ -1963,6 +1963,8 @@ Use Sequence when each step needs its own action set and timing. A Macro action 
 
 Choose **Toggle** to start and stop a loop with successive triggers, **Loop** to repeat while held, **Wiggle** for variable step selection/timing, or **Step** to advance one step per trigger. Individual steps also have repeat controls. See the [Sequence guide](containers/sequence_user_guide.md) for these modes, startup/resume settings, and worked examples.
 
+Use **Import Text…** in a Sequence container to build it from commands and **Export Text…** to copy its definition. [Sequence text commands and examples](containers/sequence_user_guide.md#import-and-export-sequence-text)
+
 ### Play sounds and generated speech
 
 Add **Play Sound/TTS** to an input for audio feedback. Select the mode before configuring its source:

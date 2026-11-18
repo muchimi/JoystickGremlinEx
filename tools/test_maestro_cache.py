@@ -443,6 +443,26 @@ class MaestroCacheChecks(unittest.TestCase):
         self.assertEqual([d.device_guid for d in shown], [missing.device_guid])
         self.assertFalse(shown[0].connected)
 
+    def test_display_inventory_labels_incomplete_profile_summaries(self):
+        known_guid, unnamed_guid = (MAESTRO.dinput.GUID(uuid.uuid4()) for _ in range(2))
+        known = MAESTRO.dinput.DeviceSummary()
+        unnamed = MAESTRO.dinput.DeviceSummary()
+        profile = NS(
+            devices={known_guid: NS(device=known, name="Saved joystick"),
+                     unnamed_guid: NS(device=unnamed, name=None)},
+            vjoy_devices={},
+        )
+        self.local_devices([])
+        with patch.object(MAESTRO.dinput.DILL, "initialized", True, create=True):
+            devices = sorted(self.registry["display_devices"](profile), key=lambda device: device.name.casefold())
+        self.assertEqual([device.device_guid for device in devices], [known_guid, unnamed_guid])
+        self.assertEqual(devices[0].name, "Saved joystick")
+        self.assertEqual(devices[1].name, f"Unnamed device ({unnamed_guid.hex})")
+        self.assertFalse(any(device.connected for device in devices))
+        for original in (known, unnamed):
+            self.assertIsNone(original.device_guid)
+            self.assertIsNone(original.name)
+
     def test_display_inventory_never_trusts_connected_cache_without_native_enumeration(self):
         cached = self.native("Cached connected joystick")
         self.registry["_all_devices_map"][cached.device_guid] = cached
