@@ -726,6 +726,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#import-and-export-sequence-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import and export sequence text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Import and export sequence text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#import-a-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import a definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-sequence-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a sequence mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#group-actions-and-set-step-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group actions and set step options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-an-existing-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export an existing sequence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#choose-an-execution-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -977,6 +1049,7 @@
 <li><a href="#before-you-start">Before you start</a></li>
 <li><a href="#create-your-first-sequence">Create your first sequence</a></li>
 <li><a href="#add-and-arrange-steps">Add and arrange steps</a></li>
+<li><a href="#import-and-export-sequence-text">Import and export sequence text</a></li>
 <li><a href="#choose-an-execution-mode">Choose an execution mode</a></li>
 <li><a href="#normal-run-once">Normal: run once</a></li>
 <li><a href="#toggle-start-and-stop-a-loop">Toggle: start and stop a loop</a></li>
@@ -1024,6 +1097,163 @@
 </ul>
 <p>Put commands in separate steps when their order or spacing matters. Actions grouped in one step receive the same synthetic press/release cycle; the normal action execution rules still apply within that group.</p>
 <p>Recheck repeat counts and timing after reordering or deleting steps. The current implementation stores these options by step position. Empty action sets are omitted from the runnable step list, so give every intended step an action and remove unused empty steps.</p>
+<h2 id="import-and-export-sequence-text">Import and export sequence text<a class="headerlink" href="#import-and-export-sequence-text" title="Permanent link">¶</a></h2>
+<p>Set <code>GEX_SEQUENCE_TEXT_ENABLED=1</code> before starting GEX to show the text controls.</p>
+<h3 id="import-a-definition">Import a definition<a class="headerlink" href="#import-a-definition" title="Permanent link">¶</a></h3>
+<ol>
+<li>Select the source button or hat, add a <strong>Sequence</strong> container, and click <strong>Import Text…</strong> in that container.</li>
+<li>Paste the definition below. Replace <code>gex-1</code> with the ID of an available virtual joystick if needed.</li>
+<li>Click <strong>Check Text</strong> to review the steps and resolved outputs. If a command is invalid, the dialog reports the line to fix.</li>
+<li>Click <strong>Import Text</strong> to fill the empty Sequence. If you open the dialog from a Sequence that already contains actions, click <strong>Create Sequence</strong> to add a separate container on the same input.</li>
+</ol>
+<pre><code class="language-text">sequence once
+press gex-1 b1
+pause 125ms
+release gex-1 b1
+set gex-1 a1 0.25
+</code></pre>
+<h3 id="choose-a-sequence-mode">Choose a sequence mode<a class="headerlink" href="#choose-a-sequence-mode" title="Permanent link">¶</a></h3>
+<p>The first command sets the container's execution mode. Each definition contains one sequence. Blank lines and <code>#</code> comments are allowed, and <code>#</code> inside a quoted string is part of the text.</p>
+<table>
+<thead>
+<tr>
+<th>Header</th>
+<th>Execution mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sequence once</code></td>
+<td>Normal. Run through the steps once.</td>
+</tr>
+<tr>
+<td><code>sequence repeat while pressed</code></td>
+<td>Loop. Repeat until the source is released.</td>
+</tr>
+<tr>
+<td><code>sequence toggle</code></td>
+<td>Toggle. Start on one trigger and stop on the next.</td>
+</tr>
+<tr>
+<td><code>sequence step</code></td>
+<td>Step. Advance one step per trigger.</td>
+</tr>
+<tr>
+<td><code>sequence wiggle</code></td>
+<td>Wiggle. Use the container's Wiggle settings to vary timing or step selection.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="action-commands">Action commands<a class="headerlink" href="#action-commands" title="Permanent link">¶</a></h3>
+<p>A command on its own creates one step with one native action. Use <code>b1</code> for button 1 and <code>a1</code> for axis 1.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>press gex-1 b1</code></td>
+<td>Press a virtual button. Pair it with a <code>release</code> command.</td>
+</tr>
+<tr>
+<td><code>release gex-1 b1</code></td>
+<td>Release a virtual button.</td>
+</tr>
+<tr>
+<td><code>hold gex-1 b1</code></td>
+<td>Hold a virtual button until the step sends its release event.</td>
+</tr>
+<tr>
+<td><code>pulse gex-1 b1 125ms</code></td>
+<td>Pulse a virtual button for the specified duration.</td>
+</tr>
+<tr>
+<td><code>set gex-1 a1 0.25</code></td>
+<td>Set a virtual axis to a value between <code>-1</code> and <code>1</code>, with <code>0</code> at center.</td>
+</tr>
+<tr>
+<td><code>pause 125ms</code></td>
+<td>Delay the sequence before the next command.</td>
+</tr>
+<tr>
+<td><code>key tap "Left Ctrl+F13" 50ms</code></td>
+<td>Send a timed Keyboard Ex pulse for a key or combination.</td>
+</tr>
+<tr>
+<td><code>key hold "F13"</code></td>
+<td>Hold a key or combination until the step sends its release event.</td>
+</tr>
+<tr>
+<td><code>key press "F13"</code></td>
+<td>Send key-down for a key or combination. Pair it with <code>key release</code>.</td>
+</tr>
+<tr>
+<td><code>key release "F13"</code></td>
+<td>Send key-up for a key or combination.</td>
+</tr>
+<tr>
+<td><code>sound "sounds/gear-lock.wav"</code></td>
+<td>Start Play Sound/TTS in Audio file mode. Relative paths use the saved profile's folder.</td>
+</tr>
+<tr>
+<td><code>say "Gear locked"</code></td>
+<td>Start Play Sound/TTS with the default local voice.</td>
+</tr>
+<tr>
+<td><code>say "Gear locked" engine=edge</code></td>
+<td>Start Play Sound/TTS with Edge-TTS.</td>
+</tr>
+</tbody>
+</table>
+<p>Use a Maestro service ID such as <code>gex-1</code> or a vJoy slot such as <code>vjoy-1</code>. If multiple bridges use the same Maestro ID, supply the full service address shown by export. Quote key combinations, paths, and speech text with double quotes. In a Windows path, use forward slashes or write each backslash twice. Use duration units such as <code>125ms</code> or <code>0.5s</code>.</p>
+<h3 id="group-actions-and-set-step-options">Group actions and set step options<a class="headerlink" href="#group-actions-and-set-step-options" title="Permanent link">¶</a></h3>
+<pre><code class="language-text">sequence once
+step repeat=3 repeat-delay=100ms autorelease=50ms
+    hold gex-1 b1
+    key hold "F13"
+end step
+pause 250ms
+set gex-1 a1 0.25
+</code></pre>
+<p>Commands between <code>step</code> and <code>end step</code> share the step's press and release events. The example holds both outputs for 50 ms, releases them, and waits 100 ms before the next repetition. After three repetitions, it pauses and sets the axis. Use a block around a single action to give that step its own options.</p>
+<table>
+<thead>
+<tr>
+<th>Step option</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repeat=none</code> or omitted</td>
+<td>Run the step once using the container's timing.</td>
+</tr>
+<tr>
+<td><code>repeat=3</code></td>
+<td>Run the whole step three times, including the first execution.</td>
+</tr>
+<tr>
+<td><code>repeat=random:4</code></td>
+<td>Choose zero to four repetitions per visit.</td>
+</tr>
+<tr>
+<td><code>repeat-delay=100ms</code></td>
+<td>Wait between repetitions. Use <code>100ms..250ms</code> for an inclusive random range.</td>
+</tr>
+<tr>
+<td><code>autorelease=50ms</code></td>
+<td>Wait before sending the step's release event. Use <code>40ms..80ms</code> for an inclusive random range.</td>
+</tr>
+</tbody>
+</table>
+<p>Fixed repeat counts and random repeat limits start at 2. Set <code>repeat-delay</code> and <code>autorelease</code> on steps with fixed or random repetition. Each defaults to 250 ms when omitted.</p>
+<p>New text definitions in Normal, Loop, Toggle, and Step modes start with zero container interval and autorelease delays. Use <code>pause</code> for spacing and <code>pulse</code> or <code>key tap</code> for a timed output. Sound and speech start asynchronously. Add a long enough <code>pause</code> after a final audio command if it needs time to finish before the sequence ends. For loops that can be interrupted, use a timed pulse or a grouped <code>hold</code> when the output should release automatically.</p>
+<h3 id="export-an-existing-sequence">Export an existing sequence<a class="headerlink" href="#export-an-existing-sequence" title="Permanent link">¶</a></h3>
+<p>Open the Sequence editor and click <strong>Export Text…</strong>, then <strong>Copy Text</strong>. The export uses the same commands and step options as the examples above. Paste the text into <strong>Import Text…</strong> in a Sequence container to create an editable sequence.</p>
+<p>The export dialog lists skipped actions and flags settings that use import defaults. Review custom timing, conditions, and action settings in the editor after importing.</p>
 <h2 id="choose-an-execution-mode">Choose an execution mode<a class="headerlink" href="#choose-an-execution-mode" title="Permanent link">¶</a></h2>
 <table>
 <thead>

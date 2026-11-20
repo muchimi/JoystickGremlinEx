@@ -128,6 +128,7 @@ GEX m77 is the current iteration of GremlinEx in testing/development and incorpo
 - optimized API flows to reduce overhead and further reduce TTO (time to output) on processed triggers
 - reworked DINPUT input queues and event distribution, more use of direct callbacks and teardowns to optimize response time and reduce Python overhead/leverage caching (prior event handling model could choke on heavy inputs).
 - focus on quality of life improvements with container/action and input manipulation in particular
+- [remote control setup guide](remote_control.md).
 
 
 ## How can I support the project?

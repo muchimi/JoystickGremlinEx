@@ -235,30 +235,63 @@ class ProfileOptionsUi(QRememberDialog):
         self.start_mode_changed.emit(mode_name)
 
 
-def _network_computer_browse_button(dialog, select_address, *, target="server"):
-    """Create a button that opens the Windows Network Discovery picker."""
+class NetworkComputerPicker(QOperationDialog):
+    """Choose an IPv4 address found by Windows Network Discovery."""
 
-    def select_computer(computers):
-        if not computers:
-            dialog.status_widget.setText(f"Windows Network Discovery returned no computers with IPv4 addresses. Enter the {target} address manually.")
-            return
+    def __init__(self, parent, target):
+        super().__init__(self.__class__.__name__, parent=parent)
+        self.setWindowTitle("Network Computers")
+        self._target = target
+        self._computers = QDataComboBox()
+        self._computers.setAccessibleName("Discovered network computers")
+        self.content_layout.addWidget(QDataLabel(f"Select the {target} and its IPv4 address"))
+        self.content_layout.addWidget(self._computers)
 
-        choices = {f"{name} ({address})": address for name, address in computers}
-        selected, accepted = QtWidgets.QInputDialog.getItem(
-            dialog, "Network Computers", f"Select the {target} and its IPv4 address", list(choices), editable=False
-        )
-        dialog.status_widget.setText("")
-        select_address(choices[selected] if accepted else None)
+        self._select = QDataPushButton("Select", clicked=self.accept)
+        self._cancel = QDataPushButton("Cancel", clicked=self.reject)
+        self.button_layout.addStretch()
+        self.button_layout.addWidget(self._select)
+        self.button_layout.addWidget(self._cancel)
 
-    def browse():
-        dialog._submit(
+        self._submit(
             operation=discover_windows_computers,
-            complete=select_computer,
-            message="Looking for computers...",
+            complete=self._populate,
+            message="Looking for computers…",
             request_name="GEX Network Discovery",
         )
 
-    button = QDataPushButton("Browse…", clicked=browse)
+    @property
+    def address(self):
+        return self._computers.currentData()
+
+    def _populate(self, computers):
+        if not computers:
+            self.status_widget.setText(
+                f"Windows Network Discovery returned no computers with IPv4 addresses. Enter the {self._target} address manually."
+            )
+            return
+
+        for name, address in computers:
+            self._computers.addItem(f"{name} ({address})", address)
+        self.status_widget.clear()
+
+    def _update_ui(self):
+        can_select = not self._busy and self._computers.count() > 0
+        self._computers.setEnabled(can_select)
+        self._select.setEnabled(can_select)
+        self._cancel.setEnabled(not self._busy)
+
+
+def _network_computer_browse_button(dialog, select_address, *, target="server", label="Browse…"):
+    """Create a button that opens the Windows Network Discovery picker."""
+
+    def browse():
+        picker = NetworkComputerPicker(dialog, target)
+        if picker.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            select_address(picker.address)
+        picker.deleteLater()
+
+    button = QDataPushButton(label, clicked=browse)
     button.setAutoDefault(False)
     button.setToolTip("Choose an IPv4 address from discoverable local computers.")
     return button
@@ -1562,7 +1595,12 @@ class OptionsDialog(BaseDialogUi):
             tooltip="Select the GremlinEx broadcast server's IPv4 address.",
             clicked=self._remote_control_server_ip_select,
         )
-        self._remote_test_host_container = getHContainer([self._remote_test_host, select_test_host_button], "GEX Master Server IPv4:", widget_only=True)
+        discover_test_host_button = _network_computer_browse_button(
+            self, self._set_remote_server_address, target="GEX master server", label="Discover…"
+        )
+        self._remote_test_host_container = getHContainer(
+            [self._remote_test_host, select_test_host_button, discover_test_host_button], "GEX Master Server IPv4:", widget_only=True
+        )
         test_layout.addWidget(self._remote_test_host_container)
         test_layout.addWidget(getHContainer([self._remote_test_button, self._add_firewall_rule_button], widget_only=True))
 
@@ -2786,7 +2824,9 @@ Enabled modules may not show until the device filter is updated.
 
     @QtCore.Slot()
     def _broadcast_host_ip_selected(self):
-        host_ip = self._host_dialog._host_ip
+        self._set_remote_server_address(self._host_dialog._host_ip)
+
+    def _set_remote_server_address(self, host_ip):
         if not self.config.enable_remote_broadcast:
             self._remote_test_host.setText(host_ip)
         self.remote_control_server_widget.setText(host_ip)

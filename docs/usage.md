@@ -743,6 +743,8 @@ Holding the left-shift key and the left-control key when in button detect mode t
 
 ## Remote control
 
+For the walkthrough, see [GremlinEx remote control setup](remote_control.md).
+
 GremlinEx can link multiple GremlinEx instances running on separate computers on the local network.  One instance (the broadcaster) can remote control another GremlinEx (client) as well as output to itself.  This is helpful to share a single set of controls or profile on a master machine to one or more client machines on the local network.
 
 As of T183, GremlinEx, actions that support remote output can control specific GremlinEx instances on the network, or any (all).
