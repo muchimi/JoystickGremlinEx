@@ -690,6 +690,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="General Context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#important" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -754,10 +771,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-register-clients-on-the-master" class="md-nav__link">
+  <a href="#4-register-clients-on-the-master-for-specific-client-targeting-by-the-master" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Register clients on the master
+        4. Register clients on the master (for specific client targeting by the master)
       
     </span>
   </a>
@@ -797,6 +814,89 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#8-subsequent-client-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Subsequent client setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-subsequent-master-instance-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Subsequent Master instance setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status bar
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Status bar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#remote-control-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote control disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remote-control-master" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote control master
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remote-control-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote control client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -816,8 +916,20 @@
 
 <h1 id="gremlinex-remote-control-setup">GremlinEx remote control setup<a class="headerlink" href="#gremlinex-remote-control-setup" title="Permanent link">¶</a></h1>
 <h2 id="general-context">General Context<a class="headerlink" href="#general-context" title="Permanent link">¶</a></h2>
-<p>GEX lets you send outputs from its mappings to other GEX clients on the <strong>local</strong> network.  </p>
+<p>GEX lets you send outputs from its mappings to other GEX clients on the <strong>local</strong> network.  Supported outputs include any axis, button, hat, keyboard and mouse.  GEX also has a special KVM Mode where exclusive output of keyboard/mouse goes to clients.</p>
+<p>GEX uses a UDP port to communicated on the local network.  The UDP port defaults to <strong>6012</strong> and must be open on each machine to receive. This can be done within GEX, and usually this is also setup automatically for you as you run the application as UAC will ask for permissions.  This may not work depending on machine policies, so GEX offers a manual way to do this as well in case it's needed.</p>
 <p>Use one GremlinEx (GEX) instance as the <strong>master</strong> to send mapped output to one or more <strong>clients</strong>. Start with all machines on the same trusted LAN, running the same GEX build. Use the same <strong>Broadcast Port</strong> on each machine. The default is UDP <code>6012</code>.</p>
+<h3 id="important">Important<a class="headerlink" href="#important" title="Permanent link">¶</a></h3>
+<ul>
+<li>There can only be one master on the local network at a time to avoid problems.</li>
+<li>You can have as many clients as you need.</li>
+<li>Each client must have outputs defined for joystick, buttons and axes matching the number of devices used for output on the master profile.  If you have three (3) output joysticks and (1) gamepad on the master, you need to duplicate this on the client.</li>
+<li>The clients must be running with a <strong>blank profile</strong>.</li>
+<li>The master must be running with the master profile configured for remote output, meaning, it has mappings that manage the behavior of the remote control, such as, when GEX sends the output locally, or remotely, or to both at the same time.</li>
+<li>Data is sent real time with low latency so there is no perceptible delay on the clients.</li>
+<li>More than one client can receive data at the same time if the client is not specifically targeted for output (broadcast mode).</li>
+<li>Versions usually do not matter but should be identical to be ensure there is feature parity.</li>
+</ul>
 <h2 id="1-set-up-the-master">1. Set up the master<a class="headerlink" href="#1-set-up-the-master" title="Permanent link">¶</a></h2>
 <ol>
 <li>On the PC with the physical controls and mapping profile, open <strong>Tools &gt; Options &gt; Remote Control</strong>.</li>
@@ -828,10 +940,11 @@
 </ol>
 <h2 id="2-set-up-each-receiving-client">2. Set up each receiving client<a class="headerlink" href="#2-set-up-each-receiving-client" title="Permanent link">¶</a></h2>
 <ol>
-<li>Open <strong>Tools &gt; Options &gt; Remote Control</strong>. Enable <strong>Enable control of this client by a remote server</strong>. Clear <strong>Current host is the master GEX server</strong> if it is checked. GEX switches off <strong>Enable server broadcast</strong> when you enable the receiving role.</li>
+<li>Use a <strong>blank profile</strong> on the client.</li>
+<li>Open <strong>Tools &gt; Options &gt; Remote Control</strong>, enable <strong>Enable control of this client by a remote server</strong>. Clear <strong>Current host is the master GEX server</strong> if it is checked. GEX switches off <strong>Enable server broadcast</strong> when you enable the receiving role.</li>
 <li>Give the client a recognizable <strong>Custom Client Name</strong>, such as <code>Flight Display</code>, or use its Windows host name.</li>
 <li>Set <strong>Broadcast Port</strong> to the same value as the master. Leave <strong>All IPs</strong> checked on the client.</li>
-<li>Under <strong>GEX connection test</strong>, click <strong>Discover…</strong> next to <strong>GEX Master Server IPv4</strong>. Choose the master computer and its LAN IPv4 address, then click <strong>Select</strong> to save it. If Windows Network Discovery does not list the master, use the <strong>Select</strong> button next to the address field, enter the address in <strong>Server IPv4</strong>, and click <strong>OK</strong>.</li>
+<li>Under <strong>GEX connection test</strong>, click <strong>Select</strong> next to <strong>GEX Master Server IPv4</strong>. Enter the master's LAN IPv4 address in <strong>Server IPv4</strong>, or use the network browse button to find it, then click <strong>OK</strong> to save the selection.</li>
 <li>Create or load a profile on the client. A blank profile works. Activate the profile when you're ready to receive output and keep it running while you use remote control. For vJoy output, configure the receiving vJoy device with the same device ID and corresponding axes, buttons, and hats used by the master mapping.</li>
 </ol>
 <h2 id="3-check-connectivity-and-open-the-firewall-if-needed">3. Check connectivity and open the firewall if needed<a class="headerlink" href="#3-check-connectivity-and-open-the-firewall-if-needed" title="Permanent link">¶</a></h2>
@@ -854,7 +967,7 @@
 <li>On <strong>Scope</strong>, use the master's IPv4 address as the <strong>remote</strong> IP on a client. You can scope the client's <strong>local</strong> IP to the multicast group <code>224.3.29.72</code>. On the master, leave the <strong>local</strong> addresses unrestricted to cover unicast and multicast and set the <strong>remote</strong> addresses to the participating client IPv4 addresses.</li>
 <li>Choose <strong>Allow the connection</strong>, select the profile used by the trusted LAN, and give the rule a descriptive name. Repeat on the machine that needs an inbound rule, then rerun the GEX tests. <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure#create-an-inbound-port-rule">Microsoft's inbound port rule instructions</a></li>
 </ol>
-<h2 id="4-register-clients-on-the-master">4. Register clients on the master<a class="headerlink" href="#4-register-clients-on-the-master" title="Permanent link">¶</a></h2>
+<h2 id="4-register-clients-on-the-master-for-specific-client-targeting-by-the-master">4. Register clients on the master (for specific client targeting by the master)<a class="headerlink" href="#4-register-clients-on-the-master-for-specific-client-targeting-by-the-master" title="Permanent link">¶</a></h2>
 <ol>
 <li>Open <strong>Tools &gt; Remote Clients…</strong> on the master. You can also use <strong>Manage Remote Clients…</strong> in the <strong>Remote Control</strong> options or <strong>Edit Clients…</strong> in a client checklist.</li>
 <li>Click <strong>Refresh GEX Clients</strong> to ask running GEX instances to register. To save one directly, enter its IPv4 address or network name and click <strong>Add</strong>. <strong>Auto Discover</strong> adds computers found by Windows Network Discovery, so use <strong>Check Broadcast</strong> to verify which ones are responding as GEX clients.</li>
@@ -907,6 +1020,28 @@
 <li>Use a remote-capable action such as <strong>Map to Keyboard/Mouse Ex</strong> or <strong>Vjoy Remap</strong>. For an initial test, leave <strong>Custom output configuration</strong> off in <strong>Map to Keyboard/Mouse Ex</strong> so it uses the profile routing and default <strong>Any</strong> client target. For an existing mapping with custom output, check its local and remote settings and ensure its target list includes the client.</li>
 <li>For example, map a spare button to type a letter with <strong>Map to Keyboard/Mouse Ex</strong>. Open a text editor on the client, set the master profile to <strong>Remote</strong> with that client selected, then press the mapped button. Confirm the letter appears on the client. Trigger <strong>Mute all</strong>, then press the mapped button again to confirm that remote output stops.</li>
 </ol>
+<h2 id="8-subsequent-client-setup">8. Subsequent client setup<a class="headerlink" href="#8-subsequent-client-setup" title="Permanent link">¶</a></h2>
+<ol>
+<li>Start each client with a <strong>blank profile</strong></li>
+<li>Ensure the toolbar shows a green status for the remote control feature.</li>
+<li>Start the profile on the client.</li>
+</ol>
+<h2 id="9-subsequent-master-instance-setup">9. Subsequent Master instance setup<a class="headerlink" href="#9-subsequent-master-instance-setup" title="Permanent link">¶</a></h2>
+<ol>
+<li>Start the master instance with the profile setup for remote control.</li>
+<li>Ensure the toolbar shows a gree status for the master control feature.</li>
+<li>Start the profile.</li>
+<li>Use profile mappings to enable remote control using the Remote Control action or the Virtual Remap action or the Control Action.</li>
+</ol>
+<h2 id="status-bar">Status bar<a class="headerlink" href="#status-bar" title="Permanent link">¶</a></h2>
+<h3 id="remote-control-disabled">Remote control disabled<a class="headerlink" href="#remote-control-disabled" title="Permanent link">¶</a></h3>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/remote_control_off.png" data-desc-position="bottom"><img alt="Remote control disabled" src="../assets/remote_control_off.png"></a></p>
+<h3 id="remote-control-master">Remote control master<a class="headerlink" href="#remote-control-master" title="Permanent link">¶</a></h3>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/remote_control_master_on.png" data-desc-position="bottom"><img alt="Remote control disabled" src="../assets/remote_control_master_on.png"></a></p>
+<h3 id="remote-control-client">Remote control client<a class="headerlink" href="#remote-control-client" title="Permanent link">¶</a></h3>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/remote_control_client_on.png" data-desc-position="bottom"><img alt="Remote control disabled" src="../assets/remote_control_client_on.png"></a></p>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">¶</a></h2>
+<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../assets/remote_control_setup.png" data-desc-position="bottom"><img alt="Remote Control" src="../assets/remote_control_setup.png"></a></p>
 
 
 

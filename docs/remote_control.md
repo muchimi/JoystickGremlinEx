@@ -2,9 +2,22 @@
 
 ## General Context
 
-GEX lets you send outputs from its mappings to other GEX clients on the **local** network.  
+GEX lets you send outputs from its mappings to other GEX clients on the **local** network.  Supported outputs include any axis, button, hat, keyboard and mouse.  GEX also has a special KVM Mode where exclusive output of keyboard/mouse goes to clients.
+
+GEX uses a UDP port to communicated on the local network.  The UDP port defaults to **6012** and must be open on each machine to receive. This can be done within GEX, and usually this is also setup automatically for you as you run the application as UAC will ask for permissions.  This may not work depending on machine policies, so GEX offers a manual way to do this as well in case it's needed.
 
 Use one GremlinEx (GEX) instance as the **master** to send mapped output to one or more **clients**. Start with all machines on the same trusted LAN, running the same GEX build. Use the same **Broadcast Port** on each machine. The default is UDP `6012`.
+
+### Important
+
+- There can only be one master on the local network at a time to avoid problems.
+- You can have as many clients as you need.
+- Each client must have outputs defined for joystick, buttons and axes matching the number of devices used for output on the master profile.  If you have three (3) output joysticks and (1) gamepad on the master, you need to duplicate this on the client.
+- The clients must be running with a **blank profile**.
+- The master must be running with the master profile configured for remote output, meaning, it has mappings that manage the behavior of the remote control, such as, when GEX sends the output locally, or remotely, or to both at the same time.
+- Data is sent real time with low latency so there is no perceptible delay on the clients.
+- More than one client can receive data at the same time if the client is not specifically targeted for output (broadcast mode).
+- Versions usually do not matter but should be identical to be ensure there is feature parity.
 
 ## 1. Set up the master
 
@@ -16,11 +29,12 @@ Use one GremlinEx (GEX) instance as the **master** to send mapped output to one 
 
 ## 2. Set up each receiving client
 
-1. Open **Tools > Options > Remote Control**. Enable **Enable control of this client by a remote server**. Clear **Current host is the master GEX server** if it is checked. GEX switches off **Enable server broadcast** when you enable the receiving role.
-2. Give the client a recognizable **Custom Client Name**, such as `Flight Display`, or use its Windows host name.
-3. Set **Broadcast Port** to the same value as the master. Leave **All IPs** checked on the client.
-4. Under **GEX connection test**, click **Discover…** next to **GEX Master Server IPv4**. Choose the master computer and its LAN IPv4 address, then click **Select** to save it. If Windows Network Discovery does not list the master, use the **Select** button next to the address field, enter the address in **Server IPv4**, and click **OK**.
-5. Create or load a profile on the client. A blank profile works. Activate the profile when you're ready to receive output and keep it running while you use remote control. For vJoy output, configure the receiving vJoy device with the same device ID and corresponding axes, buttons, and hats used by the master mapping.
+1. Use a **blank profile** on the client.
+2. Open **Tools > Options > Remote Control**, enable **Enable control of this client by a remote server**. Clear **Current host is the master GEX server** if it is checked. GEX switches off **Enable server broadcast** when you enable the receiving role.
+3. Give the client a recognizable **Custom Client Name**, such as `Flight Display`, or use its Windows host name.
+4. Set **Broadcast Port** to the same value as the master. Leave **All IPs** checked on the client.
+5. Under **GEX connection test**, click **Select** next to **GEX Master Server IPv4**. Enter the master's LAN IPv4 address in **Server IPv4**, or use the network browse button to find it, then click **OK** to save the selection.
+6. Create or load a profile on the client. A blank profile works. Activate the profile when you're ready to receive output and keep it running while you use remote control. For vJoy output, configure the receiving vJoy device with the same device ID and corresponding axes, buttons, and hats used by the master mapping.
 
 ## 3. Check connectivity and open the firewall if needed
 
@@ -42,7 +56,7 @@ Use one GremlinEx (GEX) instance as the **master** to send mapped output to one 
 3. On **Scope**, use the master's IPv4 address as the **remote** IP on a client. You can scope the client's **local** IP to the multicast group `224.3.29.72`. On the master, leave the **local** addresses unrestricted to cover unicast and multicast and set the **remote** addresses to the participating client IPv4 addresses.
 4. Choose **Allow the connection**, select the profile used by the trusted LAN, and give the rule a descriptive name. Repeat on the machine that needs an inbound rule, then rerun the GEX tests. [Microsoft's inbound port rule instructions](https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure#create-an-inbound-port-rule)
 
-## 4. Register clients on the master
+## 4. Register clients on the master (for specific client targeting by the master)
 
 1. Open **Tools > Remote Clients…** on the master. You can also use **Manage Remote Clients…** in the **Remote Control** options or **Edit Clients…** in a client checklist.
 2. Click **Refresh GEX Clients** to ask running GEX instances to register. To save one directly, enter its IPv4 address or network name and click **Add**. **Auto Discover** adds computers found by Windows Network Discovery, so use **Check Broadcast** to verify which ones are responding as GEX clients.
@@ -73,3 +87,34 @@ On the master, open the profile's **Profile Settings** tab and find **Remote Con
 1. Run the profile on the master and a profile on each receiving client.
 2. Use a remote-capable action such as **Map to Keyboard/Mouse Ex** or **Vjoy Remap**. For an initial test, leave **Custom output configuration** off in **Map to Keyboard/Mouse Ex** so it uses the profile routing and default **Any** client target. For an existing mapping with custom output, check its local and remote settings and ensure its target list includes the client.
 3. For example, map a spare button to type a letter with **Map to Keyboard/Mouse Ex**. Open a text editor on the client, set the master profile to **Remote** with that client selected, then press the mapped button. Confirm the letter appears on the client. Trigger **Mute all**, then press the mapped button again to confirm that remote output stops.
+
+## 8. Subsequent client setup
+
+1. Start each client with a **blank profile**
+2. Ensure the toolbar shows a green status for the remote control feature.
+3. Start the profile on the client.
+
+## 9. Subsequent Master instance setup
+
+1. Start the master instance with the profile setup for remote control.
+2. Ensure the toolbar shows a gree status for the master control feature.
+3. Start the profile.
+4. Use profile mappings to enable remote control using the Remote Control action or the Virtual Remap action or the Control Action.
+
+## Status bar
+
+### Remote control disabled
+
+![Remote control disabled](assets/remote_control_off.png)
+
+### Remote control master
+
+![Remote control disabled](assets/remote_control_master_on.png)
+
+### Remote control client
+
+![Remote control disabled](assets/remote_control_client_on.png)
+
+## Example
+
+![Remote Control](assets/remote_control_setup.png)
