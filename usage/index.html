@@ -6261,6 +6261,8 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <p>Check that the AFCS output destination does not also receive a conflicting direct mapping. For a simpler two-axis merge, use the merge controls in <a href="../actions/map_to_vjoy_user_guide/#merge-axes">Map to vJoy</a>.</p>
 <h3 id="reordering-of-devices">Reordering of devices<a class="headerlink" href="#reordering-of-devices" title="Permanent link">¶</a></h3>
 <p>Microsoft Windows does not currently offer a way to set the order of devices connected to a computer, and furthermore, this order may change depending on connections/disconnections, reboot status, and the order of detection by the operating system.  To this end, GremlinEx offers a way to manually re-order devices as displayed in GremlinEx for convenience via drag and drop of the device tabs.   The order only exists within GremlinEx and it does not change the device order in the operating system.</p>
+<p>The default order is joysticks and gamepads, enabled virtual inputs, special devices, then <strong>Settings</strong> and <strong>Plugins</strong>. New devices join their default group. User reordering is preserved, including the positions of Settings and Plugins. These two tabs are always visible and cannot be filtered out. <strong>Default</strong> in Order Devices restores the default order.</p>
+<p><strong>Save</strong>, <strong>Load</strong>, and <strong>Load Last</strong> in Order Devices save or restore device visibility only. Loading a visibility layout or changing visibility checkboxes does not change the tab order. Dragging device rows explicitly changes the order.</p>
 <h2 id="inputs_1">Inputs<a class="headerlink" href="#inputs_1" title="Permanent link">¶</a></h2>
 <p>An input is a source trigger definition.  When you press a button on a controller, move an axis, or press a key or click a mouse button, all these are input source triggers that can be mapped to a series of actions.</p>
 <p>Some hardware devices have a fixed set of inputs defined at the hardware (firmware) level.  Some controllers can change that information with their own programming, but for the purpose of GremlinEx, physical hardware defines a fixed number of axes, buttons and hats it can use for mapping.</p>
@@ -6406,6 +6408,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p>Holding the left-shift key down when in button detect mode temporarily enables axis detection as well as button detection.  This is the same as the first option in the table above.</p>
 <p>Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored.</p>
 <h2 id="remote-control">Remote control<a class="headerlink" href="#remote-control" title="Permanent link">¶</a></h2>
+<p>For the walkthrough, see <a href="../remote_control/">GremlinEx remote control setup</a>.</p>
 <p>GremlinEx can link multiple GremlinEx instances running on separate computers on the local network.  One instance (the broadcaster) can remote control another GremlinEx (client) as well as output to itself.  This is helpful to share a single set of controls or profile on a master machine to one or more client machines on the local network.</p>
 <p>As of T183, GremlinEx, actions that support remote output can control specific GremlinEx instances on the network, or any (all).</p>
 <table>
@@ -7640,6 +7643,7 @@ We would define a third state, called a_or_b, defined as:</p>
 <li>Save, start the profile, and press the source once. Adjust the timing for the target application after confirming the step order.</li>
 </ol>
 <p>Choose <strong>Toggle</strong> to start and stop a loop with successive triggers, <strong>Loop</strong> to repeat while held, <strong>Wiggle</strong> for variable step selection/timing, or <strong>Step</strong> to advance one step per trigger. Individual steps also have repeat controls. See the <a href="../containers/sequence_user_guide/">Sequence guide</a> for these modes, startup/resume settings, and worked examples.</p>
+<p>Use <strong>Import Text…</strong> in a Sequence container to build it from commands and <strong>Export Text…</strong> to copy its definition. <a href="../containers/sequence_user_guide/#import-and-export-sequence-text">Sequence text commands and examples</a></p>
 <h3 id="play-sounds-and-generated-speech">Play sounds and generated speech<a class="headerlink" href="#play-sounds-and-generated-speech" title="Permanent link">¶</a></h3>
 <p>Add <strong>Play Sound/TTS</strong> to an input for audio feedback. Select the mode before configuring its source:</p>
 <ol>

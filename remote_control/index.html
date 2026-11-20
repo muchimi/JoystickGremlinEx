@@ -1,0 +1,968 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/remote_control/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>GremlinEx remote control setup - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gremlinex-remote-control-setup" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GremlinEx remote control setup
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../actions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#general-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-set-up-the-master" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Set up the master
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-set-up-each-receiving-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Set up each receiving client
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-check-connectivity-and-open-the-firewall-if-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Check connectivity and open the firewall if needed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Check connectivity and open the firewall if needed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-gex-firewall-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use GEX Firewall Check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-an-inbound-rule-in-windows-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add an inbound rule in Windows manually
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-register-clients-on-the-master" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Register clients on the master
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-choose-what-happens-at-profile-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Choose what happens at profile start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-manage-clients-while-the-profile-is-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Manage clients while the profile is running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-verify-mapped-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Verify mapped output
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="gremlinex-remote-control-setup">GremlinEx remote control setup<a class="headerlink" href="#gremlinex-remote-control-setup" title="Permanent link">¶</a></h1>
+<h2 id="general-context">General Context<a class="headerlink" href="#general-context" title="Permanent link">¶</a></h2>
+<p>GEX lets you send outputs from its mappings to other GEX clients on the <strong>local</strong> network.  </p>
+<p>Use one GremlinEx (GEX) instance as the <strong>master</strong> to send mapped output to one or more <strong>clients</strong>. Start with all machines on the same trusted LAN, running the same GEX build. Use the same <strong>Broadcast Port</strong> on each machine. The default is UDP <code>6012</code>.</p>
+<h2 id="1-set-up-the-master">1. Set up the master<a class="headerlink" href="#1-set-up-the-master" title="Permanent link">¶</a></h2>
+<ol>
+<li>On the PC with the physical controls and mapping profile, open <strong>Tools &gt; Options &gt; Remote Control</strong>.</li>
+<li>Enable <strong>Enable server broadcast (must be enabled to control remote clients)</strong> and check <strong>Current host is the master GEX server</strong>. Enabling broadcast switches this instance to the sending role.</li>
+<li>Set <strong>Broadcast Port</strong> to <code>6012</code> or the UDP port you will use on every GEX instance.</li>
+<li>Run <code>ipconfig</code> on the master and record the <strong>IPv4 Address</strong> of the Ethernet or Wi-Fi adapter that shares the clients' LAN. For example, if the master's Ethernet adapter shows <code>192.168.1.20</code>, use that address on the clients.</li>
+<li>Leave <strong>All IPs</strong> checked to use the Windows default interface for outbound multicast. If the master has several adapters and Windows is using the wrong one, clear <strong>All IPs</strong>, click <strong>Select</strong> next to <strong>GEX Master Server IPv4</strong>, and choose the master's LAN adapter address from <strong>Available IPs</strong>.</li>
+</ol>
+<h2 id="2-set-up-each-receiving-client">2. Set up each receiving client<a class="headerlink" href="#2-set-up-each-receiving-client" title="Permanent link">¶</a></h2>
+<ol>
+<li>Open <strong>Tools &gt; Options &gt; Remote Control</strong>. Enable <strong>Enable control of this client by a remote server</strong>. Clear <strong>Current host is the master GEX server</strong> if it is checked. GEX switches off <strong>Enable server broadcast</strong> when you enable the receiving role.</li>
+<li>Give the client a recognizable <strong>Custom Client Name</strong>, such as <code>Flight Display</code>, or use its Windows host name.</li>
+<li>Set <strong>Broadcast Port</strong> to the same value as the master. Leave <strong>All IPs</strong> checked on the client.</li>
+<li>Under <strong>GEX connection test</strong>, click <strong>Discover…</strong> next to <strong>GEX Master Server IPv4</strong>. Choose the master computer and its LAN IPv4 address, then click <strong>Select</strong> to save it. If Windows Network Discovery does not list the master, use the <strong>Select</strong> button next to the address field, enter the address in <strong>Server IPv4</strong>, and click <strong>OK</strong>.</li>
+<li>Create or load a profile on the client. A blank profile works. Activate the profile when you're ready to receive output and keep it running while you use remote control. For vJoy output, configure the receiving vJoy device with the same device ID and corresponding axes, buttons, and hats used by the master mapping.</li>
+</ol>
+<h2 id="3-check-connectivity-and-open-the-firewall-if-needed">3. Check connectivity and open the firewall if needed<a class="headerlink" href="#3-check-connectivity-and-open-the-firewall-if-needed" title="Permanent link">¶</a></h2>
+<ul>
+<li><strong>From a client</strong>, click <strong>Test Connection</strong> under <strong>GEX connection test</strong>. Look for both <strong>GEX responded … over UDP</strong> and <strong>Server multicast reached this PC</strong>. The first confirms the direct UDP exchange with the master's IPv4 address. The second confirms that the master's multicast traffic reaches the client.</li>
+<li><strong>From the master</strong>, click <strong>Check Broadcast</strong> in the same section. GEX sends a multicast ping and lists the clients that reply with their names and addresses. Repeat after bringing additional clients online. If the Tools menu is disabled on the PC where you are testing, stop its profile to open Options. The network tests can run before you activate a profile.</li>
+<li>If the direct test fails, verify the master's IPv4 address, its broadcast setting, the matching UDP port, and the master's inbound firewall rule. If the direct test succeeds but multicast fails, check the master's outbound and the client's inbound firewall policy, the selected adapter, and whether the LAN permits multicast. Guest Wi-Fi, client isolation, and VPN routing can interfere.</li>
+</ul>
+<h3 id="use-gex-firewall-check">Use GEX Firewall Check<a class="headerlink" href="#use-gex-firewall-check" title="Permanent link">¶</a></h3>
+<ol>
+<li>On the affected PC, open <strong>Tools &gt; Options &gt; Remote Control &gt; Firewall Check...</strong>. Verify that <strong>UDP port</strong> matches <strong>Broadcast Port</strong>.</li>
+<li>On a client, select <strong>Allow from a specific host</strong> and confirm that <strong>Server IPv4</strong> contains the master's LAN address. The client rule covers inbound multicast to <code>224.3.29.72</code> from that address.</li>
+<li>On the master, select <strong>Allow from any host</strong> if using the built-in rule. The master needs to receive unicast test requests and broadcast-check replies from the clients. To scope that rule to the client addresses, use the Windows procedure below.</li>
+<li>If a rule is missing, click <strong>Check / Add Rule</strong> and approve the Windows elevation prompt if shown. <strong>Apply</strong> alone saves the port and host settings. If Windows reports a block rule or managed policy, review the rule or ask the administrator who manages it. Run both GEX tests again after the change.</li>
+</ol>
+<h3 id="add-an-inbound-rule-in-windows-manually">Add an inbound rule in Windows manually<a class="headerlink" href="#add-an-inbound-rule-in-windows-manually" title="Permanent link">¶</a></h3>
+<ol>
+<li>Run <code>wf.msc</code> to open <strong>Windows Defender Firewall with Advanced Security</strong>. Choose <strong>Inbound Rules &gt; New Rule &gt; Custom</strong>.</li>
+<li>On <strong>Program</strong>, choose the GEX executable if you want to limit the rule to that program. On <strong>Protocol and Ports</strong>, choose <strong>UDP</strong>, set <strong>Local port</strong> to the configured broadcast port, and leave <strong>Remote port</strong> at <strong>All Ports</strong>.</li>
+<li>On <strong>Scope</strong>, use the master's IPv4 address as the <strong>remote</strong> IP on a client. You can scope the client's <strong>local</strong> IP to the multicast group <code>224.3.29.72</code>. On the master, leave the <strong>local</strong> addresses unrestricted to cover unicast and multicast and set the <strong>remote</strong> addresses to the participating client IPv4 addresses.</li>
+<li>Choose <strong>Allow the connection</strong>, select the profile used by the trusted LAN, and give the rule a descriptive name. Repeat on the machine that needs an inbound rule, then rerun the GEX tests. <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure#create-an-inbound-port-rule">Microsoft's inbound port rule instructions</a></li>
+</ol>
+<h2 id="4-register-clients-on-the-master">4. Register clients on the master<a class="headerlink" href="#4-register-clients-on-the-master" title="Permanent link">¶</a></h2>
+<ol>
+<li>Open <strong>Tools &gt; Remote Clients…</strong> on the master. You can also use <strong>Manage Remote Clients…</strong> in the <strong>Remote Control</strong> options or <strong>Edit Clients…</strong> in a client checklist.</li>
+<li>Click <strong>Refresh GEX Clients</strong> to ask running GEX instances to register. To save one directly, enter its IPv4 address or network name and click <strong>Add</strong>. <strong>Auto Discover</strong> adds computers found by Windows Network Discovery, so use <strong>Check Broadcast</strong> to verify which ones are responding as GEX clients.</li>
+<li>Use the saved entries to target particular machines in a profile. <strong>Enable all</strong> and <strong>Select All</strong> can include eligible clients beyond the saved list.</li>
+</ol>
+<h2 id="5-choose-what-happens-at-profile-start">5. Choose what happens at profile start<a class="headerlink" href="#5-choose-what-happens-at-profile-start" title="Permanent link">¶</a></h2>
+<p>On the master, open the profile's <strong>Profile Settings</strong> tab and find <strong>Remote Control at Profile Start</strong>. Set <strong>Mode</strong> to choose the client filter and <strong>Routing</strong> to choose the output destination. Save the profile, then activate it to apply these settings. If it was already active, stop and restart it.</p>
+<table>
+<thead>
+<tr>
+<th>To start the profile with</th>
+<th>Mode</th>
+<th>Routing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Output on the master only</td>
+<td><strong>No change</strong></td>
+<td><strong>Local</strong></td>
+</tr>
+<tr>
+<td>Output on every eligible client</td>
+<td><strong>Enable all</strong></td>
+<td><strong>Remote</strong></td>
+</tr>
+<tr>
+<td>Output on the master and specific clients</td>
+<td><strong>Selection</strong> and check the clients</td>
+<td><strong>Both</strong></td>
+</tr>
+<tr>
+<td>Local output and every remote client muted</td>
+<td><strong>Mute all</strong></td>
+<td><strong>Local</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>No change</strong> keeps the current setting for that field. In <strong>Selection</strong>, use <strong>Solo</strong> to select one client or <strong>Select All</strong> to include all eligible clients, including newly discovered ones. Use <strong>Mute all</strong> for an explicit startup mute. An empty startup <strong>Selection</strong> enables all clients.</p>
+<h2 id="6-manage-clients-while-the-profile-is-running">6. Manage clients while the profile is running<a class="headerlink" href="#6-manage-clients-while-the-profile-is-running" title="Permanent link">¶</a></h2>
+<ol>
+<li>In the master profile, choose a joystick button, hat direction, or keyboard input and add the <strong>Remote Control</strong> action.</li>
+<li>Under <strong>Mode</strong>, choose <strong>Selection</strong> and check the desired clients, choose <strong>Enable all</strong>, or choose <strong>Mute all</strong>. Use <strong>No change</strong> to adjust routing while keeping the current client filter. In this action, <strong>Selection</strong> with an empty checklist is skipped at runtime.</li>
+<li>Under <strong>Routing</strong>, choose <strong>Local</strong>, <strong>Remote</strong>, <strong>Both</strong>, or <strong>No change</strong>. For example, choose <strong>Mute all</strong> with <strong>Both</strong> to mute the clients and keep local output enabled. Use a second action with <strong>Enable all</strong> and <strong>No change</strong> to restore the clients without changing routing.</li>
+<li>Choose when the action applies. With both behavior boxes clear, the filter stays in effect until another command changes it. <strong>Hold</strong> applies the client filter on press and restores the previous filter on release. <strong>Toggle on each trigger</strong> applies or removes a <strong>Selection</strong> on successive triggers. For toggling once per press, check <strong>Execute on press</strong> and clear <strong>Execute on release</strong>. A change requested under <strong>Routing</strong> stays in effect after releasing a held filter or toggling it off. Choose <strong>No change</strong> for a client-only override.</li>
+</ol>
+<h2 id="7-verify-mapped-output">7. Verify mapped output<a class="headerlink" href="#7-verify-mapped-output" title="Permanent link">¶</a></h2>
+<ol>
+<li>Run the profile on the master and a profile on each receiving client.</li>
+<li>Use a remote-capable action such as <strong>Map to Keyboard/Mouse Ex</strong> or <strong>Vjoy Remap</strong>. For an initial test, leave <strong>Custom output configuration</strong> off in <strong>Map to Keyboard/Mouse Ex</strong> so it uses the profile routing and default <strong>Any</strong> client target. For an existing mapping with custom output, check its local and remote settings and ensure its target list includes the client.</li>
+<li>For example, map a spare button to type a letter with <strong>Map to Keyboard/Mouse Ex</strong>. Open a text editor on the client, set the master profile to <strong>Remote</strong> with that client selected, then press the mapped button. Confirm the letter appears on the client. Trigger <strong>Mute all</strong>, then press the mapped button again to confirm that remote output stops.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
