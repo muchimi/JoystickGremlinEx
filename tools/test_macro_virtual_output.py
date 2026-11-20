@@ -31,6 +31,7 @@ from gremlin.types import DeviceType
 
 syslog = logging.getLogger("macro-output-checks")
 QWidget, QSize = QtWidgets.QWidget, QtCore.QSize
+QHorizontalLine = QtWidgets.QFrame
 get_text_width = lambda text: QtGui.QFontMetrics(APP.font()).horizontalAdvance(text)
 parse_guid, write_guid = UUID, str
 
@@ -91,6 +92,9 @@ def container(widgets=None, label=None, widget_only=False):
     return widget if widget_only else (widget, layout)
 
 
+getHContainer = getVContainer = container
+
+
 class Combo(QtWidgets.QComboBox):
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent)
@@ -137,11 +141,13 @@ for name in ("KeyAction", "MouseButtonAction", "MouseMotionAction", "PauseAction
 for name in ("QLineEdit", "QFloatLineEdit", "AbstractInputSelector", "VirtualDeviceSelector"):
     load("gremlin/ui/ui_common.py", name)
 QDataComboBox = Combo
+QDataRadioButton = Radio
 common = module("gremlin.ui.ui_common", QFloatLineEdit=QFloatLineEdit, QDataComboBox=Combo,
                 VirtualDeviceSelector=VirtualDeviceSelector, QDataRadioButton=Radio,
                 QHorizontalLine=QtWidgets.QFrame, NoKeyboardPushButton=QtWidgets.QPushButton,
                 getHContainer=container, getVContainer=container, clear_layout=clear_layout,
                 Buttons=NS(getListenWidget=lambda **kwargs: QtWidgets.QPushButton("Listen")))
+Buttons = common.Buttons
 load("gremlin/macro_handler.py", "MacroListModel")
 load("action_plugins/macro/__init__.py", "MacroActionEditor")
 load("action_plugins/macro/__init__.py", "Macro", {
@@ -337,7 +343,7 @@ class MacroVirtualOutputTests(unittest.TestCase):
         self.backends[self.maestro.device_guid].axis(1).value = 0.9
         self.action(value=0.5, axis_type="relative")(is_local=True, is_remote=True)
         self.assertEqual(self.backends[self.maestro.device_guid].axis(1).value, 1.0)
-        REMOTE.send_relative_axis.assert_called_once_with(1, 1, 0.5, None, None)
+        REMOTE.send_relative_axis.assert_called_once_with(self.maestro.device_guid, 1, 0.5, None, None)
 
     def test_remote_only_outputs_do_not_acquire_local_vjoy(self):
         for kind, value, method in ((InputType.JoystickButton, "press", "send_button"),
@@ -356,7 +362,7 @@ class MacroVirtualOutputTests(unittest.TestCase):
     def test_force_remote_relative_axis_keeps_routing_arguments(self):
         self.action(value=-0.5, axis_type="relative")(
             is_local=True, is_remote=False, force_remote=True, client_list=["peer"])
-        REMOTE.send_relative_axis.assert_called_once_with(1, 1, -0.5, ["peer"], True)
+        REMOTE.send_relative_axis.assert_called_once_with(self.maestro.device_guid, 1, -0.5, ["peer"], True)
         get_output_target.assert_not_called()
         VJoyProxy.assert_not_called()
 

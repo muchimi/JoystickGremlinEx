@@ -1689,6 +1689,11 @@ class Icons:
     """general UI icon handling"""
 
     @staticmethod
+    def deviceMappingIcon() -> QtGui.QIcon:
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        return gremlin.util.load_icon(f"{prefix}device_mapping.png")
+
+    @staticmethod
     def scanIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
             qta_color = Color().blueColor()
@@ -8147,6 +8152,13 @@ class QOnOffStatusfWidget(QWidget):
             self._button_widget.setPixmap(self._off_pixmap)
 
 
+def _viewer_event_source(device):
+    """Keep native input events out of a Maestro output-only layout."""
+    if device.data.get("maestro_key") and not device.input_enabled:
+        return EventSourceType.Virtual
+    return EventSourceType.Any
+
+
 class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
     """Displays the current state of all axes on a device (input viewer)"""
 
@@ -8200,7 +8212,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 axis_label = QtWidgets.QLabel(f"Axis {device.getAxisName(input_id)}")
                 self.index_map[linear_id] = input_id
                 values = (
-                    gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(device.device_guid, input_id))
+                    gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_virtual_output_axis(device, input_id))
                     if device.is_virtual
                     else sd.getAxisValues(device.device_guid, input_id)
                 )
@@ -8219,14 +8231,13 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 #     syslog.info(f"AxisCurrentState: virtual device {device.name} axis {device.getAxisName(input_id)} value: {str(values)}")
 
                 # hook the input both runtime and design time
-                source = EventSourceType.Any
                 jep.registerListenerUICallback(
                     device_guid=device.device_guid,
                     input_type=InputType.JoystickAxis,
                     input_id=input_id,
                     callback=self.process_event_ui,
                     mode=CallbackMode.All,
-                    source=source,
+                    source=_viewer_event_source(device),
                 )
 
                 if not self._readonly:
@@ -8593,7 +8604,7 @@ class HatState(QtWidgets.QGroupBox):
                 # trap interaction by the user
                 hat_widget.clicked.connect(self._hat_clicked)
             self._hat_map[input_id] = hat_widget
-            hat_widget.set_angle(gremlin.joystick_handling.get_hat_position(device.device_guid, input_id))
+            hat_widget.set_angle(gremlin.joystick_handling.get_hat_position(device, input_id))
             hat_layout.addWidget(hat_widget)
 
             jep.registerListenerUICallback(
@@ -8602,6 +8613,7 @@ class HatState(QtWidgets.QGroupBox):
                 input_id=input_id,
                 callback=self.process_event_ui,
                 mode=CallbackMode.All,
+                source=_viewer_event_source(device),
             )
 
         self.setLayout(hat_layout)
@@ -8695,7 +8707,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         astate = gremlin.event_handler.AxisState()
         for input_id in self.input_id_list:
             values = (
-                gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_axis(self.device_guid, input_id))
+                gremlin.event_handler.AxisValues(gremlin.joystick_handling.get_virtual_output_axis(self.device, input_id))
                 if self.device.is_virtual
                 else astate.getAxisValues(self.device_guid, input_id)
             )
@@ -9067,6 +9079,7 @@ class JoystickDeviceWidget(QWidget):
                     input_id=-1,  # all inputs of that type
                     callback=self._hat_update_ui,
                     mode=CallbackMode.All,
+                    source=_viewer_event_source(self._device),
                 )  # event is processed on the UI thread
 
         self._hooked = True
@@ -9646,6 +9659,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
                 input_id=input_id,
                 callback=self.process_event_ui,
                 mode=CallbackMode.All,
+                source=_viewer_event_source(device),
             )
 
             widget.setStyleSheet(css)
@@ -9655,7 +9669,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
                 widget.setCheckable(True)  # set checkable for state retention
 
             # read the current state
-            is_pressed = gremlin.joystick_handling.get_button(device.device_guid, input_id)
+            is_pressed = gremlin.joystick_handling.get_button(device, input_id)
             widget.setDown(is_pressed)
             widget.setChecked(is_pressed)
             widget._set_highlight_ui(is_pressed)
@@ -10836,12 +10850,13 @@ class QFlowLayout(QtWidgets.QLayout):
         return True
 
     def heightForWidth(self, width):
-        height = self._do_layout(QRect(0, 0, width, 0), True)
-        return height
+        margins = self.contentsMargins()
+        rect = QRect(0, 0, width, 0).marginsRemoved(margins)
+        return self._do_layout(rect, True) + margins.top() + margins.bottom()
 
     def setGeometry(self, rect):
         super().setGeometry(rect)
-        self._do_layout(rect, False)
+        self._do_layout(rect.marginsRemoved(self.contentsMargins()), False)
 
     def sizeHint(self):
         return self.minimumSize()
@@ -10849,17 +10864,11 @@ class QFlowLayout(QtWidgets.QLayout):
     def minimumSize(self):
         size = QSize()
 
-        lineHeight = 0
         for item in self._item_list:
-            item_size = item.minimumSize()
-            size = size.expandedTo(item_size)
-            lineHeight = max(lineHeight, item_size.height())
+            size = size.expandedTo(item.minimumSize())
 
-        size += QSize(
-            2 * self.contentsMargins().top(),
-            2 * self.contentsMargins().top() + lineHeight / 2,
-        )
-        return size
+        margins = self.contentsMargins()
+        return size + QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
 
     @property
     def lineCount(self):
@@ -10868,6 +10877,7 @@ class QFlowLayout(QtWidgets.QLayout):
     def _do_layout(self, rect, test_only):
         x = rect.x()
         y = rect.y()
+        right = rect.x() + rect.width()
         line_height = 0
         line_count = 1
         spacing = self.spacing()
@@ -10890,7 +10900,7 @@ class QFlowLayout(QtWidgets.QLayout):
                 style_spacing[style] = spaces
             space_x, space_y = spaces
             next_x = x + item_size.width() + space_x
-            if next_x - space_x > rect.right() and line_height > 0:
+            if next_x - space_x > right and line_height > 0:
                 x = rect.x()
                 y = y + line_height + space_y
                 next_x = x + item_size.width() + space_x
@@ -18988,12 +18998,12 @@ class QEnabledWidget(QDataPushButton):
 
     def __init__(
         self,
-        label: str = None,
+        label: str | None = None,
         enabled=True,
-        tooltip: str = None,
+        tooltip: str | None = None,
         data=None,
-        callback: Callable = None,
-        callbackEx: Callable = None,
+        callback: Callable | None = None,
+        callbackEx: Callable | None = None,
         parent=None,
     ):
         super().__init__(text=label, data=data, tooltip=tooltip, callback=callback, callbackEx=callbackEx, parent=parent)
@@ -19019,6 +19029,8 @@ class QFailoverWidget(QIconLabel):
         label: str = " Failover mode",
         tooltip: str = "VJOY devices shown in this selector will map to corresponding HID Maestro devices if they exist.\nThese VJOY devices are created by GEX but do not exist.",
         parent=None,
+        *,
+        visibility_provider: Callable[[], bool] | None = None,
     ):
         super().__init__(
             "fa5s.info-circle",
@@ -19030,24 +19042,118 @@ class QFailoverWidget(QIconLabel):
             parent=parent,
         )
 
-        # update visibility based on the current configuration
-        el = gremlin.event_handler.EventListener()
-        el.config_option_changed.connect(self._update_ui)
-        el.profile_loaded.connect(self._update_ui)
+        self._visibility_provider = visibility_provider
         self._initialized = True
+        el = gremlin.event_handler.EventListener()
+        el.config_option_changed.connect(self.refresh)
+        el.profile_loaded.connect(self.refresh)
+        if visibility_provider is not None:
+            el.device_initialized.connect(self.refresh)
+            el.device_change_event.connect(self.refresh)
 
-        self._update_ui()
+        self.refresh()
 
     def _cleanup_ui(self):
         if self._initialized:
             self._initialized = False
             el = gremlin.event_handler.EventListener()
-            el.config_option_changed.disconnect(self._update_ui)
-            el.profile_loaded.disconnect(self._update_ui)
+            el.config_option_changed.disconnect(self.refresh)
+            el.profile_loaded.disconnect(self.refresh)
+            if self._visibility_provider is not None:
+                el.device_initialized.disconnect(self.refresh)
+                el.device_change_event.disconnect(self.refresh)
+                self._visibility_provider = None
+
+    def refresh(self):
+        if not Shiboken.isValid(self):
+            self._cleanup_ui()
+            return
+        gremlin.util.InvokeUiMethod(self._refresh_ui)
+
+    def _refresh_ui(self):
+        if not self._initialized:
+            return
+        if self._visibility_provider is not None:
+            visible = self._visibility_provider()
+        else:
+            config = gremlin.config.Configuration()
+            visible = config.virtual_output_failover and config.vjoy_failover and not config.vjoy_installed
+        self.setVisible(visible)
+
+
+class QOperationDialog(BaseDialogUi):
+    """UI for performing an operation with a remember dialog."""
+
+    _operation_completed = QtCore.Signal(object, object)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setModal(True)
+        self._busy = False
+        self._completion = None
+        self._operation_completed.connect(self._completed, QtCore.Qt.ConnectionType.QueuedConnection)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.content_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.addLayout(self.content_layout)
+
+
+        self.status_widget = QDataLabel()
+        self.status_widget.setWordWrap(True)
+        self.status_widget.setTextFormat(QtCore.Qt.TextFormat.PlainText)
+        self.main_layout.addWidget(self.status_widget)
+
+        self.button_layout = QtWidgets.QHBoxLayout()
+        self.main_layout.addLayout(self.button_layout)
+
+
+
+    def _submit(self, operation, complete, message, *, suppress_device_changes=False, request_name: str | None = None):
+        from gremlin.worker import WorkManager
+
+        if self._busy:
+            return
+        self._busy = True
+        wm = WorkManager()
+
+        listener = None
+        if suppress_device_changes:
+            listener = gremlin.event_handler.EventListener()
+            listener.pushDeviceChangeSuppression()
+        self._completion = complete, listener
+        self.status_widget.setText(message)
+        self._update_ui()
+
+        def run():
+            result, error = None, None
+            try:
+                wm.pushCursor()
+                result = operation()
+            except Exception as exc:  # noqa: BLE001
+                syslog.exception("Dialog operation failed")
+                error = str(exc)
+            finally:
+                wm.popCursor()
+            self._operation_completed.emit(result, error)
+
+        try:
+            threading.Thread(target=run, name=request_name or "dialog operation", daemon=True).start()
+        except Exception as exc:  # noqa: BLE001
+            self._completed(None, str(exc))
+
+    @QtCore.Slot(object, object)
+    def _completed(self, result, error):
+        self._busy = False
+        (complete, listener), self._completion = self._completion, None
+        try:
+            if error:
+                self.status_widget.setText(f"The operation did not complete. {error}")
+            else:
+                complete(result)
+        finally:
+            if listener is not None:
+                listener.popDeviceChangeSuppression()
+            self._update_ui()
 
     def _update_ui(self):
-        if Shiboken.isValid(self):
-            config = gremlin.config.Configuration()
-            self.setVisible(config.virtual_output_failover and config.vjoy_failover and not config.vjoy_installed)
-        else:
-            self._cleanup_ui()
+        """override this method to update the UI based on the current state"""

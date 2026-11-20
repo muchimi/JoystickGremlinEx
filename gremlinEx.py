@@ -160,6 +160,7 @@ if os.path.isdir(install_path):
         pass
 
 syslog = logging.getLogger("system")
+REMOTE_CLIENT_ICON = "ph.cloud-arrow-down-bold"
 
 
 class GremlinUi(QRememberMainWindow):
@@ -379,7 +380,6 @@ class GremlinUi(QRememberMainWindow):
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)
-        el.remote_control_changed.connect(self._remote_control_changed)
 
         # hook input selection
         el.select_input.connect(self._select_input_handler)
@@ -1118,17 +1118,28 @@ class GremlinUi(QRememberMainWindow):
 
         menuTools.addSeparator()
 
+
         self._actionRemapProfileDevices = QtGui.QAction(
-            "Remap Profile Device...", self, triggered=self._remap_profile_devices_cb
+            Icons.deviceMappingIcon(), "Remap Profile Device...", self, triggered=self._remap_profile_devices_cb
         )
         self._actionRemapProfileDevices.setToolTip(
             "Replace saved profile device GUIDs with connected device identities"
         )
+
         menuTools.addAction(self._actionRemapProfileDevices)
         menuTools.addAction(self._actionTabDisplayDevice)
         menuTools.addAction(self._ationTabCopyAssignments)
         menuTools.addAction(self._actionTabClearMap)
         menuTools.addAction(self._actionMaestro)
+        action = QtGui.QAction("Remote Clients…", self, triggered=self._show_remote_clients)
+        action.setIcon(QtGui.QIcon("fa6s.network-wired"))
+        menuTools.addAction(action)
+
+
+    def _show_remote_clients(self):
+        from gremlin.ui.dialogs import show_remote_clients
+
+        show_remote_clients(self)
 
     def setMaestroEnabled(self, enabled: bool):
         """controls the UI enabling of Maestro functions"""
@@ -1181,13 +1192,14 @@ class GremlinUi(QRememberMainWindow):
         """tab context menu"""
         self._context_menu_tab_index = tab_index
         data = self.ui.devices_tab_header_widget.tabData(tab_index)
-        _tab_type = data.tab_type
 
         menu = QtWidgets.QMenu(self)
 
         menu.addAction(self.ui.actionReorderDevices)
         menu.addAction(self.ui.actionDeviceInformation)
         menu.addAction(self._ationTabCopyAssignments)
+        if data.tab_type in (TabDeviceType.Joystick, TabDeviceType.VjoyInput, TabDeviceType.MaestroInput):
+            menu.addAction(self._actionRemapProfileDevices)
 
         menu.addAction(self._actionTabClearMap)
 
@@ -1622,7 +1634,10 @@ class GremlinUi(QRememberMainWindow):
             el.remote_control_disable.emit()
 
         el.remote_control_changed.emit(enable)
-        el.remote_control_state_change.emit()
+
+    def toggle_server_control(self, enabled: bool):
+        """Allow a remote server to control this instance."""
+        self.config.enable_remote_control = enabled
 
     def abort(self, message=None):
         gremlin.util.InvokeUiMethod(self._abort_ui, message)  # run on UI thread
@@ -2249,9 +2264,8 @@ class GremlinUi(QRememberMainWindow):
         self.ui.actionBackupConfig.triggered.connect(self.backup_config)
         self.ui.actionRestoreConfig.triggered.connect(self.restore_config)
 
-        connected = gremlin.config.Configuration().remoteEnabled()
-        self.ui.actionToggleRemoteControl.setChecked(connected)
         self.ui.actionToggleRemoteControl.triggered.connect(self.toggle_remote)
+        self.ui.actionToggleServerControl.triggered.connect(self.toggle_server_control)
 
         # Tray icon
         self.ui.tray_icon.activated.connect(self._tray_icon_activated_cb)
@@ -2287,7 +2301,6 @@ class GremlinUi(QRememberMainWindow):
         self.status_bar_repeater_widget.setContentsMargins(5, 0, 5, 0)
 
         server_icon = "mdi6.wifi-arrow-up"
-        client_icon = "ph.cloud-arrow-down-bold"
         remote_icon = "mdi6.wifi-arrow-up"
         self.status_bar_server_widget = QOnOffStatusfWidget(
             on_icon=server_icon,
@@ -2296,8 +2309,8 @@ class GremlinUi(QRememberMainWindow):
             tooltip="Server state",
         )
         self.status_bar_client_widget = QOnOffStatusfWidget(
-            on_icon=client_icon,
-            off_icon=client_icon,
+            on_icon=REMOTE_CLIENT_ICON,
+            off_icon=REMOTE_CLIENT_ICON,
             icon_size=20,
             tooltip="Client state",
         )
@@ -5357,8 +5370,13 @@ class GremlinUi(QRememberMainWindow):
         remote_activate_icon.addPixmap(pixmap_off, QtGui.QIcon.Normal)
         remote_activate_icon.addPixmap(pixmap_on, QtGui.QIcon.Active, QtGui.QIcon.On)
 
-        # self.ui.actionToggleRemotecontrol.setCheckable(True)
         self.ui.actionToggleRemoteControl.setIcon(remote_activate_icon)
+
+        server_control_icon = QtGui.QIcon()
+        for state, color in ((QtGui.QIcon.State.Off, Color().offColor()), (QtGui.QIcon.State.On, Color().onColor())):
+            pixmap = load_icon(REMOTE_CLIENT_ICON, qta_color=color).pixmap(24, 24)
+            server_control_icon.addPixmap(pixmap, QtGui.QIcon.Mode.Normal, state)
+        self.ui.actionToggleServerControl.setIcon(server_control_icon)
 
         self.ui.actionOpen.setIcon(load_icon(profile_icon))
 
@@ -5649,14 +5667,6 @@ class GremlinUi(QRememberMainWindow):
         self._is_active = is_active
         self._update_status_bar(gremlin.remote.remote_control.to_state_event())
 
-    def _remote_control_changed(self, enabled: bool):
-        gremlin.util.InvokeUiMethod(self._remote_control_changed_ui, enabled)
-
-    def _remote_control_changed_ui(self, enabled: bool):
-        """called when remote control state changes"""
-        with QtCore.QSignalBlocker(self.ui.actionToggleRemoteControl):
-            self.ui.actionToggleRemoteControl.setChecked(enabled)
-
     def _maestro_service_state_changed(self, *args):
         self._update_status_bar()
 
@@ -5687,6 +5697,8 @@ class GremlinUi(QRememberMainWindow):
 
             server_state = gremlin.remote.remote_control.serverEnabled
             client_state = gremlin.remote.remote_control.clientEnabled
+            self.ui.actionToggleRemoteControl.setChecked(server_state)
+            self.ui.actionToggleServerControl.setChecked(client_state)
             remote_state = gremlin.remote.remote_control.is_remote
             self.status_bar_client_widget.setState(client_state)
             self.status_bar_client_widget.setToolTip(
@@ -7124,7 +7136,8 @@ if __name__ == "__main__":
         # event regsitry
         event_registry = gremlin.event_handler.EventRegistry()
 
-        # RPC server if enabled in configuration
+        # Allow RPC startup now that system logging and devices are initialized.
+        gremlin.remote.remote_server.enable_startup()
         if config.remoteEnabled():
             gremlin.remote.remote_server.start()
             gremlin.remote.remote_client.start()

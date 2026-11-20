@@ -609,6 +609,72 @@ class SelectUsedTests(unittest.TestCase):
                 self.assertEqual(self.viewer._stacked_widget.currentIndex(), 1)
 
 
+class ButtonViewerGeometryTests(unittest.TestCase):
+    def test_last_button_row_fits_after_resizing(self):
+        from test_qflowlayout import FLOW
+
+        with patch.dict(NAMESPACE, QSize=QtCore.QSize, QScrollAreaResizeCallback=QtWidgets.QScrollArea):
+            load("gremlin/ui/ui_common.py", {"getHContainer", "QScrollLayout"})
+            load("gremlin/ui/input_viewer.py", {"InputViewerArea"}, {"__init__", "add_widget"})
+            for vis in (VisualizationType.Button, VisualizationType.ButtonHat):
+                with self.subTest(visualization=vis):
+                    self.check_button_geometry(vis, FLOW)
+
+    def check_button_geometry(self, vis, flow_layout):
+        area = NAMESPACE["InputViewerArea"]()
+        area.resize(820, 300)
+        scroll = area.scroll_area
+        device = NS(button_count=128)
+        key = ("Stick", vis)
+        viewer = NAMESPACE["VisualizerWidget"](key, device, vis)
+        area.add_widget(key, viewer)
+        area.show()
+
+        content = QtWidgets.QWidget()
+        content_layout = QtWidgets.QHBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        buttons = hats = None
+        content.buttonWidget = lambda: buttons
+        content.hatWidget = lambda: hats
+        viewer.setWidget(content)
+        buttons = QtWidgets.QGroupBox("Buttons")
+        grid = flow_layout()
+        buttons.setLayout(grid)
+        for index in range(device.button_count):
+            button = QtWidgets.QPushButton(str(index + 1))
+            button.setFixedSize(38, 38)
+            grid.addWidget(button)
+
+        if vis == VisualizationType.ButtonHat:
+            hats = QtWidgets.QGroupBox("Hats")
+            hats.setFixedSize(150, 80)
+            content_layout.addWidget(NAMESPACE["getHContainer"](
+                [buttons, hats], widget_only=True, alignment=QtCore.Qt.AlignTop, right_stretch=False,
+            ))
+        else:
+            content_layout.addWidget(buttons)
+
+        try:
+            heights = []
+            for width in (600, 390, 700):
+                content.setFixedWidth(width)
+                for _ in range(6):
+                    APP.processEvents()
+                self.assertTrue(buttons.contentsRect().contains(button.geometry()))
+                scrollbar = scroll.verticalScrollBar()
+                scrollbar.setValue(scrollbar.maximum())
+                last_bottom = button.mapTo(scroll.viewport(), button.rect().bottomRight()).y()
+                self.assertIn(last_bottom, range(scroll.viewport().height()))
+                heights.append(viewer.height())
+
+            self.assertGreater(heights[1], heights[0])
+            self.assertLess(heights[2], heights[0])
+        finally:
+            area.close()
+            area.deleteLater()
+            flush_deletes()
+
+
 class MappedDeviceListTests(unittest.TestCase):
     def test_mapped_list_includes_all_tabs_and_refreshes_after_mapping_changes(self):
         devices = [NS(device_guid=name) for name in ("Stick", "Keyboard", "State", "Unused")]

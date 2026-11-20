@@ -19,19 +19,21 @@ from __future__ import annotations  # deprecated with python 3.14+
 import ctypes
 import enum
 import logging
+import os
 import threading
 import time
-import os
 from functools import cache
+from typing import ClassVar
 
-import gremlin.util
-from vjoy.vjoy_interface import VJoyState, VJoyInterface
-from gremlin.error import VJoyError
 import gremlin.spline
 import gremlin.types
-from gremlin.types import EventSourceType
+import gremlin.util
+from gremlin.error import VJoyError
 from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.types import EventSourceType
+import vjoy
+from vjoy.vjoy_interface import VJoyInterface, VJoyState
 
 syslog = logging.getLogger("system")
 
@@ -234,6 +236,11 @@ class Axis:
         :return position of the axis as a value between [-1, 1]
         """
         self.vjoy_dev.used()
+        return self.output_value
+
+    @property
+    def output_value(self) -> float:
+        """Read the retained position without marking the device used."""
         return self._value
 
     @value.setter
@@ -386,7 +393,8 @@ class Button:
             device_guid=self.device_guid,
             event_type = InputType.JoystickButton,
             identifier=self.button_id,
-            is_pressed = is_pressed
+            is_pressed=is_pressed,
+            source=EventSourceType.Virtual,
         )
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
@@ -409,10 +417,16 @@ class Hat:
     of the hat."""
 
     # Discrete directions, mapping (x, y) coordinates to vJoy values
-    to_discrete_direction = {(0, 1): 0, (1, 0): 1, (0, -1): 2, (-1, 0): 3, (0, 0): -1}
+    to_discrete_direction: ClassVar[dict[tuple[int, int], int]] = {
+        (0, 1): 0,
+        (1, 0): 1,
+        (0, -1): 2,
+        (-1, 0): 3,
+        (0, 0): -1,
+    }
 
     # Continuous directions, mapping 8-way *(x, y) coordinates to vJoy values
-    to_continuous_direction = {
+    to_continuous_direction: ClassVar[dict[tuple[int, int], int]] = {
         (0, 0): -1,
         (0, 1): 0,
         (1, 1): 4500,
@@ -424,7 +438,7 @@ class Hat:
         (-1, 1): 31500,
     }
 
-    to_continuous_position = {
+    to_continuous_position: ClassVar[dict[int, tuple[int, int]]] = {
         -1: (0, 0),
         0: (0, 1),
         4500: (1, 1),
@@ -453,7 +467,7 @@ class Hat:
         return Hat.direction_to_icon.get(position)
 
     # Mapping from event directions to names
-    direction_to_name = {
+    direction_to_name: ClassVar[dict[tuple[int, int], str]] = {
         (0, 0): "Center",
         (0, 1): "North",
         (1, 1): "North-east",
@@ -466,7 +480,7 @@ class Hat:
     }
 
     # Mapping from names to event directions
-    name_to_direction = {
+    name_to_direction: ClassVar[dict[str, tuple[int, int]]] = {
         "Center": (0, 0),
         "North": (0, 1),
         "North-east": (1, 1),
@@ -508,7 +522,7 @@ class Hat:
         """gets the positions for all hat positions"""
         return Hat.direction_to_icon
 
-    direction_to_icon = {
+    direction_to_icon: ClassVar[dict[tuple[int, int], str]] = {
         (0, 0): "mdi.image-filter-center-focus-strong",  # "Center",
         (0, 1): "mdi.arrow-up-thin-circle-outline",  # "North",
         (1, 1): "mdi.arrow-top-right-thin-circle-outline",  # "North-east",
@@ -527,7 +541,6 @@ class Hat:
         :param hat_id the id of the hat this object controls
         :param hat_type the type of hat being used, discrete or continuous
         """
-        import vjoy.vjoy
         self.vjoy_dev : vjoy.vjoy.Vjoy = vjoy_dev
         self.vjoy_id = vjoy_dev.vjoy_id
         self.hat_id = hat_id
@@ -560,7 +573,8 @@ class Hat:
             event_type = InputType.JoystickHat,
             identifier=self.hat_id,
             value = direction,
-            is_pressed= direction != (0,0)
+            is_pressed=direction != (0, 0),
+            source=EventSourceType.Virtual,
         )
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
@@ -627,7 +641,7 @@ class VJoy:
     keep_alive_timeout = 30 if __debug__ else 60*3
 
     # Axis name mapping
-    axis_equivalence = {
+    axis_equivalence: ClassVar[dict[AxisName, int]] = {
         AxisName.X: 1,
         AxisName.Y: 2,
         AxisName.Z: 3,
@@ -645,6 +659,17 @@ class VJoy:
         """
         self.vjoy_id = None
         self._enabled = True
+        self._acquired = False
+        self._axis_lookup = {}
+        self._axis_names = {}
+        self._vjoy_monitor = None
+        self._hat = {}
+        self._button = {}
+
+        config = gremlin.config.Configuration()
+        if not config.vjoy_installed:
+            self._enabled = False
+            raise VJoyError("vJoy is not available on this machine")
 
         if not VJoyInterface.vJoyEnabled():
             syslog.error("vJoy is not currently running")
@@ -654,7 +679,7 @@ class VJoy:
         # true if the device is successfully acquired by GremlinEx.
         # Was previously assigned True then immediately overwritten with False,
         # so acquired always reported False even after a successful acquisition.
-        self._acquired = False
+
 
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
             syslog.error(f"Requested vJoy device is not available - vid: {vjoy_id}")
@@ -669,8 +694,7 @@ class VJoy:
         self.pid = os.getpid()
 
         # Initialize all controls
-        self._axis_lookup = {}
-        self._axis_names = {}
+
         self._axis = self._init_axes()
         self._button = self._init_buttons()
         self._hat = self._init_hats()
@@ -998,7 +1022,7 @@ class VJoyMonitor:
         self._keep_alive_running = False
         self._keep_alive_started = False
         self._keep_alive_thread = None
-        
+
 
         self._vjoy_id_list = []
 

@@ -1,30 +1,28 @@
 from __future__ import annotations  # deprecated with python 3.14+
-import logging
-from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets, QtCore
+import logging
+
+from lxml import etree as ElementTree
+from PySide6 import QtCore, QtWidgets
+from shiboken6 import Shiboken
+
 import gremlin.actions
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
+import gremlin.input_item
 import gremlin.joystick_handling
 import gremlin.shared_state
-import gremlin.base_profile
-from gremlin.input_types import InputType
-from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
-import gremlin.input_item
-from gremlin.types import ControlAction
-from shiboken6 import Shiboken
-
-from gremlin.types import SyncMode
+from gremlin.input_types import InputType
+from gremlin.types import ControlAction, SyncMode
 from gremlin.ui.ui_common import (
     QDataComboBox,
     QExecuteWidget,
     QSyncModeWidget,
     getGridContainer,
 )
-
+from gremlin.util import safe_format, safe_read
 
 syslog = logging.getLogger("system")
 
@@ -125,7 +123,7 @@ class ControlWidget(gremlin.input_item.AbstractActionWidget):
 
             with QtCore.QSignalBlocker(self.device_widget):
                 set_index = None
-                for input_type in input_items.config.keys():
+                for input_type in input_items.config:
                     sorted_keys = sorted(input_items.config[input_type].keys())
                     for data_key in sorted_keys:
                         data = input_items.config[input_type][data_key]
@@ -298,9 +296,9 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
             action = self.action_data.action
             if device_guid in profile.devices:
                 dev = profile.devices[device_guid]
-                for mode_name in dev.modes.keys():
+                for mode_name in dev.modes:
                     mode = dev.modes[mode_name]
-                    for input_type in mode.config.keys():
+                    for input_type in mode.config:
                         item: gremlin.input_item.InputItem
                         for item in mode.config[input_type].values():
                             if item.input_id == input_id:
@@ -334,9 +332,9 @@ class Control(gremlin.input_item.AbstractAction):
     functor = ControlFunctor
     widget = ControlWidget
 
-    input_types = [InputType.JoystickButton, InputType.JoystickHat]
+    input_types = [InputType.JoystickButton, InputType.JoystickHat]  # noqa: RUF012
 
-    def __init__(self, parent, extra_data: dict = None):
+    def __init__(self, parent, extra_data: dict | None = None):
         super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.action: ControlAction = ControlAction.TTSAbort

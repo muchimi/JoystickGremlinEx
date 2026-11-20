@@ -2,6 +2,8 @@
 
 import ast
 from dataclasses import dataclass, field
+import enum
+import html
 import json
 import logging
 import os
@@ -56,8 +58,11 @@ def load(path, names, namespace, methods=None, base=None):
 
 class Events(QtCore.QObject):
     virtual_as_input_changed = QtCore.Signal()
+    remote_control_client_change = QtCore.Signal()
     profile_loaded = QtCore.Signal()
     tabs_loaded = QtCore.Signal()
+    config_option_changed = QtCore.Signal()
+    device_initialized = QtCore.Signal()
     device_change_event = QtCore.Signal()
 
 
@@ -110,9 +115,9 @@ class VirtualInputChecks(unittest.TestCase):
         )
         self.services = NS(
             config=NS(Configuration=lambda: self.config),
-            shared_state=NS(current_profile=None, is_joystick_suspended=False, is_running=False),
+            shared_state=NS(current_profile=None, is_joystick_suspended=False, is_running=False, is_dark_theme=False),
             event_handler=NS(EventListener=lambda: self.events),
-            util=NS(normalize_guid=str, is_ui_thread=lambda: True),
+            util=NS(normalize_guid=str, is_ui_thread=lambda: True, load_icon=lambda name: QtGui.QIcon(str(ROOT / "icons" / name))),
         )
         self.ui = dict(
             COMMON,
@@ -126,7 +131,7 @@ class VirtualInputChecks(unittest.TestCase):
             Widget=QtWidgets.QWidget,
             EventListener=lambda: self.events,
             QInfoBox=QtWidgets.QLabel,
-            QFailoverWidget=lambda: QtWidgets.QLabel("Virtual output failover"),
+            QFailoverWidget=lambda **kwargs: QtWidgets.QLabel("Virtual output failover"),
             safe_format=lambda value, cast: str(value),
             safe_read=lambda node, key, cast, default: (
                 (node.get(key).casefold() == "true" if cast is bool else cast(node.get(key)))
@@ -136,6 +141,8 @@ class VirtualInputChecks(unittest.TestCase):
             syslog=logging.getLogger("virtual-input-checks"),
             traceback=traceback,
         )
+        self.ui.update(enum=enum, ElementTree=etree)
+        load("gremlin/remote.py", {"ClientOperation", "OutputMode", "_client_address_key", "read_client_selection", "write_client_selection"}, self.ui)
         load("gremlin/base_profile.py", {"Settings"}, self.ui)
         load("gremlin/event_handler.py", {"JoystickState"}, self.ui)
         self.state = self.ui["JoystickState"]()
@@ -155,6 +162,7 @@ class VirtualInputChecks(unittest.TestCase):
             getConfigDevices=lambda: [],
             getDeviceName=str,
             getDeviceFromVjoyId=lambda index: self.devices[0] if index == 1 else None,
+            get_native_vjoy_devices=lambda: [dev for dev in self.devices if dev.device_type == DeviceType.VJoy and dev.connected],
             maestro_info_from_index=lambda index: next(
                 (dev for dev in self.devices if dev.device_type == DeviceType.Maestro and dev.virtual_id == index), None
             ),
@@ -180,6 +188,7 @@ class VirtualInputChecks(unittest.TestCase):
         for name in ("virtual_input_candidates", "virtual_input_devices"):
             setattr(self.services.joystick_handling, name, self.ui[name])
         load("gremlin/ui/ui_common.py", {"QDataCheckbox", "QScrollableWidget"}, self.ui)
+        load("gremlin/ui/ui_common.py", {"Icons"}, self.ui, {"deviceMappingIcon"})
         self.services.ui = NS(
             ui_common=NS(
                 QRememberDialog=self.ui["QRememberDialog"],
@@ -198,6 +207,8 @@ class VirtualInputChecks(unittest.TestCase):
         settings.vjoy_initial_values, settings.input_visible_map = {}, {}
         settings.startup_mode, settings.default_delay = None, 0.05
         settings.loadFilterDefaults = Mock()
+        settings.profile = NS(profile_file=None)
+        settings.reset()
         return settings
 
     def widget(self, name):
@@ -774,15 +785,66 @@ class VirtualInputChecks(unittest.TestCase):
         self.assertTrue(self.state.inputEnabled("Reconnected Maestro"))
         self.assertFalse(self.state.inputEnabled("Maestro 0"))
 
+    def test_device_mapping_shortcut_requires_failover_without_native_vjoy(self):
+        remap = Mock()
+        self.services.shared_state.ui = NS(_remap_profile_devices_cb=remap)
+        widget = self.widget("VirtualAsInputWidget")
+        button = widget._device_mapping_button
+        self.assertTrue(button.isHidden())
+
+        self.config.virtual_output_failover = True
+        self.events.config_option_changed.emit()
+        self.assertTrue(button.isHidden())
+
+        native_vjoy = self.devices[0]
+        native_vjoy.connected = False
+        self.events.device_change_event.emit()
+        self.assertFalse(button.isHidden())
+
+        self.devices.append(Device("Failover vJoy", DeviceType.VJoy, data={"failover": True}))
+        self.events.profile_loaded.emit()
+        self.assertFalse(button.isHidden())
+        button.click()
+        remap.assert_called_once_with()
+
+        native_vjoy.connected = True
+        self.events.device_initialized.emit()
+        self.assertTrue(button.isHidden())
+
+        native_vjoy.connected = False
+        self.config.virtual_output_failover = False
+        self.events.config_option_changed.emit()
+        self.assertTrue(button.isHidden())
+
     def test_maestro_input_is_available_with_output_failover_enabled(self):
         self.config.virtual_output_failover = True
         load(
             "gremlin/ui/profile_settings.py",
             {"ProfileSettingsWidget"},
             self.ui,
-            {"_create_ui", "virtual_as_input_changed"},
+            {"_create_ui", "_startup_remote_clients_changed", "virtual_as_input_changed"},
             "Widget",
         )
+        load("gremlin/ui/ui_common.py", {"QDataRadioButton", "QDataRadioButtonGroup"}, self.ui)
+        load("gremlin/remote.py", {"SelectionBehavior", "RemoteClientOptionsWidget", "RemoteClientSelectionWidget", "remote_client_row_label"}, self.ui)
+        known = {"cockpit-pc": "Test & panel", "panel-pc": ""}
+        self.ui["remote_control"] = NS(getKnownClients=lambda: known.copy())
+        self.ui["html"] = html
+        self.ui["Color"] = lambda: NS(
+            cssButton=lambda: "",
+            normalColor=lambda: "#111111",
+            actionBackgroundColor=lambda: "#cccccc",
+            borderColor=lambda: "#111111",
+        )
+        self.ui["show_remote_clients"] = Mock()
+
+        def clear_rows(layout):
+            while layout.count():
+                row = layout.takeAt(0).widget()
+                row.hide()
+                row.deleteLater()
+
+        self.services.util.clear_layout = clear_rows
         self.services.shared_state.settings_tab_id = "settings"
         self.services.tabstate = NS(TabState=lambda: NS(getData=lambda key: NS(populateEnabled=True)))
         self.ui["DefaultModeSelector"] = lambda settings: QtWidgets.QLabel("Mode")
@@ -792,6 +854,7 @@ class VirtualInputChecks(unittest.TestCase):
         self.services.ui.ui_common.getVContainer = self.ui["getVContainer"]
         window = self.ui["ProfileSettingsWidget"]()
         window.profile_settings = self.settings
+        window.changed = Mock()
         window.scroll_layout = QtWidgets.QVBoxLayout(window)
         self.addCleanup(self.delete_widget, window)
         window._create_ui()
@@ -799,6 +862,53 @@ class VirtualInputChecks(unittest.TestCase):
         self.assertIsNotNone(group)
         self.assertIn((DeviceType.Maestro, 0), group._virtual_widgets)
         self.assertEqual(group.title(), "Virtual as Input")
+        options = window.findChild(self.ui["RemoteClientOptionsWidget"])
+        self.assertIs(options.operation, self.ui["ClientOperation"].EnableAll)
+        self.assertIs(options.output_mode, self.ui["OutputMode"].LocalOnly)
+        next(radio for radio in options.findChildren(QtWidgets.QRadioButton) if radio.text() == "Selection").click()
+        clients = window.findChild(self.ui["RemoteClientSelectionWidget"])
+        self.assertIsNotNone(clients)
+        panel = next(check for check in clients.findChildren(QtWidgets.QCheckBox) if check.accessibleName() == "Include panel-pc")
+        self.assertTrue(panel.isChecked())
+        panel.setChecked(False)
+        self.assertEqual(self.settings.startup_remote_clients, frozenset({"cockpit-pc"}))
+        self.assertTrue(any(
+            label.text() == "<b>cockpit-pc</b> — Test &amp; panel" and "border-radius: 6px" in label.styleSheet()
+            for label in clients.findChildren(QtWidgets.QLabel)
+        ))
+        buttons = {button.text(): button for button in clients.findChildren(QtWidgets.QPushButton)}
+        self.assertEqual(set(buttons), {"Select All", "Select None", "Edit Clients…", "Solo"})
+        buttons["Edit Clients…"].click()
+        self.ui["show_remote_clients"].assert_called_once_with(clients)
+
+        known["new-pc"] = ""
+        self.events.remote_control_client_change.emit()
+        self.assertEqual(self.settings.startup_remote_clients, frozenset({"cockpit-pc"}))
+        self.assertEqual(clients._clients.getLayout().count(), 3)
+
+        self.assertFalse(any(check.text() == "Hold" for check in options.findChildren(QtWidgets.QCheckBox)))
+        for label in ("Mute all", "Both"):
+            next(radio for radio in options.findChildren(QtWidgets.QRadioButton) if radio.text() == label).click()
+        self.assertIs(self.settings.startup_remote_operation, self.ui["ClientOperation"].DisableAll)
+        self.assertIs(self.settings.startup_remote_output_mode, self.ui["OutputMode"].LocalAndRemote)
+        self.assertTrue(clients.isHidden())
+        reopened = self.make_settings()
+        reopened.from_xml(self.settings.to_xml())
+        self.assertIs(reopened.startup_remote_operation, self.ui["ClientOperation"].DisableAll)
+        self.assertIs(reopened.startup_remote_output_mode, self.ui["OutputMode"].LocalAndRemote)
+        self.assertEqual(reopened.startup_remote_clients, frozenset({"cockpit-pc"}))
+
+    def test_new_and_legacy_profile_remote_startup_defaults(self):
+        self.assertIs(self.settings.startup_remote_operation, self.ui["ClientOperation"].EnableAll)
+        self.assertIs(self.settings.startup_remote_output_mode, self.ui["OutputMode"].LocalOnly)
+        self.assertIsNone(self.settings.startup_remote_clients)
+        saved = self.settings.to_xml()
+        self.assertEqual(saved.get("startup-remote-operation"), "enable-all")
+        self.assertEqual(saved.get("startup-remote-output-mode"), "local-only")
+        self.settings.from_xml(etree.fromstring(b'<settings><startup-remote-clients><client address="panel"/></startup-remote-clients></settings>'))
+        self.assertIs(self.settings.startup_remote_operation, self.ui["ClientOperation"].Select)
+        self.assertIs(self.settings.startup_remote_output_mode, self.ui["OutputMode"].Unchanged)
+        self.assertEqual(self.settings.startup_remote_clients, frozenset({"panel"}))
 
     def test_saved_tab_order_only_includes_selected_virtual_inputs(self):
         load("gremlinEx.py", {"GremlinUi"}, self.ui, {"_get_sorted_tab_map"}, "Widget")

@@ -11,11 +11,12 @@ import inspect
 import json
 import logging
 import os
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace as NS
 from typing import Callable
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import uuid
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -234,6 +235,46 @@ class StateVisualizerTests(unittest.TestCase):
         first._state_filter_widget.setCategory(None)
         first._state_filter_widget.setActiveAttributes(["tag"])
         self.assertEqual(list(first._state_buttons), ["alpha"])
+
+    def test_saved_search_combines_category_search_and_multiple_attributes_on_open(self):
+        STORE.states = {
+            "panel-ready": State("panel-ready", "Panel", ["Ready", "Live"]),
+            "panel-one": State("panel-one", "Panel", ["Ready"]),
+            "panel-other": State("panel-other", "Other", ["Ready", "Live"]),
+            "elsewhere": State("elsewhere", "Panel", ["Ready", "Live"]),
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            profile = Path(folder, "profile.xml")
+            profile.touch()
+            preset = {"search": "panel", "category": "Panel", "attributes": ["Ready", "Live"]}
+            Path(folder, "profile.filters.json").write_text(json.dumps({
+                "version": 2, "selected": "Panel", "presets": {"Panel": preset},
+            }), encoding="utf-8")
+            def swapext(path, ext, suffix):
+                return str(Path(path).with_suffix(suffix + ext))
+
+            with patch.object(SERVICES.shared_state.current_profile, "profile_file", str(profile)):
+                with patch.object(SERVICES.util, "swapext", swapext, create=True):
+                    widget = self.viewer()
+            self.assertEqual(list(widget._state_buttons), ["panel-ready"])
+            self.assertIn("showing 1 of 4", widget._state_filter_widget.count_widget.text())
+
+    def test_attribute_and_category_choices_refresh_without_clearing_other_filters(self):
+        STORE.states["alpha"] = State("alpha", "Panel", ["tag", "live"])
+        STORE.states["alpha2"] = State("alpha2", "Panel", ["tag"])
+        STORE.states["alpha3"] = State("alpha3", "Other", ["tag", "live"])
+        widget = self.viewer()
+        filters = widget._state_filter_widget
+        filters.setFilterOptions({"category": "Panel", "attributes": ["tag", "live"]})
+        self.assertEqual(list(widget._state_buttons), ["alpha"])
+
+        STORE.states["new"] = State("new", "Panel", ["tag", "live", "new"])
+        STORE.crud.emit()
+        self.assertEqual(list(widget._state_buttons), ["alpha", "new"])
+        self.assertIn("new", filters.attribute_actions)
+        filters.attribute_actions["new"].setChecked(True)
+        self.assertEqual(list(widget._state_buttons), ["new"])
+        self.assertEqual(filters.getFilterOptions()["category"], "Panel")
 
     def test_button_toggle_and_external_state_changes_stay_live_after_refresh(self):
         widget = self.viewer()

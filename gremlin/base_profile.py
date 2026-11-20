@@ -1025,12 +1025,17 @@ class Settings:
 
     def reset(self):
         """resets setting"""
+        from gremlin.remote import ClientOperation, OutputMode
+
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             syslog.info("profile settings reset...")
         self._virtual_as_input.clear()
         self.vjoy_initial_values.clear()
         self.startup_mode = None
+        self.startup_remote_clients: frozenset[str] | None = None
+        self.startup_remote_operation = ClientOperation.EnableAll
+        self.startup_remote_output_mode = OutputMode.LocalOnly
         self.default_delay = 0.05
         self.input_visible_map.clear()
 
@@ -1047,6 +1052,8 @@ class Settings:
 
         :return XML node containing the settings
         """
+        from gremlin.remote import ClientOperation, OutputMode, write_client_selection
+
         node = etree.Element("settings")
 
         # Startup mode
@@ -1054,6 +1061,12 @@ class Settings:
             mode_node = etree.Element("startup-mode")
             mode_node.text = safe_format(self.startup_mode, str)
             node.append(mode_node)
+
+        write_client_selection(node, "startup-remote-clients", self.startup_remote_clients)
+        if self.startup_remote_operation is not ClientOperation.Select:
+            node.set("startup-remote-operation", self.startup_remote_operation.value)
+        if self.startup_remote_output_mode is not OutputMode.Unchanged:
+            node.set("startup-remote-output-mode", self.startup_remote_output_mode.value)
 
         # Default delay
         delay_node = etree.Element("default-delay")
@@ -1122,6 +1135,11 @@ class Settings:
         :param node the node containing the settings data
         """
 
+        from gremlin.remote import ClientOperation, OutputMode, read_client_selection
+
+        self.startup_remote_clients = None
+        self.startup_remote_operation = ClientOperation.Select
+        self.startup_remote_output_mode = OutputMode.Unchanged
         if node is None:
             return
 
@@ -1131,6 +1149,10 @@ class Settings:
         self.startup_mode = None
         if node.find("startup-mode") is not None:
             self.startup_mode = node.find("startup-mode").text
+
+        self.startup_remote_clients = read_client_selection(node.find("startup-remote-clients"))
+        self.startup_remote_operation = safe_read(node, "startup-remote-operation", ClientOperation, None) or ClientOperation.Select
+        self.startup_remote_output_mode = safe_read(node, "startup-remote-output-mode", OutputMode, None) or OutputMode.Unchanged
 
         # Default delay
         self.default_delay = 0.05

@@ -799,11 +799,9 @@ class CallbackActions:
 
         assert callback is not None and callable(callback), "Callback must be provided and be a callable"
 
-        if release_evt not in self._registry:
-            self._registry[key] = []
         # Do not record the mode since we may want to run the release action
         # independent of a mode
-        self._registry[key].append(ButtonReleaseEntry(callback, release_evt))
+        self._registry.setdefault(key, []).append(ButtonReleaseEntry(callback, release_evt))
 
     def register_button_release(
         self,
@@ -813,6 +811,7 @@ class CallbackActions:
         is_local=True,
         is_remote=False,
         force_remote=False,
+        client_list=None,
     ):
         """Registers a physical and vjoy button pair for tracking.
 
@@ -834,19 +833,14 @@ class CallbackActions:
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         if verbose:
             syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {release_evt!s}")
-        if release_evt not in self._registry:
-            self._registry[key] = []
-            # self._registry_key_map[key] = release_evt
-
-        # Record current mode so we only release if we've changed mode
-        self._registry[key].append(
+        self._registry.setdefault(key, []).append(
             ButtonReleaseEntry(
-                lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
+                lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote, client_list),
                 release_evt,
             )
         )
 
-    def _release_callback_prototype(self, vjoy_input, is_local=False, is_remote=False, force_remote=False) -> None:
+    def _release_callback_prototype(self, vjoy_input, is_local=False, is_remote=False, force_remote=False, client_list=None) -> None:
         key, button_id = vjoy_input
         device = gremlin.joystick_handling.get_virtual_device(key)
         if device is None or not 0 < button_id <= device.button_count:
@@ -855,7 +849,7 @@ class CallbackActions:
         if is_local:
             gremlin.joystick_handling.set_button(key, button_id, False)
         if is_remote or force_remote:
-            gremlin.remote.remote_client.send_button(device.virtual_id, button_id, False, force_remote=force_remote)
+            gremlin.remote.remote_client.send_button(key, button_id, False, client_list=client_list, force_remote=force_remote)
 
     def _input_event_cb(self, event):
         """Runs callbacks associated with the given event.

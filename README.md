@@ -52,6 +52,29 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T106)
+
+#### This patch includes major enhancements related to remote control.
+
+- New: API (Remote): GEX now maintains an optional list of remote clients that persists across profiles. This allows the master GEX instance to define and keep a list of target clients on the local network for selective output purposes when the profile is in remote control mode. The list of clients is available through Tools > Remote Clients or the remote options tab in global options.  The clients that show in this list only need to be listed if the profile wants to target a specific client for output at runtime (both axis/button/hat, keyboard, mouse and KVM).  Leave blank for the current default behavior of prior versions.
+- New: Remote Action: This new mapping action allows an input to manipulate the output routing for remote clients and change the profile remote control setting at runtime.  The action includes a hold state for temporary behavior while pressed, and a toggle option.
+- New: UI (Profile Settings): The profile settings page gains a remote client panel that lets you determine the remote control behavior on profile start.
+- New: API: Added built-in buttons in GEX's remote options dialog to configure the Windows firewall, if needed, to support GEX networking.  This will prompt for elevated admin rights if needed, and will create an inbound rule to allow UDP traffice for GEX on the specified port (default 6012).
+- New: API: Added testing for connectivity from within GEX's remote options dialog box to test the configured parameters.
+- New: API: Added for server selection on a remote client (not the master system), the ability to select the master GEX machine from the list of discovered Windows machines on the local network.  This is to more quickly find the IP address for that host.
+- New: 1:1 mapper: added ability to do 1:1 mapping between gamepad device with the new Maestro virtual gamepads.
+- New: Map to Application action:  Contribution to GEX by @Jopie - thank you!  The version incorporated here was updated slightly for hardening and to account for some behaviors that came up through regression and functionality testing.
+
+
+- Change: UI: Added a new toolbar button to easily toggle server mode or client mode for GEX networking.  These two buttons are exclusive as master and client are exclusive, however each button can turn itself off as well.
+
+- Fix: Input Viewer: layout issue with the button repeaters and possible clipping of some of the visuals depending on scale and aspect ratio.
+- Fix: Input Viewer: input viewer does not update virtual devices when the data comes from the GEX master.
+- Fix: API (Remote): resolved an issue when a remote client was not finding the Maestro device to map to causing no output for that device.
+- Fix: UI (Input Viewer): state visualizer filter options can produce incorrect results.
+- Fix: Vjoy Remap action: when sync on start selected, did not always trigger the correct action if not a button/axis/hat action.
+- Fix: 1:1 mapping tool: resolved an issue with 1:1 mapping with the new virtual device API and added support for Maestro devices, both joystick and gamepad.
+
 ### (m77T105)
 - Change: UI:  Device Remap dialog gains a status icon indicating if the device is matched, not matched but a suitable remap was automatically map, and undetermined (no device was automatically derived).  
 - Change: UI:  Device Remap dialog: GEX will attempt to guess a device to remap for operating system GUID changes.

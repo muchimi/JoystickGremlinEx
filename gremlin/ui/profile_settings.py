@@ -20,6 +20,7 @@ from PySide6 import QtCore, QtWidgets
 import gremlin.event_handler
 import gremlin.input_item
 import gremlin.joystick_handling
+from gremlin.remote import RemoteClientOptionsWidget
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.config
@@ -174,6 +175,16 @@ class ProfileSettingsWidget(QDataWidget):
 
         mode_widget = DefaultModeSelector(self.profile_settings)
         delay_widget = DefaultDelay(self.profile_settings)
+        remote_clients_group = QtWidgets.QGroupBox("Remote Control at Profile Start")
+        remote_clients_layout = QtWidgets.QVBoxLayout(remote_clients_group)
+        self._remote_clients = RemoteClientOptionsWidget(
+            self.profile_settings.startup_remote_operation,
+            self.profile_settings.startup_remote_output_mode,
+            self.profile_settings.startup_remote_clients,
+            remote_clients_group,
+        )
+        self._remote_clients.changed.connect(self._startup_remote_clients_changed)
+        remote_clients_layout.addWidget(self._remote_clients)
 
         # Maestro input remains available when virtual output failover is on.
         virtual_as_input_widget = VirtualAsInputWidget(self.profile_settings)
@@ -198,7 +209,7 @@ class ProfileSettingsWidget(QDataWidget):
 
         self.scroll_layout.addWidget(label_widget)
 
-        widgets = [mode_widget, delay_widget, virtual_as_input_widget, grid_widget, label_widget]
+        widgets = [mode_widget, remote_clients_group, delay_widget, virtual_as_input_widget, grid_widget, label_widget]
 
         # holds all the inputs in a vertical box
         widget = getVContainer(widgets, widget_only=True)
@@ -209,6 +220,13 @@ class ProfileSettingsWidget(QDataWidget):
         self.scroll_layout.addWidget(container)
 
         self.scroll_layout.addStretch(1)
+
+    @QtCore.Slot()
+    def _startup_remote_clients_changed(self):
+        self.profile_settings.startup_remote_operation = self._remote_clients.operation
+        self.profile_settings.startup_remote_output_mode = self._remote_clients.output_mode
+        self.profile_settings.startup_remote_clients = self._remote_clients.selection
+        self.changed.emit()
 
 
 class DefaultDelay(QtWidgets.QWidget):
@@ -698,16 +716,41 @@ class VirtualAsInputWidget(QtWidgets.QGroupBox):
             else:
                 self.virtual_layout.addWidget(widget)
 
-        self.virtual_layout.addWidget(QFailoverWidget())
-        # Information label
+        self.virtual_layout.addWidget(QFailoverWidget(visibility_provider=self._needs_device_mapping))
         dialog_button = QDataPushButton(
             "Configure...", tooltip="Select vJoy and Maestro joysticks to use as inputs in this profile.", callback=self._open_dialog
         )
-        self.virtual_layout.addWidget(getHContainer([dialog_button, "||"], widget_only=True))
+        self._device_mapping_button = QDataPushButton(
+            "Device Mapping...", tooltip="Remap this profile's vJoy outputs to connected devices."
+        )
+        self._device_mapping_button.setIcon(Icons.deviceMappingIcon())
+        self._device_mapping_button.clicked.connect(self._open_device_mapping)
+        self.virtual_layout.addWidget(getHContainer([dialog_button, self._device_mapping_button, "||"], widget_only=True))
+        events = gremlin.event_handler.EventListener()
+        events.config_option_changed.connect(self._refresh_device_mapping_button)
+        events.device_initialized.connect(self._refresh_device_mapping_button)
+        events.device_change_event.connect(self._refresh_device_mapping_button)
+        events.profile_loaded.connect(self._refresh_device_mapping_button)
+        self._refresh_device_mapping_button()
 
         self.main_layout.addLayout(self.virtual_layout)
 
         self.main_layout.addStretch()
+
+    @staticmethod
+    def _needs_device_mapping():
+        return gremlin.config.Configuration().virtual_output_failover and not any(
+            not device.disabled and not device.data.get("failover", False)
+            for device in gremlin.joystick_handling.get_native_vjoy_devices()
+        )
+
+    @QtCore.Slot()
+    def _refresh_device_mapping_button(self):
+        self._device_mapping_button.setVisible(self._needs_device_mapping())
+
+    @QtCore.Slot()
+    def _open_device_mapping(self):
+        gremlin.shared_state.ui._remap_profile_devices_cb()
 
     def _edit_dialog(self, widget, device):
         """startup options for a given device"""

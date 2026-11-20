@@ -90,8 +90,8 @@ class KVMChecks(unittest.TestCase):
         self.joystick.get_hat_position.return_value = (0, 0)
         self.cursor = NS(GetCursorPos=Mock(return_value=(100, 200)))
         self.listener = NS(remote_control_state_change=Signal(), config_changed=Signal())
-        self.config = NS(verbose_mode_remote=False, enable_remote_broadcast=True)
-        self.config.remoteEnabled = lambda: self.config.enable_remote_broadcast
+        self.config = NS(verbose_mode_remote=False, enable_remote_broadcast=True, enable_remote_control=False)
+        self.config.remoteEnabled = lambda: self.config.enable_remote_broadcast or self.config.enable_remote_control
         self.services = NS(
             base_profile=NS(AbstractFunctor=BaseFunctor),
             input_item=NS(AbstractAction=BaseAction),
@@ -115,6 +115,7 @@ class KVMChecks(unittest.TestCase):
         self.control._is_remote = True
         self.control._is_paired = False
         self.control._global_remote_enabled = True
+        self.control._client_enabled = False
         remote_namespace["RemoteControl"] = lambda: self.control
         self.routing = object.__new__(remote_namespace["RemoteConfig"])
         self.routing._local = self.routing._local_enabled = True
@@ -331,6 +332,13 @@ class KVMChecks(unittest.TestCase):
         self.listener.config_changed.emit()
         self.functor._keyboard_handler(self.key())
         self.remote.send_kvm_keyboard.assert_called_once_with(0x41, 0x1E, 0, client_list=[0])
+
+    def test_client_role_does_not_activate_profile_broadcast(self):
+        self.assertTrue(self.control.is_remote)
+        self.config.enable_remote_broadcast = False
+        self.config.enable_remote_control = True
+        self.assertTrue(self.control.remoteEnabled())
+        self.assertFalse(self.control.is_remote)
 
     def test_remote_mouse_transforms_preserved_in_concurrent_mode(self):
         self.control.mode = VjoyAction.VJoyEnableLocalAndRemote

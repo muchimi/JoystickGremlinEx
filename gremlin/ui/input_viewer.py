@@ -317,8 +317,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         """Include connected inputs and outputs, retaining the user's tab order."""
         devices = [device for device in gremlin.joystick_handling.all_joystick_devices()
                    if device.connected and not device.disabled]
-        # Prefer the native input row carrying bridge metadata over its output
-        # summary or another native interface for the same Maestro service.
+        # Use the native row to identify duplicate interfaces for the same
+        # Maestro service. Display the bridge's output layout when it differs.
         devices.sort(key=lambda device: (
             bool(getattr(device, "input_enabled", False)),
             bool(getattr(device, "data", {}).get("maestro_key")),
@@ -350,7 +350,7 @@ class VisualizationSelector(QtWidgets.QWidget):
             if ((service_key and service_key in service_keys) or guids & identities
                     or (product is not None and product in local_products)):
                 continue
-            unique.append(device)
+            unique.append(output if output is not None else device)
             identities.update(guids)
             if product is not None:
                 local_products.add(product)
@@ -819,13 +819,13 @@ class VisualizerWidget(QtWidgets.QWidget):
 
             # give the widget a 100x expansion ratio so it fills most of the available space horizontally
             widget.setFixedWidth(600)
-            self._widget_container = getHContainer([(widget, 100), "||", close_widget], widget_only=True, alignment=QtCore.Qt.AlignTop)
+            widget_container = getHContainer([(widget, 100), "||", close_widget], widget_only=True, alignment=QtCore.Qt.AlignTop)
 
             container_widget = QtWidgets.QWidget()
             container_layout = QtWidgets.QVBoxLayout(container_widget)
             container_layout.setContentsMargins(0, 0, 0, 0)
             container_layout.addWidget(QHorizontalLine())
-            container_layout.addWidget(self._widget_container)
+            container_layout.addWidget(widget_container)
             self._container = container_widget
 
             if self._debug_visuals:
@@ -858,25 +858,8 @@ class VisualizerWidget(QtWidgets.QWidget):
             if self._widget and Shiboken.isValid(self._widget):
                 match self._vis:
                     case VisualizationType.Button | VisualizationType.ButtonHat:
-                        button_widget = self._widget.buttonWidget()
-                        w = button_widget.width() if button_widget else self._widget.width()
-
-                        count = self._device.button_count
-                        bw = 38 + 8  # width + margin of 4
-                        cols = max(1, w // bw)
-                        rows = (count + cols - 1) // cols
-                        h = rows * bw
-
-                        if self._vis == VisualizationType.ButtonHat:
-                            # account for hat visual
-                            hat_height = self._widget.hatWidget().height() if self._widget.hatWidget() else 0
-                            h = max(h, hat_height)
-
-                        self._widget_container.setFixedHeight(h + bw)
-                        self._container.updateGeometry()
-
-                        h = self._container.sizeHint().height()
-                        self.setFixedHeight(h)
+                        # SetFixedSize uses the flow layout's height-for-width through the nested layouts.
+                        self.main_layout.activate()
 
                     case VisualizationType.State:
                         # handle state widget
@@ -1928,6 +1911,7 @@ class InputViewerArea(QtWidgets.QWidget):
 
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QScrollLayout(self.scroll_widget)
+        self.scroll_layout.setVerticalSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetMinimumSize)
         self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self.scroll_area.setWidget(self.scroll_widget)

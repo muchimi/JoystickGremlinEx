@@ -5,18 +5,19 @@ Run: python tools/test_virtual_output_selectors.py
 
 import ast
 import copy
+import enum
 import json
 from pathlib import Path
 from types import SimpleNamespace as NS
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 import uuid
 
 from lxml import etree
 from PySide6 import QtCore, QtWidgets
 
 import test_macro_virtual_output as macro
-from gremlin.types import MergeAxisOperation, PluginVariableType
+from gremlin.types import MergeAxisOperation, PluginVariableType, TabDeviceType
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,7 +116,11 @@ for name in ("_new_id", "default_node_props", "default_node", "_normalize_node")
 ENV.update(NODE_KINDS=("input", "merge", "curve", "limiter", "deadzone", "override", "laglead", "output"),
            decode_when=lambda value: value if isinstance(value, dict) else {})
 load("gremlin/ui/afcs/runtime.py", "_write_output")
-Mapper = load("gremlin/import_profile.py", "MapperDialog", {"mapSingle"}, "object")
+ENV.update(enum=enum, TabDeviceType=TabDeviceType)
+load("gremlin/import_profile.py", "MapperMode")
+Mapper = load("gremlin/import_profile.py", "MapperDialog", {"mapSingle", "getInputMap", "create_1to1_mapping"}, "object")
+MapperTool = load("gremlin/import_profile.py", "Mapper", {"output_choices"}, "object")
+ActionRegistry = load("gremlin/plugin_manager.py", "ActionPlugins", {"repository", "_create_action_name_map", "get_class"}, "object")
 ENV["dinput"] = NS(GUID=uuid.UUID)
 macro.module("gremlin.plugin_manager")
 MergeUI = load("gremlin/ui/merge_axis.py", "MergeAxisUi", {"to_profile", "from_profile"}, "object")
@@ -575,12 +580,53 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         macro.gremlin.shared_state.current_profile = profile
         container = NS(add_action=Mock())
         create = Mock(return_value=NS(virtual_device=None))
+        create.name = "Virtual Remap"
+        create.aliases = ["Vjoy Remap"]
+        create.tag = "vjoyremap"
+        plugins = ActionRegistry()
+        plugins._plugins = {create.name: create}
+        plugins._name_to_type_map = {}
+        plugins._tag_to_type_map = {}
+        plugins._create_action_name_map()
         macro.gremlin.plugin_manager.ContainerPlugins = lambda: NS(repository={"basic": lambda owner: container})
-        macro.gremlin.plugin_manager.ActionPlugins = lambda: NS(repository={"Vjoy Remap": create})
+        macro.gremlin.plugin_manager.ActionPlugins = lambda: plugins
         Mapper().mapSingle(profile, uuid.UUID(int=3), "Default", macro.InputType.JoystickAxis, 2,
                            self.key, macro.InputType.JoystickAxis, 1)
         self.assertEqual(create.call_args.args[1]["vjoy_id"], 1)
         self.assertIs(create.return_value.virtual_device, self.maestro)
+
+    def test_one_to_one_target_picker_keeps_all_four_gamepads_separate(self):
+        gamepads = [macro.device(10 + index, f"gex-gp-{index}", macro.DeviceType.Maestro)
+                    for index in range(1, 5)]
+        self.devices.extend(gamepads)
+        for gamepad in gamepads:
+            self.targets[str(gamepad.device_guid)] = NS(device=gamepad)
+        with patch.object(macro.gremlin.joystick_handling, "get_output_target", macro.get_output_target):
+            choices = MapperTool.output_choices(self.vjoy)
+            self.assertTrue(all(choices[str(pad.device_guid)] is pad for pad in gamepads))
+            self.assertNotIn(self.native_key, choices)
+            self.assertIn(self.key, choices)
+
+    def test_one_to_one_gamepad_mapping_uses_full_bridge_layout(self):
+        source = macro.device(9, "Source gamepad", macro.DeviceType.Maestro, axes=range(1, 7), buttons=16)
+        source.getAxisInputIdList = lambda: list(range(1, 7))
+        output = macro.device(self.maestro.device_guid.int, "gex-gp-1", macro.DeviceType.Maestro, axes=range(1, 7), buttons=16)
+        self.targets[self.key] = NS(device=output)
+        model = Mock()
+        ui = NS(getActiveTabType=lambda: TabDeviceType.MaestroInput, getRegisteredWidget=lambda guid: NS(inputItemListModel=model))
+        mapper = Mapper()
+        mapper.mapSingle = Mock()
+        with (
+            patch.object(macro.gremlin.joystick_handling, "get_output_target", macro.get_output_target),
+            patch.object(macro.gremlin.shared_state, "ui", ui, create=True),
+            patch.object(macro.gremlin.shared_state, "current_mode", "Default", create=True),
+            patch.object(macro.gremlin.shared_state, "current_profile", Profile(), create=True),
+        ):
+            self.assertTrue(mapper.create_1to1_mapping(device=source, vjoy_id=self.key, rollover=ENV["MapperMode"].Stop))
+        calls = [call.kwargs for call in mapper.mapSingle.call_args_list]
+        self.assertEqual(len(calls), 23)
+        self.assertTrue(all(call["vjoy_id"] == self.key and call["input_id"] == call["vjoy_input_id"] for call in calls))
+        self.assertEqual(model.mock_calls, [call.pushSuspend(), call.popSuspend()])
 
 
 if __name__ == "__main__":

@@ -130,6 +130,11 @@ class Ui_Gremlin(object):
         self.actionToggleRemoteControl.setToolTip("Enable or disable remote control of GremlinEx clients")
         self.actionToggleRemoteControl.setObjectName("actionToggleRemote Control")
 
+        self.actionToggleServerControl = QtGui.QAction("Allow control by server", main_window)
+        self.actionToggleServerControl.setCheckable(True)
+        self.actionToggleServerControl.setToolTip("Allow a remote server to control this GremlinEx instance")
+        self.actionToggleServerControl.setObjectName("actionToggleServerControl")
+
         self.actionNewProfile = QtGui.QAction(main_window)
         self.actionNewProfile.setObjectName("actionNewProfile")
         self.actionSaveProfile = QtGui.QAction(main_window)
@@ -316,6 +321,7 @@ class Ui_Gremlin(object):
         # self.toolBar.addWidget(QtWidgets.QLabel(" "*5))
         # self.toolbar_options.addWidget(widget)
         self.toolbar_options.addAction(self.actionToggleRemoteControl)
+        self.toolbar_options.addAction(self.actionToggleServerControl)
         self.toolbar_options.addSeparator()
         self.toolbar_options.addAction(self.actionInputViewer)
         self.toolbar_options.addAction(self.actionOverlayControl)

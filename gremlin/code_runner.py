@@ -99,6 +99,8 @@ class CodeRunner:
 
         def collect_outputs(action, extra_data):
             if action.tag in ("remap", "vjoyremap"):
+                if action.tag == "vjoyremap" and gremlin.types.VjoyAction.is_command(getattr(action, "action_mode", None)):
+                    return True
                 if action.vjoy_input_id:
                     device = action.virtual_device
                     keys.add(
@@ -187,6 +189,9 @@ class CodeRunner:
         vs = gremlin.joystick_handling.VjoyStart()
         vs.reset()  # reset the vjoy start data
 
+        remote_control = gremlin.remote.remote_control
+        remote_control.applyClientOperation(settings.startup_remote_operation, settings.startup_remote_clients)
+        remote_control.applyOutputMode(settings.startup_remote_output_mode)
         el.profile_before_start.emit()  # tell components the profile is about to start
 
         ec = gremlin.execution_graph.ExecutionContext()

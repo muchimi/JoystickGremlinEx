@@ -3752,7 +3752,7 @@ class MaestroDialog(QRememberDialog):
             "Maestro bridge service is running." if connected else "Maestro bridge service is stopped or not connected."
         )
 
-    def _submit(self, operation, complete, message, *, suppress_device_changes=False):
+    def _submit(self, operation, complete, message, *, suppress_device_changes=False, request_name : str | None= None):
         if self._busy:
             return
         self._busy = True
@@ -3773,7 +3773,7 @@ class MaestroDialog(QRememberDialog):
             try:
                 wm.pushCursor()
                 result = operation()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 syslog.exception("MAESTRO: dialog operation failed")
                 error = str(exc)
             finally:
@@ -3782,7 +3782,7 @@ class MaestroDialog(QRememberDialog):
 
         try:
             threading.Thread(target=run, name="Maestro dialog request", daemon=True).start()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self._completed(None, str(exc))
 
     @QtCore.Slot(object, object)

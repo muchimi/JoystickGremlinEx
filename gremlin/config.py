@@ -15,27 +15,24 @@
 
 import json
 import logging
+import os
+import re
+import shutil
+import sys
 import threading
 import time
-import os
-import shutil
-import re
-import sys
 import traceback
-from PySide6 import QtCore, QtWidgets
-import gremlin.config
-import gremlin.input_types
+from collections import deque
+
 import filelock
+from psygnal import Signal
+from PySide6 import QtCore, QtWidgets
 
 import gremlin.shared_state
-from gremlin.types import VerboseMode, DeviceType
-from gremlin.input_types import InputType
-from psygnal import Signal
-from gremlin.util import safeReplace
-
-from collections import deque
 import gremlin.singleton_decorator
-
+from gremlin.input_types import InputType
+from gremlin.types import DeviceType, VerboseMode
+from gremlin.util import safeReplace
 
 syslog = logging.getLogger("system")
 
@@ -174,11 +171,10 @@ class Configuration(QtCore.QObject):
 
         fname = self.get_config()
         basedir = os.path.dirname(fname)
-        if not os.path.isdir(basedir):
-            if not gremlin.util.create_folder(basedir):
-                msg = f"CONFIG: Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually."
-                gremlin.util.display_error(msg)
-                syslog.error(msg)
+        if not os.path.isdir(basedir) and not gremlin.util.create_folder(basedir):
+            msg = f"CONFIG: Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually."
+            gremlin.util.display_error(msg)
+            syslog.error(msg)
 
         if not os.path.isfile(fname):
             # create a stub - first time run
@@ -238,7 +234,7 @@ class Configuration(QtCore.QObject):
         if not os.path.exists(folder):
             try:
                 os.makedirs(folder)
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 syslog.error("Unable to create data folder:")
                 syslog.error(f"{err}\n{traceback.format_exc()}")
 
@@ -248,8 +244,8 @@ class Configuration(QtCore.QObject):
 
     def backup(self) -> bool:
         """backs the config up"""
-        import gremlin.util
         import gremlin.ui.ui_common
+        import gremlin.util
 
         backup_fname = self.get_backup_config()
         try:
@@ -279,7 +275,7 @@ class Configuration(QtCore.QObject):
 
             self.save(backup_fname)
             gremlin.ui.ui_common.MessageBoxInfo(title="Backup Configuration", prompt="Backup saved")
-        except Exception:
+        except Exception:  # noqa: BLE001
             gremlin.ui.ui_common.MessageBoxWarning(
                 title="Backup Configuration",
                 prompt="The backup file could not be saved due to a file I/O error.",
@@ -300,7 +296,7 @@ class Configuration(QtCore.QObject):
                 syslog.info("CONFIG: backup restored")
                 self._reload()
                 gremlin.ui.ui_common.MessageBoxInfo(title="Restore Configuration", prompt="Backup restored")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 gremlin.ui.ui_common.MessageBoxWarning(
                     title="Restore Configuration",
                     prompt="The backup file could not be restored due to a file I/O error.",
@@ -351,7 +347,7 @@ class Configuration(QtCore.QObject):
             try:
                 os.makedirs(current_data_path)
                 self.saveVersion()
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 syslog.error(f"Unable to create data folder for current version: {err}")
                 sys.exit(-1)
 
@@ -375,7 +371,7 @@ class Configuration(QtCore.QObject):
                         self._last_version_path = self.data_path()
 
                     syslog.info(f"CONFIG: last version found: {self._last_version}")
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001
                     syslog.error(f"Unable to read last version file: {err}")
 
             # save the new version
@@ -393,7 +389,7 @@ class Configuration(QtCore.QObject):
             self.ensureProfilePath()
             with open(version_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"Unable to save version file: {err}")
 
     def data_path(self):
@@ -416,7 +412,7 @@ class Configuration(QtCore.QObject):
                     try:
                         os.makedirs(app_path)
 
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         print(
                             f"Error: unable to create application data folder: {app_path}",
                             file=sys.stderr,
@@ -463,19 +459,18 @@ class Configuration(QtCore.QObject):
         # default empty values while preserving a backup of the broken file.
         load_successful = False
         data = self._data if isinstance(self._data, dict) else self._init_data()
-        if os.path.isfile(fname):
-            if not self._is_blank(fname):
-                with open(fname, "r", encoding="utf-8") as hdl:
-                    try:
-                        data = json.load(hdl)
-                        load_successful = True
-                    except ValueError:
-                        self._archive_broken_config(fname, "invalid JSON while reloading config")
-                        data = self._data if isinstance(self._data, dict) else self._init_data()
-                    except Exception as err:
-                        syslog.warning(f"CONFIG: issue loading {fname}: {err}")
-                        self._archive_broken_config(fname, "read error while reloading config")
-                        data = self._data if isinstance(self._data, dict) else self._init_data()
+        if os.path.isfile(fname) and not self._is_blank(fname):
+            with open(fname, "r", encoding="utf-8") as hdl:
+                try:
+                    data = json.load(hdl)
+                    load_successful = True
+                except ValueError:
+                    self._archive_broken_config(fname, "invalid JSON while reloading config")
+                    data = self._data if isinstance(self._data, dict) else self._init_data()
+                except Exception as err:  # noqa: BLE001
+                    syslog.warning(f"CONFIG: issue loading {fname}: {err}")
+                    self._archive_broken_config(fname, "read error while reloading config")
+                    data = self._data if isinstance(self._data, dict) else self._init_data()
         if not load_successful:
             data = self._data if isinstance(self._data, dict) else self._init_data()
 
@@ -487,6 +482,10 @@ class Configuration(QtCore.QObject):
         for field in field_list:
             if field not in data:
                 data[field] = {}
+
+        # Honor the receive role when loading an older config with both roles enabled.
+        if data.get("allow_remote_control") and data.get("enable_remote_broadcast"):
+            data["enable_remote_broadcast"] = False
 
         self._data = data
 
@@ -538,7 +537,7 @@ class Configuration(QtCore.QObject):
                             syslog.warning(f"CONFIG: invalid JSON in profile config {fname}: {e}")
                             self._archive_broken_config(fname, "invalid JSON while reloading profile config")
                             data = previous_profile_data.copy()
-                        except Exception as err:
+                        except Exception as err:  # noqa: BLE001
                             syslog.warning(f"CONFIG: unable to read profile config {fname}: {err}")
                             self._archive_broken_config(fname, "read error while reloading profile config")
                             data = previous_profile_data.copy()
@@ -555,9 +554,9 @@ class Configuration(QtCore.QObject):
         # drop keys that other subsystems own (e.g. streamdeck_pages).
         self._last_profile_reload = time.time()
 
-    def save(self, fname: str = None, save_profile: bool = False):
-        import gremlin.util
+    def save(self, fname: str | None = None, save_profile: bool = False):
         import gremlin.event_handler
+        import gremlin.util
 
         if QtWidgets.QApplication.instance():
             gremlin.util.InvokeUiMethod(self._save_ui, fname, save_profile)  # ensure on UI thread
@@ -1481,8 +1480,30 @@ class Configuration(QtCore.QObject):
 
     @enable_remote_control.setter
     def enable_remote_control(self, value):
-        if isinstance(value, bool):
-            self._set_data("allow_remote_control", value)
+        self._set_remote_role("allow_remote_control", "enable_remote_broadcast", value)
+
+    @property
+    def remote_control_firewall_all_hosts(self) -> bool:
+        """returns whether remote control is allowed from all hosts"""
+        return self._get_data("remote_control_firewall_all_hosts", True)
+
+    @remote_control_firewall_all_hosts.setter
+    def remote_control_firewall_all_hosts(self, value: bool):
+        self._set_data("remote_control_firewall_all_hosts", value)
+
+    def apply_remote_control_firewall_settings(self, port: int, host: str | None):
+        """Save the rule scope and remote endpoint together."""
+        all_hosts = host is None
+        if (
+            self.remote_control_firewall_all_hosts == all_hosts
+            and self.server_port == port
+            and (all_hosts or self.broadcast_host_ip == host)
+        ):
+            return
+        self._data.update(server_port=port, remote_control_firewall_all_hosts=all_hosts)
+        if host is not None:
+            self._data["broadcast_host_ip"] = host
+        self.save()
 
     @property
     def enable_remote_broadcast(self):
@@ -1492,8 +1513,17 @@ class Configuration(QtCore.QObject):
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         """remote broadcast master switch enable"""
-        if isinstance(value, bool) and self._get_data("enable_remote_broadcast", False) != value:
-            self._set_data("enable_remote_broadcast", value)
+        self._set_remote_role("enable_remote_broadcast", "allow_remote_control", value)
+
+    def _set_remote_role(self, role, other_role, enabled):
+        if not isinstance(enabled, bool):
+            return
+        if enabled and self._get_data(other_role, False):
+            # Publish the role switch in one save so the listener sees a continuous remote session.
+            self._data.update({role: True, other_role: False})
+            self.save()
+        elif enabled != self._get_data(role, False):
+            self._set_data(role, enabled)
 
     @property
     def custom_host_name(self) -> str:

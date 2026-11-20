@@ -1728,7 +1728,7 @@ class ImportProfileDialog(QRememberDialog):
         :widget: the target mapped widget
 
         """
-        item = next((item for item in self._map.keys() if item.map_to_widget == widget), None)
+        item = next((item for item in self._map if item.map_to_widget == widget), None)
         return item
 
     def _create_target_selection_widget(self, device_type):
@@ -1792,7 +1792,7 @@ class ImportProfileDialog(QRememberDialog):
         if source_input_type == InputType.Keyboard:
             source_input_type = InputType.KeyboardLatched  # move to GremlinEX keyboard device
 
-        if target_device_guid not in self._target_input_item_map.keys():
+        if target_device_guid not in self._target_input_item_map:
             items = {}  # map of possible target input items keyed by input type
             for _, input_type in enumerate(InputType):
                 items[input_type] = []
@@ -1836,7 +1836,7 @@ class ImportProfileDialog(QRememberDialog):
                         if verbose:
                             syslog.info(f"\t\t\tDevice {info.name} -> axis count: {info.axis_count}")
                         if info.axis_count:
-                            for input_id in range(0, info.axis_count + 1):
+                            for input_id in range(info.axis_count + 1):
                                 item = ImportInputItem()
                                 if input_id == 0:
                                     item.input_name = "No Map"
@@ -1861,7 +1861,7 @@ class ImportProfileDialog(QRememberDialog):
                         if verbose:
                             syslog.info(f"\t\t\tDevice {info.name} -> button count: {info.button_count}")
                         if info.button_count:
-                            for input_id in range(0, info.button_count + 1):
+                            for input_id in range(info.button_count + 1):
                                 item = ImportInputItem()
                                 if input_id == 0:
                                     item.input_name = "No Map"
@@ -1885,7 +1885,7 @@ class ImportProfileDialog(QRememberDialog):
                             syslog.info(f"\t\t\tDevice {info.name} -> hat count: {info.hat_count}")
                         if info.hat_count:
                             items[input_type].append(self._no_map_item())
-                            for input_id in range(0, info.hat_count + 1):
+                            for input_id in range(info.hat_count + 1):
                                 item = ImportInputItem()
                                 if input_id == 0:
                                     item.input_name = "No Map"
@@ -1988,7 +1988,7 @@ class ImportProfileDialog(QRememberDialog):
         """maps the inputs one to one as best able to"""
         # get list of all input items
 
-        input_items = [item for item in self._map.keys() if isinstance(item, ImportInputItem)]
+        input_items = [item for item in self._map if isinstance(item, ImportInputItem)]
         input_item: ImportInputItem
         for input_item in input_items:
             widget = self._map[input_item]
@@ -2000,7 +2000,7 @@ class ImportProfileDialog(QRememberDialog):
                     device_guid = data.device_guid
                     # get the list of possible inputs for that device
                     items_map = self._target_input_item_map[device_guid]
-                    for input_type in items_map.keys():
+                    for input_type in items_map:
                         items = items_map[input_type]
                         if items:
                             first = next(
@@ -2020,14 +2020,14 @@ class ImportProfileDialog(QRememberDialog):
     @QtCore.Slot()
     def _cmd_deselect_all(self):
         """deselects all nodes in the tree"""
-        items = [item for item in self._map.keys() if isinstance(item, ImportItem)]
+        items = [item for item in self._map if isinstance(item, ImportItem)]
         for item in items:
             item.selected = False
 
     @QtCore.Slot()
     def _cmd_select_all(self):
         """selects all nodes in the tree"""
-        items = [item for item in self._map.keys() if isinstance(item, ImportItem)]
+        items = [item for item in self._map if isinstance(item, ImportItem)]
         for item in items:
             item.selected = True
 
@@ -2082,7 +2082,7 @@ class ImportProfileDialog(QRememberDialog):
         # only map the selected import items
 
         try:
-            import_items = [item for item in self._map.keys() if isinstance(item, ImportItem) and item.selected]
+            import_items = [item for item in self._map if isinstance(item, ImportItem) and item.selected]
             import_item: ImportItem
 
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
@@ -2108,7 +2108,7 @@ class ImportProfileDialog(QRememberDialog):
                 source_device_guid = import_item.device_guid
 
                 # get the modes mapped for this input
-                mode_items = [item for item in self._map.keys() if isinstance(item, ImportModeItem) and item.parent == import_item and item.selected]
+                mode_items = [item for item in self._map if isinstance(item, ImportModeItem) and item.parent == import_item and item.selected]
                 mode_item: ImportModeItem
                 for mode_item in mode_items:
                     # current modes in existing profile
@@ -2139,7 +2139,7 @@ class ImportProfileDialog(QRememberDialog):
                         processed_mode_set.add(source_mode)
 
                         # get the list of source items to map to the target device for the target mode
-                        input_items = [item for item in self._map.keys() if isinstance(item, ImportInputItem) and item.parent == mode_item and item.selected]
+                        input_items = [item for item in self._map if isinstance(item, ImportInputItem) and item.parent == mode_item and item.selected]
                         input_item: ImportInputItem
                         for input_item in input_items:
                             # get the target input for the source input
@@ -2305,10 +2305,23 @@ def import_profile():
 class Mapper:
     """mapping helper class"""
 
+    @staticmethod
+    def output_choices(source: dinput.DeviceSummary) -> dict[int | str, dinput.DeviceSummary]:
+        """List live joystick and gamepad outputs by provider-specific key."""
+        handling = gremlin.joystick_handling
+        choices = {}
+        devices = sorted(handling.virtual_devices(), key=lambda device: (device.name.casefold(), str(device.device_guid)))
+        for device in devices:
+            key = handling.virtual_device_key(device)
+            target = handling.get_output_target(key)
+            if target is not None and target.device.device_guid != source.device_guid:
+                choices[key] = device
+        return choices
+
     class MapperDialog(QRememberDialog):
         """dialog for mapping options"""
 
-        def __init__(self, device: dinput.DeviceSummary, parent=None):
+        def __init__(self, device: dinput.DeviceSummary, outputs, parent=None):
 
             super().__init__(self.__class__.__name__, parent=parent)
 
@@ -2322,12 +2335,6 @@ class Mapper:
 
             self.button_mapper = "Vjoy Remap"
             self.device = device
-
-            devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: (x.name, str(x.device_guid)))
-            if not devices:
-                # no vjoy devices to map
-                MessageBox(prompt="No virtual output devices found to map to")
-                self.close()
 
             # info
             self.container_info_widget = QtWidgets.QWidget()
@@ -2358,7 +2365,7 @@ class Mapper:
             self.container_button_layout = QtWidgets.QHBoxLayout(self.container_button_widget)
             self.container_button_layout.setContentsMargins(0, 0, 0, 0)
 
-            self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target Virtual Device:")
+            self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target joystick or gamepad:")
             self.cb_vjoy_device_selector = QDataComboBox()
 
             self.container_selector_widget = QtWidgets.QWidget()
@@ -2376,14 +2383,12 @@ class Mapper:
             self._vjoy_id = config.mapping_vjoy_id
 
             selected_index = None
-            index = 0
-            for dev in devices:
-                key = gremlin.joystick_handling.virtual_device_key(dev)
+            
+            for index, (key, dev) in enumerate(outputs.items()):
                 self.cb_vjoy_device_selector.addItem(dev.name, key)
                 self.vjoy_map[key] = dev
                 if key == self.vjoy_id:
                     selected_index = index
-                index += 1
 
             if selected_index is not None:
                 self.cb_vjoy_device_selector.setCurrentIndex(selected_index)
@@ -2439,11 +2444,11 @@ class Mapper:
             return widget
 
         @property
-        def vjoy_id(self) -> int:
+        def vjoy_id(self) -> int | str:
             return self._vjoy_id
 
         @vjoy_id.setter
-        def vjoy_id(self, value: int):
+        def vjoy_id(self, value: int | str):
             self._vjoy_id = value
             gremlin.config.Configuration().mapping_vjoy_id = value
 
@@ -2470,13 +2475,10 @@ class Mapper:
         @QtCore.Slot()
         def _execute_mapping(self):
             """executes the mapping"""
-            self.create_1to1_mapping(device = self.device,
-                                     vjoy_id = self.vjoy_id,
-                                     vjoy_mapper = self.button_mapper,
-                                     rollover =  self.mode)
-
-            self.accept()
-            # self.close()
+            if self.create_1to1_mapping(
+                device=self.device, vjoy_id=self.vjoy_id, vjoy_mapper=self.button_mapper, rollover=self.mode
+            ):
+                self.accept()
 
         def getInputMap(self, l1, l2, rollover: MapperMode):
             """builds a mapping of device input id to vjoy input id based on relative sizes, returns list of pairs"""
@@ -2513,7 +2515,7 @@ class Mapper:
             mode : str,
             input_type: InputType,
             input_id: int,
-            vjoy_id: int,
+            vjoy_id: int | str,
             vjoy_input_type: InputType,
             vjoy_input_id: int,
             vjoy_mapper: str = "Vjoy Remap",
@@ -2530,6 +2532,7 @@ class Mapper:
                 raise ValueError(f"Virtual output device is unavailable: {vjoy_id}")
             assert isinstance(vjoy_input_type, InputType), f"invalid vjoy input type: {vjoy_input_type}"
             assert isinstance(vjoy_input_id, int), f"invalid vjoy input id: {vjoy_input_id}"
+            action_factory = gremlin.plugin_manager.ActionPlugins().get_class(vjoy_mapper)
 
             input_item = registry.getInputItem(
                 device_guid=device_guid,
@@ -2540,14 +2543,12 @@ class Mapper:
             )
 
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
-            action_plugins = gremlin.plugin_manager.ActionPlugins()
 
             mode_node : gremlin.base_profile.ModeNode = profile.getModeNode(device_guid=device_guid, mode=mode)
 
 
             # add a basic container
             container = container_plugins.repository["basic"](input_item)
-            input_item.containers.append(container)
 
             extra_data = {
                 "input_item": input_item,
@@ -2573,8 +2574,9 @@ class Mapper:
                     pass
 
 
-            action = action_plugins.repository[vjoy_mapper](container, extra_data)
+            action = action_factory(container, extra_data)
             action.virtual_device = target_device
+            input_item.containers.append(container)
             container.add_action(action)
 
             # add the new input to the device
@@ -2585,13 +2587,13 @@ class Mapper:
         def create_1to1_mapping(
             self,
             device: dinput.DeviceSummary = None,
-            vjoy_id: int = 1,
+            vjoy_id: int | str = 1,
             vjoy_mapper: str = "Vjoy Remap",
             rollover: MapperMode = MapperMode.Unused,
         ):
-            """Creates a 1 to 1 mapping of the given device to the specified VJOY device """
-            import gremlin.joystick_handling
+            """Map the source inputs to a virtual joystick or gamepad output."""
 
+            suspended_model = None
             try:
                 # syslog = logging.getLogger("system")
                 tab_device_type: TabDeviceType
@@ -2601,10 +2603,11 @@ class Mapper:
                 if tab_device_type not in (
                     TabDeviceType.Joystick,
                     TabDeviceType.VjoyInput,
+                    TabDeviceType.MaestroInput,
                 ):
                     MessageBox(
                         "Information",
-                        "1:1 mapping is only available on input joysticks",
+                        "1:1 mapping is only available on joystick and gamepad input tabs",
                     )
                     return
 
@@ -2623,9 +2626,13 @@ class Mapper:
                 device_button_list = [i for i in range(1, device.button_count + 1)]
                 device_hat_list = [i for i in range(1, device.hat_count + 1)]
 
-                vjoy_info: dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-                if vjoy_info is None:
-                    return
+                target = gremlin.joystick_handling.get_output_target(vjoy_id)
+                if target is None or target.device.device_guid == device_guid:
+                    MessageBox(prompt="The selected joystick or gamepad output is no longer available.")
+                    return False
+                # The bridge exposes the full output layout even when the local
+                # DirectInput view combines gamepad triggers or omits buttons.
+                vjoy_info = target.device
                 vjoy_axis_list = [vjoy_info.axis_sequence_to_input_id(i) for i in range(vjoy_info.axis_count)]
                 vjoy_hat_list = [i for i in range(1, vjoy_info.hat_count + 1)]
                 vjoy_button_list = [i for i in range(1, vjoy_info.button_count + 1)]
@@ -2660,7 +2667,9 @@ class Mapper:
                     if input_map:
                         source.append((InputType.JoystickHat, input_map))
 
-                widget.inputItemListModel.pushSuspend()
+                model = widget.inputItemListModel
+                model.pushSuspend()
+                suspended_model = model
 
                 for input_type, input_map in source:
                     for input_id, vjoy_input_id in input_map:
@@ -2673,14 +2682,13 @@ class Mapper:
                             vjoy_id = vjoy_id,
                             vjoy_input_type = input_type,
                             vjoy_input_id = vjoy_input_id,
+                            vjoy_mapper = vjoy_mapper,
                         )
-
-
-                widget.inputItemListModel.popSuspend()
-
+                return True
 
             finally:
-                pass # el.update_action_icons.emit() # asks all inputs to refresh their action icons
+                if suspended_model is not None:
+                    suspended_model.popSuspend()
 
 
     def create_1to1_mapping(self):
@@ -2689,7 +2697,11 @@ class Mapper:
         device_guid = gremlin.shared_state.ui._active_tab_guid()
         device_info = gremlin.joystick_handling.getDevice(device_guid)
         if device_info is not None:
-            dialog = Mapper.MapperDialog(device_info)
+            outputs = self.output_choices(device_info)
+            if not outputs:
+                MessageBox(prompt="No virtual joystick or gamepad outputs found to map to")
+                return
+            dialog = Mapper.MapperDialog(device_info, outputs)
             gremlin.util.centerDialog(dialog, width=dialog.width(), height=dialog.height())
             result = dialog.exec()
             if result == QtWidgets.QDialog.Accepted:

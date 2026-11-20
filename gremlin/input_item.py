@@ -13576,12 +13576,16 @@ class FilterControlWidget(QWidget):
         # Hide optional controls unless at least one item supplies the field.
         self.category_combo.setVisible(bool(categories))
         self.attr_button.setVisible(bool(attributes))
-        self.category_combo.blockSignals(True)
-        self.category_combo.clear()
-        self.category_combo.addItem("All categories", None)
-        for category in categories:
-            self.category_combo.addItem(category, category)
-        self.category_combo.blockSignals(False)
+        current_categories = [self.category_combo.itemData(index) for index in range(1, self.category_combo.count())]
+        if categories == current_categories and attributes == list(self.attribute_actions):
+            return
+
+        options = self.getFilterOptions()
+        with QtCore.QSignalBlocker(self.category_combo):
+            self.category_combo.clear()
+            self.category_combo.addItem("All categories", None)
+            for category in categories:
+                self.category_combo.addItem(category, category)
         self.attr_menu.clear()
         self.attribute_actions.clear()
         for attr in attributes:
@@ -13589,11 +13593,11 @@ class FilterControlWidget(QWidget):
             action.setCheckable(True)
             action.toggled.connect(lambda checked, a=attr: self._on_attribute(a, checked))
             self.attribute_actions[attr] = action
-        # Remove chips for any options that are no longer available.
+        # Category and attribute chips are restored from the rebuilt controls.
         for key in list(self.active_chips):
             if key != "search":
                 self._set_chip(key, None)
-        self.clearFilters()
+        self.setFilterOptions(options)
 
     def _on_search(self, text):
         self._set_chip("search", text if text else None, background_color=Color().nameColor())

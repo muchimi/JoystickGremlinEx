@@ -98,7 +98,7 @@ class VJoyChecks(unittest.TestCase):
         self.services.shared_state = NS(current_profile=None)
         self.services.joystick_handling = NS(getVjoyDeviceGuid=lambda vid: f"vjoy-{vid}")
         self.services.types = NS(AxisNames=AxisNames)
-        self.services.config = NS(Configuration=lambda: NS(verbose_mode_vjoy=False))
+        self.services.config = NS(Configuration=lambda: NS(vjoy_installed=True, verbose_mode_vjoy=False))
         self.services.spline = NS(
             CubicSpline=lambda points: lambda value: value * value,
             CubicBezierSpline=lambda points: lambda value: value / 2,
@@ -161,6 +161,13 @@ class VJoyChecks(unittest.TestCase):
         self.driver.AcquireVJD.assert_not_called()
         self.driver.GetVJDButtonNumber.assert_not_called()
 
+    def test_uninstalled_driver_does_not_return_a_partially_initialized_device(self):
+        self.services.config.Configuration = lambda: NS(vjoy_installed=False)
+        with self.assertRaisesRegex(VJoyError, "vJoy is not available"):
+            self.ns["VJoy"](1)
+        self.driver.vJoyEnabled.assert_not_called()
+        self.driver.AcquireVJD.assert_not_called()
+
     def test_axis_scaling_clamping_and_nan(self):
         for value, expected in ((-2, -1), (-1, -1), (-0.5, -0.5), (0, 0), (0.5, 0.5), (1, 1), (2, 1), (math.nan, -1)):
             with self.subTest(value=value):
@@ -205,6 +212,12 @@ class VJoyChecks(unittest.TestCase):
         self.assertEqual(event.source, EventSourceType.Virtual)
         self.assertIs(self.listener.vjoy_output_event_ui.events[0], event)
 
+    def test_reading_retained_axis_output_does_not_mark_device_used(self):
+        self.axis.value = -0.5
+        last_active = self.monitor._last_active
+        self.assertEqual(self.axis.output_value, -0.5)
+        self.assertEqual(self.monitor._last_active, last_active)
+
     def test_duplicate_values_still_write_and_emit_every_sample(self):
         for _ in range(3):
             self.axis.value = 0.5
@@ -218,6 +231,7 @@ class VJoyChecks(unittest.TestCase):
             self.assertEqual(self.button.is_pressed, pressed)
             self.driver.SetBtn.assert_called_with(pressed, 1, 1)
             self.assertEqual(self.listener.vjoy_output_event.events[-1].is_pressed, pressed)
+            self.assertEqual(self.listener.vjoy_output_event.events[-1].source, EventSourceType.Virtual)
         self.clear_events()
         self.driver.SetBtn.return_value = False
         self.button.is_pressed = True
@@ -230,6 +244,7 @@ class VJoyChecks(unittest.TestCase):
                 self.assertEqual(self.hat.direction, direction)
                 self.driver.SetContPov.assert_called_with(native, 1, 1)
                 self.assertEqual(self.listener.vjoy_output_event.events[-1].value, direction)
+                self.assertEqual(self.listener.vjoy_output_event.events[-1].source, EventSourceType.Virtual)
 
     def test_discrete_hats_preserve_directions_and_reject_diagonals(self):
         self.hat.hat_type = self.ns["HatType"].Discrete
@@ -278,6 +293,7 @@ class VJoyChecks(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("vjoy.vjoy", ROOT / "vjoy/vjoy.py")
         module = importlib.util.module_from_spec(spec)
         replacements = {
+            "gremlin.config": self.services.config,
             "gremlin.util": self.services.util,
             "gremlin.spline": self.services.spline,
             "gremlin.event_handler": self.services.event_handler,

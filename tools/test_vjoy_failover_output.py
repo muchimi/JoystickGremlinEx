@@ -52,7 +52,7 @@ class FailoverOutputChecks(unittest.TestCase):
         self.maestro = device(DeviceType.Maestro)
         self.devices = [self.vjoy]
         self.config = NS(virtual_output_failover=True, verbose_mode_outputs=False, verbose_mode_vjoy=False,
-                         verbose_mode_maestro=False)
+                         verbose_mode_maestro=False, enable_remote_broadcast=True)
         self.button, self.axis = NS(is_pressed=False), NS(value=0.25)
         self.backend = NS(button=lambda index: self.button, axis=lambda index: self.axis)
         self.native = Mock(return_value={1: self.backend})
@@ -68,8 +68,9 @@ class FailoverOutputChecks(unittest.TestCase):
         services = NS(
             config=NS(Configuration=lambda: self.config), joystick_handling=self.handling,
             util=NS(to_guid=lambda key: key),
-            remote=NS(remote_control=NS(paired=False)),
+            remote=NS(remote_control=Mock(paired=False)),
             shared_state=NS(runtime_mode="Default", current_profile=NS(get_start_mode=lambda: "Default")),
+            types=NS(VjoyAction=VjoyAction),
             ui=NS(ui_common=NS(MessageBoxWarning=self.warning)), macro=NS(VJoyMacroAction=MacroOutput),
         )
         self.namespace = dict(
@@ -89,6 +90,7 @@ class FailoverOutputChecks(unittest.TestCase):
         )
         load("gremlin/joystick_handling.py", {
             "OutputTarget", "_maestro_failover_id", "_maestro_output_summary", "_find_output_target", "get_output_target", "get_output_device", "parse_virtual_device_key",
+            "get_maestro_failover_devices", "is_failover_device",
             "get_virtual_device", "virtual_device_key", "resolve_output_targets", "updateFailoverMap",
         }, self.namespace)
         for name in ("get_output_target", "get_output_device", "get_virtual_device", "virtual_device_key",
@@ -99,7 +101,7 @@ class FailoverOutputChecks(unittest.TestCase):
         self.handling.is_vjoy_connected = lambda index: True  # Failover metadata is connected.
         load("action_plugins/map_to_vjoy/__init__.py", {"VJoyRemapFunctor"}, self.namespace, {
             "_is_maestro_target", "_output_key", "_target_device", "_is_output_connected", "_output_device",
-            "_send_flags", "getSteppedIndexDataKey", "profile_start", "_set_axis", "_get_axis", "_process_event",
+            "_can_broadcast", "_send_flags", "getSteppedIndexDataKey", "profile_start", "profile_mode_changed", "_set_axis", "_get_axis", "_process_event",
         })
         self.functor = self.namespace["VJoyRemapFunctor"]()
         f = self.functor
@@ -123,7 +125,10 @@ class FailoverOutputChecks(unittest.TestCase):
         self.actions, self.initial_values = [], []
         self.profile = NS(
             filter_actions=lambda tags, callback: [callback(action, None) for action in self.actions if action.tag in tags],
-            merge_axes=[], settings=NS(get_initial_vjoy_axis_value_list=lambda: self.initial_values), _start_state={},
+            merge_axes=[], settings=NS(
+                get_initial_vjoy_axis_value_list=lambda: self.initial_values, startup_remote_clients=None,
+                startup_remote_operation="select", startup_remote_output_mode="local-only",
+            ), _start_state={},
         )
 
     def remap(self, device=None, key=1):
@@ -176,6 +181,26 @@ class FailoverOutputChecks(unittest.TestCase):
                 self.assertIsNone(self.target(key))
                 self.assertIsNone(self.handling.get_output_device(key))
         self.native.assert_not_called()
+
+    def test_failover_device_must_be_the_mapped_maestro_backend(self):
+        self.devices.append(self.maestro)
+        self.resolve_targets()
+        is_failover_device = self.namespace["is_failover_device"]
+        self.assertTrue(is_failover_device(self.maestro))
+        self.assertTrue(is_failover_device(NS(device_type=DeviceType.Maestro, device_guid=self.maestro.device_guid)))
+        self.assertFalse(is_failover_device(self.vjoy))
+        self.assertFalse(is_failover_device(None))
+
+        self.config.virtual_output_failover = False
+        self.assertFalse(is_failover_device(self.maestro))
+        self.assertIs(self.namespace["get_output_target"](self.maestro.device_guid).device, self.maestro)
+
+        self.config.virtual_output_failover = True
+        self.assertTrue(is_failover_device(self.maestro))
+        self.vjoy.data["failover"] = False
+        self.resolve_targets()
+        self.assertFalse(is_failover_device(self.maestro))
+        self.assertIs(self.namespace["get_output_target"](1).device, self.vjoy)
 
     def test_profile_start_with_neither_backend_keeps_remote_start_state(self):
         self.functor.profile_start()
@@ -467,6 +492,63 @@ class FailoverOutputChecks(unittest.TestCase):
         self.assertIsNone(self.namespace["get_output_target"](self.vjoy.device_guid))
         self.assertIs(self.namespace["get_output_target"](self.maestro.device_guid).device, self.maestro)
 
+    def test_startup_routing_commands_follow_throttle_button_27(self):
+        services = self.namespace["gremlin"]
+        services.shared_state.current_profile.get_mode_ancestors = lambda mode, include_self: [mode]
+        remote_control = services.remote.remote_control
+        base_mode = VjoyAction.VJoyEnableLocalAndRemote
+        for pressed, expected in ((True, VjoyAction.VJoyEnableRemoteOnly), (False, VjoyAction.VJoyEnableLocalOnly)):
+            with self.subTest(pressed=pressed):
+                self.handling.get_button.reset_mock()
+                self.handling.get_button.return_value = pressed
+                remote_control.mode = base_mode
+                commands = []
+                for on_press, mode in ((True, VjoyAction.VJoyEnableRemoteOnly), (False, VjoyAction.VJoyEnableLocalOnly)):
+                    command = self.namespace["VJoyRemapFunctor"]()
+                    command.profile_mode = "Default"
+                    command._valid = True
+                    command.action_mode = mode
+                    command.action_data = NS(
+                        sync_mode=SyncMode.Input, hardware_raw_input_type=InputType.JoystickButton,
+                        hardware_device_guid="throttle", hardware_input_id=27,
+                        exec_on_press=on_press, exec_on_release=not on_press,
+                    )
+                    command._target_device = Mock(side_effect=AssertionError("Routing requires no virtual device"))
+                    command.profile_start()
+                    commands.append(command)
+                self.assertEqual(remote_control.mode, base_mode)
+                for command in commands:
+                    command.profile_mode_changed("Default")
+                self.assertEqual(remote_control.mode, expected)
+                self.assertEqual(self.handling.get_button.call_count, 2)
+                self.handling.get_button.assert_called_with("throttle", 27)
+                remote_control.mode = base_mode
+                for command in commands:
+                    command.profile_mode_changed("Default")
+                self.assertEqual(remote_control.mode, base_mode)
+                self.start.setStartState.assert_not_called()
+
+    def test_startup_routing_skips_unsynced_and_inactive_commands(self):
+        services = self.namespace["gremlin"]
+        services.shared_state.current_profile.get_mode_ancestors = lambda mode, include_self: [mode]
+        command = self.functor
+        command.profile_mode = "Default"
+        command.action_mode = VjoyAction.VJoyEnableRemoteOnly
+        command.action_data.sync_mode = SyncMode.Ignore
+        command.profile_start()
+        command.profile_mode_changed("Default")
+        command.action_data.sync_mode = SyncMode.Input
+        command.profile_start()
+        command.profile_mode_changed("Other Mode")
+        self.handling.get_button.assert_not_called()
+
+    def test_routing_command_does_not_warn_about_unused_output(self):
+        command = self.remap(key=16)
+        command.action_mode = VjoyAction.VJoyEnableRemoteOnly
+        self.actions.append(command)
+        self.assertFalse(self.runner._warn_missing_virtual_outputs(self.profile))
+        self.warning.assert_not_called()
+
     def test_no_output_mappings_does_not_warn(self):
         self.actions.append(NS(tag="macro", sequence=[NS(device_guid="physical-input")]))
         self.runner._warn_missing_virtual_outputs(self.profile)
@@ -550,7 +632,7 @@ class FailoverOutputChecks(unittest.TestCase):
 
     def test_nested_gate_outputs_are_found_by_the_real_profile_traversal(self):
         services = self.namespace["gremlin"]
-        services.types = NS(DeviceType=DeviceType)
+        services.types.DeviceType = DeviceType
         load("gremlin/base_profile.py", {"Profile"}, self.namespace,
              {"filter_actions", "_filter_actions_input_item"})
         profile = self.namespace["Profile"]()
@@ -571,12 +653,22 @@ class FailoverOutputChecks(unittest.TestCase):
         self.profile.merge_axes.append({"mode": "Default"})
         self.namespace["_output_targets"][1] = self.namespace["OutputTarget"](self.vjoy, "vjoy", 1, 1)
         services = self.namespace["gremlin"]
-        services.event_handler = NS(EventListener=Mock(), EventHandler=Mock())
+        self.profile.settings.startup_remote_clients = frozenset({"cockpit-pc"})
+        listener = Mock()
+        services.event_handler = NS(EventListener=lambda: listener, EventHandler=Mock())
+        startup = Mock()
+        startup.attach_mock(services.remote.remote_control, "remote")
+        startup.attach_mock(listener.profile_before_start.emit, "before_start")
         context = Mock(getLastBuildError=Mock(return_value="Stop at the test build boundary"))
         services.execution_graph = NS(ExecutionContext=lambda: context)
         self.runner.stop = Mock()
         self.assertFalse(self.runner.start({}, self.profile.settings, "Default", self.profile))
         self.warning.assert_called_once()
+        self.assertEqual(startup.mock_calls, [
+            call.remote.applyClientOperation("select", frozenset({"cockpit-pc"})),
+            call.remote.applyOutputMode("local-only"),
+            call.before_start(),
+        ])
         context.reset.assert_called_once_with(force_rebuild=True)
         self.runner.stop.assert_called_once()
 

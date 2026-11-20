@@ -32,6 +32,8 @@ def load_class(path, name, namespace, methods=None):
 class Events(QtCore.QObject):
     config_option_changed = QtCore.Signal()
     profile_loaded = QtCore.Signal()
+    device_initialized = QtCore.Signal()
+    device_change_event = QtCore.Signal()
 
 
 class IconLabel(QtWidgets.QLabel):
@@ -48,6 +50,7 @@ class VJoyFailoverChecks(unittest.TestCase):
             config=NS(Configuration=lambda: self.config),
             joystick_handling=self.devices,
             event_handler=NS(EventListener=lambda: self.events),
+            util=NS(InvokeUiMethod=lambda method: method()),
         )
         namespace = dict(
             gremlin=self.services, re=re, parse_guid=UUID, syslog=Mock(),
@@ -58,7 +61,7 @@ class VJoyFailoverChecks(unittest.TestCase):
         )()
         self.widget_class = load_class(
             "gremlin/ui/ui_common.py", "QFailoverWidget",
-            dict(gremlin=self.services, QIconLabel=IconLabel, Shiboken=Shiboken),
+            dict(gremlin=self.services, QIconLabel=IconLabel, Shiboken=Shiboken, Callable=object),
         )
 
     def configure(self, content):
@@ -115,8 +118,8 @@ class VJoyFailoverChecks(unittest.TestCase):
         self.assertFalse(self.config.vjoy_failover)
         self.assertEqual(self.devices.clearVjoyDevices.call_count, 2)
 
-    def widget(self):
-        widget = self.widget_class()
+    def widget(self, **kwargs):
+        widget = self.widget_class(**kwargs)
         self.addCleanup(flush_deletes)
         self.addCleanup(widget.deleteLater)
         self.addCleanup(widget._cleanup_ui)
@@ -143,6 +146,38 @@ class VJoyFailoverChecks(unittest.TestCase):
         self.assertFalse(widget.isHidden())
         self.configure('')
         self.events.profile_loaded.emit()
+        self.assertTrue(widget.isHidden())
+
+    def test_remap_indicator_follows_selection_and_device_mapping(self):
+        vjoy = NS(key=1, device_type="vJoy")
+        maestro = NS(key="maestro-guid", device_type="Maestro")
+        targets = {vjoy.key: NS(device=maestro), maestro.key: NS(device=maestro)}
+        self.devices.virtual_device_key = lambda device: device.key
+        self.devices.get_output_target = targets.get
+        remap = load_class(
+            "action_plugins/map_to_vjoy/__init__.py", "VJoyRemapWidget",
+            dict(gremlin=self.services), {"_selected_output_uses_failover"},
+        )()
+        combo = QtWidgets.QComboBox()
+        self.addCleanup(combo.deleteLater)
+        remap.virtual_device_selector_widget = combo
+        widget = self.widget(visibility_provider=remap._selected_output_uses_failover)
+        combo.currentIndexChanged.connect(widget.refresh)
+        self.assertTrue(widget.isHidden())
+
+        combo.addItem("vJoy 1", vjoy)
+        combo.addItem("gex-1", maestro)
+        self.assertFalse(widget.isHidden())
+        combo.setCurrentIndex(1)
+        self.events.config_option_changed.emit()
+        self.events.profile_loaded.emit()
+        self.assertTrue(widget.isHidden())
+
+        combo.setCurrentIndex(0)
+        self.events.device_initialized.emit()
+        self.assertFalse(widget.isHidden())
+        targets[vjoy.key] = NS(device=vjoy)
+        self.events.device_change_event.emit()
         self.assertTrue(widget.isHidden())
 
     def test_new_profile_resets_failover_before_creating_profile(self):

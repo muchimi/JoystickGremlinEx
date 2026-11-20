@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import ipaddress
 import json
 import logging
 import os
@@ -23,7 +24,7 @@ from typing import Callable
 
 from lxml import etree
 from psygnal import Signal
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtNetwork, QtWidgets
 from PySide6.QtCore import QMimeData, QPoint, Qt
 from PySide6.QtGui import QDrag, QPixmap
 from PySide6.QtWidgets import QAbstractItemView, QLabel, QListWidget, QListWidgetItem
@@ -37,13 +38,20 @@ import gremlin.joystick_handling
 import gremlin.process
 import gremlin.shared_state
 import gremlin.types
-import gremlin.ui.ui_about as ui_about
 import gremlin.util
 from dinput import DeviceSummary
 from gremlin.clipboard import Clipboard
 from gremlin.input_types import InputType
+from gremlin.network import (
+    REMOTE_CONTROL_MULTICAST_GROUP,
+    RemoteControlFirewallStatus,
+    checkInboundRemoteControlFirewallRule,
+    discover_windows_computers,
+    ensureInboundRemoteControlFirewallRule,
+)
 from gremlin.tabstate import TabData
 from gremlin.types import DeviceType
+from gremlin.ui import ui_about
 from gremlin.ui.ui_common import (
     BaseDialogUi,
     Buttons,
@@ -59,17 +67,20 @@ from gremlin.ui.ui_common import (
     QDataCheckbox,
     QDataComboBox,
     QDataIPLineEdit,
+    QDataLabel,
     QDataLineEdit,
     QDataPushButton,
     QDataRadioButton,
     QDataRadioButtonGroup,
     QDelayWidget,
     QFloatLineEdit,
+    QGroupBoxV,
     QHorizontalLine,
     QIconLabel,
     QInfoBox,
     QIntLineEdit,
     QLineEdit,
+    QOperationDialog,
     QPathLineItem,
     QRememberDialog,
     QScrollableWidget,
@@ -224,27 +235,51 @@ class ProfileOptionsUi(QRememberDialog):
         self.start_mode_changed.emit(mode_name)
 
 
-class HostIpDialog(BaseDialogUi):
-    """dialog to display and have the user select an IP address for the current host
+def _network_computer_browse_button(dialog, select_address, *, target="server"):
+    """Create a button that opens the Windows Network Discovery picker."""
 
-    hosts may have multiple IP addresses
-    a manual entry can aslo be entered
+    def select_computer(computers):
+        if not computers:
+            dialog.status_widget.setText(f"Windows Network Discovery returned no computers with IPv4 addresses. Enter the {target} address manually.")
+            return
 
-    """
+        choices = {f"{name} ({address})": address for name, address in computers}
+        selected, accepted = QtWidgets.QInputDialog.getItem(
+            dialog, "Network Computers", f"Select the {target} and its IPv4 address", list(choices), editable=False
+        )
+        dialog.status_widget.setText("")
+        select_address(choices[selected] if accepted else None)
 
-    def __init__(self, host_ip: str = None, parent=None):
+    def browse():
+        dialog._submit(
+            operation=discover_windows_computers,
+            complete=select_computer,
+            message="Looking for computers...",
+            request_name="GEX Network Discovery",
+        )
+
+    button = QDataPushButton("Browse…", clicked=browse)
+    button.setAutoDefault(False)
+    button.setToolTip("Choose an IPv4 address from discoverable local computers.")
+    return button
+
+
+class HostIpDialog(QOperationDialog):
+    """Select a local interface or enter the address of a network host."""
+
+    def __init__(self, host_ip: str = None, parent=None, *, browse_network=False):
         """
         :param host_ip: current host IP to display (optional)"""
         super().__init__(self.__class__.__name__, parent=parent)
 
         self._host_ip = host_ip
         self._ip_list = gremlin.util.getHostIp()  # get list of host IPs
-        self.setWindowTitle("Host IP Selection")
+        self.setWindowTitle("Broadcast Server" if browse_network else "Host IP Selection")
+        self.status_widget.setVisible(browse_network)
         self._existing_only = False  # true if the dialog should only allow selecting an existing IP
 
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-
-        grid_layout = QtWidgets.QGridLayout()
+        self._address_form = QtWidgets.QWidget()
+        grid_layout = QtWidgets.QGridLayout(self._address_form)
 
         self._ip_list_widget = QDataComboBox()
         w = get_text_width("888.888.888.888 ")
@@ -253,7 +288,7 @@ class HostIpDialog(BaseDialogUi):
 
         self._host_ip_widget = QDataIPLineEdit()
         self._host_ip_widget.setMinimumWidth(w)
-        self._host_ip_widget.setText(self._host_ip)
+        self._host_ip_widget.setText(self._host_ip or "")
         self._host_ip_widget.textChanged.connect(self._ip_host_changed)
 
         self._instruction_widget = QtWidgets.QLabel()
@@ -270,23 +305,25 @@ class HostIpDialog(BaseDialogUi):
         grid_layout.addWidget(self._instruction_widget, row, 0, 1, -1)
 
         row += 1
-        grid_layout.addWidget(QtWidgets.QLabel("Available IPs:"), row, 0)
+        grid_layout.addWidget(QtWidgets.QLabel("Local IPs" if browse_network else "Available IPs:"), row, 0)
         grid_layout.addWidget(self._ip_list_widget, row, 1)
         grid_layout.addWidget(refresh_widget, row, 2)
         grid_layout.addWidget(QtWidgets.QLabel(""), row, 3)
         row += 1
 
-        grid_layout.addWidget(QtWidgets.QLabel("Host Ip:"), row, 0)
+        grid_layout.addWidget(QtWidgets.QLabel("Server IPv4" if browse_network else "Host IP:"), row, 0)
         grid_layout.addWidget(self._host_ip_widget, row, 1)
+        if browse_network:
+            grid_layout.addWidget(_network_computer_browse_button(self, self._select_network_address), row, 2, 1, 2)
 
         grid_layout.setColumnStretch(3, 2)
-        self.main_layout.addLayout(grid_layout)
+        self.content_layout.addWidget(self._address_form)
 
-        ok_widget = QDataPushButton("Ok", callback=self._ok_cb)
-        cancel_widget = QDataPushButton("Cancel", callback=self._cancel_cb)
+        self._ok_button = QDataPushButton("OK", clicked=self._ok_cb)
+        self._cancel_button = QDataPushButton("Cancel", clicked=self.reject)
 
-        widget = getHContainer([ok_widget, cancel_widget], left_stretch=True, auto_size=True, widget_only=True)
-        self.main_layout.addWidget(widget)
+        widget = getHContainer([self._ok_button, self._cancel_button], left_stretch=True, auto_size=True, widget_only=True)
+        self.button_layout.addWidget(widget)
 
         self._update_ip()
         self._update_ui()
@@ -304,15 +341,14 @@ class HostIpDialog(BaseDialogUi):
         with QtCore.QSignalBlocker(self._ip_list_widget):
             self._ip_list_widget.clear()
             self._ip_list_widget.addItems(self._ip_list)
-            if self._host_ip in self._ip_list:
-                self._ip_list_widget.setCurrentText(self._host_ip)
+            self._ip_list_widget.setCurrentIndex(self._ip_list_widget.findText(self._host_ip or ""))
 
     def _update_ui(self):
+        for widget in (self._address_form, self._ok_button, self._cancel_button):
+            widget.setEnabled(not self._busy)
         self._host_ip_widget.setReadOnly(self._existing_only)
 
-        msg = (
-            "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
-        )
+        msg = "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
         self._instruction_widget.setText(msg)
 
     @QtCore.Slot()
@@ -324,16 +360,318 @@ class HostIpDialog(BaseDialogUi):
 
     @QtCore.Slot()
     def _ip_host_changed(self):
-        self._host_ip = self._ip_list_widget.currentText()
+        self._host_ip = self._host_ip_widget.text().strip()
+
+    def _select_network_address(self, address):
+        if address is not None:
+            self._host_ip_widget.setText(address)
 
     @QtCore.Slot()
     def _ok_cb(self):
+        if self._busy:
+            return
+        if not self._existing_only:
+            try:
+                self._host_ip = str(ipaddress.IPv4Address(self._host_ip))
+            except ipaddress.AddressValueError:
+                self.status_widget.setText("Enter a valid server IPv4 address.")
+                self.status_widget.show()
+                self._host_ip_widget.setFocus()
+                return
         self.accept()
-        self.close()
+
+    def reject(self):
+        if not self._busy:
+            super().reject()
+
+
+class RemoteClientsDialog(QOperationDialog):
+    """Manage the client catalog shared by profiles on this instance."""
+
+    def __init__(self, parent=None):
+        from gremlin.remote import remote_client, remote_control
+
+        super().__init__(self.__class__.__name__, parent=parent)
+        self.setWindowTitle("Remote Clients")
+        self.resize(480, 320)
+        self._control = remote_control
+        self._catalog_entries = None
+
+        msg = "The list of clients shown here are the named clients known to this instance.  All GEX clients will receive output whether on this list or not, however only the clients on the list below can be actively managed by the profile at runtime."
+        info_widget = QInfoBox(msg)
+        self.content_layout.addWidget(info_widget)
+
+        clients_group = QGroupBoxV("Known clients")
+        self._catalog = QScrollableWidget(stretch=False, horizontal_scroll=False)
+        self._catalog.setAccessibleName("Known remote clients")
+        self._catalog.getLayout().setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._catalog.setMinimumHeight(150)
+        clients_group.addWidget(self._catalog)
+        self.content_layout.addWidget(clients_group, 1)
+
+        self._address = QLineEdit()
+        self._address.setPlaceholderText("IPv4 address or network name")
+        self._address.setAccessibleName("Client address")
+        self._address.textChanged.connect(self._update_ui)
+        self._address.returnPressed.connect(self._add_client)
+        self._browse = _network_computer_browse_button(self, self._select_network_address, target="client")
+        self._add = QDataPushButton("Add", clicked=self._add_client)
+        self.content_layout.addWidget(getHContainer([(self._address, 1), self._browse, self._add], right_stretch=False, widget_only=True))
+
+        self._auto_discover = QDataPushButton(
+            "Auto Discover",
+            clicked=self._discover_clients,
+            tooltip="Add computers found by Windows Network Discovery to the shared client list.",
+        )
+        self._refresh = QDataPushButton(
+            "Refresh GEX Clients",
+            clicked=remote_client.requestIdentify,
+            tooltip="Ask running GEX clients to register with this instance.",
+        )
+        self._close = QDataPushButton("Close", clicked=self.accept)
+        for button in (self._add, self._auto_discover, self._refresh, self._close):
+            button.setAutoDefault(False)
+        self.button_layout.addWidget(self._auto_discover)
+        self.button_layout.addWidget(self._refresh)
+        self.button_layout.addStretch()
+        self.button_layout.addWidget(self._close)
+
+        gremlin.event_handler.EventListener().remote_control_client_change.connect(self._refresh_catalog)
+        self._refresh_catalog()
+        self._update_ui()
 
     @QtCore.Slot()
-    def _cancel_cb(self):
-        self.close()
+    def _refresh_catalog(self):
+        from gremlin.remote import remote_client_row_label
+
+        clients = self._control.getKnownClients()
+        if clients == self._catalog_entries:
+            return
+        self._catalog_entries = clients
+        self._catalog.clear()
+        if not clients:
+            self._catalog.addWidget(QDataLabel("No clients are saved. Add an address or use Auto Discover."))
+            return
+
+        for address, details in sorted(clients.items()):
+            label = remote_client_row_label(address, details)
+            delete_label = f"Delete client {address}"
+            delete = Buttons.getDeleteWidget(tooltip=delete_label, no_keyboard=False)
+            delete.clicked.connect(lambda _checked=False, address=address: self._delete_client(address))
+            delete.setAccessibleName(delete_label)
+            delete.setAutoDefault(False)
+            self._catalog.addWidget(getHContainer([(label, 1), delete], right_stretch=False, widget_only=True))
+
+    @QtCore.Slot()
+    def _update_ui(self):
+        self._catalog.setEnabled(not self._busy)
+        self._address.setEnabled(not self._busy)
+        self._browse.setEnabled(not self._busy)
+        self._add.setEnabled(not self._busy and bool(self._address.text().strip()))
+        self._auto_discover.setEnabled(not self._busy)
+        self._refresh.setEnabled(not self._busy and self._control.remoteEnabled())
+        self._close.setEnabled(not self._busy)
+
+    def _select_network_address(self, address):
+        if address is not None:
+            self._address.setText(address)
+
+    @QtCore.Slot()
+    def _discover_clients(self):
+        self._submit(
+            operation=discover_windows_computers,
+            complete=self._discovery_complete,
+            message="Looking for computers…",
+            request_name="GEX Network Discovery",
+        )
+
+    def _discovery_complete(self, computers: list[tuple[str, str]]):
+        if not computers:
+            self.status_widget.setText("Windows Network Discovery found no computers with IPv4 addresses.")
+            return
+
+        # A computer with several network interfaces can appear once per IPv4 address.
+        found = len({name for name, _ in computers})
+        if found > 10:
+            MessageBoxWarning(
+                title="Remote Client Discovery",
+                prompt=f"Windows Network Discovery found {found} computers on the local network.",
+                parent=self,
+            )
+        try:
+            added = self._control.addDiscoveredClients(computers)
+        except OSError as error:
+            self.status_widget.setText(f"Could not save discovered clients. {error}")
+            return
+
+        noun = "computer" if found == 1 else "computers"
+        self.status_widget.setText(f"Found {found} network {noun} and added {added} to the client list.")
+
+    @QtCore.Slot()
+    def _add_client(self):
+        if not self._add.isEnabled():
+            return
+        try:
+            self._control.addKnownClient(self._address.text())
+        except (OSError, ValueError) as error:
+            self.status_widget.setText(str(error))
+            return
+        self._address.clear()
+        self.status_widget.clear()
+
+    def _delete_client(self, address):
+        if self._busy:
+            return
+        try:
+            self._control.removeKnownClient(address)
+        except OSError as error:
+            self.status_widget.setText(str(error))
+            return
+        self.status_widget.clear()
+
+    def reject(self):
+        if not self._busy:
+            super().reject()
+
+
+def show_remote_clients(parent):
+    dialog = RemoteClientsDialog(parent)
+    dialog.exec()
+    dialog.deleteLater()
+
+
+class FirewallRuleDialog(QOperationDialog):
+    """UI for checking and managing inbound firewall rules."""
+
+    def __init__(self, parent=None, *, port=None, host=None):
+        super().__init__(self.__class__.__name__, parent=parent)
+        self.setWindowTitle("Firewall Check")
+        self.config = gremlin.config.Configuration()
+        self._all_hosts = self.config.remote_control_firewall_all_hosts
+        # A broadcasting server also receives the connection test's unicast request.
+        self._include_unicast = self.config.enable_remote_broadcast
+        self.rule_target = None
+
+        any_host = QDataRadioButton("Allow from any host", checked=self._all_hosts)
+        specific_host = QDataRadioButton("Allow from a specific host", checked=not self._all_hosts)
+        any_host.toggled.connect(self._handle_firewall_rule_option_changed)
+        self._scope_widget = getHContainer([any_host, specific_host], widget_only=True)
+        self.content_layout.addWidget(self._scope_widget)
+
+        self.host_widget = QDataIPLineEdit(self.config.broadcast_host_ip if host is None else host)
+        self.host_widget.editingFinished.connect(self._update_status)
+        browse_button = _network_computer_browse_button(self, self._select_network_address)
+        self.host_container = getHContainer([self.host_widget, browse_button], "Server IPv4", widget_only=True)
+        self.content_layout.addWidget(self.host_container)
+
+        self.port_widget = QIntLineEdit(
+            value=port if port is not None else self.config.server_port,
+            min_range=4096,
+            max_range=65535,
+            tooltip="Local UDP port for this inbound firewall rule.",
+        )
+        self.port_widget.editingFinished.connect(self._update_status)
+        self.content_layout.addWidget(getHContainer(self.port_widget, "UDP port", widget_only=True))
+
+        self._add_button = QDataPushButton("Check / Add Rule", clicked=self._execute)
+        self._add_button.setAutoDefault(False)
+        self._add_button.setToolTip("Use an existing inbound rule or add one if needed, then apply these settings to Options.")
+        self._apply_button = QDataPushButton("Apply", clicked=self._apply)
+        self._apply_button.setDefault(True)
+        self._apply_button.setToolTip("Apply these settings to Options.")
+        self._cancel_button = QDataPushButton("Cancel", clicked=self.reject)
+        self.button_layout.addWidget(getHContainer(["||", self._add_button, self._apply_button, self._cancel_button], widget_only=True, auto_size=True))
+
+        self._update_status()
+        self._update_ui()
+
+    def _select_network_address(self, address):
+        if address is not None:
+            self.host_widget.setText(address)
+        self._update_status()
+
+    def _rule_target(self):
+        port = self.port_widget.value()
+        if port is None or not 4096 <= port <= 65535:
+            self.status_widget.setText("Enter a UDP port from 4096 to 65535.")
+            return None
+        host = None
+        if not self._all_hosts:
+            try:
+                address = ipaddress.IPv4Address(self.host_widget.text().strip())
+            except ipaddress.AddressValueError:
+                address = None
+            if address is None or address.is_multicast or address.is_unspecified or int(address) == 0xFFFFFFFF:
+                self.status_widget.setText("Enter the server's unicast IPv4 address.")
+                return None
+            host = str(address)
+        return port, host
+
+    def _update_status(self):
+        if self._busy:
+            return
+        target = self._rule_target()
+        if target is None:
+            return
+        port, host = target
+        try:
+            status = checkInboundRemoteControlFirewallRule(port, host, include_unicast=self._include_unicast)
+        except OSError as err:
+            syslog.warning("Firewall Check: %s", err)
+            self.status_widget.setText(str(err))
+        else:
+            self._show_rule_status(status, port, host)
+
+    def _show_rule_status(self, status, port, host):
+        traffic = f"UDP multicast to {REMOTE_CONTROL_MULTICAST_GROUP}:{port} from {host or 'any host'}"
+        if status is RemoteControlFirewallStatus.FOUND:
+            message = f"An enabled inbound rule covers {traffic}."
+        elif status is RemoteControlFirewallStatus.BLOCKED:
+            message = f"Windows Firewall blocks {traffic}. Review the inbound block rule or active firewall profile."
+        elif status is RemoteControlFirewallStatus.MANAGED:
+            message = f"Windows Firewall policy prevents adding a local rule for {traffic}."
+        else:
+            message = f"No matching inbound allow rule covers {traffic} on the active firewall profiles."
+        self.status_widget.setText(message)
+
+    def _execute(self):
+        target = self._rule_target()
+        if target is None:
+            return
+        port, host = target
+        include_unicast = self._include_unicast
+        self._submit(
+            operation=lambda: ensureInboundRemoteControlFirewallRule(port, host, include_unicast=include_unicast),
+            complete=lambda status: self._complete(status, port, host),
+            message="Checking the inbound firewall rule...",
+            request_name="firewall rule operation",
+        )
+
+    def _complete(self, status, port, host):
+        if status is RemoteControlFirewallStatus.FOUND:
+            self.rule_target = port, host
+            self.accept()
+        else:
+            self._show_rule_status(status, port, host)
+
+    def _apply(self):
+        self.rule_target = self._rule_target()
+        if self.rule_target is not None:
+            self.accept()
+
+    def _handle_firewall_rule_option_changed(self, all_hosts):
+        self._all_hosts = all_hosts
+        self._update_ui()
+        self._update_status()
+
+    def _update_ui(self):
+        self.host_container.setVisible(not self._all_hosts)
+        for widget in (self._scope_widget, self.host_container, self.port_widget, self._add_button, self._apply_button, self._cancel_button):
+            widget.setEnabled(not self._busy)
+
+    def reject(self):
+        if not self._busy:
+            super().reject()
 
 
 class OptionsDialog(BaseDialogUi):
@@ -352,6 +690,7 @@ class OptionsDialog(BaseDialogUi):
 
         # Actual configuration object being managed
         self._reload_needed = False  # true if UI reload is needed on option changes
+        self._remote_connection_test = None
         self.config = gremlin.config.Configuration()
 
         preferred = self.preferredSize()
@@ -446,12 +785,8 @@ class OptionsDialog(BaseDialogUi):
             message_box = QtWidgets.QMessageBox()
             message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
             message_box.setText("Configuration Error")
-            message_box.setInformativeText(
-                "The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries."
-            )
-            message_box.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Cancel | QtWidgets.QMessageBox.StandardButton.Discard
-            )
+            message_box.setInformativeText("The configuration is invalid.<br/>Press cancel to return,<br>or discard to remove the invalid entries.")
+            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Cancel | QtWidgets.QMessageBox.StandardButton.Discard)
             gremlin.util.centerDialog(message_box)
             result = message_box.exec()
             if result == QtWidgets.QMessageBox.StandardButton.Discard:
@@ -560,17 +895,11 @@ class OptionsDialog(BaseDialogUi):
         page_layout.addStretch()
 
         # Close to system tray option
-        self.close_to_systray = QDataCheckbox(
-            "Closing minimizes to system tray", checked=self.config.close_to_tray, callback=self._close_to_systray
-        )
+        self.close_to_systray = QDataCheckbox("Closing minimizes to system tray", checked=self.config.close_to_tray, callback=self._close_to_systray)
 
         # show import dialog on missing devices
-        self.import_prompt_widget = QDataCheckbox(
-            "Import prompt on missing devices", checked=self.config.import_prompt_enabled, callback=self._import_prompt
-        )
-        self.import_prompt_widget.setToolTip(
-            "When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device"
-        )
+        self.import_prompt_widget = QDataCheckbox("Import prompt on missing devices", checked=self.config.import_prompt_enabled, callback=self._import_prompt)
+        self.import_prompt_widget.setToolTip("When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device")
 
         # synchronize action/container drop downs
         self.sync_last_selection = QDataCheckbox(
@@ -578,9 +907,7 @@ class OptionsDialog(BaseDialogUi):
             checked=self.config.sync_last_selection,
             callback=self._sync_last_selection,
         )
-        self.sync_last_selection.setToolTip(
-            "When enabled, action and container drop downs will remain synchronized with the last selected entry"
-        )
+        self.sync_last_selection.setToolTip("When enabled, action and container drop downs will remain synchronized with the last selected entry")
 
         # ignore device changes at runtime
         self.runtime_ignore_device_change = QDataCheckbox(
@@ -588,32 +915,20 @@ class OptionsDialog(BaseDialogUi):
             checked=self.config.runtime_ignore_device_change,
             callback=self._runtime_ignore_device_change,
         )
-        self.runtime_ignore_device_change.setToolTip(
-            "When enabled, device connect/disconnects will be ignored at runtime"
-        )
+        self.runtime_ignore_device_change.setToolTip("When enabled, device connect/disconnects will be ignored at runtime")
 
-        self.show_input_enable = QDataCheckbox(
-            "Show input enable buttons", checked=self.config.show_input_enable, callback=self._show_input_enable
-        )
-        self.show_input_enable.setToolTip(
-            "When enabled, displays a toggle button for each input to enable or disable it in the profile"
-        )
+        self.show_input_enable = QDataCheckbox("Show input enable buttons", checked=self.config.show_input_enable, callback=self._show_input_enable)
+        self.show_input_enable.setToolTip("When enabled, displays a toggle button for each input to enable or disable it in the profile")
         self.show_input_enable.setDisabled(True)
 
-        self.start_on_f5 = QDataCheckbox(
-            "Start profile on F5", checked=self.config.start_on_f5, callback=self._start_on_f5
-        )
+        self.start_on_f5 = QDataCheckbox("Start profile on F5", checked=self.config.start_on_f5, callback=self._start_on_f5)
         self.start_on_f5.setToolTip("When enabled, profiles can be started using the F5 key")
 
         # Start minimized option
-        self.start_minimized = QDataCheckbox(
-            "Start Gremlin Ex minimized", checked=self.config.start_minimized, callback=self._start_minimized
-        )
+        self.start_minimized = QDataCheckbox("Start Gremlin Ex minimized", checked=self.config.start_minimized, callback=self._start_minimized)
 
         # Start on user login
-        self.start_with_windows = QDataCheckbox(
-            "Start Gremlin Ex with Windows", checked=self._start_windows_enabled(), callback=self._start_windows
-        )
+        self.start_with_windows = QDataCheckbox("Start Gremlin Ex with Windows", checked=self._start_windows_enabled(), callback=self._start_windows)
         self.start_with_windows.setToolTip("Enables starting GremlinEx at login (GremlinEx must run as administrator)")
         is_admin = self.is_admin()
         self.start_with_windows.setEnabled(is_admin)
@@ -630,22 +945,16 @@ class OptionsDialog(BaseDialogUi):
             checked=self.config.allow_exec_tree_container_validation_fail,
             callback=self._allow_invalid_container_build,
         )
-        self.allow_invalid_container_build.setToolTip(
-            "When enabled, an invalid container will not fail the execution build."
-        )
+        self.allow_invalid_container_build.setToolTip("When enabled, an invalid container will not fail the execution build.")
 
         # allow partial plugin configurations
-        self.partial_plugin_save = QDataCheckbox(
-            "Save partial user plugin data", checked=self.config.partial_plugin_save, callback=self._partial_plugin_save
-        )
+        self.partial_plugin_save = QDataCheckbox("Save partial user plugin data", checked=self.config.partial_plugin_save, callback=self._partial_plugin_save)
         self.partial_plugin_save.setToolTip(
             "When enabled, user-plugin configuration will be saved even if one or more input variable reports not-configured.<br>This feature allows saving of the configuration to date.<br>Incomplete configurations will not be activated at runtime even if this feature is used."
         )
 
         # range resolution - decimal
-        self.range_precision_widget = QIntLineEdit(
-            min_range=0, max_range=8, value=self.config.range_comparison_decimals
-        )
+        self.range_precision_widget = QIntLineEdit(min_range=0, max_range=8, value=self.config.range_comparison_decimals)
         self.range_precision_widget.setToolTip("Number of decimals for floating point range comparisons")
         self.range_precision_widget.valueChanged.connect(self._range_precision_changed)
 
@@ -655,17 +964,11 @@ class OptionsDialog(BaseDialogUi):
             checked=self.config.enable_log_version,
             callback=self._enable_version_log_changed,
         )
-        self.enable_version_log_widget.setToolTip(
-            "If enabled, GremlinEx will use a versioned data folder.  Not recommended for normal usage."
-        )
+        self.enable_version_log_widget.setToolTip("If enabled, GremlinEx will use a versioned data folder.  Not recommended for normal usage.")
 
         # global numlock
-        self.numlock_enabled = QDataCheckbox(
-            "Force Numlock Off (global)", checked=self.config.numlock_off, callback=self._numlock_off
-        )
-        self.numlock_enabled.setToolTip(
-            "When set, numlock will be turned off whenever a profile starts unless that profile has its own setting"
-        )
+        self.numlock_enabled = QDataCheckbox("Force Numlock Off (global)", checked=self.config.numlock_off, callback=self._numlock_off)
+        self.numlock_enabled.setToolTip("When set, numlock will be turned off whenever a profile starts unless that profile has its own setting")
 
         # Show message on mode change
         self.show_mode_change_message = QDataCheckbox(
@@ -678,9 +981,7 @@ class OptionsDialog(BaseDialogUi):
         # Default action selection
 
         self.default_action_dropdown = QDataComboBox(auto_adjust=True)
-        self.default_action_widget, self.default_action_layout = getHContainer(
-            [self.default_action_dropdown, ("", 100)], "Default Action:"
-        )
+        self.default_action_widget, self.default_action_layout = getHContainer([self.default_action_dropdown, ("", 100)], "Default Action:")
         self._init_action_dropdown()
 
         # Macro axis polling rate
@@ -825,9 +1126,7 @@ class OptionsDialog(BaseDialogUi):
             widget.clicked.connect(self._theme_changed)
             widgets.append(widget)
 
-        self.customize_theme_widget = QDataPushButton(
-            "Custom Colors...", tooltip="Customize theme", callback=self._handle_customize_theme
-        )
+        self.customize_theme_widget = QDataPushButton("Custom Colors...", tooltip="Customize theme", callback=self._handle_customize_theme)
         widgets.append("(Restart Required)")
 
         self.theme_widget = getHContainer(widgets, widget_only=True)
@@ -841,9 +1140,7 @@ class OptionsDialog(BaseDialogUi):
         col1_layout.addWidget(box)
 
         # Switch to highlighted device (master switch)
-        self.highlight_enabled = QDataCheckbox(
-            "Enable Input Highlighting", checked=self.config.highlight_enabled, callback=self._highlight_enabled_cb
-        )
+        self.highlight_enabled = QDataCheckbox("Enable Input Highlighting", checked=self.config.highlight_enabled, callback=self._highlight_enabled_cb)
         self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
         self.highlight_enabled.setToolTip("Enable device highlighting.")
         self.highlight_enabled.setChecked(self.config.highlight_enabled)
@@ -962,9 +1259,7 @@ class OptionsDialog(BaseDialogUi):
             checked=self.config.show_scancodes,
             callback=self._show_scancodes_cb,
         )
-        self.show_scancodes_widget.setToolTip(
-            "When enabled, keyboard hexadecimal scan codes will be displayed in the keyboard input UI"
-        )
+        self.show_scancodes_widget.setToolTip("When enabled, keyboard hexadecimal scan codes will be displayed in the keyboard input UI")
 
         box = QBoxFrameLayout(title="Keyboard", transparent=True)
         box.addWidget(self.show_scancodes_widget)
@@ -987,9 +1282,7 @@ class OptionsDialog(BaseDialogUi):
         # )
         # self.runtime_ui_update.setEnabled(False)
 
-        self.show_id_widget = QDataCheckbox(
-            "Show container/action IDs", checked=self.config.show_container_id, callback=self._show_id_changed
-        )
+        self.show_id_widget = QDataCheckbox("Show container/action IDs", checked=self.config.show_container_id, callback=self._show_id_changed)
 
         log_description_widget = QDataCheckbox(
             "Log description action",
@@ -1100,6 +1393,8 @@ class OptionsDialog(BaseDialogUi):
 
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
+        manage_clients = QDataPushButton("Manage Remote Clients…", clicked=lambda: show_remote_clients(self))
+        page_layout.addWidget(manage_clients, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.client_name_widget = QLineEdit()
         self.client_name_widget.setText(self.config.client_name)
@@ -1229,13 +1524,11 @@ class OptionsDialog(BaseDialogUi):
         self.remote_control_server_all_ip_widget.setChecked(bind_all)
         self.remote_control_server_all_ip_widget.clicked.connect(self._remote_control_all_ip_changed)
 
-        enabled = not bind_all
         self.remote_control_server_widget = QDataIPLineEdit(self.config.broadcast_host_ip)
-        self.remote_control_server_widget.textChanged.connect(self._remote_control_server_ip_changed)
-        self.remote_control_server_widget.setToolTip("Host IP of the broadcast host (local machine IP)")
+        self.remote_control_server_widget.editingFinished.connect(self._remote_control_server_ip_changed)
 
         self.remote_control_master_widget = QDataCheckbox(
-            "Master",
+            "Current host is the master GEX server",
             value=self.config.master,
             callback=self._handle_master_changed,
             tooltip="Enable to make this the GremlinEx server on the network.\nClients should point to this machine as the broadcast host.\nOnly one machine should act as the server.",
@@ -1243,8 +1536,7 @@ class OptionsDialog(BaseDialogUi):
 
         self.remote_control_select_ip_widget = QDataPushButton(
             "Select",
-            tooltip="Select a different IP address for the GremlinEx Broadcast server if the host has more than one IP address.",
-            callback=self._remote_control_server_ip_select,
+            clicked=self._remote_control_server_ip_select,
         )
 
         self.remote_control_port_widget = QIntLineEdit(
@@ -1252,49 +1544,76 @@ class OptionsDialog(BaseDialogUi):
             callback=self._handle_remote_server_port_changed,
             min_range=4096,
             max_range=65535,
-            tooltip="This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.",
+            tooltip="UDP port used by GremlinEx remote control, including multicast.",
         )
-
-        # QtWidgets.QDoubleSpinBox()
-        # self.remote_control_port_widget.setRange(4096,65535)
-        # self.remote_control_port_widget.setDecimals(0)
-        # self.remote_control_port_widget.setValue(float(self.config.broadcast_port))
-        # self.remote_control_port_widget.valueChanged.connect(self._handle_remote_server_port_changed)
-        # self.remote_control_port_widget.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
 
         page_layout.addWidget(self.remote_control_server_all_ip_widget)
 
-        widget, _ = getHContainer(
-            [self.remote_control_server_widget, self.remote_control_select_ip_widget],
-            "Broadcast Server:",
-        )
-        page_layout.addWidget(widget)
+        self._remote_test_button = QDataPushButton("Test Connection", clicked=self._handle_test_remote_connection)
+        self._add_firewall_rule_button = QDataPushButton("Firewall Check...", clicked=self._handle_firewall_check)
 
+        test_widget = QtWidgets.QGroupBox("GEX connection test")
+        test_layout = QtWidgets.QVBoxLayout(test_widget)
+
+        self._remote_test_host = QDataIPLineEdit(self.config.broadcast_host_ip)
+        self._remote_test_host.textChanged.connect(self._cancel_remote_connection_test)
+        select_test_host_button = QDataPushButton(
+            "Select",
+            tooltip="Select the GremlinEx broadcast server's IPv4 address.",
+            clicked=self._remote_control_server_ip_select,
+        )
+        self._remote_test_host_container = getHContainer([self._remote_test_host, select_test_host_button], "GEX Master Server IPv4:", widget_only=True)
+        test_layout.addWidget(self._remote_test_host_container)
+        test_layout.addWidget(getHContainer([self._remote_test_button, self._add_firewall_rule_button], widget_only=True))
+
+        self._remote_test_status = QtWidgets.QLabel()
+        self._remote_test_status.setWordWrap(True)
+        self._remote_test_status.setTextFormat(Qt.TextFormat.PlainText)
+        test_layout.addWidget(self._remote_test_status)
+
+        self._remote_test_clients = QtWidgets.QListWidget()
+        self._remote_test_clients.setAccessibleName("Clients that replied to the multicast ping")
+        self._remote_test_clients.setMaximumHeight(150)
+        test_layout.addWidget(self._remote_test_clients)
+
+        self._master_server_container = getHContainer(
+            ["GEX Master Server IPv4:", self.remote_control_server_widget, self.remote_control_select_ip_widget], widget_only=True
+        )
         page_layout.addWidget(self.remote_control_master_widget)
+        page_layout.addWidget(self._master_server_container)
+        page_layout.addWidget(test_widget)
 
         widget, _ = getHContainer(self.remote_control_port_widget, "Broadcast Port:")
         page_layout.addWidget(widget)
 
-        msg = """GremlinEx broadcasts command packets via UDP unicast on the specified port.
-The default port is 6012.  Please ensure the firewall rules enable this traffic on both server and client.
-Control packets are non routable unicast (will not cross routers unless forwarded).
-Client GremlinEx machines on the local subnet must match the server port number.
-Only enable the client remote control on a client.
-Only enable the server control on the master GremlinEx machine.
-There should only be one GremlinEx master server on the subnet.
-Video return (optional) uses a separate TCP port (default 6013) from client to master Overlay widgets.
-"""
+        self.finished.connect(self._cancel_remote_connection_test)
 
-        info_box = QInfoBox(msg)
-        page_layout.addWidget(info_box)
+        self._update_remote_test_controls()
 
         page_layout.addStretch()
 
         content_widget = QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Remote Control")
 
-        self.remote_control_select_ip_widget.setEnabled(enabled)
-        self.remote_control_server_widget.setEnabled(enabled)
+    def _handle_firewall_check(self):
+        """Checks firewall rules and applies the accepted settings to Options."""
+        self._cancel_remote_connection_test()
+        test_host = "" if self.config.enable_remote_broadcast else self._remote_test_host.text().strip()
+        dialog = FirewallRuleDialog(
+            self,
+            port=self.remote_control_port_widget.value(),
+            host=test_host or self.remote_control_server_widget.text(),
+        )
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+
+        port, host = dialog.rule_target
+        self.remote_control_port_widget.setValue(port, emit=False)
+        if host is not None:
+            self.remote_control_server_widget.setText(host)
+            if self._remote_test_host.text() in ("", self.config.broadcast_host_ip):
+                self._remote_test_host.setText(host)
+        self.config.apply_remote_control_firewall_settings(port, host)
 
     def _handle_customize_theme(self):
         # Implement the logic to customize the theme here
@@ -1671,9 +1990,7 @@ Video return (optional) uses a separate TCP port (default 6013) from client to m
         self.tts_rate_widget.setValue(self.config.initial_load_rate_tts)
         self.tts_rate_widget.valueChanged.connect(self._rate_changed_cb)
         self.tts_rate_widget.doubleClick.connect(self._rate_reset_cb)
-        self.tts_rate_widget.setToolTip(
-            f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}"
-        )
+        self.tts_rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
 
         self.tts_volume_widget = QIntLineEdit()
         self.tts_volume_widget.setRange(0, 100)
@@ -1871,12 +2188,8 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_layout.setContentsMargins(6, 0, 6, 0)
         self.scroll_layout.addStretch()
 
-        sort_profile_widget = QDataPushButton(
-            "Sort Profile", callback=self._sort_profile_cb, tooltip="Sorts mappings by profile"
-        )
-        sort_process_widget = QDataPushButton(
-            "Sort Process", callback=self._sort_process_cb, tooltip="Sorts mappings by process"
-        )
+        sort_profile_widget = QDataPushButton("Sort Profile", callback=self._sort_profile_cb, tooltip="Sorts mappings by profile")
+        sort_process_widget = QDataPushButton("Sort Process", callback=self._sort_process_cb, tooltip="Sorts mappings by process")
 
         add_map_widget = QDataPushButton(
             "Add mapping",
@@ -1891,9 +2204,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         count = self.config.backup_count
         self.backup_count_widget.setValue(count)
         self.backup_count_widget.valueChanged.connect(self._backup_count_changed)
-        self.backup_count_widget.setToolTip(
-            "Number of backups to make when saving a profile.\nSet to 0 to disable backups."
-        )
+        self.backup_count_widget.setToolTip("Number of backups to make when saving a profile.\nSet to 0 to disable backups.")
 
         self.backup_count_disabled = QtWidgets.QLabel("(disabled)")
         self.backup_count_disabled.setVisible(count == 0)
@@ -2135,9 +2446,7 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         self._local_host_ip_widget.setMaximumWidth(w)
 
         self._select_ip_widget = QDataPushButton("Select")
-        self._select_ip_widget.setToolTip(
-            "Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address."
-        )
+        self._select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address.")
         self._select_ip_widget.clicked.connect(self._change_host_ip)
 
         row = 0
@@ -2360,9 +2669,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 case "maestro":
                     value = self.config.maestro_enabled
                     enabled = False
-            checkbox = QDataCheckbox(
-                name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed
-            )
+            checkbox = QDataCheckbox(name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed)
             checkbox.setEnabled(enabled)
             if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
                 var_widget = QtWidgets.QLabel(f"({env_var} set)")
@@ -2468,17 +2775,22 @@ Enabled modules may not show until the device filter is updated.
 
     @QtCore.Slot()
     def _remote_control_server_ip_select(self):
-        """select a host IP address for hosts with multiple IPs"""
-        self._host_dialog = HostIpDialog(self._host_ip)
+        """Select the remote server or a local broadcast interface."""
+        broadcasting = self.config.enable_remote_broadcast
+        host = self._host_ip if broadcasting else self._remote_test_host.text()
+        self._host_dialog = HostIpDialog(host, parent=self, browse_network=not broadcasting)
         self._host_dialog.accepted.connect(self._broadcast_host_ip_selected)
-        self._host_dialog.setExistingOnly(True)
+        self._host_dialog.setExistingOnly(broadcasting)
         self._host_dialog.exec()
         self._host_dialog = None
 
     @QtCore.Slot()
     def _broadcast_host_ip_selected(self):
         host_ip = self._host_dialog._host_ip
+        if not self.config.enable_remote_broadcast:
+            self._remote_test_host.setText(host_ip)
         self.remote_control_server_widget.setText(host_ip)
+        self._remote_control_server_ip_changed()
 
     @QtCore.Slot()
     def _change_host_ip(self):
@@ -2611,10 +2923,8 @@ Enabled modules may not show until the device filter is updated.
         self.tab_container.addTab(content_widget, "VIGEM")
 
     def closeEvent(self, event):
-        """Closes the calibration window.
-
-        :param event the close event
-        """
+        """Releases the test socket before saving Options."""
+        self._cancel_remote_connection_test()
         self.save()
 
         gremlin.util.clear_widget_references(self)
@@ -2870,7 +3180,7 @@ Enabled modules may not show until the device filter is updated.
                 streamdeck_ui.ensure_bridge_started()
             else:
                 streamdeck_ui.StreamDeckBridge().stop()
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"STREAMDECK: enable toggle error: {err}")
 
     @QtCore.Slot()
@@ -2882,7 +3192,7 @@ Enabled modules may not show until the device filter is updated.
             if self.config.streamdeck_enabled:
                 streamdeck_ui.StreamDeckBridge().stop()
                 streamdeck_ui.ensure_bridge_started()
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"STREAMDECK: port change error: {err}")
 
     @QtCore.Slot()
@@ -3004,6 +3314,7 @@ Enabled modules may not show until the device filter is updated.
         if self._is_scheduled_task():
             result = subprocess.run(
                 ["schtasks", "/Delete", "/TN", REG_KEY, "/F"],
+                check=False,
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 capture_output=True,
                 text=True,
@@ -3172,15 +3483,9 @@ Enabled modules may not show until the device filter is updated.
     @QtCore.Slot(bool)
     def _enable_remote_control(self, clicked):
         """updates remote control flag"""
+        self._cancel_remote_connection_test()
         self.config.enable_remote_control = clicked
-        self.config.save()
-        self._sync_remote_video_controls()
-        try:
-            from gremlin.remote_video import sync_publisher_with_runtime
-
-            sync_publisher_with_runtime()
-        except Exception:
-            pass
+        self._sync_remote_role_controls()
 
     @QtCore.Slot(str)
     def _client_name_changed_cb(self, text):
@@ -3199,13 +3504,13 @@ Enabled modules may not show until the device filter is updated.
             from gremlin.remote_video import sync_publisher_with_runtime
 
             sync_publisher_with_runtime()
-        except Exception:
+        except Exception:  # noqa: S110, BLE001
             pass
         try:
             import gremlin.remote
 
             gremlin.remote.remote_client.requestIdentify()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     def _sync_remote_video_controls(self):
@@ -3247,7 +3552,7 @@ Enabled modules may not show until the device filter is updated.
             for index, label in list_monitors():
                 widget.addItem(label, index)
             idx = widget.findData(current)
-            widget.setCurrentIndex(idx if idx >= 0 else 0)
+            widget.setCurrentIndex(max(idx, 0))
 
     def _refresh_remote_video_windows(self):
         from gremlin.remote_video import list_top_windows
@@ -3306,14 +3611,22 @@ Enabled modules may not show until the device filter is updated.
             from gremlin.remote_video import sync_publisher_with_runtime
 
             sync_publisher_with_runtime()
-        except Exception:
+        except Exception:  # noqa: S110, BLE001
             pass
 
     @QtCore.Slot(bool)
     def _enable_remote_broadcast(self, clicked):
         """updates remote broadcast flag"""
+        self._cancel_remote_connection_test()
         self.config.enable_remote_broadcast = clicked
-        self.config.save()
+        self._sync_remote_role_controls()
+
+    def _sync_remote_role_controls(self):
+        with QtCore.QSignalBlocker(self.enable_remote_control_widget), QtCore.QSignalBlocker(self.enable_remote_broadcast_widget):
+            self.enable_remote_control_widget.setChecked(self.config.enable_remote_control)
+            self.enable_remote_broadcast_widget.setChecked(self.config.enable_remote_broadcast)
+        self._sync_remote_video_controls()
+        self._update_remote_test_controls()
 
     @QtCore.Slot(bool)
     def _enable_broadcast_speech(self, clicked):
@@ -3323,13 +3636,88 @@ Enabled modules may not show until the device filter is updated.
     @QtCore.Slot(int)
     def _handle_remote_server_port_changed(self, value: int):
         """updates the remote control server port"""
-        self.config.server_port = value
-        self.config.save()
+        if self.config.server_port != value:
+            self._cancel_remote_connection_test()
+            self.config.server_port = value
+
+    @QtCore.Slot()
+    def _handle_test_remote_connection(self):
+        from gremlin.remote import RemoteBroadcastTest, RemoteConnectionTest
+
+        self._remote_test_clients.clear()
+        self._remote_test_clients.hide()
+        self._remote_test_status.show()
+        port = self.remote_control_port_widget.value()
+        if port is None or not 4096 <= port <= 65535:
+            self._remote_test_status.setText("Enter a Broadcast Port from 4096 to 65535.")
+            self.remote_control_port_widget.setFocus()
+            return
+
+        if self.config.enable_remote_broadcast:
+            self._handle_remote_server_port_changed(port)
+            self._remote_test_status.setText(f"Pinging remote clients over UDP multicast on port {port}…")
+            test = RemoteBroadcastTest(port, parent=self)
+            test.finished.connect(self._remote_broadcast_test_finished)
+        else:
+            address = QtNetwork.QHostAddress(self._remote_test_host.text().strip())
+            if (
+                address.protocol() != QtNetwork.QAbstractSocket.NetworkLayerProtocol.IPv4Protocol
+                or address.toIPv4Address() in (0, 0xFFFFFFFF)
+                or address.isMulticast()
+            ):
+                self._remote_test_status.setText("Enter the IPv4 address of the GEX server.")
+                self._remote_test_host.setFocus()
+                return
+            self._remote_test_status.setText(f"Testing GEX at {address.toString()}:{port}…")
+            test = RemoteConnectionTest(address, port, True, parent=self)
+            test.finished.connect(self._remote_test_finished)
+
+        self._remote_test_button.setEnabled(False)
+        self._remote_connection_test = test
+        test.start()
+
+    def _update_remote_test_controls(self):
+        broadcasting = self.config.enable_remote_broadcast
+        self._update_broadcast_server_controls()
+        self._remote_test_button.setText("Check Broadcast" if broadcasting else "Test Connection")
+        self._remote_test_host_container.setVisible(not broadcasting)
+        self._master_server_container.setVisible(broadcasting)
+        self._remote_test_status.hide()
+        self._remote_test_clients.clear()
+        self._remote_test_clients.hide()
+
+    @QtCore.Slot(str)
+    def _remote_test_finished(self, result):
+        self._cancel_remote_connection_test()
+        self._remote_test_status.setText(result)
+        self._remote_test_status.show()
+
+    @QtCore.Slot(str, list)
+    def _remote_broadcast_test_finished(self, result, clients):
+        self._remote_test_finished(result)
+        if clients:
+            self._remote_test_clients.addItems([f"{name} ({address})" if name else address for name, address in clients])
+            self._remote_test_clients.show()
+
+    @QtCore.Slot()
+    def _cancel_remote_connection_test(self):
+        test = self._remote_connection_test
+        if test is not None:
+            self._remote_connection_test = None
+            test.cancel()
+            test.deleteLater()
+            self._remote_test_button.setEnabled(True)
+            self._remote_test_status.hide()
 
     @QtCore.Slot()
     def _remote_control_server_ip_changed(self):
-        widget = self.sender()
-        self.config.broadcast_host_ip = widget.text()
+        try:
+            host = str(ipaddress.IPv4Address(self.remote_control_server_widget.text().strip()))
+        except ipaddress.AddressValueError:
+            return
+        if self.config.broadcast_host_ip != host:
+            self._cancel_remote_connection_test()
+            self.config.broadcast_host_ip = host
 
     @QtCore.Slot()
     def _handle_master_changed(self, checked):
@@ -3337,10 +3725,18 @@ Enabled modules may not show until the device filter is updated.
 
     @QtCore.Slot(bool)
     def _remote_control_all_ip_changed(self, checked: bool):
+        self._cancel_remote_connection_test()
         self.config.broadcast_bind_all_ips = checked
-        enabled = not checked
+        self._update_broadcast_server_controls()
+
+    def _update_broadcast_server_controls(self):
+        broadcasting = self.config.enable_remote_broadcast
+        enabled = not broadcasting or not self.config.broadcast_bind_all_ips
+        tooltip = "Select a local IPv4 interface for broadcasting." if broadcasting else "Select the GremlinEx broadcast server's IPv4 address."
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
+        self.remote_control_select_ip_widget.setToolTip(tooltip)
+        self.remote_control_server_widget.setToolTip(tooltip)
 
     @QtCore.Slot(float)
     def _macro_axis_polling_rate(self, value):
@@ -3487,9 +3883,7 @@ Enabled modules may not show until the device filter is updated.
                 restore_widget = QDataCheckbox("Restore last mode on start", item)
                 restore_widget.setChecked(item.restore_last_mode_on_auto_activate)
                 restore_widget.clicked.connect(self._restore_profile_last_mode_on_change)
-                restore_widget.setToolTip(
-                    "When set, restores the last used mode if the profile has been automatically loaded on process change"
-                )
+                restore_widget.setToolTip("When set, restores the last used mode if the profile has been automatically loaded on process change")
 
                 mode_widget = QDataComboBox(item)
 
@@ -3579,9 +3973,7 @@ Enabled modules may not show until the device filter is updated.
     def _profile_open_cb(self, widget):
         """opens the profile list"""
         item = widget.data
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None, "Select Profile", gremlin.shared_state.data_path, "XML files (*.xml)"
-        )
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Select Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
         if fname:
             item.profile = fname
             with QtCore.QSignalBlocker(widget):
@@ -3615,9 +4007,7 @@ Enabled modules may not show until the device filter is updated.
         # pixmap = load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
         message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
-        )
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
@@ -3706,9 +4096,7 @@ class ProcessWindow(BaseDialogUi):
         self.button_bar_layout = QtWidgets.QHBoxLayout()
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
-        self.refresh_button = QDataPushButton(
-            "Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh
-        )
+        self.refresh_button = QDataPushButton("Refresh", icon=load_icon("ei.refresh", qta_color=Color().activeColor()), callback=self._refresh)
 
         self.main_layout.addWidget(self.list_view)
 
@@ -3768,7 +4156,7 @@ class ProcessWindow(BaseDialogUi):
         if not text and self._current_selection_qindex is not None:
             try:
                 text = self.list_model.itemData(self._current_selection_qindex)[0]
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if text and os.path.isfile(text):
@@ -3879,7 +4267,7 @@ class AboutUi(BaseDialogUi):
         self.ui = ui_about.Ui_About()
         self.ui.setupUi(self)
 
-        self.ui.jg_license.setHtml(open(gremlin.util.resource_path("about/joystick_gremlin.html")).read())
+        self.ui.jg_license.setHtml(open(gremlin.util.resource_path("about/joystick_gremlin.html")).read())  # noqa: SIM115
 
         license_list = [
             "about/third_party_licenses.html",
@@ -3892,7 +4280,7 @@ class AboutUi(BaseDialogUi):
         ]
         third_party_licenses = ""
         for fname in license_list:
-            third_party_licenses += open(gremlin.util.resource_path(fname)).read()
+            third_party_licenses += open(gremlin.util.resource_path(fname)).read()  # noqa: SIM115
             third_party_licenses += "<hr>"
         self.ui.third_party_licenses.setHtml(third_party_licenses)
 
@@ -3912,14 +4300,12 @@ class ModeManagerAddUI(BaseDialogUi):
         grid_widgets = []
 
         widgets = []
-        widget, layout = getGridContainer(["New mode:", self._edit_widget])
+        widget = getGridContainer(["New mode:", self._edit_widget], widget_only=True)
         grid_widgets.append(widget)
 
-        self._parent_widget = QDataComboBox(
-            tooltip="Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode."
-        )
+        self._parent_widget = QDataComboBox(tooltip="Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode.")
 
-        widget, layout = getGridContainer(["Parent mode:", self._parent_widget])
+        widget = getGridContainer(["Parent mode:", self._parent_widget], widget_only=True)
         grid_widgets.append(widget)
 
         widget = getVContainer(grid_widgets, widget_only=True)
@@ -3936,9 +4322,7 @@ class ModeManagerAddUI(BaseDialogUi):
         cancel_button_widget = QDataPushButton("Cancel", callback=self._cancel_cb)
         ok_button_widget = QDataPushButton("Ok", callback=self._close_cb)
 
-        widget = getHContainer(
-            [ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True, auto_size=True
-        )
+        widget = getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only=True, auto_size=True)
         button_container_widget = widget
 
         self.main_layout.addWidget(button_container_widget)
@@ -4046,13 +4430,9 @@ class ModeManagerDialog(BaseDialogUi):
         self.scroll_layout.addWidget(self.mode_widget)
         self.scroll_layout.addStretch()
 
-        self.add_button = QDataPushButton(
-            "Add Mode", callback=self._add_mode_cb, tooltip="Adds a new mode to the profile"
-        )
+        self.add_button = QDataPushButton("Add Mode", callback=self._add_mode_cb, tooltip="Adds a new mode to the profile")
 
-        label = QtWidgets.QLabel(
-            'A mode represents a unique set of mappings.A parent for a mode causes the the mode "inherits" all actions of the parent. '
-        )
+        label = QtWidgets.QLabel('A mode represents a unique set of mappings.A parent for a mode causes the the mode "inherits" all actions of the parent. ')
         label.setStyleSheet(f"QLabel {{ background-color : {Color().selectColor()}; }}")
         label.setWordWrap(True)
         label.setFrameShape(QtWidgets.QFrame.Box)
@@ -4172,17 +4552,13 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = QDataPushButton(
-                icon=load_icon("ei.edit"), tooltip="Edit", callback=self._create_rename_mode_cb(mode)
-            )
+            self.mode_rename[mode] = QDataPushButton(icon=load_icon("ei.edit"), tooltip="Edit", callback=self._create_rename_mode_cb(mode))
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = QDataPushButton(
-                icon=load_icon("mdi.delete"), tooltip="Delete", callback=self._create_delete_mode_cb(mode)
-            )
+            self.mode_delete[mode] = QDataPushButton(icon=load_icon("mdi.delete"), tooltip="Delete", callback=self._create_delete_mode_cb(mode))
             self.mode_delete[mode].setEnabled(len(mode_list) > 1)
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
@@ -4270,19 +4646,16 @@ The setting can be overriden by the global mode reload option set in Options for
         """
 
         # Retrieve new name from the user
-        new_name, user_input = QtWidgets.QInputDialog.getText(
-            self, "Mode name", "", QtWidgets.QLineEdit.Normal, current_name
-        )
+        new_name, user_input = QtWidgets.QInputDialog.getText(self, "Mode name", "", QtWidgets.QLineEdit.Normal, current_name)
         new_name = new_name.strip()
         if new_name == current_name:
             # nothing to change
             return
 
-        if user_input:
-            if self._profile.rename_mode(current_name, new_name, emit=False):
-                if self.selected_mode == current_name:
-                    self.selected_mode = new_name
-                self._populate_mode_layout()
+        if user_input and self._profile.rename_mode(current_name, new_name, emit=False):
+            if self.selected_mode == current_name:
+                self.selected_mode = new_name
+            self._populate_mode_layout()
 
     def _delete_mode(self, mode_name):
         if ConfirmBox(
@@ -4432,14 +4805,10 @@ class DeviceInformationDialog(BaseDialogUi):
         disconnected_widget.setStyleSheet(f"background-color: {color_disconnected}; border-radius: 6px; padding: 5px;")
         color_virtual_connected = self._color(virtual=True, connected=True)
         virtual_connected_widget = QtWidgets.QLabel("Virtual Connected")
-        virtual_connected_widget.setStyleSheet(
-            f"background-color: {color_virtual_connected}; border-radius: 6px; padding: 5px;"
-        )
+        virtual_connected_widget.setStyleSheet(f"background-color: {color_virtual_connected}; border-radius: 6px; padding: 5px;")
         color_virtual_disconnected = self._color(virtual=True, connected=False)
         virtual_disconnected_widget = QtWidgets.QLabel("Virtual Disconnected")
-        virtual_disconnected_widget.setStyleSheet(
-            f"background-color: {color_virtual_disconnected}; border-radius: 6px; padding: 5px;"
-        )
+        virtual_disconnected_widget.setStyleSheet(f"background-color: {color_virtual_disconnected}; border-radius: 6px; padding: 5px;")
 
         legend_widgets = [
             "Legend:",
@@ -4504,18 +4873,14 @@ class DeviceInformationDialog(BaseDialogUi):
             if device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro) and not device.disabled
         ]
 
-        connected_devices = [
-            d for d in devices if d.connected and not d.is_virtual
-        ]  # list of connected hardware devices
+        connected_devices = [d for d in devices if d.connected and not d.is_virtual]  # list of connected hardware devices
         connected_vjoy_devices = [d for d in devices if d.connected and d.is_virtual]  # list of connected vjoy devices
 
         connected_devices.sort(key=lambda d: (d.device_type, d.vendor_id, d.name))
         connected_vjoy_devices.sort(key=lambda d: d.vjoy_id)
 
         if show_disconnected:
-            disconnected_devices = [
-                d for d in devices if not d.connected
-            ]  # list of disconnected devices, including vjoy devices
+            disconnected_devices = [d for d in devices if not d.connected]  # list of disconnected devices, including vjoy devices
             disconnected_devices.sort(key=lambda d: (d.vjoy_id, d.device_type, d.vendor_id, d.name))
         else:
             disconnected_devices = []
@@ -4559,11 +4924,7 @@ class DeviceInformationDialog(BaseDialogUi):
 
     def eventFilter(self, source, event):
         """table event filter"""
-        if (
-            isinstance(event, QtGui.QSinglePointEvent)
-            and event.type() == QtCore.QEvent.MouseButtonPress
-            and source is self.table.viewport()
-        ):
+        if isinstance(event, QtGui.QSinglePointEvent) and event.type() == QtCore.QEvent.MouseButtonPress and source is self.table.viewport():
             button = event.buttons()
             if button == QtCore.Qt.RightButton:
                 pos = event.position().toPoint()
@@ -4629,30 +4990,24 @@ class DeviceInformationDialog(BaseDialogUi):
             if device.is_virtual:
                 # skip virtual devices
                 continue
-            var_name = re.sub(
-                "[^0-9a-zA-Z]+", "_", device.name
-            )  # cleanup non alphanumeric in the name for clean variable names
-            s_list.append(
-                f"\n# device {device.name} - axis count: {device.axis_count}  hat count: {device.hat_count}  button count: {device.button_count}"
-            )
+            var_name = re.sub("[^0-9a-zA-Z]+", "_", device.name)  # cleanup non alphanumeric in the name for clean variable names
+            s_list.append(f"\n# device {device.name} - axis count: {device.axis_count}  hat count: {device.hat_count}  button count: {device.button_count}")
             s_list.append(f'{var_name}_NAME = "{device.name}"')
             s_list.append(f'{var_name}_GUID = "{device.device_guid}"')
             for mode_name in mode_list:
                 mode_suffix = mode_name.replace(" ", "_")
-                if mode_name not in a_map.keys():
+                if mode_name not in a_map:
                     a_map[mode_name] = set()
-                a_map[mode_name].add(
-                    f'{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, "{mode_name}")'
-                )
+                a_map[mode_name].add(f'{var_name}_{mode_suffix} = gremlin.input_devices.JoystickDecorator({var_name}_NAME, {var_name}_GUID, "{mode_name}")')
 
         script = ""
         for line in s_list:
             script += line + "\n"
 
         script += "\n# plugin decorator definitions\n"
-        for mode_name in a_map.keys():
+        for mode_name, value in a_map.items():
             script += f"\n# decorators for mode {mode_name}\n"
-            for line in a_map[mode_name]:
+            for line in value:
                 script += line + "\n"
 
         # set the clipboard data
@@ -4826,9 +5181,7 @@ class SubstituteDialog(QRememberDialog):
         self.main_layout.addWidget(self.header_container_widget)
         self.main_layout.addStretch()
 
-        self._profile_devices = [
-            device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick
-        ]
+        self._profile_devices = [device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick]
         self._profile_devices.sort(key=lambda x: x.name.casefold())
 
         # populate devices currently connected
@@ -4871,9 +5224,7 @@ class SubstituteDialog(QRememberDialog):
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText(content)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
-        )
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         return result == QtWidgets.QMessageBox.StandardButton.Ok
@@ -4901,7 +5252,7 @@ class SubstituteDialog(QRememberDialog):
             xml_file = profile.profile_file
             backup_file = profile.profile_file
             dirname, base_file = os.path.split(backup_file)
-            basename, ext = os.path.splitext(base_file)
+            basename, _ = os.path.splitext(base_file)
             max_count = 5
             count = 0
             file_list = []
@@ -4918,7 +5269,7 @@ class SubstituteDialog(QRememberDialog):
 
             try:
                 shutil.copyfile(xml_file, backup_file)
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 syslog.error(f"Error backing up profile to :{backup_file}\n{err}")
                 self.ok_message_box("Error backing up the profile")
                 return
@@ -4932,9 +5283,7 @@ class SubstituteDialog(QRememberDialog):
                 if tmp_guid.casefold() == current_guid.casefold():
                     node.set("device-guid", new_device_guid)
                     node.set("name", new_device_name)
-                    node_comment = etree.Comment(
-                        f"Substituted: [{current_guid}] {current_name} with [{new_device_guid}] {new_device_name}"
-                    )
+                    node_comment = etree.Comment(f"Substituted: [{current_guid}] {current_name} with [{new_device_guid}] {new_device_name}")
                     previous_node = node.getprevious()
                     if previous_node is not None:
                         previous_node.append(node_comment)
@@ -4949,7 +5298,7 @@ class SubstituteDialog(QRememberDialog):
                 # dirname, basename = os.path.split(xml_file)
                 # out_file = os.path.join(dirname, f"sub_{basename}")
                 tree.write(out_file, pretty_print=True, xml_declaration=True, encoding="utf-8")
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 syslog.error(f"Error writing updated profile: {out_file}\n{err}")
                 self.ok_message_box("Error writing new profile")
                 return
@@ -5032,7 +5381,7 @@ class CreateReportDialog(QRememberDialog):
         self.cancel_widget = QDataPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, layout = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
 
         self.main_layout.addWidget(widget)
 
@@ -5088,9 +5437,7 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
     def __init__(self, name: str, visible: bool, visible_change_callback: Callable, data: object, parent=None):
         super().__init__(parent=parent)
         self.data = data
-        self.visible_widget = QDataCheckbox(
-            callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self
-        )
+        self.visible_widget = QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self)
         self.name_widget = QLabel(name)
         joystick = data.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro)
         disconnected = joystick and not data.connected
@@ -5178,9 +5525,10 @@ class DeviceDisplayDialog(QRememberDialog):
 
         list_widget = ReorderListWidget(self)
 
-        all_devices = sorted(gremlin.joystick_handling.display_devices(refresh=True), key=lambda device: (
-            DeviceType.tab_order_group(device.device_type), (device.name or "").casefold()
-        ))
+        all_devices = sorted(
+            gremlin.joystick_handling.display_devices(refresh=True),
+            key=lambda device: (DeviceType.tab_order_group(device.device_type), (device.name or "").casefold()),
+        )
 
         device: TabData
         self.visible_map = dict(self.config.device_visible_map)
@@ -5219,26 +5567,14 @@ class DeviceDisplayDialog(QRememberDialog):
 
         self.main_layout.addWidget(list_widget)
 
-        default_order_widget = QDataPushButton(
-            "Default", tooltip="Default device order", callback=self._handle_default_order
-        )
+        default_order_widget = QDataPushButton("Default", tooltip="Default device order", callback=self._handle_default_order)
 
-        save_order_widget = QDataPushButton(
-            "Save...", tooltip="Save device visibility", callback=self._handle_save_order
-        )
-        load_order_widget = QDataPushButton(
-            "Load...", tooltip="Load saved device visibility", callback=self._handle_load_order
-        )
-        select_all_widget = QDataPushButton(
-            "Select All", tooltip="Select all devices", callback=self._handle_select_all
-        )
-        select_none_widget = QDataPushButton(
-            "Select None", tooltip="Select no devices", callback=self._handle_select_none
-        )
+        save_order_widget = QDataPushButton("Save...", tooltip="Save device visibility", callback=self._handle_save_order)
+        load_order_widget = QDataPushButton("Load...", tooltip="Load saved device visibility", callback=self._handle_load_order)
+        select_all_widget = QDataPushButton("Select All", tooltip="Select all devices", callback=self._handle_select_all)
+        select_none_widget = QDataPushButton("Select None", tooltip="Select no devices", callback=self._handle_select_none)
 
-        self.last_order_widget = QDataPushButton(
-            "Load Last", tooltip="Load last saved device visibility", callback=self._handle_load_last_order
-        )
+        self.last_order_widget = QDataPushButton("Load Last", tooltip="Load last saved device visibility", callback=self._handle_load_last_order)
 
         action_container_widget = getHContainer(
             [
@@ -5306,16 +5642,14 @@ class DeviceDisplayDialog(QRememberDialog):
         """Save visibility without serializing device positions."""
         tab_map = self._get_current_map()
         if tab_map:
-            fname, _ = QtWidgets.QFileDialog.getSaveFileName(
-                None, "Save Device Visibility", gremlin.shared_state.data_path, "JSON files (*.json)"
-            )
+            fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Device Visibility", gremlin.shared_state.data_path, "JSON files (*.json)")
             if fname != "":
                 try:
                     data = json.dumps(dict(tab_map.values()), indent=4, sort_keys=True)
                     with open(fname, "w", encoding="utf-8") as h:
                         h.write(data)
                         h.flush()
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001
                     MessageBoxWarning("Error", f"Unable to save: {err}")
                     syslog.error(err)
 
@@ -5388,7 +5722,7 @@ class DeviceDisplayDialog(QRememberDialog):
                 self._populate_list_widget(rows)
 
                 self.config.last_reorder_file = fname
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001
                 MessageBoxWarning("Error", f"Unable to read file: {err}")
                 syslog.error(err)
 
@@ -5416,9 +5750,7 @@ class DeviceDisplayDialog(QRememberDialog):
                 return False
             return device.device_guid in profile.devices or device.device_guid in profile.vjoy_devices
         if device.is_virtual:
-            return any(
-                dev.device_guid == device.device_guid for dev in gremlin.joystick_handling.virtual_input_devices()
-            )
+            return any(dev.device_guid == device.device_guid for dev in gremlin.joystick_handling.virtual_input_devices())
         config = gremlin.config.Configuration()
         match device.device_type:
             case DeviceType.Osc:
@@ -5458,7 +5790,9 @@ class DeviceDisplayDialog(QRememberDialog):
                 self.visible_map[device.device_id] = True
             widget = ReorderDeviceListWidget(
                 device.name or f"Unnamed device ({device.device_id})",
-                visible=visible, visible_change_callback=self._handle_visible_changed, data=device,
+                visible=visible,
+                visible_change_callback=self._handle_visible_changed,
+                data=device,
             )
             item = QListWidgetItem(self._list_widget)
             item.setData(QtCore.Qt.UserRole, (device, visible))

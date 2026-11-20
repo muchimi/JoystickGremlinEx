@@ -1545,7 +1545,11 @@ class ExecutionContext:
                     action_set_node.parent = container_group
                     action_set_group_node.parent = action_set_node
 
-                    action_list = [((action.priority, index), action) for index, action in enumerate(action_set)]
+                    action_list = [
+                        ((action.priority, index), action)
+                        for index, action in enumerate(action_set)
+                        if action.hasOutput()
+                    ]
                     if not action_list:
                         # empty set
                         continue
@@ -2695,6 +2699,8 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
         if verbose:
             syslog.info("Ordering action sets:")
         for action in action_set:
+            if not action.hasOutput():
+                continue
             action_set_node = ExecutionGraphActionSetNode()
             action_set_node.parent = parent
 

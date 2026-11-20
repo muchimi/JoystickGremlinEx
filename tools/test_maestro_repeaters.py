@@ -4,6 +4,7 @@ Run: python tools/test_maestro_repeaters.py
 """
 
 import math
+from concurrent.futures import ThreadPoolExecutor
 import struct
 import threading
 import time
@@ -17,7 +18,10 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 
 import test_virtual_output_selectors as outputs
+import test_remote
+import test_vjoy
 from test_qt_marshalling import APP, Colors, flush_deletes, pump_until
+from gremlin import maestro_identity
 from gremlin.types import CallbackMode, EventSourceType, HatDirection, VisualizationType, VjoyAction
 
 
@@ -106,12 +110,14 @@ ENV.update(Event=Event, Color=Palette, QFlowLayout=Flow, QUsedPushButton=Button,
            QFloatLineEdit=macro.QFloatLineEdit, Pixmaps=lambda: NS(
                onIconPixmap=QtGui.QPixmap(16, 16), offIconPixmap=QtGui.QPixmap(16, 16)))
 AxisValues = load("gremlin/event_handler.py", "AxisValues")
+load("gremlin/joystick_handling.py", "_maestro_output_summary")
+get_virtual_output_axis = load("gremlin/joystick_handling.py", "get_virtual_output_axis")
 ENV["_pin_deleted_widget"] = Mock()
 load("gremlin/util.py", "delete_widget")
 Processor = load("gremlin/event_handler.py", "JoystickEventProcessor", {
     "registerListenerUICallback", "unregisterListenerUICallback", "_fireCallbacks_ui", "process_vjoy_ui",
 }, "object")
-for name in ("_normalize_axis_value_key", "QProgressBar", "QJoystickListener", "QAxisRepeaterProgressbar",
+for name in ("_viewer_event_source", "_normalize_axis_value_key", "QProgressBar", "QJoystickListener", "QAxisRepeaterProgressbar",
              "QButtonStateWidget", "JoystickDeviceAxisStateWidget", "HatWidget", "HatState",
              "AxesTimeline", "TimeLinePlotWidget", "JoystickDeviceButtonStateWidget"):
     load("gremlin/ui/ui_common.py", name)
@@ -126,10 +132,13 @@ Dialog = load("gremlin/ui/input_viewer.py", "InputViewerDialog", {"_update_virtu
 ENV["HAT_POSITIONS"] = {(0, 0): 0, (0, 1): 1, (1, 1): 2, (1, 0): 3, (1, -1): 4,
                         (0, -1): 5, (-1, -1): 6, (-1, 0): 7, (-1, 1): 8}
 macro.module("gremlin.input_item", InputItem=InputItem, getInputIdKey=lambda value: value)
+macro.MODULES["gremlin.maestro_identity"] = maestro_identity
 macro.module("gremlin.maestro", MaestroOutputDevice=ENV["MaestroOutputDevice"])
 macro.module("gremlin.actions", Value=lambda value, raw=None, is_pressed=None: NS(current=value, raw=raw, is_pressed=is_pressed))
 RemapFunctor = load("action_plugins/map_to_vjoy/__init__.py", "VJoyRemapFunctor", {
-    "process_event", "_process_event", "_set_axis", "_is_maestro_target", "_output_key", "_output_device", "_send_flags",
+    "process_event", "_process_event", "_set_axis", "_is_maestro_target", "_output_key", "_output_device", "_send_flags", "_can_broadcast",
+    "_pulse_on", "_pulse_off",
+    "client_list",
 }, "object")
 macro.gremlin.types.EventSourceType = EventSourceType
 
@@ -152,6 +161,8 @@ class MaestroRepeaterTests(unittest.TestCase):
         macro.gremlin.shared_state.is_running = False
         macro.gremlin.shared_state.current_profile = None
         macro.CONFIG.verbose_mode_ui_level = lambda level: False
+        macro.CONFIG.verbose_mode_maestro = False
+        macro.CONFIG.enable_remote_broadcast = False
         macro.CONFIG.splitJoystickRepeater = True
         macro.CONFIG.changed = self.bus.changed
         macro.gremlin.util.assert_ui_thread = lambda: self.assertTrue(QtCore.QThread.isMainThread())
@@ -160,6 +171,8 @@ class MaestroRepeaterTests(unittest.TestCase):
         macro.gremlin.util.delete_widget = ENV["delete_widget"]
         macro.gremlin.joystick_handling.VirtualDeviceUsageState = lambda: NS(used_button_list=lambda guid: [])
         self.maestro.button_count, self.maestro.hat_count = 40, 2
+        self.maestro.input_enabled = True
+        self.vjoy.data = {}
         self.maestro.device_id = self.maestro.key = str(self.maestro.device_guid)
         self.vjoy.device_id = self.vjoy.key = str(self.vjoy.device_guid)
         macro.gremlin.joystick_handling.all_joystick_devices = lambda: self.devices
@@ -170,8 +183,12 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.service = Maestro()
         self.service.enabled, self.service._lock, self.service._stopping = True, threading.RLock(), threading.Event()
         self.service.client = NS(write=Mock())
-        controller = NS(id="gex-1", key="controller-1", axis_count=2, button_count=40, hat_count=2, axis_names=["X", "Y"])
+        controller = NS(id="gex-1", key="controller-1", axis_count=2, button_count=40, hat_count=2, axis_names=["X", "Y"],
+                        instance_token=None, profile=NS(VendorId=1, ProductId=0x4701))
         self.service._controller_map = {1: controller}
+        self.service._active_service_devices = {}
+        self.service._native_gamepad_inputs = []
+        ENV.update(GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1, gex_product_id=lambda device_id: 0x4701)
         self.service._device_map = {1: self.maestro}
         self.maestro.data = {"maestro_key": controller.key}
         macro.gremlin.joystick_handling.maestro_devices = lambda connected_only=True: [device for device in self.devices if device.device_type == macro.DeviceType.Maestro]
@@ -183,6 +200,9 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.targets[self.maestro.device_guid].maestro = self.output
         self.targets[self.key].maestro = self.output
         macro.gremlin.joystick_handling.get_axis = lambda guid, axis: self.service._read_axis_raw(1, axis) / 32767
+        ENV["get_axis"] = macro.gremlin.joystick_handling.get_axis
+        macro.gremlin.joystick_handling.get_virtual_output_axis = get_virtual_output_axis
+        ENV["joystick_handling"] = macro.gremlin.joystick_handling
         macro.gremlin.joystick_handling.get_button = lambda guid, button: self.service._read_button(1, button)
         macro.gremlin.joystick_handling.get_hat_position = lambda guid, hat: self.output.hat(hat).direction
 
@@ -501,6 +521,153 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.assertEqual(hats._hat_map[2].angle, hats._hat_map[2]._angle_map[(0, -1)])
         loopback.assert_not_called()
 
+    def test_remote_vjoy_outputs_update_viewer_when_directinput_is_stale(self):
+        test_vjoy.VJoyChecks.setUpClass()
+        vjoy = test_vjoy.VJoyChecks()
+        vjoy.setUp()
+        self.addCleanup(vjoy.doCleanups)
+        vjoy.services.event_handler.Event = Event
+        vjoy.services.event_handler.EventListener = lambda: self.bus
+        vjoy.ns["_output_event_context"].cache_clear()
+        for control in (vjoy.axis, vjoy.button, vjoy.hat):
+            control.device_guid = self.vjoy.device_guid
+        outputs.Proxy.vjoy_devices[1] = vjoy.device
+        ENV["get_axis"] = Mock(return_value=0.0)
+
+        self.vjoy.axis_count = 1
+        self.vjoy.getAxisInputIdList = lambda: [6]
+        self.vjoy.getAxisLinearId = lambda input_id: 1
+        self.vjoy.axis_sequence_to_input_id = lambda index: 6
+        self.vjoy.getAxisName = self.vjoy.get_axis_name
+        self.vjoy.button_count = self.vjoy.hat_count = 1
+        axes, buttons, hats, timeline = [ENV[name](self.vjoy) for name in (
+            "JoystickDeviceAxisStateWidget", "JoystickDeviceButtonStateWidget", "HatState", "AxesTimeline",
+        )]
+        self.widgets.extend((axes, buttons, hats, timeline))
+
+        test_remote.RemoteChecks.setUpClass()
+        remote = test_remote.RemoteChecks()
+        remote.setUp()
+        macro.gremlin.shared_state.is_running = True
+        remote.services.joystick_handling.VJoyProxy = outputs.Proxy
+        loopback = Mock()
+        self.bus.joystick_event.connect(loopback)
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            for send, args in (
+                (remote.sender.send_axis, (1, 6, -0.5)),
+                (remote.sender.send_button, (1, 1, True)),
+                (remote.sender.send_hat, (1, 1, (0, -1))),
+            ):
+                send(*args)
+                worker.submit(remote.transfer).result(timeout=2)
+
+            pump_until(lambda: buttons._widget_map[1].highlight)
+            self.assertAlmostEqual(axes.value_label_widgets[6].value(), -0.5, places=3)
+            self.assertEqual(hats._hat_map[1].angle, hats._hat_map[1]._angle_map[(0, -1)])
+            timeline._update_points()
+            self.assertEqual(timeline.plot_widget._series[6][-1], 0.5)
+            reopened_axes = ENV["JoystickDeviceAxisStateWidget"](self.vjoy)
+            self.widgets.append(reopened_axes)
+            self.assertAlmostEqual(reopened_axes.value_label_widgets[6].value(), -0.5, places=3)
+
+            remote.sender.toggle_button(1, 1)
+            worker.submit(remote.transfer).result(timeout=2)
+            remote.sender.send_hat(1, 1, (0, 0))
+            worker.submit(remote.transfer).result(timeout=2)
+            pump_until(lambda: not buttons._widget_map[1].highlight and hats._hat_map[1].angle == -1)
+        loopback.assert_not_called()
+
+    def test_remote_maestro_outputs_use_bridge_layout_and_retained_values(self):
+        output_view = NS(**vars(self.maestro))
+        output_view.input_enabled = False
+        output_view.is_gamepad = False
+        output_view.data = self.maestro.data.copy()
+        output_view.get_axis = lambda axis: self.service._read_axis_raw(1, axis)
+        output_view.get_button = lambda button: self.service._read_button(1, button)
+        output_view.get_hat = lambda hat: self.service._read_hat(1, hat)
+        self.maestro.data["maestro_output_summary"] = output_view
+        self.maestro.axis_count = self.maestro.button_count = self.maestro.hat_count = 1
+        selector = Selector()
+        self.widgets.append(selector)
+        viewer_device = next(device for device in selector._available_devices() if device.device_guid == self.maestro.device_guid)
+        self.assertIs(viewer_device, output_view)
+
+        test_remote.RemoteChecks.setUpClass()
+        remote = test_remote.RemoteChecks()
+        remote.setUp()
+        macro.gremlin.shared_state.is_running = True
+        macro.CONFIG.enable_remote_broadcast = True
+        routing = remote.services.joystick_handling
+        routing.get_output_target = {self.key: NS(kind="maestro", maestro=self.output)}.get
+        routing.get_output_device = {output_view.device_guid: self.output}.get
+        remote.config.vjoy_installed = False
+        routing.VJoyProxy = Mock(side_effect=AssertionError("Maestro output opened vJoy"))
+        routing.vjoy_id_from_guid = Mock(return_value=None)
+        master = NS(**vars(output_view))
+        master.device_guid = uuid.UUID(int=42)
+        master.virtual_id = 7
+        master.name = "Master flight controls"
+        master.data = {"maestro_key": "maestro://master:8010/gex-2"}
+        output_view.data["maestro_key"] = "maestro://client:8010/gex-2"
+        self.service._controller_map[1].key = output_view.data["maestro_key"]
+        remote.ns["maestro_devices"] = lambda: [output_view]
+        routing.get_virtual_device = {str(master.device_guid): master}.get
+
+        functor = RemapFunctor()
+        functor.remote_client = remote.sender
+        config = remote.make_routing()
+        functor.vjoy_id, functor.vjoy_input_id = master.virtual_id, 2
+        functor.action_mode = VjoyAction.VJoyAxis
+        functor.action_data = NS(virtual_device=master, action_mode=VjoyAction.VJoyAxis,
+                                 sendFlags=lambda: (False, True), remote_config=config)
+        functor.usage_data = NS(is_inverted=lambda *args: False)
+        functor.verbose = functor.verbose_extra = False
+
+        readbacks = {name: load("gremlin/joystick_handling.py", name) for name in ("get_axis", "get_button", "get_hat", "get_hat_position", "get_device")}
+        hat_angles = {code * 4500 - 4500: direction for direction, code in ENV["HAT_POSITIONS"].items() if code}
+        with patch.dict(ENV, readbacks, DeviceSummary=NS, vjoy=NS(Hat=NS(to_continuous_position=hat_angles))), patch.multiple(
+            macro.gremlin.joystick_handling, get_button=readbacks["get_button"], get_hat_position=readbacks["get_hat_position"],
+            maestro_devices=lambda: [output_view],
+        ):
+            with ThreadPoolExecutor(max_workers=1) as worker:
+                remote.sender.send_axis(self.key, 2, -0.5)
+                worker.submit(remote.transfer).result(timeout=2)
+                remote.sender.send_button(2, 40, True)
+                worker.submit(remote.transfer).result(timeout=2)
+                remote.sender.send_hat(self.key, 2, (0, -1))
+                worker.submit(remote.transfer).result(timeout=2)
+
+                axes, buttons, hats, timeline = [ENV[name](viewer_device) for name in (
+                    "JoystickDeviceAxisStateWidget", "JoystickDeviceButtonStateWidget", "HatState", "AxesTimeline",
+                )]
+                self.widgets.extend((axes, buttons, hats, timeline))
+                self.assertAlmostEqual(axes.value_label_widgets[2].value(), -0.5, places=3)
+                self.assertTrue(buttons._widget_map[40].highlight)
+                self.assertEqual(hats._hat_map[2].angle, hats._hat_map[2]._angle_map[(0, -1)])
+                timeline._update_points()
+                self.assertAlmostEqual(timeline.plot_widget._series[2][-1], 0.5, places=3)
+
+                functor._set_axis(master.virtual_id, 2, 0.75)
+                packet = worker.submit(remote.transfer).result(timeout=2)
+                self.assertEqual(packet["data"]["device"], {
+                    "maestro_id": "gex-2", "name": "Master flight controls", "gamepad": False,
+                })
+                self.assertEqual(packet["to"], 0)
+                remote.sender.toggle_button(self.key, 40)
+                worker.submit(remote.transfer).result(timeout=2)
+                config.isCustom = True
+                config.getClient(0).selected = False
+                config.addClient("Client", remote.receiver.clientId).selected = True
+                functor.action_data.vjoy_hat_return_position = (0, 0)
+                functor._pulse_off((master.virtual_id, macro.InputType.JoystickHat, 2, (0, -1), False, True, False))
+                packet = worker.submit(remote.transfer).result(timeout=2)
+                self.assertEqual(packet["to"], remote.receiver.clientId)
+                pump_until(lambda: not buttons._widget_map[40].highlight and hats._hat_map[2].angle == -1)
+                self.processor._fireCallbacks_ui(self.event(input_id=2, value=0.0, source=EventSourceType.dInput))
+                self.assertAlmostEqual(axes.value_label_widgets[2].value(), 0.75, places=3)
+        routing.VJoyProxy.assert_not_called()
+        routing.vjoy_id_from_guid.assert_not_called()
+
     def test_viewer_virtual_picker_includes_more_than_three_devices_and_keeps_guid(self):
         self.devices = [macro.device(i, f"Maestro {i}", macro.DeviceType.Maestro) for i in range(2, 8)]
         widget = Dialog()
@@ -550,6 +717,7 @@ class MaestroRepeaterTests(unittest.TestCase):
     def test_select_virtual_device_includes_buttons_and_hats_and_separates_providers(self):
         widget = Selector()
         self.widgets.append(widget)
+        widget._devices = self.devices
         controls = {}
         for device in (self.maestro, self.vjoy):
             key = getattr(device, "key", str(device.device_guid))

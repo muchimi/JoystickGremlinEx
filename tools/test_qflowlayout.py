@@ -173,6 +173,33 @@ class FlowLayoutChecks(unittest.TestCase):
         finally:
             parent.deleteLater()
 
+    def test_exact_fit_and_wrapped_height_include_layout_margins(self):
+        parent = QtWidgets.QWidget()
+        self.addCleanup(parent.deleteLater)
+        layout = FLOW(parent)
+        layout.setContentsMargins(3, 5, 7, 11)
+        layout.setSpacing(4)
+        first, last = HintWidget(30, 20), HintWidget(30, 25)
+        layout.addWidget(first)
+        layout.addWidget(last)
+        style = first.style()
+        button = QtWidgets.QSizePolicy.ControlType.PushButton
+        gap = layout.spacing() + style.layoutSpacing(button, button, QtCore.Qt.Orientation.Horizontal)
+        width = 3 + 30 + gap + 30 + 7
+
+        self.assertEqual(layout.minimumSize(), QtCore.QSize(40, 41))
+        self.assertEqual(layout.heightForWidth(width), 41)
+        layout.setGeometry(QtCore.QRect(0, 0, width, 41))
+        self.assertEqual(last.geometry(), QtCore.QRect(3 + 30 + gap, 5, 30, 25))
+        self.assertEqual(layout.lineCount, 1)
+
+        width -= 1
+        height = layout.heightForWidth(width)
+        layout.setGeometry(QtCore.QRect(0, 0, width, height))
+        self.assertEqual(layout.lineCount, 2)
+        self.assertEqual(last.geometry().left(), 3)
+        self.assertEqual(last.geometry().bottom() + 1 + 11, height)
+
     def test_native_qt_insert_remove_and_resize_update_geometry(self):
         parent = QtWidgets.QWidget()
         layout = FLOW(parent)

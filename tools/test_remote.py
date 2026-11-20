@@ -1,18 +1,23 @@
-"""Remoting regression checks without live network or device output.
+"""Remoting regression checks without device output.
 
 Run with: python tools/test_remote.py
 Actual packet builders, MessagePack, receive handlers, and worker queues are
-used with in-memory sockets and device doubles.
+used with in-memory sockets, loopback UDP, and device doubles.
 """
 
 import ast
 import enum
+import ipaddress
+import json
 import logging
+import os
 import queue
+import re
 import socket
 import socketserver
 import struct
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -22,31 +27,56 @@ from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
 
 import msgpack
+from lxml import etree
+from psygnal import Signal
+from PySide6 import QtCore, QtWidgets
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gremlin.types import GamePadOutput, MouseButton  # noqa: E402
+from gremlin.types import DeviceType, GamePadOutput, MouseButton, VjoyAction  # noqa: E402
+from gremlin.error import VJoyError  # noqa: E402
 from gremlin.input_types import InputType  # noqa: E402
+from gremlin.network import REMOTE_CONTROL_MULTICAST_GROUP  # noqa: E402
 
 
 def load_remote(source=None):
     names = {
-        "_hat_direction", "_open_remote_vjoy", "GremlinServer", "GremlinSocketHandler",
-        "RemoteClient", "BaseData", "ButtonData", "AxisData", "HatData", "KeyData",
+        "_unpack_remote_packet", "_hat_direction", "_open_remote_output", "GremlinServer", "GremlinSocketHandler",
+        "RPCGremlin", "RemoteBroadcastTest", "RemoteClient", "BaseData", "ButtonData", "AxisData", "HatData", "KeyData",
         "MouseData", "BlockData", "ClientData", "PacketState", "PacketData",
+        "RemoteClientData", "RemoteConfig", "_VIRTUAL_OUTPUT_ACTIONS",
+        "RemoteControl", "RemoteClientSelectionWidget", "_client_address_key", "normalize_client_address",
+        "ClientOperation", "OutputMode", "SelectionBehavior", "_OUTPUT_MODES",
+        "read_client_selection", "write_client_selection",
     }
     tree = ast.parse(source if source is not None else (ROOT / "gremlin/remote.py").read_bytes())
-    nodes = [node for node in tree.body if getattr(node, "name", None) in names]
+    nodes = [
+        node
+        for node in tree.body
+        if getattr(node, "name", None) in names
+        or isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and (target.id.startswith("_PROBE_") or target.id in names) for target in node.targets)
+    ]
+    output_api = ast.parse((ROOT / "gremlin/joystick_handling.py").read_bytes())
+    nodes.extend(node for node in output_api.body if getattr(node, "name", None) in {
+        "parse_virtual_device_key", "maestro_output_identity", "match_maestro_output",
+    })
     services = NS(singleton_decorator=NS(SingletonDecorator=lambda cls: cls))
     namespace = dict(
         gremlin=services, socket=socket, socketserver=socketserver, queue=queue,
         threading=threading, struct=struct, time=time, uuid=uuid, enum=enum,
-        msgpack=msgpack, GamePadOutput=GamePadOutput, MouseButton=MouseButton,
+        msgpack=msgpack, DeviceType=DeviceType, GamePadOutput=GamePadOutput, MouseButton=MouseButton, VJoyError=VJoyError,
+        QtCore=QtCore, QtWidgets=QtWidgets, Signal=Signal, VjoyAction=VjoyAction,
+        ipaddress=ipaddress, json=json, re=re, Path=Path, tempfile=tempfile, ElementTree=etree,
+        safe_read=lambda node, attr, kind, default: (
+            (node.get(attr).casefold() == "true" if kind is bool else kind(node.get(attr)))
+            if attr in node.attrib else default
+        ),
         get_guid=lambda: str(uuid.uuid4()), syslog=logging.getLogger("remote-checks"),
-        RPCGremlin=NS(MULTICAST_GROUP="224.3.29.72", MULTICAST_TTL=2),
-        remote_server=Mock(),
+        REMOTE_CONTROL_MULTICAST_GROUP=REMOTE_CONTROL_MULTICAST_GROUP,
+        remote_server=Mock(startup_ready=True),
     )
     module = ast.Module(body=[
         ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
@@ -59,13 +89,21 @@ def load_remote(source=None):
 class MemorySocket:
     def __init__(self):
         self.packets = []
+        self.destinations = []
         self.closed = False
 
     def sendto(self, data, address):
         if self.closed:
             raise OSError("closed socket")
         self.packets.append(data)
+        self.destinations.append(address)
         return len(data)
+
+    def getsockname(self):
+        return "0.0.0.0", 49832
+
+    def getsockopt(self, level, option, size):
+        return socket.inet_aton("192.0.2.1")
 
     def close(self):
         self.closed = True
@@ -117,7 +155,17 @@ class RemoteChecks(unittest.TestCase):
             hat=lambda target: self.hat, button=lambda target: self.button,
             axis=lambda target: self.axes[target], is_axis_valid=lambda axis_id: axis_id in self.axes,
         )
-        self.services.joystick_handling = NS(VJoyProxy=lambda: {1: self.device}, vjoy_id_from_guid=lambda *_: 1)
+        self.services.joystick_handling = NS(
+            VJoyProxy=lambda: {1: self.device},
+            vjoy_id_from_guid=lambda *_: 1,
+            get_output_device=lambda *_: None,
+            get_output_target=lambda *_: None,
+            get_virtual_device=lambda *_: None,
+            parse_virtual_device_key=self.ns["parse_virtual_device_key"],
+            maestro_output_identity=self.ns["maestro_output_identity"],
+            match_maestro_output=self.ns["match_maestro_output"],
+        )
+        self.ns["maestro_devices"] = lambda: []
         self.services.shared_state = NS(is_running=True, application_version="test", application_start_time=1)
         self.services.util = NS(get_guid=lambda: str(uuid.uuid4()), clamp=lambda value: max(-1, min(1, value)))
         self.services.sendinput = Mock()
@@ -126,7 +174,11 @@ class RemoteChecks(unittest.TestCase):
         self.services.types = NS(MouseButton=MouseButton)
         self.gamepad = Mock()
         self.services.gamepad_handling = NS(getGamepad=lambda index: self.gamepad)
-        self.services.config = NS(Configuration=lambda: NS(enable_remote_control=True, remote_video_enabled=False))
+        self.config = NS(
+            enable_remote_control=True, remote_video_enabled=False, client_name="test", verbose_mode_remote=False,
+            vjoy_installed=True, virtual_output_failover=True, verbose_mode_maestro=False,
+        )
+        self.services.config = NS(Configuration=lambda: self.config)
         self.sender = self.make_client(10)
         self.receiver = self.make_client(20)
         self.ns["remote_client"] = self.receiver
@@ -135,6 +187,7 @@ class RemoteChecks(unittest.TestCase):
         client = object.__new__(self.ns["RemoteClient"])
         client._sock = MemorySocket()
         client._socket_lock = threading.RLock()
+        client._socket_settings = (6012, "127.0.0.1", True)
         client._callbacks_lock = threading.Lock()
         client._address = ("224.3.29.72", 6012)
         client._started = False
@@ -144,6 +197,7 @@ class RemoteChecks(unittest.TestCase):
         client.remote_control = NS(
             clientId=identifier, clientName=f"client-{identifier}", customName="",
             registerClient=Mock(), unregisterClient=Mock(),
+            filterClientTargets=lambda targets: (0,) if 0 in targets else targets,
         )
         return client
 
@@ -153,6 +207,11 @@ class RemoteChecks(unittest.TestCase):
         packet = msgpack.unpackb(sender._sock.packets[-1])
         receiver.handle(packet, peer_ip="192.0.2.1")
         return packet
+
+    def make_routing(self):
+        self.ns["remote_control"] = NS(getClients=lambda: {})
+        self.services.event_handler = NS(EventListener=lambda: NS(remote_control_client_change=Mock()))
+        return self.ns["RemoteConfig"]()
 
     def test_all_hat_directions_survive_messagepack(self):
         for position in sorted(Hat.directions):
@@ -183,6 +242,34 @@ class RemoteChecks(unittest.TestCase):
         self.transfer()
         self.assertEqual(self.axes[6].value, 1)
 
+    def test_legacy_axis_uses_configured_maestro_when_native_vjoy_is_unavailable(self):
+        routing = self.services.joystick_handling
+        maestro = NS(device_guid=uuid.uuid4(), name="Pedals", is_gamepad=False, virtual_id=27,
+                     connected=True, disabled=False, data={"maestro_key": "maestro://client:8010/gex-1"})
+        self.ns["maestro_devices"] = lambda: [maestro]
+        routing.get_output_device = Mock(side_effect={maestro.device_guid: self.device}.get)
+        routing.VJoyProxy = Mock(side_effect=VJoyError("driver unavailable"))
+
+        self.config.vjoy_installed = False
+        self.sender.send_axis(1, 6, 0.6)
+        self.transfer()
+        self.assertEqual(self.axes[6].value, 0.6)
+        routing.VJoyProxy.assert_not_called()
+        routing.get_output_device.assert_called_once_with(maestro.device_guid)
+
+        self.config.vjoy_installed = True
+        self.sender.send_axis(1, 6, 0.9)
+        self.transfer()
+        self.assertEqual(self.axes[6].value, 0.9)
+        routing.VJoyProxy.assert_called_once_with()
+
+        self.config.virtual_output_failover = False
+        routing.get_output_device.reset_mock()
+        self.sender.send_axis(1, 6, -0.25)
+        self.transfer()
+        self.assertEqual(self.axes[6].value, 0.9)
+        routing.get_output_device.assert_not_called()
+
     def test_invalid_axis_is_ignored_before_reading_current_value(self):
         self.sender.send_relative_axis(1, 99, 0.1)
         self.transfer()
@@ -195,6 +282,38 @@ class RemoteChecks(unittest.TestCase):
         self.sender.toggle_button(1, 1)
         self.transfer()
         self.assertFalse(self.button.is_pressed)
+
+    def test_maestro_command_uses_service_index_or_unique_name_across_hosts(self):
+        master = NS(device_type=DeviceType.Maestro, name="Pedals", is_gamepad=False, virtual_id=6,
+                    data={"maestro_key": "maestro://master:8010/gex-2"})
+        target = NS(device_guid=uuid.uuid4(), name="Renamed pedals", is_gamepad=False, virtual_id=12,
+                    connected=True, disabled=False, data={"maestro_key": "maestro://client:8010/gex-2"})
+        decoy = NS(device_guid=uuid.uuid4(), name="Yoke", is_gamepad=False, virtual_id=6,
+                   connected=True, disabled=False, data={"maestro_key": "maestro://client:8010/gex-5"})
+        routing = self.services.joystick_handling
+        key = str(uuid.uuid4())
+        routing.get_virtual_device = {key: master}.get
+        routing.get_output_device = Mock(side_effect={target.device_guid: self.device}.get)
+        self.ns["maestro_devices"] = lambda: [decoy, target]
+
+        self.sender.send_button(key, 1, True)
+        self.transfer()
+        self.assertTrue(self.button.is_pressed)
+        routing.get_output_device.assert_called_once_with(target.device_guid)
+
+        target.data["maestro_key"] = "maestro://client:8010/gex-8"
+        target.name = " PEDALS "
+        self.sender.send_button(key, 1, False)
+        self.transfer()
+        self.assertFalse(self.button.is_pressed)
+        routing.get_output_device.assert_called_with(target.device_guid)
+
+        decoy.name = "Pedals"
+        routing.get_output_device.reset_mock()
+        self.sender.send_button(key, 1, True)
+        self.transfer()
+        self.assertFalse(self.button.is_pressed)
+        routing.get_output_device.assert_not_called()
 
     def test_keyboard_without_target_process_is_sent(self):
         self.sender.send_key(0x41, 0x1E, 2)
@@ -271,6 +390,39 @@ class RemoteChecks(unittest.TestCase):
                 self.transfer()
                 getattr(self.services.sendinput, output).assert_called_with(*expected)
 
+    def test_all_kvm_packet_types_use_the_current_master_client_filter(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        sends = (
+            (self.sender.send_kvm_mouse_motion_start, (), "start"),
+            (self.sender.send_kvm_keyboard, (0x41, 0x1E, 0), "key"),
+            (self.sender.send_kvm_keyboard, (0x41, 0x1E, 2), "key"),
+            (self.sender.send_kvm_mouse_motion, (0, 0, 3, -2), "motion"),
+            (self.sender.send_kvm_mouse_button, (1, True), "button"),
+            (self.sender.send_kvm_mouse_button, (1, False), "button"),
+            (self.sender.send_kvm_mouse_wheel, (120, False), "wheel"),
+            (self.sender.send_kvm_mouse_wheel, (-120, True), "hwheel"),
+            (self.sender.send_kvm_mouse_motion_stop, (), "stop"),
+        )
+        for selection, targets, expected in (
+            (frozenset({"left-pc"}), [0], [20]),
+            (frozenset({"192.0.2.30"}), [20, 30], [30]),
+            (frozenset({"192.0.2.30"}), [20], []),
+            (frozenset({"offline-pc"}), [0], []),
+            (None, [0], [0]),
+        ):
+            with self.subTest(selection=selection, targets=targets):
+                control.setActiveClients(selection)
+                self.sender._sock.packets.clear()
+                for send, args, _ in sends:
+                    send(*args, client_list=targets)
+                packets = [msgpack.unpackb(packet) for packet in self.sender._sock.packets]
+                self.assertEqual(
+                    [(packet["action"], packet["subtype"], packet["to"]) for packet in packets],
+                    [("kvm", subtype, client_id) for _, _, subtype in sends for client_id in expected],
+                )
+
     def test_gamepad_button_roundtrip(self):
         self.sender.send_gamepad_button(0, 0x1000, True)
         self.transfer()
@@ -294,6 +446,246 @@ class RemoteChecks(unittest.TestCase):
         self.sender.send_hat(1, 1, (0, 1), client_list=[])
         self.assertEqual(len(self.sender._sock.packets), 1)
 
+    def make_master(self):
+        folder = self.enterContext(tempfile.TemporaryDirectory())
+        self.config.enable_remote_broadcast = True
+        self.config.master = True
+        self.config.custom_host_name = ""
+        self.config.data_path = lambda: folder
+        self.services.util.safeReplace = os.replace
+        self.services.util.is_ui_thread = lambda: True
+        self.services.event_handler = NS(EventListener=Mock())
+        control = self.ns["RemoteControl"]()
+        self.sender.remote_control = control
+        return control
+
+    def register_peer(self, client_id, name, address):
+        client = self.ns["ClientData"].fromData(client_id, "GEX Client", "")
+        client.host_name = name
+        self.sender.handle(
+            {"action": "register_client", "sender_id": client_id, "data": client.toPayload()},
+            peer_ip=address,
+        )
+
+    def test_master_catalog_remembers_manual_and_discovered_clients_after_disconnect(self):
+        control = self.make_master()
+        control.addKnownClient("  Spare-Client. ")
+        self.register_peer(20, "Left-PC", "192.0.2.20")
+        control.unregisterClient(20)
+        self.assertIsNone(control.getClient(20))
+        self.assertEqual(control.getKnownClients(), {"left-pc": "GEX Client, 192.0.2.20", "spare-client": ""})
+
+        restarted = self.ns["RemoteControl"]()
+        self.assertEqual(restarted.getKnownClients(), control.getKnownClients())
+        restarted.removeKnownClient("spare-client")
+        self.assertEqual(self.ns["RemoteControl"]().getKnownClients(), {"left-pc": "GEX Client, 192.0.2.20"})
+
+    def test_registered_client_updates_a_manually_entered_ip(self):
+        control = self.make_master()
+        control.addKnownClient("192.0.2.20")
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.assertEqual(control.getKnownClients(), {"192.0.2.20": "left-pc, GEX Client"})
+
+    def test_network_discovery_merges_hosts_in_one_save_and_keeps_existing_addresses(self):
+        control = self.make_master()
+        control.addKnownClient("192.0.2.20")
+        computers = [
+            ("Right-PC", "192.0.2.30"),
+            ("RIGHT-PC", "192.0.2.9"),
+            ("Left-PC", "192.0.2.20"),
+        ]
+        with patch.object(control, "_save_known_clients", wraps=control._save_known_clients) as save:
+            self.assertEqual(control.addDiscoveredClients(computers), 1)
+            self.assertEqual(control.addDiscoveredClients(computers), 0)
+            save.assert_called_once()
+        self.assertEqual(
+            self.ns["RemoteControl"]().getKnownClients(),
+            {"192.0.2.20": "", "right-pc": "192.0.2.9, 192.0.2.30"},
+        )
+
+    def test_master_filter_matches_name_or_ip_and_intersects_explicit_targets(self):
+        control = self.make_master()
+        control.setActiveClients(frozenset({"left-pc", "192.0.2.30"}))
+        self.sender.send_button(1, 1, True, client_list=[0])
+        self.assertEqual(self.sender._sock.packets, [])
+        self.register_peer(20, "LEFT-PC", "192.0.2.20")
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        self.register_peer(40, "middle-pc", "192.0.2.40")
+
+        self.assertEqual(control.getActiveClients(), {20, 30})
+        self.sender.send_button(1, 1, True, client_list={0: True})
+        self.assertCountEqual([msgpack.unpackb(packet)["to"] for packet in self.sender._sock.packets], [20, 30])
+        self.sender._sock.packets.clear()
+        self.sender.send_button(1, 1, True, client_list=["30", "40", "30"])
+        self.sender.send_button(1, 1, True, client_list=[])
+        self.assertEqual([msgpack.unpackb(packet)["to"] for packet in self.sender._sock.packets], [30])
+
+        for selection in (None, frozenset()):
+            with self.subTest(selection=selection):
+                control.setActiveClients(selection)
+                self.assertFalse(control.clientFiltered)
+                self.sender.send_button(1, 1, True)
+                self.assertEqual(msgpack.unpackb(self.sender._sock.packets[-1])["to"], 0)
+
+    def test_solo_takes_precedence_temporarily_and_restores_the_latest_regular_selection(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        control.setActiveClients(frozenset({"left-pc"}))
+        first, second = object(), object()
+
+        control.beginClientSolo(first, "192.0.2.30")
+        self.assertEqual(control.getActiveClients(), {30})
+        self.assertEqual(control.filterClientTargets((20, 30)), (30,))
+        control.endClientSolo(first)
+        self.assertEqual(control.getActiveClients(), {20})
+
+        control.beginClientSolo(first, "192.0.2.30")
+        control.beginClientSolo(second, "LEFT-PC")
+        self.assertEqual(control.getActiveClients(), {20})
+
+        control.setActiveClients(None)
+        control.endClientSolo(second)
+        self.assertEqual(control.filterClientTargets((0,)), {30})
+        control.endClientSolo(first)
+        self.assertEqual(control.filterClientTargets((0,)), (0,))
+
+    def test_solo_tracks_live_registration_and_handles_out_of_order_release(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        first, second = object(), object()
+        control.beginClientSolo(first, "left-pc")
+        control.beginClientSolo(second, "right-pc")
+        self.assertFalse(control.filterClientTargets((0,)))
+
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        control.endClientSolo(first)
+        self.assertEqual(control.getActiveClients(), {30})
+        control.unregisterClient(30)
+        self.assertFalse(control.filterClientTargets((0,)))
+        control.endClientSolo(second)
+        self.assertFalse(control.clientFiltered)
+
+    def test_temporary_client_selection_matches_multiple_live_clients(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        control.setActiveClients(frozenset({"left-pc"}))
+        hold = object()
+        control.beginClientOverride(hold, frozenset({"right-pc", "192.0.2.40"}))
+        self.assertEqual(control.getActiveClients(), {30})
+
+        self.register_peer(40, "panel-pc", "192.0.2.40")
+        self.assertEqual(control.getActiveClients(), {30, 40})
+        control.endClientOverride(hold)
+        self.assertEqual(control.getActiveClients(), {20})
+
+    def test_all_client_overrides_include_or_block_undiscovered_clients(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        control.setActiveClients(frozenset({"left-pc"}))
+        enable, disable = object(), object()
+
+        control.beginClientOverride(enable, None)
+        self.assertFalse(control.clientFiltered)
+        self.assertTrue(control.clientActive(30))
+        self.sender.send_kvm_keyboard(0x41, 0x1E, 0, client_list=[0])
+        self.assertEqual(self.transfer(receiver=self.make_client(30))["to"], 0)
+        self.services.sendinput.send_key.assert_called_once_with(0x41, 0x1E, 0)
+        self.assertEqual(control.filterClientTargets((30,)), (30,))
+
+        control.beginClientOverride(disable, frozenset())
+        self.assertTrue(control.clientFiltered)
+        self.assertFalse(control.clientActive(30))
+        self.assertFalse(control.getActiveClients())
+        self.sender._sock.packets.clear()
+        self.sender.send_kvm_keyboard(0x41, 0x1E, 0, client_list=[0])
+        self.sender.send_kvm_keyboard(0x41, 0x1E, 0, client_list=[30])
+        self.assertEqual(self.sender._sock.packets, [])
+
+        control.endClientOverride(disable)
+        self.assertEqual(control.filterClientTargets((0,)), (0,))
+        control.endClientOverride(enable)
+        self.assertEqual(control.getActiveClients(), {20})
+        self.assertEqual(control.filterClientTargets((30,)), ())
+
+    def test_regular_all_client_mute_survives_registration_and_temporary_overrides(self):
+        control = self.make_master()
+        control.setAllClientsActive(False)
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.assertTrue(control.clientFiltered)
+        self.assertEqual(control.filterClientTargets((0, 20, 30)), frozenset())
+        self.assertEqual(control.filterClientTargets((20, 30)), ())
+
+        hold = object()
+        control.beginClientOverride(hold, None)
+        self.assertEqual(control.filterClientTargets((0,)), (0,))
+        control.endClientOverride(hold)
+        self.assertEqual(control.filterClientTargets((0,)), frozenset())
+
+        control.setAllClientsActive(True)
+        self.assertEqual(control.filterClientTargets((0,)), (0,))
+        self.assertEqual(control.filterClientTargets((20, 30)), (20, 30))
+
+    def test_startup_client_operation_and_routing_apply_independently(self):
+        control = self.make_master()
+        operations = self.ns["ClientOperation"]
+        modes = self.ns["OutputMode"]
+        self.register_peer(20, "panel", "192.0.2.20")
+        control.applyClientOperation(operations.Select, frozenset({"panel"}))
+        control.applyOutputMode(modes.RemoteOnly)
+        self.assertEqual(control.getActiveClients(), {20})
+        self.assertEqual((control.is_local, control.is_remote), (False, True))
+        control.applyClientOperation(operations.Unchanged, None)
+        control.applyOutputMode(modes.LocalAndRemote)
+        self.assertEqual(control.getActiveClients(), {20})
+        self.assertEqual((control.is_local, control.is_remote), (True, True))
+        control.applyClientOperation(operations.DisableAll, None)
+        control.applyOutputMode(modes.Unchanged)
+        self.assertEqual(control.filterClientTargets((0,)), frozenset())
+        self.assertEqual((control.is_local, control.is_remote), (True, True))
+        control.applyClientOperation(operations.EnableAll, None)
+        control.applyOutputMode(modes.LocalOnly)
+        self.assertEqual(control.filterClientTargets((0,)), (0,))
+        self.assertEqual((control.is_local, control.is_remote), (True, False))
+
+    def test_default_mapping_multicasts_once_without_discovery(self):
+        routing = self.make_routing()
+        self.assertEqual(routing.getClientList(), [0])
+        self.sender.send_axis(1, 6, 0.75, client_list=routing.getClientList())
+        self.assertEqual(self.sender._sock.destinations, [(REMOTE_CONTROL_MULTICAST_GROUP, 6012)])
+        self.assertEqual(self.transfer()["to"], 0)
+        self.assertEqual(self.axes[6].value, 0.75)
+
+        other = self.make_client(30)
+        self.axes[6].value = 0.0
+        self.transfer(receiver=other)
+        self.assertEqual(self.axes[6].value, 0.75)
+
+    def test_saved_specific_mapping_uses_multicast_and_filters_non_targets(self):
+        routing = self.make_routing()
+        routing.from_xml(etree.fromstring(
+            '<remote-config custom="true"><client client-id="20" selected="true"/></remote-config>'
+        ))
+        self.assertEqual(routing.getClientList(), [20])
+        self.sender.send_button(1, 1, True, client_list=routing.getClientList())
+        self.assertEqual(self.sender._sock.destinations, [(REMOTE_CONTROL_MULTICAST_GROUP, 6012)])
+        self.transfer(receiver=self.make_client(30))
+        self.assertFalse(self.button.is_pressed)
+        packet = self.transfer()
+        self.assertEqual(packet["to"], 20)
+        self.assertTrue(self.button.is_pressed)
+
+        routing.isCustom = False
+        self.assertEqual(routing.getClientList(), [0])
+
+    def test_virtual_output_requires_a_recipient_field(self):
+        self.sender.send_button(1, 1, True)
+        packet = msgpack.unpackb(self.sender._sock.packets[-1])
+        del packet["to"]
+        self.receiver.handle(packet)
+        self.assertFalse(self.button.is_pressed)
+
     def test_send_does_not_mutate_callers_packet(self):
         packet = {"action": "hb", "data": {"example": 1}}
         self.assertTrue(self.sender.send(packet, 20))
@@ -315,6 +707,17 @@ class RemoteChecks(unittest.TestCase):
 
     def test_register_client_is_dispatched_without_running_profile(self):
         self.services.shared_state.is_running = False
+        payload = dict(client_id=10, client_name="peer", client_custom="", client_version="test", client_timestamp=1)
+        self.sender.send({"action": "register_client", "data": payload})
+        self.transfer()
+        self.receiver.remote_control.registerClient.assert_called_once()
+
+    def test_broadcast_role_ignores_received_control_but_still_discovers_clients(self):
+        self.services.config.Configuration = lambda: NS(enable_remote_control=False, client_name="test")
+        self.sender.send_button(1, 1, True)
+        self.transfer()
+        self.assertFalse(self.button.is_pressed)
+
         payload = dict(client_id=10, client_name="peer", client_custom="", client_version="test", client_timestamp=1)
         self.sender.send({"action": "register_client", "data": payload})
         self.transfer()
@@ -437,6 +840,339 @@ class RemoteChecks(unittest.TestCase):
         handler.client_address = ("192.0.2.1", 1234)
         handler.request = (msgpack.packb({"sender_id": 10, "action": "hat", "to": 20, "data": {}}), None)
         handler.handle()
+
+    def test_connection_probe_replies_to_sender_and_only_multicasts_when_requested(self):
+        handler = object.__new__(self.ns["GremlinSocketHandler"])
+        handler.client_address = ("192.0.2.1", 1234)
+        connection = Mock()
+        remote = Mock()
+        nonce = uuid.uuid4().bytes
+
+        with patch.dict(self.ns, remote_client=remote):
+            for multicast in (False, True):
+                request = {"action": "connection_test", "nonce": nonce, "multicast": multicast}
+                handler.request = (msgpack.packb(request), connection)
+                handler.handle()
+                packet, address = connection.sendto.call_args.args
+                self.assertEqual(address, handler.client_address)
+                self.assertEqual(msgpack.unpackb(packet), {"action": "connection_test_reply", "nonce": nonce})
+                if not multicast:
+                    remote.send.assert_not_called()
+
+        remote.send.assert_called_once_with({"action": "connection_test_multicast", "nonce": nonce})
+        remote.handle.assert_not_called()
+
+    def test_multicast_probe_notifies_diagnostic_listener_without_replying(self):
+        handler = object.__new__(self.ns["GremlinSocketHandler"])
+        handler.server = NS(server_address=("0.0.0.0", 6012))
+        connection = Mock()
+        listener = Mock()
+        nonce = uuid.uuid4().bytes
+
+        with patch.dict(self.ns, remote_server=listener):
+            for candidate in ("invalid", b"short", nonce):
+                packet = {"action": "connection_test_multicast", "nonce": candidate}
+                handler.request = (msgpack.packb(packet), connection)
+                handler.handle()
+
+        listener.connection_test_multicast.emit.assert_called_once_with(nonce, 6012)
+        connection.sendto.assert_not_called()
+
+    def test_broadcast_ping_replies_from_enabled_client_without_running_profile(self):
+        handler = object.__new__(self.ns["GremlinSocketHandler"])
+        handler.server = NS(server_address=("0.0.0.0", 6012))
+        handler.client_address = ("192.0.2.1", 49832)
+        connection = Mock()
+        nonce = uuid.uuid4().bytes
+        self.services.shared_state.is_running = False
+        config = self.services.config.Configuration()
+        self.services.config.Configuration = lambda: config
+
+        def ping(sender, token=nonce):
+            request = {"action": "broadcast_test_ping", "nonce": token, "sender_id": sender}
+            handler.request = (msgpack.packb(request), connection)
+            handler.handle()
+
+        ping(self.receiver.clientId)  # Its own multicast packet.
+        ping(self.sender.clientId, b"short")
+        config.enable_remote_control = False
+        with self.assertLogs("remote-checks") as logs:
+            ping(self.sender.clientId)
+        self.assertIn("skipped pong because client remote control is disabled", logs.output[-1])
+        connection.sendto.assert_not_called()
+
+        config.enable_remote_control = True
+        with self.assertLogs("remote-checks") as logs:
+            ping(self.sender.clientId)
+        self.assertIn(f"[{nonce.hex()}] received ping from 192.0.2.1:49832 on UDP port 6012", logs.output[0])
+        self.assertIn(f"[{nonce.hex()}] sent unicast pong to 192.0.2.1:6012", logs.output[1])
+        connection.sendto.assert_called_once()
+        packet, destination = connection.sendto.call_args.args
+        self.assertEqual(destination, ("192.0.2.1", 6012))
+        self.assertEqual(
+            msgpack.unpackb(packet),
+            {"action": "broadcast_test_pong", "nonce": nonce, "sender_id": 20, "sender_name": "test", "to": 10},
+        )
+
+        connection.sendto.side_effect = OSError("test error")
+        with self.assertLogs("remote-checks", level="WARNING") as logs:
+            ping(self.sender.clientId)
+        self.assertIn(f"[{nonce.hex()}] could not send pong to 192.0.2.1:6012: test error", logs.output[0])
+
+    def test_broadcast_pong_is_delivered_only_to_the_addressed_server(self):
+        handler = object.__new__(self.ns["GremlinSocketHandler"])
+        handler.server = NS(server_address=("0.0.0.0", 6012))
+        handler.client_address = ("192.0.2.12", 6012)
+        listener = Mock()
+        nonce = uuid.uuid4().bytes
+        client_id = 0xABCDEF012345
+        packet = {
+            "action": "broadcast_test_pong", "nonce": nonce, "sender_id": client_id,
+            "sender_name": "  Test\nClient  ", "to": self.sender.clientId,
+        }
+
+        with patch.dict(self.ns, remote_server=listener):
+            handler.request = (msgpack.packb(packet), None)
+            handler.handle()
+            listener.broadcast_test_reply.emit.assert_not_called()
+            packet["to"] = self.receiver.clientId
+            handler.request = (msgpack.packb(packet), None)
+            with self.assertLogs("remote-checks") as logs:
+                handler.handle()
+
+        listener.broadcast_test_reply.emit.assert_called_once_with(nonce, 6012, client_id, "Test Client", "192.0.2.12")
+        self.assertIn(f"[{nonce.hex()}] received pong from 192.0.2.12:6012 on UDP port 6012", logs.output[0])
+
+    def test_client_refreshes_outbound_socket_only_when_endpoint_changes(self):
+        config = self.services.config.Configuration()
+        config.server_port, config.broadcast_host_ip, config.broadcast_bind_all_ips = self.sender._socket_settings
+        config.verbose_mode_remote_extra = config.verbose_mode_remote = config.verbose_mode_outputs = False
+        self.services.config.Configuration = lambda: config
+        self.sender.remote_control.remoteEnabled = lambda: True
+        self.sender._started = True
+        self.sender.requestIdentify = Mock()
+
+        outbound = self.sender._sock
+        self.sender._handle_config_options_changed()
+        self.assertIs(self.sender._sock, outbound)
+        self.sender.requestIdentify.assert_not_called()
+
+        config.server_port += 1
+        self.sender._handle_config_options_changed()
+        self.assertTrue(outbound.closed)
+        self.assertIsNone(self.sender._sock)
+        self.sender.requestIdentify.assert_called_once()
+
+    def test_client_waits_for_application_startup(self):
+        server = Mock(startup_ready=False)
+        self.sender.remote_control.remoteEnabled = lambda: True
+        self.sender.ensure_socket = Mock()
+        with patch.dict(self.ns, remote_server=server):
+            self.sender.start()
+            self.assertFalse(self.sender.send({"action": "identify"}))
+
+        self.sender.ensure_socket.assert_not_called()
+        server.start.assert_not_called()
+        self.assertEqual(self.sender._sock.packets, [])
+
+    def test_broadcast_test_multicasts_and_collects_unique_current_replies(self):
+        class ReplyListener(QtCore.QObject):
+            broadcast_test_reply = QtCore.Signal(bytes, int, object, str, str)
+
+        app = QtCore.QCoreApplication.instance() or QtCore.QCoreApplication([])
+        listener = ReplyListener()
+        listener.listening_port = 6012
+        listener.startup_ready = True
+        listener.start = Mock()
+        send = Mock(wraps=self.sender._sock.sendto)
+        self.sender._sock.sendto = send
+        test = self.ns["RemoteBroadcastTest"](6012)
+        finished = Mock()
+        test.finished.connect(finished)
+
+        with patch.dict(self.ns, remote_client=self.sender, remote_server=listener):
+            try:
+                with self.assertLogs("remote-checks") as logs:
+                    test.start()
+                send.assert_called_once()
+                raw, target = send.call_args.args
+                self.assertEqual(target, (REMOTE_CONTROL_MULTICAST_GROUP, 6012))
+                ping = msgpack.unpackb(raw)
+                self.assertEqual(ping["action"], "broadcast_test_ping")
+                nonce = ping["nonce"]
+                self.assertIn(
+                    f"[{nonce.hex()}] sent multicast ping to {REMOTE_CONTROL_MULTICAST_GROUP}:6012 using 192.0.2.1, "
+                    "source UDP port 49832, expecting unicast replies on UDP port 6012",
+                    logs.output[0],
+                )
+
+                listener.broadcast_test_reply.emit(nonce, 6012, 0xABCDEF012345, "Zeta", "192.0.2.12")
+                listener.broadcast_test_reply.emit(nonce, 6012, 0xABCDEF012345, "Duplicate", "192.0.2.13")
+                listener.broadcast_test_reply.emit(nonce, 6012, 31, "Alpha", "192.0.2.14")
+                listener.broadcast_test_reply.emit(nonce, 6013, 32, "Other port", "192.0.2.15")
+                listener.broadcast_test_reply.emit(uuid.uuid4().bytes, 6012, 33, "Old test", "192.0.2.16")
+                app.processEvents()
+                with self.assertLogs("remote-checks") as logs:
+                    test._finish()
+                self.assertIn(f"[{nonce.hex()}] completed with 2 unique client replies", logs.output[0])
+                finished.assert_called_once_with(
+                    "2 clients replied to the multicast ping.", [("Alpha", "192.0.2.14"), ("Zeta", "192.0.2.12")]
+                )
+            finally:
+                test.cancel()
+
+
+class RemoteClientTriggerChecks(unittest.TestCase):
+    def setUp(self):
+        class ActionBase:
+            def __init__(self, parent, extra_data=None):
+                pass
+
+            def setPriority(self, priority):
+                pass
+
+        class FunctorBase:
+            def __init__(self, action, parent=None):
+                self.action_data = action
+
+        namespace = load_remote()
+        self.control = Mock()
+        self.callbacks = Mock()
+        namespace["gremlin"].input_item = NS(AbstractAction=ActionBase)
+        namespace["gremlin"].base_profile = NS(AbstractFunctor=FunctorBase)
+        namespace.update(
+            InputType=InputType, RemoteClientWidget=object, remote_control=self.control,
+            CallbackActions=lambda: self.callbacks, etree=etree, safe_format=lambda value, kind: str(value),
+        )
+        source = ROOT / "action_plugins/remote_client/__init__.py"
+        nodes = [node for node in ast.parse(source.read_bytes()).body
+                 if isinstance(node, ast.ClassDef) and node.name in ("RemoteClientAction", "RemoteClientFunctor")]
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), namespace)
+        self.operations = namespace["ClientOperation"]
+        self.behaviors = namespace["SelectionBehavior"]
+        self.routing = namespace["OutputMode"]
+        self.action = namespace["RemoteClientAction"](None)
+        self.functor = namespace["RemoteClientFunctor"](self.action)
+
+    def send(self, pressed, *, event_type=InputType.JoystickButton, value=None):
+        event = NS(is_pressed=pressed, event_type=event_type, value=value, extra_data=None, is_virtual_button=False)
+        self.assertTrue(self.functor.process_event(event, None))
+
+    def test_legacy_default_and_release_round_trip(self):
+        self.action._parse_xml(etree.Element("remote-client"))
+        self.assertTrue(self.action.exec_on_press)
+        self.assertFalse(self.action.exec_on_release)
+        self.action.exec_on_press = False
+        self.action.exec_on_release = True
+        self.action._parse_xml(self.action._generate_xml())
+        self.assertFalse(self.action.exec_on_press)
+        self.assertTrue(self.action.exec_on_release)
+
+    def test_release_only_applies_client_filter_and_routing(self):
+        self.action.exec_on_press = False
+        self.action.exec_on_release = True
+        self.action.operation = self.operations.DisableAll
+        self.action.output_mode = self.routing.LocalOnly
+        self.send(True)
+        self.control.applyClientOperation.assert_not_called()
+        self.control.applyOutputMode.assert_not_called()
+        self.send(False)
+        self.control.applyClientOperation.assert_called_once_with(self.operations.DisableAll, None)
+        self.control.applyOutputMode.assert_called_once_with(self.routing.LocalOnly)
+        self.action.exec_on_release = False
+        self.assertFalse(self.action.hasOutput())
+
+    def test_toggle_on_both_edges_ignores_hat_center_events(self):
+        self.action.behavior = self.behaviors.Toggle
+        self.action.exec_on_release = True
+        self.action.selection = frozenset({"panel-pc"})
+        self.send(False, event_type=InputType.JoystickHat, value=(0, 0))
+        self.send(True, event_type=InputType.JoystickHat, value=(1, 0))
+        self.control.beginClientOverride.assert_called_once()
+        hold, addresses = self.control.beginClientOverride.call_args.args
+        self.assertEqual(addresses, self.action.selection)
+        self.send(False, event_type=InputType.JoystickHat, value=(1, 0))
+        self.send(True, event_type=InputType.JoystickHat, value=(0, 0))
+        self.control.endClientOverride.assert_called_once_with(hold)
+
+    def test_release_only_toggle_uses_each_release(self):
+        self.action.behavior = self.behaviors.Toggle
+        self.action.exec_on_press = False
+        self.action.exec_on_release = True
+        self.send(True)
+        self.control.beginClientOverride.assert_not_called()
+        self.send(False)
+        self.control.beginClientOverride.assert_called_once()
+        hold, _ = self.control.beginClientOverride.call_args.args
+        self.send(True)
+        self.control.endClientOverride.assert_not_called()
+        self.send(False)
+        self.control.endClientOverride.assert_called_once_with(hold)
+
+    def test_hold_uses_press_and_release_regardless_of_trigger_settings(self):
+        self.action.behavior = self.behaviors.Temporary
+        self.action.operation = self.operations.EnableAll
+        self.action.exec_on_press = False
+        self.action.exec_on_release = True
+        self.assertTrue(self.action.hasOutput())
+        self.send(True)
+        self.control.beginClientOverride.assert_called_once()
+        hold, addresses = self.control.beginClientOverride.call_args.args
+        self.assertIsNone(addresses)
+        release_callback, _ = self.callbacks.register_callback.call_args.args
+        release_callback()
+        self.send(False)
+        self.control.endClientOverride.assert_called_once_with(hold)
+        self.control.applyOutputMode.assert_called_once()
+
+
+class ListenerChecks(unittest.TestCase):
+    def test_only_endpoint_changes_replace_listener_and_close_old_socket_first(self):
+        ns = load_remote()
+        services = ns["gremlin"]
+        with socket.socket(type=socket.SOCK_DGRAM) as first, socket.socket(type=socket.SOCK_DGRAM) as second:
+            first.bind(("0.0.0.0", 0))
+            second.bind(("0.0.0.0", 0))
+            port, next_port = first.getsockname()[1], second.getsockname()[1]
+
+        config = NS(server_port=port, broadcast_host_ip="127.0.0.1", remoteEnabled=lambda: True)
+        services.config = NS(Configuration=lambda: config)
+        services.joystick_handling = NS(vjoy_id_list=lambda **_: [], VJoyProxy=Mock())
+        rpc = ns["RPCGremlin"]()
+        self.addCleanup(rpc.stop)
+        with patch.dict(ns, GremlinServer=Mock()) as bindings:
+            rpc.start()
+            rpc.reconfigure()
+            bindings["GremlinServer"].assert_not_called()
+            self.assertIsNone(rpc.listening_port)
+
+        rpc.enable_startup()
+        rpc.start()
+        self.assertEqual(rpc.listening_port, port)
+        initial_listener = rpc._listener
+        rpc.reconfigure()
+        self.assertIs(rpc._listener, initial_listener)
+
+        for host, expected_port in (("127.0.0.2", port), ("127.0.0.2", next_port)):
+            previous_server, previous_thread = rpc._listener
+            config.broadcast_host_ip = host
+            config.server_port = expected_port
+            real_factory = ns["GremlinServer"]
+
+            def bind_after_close(*args):
+                self.assertEqual(previous_server.socket.fileno(), -1)
+                self.assertFalse(previous_thread.is_alive())
+                return real_factory(*args)
+
+            with patch.dict(ns, GremlinServer=bind_after_close):
+                rpc.reconfigure()
+            self.assertEqual(rpc.listening_port, expected_port)
+            self.assertIsNot(rpc._listener[0], previous_server)
+
+        rpc.stop()
+        self.assertIsNone(rpc.listening_port)
+        with socket.socket(type=socket.SOCK_DGRAM) as released:
+            released.bind(("0.0.0.0", next_port))
 
 
 class WorkerChecks(unittest.TestCase):

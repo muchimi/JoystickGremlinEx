@@ -3,11 +3,14 @@
 import ast
 from collections import deque
 import importlib.util
+import ipaddress
 from pathlib import Path
 import socket
 import struct
+import sys
 import threading
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 
@@ -21,6 +24,156 @@ OSC = dict(struct=struct)
 exec(compile(ast.Module(body=[node for node in ast.parse((ROOT / "gremlin/maestro.py").read_bytes()).body
     if getattr(node, "name", None) in {"_osc_string", "_encode_message", "_decode_message"}],
     type_ignores=[]), "maestro-osc-codec", "exec"), OSC)
+
+
+class RemoteControlFirewallChecks(unittest.TestCase):
+    status = NETWORK.RemoteControlFirewallStatus
+    group = NETWORK.REMOTE_CONTROL_MULTICAST_GROUP
+    server = "192.0.2.12"
+
+    def rule(self, **changes):
+        fields = dict(
+            Enabled=True, Direction=1, Protocol=socket.IPPROTO_UDP, Action=1, Profiles=6,
+            LocalPorts="6012", RemotePorts="*", LocalAddresses=self.group, RemoteAddresses=self.server,
+            ApplicationName="", ServiceName="", Interfaces=None, InterfaceTypes="All",
+            LocalAppPackageId="", LocalUserOwner="", LocalUserAuthorizedList="",
+            RemoteUserAuthorizedList="", RemoteMachineAuthorizedList="", SecureFlags=0,
+        )
+        fields.update(changes)
+        return SimpleNamespace(**fields)
+
+    def check(self, *rules, host=server, include_unicast=False, modify_state=0):
+        policy = SimpleNamespace(CurrentProfileTypes=6, LocalPolicyModifyState=modify_state, Rules=rules)
+        source = ipaddress.IPv4Address(host) if host else None
+        return NETWORK._multicast_firewall_status(policy, 6012, source, include_unicast)
+
+    def test_checks_destination_source_and_rule_scope(self):
+        self.assertIs(self.check(self.rule()), self.status.FOUND)
+        self.assertIs(self.check(self.rule(), host=None), self.status.MISSING)
+        self.assertIs(self.check(self.rule(RemoteAddresses="*"), host=None), self.status.FOUND)
+        self.assertIs(self.check(self.rule(LocalAddresses="*", RemoteAddresses="*")), self.status.FOUND)
+        self.assertIs(
+            self.check(self.rule(LocalAddresses="224.0.0.0/4", RemoteAddresses="192.0.2.1-192.0.2.20")),
+            self.status.FOUND,
+        )
+        for changes in (
+            {"LocalAddresses": "192.0.2.1"}, {"RemoteAddresses": self.group}, {"LocalPorts": "6013"},
+            {"RemotePorts": "6012"}, {"Enabled": False}, {"Direction": 2}, {"Protocol": socket.IPPROTO_TCP},
+            {"ApplicationName": r"C:\OtherApp\other.exe"}, {"ServiceName": "OtherService"},
+            {"LocalUserOwner": "S-1-5-21-1"}, {"SecureFlags": 1},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIs(self.check(self.rule(**changes)), self.status.MISSING)
+
+    def test_applies_active_profiles_and_reports_blocking_policy(self):
+        self.assertIs(self.check(self.rule(Profiles=2)), self.status.MISSING)
+        self.assertIs(self.check(self.rule(Profiles=2), self.rule(Profiles=4)), self.status.FOUND)
+        self.assertIs(self.check(self.rule(), self.rule(Action=0, Profiles=4)), self.status.BLOCKED)
+        self.assertIs(self.check(self.rule(), self.rule(Action=0, Profiles=1)), self.status.FOUND)
+        self.assertIs(self.check(self.rule(), modify_state=2), self.status.BLOCKED)
+        self.assertIs(self.check(modify_state=1), self.status.MANAGED)
+
+    def test_symbolic_addresses_are_skipped_before_ip_parsing(self):
+        with patch.object(NETWORK.ipaddress, "ip_address", wraps=ipaddress.ip_address) as parse_address:
+            symbolic = self.rule(LocalAddresses="LocalSubnet", RemoteAddresses="LocalSubnet4,DNS")
+            self.assertIs(self.check(symbolic), self.status.MISSING)
+            parse_address.assert_not_called()
+
+            mixed = self.rule(
+                LocalAddresses=f"LocalSubnet, {self.group}",
+                RemoteAddresses=f"DNS, LocalSubnet4, {self.server}",
+            )
+            self.assertIs(self.check(mixed), self.status.FOUND)
+            self.assertEqual([call.args[0] for call in parse_address.call_args_list], [self.group, self.server])
+
+    def test_broadcast_server_rule_also_covers_unicast_probe_requests(self):
+        self.assertIs(self.check(self.rule(), include_unicast=True), self.status.MISSING)
+        self.assertIs(self.check(self.rule(LocalAddresses="*"), include_unicast=True), self.status.FOUND)
+        with patch.object(NETWORK, "_run_netsh_elevated", return_value=True) as launch:
+            self.assertTrue(NETWORK.addInboundRemoteControlFirewallRule(6012, include_unicast=True))
+        command = launch.call_args.args[0]
+        self.assertNotIn("localip=", command)
+        self.assertNotIn("remoteip=", command)
+
+    def test_creation_places_multicast_group_and_server_in_correct_fields(self):
+        with patch.object(NETWORK, "_run_netsh_elevated", return_value=True) as launch:
+            self.assertTrue(NETWORK.addInboundRemoteControlFirewallRule(6108, self.server))
+            with self.assertRaisesRegex(ValueError, "unicast"):
+                NETWORK.addInboundRemoteControlFirewallRule(6108, self.group)
+        launch.assert_called_once()
+        command = launch.call_args.args[0]
+        for field in (
+            "dir=in", "action=allow", "enable=yes", "profile=any", "protocol=UDP",
+            "localport=6108", f"localip={self.group}", f"remoteip={self.server}",
+        ):
+            self.assertIn(field, command)
+        self.assertNotIn("remoteport=", command)
+
+    def test_reuses_existing_rule_and_confirms_new_rule(self):
+        with patch.object(NETWORK, "checkInboundRemoteControlFirewallRule") as read, \
+                patch.object(NETWORK, "addInboundRemoteControlFirewallRule", return_value=True) as add:
+            for status in (self.status.FOUND, self.status.BLOCKED, self.status.MANAGED):
+                read.return_value = status
+                self.assertIs(NETWORK.ensureInboundRemoteControlFirewallRule(6012, self.server), status)
+            add.assert_not_called()
+
+            read.reset_mock()
+            read.side_effect = [self.status.MISSING, self.status.FOUND]
+            self.assertIs(NETWORK.ensureInboundRemoteControlFirewallRule(6012, self.server), self.status.FOUND)
+            add.assert_called_once_with(6012, self.server, include_unicast=False)
+            self.assertEqual(read.call_count, 2)
+
+            read.side_effect = [self.status.MISSING, self.status.MISSING]
+            with self.assertRaisesRegex(RuntimeError, "did not report a matching rule"):
+                NETWORK.ensureInboundRemoteControlFirewallRule(6012, self.server)
+
+            read.reset_mock()
+            read.side_effect = [self.status.MISSING]
+            add.return_value = False
+            with self.assertRaisesRegex(RuntimeError, "Windows did not add the firewall rule"):
+                NETWORK.ensureInboundRemoteControlFirewallRule(6012, self.server)
+            self.assertEqual(read.call_count, 1)
+
+
+class WindowsDiscoveryChecks(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Uses the Windows Shell")
+    def test_uses_explorer_computer_paths_and_skips_other_entries(self):
+        import pythoncom
+
+        items = [
+            SimpleNamespace(IsFolder=True, Path=r"\\Server"),
+            SimpleNamespace(IsFolder=True, Path=r"\\server"),
+            SimpleNamespace(IsFolder=True, Path=r"\\LocalPC"),
+            SimpleNamespace(IsFolder=True, Path=r"\\Server\Share"),
+            SimpleNamespace(IsFolder=False, Path="provider://printer"),
+        ]
+        folder = SimpleNamespace(Items=lambda: items)
+        shell = SimpleNamespace(NameSpace=Mock(return_value=folder))
+        with (
+            patch("win32com.client.Dispatch", return_value=shell) as dispatch,
+            patch.object(pythoncom, "CoInitialize") as initialize,
+            patch.object(pythoncom, "CoUninitialize") as uninitialize,
+            patch.object(NETWORK.socket, "gethostname", return_value="localpc"),
+        ):
+            self.assertEqual(NETWORK._windows_network_computer_names(), ["Server"])
+        dispatch.assert_called_once_with("Shell.Application")
+        shell.NameSpace.assert_called_once_with(18)
+        initialize.assert_called_once()
+        uninitialize.assert_called_once()
+
+    def test_resolves_ipv4_only_for_discovered_computers(self):
+        def resolve(name, port, family, kind):
+            if name == "Offline":
+                raise socket.gaierror("Name unavailable")
+            return [(family, kind, 0, "", (ip, 0)) for ip in ("192.0.2.108", "192.0.2.95", "192.0.2.95", "127.0.0.1")]
+
+        with (
+            patch.object(NETWORK, "_windows_network_computer_names", return_value=["Offline", "Server"]),
+            patch.object(NETWORK.socket, "getaddrinfo", side_effect=resolve) as getaddrinfo,
+        ):
+            self.assertEqual(NETWORK.discover_windows_computers(), [("Server", "192.0.2.95"), ("Server", "192.0.2.108")])
+            self.assertEqual(getaddrinfo.call_count, 2)
+            getaddrinfo.assert_called_with("Server", None, socket.AF_INET, socket.SOCK_DGRAM)
 
 
 class NetworkPortChecks(unittest.TestCase):

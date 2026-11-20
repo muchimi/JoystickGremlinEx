@@ -152,6 +152,7 @@ class RelativeAxisOutputChecks(unittest.TestCase):
         f._relative_pulse_worker = None
         f._send_flags = lambda: (True, True)
         f._is_maestro_target = lambda: False
+        f._can_broadcast = lambda: not f._is_maestro_target()
         f._output_key = lambda device_id: device_id
         f._is_output_connected = Mock(return_value=True)
         f._output_device = lambda device_id: NS(axis=lambda axis_id: self.axis)
@@ -182,6 +183,12 @@ class RelativeAxisOutputChecks(unittest.TestCase):
         self.move(0.5).tick()
         self.assertAlmostEqual(self.axis.value, 0.5)
         self.assertAlmostEqual(self.remote_value, -0.3)
+
+    def test_remote_increment_sends_without_a_local_output_device(self):
+        self.functor._is_output_connected.return_value = False
+        self.move(0.5).tick()
+        self.assertAlmostEqual(self.axis.value, 0.4)
+        self.assertAlmostEqual(self.remote_value, 0.5)
 
     def test_negative_and_reversed_inputs(self):
         for reverse, expected in ((False, 0.3), (True, 0.5)):

@@ -1,4 +1,3 @@
-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -15,96 +14,126 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+
+import enum
+import html
+import ipaddress
+import json
 import logging
-import time
-import threading
-import struct
-import uuid
+import queue
+import re
 import socket
+import socketserver
+import struct
+import tempfile
+import threading
+import time
+import uuid
+from pathlib import Path
+from typing import Callable  # noqa: UP035
+
+import msgpack
 from lxml import etree as ElementTree
-from gremlin.util import safe_read, safe_format
-
-from PySide6 import QtCore
-
+from psygnal import Signal
+from PySide6 import QtCore, QtNetwork, QtWidgets
 
 import gremlin.base_classes
 import gremlin.config
 import gremlin.event_handler
 import gremlin.gamepad_handling
 import gremlin.joystick_handling
-import gremlin.shared_state
-from gremlin.types import GamePadOutput
-
 import gremlin.keyboard
-import gremlin.shared_state
-import gremlin.types
-from gremlin.types import MouseButton
-import gremlin.util
-from gremlin.util import get_guid
-from psygnal import Signal
-
-
 import gremlin.sendinput
-
-import socketserver
-import queue
-import msgpack
-import enum
-
+import gremlin.shared_state
 import gremlin.singleton_decorator
-from gremlin.types import VjoyAction
-
+import gremlin.types
+import gremlin.util
+from gremlin.error import VJoyError
+from gremlin.network import REMOTE_CONTROL_MULTICAST_GROUP
+from gremlin.types import DeviceType, GamePadOutput, MouseButton, VjoyAction
+from gremlin.util import get_guid, safe_format, safe_read
 
 syslog = logging.getLogger("system")
+
+_PROBE_REQUEST = "connection_test"
+_PROBE_REPLY = "connection_test_reply"
+_PROBE_MULTICAST = "connection_test_multicast"
+_PROBE_BROADCAST_PING = "broadcast_test_ping"
+_PROBE_BROADCAST_PONG = "broadcast_test_pong"
+_VIRTUAL_OUTPUT_ACTIONS = ("axis", "relative_axis", "relative_Axis", "button", "toggle", "hat", "gamepad")
+
+
+def _unpack_remote_packet(raw_data):
+    # MessagePack is binary. Trailing whitespace bytes may be valid values.
+    try:
+        data = msgpack.unpackb(raw_data)
+    except msgpack.UnpackException, ValueError, TypeError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _hat_direction(value):
     """Restore MessagePack arrays to the tuples required by vJoy."""
     if value is None or value is False:
         return (0, 0)
-    if isinstance(value, (tuple, list)) and len(value) == 2:
-        if value[0] in (-1, 0, 1) and value[1] in (-1, 0, 1):
-            return tuple(value)
+    if isinstance(value, (tuple, list)) and len(value) == 2 and value[0] in (-1, 0, 1) and value[1] in (-1, 0, 1):
+        return tuple(value)
     raise ValueError(f"Invalid remote hat direction: {value!r}")
 
 
-def _open_remote_vjoy(device_id):
-    """Acquire a virtual output device for remote output (opens on demand if needed).
-
-    Applies vJoy/Maestro failover (resolved once and cached) when enabled on this machine.
-    Returns (vjoy_id, device) or (None, None). The device is a vJoy device or a
-    Maestro output device; both expose the same button/axis/hat interface.
-
-    Membership checks against VJoyProxy.vjoy_devices fail after profile stop
-    (reset) or on receive-only clients that never wrote locally — silently
-    dropping remote button/axis/hat commands. Always resolve and open via
-    VJoyProxy.__getitem__ instead.
-    """
-    vid = device_id
-    if not isinstance(vid, int):
-        try:
-            vid = int(vid)
-        except (TypeError, ValueError):
-            vid = gremlin.joystick_handling.vjoy_id_from_guid(vid, None)
-            if vid is None:
-                syslog.warning(f"REMOTE: cannot resolve vJoy device id [{device_id}]")
-                return None, None
+def _open_remote_output(device_id):
+    """Resolve a portable Maestro identity, GUID, or legacy vJoy ID."""
+    joystick_handling = gremlin.joystick_handling
+    config = gremlin.config.Configuration()
+    verbose = config.verbose_mode_remote
+    failover = config.virtual_output_failover
+    if verbose:
+        syslog.info(f"REMOTE: opening remote output for device_id [{device_id}]")
     try:
-        vid = int(vid)
-    except (TypeError, ValueError):
-        syslog.warning(f"REMOTE: invalid vJoy device id [{device_id}]")
-        return None, None
-    if vid < 1 or vid > 16:
-        syslog.warning(f"REMOTE: vJoy device id out of range [{vid}]")
-        return None, None
-    try:
-        target = gremlin.joystick_handling.get_output_target(vid)
+        if isinstance(device_id, dict):
+            device = joystick_handling.match_maestro_output(device_id)
+            if device is None:
+                syslog.debug("REMOTE: no unique Maestro output for %s", device_id)
+                return None
+            return joystick_handling.get_output_device(device.device_guid)
+
+        key = joystick_handling.parse_virtual_device_key(device_id)
+        if key is None or isinstance(key, int) and not 1 <= key <= 16:
+            syslog.warning(f"REMOTE: invalid virtual output id [{device_id}]")
+            return None
+        target = joystick_handling.get_output_target(key)
+        if target is None and isinstance(key, str):
+            # Older profiles can reference a vJoy GUID that predates the output map.
+            key = joystick_handling.vjoy_id_from_guid(key, None)
+            if key is None:
+                syslog.debug("REMOTE: unknown virtual output [%s]", device_id)
+                return None
+            target = joystick_handling.get_output_target(key)
         if target is not None and target.kind == "maestro":
-            return vid, target.maestro
-        return vid, gremlin.joystick_handling.VJoyProxy()[vid]
-    except Exception as err:
-        syslog.warning(f"REMOTE: cannot open output device [{vid}]: {err}")
-        return None, None
+            return target.maestro
+
+        vjoy_id = target.out_id if target is not None else key
+        if not isinstance(vjoy_id, int) or not 1 <= vjoy_id <= 16:
+            syslog.debug("REMOTE: unknown virtual output [%s]", device_id)
+            return None
+
+        if config.vjoy_installed:
+            try:
+                return joystick_handling.VJoyProxy()[vjoy_id]
+            except VJoyError as err:
+                if not failover:
+                    syslog.error(f"REMOTE: native vJoy output [{vjoy_id}] unavailable and failover is disabled. Error: {err}")
+
+        if failover:
+            # Legacy packets carry a logical vJoy ID. Match the bridge's stable
+            # service ID so an unrelated device in the same slot cannot receive it.
+            device = joystick_handling.match_maestro_output({"maestro_id": f"gex-{vjoy_id}", "name": "", "gamepad": False})
+            if device is not None:
+                return joystick_handling.get_output_device(device.device_guid)
+        syslog.warning(f"REMOTE: no available output for output device index [{device_id}] - failover mode enabled: [{failover}]")
+    except Exception as err:  #  # noqa: BLE001
+        syslog.warning(f"REMOTE: cannot open output device [{device_id}]: {err}")
+    return None
 
 
 class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
@@ -142,7 +171,7 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
                     self._request_workers.append(worker)
                 request_queue = self._request_queues[hash(client_address) % len(self._request_workers)]
                 request_queue.put((request, client_address))
-        except Exception:
+        except Exception:  # noqa: BLE001
             # A partially started pool can still preserve ordering. Only fall
             # back to synchronous handling when no worker could be started.
             with self._request_workers_lock:
@@ -164,7 +193,7 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
             request, client_address = item
             try:
                 self.process_request_thread(request, client_address)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Even an error-notification callback must not kill the worker.
                 syslog.exception("RPC: packet worker failed")
 
@@ -206,22 +235,19 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
     """
 
     def handle(self):
-        # config =  gremlin.config.Configuration()
-        # MessagePack is binary: stripping whitespace also strips valid values
-        # such as 9, 10, 13 and 32 when they occur at the end of a packet.
-        raw_data = self.request[0]
-        try:
-            data = msgpack.unpackb(raw_data)
-
-        except (msgpack.UnpackException, ValueError, TypeError):
+        data = _unpack_remote_packet(self.request[0])
+        if data is None:
             return
-        if not isinstance(data, dict):
+
+        action = data.get("action")
+        if action in (_PROBE_REQUEST, _PROBE_MULTICAST, _PROBE_BROADCAST_PING, _PROBE_BROADCAST_PONG):
+            self._handle_probe(action, data)
             return
 
         host_ip = ""
         try:
             host_ip = str(self.client_address[0] or "")
-        except Exception:
+        except Exception:  # noqa: BLE001
             host_ip = ""
         try:
             remote_client.handle(data, peer_ip=host_ip)
@@ -231,129 +257,204 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             syslog.error(f"RPC: handle failed from {host_ip}: {err}")
             raise
 
+    def _handle_probe(self, action, data):
+        nonce = data.get("nonce")
+        if not isinstance(nonce, bytes) or len(nonce) != 16:
+            if action in (_PROBE_BROADCAST_PING, _PROBE_BROADCAST_PONG):
+                syslog.debug("RPC: Check Broadcast ignored %s from %s with an invalid nonce", action, self.client_address)
+            return
+        if action == _PROBE_REQUEST:
+            self._reply_to_probe(nonce, data.get("multicast") is True)
+            return
+
+        port = self.server.server_address[1]
+        if action == _PROBE_MULTICAST:
+            remote_server.connection_test_multicast.emit(nonce, port)
+            return
+
+        sender = data.get("sender_id")
+        local_id = remote_client.clientId
+        if type(sender) is not int or not 0 < sender < 2**64:
+            syslog.debug("RPC: Check Broadcast [%s] ignored %s from %s with an invalid sender ID", nonce.hex(), action, self.client_address)
+            return
+        if sender == local_id:
+            syslog.debug("RPC: Check Broadcast [%s] ignored %s from %s with this instance's sender ID", nonce.hex(), action, self.client_address)
+            return
+        peer_ip, peer_port = self.client_address
+        if action == _PROBE_BROADCAST_PING:
+            config = gremlin.config.Configuration()
+            syslog.info("RPC: Check Broadcast [%s] received ping from %s:%d on UDP port %d", nonce.hex(), peer_ip, peer_port, port)
+            if not config.enable_remote_control:
+                syslog.info("RPC: Check Broadcast [%s] skipped pong because client remote control is disabled", nonce.hex())
+                return
+            name = remote_client.customName or config.client_name or remote_client.clientName
+            self._send_probe_reply(
+                {
+                    "action": _PROBE_BROADCAST_PONG,
+                    "nonce": nonce,
+                    "sender_id": local_id,
+                    "sender_name": name[:128],
+                    "to": sender,
+                },
+                # The ping uses the regular ephemeral send socket. Replies go to the server's RPC listener.
+                (peer_ip, port),
+            )
+        elif data.get("to") == local_id:
+            name = data.get("sender_name")
+            name = " ".join(name[:128].split()) if isinstance(name, str) else ""
+            syslog.info(
+                "RPC: Check Broadcast [%s] received pong from %s:%d on UDP port %d (client %r)",
+                nonce.hex(),
+                peer_ip,
+                peer_port,
+                port,
+                name or sender,
+            )
+            remote_server.broadcast_test_reply.emit(nonce, port, sender, name, peer_ip)
+        else:
+            syslog.debug("RPC: Check Broadcast [%s] ignored pong from %s:%d addressed to another instance", nonce.hex(), peer_ip, peer_port)
+
+    def _send_probe_reply(self, data, address):
+        broadcast_reply = data["action"] == _PROBE_BROADCAST_PONG
+        try:
+            self.request[1].sendto(msgpack.packb(data), address)
+        except OSError as err:
+            if broadcast_reply:
+                syslog.warning("RPC: Check Broadcast [%s] could not send pong to %s:%d: %s", data["nonce"].hex(), *address, err)
+            else:
+                syslog.debug("RPC: could not send connection test reply: %s", err)
+        else:
+            if broadcast_reply:
+                syslog.info("RPC: Check Broadcast [%s] sent unicast pong to %s:%d", data["nonce"].hex(), *address)
+
+    def _reply_to_probe(self, nonce: bytes, multicast: bool):
+        self._send_probe_reply({"action": _PROBE_REPLY, "nonce": nonce}, self.client_address)
+        if multicast:
+            # Use the same outbound socket and interface as normal remote control.
+            remote_client.send({"action": _PROBE_MULTICAST, "nonce": nonce})
+
 
 class RPCGremlin:
     """Remote UDP multicast listener"""
 
-    MULTICAST_GROUP = "224.3.29.72"  # only use not routable multicast for local network comms between instances
+    MULTICAST_GROUP = REMOTE_CONTROL_MULTICAST_GROUP
     MULTICAST_TTL = 2  # max jumps
 
     def __init__(self):
-        config = gremlin.config.Configuration()
-        self._port = config.server_port
-        self._server = None
-        self._running = False
-
-        # Thread controls
         self._lock = threading.Lock()
-        self._thread_event = threading.Event()
-        self._thread = None
+        self._listener = None
+        self._endpoint = None
+        self._startup_ready = False
         self._warning_issued = False
+        self._shutting_down = False
 
-        # Hook into global shutdown
-        el = gremlin.event_handler.EventListener()
-        el.shutdown.connect(self.stop)
+    @property
+    def startup_ready(self):
+        return self._startup_ready
 
-    def _thread_runner(self):
-        syslog.info("Starting GEX listener...")
-        server_thread = None
-        server_started = False
+    def enable_startup(self):
+        """Allows socket startup once the application has initialized logging and devices."""
+        with self._lock:
+            self._startup_ready = True
+
+    def _start(self, port):
+        server = None
         try:
-            # 1. Initialize server and socket settings
-            self._server = GremlinServer(("", self._port), GremlinSocketHandler)
-
-            # Configure multicast subscriptions prior to starting execution loops
+            server = GremlinServer(("", port), GremlinSocketHandler)
             group = socket.inet_aton(RPCGremlin.MULTICAST_GROUP)
             mreq = struct.pack("=4sI", group, socket.INADDR_ANY)
-            self._server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+            server.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-            # 2. Spawn and spin up the server worker thread
-            server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
-            server_thread.start()
-            server_started = True
+            thread = threading.Thread(target=self._serve, args=(server,), name="RPCRunner", daemon=True)
+            thread.start()
+            self._listener = server, thread
+            syslog.info(
+                "RPC: listening on %s:%d (UDP), joined multicast group %s on the OS default IPv4 interface",
+                *server.server_address,
+                self.MULTICAST_GROUP,
+            )
+        except Exception as err:  # noqa: BLE001
+            if server is not None:
+                server.server_close()
+            syslog.error(f"RPC: could not listen on UDP port {port}: {err}")
 
-            syslog.info(f"Starting gremlin server listener: multicast group {RPCGremlin.MULTICAST_GROUP} port {self._port} ...")
-
-            # Sleep until stop; no periodic wakeups are needed here.
-            self._thread_event.wait()
-
-        except Exception as e:
-            syslog.error(f"Critical error in GEX listener thread execution: {e}")
+    @staticmethod
+    def _serve(server):
+        try:
+            server.serve_forever(poll_interval=0.1)
+        except Exception:  # noqa: BLE001
+            syslog.exception("RPC: listener failed")
         finally:
-            # 4. Enforce strict cleanup sequence
-            if self._server:
-                try:
-                    if server_started:
-                        self._server.shutdown()
-                        server_thread.join()
-                except Exception as e:
-                    syslog.error(f"Error while stopping server loop: {e}")
-                try:
-                    # shutdown() blocks forever if serve_forever never started.
-                    # Always close a partially initialized multicast socket.
-                    self._server.server_close()
-                except Exception as e:
-                    syslog.error(f"Error while tearing down server context: {e}")
+            server.server_close()
 
-            with self._lock:
-                self._running = False
-
-            syslog.info("GEX listener stopped.")
-
-            # Release virtual joystick locks safely
-            try:
-                proxy = gremlin.joystick_handling.VJoyProxy()
-                proxy.reset()
-            except Exception as e:
-                syslog.error(f"Failed to reset VJoyProxy during cleanup: {e}")
+    @property
+    def listening_port(self):
+        listener = self._listener
+        if listener is not None:
+            server, thread = listener
+            if thread.is_alive():
+                return server.server_address[1]
+        return None
 
     @property
     def running(self):
-        with self._lock:
-            return self._running
+        return self.listening_port is not None
 
     def start(self):
-        """Starts the multicast listener background execution thread"""
-        with self._lock:
-            if self._running:
-                return
+        """Ensures the listener is running before sending remote traffic."""
+        # A request handler can send a reply while the server is shutting down.
+        # Keep the running check outside the lock that protects shutdown.
+        if not self.running:
+            self.reconfigure()
 
+    def reconfigure(self):
+        """Applies the configured listener state and UDP port."""
+        with self._lock:
+            if not self._startup_ready or self._shutting_down:
+                return
             config = gremlin.config.Configuration()
             if not config.remoteEnabled():
+                self._stop()
                 if not self._warning_issued:
                     syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
                     self._warning_issued = True
-                return
-
-            # Pre-acquire connected vJoy devices safely
-            vjoy_ids = gremlin.joystick_handling.vjoy_id_list(connected=True)
-            for key in vjoy_ids:
-                try:
-                    _ = gremlin.joystick_handling.VJoyProxy()[key]
-                    syslog.info(f"Remote proxy VJOY [{key}] ok")
-                except Exception:
-                    pass
-
-            self._thread_event.clear()
-            self._thread = threading.Thread(target=self._thread_runner, name="RPCRunner", daemon=True)
-            self._thread.start()
-            self._running = True
+            else:
+                port = config.server_port
+                endpoint = (port, config.broadcast_host_ip)
+                if not self.running or self._endpoint != endpoint:
+                    self._stop(release_vjoy=False)
+                    self._start(port)
+                    self._endpoint = endpoint
+                self._warning_issued = False
 
     def stop(self):
-        """Signals and safely blocks until the background loops are terminated"""
+        """Stops the listener and waits until its socket is closed."""
         with self._lock:
             self._warning_issued = False
-            if not self._running:
-                return
+            self._stop()
 
-        # Trigger thread exit event safely outside the lock to avoid blocking context transitions
-        self._thread_event.set()
+    def shutdown(self):
+        with self._lock:
+            self._shutting_down = True
+            self._stop()
 
-        if self._thread:
-            gremlin.util.safeJoin(self._thread)
-            self._thread = None
+    def _stop(self, *, release_vjoy=True):
+        if self._listener is None:
+            return
 
-        syslog.info("GEX RPC server stopped...")
+        server, thread = self._listener
+        if thread.is_alive():
+            server.shutdown()
+        # safeJoin skips daemon threads. The replacement must wait for server_close().
+        thread.join()
+        self._listener = None
+        syslog.info("RPC: listener stopped.")
+
+        if release_vjoy:
+            try:
+                gremlin.joystick_handling.VJoyProxy().reset()
+            except Exception as err:  # noqa: BLE001
+                syslog.error(f"RPC: Failed to reset VJoyProxy during cleanup: {err}")
 
 
 # class RPCGremlin_v0:
@@ -459,64 +560,51 @@ class RPCGremlin:
 class RemoteServer(QtCore.QObject):
     """Provides access to remote a remote Gremlin instance events"""
 
+    connection_test_multicast = QtCore.Signal(bytes, int)
+    broadcast_test_reply = QtCore.Signal(bytes, int, object, str, str)
+
     def __init__(self):
         """Initialises a new object."""
 
         QtCore.QObject.__init__(self)
-        self._rpc = None
-        self._started = False
-        self._warning_issued = False
-
+        self._rpc = RPCGremlin()
         el = gremlin.event_handler.EventListener()
+        el.config_option_changed.connect(self._handle_config_options_changed)
         el.remote_control_socket_timeout.connect(self._handle_socket_timeout)
         el.remote_control_socket_error.connect(self._handle_socket_error)
+        el.shutdown.connect(self._shutdown)
+
+    @property
+    def startup_ready(self):
+        return self._rpc.startup_ready
+
+    def enable_startup(self):
+        self._rpc.enable_startup()
 
     def start(self):
-        """start listening"""
-        if self._started and self._rpc is not None and self._rpc.running:
-            return
-        config = gremlin.config.Configuration()
-        # Masters need the listener too (identify replies / peer discovery).
-        # Clients need it to receive commands. Either remote flag is enough.
-        self._enabled = bool(config.remoteEnabled())
-        if not self._enabled:
-            if not self._warning_issued:
-                self._warning_issued = True
-                syslog.info("REMOTE CONTROL: RPC server not started (remote control/broadcast disabled in Options)")
-            return
-        # Allow retry if a prior start claimed success but the listener never came up.
-        if self._rpc is not None and not self._rpc.running:
-            try:
-                self._rpc.stop()
-            except Exception:
-                pass
-            self._rpc = None
-            self._started = False
-        if self._started:
-            return
-        self._rpc = RPCGremlin()
+        """Starts listening when either remote control or broadcast is enabled."""
         self._rpc.start()
-        if self._rpc.running:
-            syslog.info("Gremlin RPC server started...")
-            self._started = True
-        else:
-            if not self._warning_issued:
-                self._warning_issued = True
-                syslog.error("Gremlin RPC server failed to start listener")
-            self._started = False
-            self._rpc = None
 
     def stop(self):
         """stop listening"""
-        self._warning_issued = False
-        if self._rpc:
-            self._rpc.stop()
-            self._started = False
+        self._rpc.stop()
+
+    @QtCore.Slot()
+    def _handle_config_options_changed(self):
+        self._rpc.reconfigure()
+
+    @QtCore.Slot()
+    def _shutdown(self):
+        self._rpc.shutdown()
 
     @property
     def running(self):
         """true if the server is running"""
-        return self._rpc and self._rpc.running
+        return self._rpc.running
+
+    @property
+    def listening_port(self):
+        return self._rpc.listening_port
 
     @property
     def enabled(self):
@@ -529,11 +617,218 @@ class RemoteServer(QtCore.QObject):
 
     def _handle_socket_timeout(self):
         syslog.info("RPC: socket timeout")
-        pass
 
     def _handle_socket_error(self):
         syslog.info("RPC: socket error")
-        pass
+
+
+class RemoteConnectionTest(QtCore.QObject):
+    """Check a GEX listener over UDP and optionally receive its multicast reply."""
+
+    finished = QtCore.Signal(str)
+
+    def __init__(self, host: QtNetwork.QHostAddress, port: int, check_multicast: bool, parent=None):
+        super().__init__(parent)
+        self._host = host
+        self._port = port
+        self._check_multicast = check_multicast
+        self._nonce = uuid.uuid4().bytes
+        self._endpoint = f"{host.toString()}:{port}"
+        self._group = QtNetwork.QHostAddress(RPCGremlin.MULTICAST_GROUP)
+        self._attempts = 0
+        self._direct_result = ""
+        self._multicast_result = ""
+        self._multicast_pending = False
+        self._uses_remote_listener = False
+        self._multicast_socket = None
+
+        self._direct_socket = QtNetwork.QUdpSocket(self)
+        self._direct_socket.readyRead.connect(self._read_direct)
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._on_timeout)
+
+    def start(self):
+        if self._check_multicast:
+            self._listen_for_multicast()
+        if not self._direct_socket.bind(QtNetwork.QHostAddress.SpecialAddress.AnyIPv4):
+            self._direct_result = f"Could not open a UDP test socket for {self._endpoint}. {self._direct_socket.errorString()}"
+            self._finish()
+            return
+        self._send_request()
+
+    def _listen_for_multicast(self):
+        if self._host.isLoopback() or self._host in QtNetwork.QNetworkInterface.allAddresses():
+            self._multicast_result = "To check multicast through the firewall, enter a GEX server IP on another PC."
+            return
+        if remote_server.listening_port == self._port:
+            remote_server.connection_test_multicast.connect(self._accept_multicast, QtCore.Qt.ConnectionType.QueuedConnection)
+            self._uses_remote_listener = True
+        else:
+            listener = QtNetwork.QUdpSocket(self)
+            if not listener.bind(
+                QtNetwork.QHostAddress.SpecialAddress.AnyIPv4,
+                self._port,
+                QtNetwork.QAbstractSocket.BindFlag.DontShareAddress,
+            ) or not listener.joinMulticastGroup(self._group):
+                self._multicast_result = f"Could not listen for multicast on local UDP port {self._port}. {listener.errorString()}"
+                listener.close()
+                return
+            self._multicast_socket = listener
+            listener.readyRead.connect(self._read_multicast)
+        self._multicast_pending = True
+
+    def _send_request(self):
+        self._attempts += 1
+        packet = msgpack.packb({"action": _PROBE_REQUEST, "nonce": self._nonce, "multicast": self._multicast_pending})
+        if self._direct_socket.writeDatagram(packet, self._host, self._port) < 0:
+            if not self._direct_result:
+                self._direct_result = f"Could not send UDP to {self._endpoint}. {self._direct_socket.errorString()}"
+            if self._multicast_pending:
+                self._multicast_result = "The multicast request could not be sent."
+            self._finish()
+        else:
+            self._timer.start(1500)
+
+    @QtCore.Slot()
+    def _read_direct(self):
+        while self._direct_socket.hasPendingDatagrams():
+            datagram = self._direct_socket.receiveDatagram()
+            if datagram.senderAddress() != self._host or datagram.senderPort() != self._port:
+                continue
+            data = _unpack_remote_packet(bytes(datagram.data()))
+            if data and data.get("action") == _PROBE_REPLY and data.get("nonce") == self._nonce:
+                self._direct_result = f"GEX responded at {self._endpoint} over UDP."
+                if not self._multicast_pending:
+                    self._finish()
+                    return
+
+    @QtCore.Slot()
+    def _read_multicast(self):
+        listener = self._multicast_socket
+        while listener.hasPendingDatagrams():
+            datagram = listener.receiveDatagram()
+            data = _unpack_remote_packet(bytes(datagram.data()))
+            if data and data.get("action") == _PROBE_MULTICAST:
+                self._accept_multicast(data.get("nonce"), self._port)
+
+    @QtCore.Slot(bytes, int)
+    def _accept_multicast(self, nonce, port):
+        # The nonce identifies the requested server even if it multicasts from a different adapter.
+        if self._multicast_pending and port == self._port and nonce == self._nonce:
+            self._multicast_pending = False
+            self._multicast_result = f"Server multicast reached this PC on {RPCGremlin.MULTICAST_GROUP}:{port} (UDP)."
+            if self._direct_result:
+                self._finish()
+
+    @QtCore.Slot()
+    def _on_timeout(self):
+        if self._attempts < 2:
+            self._send_request()
+            return
+        if not self._direct_result:
+            self._direct_result = (
+                f"No GEX reply from {self._endpoint} over UDP. "
+                "Check that the server is running a GEX version with connection testing, "
+                "broadcast is enabled, and the configured UDP port matches and is allowed through the firewall."
+            )
+        if self._multicast_pending:
+            self._multicast_result = (
+                f"No multicast reply reached this PC on {RPCGremlin.MULTICAST_GROUP}:{self._port} (UDP). "
+                "Check the server's outbound and this PC's inbound firewall rules and the network's multicast settings."
+            )
+        self._finish()
+
+    def _finish(self):
+        self.cancel()
+        self.finished.emit("\n".join(filter(None, (self._direct_result, self._multicast_result))))
+
+    def cancel(self):
+        self._timer.stop()
+        self._direct_socket.close()
+        self._multicast_pending = False
+        if self._multicast_socket is not None:
+            self._multicast_socket.close()
+        if self._uses_remote_listener:
+            remote_server.connection_test_multicast.disconnect(self._accept_multicast)
+            self._uses_remote_listener = False
+
+
+class RemoteBroadcastTest(QtCore.QObject):
+    """Send a multicast ping and collect unicast replies from remote-control clients."""
+
+    finished = QtCore.Signal(str, list)
+
+    def __init__(self, port: int, parent=None):
+        super().__init__(parent)
+        self._port = port
+        self._nonce = uuid.uuid4().bytes
+        self._responders = {}
+        self._collecting = False
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._finish)
+
+    def start(self):
+        remote_server.start()
+        if remote_server.listening_port != self._port:
+            syslog.warning(
+                "RPC: Check Broadcast [%s] could not start on UDP port %d (listener port: %s)",
+                self._nonce.hex(),
+                self._port,
+                remote_server.listening_port,
+            )
+            self.finished.emit(f"Could not listen for replies on UDP port {self._port}.", [])
+            return
+
+        remote_server.broadcast_test_reply.connect(self._accept_reply, QtCore.Qt.ConnectionType.QueuedConnection)
+        self._collecting = True
+        if remote_client.send({"action": _PROBE_BROADCAST_PING, "nonce": self._nonce}):
+            self._timer.start(2000)
+        else:
+            syslog.warning(
+                "RPC: Check Broadcast [%s] could not send multicast ping to %s:%d",
+                self._nonce.hex(),
+                RPCGremlin.MULTICAST_GROUP,
+                self._port,
+            )
+            self.cancel()
+            self.finished.emit(f"Could not send the multicast ping to {RPCGremlin.MULTICAST_GROUP}:{self._port}.", [])
+
+    @QtCore.Slot(bytes, int, object, str, str)
+    def _accept_reply(self, nonce, port, client_id, name, peer_ip):
+        if self._collecting and nonce == self._nonce and port == self._port:
+            self._responders.setdefault(client_id, (name, peer_ip))
+        elif self._collecting:
+            syslog.debug(
+                "RPC: Check Broadcast [%s] ignored pong [%s] from %s on UDP port %d (expected port %d)",
+                self._nonce.hex(),
+                nonce.hex(),
+                peer_ip,
+                port,
+                self._port,
+            )
+
+    @QtCore.Slot()
+    def _finish(self):
+        self.cancel()
+        clients = sorted(self._responders.values(), key=lambda client: (client[0].casefold(), client[1]))
+        count = len(clients)
+        if count:
+            message = "1 client replied to the multicast ping." if count == 1 else f"{count} clients replied to the multicast ping."
+        else:
+            message = (
+                f"No clients replied to the multicast ping on {RPCGremlin.MULTICAST_GROUP}:{self._port}. "
+                "Check that clients have remote control enabled, use the same UDP port, and run a build with Check Broadcast support."
+            )
+        syslog.info("RPC: Check Broadcast [%s] completed with %d unique client replies", self._nonce.hex(), count)
+        self.finished.emit(message, clients)
+
+    def cancel(self):
+        self._timer.stop()
+        if self._collecting:
+            self._collecting = False
+            remote_server.broadcast_test_reply.disconnect(self._accept_reply)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -550,6 +845,7 @@ class RemoteClient:
 
         self._sock = None
         self._socket_lock = threading.RLock()
+        self._socket_settings = None
         config = gremlin.config.Configuration()
         self._verbose_remote_extra = config.verbose_mode_remote_extra
         self._verbose_remote = config.verbose_mode_remote
@@ -574,10 +870,6 @@ class RemoteClient:
         el.remote_control_enable.connect(self._handle_enable_control_request)
         el.remote_control_identify.connect(self.requestIdentify)  # request network clients to identify
         el.profile_stop.connect(self._handle_profile_stop)
-
-        # enable control if enabled
-        if self.remote_control.remoteEnabled():
-            self._handle_enable_control_request()
 
     @property
     def clientName(self) -> str:
@@ -610,16 +902,27 @@ class RemoteClient:
 
         # get remote control options and start/stop as needed
         enabled = self.remote_control.remoteEnabled()
-        if self._started and not enabled:
-            self.stop()  # terminate connection if remote control is no longer enabled and it was previously on
-        elif not self._started and enabled:
-            self._handle_enable_control_request()  # enable remote control if it was previously off and now enabled
+        if not enabled:
+            if self._started:
+                self.stop()
+            return
+
+        settings = (config.server_port, config.broadcast_host_ip, config.broadcast_bind_all_ips)
+        with self._socket_lock:
+            socket_changed = self._socket_settings != settings
+            if socket_changed and self._sock is not None:
+                self._sock.close()
+                self._sock = None
+        if not self._started:
+            self._handle_enable_control_request()
+        elif socket_changed:
+            self.requestIdentify()
 
     def _handle_enable_control_request(self):
         """called when request to enable remote control has been made"""
         self.start()
 
-    def getDatablock(self, action: str = None, key: str = None, data=None) -> dict:
+    def getDatablock(self, action: str | None = None, key: str | None = None, data=None) -> dict:
         """gets a dict with the sender info"""
         block = {}
         if action:
@@ -633,17 +936,16 @@ class RemoteClient:
 
     def start(self):
         """creates a multicast client send socket on profile start"""
-        if not self._started:
-            if self.remote_control.remoteEnabled():
-                # Always bring the UDP listener up before sending identify.
-                remote_server.start()
-                if self.ensure_socket():
-                    el = gremlin.event_handler.EventListener()
-                    el.heartbeat.connect(self._alive_ticker)
-                    self._started = True
+        if remote_server.startup_ready and not self._started and self.remote_control.remoteEnabled():
+            # Always bring the UDP listener up before sending identify.
+            remote_server.start()
+            if self.ensure_socket():
+                el = gremlin.event_handler.EventListener()
+                el.heartbeat.connect(self._alive_ticker)
+                self._started = True
 
-                    # send ID request when starting to update clients
-                    self.requestIdentify()
+                # send ID request when starting to update clients
+                self.requestIdentify()
 
     def stop(self):
         """closes the client socket"""
@@ -653,21 +955,9 @@ class RemoteClient:
 
             try:
                 el = gremlin.event_handler.EventListener()
-                if self._alive_ticker in el.heartbeat:
-                    el.heartbeat.disconnect(self._alive_ticker)
-            except Exception:
+                el.heartbeat.disconnect(self._alive_ticker)
+            except Exception:  # noqa: BLE001, S110
                 pass
-
-            # if self._alive_thread:
-            #     syslog.info("Alive stop requested...")
-
-            #     self._alive_thread_stop_requested = True
-            #     self._alive_thread_event.set()
-
-            #     gremlin.util.safeJoin(self._alive_thread)
-
-            #     syslog.info("Alive thread stopped")
-            #     self._alive_thread = None
 
             self._started = False
 
@@ -694,13 +984,15 @@ class RemoteClient:
             if not self._sock:
                 config = gremlin.config.Configuration()
                 broadcast_host = config.broadcast_host_ip
-                if broadcast_host == "127.0.0.1":
+                port = config.server_port
+                bind_all = config.broadcast_bind_all_ips
+                settings = (port, broadcast_host, bind_all)
+                if not bind_all and broadcast_host == "127.0.0.1":
                     broadcast_host = gremlin.util.getHostIp()[0]
                     syslog.warning(
                         f"RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses."
                     )
 
-                port = config.server_port
                 self._address = (RPCGremlin.MULTICAST_GROUP, port)
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 ttl = struct.pack("b", RPCGremlin.MULTICAST_TTL)
@@ -708,7 +1000,6 @@ class RemoteClient:
                 # Never bind the *send* socket to server_port — that collides with the
                 # UDP listener and produces RPC socket errors / missed identify replies.
                 # Optionally pin the outbound multicast interface instead.
-                bind_all = config.broadcast_bind_all_ips
                 if (not bind_all) and broadcast_host and broadcast_host not in ("0.0.0.0", ""):
                     try:
                         self._sock.setsockopt(
@@ -716,14 +1007,15 @@ class RemoteClient:
                             socket.IP_MULTICAST_IF,
                             socket.inet_aton(broadcast_host),
                         )
-                        syslog.info(f"Gremlin RPC client started... iface {broadcast_host} port: {port}")
+                        syslog.info("RPC: multicast sender configured for %s:%d using interface %s", *self._address, broadcast_host)
                     except OSError as err:
                         syslog.warning(f"RPC: could not set multicast iface {broadcast_host}: {err}")
-                        syslog.info(f"Gremlin RPC client started... ALL IP - port: {port}")
+                        syslog.info("RPC: multicast sender configured for %s:%d using the OS default IPv4 interface", *self._address)
                 else:
-                    syslog.info(f"Gremlin RPC client started... ALL IP - port: {port}")
+                    syslog.info("RPC: multicast sender configured for %s:%d using the OS default IPv4 interface", *self._address)
+                self._socket_settings = settings
             return self._sock is not None
-        except Exception:
+        except Exception:  # noqa: BLE001
             syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
             if self._sock is not None:
                 self._sock.close()
@@ -762,18 +1054,16 @@ class RemoteClient:
         """sends a network notice the current client is disconnecting"""
         self.unregisterClient()
 
-    def _dispatch(self, data, client_list: list | tuple | int):
+    def _dispatch(self, data, client_list):
+        """Send output to the requested targets allowed by the master filter."""
         if client_list is None:
-            self.send(data)
-            return
-        if isinstance(client_list, (str, int)):
-            self.send(data, client_list)
-            return
-        clients = dict.fromkeys(int(client_id) for client_id in client_list)
-        if 0 in clients:
-            self.send(data)
-            return
-        for client_id in clients:
+            targets = (0,)
+        elif isinstance(client_list, (str, int)):
+            targets = (int(client_list),)
+        else:
+            targets = tuple(dict.fromkeys(int(client_id) for client_id in client_list))
+
+        for client_id in self.remote_control.filterClientTargets(targets):
             self.send(data, client_id)
 
     def _alive_ticker(self):
@@ -838,7 +1128,16 @@ class RemoteClient:
             self._send_joystick("hat", HatData.key, device_id, hat_id, _hat_direction(direction), client_list)
 
     def _send_joystick(self, action, key, device_id, target, value, client_list, relative_value=None):
-        """Build the existing wire format without temporary data objects."""
+        """Encode a portable identity for Maestro and preserve legacy vJoy IDs."""
+        joystick_handling = gremlin.joystick_handling
+        device_id = joystick_handling.parse_virtual_device_key(device_id)
+        if isinstance(device_id, str):
+            device = joystick_handling.get_virtual_device(device_id)
+            if device is not None:
+                if device.device_type == DeviceType.Maestro:
+                    device_id = joystick_handling.maestro_output_identity(device)
+                elif device.device_type == DeviceType.VJoy:
+                    device_id = device.vjoy_id
         command = action if key == ButtonData.key else "value"
         if relative_value is not None:
             command = "relative"
@@ -880,7 +1179,7 @@ class RemoteClient:
         is_pressed,
         client_list=None,
         force_remote=False,
-        extra_data: dict = None,
+        extra_data: dict | None = None,
     ):
         """sends a mouse button press or release to clients"""
         if self.enabled or force_remote:
@@ -898,7 +1197,7 @@ class RemoteClient:
         is_pressed,
         client_list=None,
         force_remote=False,
-        extra_data: dict = None,
+        extra_data: dict | None = None,
     ):
         """sends a mouse button press or release to clients"""
         if self.enabled or force_remote:
@@ -909,7 +1208,7 @@ class RemoteClient:
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
-    def send_mouse_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
+    def send_mouse_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict | None = None):
         """sends vertical mousewheel data  to clients"""
         if self.enabled or force_remote:
             verbose = self._verbose_remote
@@ -919,7 +1218,7 @@ class RemoteClient:
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
-    def send_mouse_h_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
+    def send_mouse_h_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict | None = None):
         """sends horizontal mousewheel data to clients"""
         if self.enabled or force_remote:
             verbose = self._verbose_outputs
@@ -930,7 +1229,7 @@ class RemoteClient:
             data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
-    def send_mouse_motion(self, dx, dy, client_list=None, force_remote=False, extra_data: dict = None):
+    def send_mouse_motion(self, dx, dy, client_list=None, force_remote=False, extra_data: dict | None = None):
         """sends mouse motion data to clients"""
         if self.enabled or force_remote:
             verbose = self._verbose_remote
@@ -949,7 +1248,7 @@ class RemoteClient:
         time_to_max_speed,
         client_list=None,
         force_remote=False,
-        extra_data: dict = None,
+        extra_data: dict | None = None,
     ):
         """sends mouse acceleration data to clients"""
         if self.enabled or force_remote:
@@ -1060,7 +1359,7 @@ class RemoteClient:
 
     def send(self, data=None, client_id: int = 0) -> bool:
         """sends data to the socket. Returns True if a datagram was sent."""
-        if not data:
+        if not data or not remote_server.startup_ready:
             return False
         data = data.copy()
         data["sender_id"] = self.clientId
@@ -1077,7 +1376,7 @@ class RemoteClient:
         # encode the data
         try:
             raw_data = msgpack.packb(data)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"RPC: msgpack failed: {err}")
             return False
 
@@ -1087,12 +1386,35 @@ class RemoteClient:
                 return False
             try:
                 self._sock.sendto(raw_data, self._address)
-                return True
             except OSError as err:
                 syslog.error(f"RPC: sendto failed: {err}")
                 return False
+            if data.get("action") == _PROBE_BROADCAST_PING:
+                nonce = data.get("nonce")
+                if isinstance(nonce, bytes):
+                    self._log_broadcast_ping(nonce)
+            return True
 
-    def sendRequest(self, callback, payload: dict = None, client_id: str = None):
+    def _log_broadcast_ping(self, nonce):
+        try:
+            local_port = self._sock.getsockname()[1]
+            address = socket.inet_ntoa(self._sock.getsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, 4))
+            interface = address if address != "0.0.0.0" else "the OS default IPv4 interface"
+        except OSError:
+            local_port = "unknown"
+            interface = "an unknown IPv4 interface"
+        group, port = self._address
+        syslog.info(
+            "RPC: Check Broadcast [%s] sent multicast ping to %s:%d using %s, source UDP port %s, expecting unicast replies on UDP port %d",
+            nonce.hex(),
+            group,
+            port,
+            interface,
+            local_port,
+            port,
+        )
+
+    def sendRequest(self, callback, payload: dict | None = None, client_id: str | None = None):
         """sends a packet request to clients expecting a response
 
         :param callback: callback to call when the data is received, sends the packet block
@@ -1145,7 +1467,7 @@ class RemoteClient:
         self.sendRequest(callback=callback, payload=payload)
 
     def handle(self, data: dict, peer_ip: str = ""):
-        """handles received data
+        """handles received data from the sender
 
         :param peer_ip: UDP source address when known (used for video return connect-back)
         """
@@ -1159,6 +1481,8 @@ class RemoteClient:
         client_id = self.clientId
         if sender == client_id or (target and target != client_id):
             return
+        if action in _VIRTUAL_OUTPUT_ACTIONS and type(data.get("to")) is not int:
+            return
         if action not in (
             "identify",
             "identify_client",
@@ -1167,12 +1491,10 @@ class RemoteClient:
             "request",
             "reply",
             "hb",
-        ):
-            if not gremlin.shared_state.is_running:
-                # profile must be running
-                return
+        ) and (not gremlin.shared_state.is_running or not gremlin.config.Configuration().enable_remote_control):
+            return
 
-        verbose = self._verbose_remote_extra
+        verbose = self._verbose_remote
         if verbose:
             syslog.info(f"REMOTE: received remote data: {data}")
 
@@ -1183,8 +1505,8 @@ class RemoteClient:
 
             case "key":
                 # keyboard output
-                import win32gui
                 import win32con
+                import win32gui
 
                 key_data = KeyData.fromPayload(data["data"])
                 virtual_code = key_data.virtual_code
@@ -1356,7 +1678,7 @@ class RemoteClient:
                         syslog.warning("RPC: identify reply send failed (no socket?)")
                     else:
                         syslog.info("RPC: identify reply sent")
-                except Exception as err:
+                except Exception as err:  # noqa: BLE001
                     syslog.error(f"RPC: identify reply failed: {err}")
 
             case "identify_client" | "register_client":
@@ -1369,7 +1691,7 @@ class RemoteClient:
                     syslog.warning(f"RPC: identify_client missing payload from {peer_ip}: keys={list(data.keys())}")
                     return
                 cd = ClientData.fromPayload(payload)
-                if peer_ip and not getattr(cd, "host_ip", ""):
+                if peer_ip:
                     cd.host_ip = peer_ip
                 syslog.info(f"RPC: identity received: {cd} version=[{cd.client_version}] ip=[{cd.host_ip}]")
 
@@ -1441,7 +1763,7 @@ class RemoteClient:
                     vigem.update()
 
             case "button" | "axis" | "hat" | "relative_axis" | "relative_Axis" | "toggle":
-                # joystick button / axis / hat — open vJoy on demand (do not require prior local claim)
+                # Open the client's joystick output on demand.
 
                 payload = data["data"]
                 device = payload["device"]
@@ -1461,40 +1783,43 @@ class RemoteClient:
                             raise ValueError("Invalid hat payload")
                         value = _hat_direction(value)
 
-                vid, vjoy = _open_remote_vjoy(device)
-                if vjoy is None:
+                output = _open_remote_output(device)
+                if output is None:
                     return
 
                 match action:
                     case "button":
                         if verbose:
-                            syslog.info(f"REMOTE: button vjoy {vid} input id: {target} pressed: {value}")
-                        if target > 0 and target <= vjoy.button_count:
-                            vjoy.button(target).is_pressed = value
+                            syslog.info(f"REMOTE: output [{device}] button {target} pressed: {value}")
+                        if target > 0 and target <= output.button_count:
+                            output.button(target).is_pressed = value
                     case "toggle":
                         if verbose:
-                            syslog.info(f"REMOTE: button toggle vjoy {vid} input id: {target}")
-                        if target > 0 and target <= vjoy.button_count:
-                            vjoy.button(target).is_pressed = not vjoy.button(target).is_pressed
+                            syslog.info(f"REMOTE: output [{device}] toggle button {target}")
+                        if target > 0 and target <= output.button_count:
+                            button = output.button(target)
+                            button.is_pressed = not button.is_pressed
                     case "axis" | "relative_axis" | "relative_Axis":
-                        if target <= 0 or not vjoy.is_axis_valid(axis_id=target):
+                        if target <= 0 or not output.is_axis_valid(axis_id=target):
+                            if verbose:
+                                syslog.error(f"REMOTE: output [{device}] invalid axis target: {target}")
                             return
-                        axis = vjoy.axis(target)
+                        axis = output.axis(target)
                         if value is None:
                             value = axis.value
                         if relative_value:
                             value = gremlin.util.clamp(value + relative_value)
                             if verbose:
-                                syslog.info(f"REMOTE: relative axis vjoy {vid} input id: {target} relative value: {relative_value:0.3f}")
+                                syslog.info(f"REMOTE: output [{device}] axis {target} relative value: {relative_value:0.3f}")
                         if verbose:
                             stub = f"{value:0.3f}" if value is not None else "None"
-                            syslog.info(f"REMOTE: axis vjoy {vid} input id: {target} {stub}")
+                            syslog.info(f"REMOTE: output [{device}] axis {target}: {stub}")
                         axis.value = value
                     case "hat":
-                        if target > 0 and target <= vjoy.hat_count:
+                        if target > 0 and target <= output.hat_count:
                             if verbose:
-                                syslog.info(f"REMOTE: hat vjoy {vid} input id: {target} direction: {value}")
-                            vjoy.hat(target).direction = value
+                                syslog.info(f"REMOTE: output [{device}] hat {target} direction: {value}")
+                            output.hat(target).direction = value
                     case _:
                         syslog.error(f"REMOTE: unknown action code received [{action}]")
 
@@ -1518,14 +1843,14 @@ class InternalSpeech:
     def speak(self, text):
         try:
             self.speaker.speak(text)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
 
 class BaseData:
     """base class for input data"""
 
-    def __init__(self, key: str, action: str, extra_data: dict = None):
+    def __init__(self, key: str, action: str, extra_data: dict | None = None):
         self.key: str = key
         self.action: str = action
         self.extra_data: dict = extra_data
@@ -1548,14 +1873,14 @@ class ButtonData(BaseData):
 
     key = "button"
 
-    def __init__(self, action: str = None, extra_data: dict = None):
+    def __init__(self, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.device_id: int | str = None  # vjoy device ID (int or guid) GUID
         self.button_id: int = None
         self.is_pressed: bool = None
 
     @staticmethod
-    def create(device_id: int | str, button_id: int, is_pressed: bool = None, action: str = None, extra_data: dict = None):
+    def create(device_id: int | str, button_id: int, is_pressed: bool | None = None, action: str | None = None, extra_data: dict | None = None):
         self = ButtonData(action, extra_data=extra_data)
         self.device_id = device_id
         self.button_id = button_id
@@ -1589,7 +1914,7 @@ class AxisData(BaseData):
 
     key = "axis"
 
-    def __init__(self, action: str = None, extra_data: dict = None):
+    def __init__(self, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.device_id: int | str = None
         self.axis_id: int = None
@@ -1600,9 +1925,9 @@ class AxisData(BaseData):
     def create(
         device_id: int | str,
         axis_id: int,
-        value: float = None,
-        relative_value: float = None,
-        action: str = None,
+        value: float | None = None,
+        relative_value: float | None = None,
+        action: str | None = None,
     ):
         self = AxisData(action=action)
         self.device_id = device_id
@@ -1642,14 +1967,14 @@ class HatData(BaseData):
 
     key = "hat"
 
-    def __init__(self, action: str = None, extra_data: dict = None):
+    def __init__(self, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.device_id: int | str = None
         self.hat_id: int = None
-        self.direction: tuple = None  # tuple
+        self.direction: tuple | None = None  # tuple
 
     @staticmethod
-    def create(device_id: int | str, hat_id: int, direction: tuple, action: str = None, extra_data: dict = None) -> HatData:
+    def create(device_id: int | str, hat_id: int, direction: tuple, action: str | None = None, extra_data: dict | None = None) -> HatData:
         self = HatData(action=action, extra_data=extra_data)
         self.device_id = device_id
         self.hat_id = hat_id
@@ -1683,7 +2008,7 @@ class KeyData(BaseData):
 
     key = "key"
 
-    def __init__(self, action: str = None, extra_data: dict = None):
+    def __init__(self, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.virtual_code: int = None
         self.scan_code: int = None
@@ -1694,8 +2019,8 @@ class KeyData(BaseData):
         virtual_code: int,
         scan_code: int,
         flags: int,
-        action: str = None,
-        extra_data: dict = None,
+        action: str | None = None,
+        extra_data: dict | None = None,
     ) -> KeyData:
         self = KeyData(action=action, extra_data=extra_data)
         self.virtual_code = virtual_code
@@ -1731,13 +2056,13 @@ class MouseData(BaseData):
 
     key = "mouse"
 
-    def __init__(self, action: str = None, extra_data: dict = None):
+    def __init__(self, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.button_id: int = None
-        self.value = None
+        self.value: int | None = None
 
     @staticmethod
-    def create(button_id: int, value, action: str = None, extra_data: dict = None) -> MouseData:
+    def create(button_id: int, value: int | None, action: str | None = None, extra_data: dict | None = None) -> MouseData:
         self = MouseData(action=action, extra_data=extra_data)
         self.button_id = button_id
         self.value = value
@@ -1768,12 +2093,12 @@ class BlockData(BaseData):
 
     key = "data"
 
-    def __init__(self, data: dict, action: str = None, extra_data: dict = None):
+    def __init__(self, data: dict, action: str | None = None, extra_data: dict | None = None):
         super().__init__(self.key, action, extra_data)
         self.data = data
 
     @staticmethod
-    def create(data: dict, action: str = None, extra_data: dict = None) -> BlockData:
+    def create(data: dict, action: str | None = None, extra_data: dict | None = None) -> BlockData:
         self = BlockData(data=data, action=action, extra_data=extra_data)
         return self
 
@@ -1786,6 +2111,40 @@ class BlockData(BaseData):
         assert data.get("key") == BlockData.key, "Invalid key for BlockData"
         self = BlockData(data=data["data"], action=data.get("action"), extra_data=data.get("extra_data"))
         return self
+
+
+def _client_address_key(address: str) -> str:
+    return address.strip().rstrip(".").casefold()
+
+
+def normalize_client_address(address: str) -> str:
+    """Normalize an IPv4 address or network name used as a client selector."""
+    address = _client_address_key(address)
+    if re.fullmatch(r"[\d.]+", address) and "." in address:
+        ip = ipaddress.IPv4Address(address)
+        if ip.is_unspecified or ip.is_multicast or address == "255.255.255.255":
+            raise ValueError("Enter a client IPv4 address or network name.")
+    elif not re.fullmatch(r"[\w-]+(?:\.[\w-]+)*", address):
+        raise ValueError("Enter a client IPv4 address or network name.")
+    return address
+
+
+def read_client_selection(node) -> frozenset[str] | None:
+    """Read the saved checklist. An absent element represents Select All."""
+    if node is None:
+        return None
+    return frozenset(
+        address for client in node.findall("client")
+        if (address := _client_address_key(client.get("address", "")))
+    )
+
+
+def write_client_selection(parent, tag: str, selection: frozenset[str] | None):
+    """Write an explicit allowlist, including an empty one."""
+    if selection is not None:
+        node = ElementTree.SubElement(parent, tag)
+        for address in sorted(selection):
+            ElementTree.SubElement(node, "client", address=address)
 
 
 class ClientData:
@@ -1801,19 +2160,19 @@ class ClientData:
             self.client_name = client_name
         else:
             self.client_name = remote_client.clientName if auto else gremlin.util.getHostName()
-        
+
         self.custom_name = remote_client.customName if auto else None  # custom name of the client (optional)
         self.client_version = gremlin.shared_state.application_version if auto else None  # version of the client (optional)
         self.client_timestamp = gremlin.shared_state.application_start_time if auto else None  # start time of the client (optional)
+        self.host_name = socket.gethostname() if auto else ""
         self.host_ip = ""  # filled by receiver from UDP peer address
         self.video_enabled = False
         self.video_port = 0
         if auto:
             try:
-
                 self.video_enabled = bool(cfg.enable_remote_control and cfg.remote_video_enabled)
                 self.video_port = int(cfg.remote_video_port) if self.video_enabled else 0
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.video_enabled = False
                 self.video_port = 0
 
@@ -1821,13 +2180,24 @@ class ClientData:
         """gets the client name custom or system"""
         return self.custom_name if self.custom_name else self.client_name
 
+    def addresses(self) -> tuple[str, ...]:
+        """Return the advertised names and observed IPv4 address used for routing."""
+        addresses = []
+        for value in (self.host_name, self.client_name, self.custom_name, self.host_ip):
+            if isinstance(value, str) and value:
+                try:
+                    addresses.append(normalize_client_address(value))
+                except ValueError:
+                    continue
+        return tuple(addresses)
+
     @staticmethod
     def fromData(
         client_id: int,
         client_name: str,
         custom_name: str,
-        client_version: str = None,
-        client_timestamp: int = None,
+        client_version: str | None = None,
+        client_timestamp: int | None = None,
     ):
         self = ClientData(False)
         self.client_name = client_name
@@ -1846,6 +2216,7 @@ class ClientData:
             "client_custom": self.custom_name,
             "client_version": self.client_version,
             "client_timestamp": self.client_timestamp,
+            "host_name": self.host_name,
             "video_enabled": bool(self.video_enabled),
             "video_port": int(self.video_port or 0),
             "host_ip": str(self.host_ip or ""),
@@ -1860,10 +2231,11 @@ class ClientData:
         cd.custom_name = data["client_custom"]
         cd.client_version = data["client_version"]
         cd.client_timestamp = data["client_timestamp"]
+        cd.host_name = str(data.get("host_name") or "")
         cd.video_enabled = bool(data.get("video_enabled", False))
         try:
             cd.video_port = int(data.get("video_port") or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             cd.video_port = 0
         cd.host_ip = str(data.get("host_ip") or "")
         return cd
@@ -1876,7 +2248,7 @@ class ClientData:
         return None
 
     def __hash__(self):
-        return hash((self.client_id, self.client_name, self.custom_name, self.client_version, self.video_enabled, self.video_port, self.host_ip))
+        return hash((self.client_id, self.client_name, self.custom_name, self.client_version, self.video_enabled, self.video_port, self.host_ip, self.host_name))
 
     def __eq__(self, other):
         if not isinstance(other, ClientData):
@@ -1889,12 +2261,40 @@ class ClientData:
             and bool(self.video_enabled) == bool(other.video_enabled)
             and int(self.video_port or 0) == int(other.video_port or 0)
             and str(self.host_ip or "") == str(other.host_ip or "")
+            and self.host_name == other.host_name
         )
 
     def __str__(self):
         stub = f"({self.custom_name})" if self.custom_name else ""
         video = f" video:{self.video_port}" if self.video_enabled else ""
         return f"client: {stub}[{self.client_name}]/[{self.client_id}]{video}"
+
+
+class ClientOperation(enum.Enum):
+    Select = "select"
+    EnableAll = "enable-all"
+    DisableAll = "disable-all"
+    Unchanged = "unchanged"
+
+
+class OutputMode(enum.Enum):
+    Unchanged = "unchanged"
+    LocalOnly = "local-only"
+    RemoteOnly = "remote-only"
+    LocalAndRemote = "local-and-remote"
+
+
+class SelectionBehavior(enum.Enum):
+    Permanent = "permanent"
+    Temporary = "temporary"
+    Toggle = "toggle"
+
+
+_OUTPUT_MODES = {
+    OutputMode.LocalOnly: VjoyAction.VJoyEnableLocalOnly,
+    OutputMode.RemoteOnly: VjoyAction.VJoyEnableRemoteOnly,
+    OutputMode.LocalAndRemote: VjoyAction.VJoyEnableLocalAndRemote,
+}
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -1906,17 +2306,26 @@ class RemoteControl:
         self._is_remote = False
         self._is_local = False
         self._is_paired = False
-        self._global_remote_enabled = gremlin.config.Configuration().remoteEnabled()  # initial state of global options
+        config = gremlin.config.Configuration()
+        self._global_remote_enabled = config.enable_remote_broadcast
+        self._client_enabled = config.enable_remote_control
         self._clients = {}
+        self._client_lock = threading.Lock()
+        self._clients_path = Path(config.data_path()) / "clients.json"
+        self._known_clients = self._load_known_clients()
+        self._active_client_map: dict[str | int, bool] = {}
+        self._client_overrides: dict[object, tuple[frozenset[str] | None, bool]] = {}
+        self._active_client_ids: frozenset[int] = frozenset()
+        self._all_clients_active = True
+        self._broadcast_to_all_clients = True
 
         self._mode = VjoyAction.VJoyEnableLocalOnly
         self._update(self._mode)
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._handle_options_changed)
+        el.config_option_changed.connect(self._handle_options_changed)
         el.remote_control_enable.connect(self._handle_remote_control_enable)
         el.remote_control_disable.connect(self._handle_remote_control_disable)
-
-        # map of clients
 
         self.registerSelf()
 
@@ -1967,6 +2376,113 @@ class RemoteControl:
         config = gremlin.config.Configuration()
         return config.enable_remote_control
 
+    def clientActive(self, client_id: int | str) -> bool:
+        """Return whether the specified client ID is allowed to receive output."""
+        with self._client_lock:
+            return self._client_active(int(client_id))
+
+    def _client_active(self, client_id: int) -> bool:
+        if self._broadcast_to_all_clients:
+            return True
+        if self._all_clients_active and not self._client_overrides:
+            return self._active_client_map.get(client_id, True)
+        return client_id in self._active_client_ids
+
+    def _refresh_active_client_ids(self):
+        if self._client_overrides:
+            addresses, solo = next(reversed(self._client_overrides.values()))
+            self._broadcast_to_all_clients = addresses is None
+            matches = frozenset(
+                client_id for client_id, client in self._clients.items()
+                if client_id != self.clientId and (addresses is None or not addresses.isdisjoint(client.addresses()))
+            )
+            self._active_client_ids = frozenset() if solo and len(matches) != 1 else matches
+            return
+
+        self._broadcast_to_all_clients = self._all_clients_active and not self._active_client_map
+        self._active_client_ids = frozenset(
+            client_id for client_id, client in self._clients.items()
+            if client_id != self.clientId and self._active_client_map.get(
+                client_id,
+                self._all_clients_active or any(self._active_client_map.get(address) for address in client.addresses()),
+            )
+        )
+
+    def setClientActive(self, client_id: int | str, active: bool):
+        """Override the state of one client by ID."""
+        with self._client_lock:
+            self._active_client_map[int(client_id)] = active
+            self._refresh_active_client_ids()
+
+    def setActiveClients(self, addresses: frozenset[str] | None):
+        """Replace the master filter with the selected IP addresses or names."""
+        active = dict.fromkeys(map(_client_address_key, addresses or ()), True)
+        with self._client_lock:
+            self._active_client_map = active
+            self._all_clients_active = not active
+            self._refresh_active_client_ids()
+
+    def resetActiveClients(self):
+        """resets all clients to active"""
+        self.setAllClientsActive(True)
+
+    def setAllClientsActive(self, active: bool):
+        """Enable or mute every client in the regular filter."""
+        with self._client_lock:
+            self._active_client_map.clear()
+            self._all_clients_active = active
+            self._refresh_active_client_ids()
+
+    def applyClientOperation(self, operation: ClientOperation, selection: frozenset[str] | None):
+        """Apply a client operation to the regular filter."""
+        if operation is ClientOperation.Select:
+            self.setActiveClients(selection)
+        elif operation in (ClientOperation.EnableAll, ClientOperation.DisableAll):
+            self.setAllClientsActive(operation is ClientOperation.EnableAll)
+
+    def applyOutputMode(self, output_mode: OutputMode):
+        """Apply the requested profile output routing."""
+        if output_mode in _OUTPUT_MODES:
+            self.mode = _OUTPUT_MODES[output_mode]
+
+    def beginClientSolo(self, hold: object, address: str):
+        """Temporarily filter output to one uniquely identified client."""
+        self.beginClientOverride(hold, frozenset({address}), solo=True)
+
+    def endClientSolo(self, hold: object):
+        """Remove the temporary filter for a Solo input."""
+        self.endClientOverride(hold)
+
+    def beginClientOverride(self, owner: object, addresses: frozenset[str] | None, *, solo: bool = False):
+        """Override the filter. None enables all clients and an empty set disables all."""
+        active = None if addresses is None else frozenset(map(_client_address_key, addresses))
+        with self._client_lock:
+            self._client_overrides[owner] = active, solo
+            self._refresh_active_client_ids()
+
+    def endClientOverride(self, owner: object):
+        """Reveal the previous override or the regular filter."""
+        with self._client_lock:
+            if self._client_overrides.pop(owner, None) is not None:
+                self._refresh_active_client_ids()
+
+    def getActiveClients(self) -> set[int]:
+        """Return IDs of registered remote clients allowed to receive output."""
+        with self._client_lock:
+            return set(self._active_client_ids)
+
+    @property
+    def clientFiltered(self) -> bool:
+        """true if any clients are currently filtered for output"""
+        return not self._broadcast_to_all_clients
+
+    def filterClientTargets(self, targets: tuple[int, ...]) -> tuple[int, ...] | frozenset[int]:
+        """Resolve the broadcast target (0) or intersect explicit targets with the filter."""
+        with self._client_lock:
+            if 0 in targets:
+                return self._active_client_ids if self.clientFiltered else (0,)
+            return tuple(client_id for client_id in targets if self._client_active(client_id))
+
     @property
     def serverEnabled(self) -> bool:
         """true if remote control enabled for broadcast/server"""
@@ -1983,30 +2499,121 @@ class RemoteControl:
         return self.clientId
 
     def getClients(self) -> dict:
-        """gets all clients"""
-        return self._clients
+        """Get the currently registered clients."""
+        with self._client_lock:
+            return self._clients.copy()
 
     def getClient(self, client_id: str):
         """gets a registered client"""
-        if client_id in self._clients:
-            return self._clients[client_id]
-        return None
+        with self._client_lock:
+            return self._clients.get(client_id)
+
+    def _load_known_clients(self) -> dict[str, str]:
+        try:
+            with self._clients_path.open(encoding="utf-8") as stream: # @IgnoreException
+                clients = json.load(stream)["clients"]
+            return {
+                normalize_client_address(address): details
+                for address, details in clients.items()
+                if isinstance(details, str)
+            }
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            syslog.exception("RPC: unable to load remote clients from %s", self._clients_path)
+            return {}
+
+    def _save_known_clients(self, clients: dict[str, str]):
+        self._clients_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=self._clients_path.parent, delete=False
+            ) as stream:
+                temporary = Path(stream.name)
+                json.dump({"clients": clients}, stream, ensure_ascii=False, indent=2, sort_keys=True)
+                stream.write("\n")
+            gremlin.util.safeReplace(temporary, self._clients_path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        self._known_clients = clients
+
+    def getKnownClients(self) -> dict[str, str]:
+        """Return saved client addresses and display details, including offline clients."""
+        with self._client_lock:
+            return self._known_clients.copy()
+
+    def addKnownClient(self, address: str):
+        """Remember an IPv4 address or network name entered by the user."""
+        address = normalize_client_address(address)
+        with self._client_lock:
+            if address in self._known_clients:
+                return
+            self._save_known_clients({**self._known_clients, address: ""})
+        self._emit_client_change()
+
+    def addDiscoveredClients(self, computers: list[tuple[str, str]]) -> int:
+        """Merge Windows Network Discovery results into the shared client catalog."""
+        discovered = {}
+        for name, address in computers:
+            try:
+                key = normalize_client_address(name)
+            except ValueError:
+                key = address
+            discovered.setdefault(key, set()).add(address)
+
+        with self._client_lock:
+            clients = self._known_clients.copy()
+            for name, addresses in discovered.items():
+                if name in clients or any(address in clients for address in addresses):
+                    continue
+                clients[name] = ", ".join(sorted(addresses - {name}, key=ipaddress.IPv4Address))
+
+            added = len(clients) - len(self._known_clients)
+            if added:
+                self._save_known_clients(clients)
+        if added:
+            self._emit_client_change()
+        return added
+
+    def removeKnownClient(self, address: str):
+        """Forget a saved client address."""
+        with self._client_lock:
+            if address not in self._known_clients:
+                return
+            clients = self._known_clients.copy()
+            del clients[address]
+            self._save_known_clients(clients)
+        self._emit_client_change()
 
     def registerClient(self, data: ClientData):
         """registers a client"""
         client_id = data.client_id
-        changed = False
-        if client_id in self._clients:
-            # client already exists, detect changes
-            client = self._clients[client_id]
-            if client != data:
-                # at least one param changed
+        if type(client_id) is not int or client_id <= 0:
+            return
+        with self._client_lock:
+            changed = self._clients.get(client_id) != data
+            if changed:
                 self._clients[client_id] = data
-                changed = True
-        else:
-            changed = True
-            self._clients[client_id] = data
-            # fire an update event
+                self._refresh_active_client_ids()
+
+            config = gremlin.config.Configuration()
+            if client_id != self.clientId and (config.enable_remote_broadcast or config.master):
+                addresses = data.addresses()
+                if addresses:
+                    address = next((value for value in addresses if value in self._known_clients), addresses[0])
+                    labels = (
+                        value for value in (data.host_name, data.getClientName(), data.host_ip)
+                        if isinstance(value, str) and value and _client_address_key(value) != address
+                    )
+                    details = ", ".join(dict.fromkeys(labels))
+                    if self._known_clients.get(address) != details:
+                        try:
+                            self._save_known_clients({**self._known_clients, address: details})
+                            changed = True
+                        except OSError:
+                            syslog.exception("RPC: unable to save remote clients to %s", self._clients_path)
 
         if changed:
             verbose = gremlin.config.Configuration().verbose_mode_remote
@@ -2016,12 +2623,14 @@ class RemoteControl:
 
     def unregisterClient(self, client_id: str):
         """unregisters a client"""
-        if client_id in self._clients:
-            verbose = gremlin.config.Configuration().verbose_mode_remote
-            if verbose:
-                data = self._clients[client_id]
-                syslog.info(f"RPC: new client unregistered: {data}")
-            del self._clients[client_id]
+        with self._client_lock:
+            data = self._clients.pop(client_id, None)
+            if data is None:
+                return
+            self._refresh_active_client_ids()
+
+        if gremlin.config.Configuration().verbose_mode_remote:
+            syslog.info(f"RPC: client unregistered: {data}")
 
         self._emit_client_change()
 
@@ -2081,9 +2690,7 @@ class RemoteControl:
             el = gremlin.event_handler.EventListener()
             el.remote_control_state_change.emit()
 
-            syslog.info(
-                f"REMOTE CONTROL: local [{'ENABLED' if self._is_local else 'DISABLED'}] remote [{'ENABLED' if self._is_remote and self.remoteEnabled() else 'DISABLED' if self._is_remote else 'DISABLED'}]"
-            )
+            syslog.info(f"REMOTE CONTROL: local [{'ENABLED' if self._is_local else 'DISABLED'}] remote [{'ENABLED' if self.is_remote else 'DISABLED'}]")
 
             self._handle_options_changed()
 
@@ -2100,17 +2707,27 @@ class RemoteControl:
             thread.start()
 
     def _handle_options_changed(self):
-        """called when broadcast config item changes"""
-
+        """Publish changes to the configured remote roles."""
         config = gremlin.config.Configuration()
-        if self._global_remote_enabled != config.enable_remote_broadcast:
-            self._global_remote_enabled = config.enable_remote_broadcast
+        broadcast_changed = self._global_remote_enabled != config.enable_remote_broadcast
+        client_changed = self._client_enabled != config.enable_remote_control
+        if not (broadcast_changed or client_changed):
+            return
+        self._global_remote_enabled = config.enable_remote_broadcast
+        self._client_enabled = config.enable_remote_control
 
-            el = gremlin.event_handler.EventListener()
-            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._global_remote_enabled))
-            el.remote_control_state_change.emit()
+        el = gremlin.event_handler.EventListener()
+        if broadcast_changed:
+            el.broadcast_changed.emit(self.to_state_event())
+            self.registerSelf()
+        if client_changed and gremlin.shared_state.is_running and config.remote_video_enabled:
+            try:
+                from gremlin.remote_video import sync_publisher_with_runtime
 
-            self.registerSelf()  # update
+                gremlin.util.InvokeUiMethod(sync_publisher_with_runtime)
+            except Exception:  # noqa: BLE001
+                syslog.exception("RPC: could not update remote video after a role change")
+        el.remote_control_state_change.emit()
 
     def say(self, msg):
         speech = InternalSpeech()
@@ -2184,8 +2801,7 @@ class RemoteControl:
     @property
     def is_remote(self):
         """status of remote control - requires both remote and broadcast to be enabled"""
-        config = gremlin.config.Configuration()
-        return self._is_remote and config.remoteEnabled()
+        return self._is_remote and self.serverEnabled
 
     @is_remote.setter
     def is_remote(self, value: bool):
@@ -2226,12 +2842,12 @@ class PacketData:
 
     def __init__(
         self,
-        id: str = None,
-        client_id: str = None,
-        server_id: str = None,
-        callback=None,
-        data=None,
-        on_timeout=None,
+        id: str | None = None,
+        client_id: str | None = None,
+        server_id: str | None = None,
+        callback: Callable | None = None,
+        data: dict | None = None,
+        on_timeout: Callable | None = None,
     ):
         self.id = id if id else gremlin.util.get_guid()
         self.callback = callback
@@ -2267,7 +2883,7 @@ class PacketData:
                 self.timer.cancel()
                 self.timer = None
 
-    def trigger(self, data: dict = None):
+    def trigger(self, data: dict | None = None):
         """trigger the callback"""
         with self._lock:
             if not self._active:
@@ -2297,10 +2913,10 @@ class PacketData:
 class RemoteClientData:
     def __init__(
         self,
-        client_name: str = None,
-        custom_client_name: str = None,
+        client_name: str | None = None,
+        custom_client_name: str | None = None,
         client_id: int = 0,
-        client_version: str = None,
+        client_version: str | None = None,
         selected: bool = False,
     ):
         self.client_name = client_name  # client to send the data to (we store the name) - None = ANY
@@ -2425,6 +3041,7 @@ class RemoteConfig:
         if client_change_callback:
             self._client_change_callbacks.append(client_change_callback)
         self.ensureAnyClient()  # ensure the ANY client is in the list
+        self._clients[0].selected = True
         self.singleton: bool = singleton  # true if the remote control can only send to a single client
         el = gremlin.event_handler.EventListener()
         el.remote_control_client_change.connect(self._clients_changed)
@@ -2500,7 +3117,7 @@ class RemoteConfig:
 
     def getClientList(self) -> list:
         """gets the list of active output clients"""
-        if self.anySelected():
+        if not self.isCustom or self.anySelected():
             return [0]  # any
         return [client.client_id for client in self._clients.values() if client.selected and client.client_id != 0]
 
@@ -2652,9 +3269,9 @@ class RemoteConfig:
     def addClient(
         self,
         client_name: str,
-        client_id: str,
-        client_version: str = None,
-        custom_name: str = None,
+        client_id: str | int,
+        client_version: str | None = None,
+        custom_name: str | None = None,
     ) -> RemoteClientData:
         """adds a new client to the config if it doesn't exist, can also update the name"""
         if client_id in self._clients:
@@ -2696,7 +3313,7 @@ class RemoteConfig:
 
     def getSelectedCount(self) -> int:
         """returns the number of selected clients"""
-        return sum((1 if client.selected else 0 for client in self._clients.values()))
+        return sum(1 if client.selected else 0 for client in self._clients.values())
 
     @property
     def enabled(self) -> bool:
@@ -2740,6 +3357,9 @@ class RemoteConfig:
         self.partialMatch = safe_read(node, "partial-title", bool, True)
 
         # list of clients
+        self.ensureAnyClient()
+        for client in self._clients.values():
+            client.selected = False
         client_nodes = node.xpath(".//client")
         for client_node in client_nodes:
             client = RemoteClientData()
@@ -2751,6 +3371,240 @@ class RemoteConfig:
         if not count:
             client = self.getClient(0)
             client.selected = True
+
+
+def remote_client_row_label(address: str, details: str) -> QtWidgets.QLabel:
+    """Create a client label shared by the catalog and selection widgets."""
+    from gremlin.ui.ui_common import Color, QDataLabel
+
+    text = f"<b>{html.escape(address)}</b>"
+    if details:
+        text += f" — {html.escape(details)}"
+    label = QDataLabel(text)
+    label.setTextFormat(QtCore.Qt.TextFormat.RichText)
+    label.setWordWrap(True)
+    colors = Color()
+    label.setStyleSheet(
+        f"color: {colors.normalColor()}; background-color: {colors.actionBackgroundColor()};"
+        f" border: 1px solid {colors.borderColor()}; border-radius: 6px; padding: 5px;"
+    )
+    return label
+
+
+class RemoteClientSelectionWidget(QtWidgets.QWidget):
+    """Edit a remote client selection using the shared catalog."""
+
+    selectionChanged = QtCore.Signal(object)
+
+    def __init__(
+        self,
+        selection: frozenset[str] | None = None,
+        parent=None,
+        *,
+        show_solo=False,
+        empty_selection_text="No clients selected. All clients are enabled.",
+    ):
+        from gremlin.ui.ui_common import QDataPushButton, QScrollableWidget
+
+        super().__init__(parent)
+        self._selection = selection
+        self._show_solo = show_solo
+        self._empty_selection_text = empty_selection_text
+        self._catalog_entries = None
+        self._checks = {}
+
+        self._clients = QScrollableWidget(stretch=False, horizontal_scroll=False)
+        self._clients.setAccessibleName("Remote clients")
+        self._clients.getLayout().setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self._clients.setMinimumHeight(110)
+        self._clients.setMaximumHeight(180)
+
+        select_all = QDataPushButton("Select All", clicked=lambda: self._set_selection(None))
+        select_none = QDataPushButton("Select None", clicked=lambda: self._set_selection(frozenset()))
+        edit = QDataPushButton("Edit Clients…", clicked=self._manage_clients)
+        for button in (select_all, select_none, edit):
+            button.setAutoDefault(False)
+
+        buttons = QtWidgets.QHBoxLayout()
+        buttons.addWidget(select_all)
+        buttons.addWidget(select_none)
+        buttons.addStretch()
+        buttons.addWidget(edit)
+
+        self._status = QtWidgets.QLabel()
+        self._status.setWordWrap(True)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._clients)
+        layout.addLayout(buttons)
+        layout.addWidget(self._status)
+
+        gremlin.event_handler.EventListener().remote_control_client_change.connect(self._refresh)
+        self._refresh()
+
+    @QtCore.Slot()
+    def _refresh(self):
+        from gremlin.ui.ui_common import QDataCheckbox, QDataLabel, QDataPushButton, getHContainer
+
+        known = remote_control.getKnownClients()
+        for address in self._selection or ():
+            known.setdefault(address, "")
+        if known != self._catalog_entries:
+            self._catalog_entries = known
+            self._clients.clear()
+            self._checks.clear()
+            if not known:
+                self._clients.addWidget(QDataLabel("No clients are saved. Use Edit Clients to add a client."))
+            for address, details in sorted(known.items()):
+                checkbox = QDataCheckbox()
+                checkbox.setAccessibleName(f"Include {address}")
+                checkbox.toggled.connect(self._checked_changed)
+                self._checks[address] = checkbox
+                label = remote_client_row_label(address, details)
+                widgets = [checkbox, (label, 1)]
+                if self._show_solo:
+                    solo = QDataPushButton(
+                        "Solo",
+                        clicked=lambda _checked=False, address=address: self._set_selection(frozenset({address})),
+                        tooltip=f"Select only {address}",
+                    )
+                    solo.setAccessibleName(f"Solo {address}")
+                    solo.setAutoDefault(False)
+                    widgets.append(solo)
+                self._clients.addWidget(getHContainer(widgets, right_stretch=False, widget_only=True))
+        for address, checkbox in self._checks.items():
+            with QtCore.QSignalBlocker(checkbox):
+                checkbox.setChecked(self._selection is None or address in self._selection)
+        self._update_status()
+
+    def _update_status(self):
+        if self._selection:
+            self._status.setText("Only checked clients receive remote output.")
+        elif self._selection is None:
+            self._status.setText("All clients are enabled, including newly discovered clients.")
+        else:
+            self._status.setText(self._empty_selection_text)
+
+    def _set_selection(self, selection):
+        if self._selection != selection:
+            self._selection = selection
+            self._refresh()
+            self.selectionChanged.emit(selection)
+
+    @QtCore.Slot()
+    def _checked_changed(self):
+        self._selection = frozenset(address for address, checkbox in self._checks.items() if checkbox.isChecked())
+        self._update_status()
+        self.selectionChanged.emit(self._selection)
+
+    @QtCore.Slot()
+    def _manage_clients(self):
+        from gremlin.ui.dialogs import show_remote_clients
+
+        show_remote_clients(self)
+
+
+class RemoteClientOptionsWidget(QtWidgets.QWidget):
+    """Edit the shared client filter and output routing options."""
+
+    changed = QtCore.Signal()
+
+    def __init__(
+        self,
+        operation: ClientOperation,
+        output_mode: OutputMode,
+        selection: frozenset[str] | None,
+        parent=None,
+        *,
+        behavior: SelectionBehavior | None = None,
+    ):
+        from gremlin.ui.ui_common import QDataCheckbox, QDataRadioButtonGroup, getHContainer
+
+        super().__init__(parent)
+        self.operation = operation
+        self.output_mode = output_mode
+        self.selection = selection
+        self.behavior = behavior
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(QDataRadioButtonGroup(
+            options=[
+                ("No change", ClientOperation.Unchanged, "Keep the current remote client filter"),
+                ("Selection", ClientOperation.Select, "Choose clients from the checklist"),
+                ("Enable all", ClientOperation.EnableAll, "Enable all remote clients"),
+                ("Mute all", ClientOperation.DisableAll, "Mute all remote clients"),
+            ],
+            value=operation,
+            label="Mode",
+            callback=self._operation_changed,
+        ))
+        layout.addWidget(QDataRadioButtonGroup(
+            options=[
+                ("No change", OutputMode.Unchanged, "Keep the current profile output routing"),
+                ("Local", OutputMode.LocalOnly),
+                ("Remote", OutputMode.RemoteOnly),
+                ("Both", OutputMode.LocalAndRemote),
+            ],
+            value=output_mode,
+            label="Routing",
+            callback=self._output_changed,
+        ))
+
+        if behavior is not None:
+            self._hold_widget = QDataCheckbox("Hold", tooltip="Apply the remote client filter while the mapped input is held.")
+            self._hold_widget.toggled.connect(self._hold_changed)
+            self._toggle_widget = QDataCheckbox(
+                "Toggle on each trigger", tooltip="Apply or remove this client selection each time the action executes."
+            )
+            self._toggle_widget.toggled.connect(self._toggle_changed)
+            self._behavior_container = getHContainer(["Behavior", self._hold_widget, self._toggle_widget], widget_only=True)
+            layout.addWidget(self._behavior_container)
+
+        checklist_options = {}
+        if behavior is not None:
+            checklist_options["empty_selection_text"] = "No clients selected. This action is skipped at runtime."
+        self._client_list_widget = RemoteClientSelectionWidget(selection, self, show_solo=True, **checklist_options)
+        self._client_list_widget.selectionChanged.connect(self._selection_changed)
+        layout.addWidget(self._client_list_widget)
+        self._update_options()
+
+    def _update_options(self):
+        selecting = self.operation is ClientOperation.Select
+        self._client_list_widget.setVisible(selecting)
+        if self.behavior is not None:
+            self._behavior_container.setVisible(self.operation is not ClientOperation.Unchanged)
+            self._toggle_widget.setVisible(selecting)
+            with QtCore.QSignalBlocker(self._hold_widget), QtCore.QSignalBlocker(self._toggle_widget):
+                self._hold_widget.setChecked(self.behavior is SelectionBehavior.Temporary)
+                self._toggle_widget.setChecked(self.behavior is SelectionBehavior.Toggle)
+
+    def _operation_changed(self, operation):
+        self.operation = operation
+        if operation in (ClientOperation.EnableAll, ClientOperation.DisableAll) and self.behavior is SelectionBehavior.Toggle:
+            self.behavior = SelectionBehavior.Permanent
+        self._update_options()
+        self.changed.emit()
+
+    def _output_changed(self, output_mode):
+        self.output_mode = output_mode
+        self.changed.emit()
+
+    def _hold_changed(self, enabled):
+        self._set_behavior(SelectionBehavior.Temporary if enabled else SelectionBehavior.Permanent)
+
+    def _toggle_changed(self, enabled):
+        self._set_behavior(SelectionBehavior.Toggle if enabled else SelectionBehavior.Permanent)
+
+    def _set_behavior(self, behavior):
+        self.behavior = behavior
+        self._update_options()
+        self.changed.emit()
+
+    @QtCore.Slot(object)
+    def _selection_changed(self, selection):
+        self.selection = selection
+        self.changed.emit()
 
 
 # remote state

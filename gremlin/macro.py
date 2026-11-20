@@ -1769,25 +1769,25 @@ class VJoyMacroAction(MacroAbstractAction):
             if is_remote:
                 send = (gremlin.remote.remote_client.send_relative_axis if self.axis_type == "relative"
                         else gremlin.remote.remote_client.send_axis)
-                send(self.vjoy_id, self.input_id, value, client_list, force_remote)
+                send(key, self.input_id, value, client_list, force_remote)
         elif self.input_type == InputType.JoystickButton:
             if self.value == "toggle":
                 if is_local:
                     output = target.maestro if target.kind == "maestro" else gremlin.joystick_handling.VJoyProxy()[target.out_id]
                     gremlin.joystick_handling.set_button(key, self.input_id, not output.button(self.input_id).is_pressed)
                 if is_remote:
-                    gremlin.remote.remote_client.toggle_button(self.vjoy_id, self.input_id, client_list, force_remote)
+                    gremlin.remote.remote_client.toggle_button(key, self.input_id, client_list, force_remote)
             else:
                 is_pressed = self.value == "press"
                 if is_local:
                     gremlin.joystick_handling.set_button(key, self.input_id, is_pressed)
                 if is_remote:
-                    gremlin.remote.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, client_list, force_remote)
+                    gremlin.remote.remote_client.send_button(key, self.input_id, is_pressed, client_list, force_remote)
         elif self.input_type == InputType.JoystickHat:
             if is_local:
                 gremlin.joystick_handling.set_hat(key, self.input_id, self.value)
             if is_remote:
-                gremlin.remote.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, client_list, force_remote)
+                gremlin.remote.remote_client.send_hat(key, self.input_id, self.value, client_list, force_remote)
 
 
 class RemoteControlAction(MacroAbstractAction):

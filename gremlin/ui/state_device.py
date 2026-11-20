@@ -3586,17 +3586,12 @@ class StateFilterWidget(FilterControlWidget):
         self, model: StateInputItemModel, profile=None, count_widget: StateFilterCountWidget = None, filter=StateInputItemModel.DEFAULT_FILTER, parent=None
     ):
         super().__init__(parent)
-        self.model = model
+        self.model = None
         self.filter = filter  # filter to use on the model
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
         self.count_widget = count_widget
         self._last_hash = None  # tracks changes in the returned data
-
-        if count_widget is not None:
-            count_widget.setModel(model)
-        if profile:
-            self.setProfile(profile.profile_file)
 
         if model:
             self.setModel(model)
@@ -3605,6 +3600,9 @@ class StateFilterWidget(FilterControlWidget):
         self.searchChanged.connect(self.setSearchString)
         self.categoryChanged.connect(self.setCategory)
         self.attributesChanged.connect(self.setActiveAttributes)
+
+        if profile:
+            self.setProfile(profile.profile_file)
 
     def setModel(self, model: StateInputItemModel):
         """updates the state input model to use for the fitler"""
@@ -3857,6 +3855,7 @@ class StateVisualizerWidget(QWidget):
         if not self.initialized or not Shiboken.isValid(self):
             return
         self.model.refresh()
+        self._state_filter_widget.setInputItems(self.model.unfilteredItemsList())
         self.model.applyFilter(filter=self.VISUALIZER_FILTER)
         self._state_filter_widget.updateFilter(force=True)
 
