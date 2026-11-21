@@ -1118,15 +1118,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation_1" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation
+        Setup
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installation">
+    <nav class="md-nav" aria-label="Setup">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1152,10 +1152,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-support" class="md-nav__link">
+  <a href="#gex-bridge-support-for-virtual-joysticks-and-gamepads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy support
+        GEX Bridge support for virtual joysticks and gamepads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-support-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VJoy support (legacy)
       
     </span>
   </a>
@@ -2307,15 +2318,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation_1" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation
+        Setup
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installation">
+    <nav class="md-nav" aria-label="Setup">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2341,10 +2352,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-support" class="md-nav__link">
+  <a href="#gex-bridge-support-for-virtual-joysticks-and-gamepads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJoy support
+        GEX Bridge support for virtual joysticks and gamepads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-support-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VJoy support (legacy)
       
     </span>
   </a>
@@ -2706,6 +2728,10 @@
 <tr>
 <td>Virtual joystick/gamepad support</td>
 <td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.</td>
+</tr>
+<tr>
+<td>XINPUT and DINPUT suport</td>
+<td>GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT.</td>
 </tr>
 <tr>
 <td>Network output support</td>
@@ -3349,7 +3375,7 @@ Some outputs can only be momentary (example, SimConnect), and thus only have a p
 <h2 id="supported-environments">Supported environments<a class="headerlink" href="#supported-environments" title="Permanent link">¶</a></h2>
 <p>The main GremlinEx application runs on <strong>Windows x64</strong>. m77 uses <strong>Python 3.14</strong> and <strong>Qt 6 / PySide6</strong>. The <a href="../resources/">resource section</a> covers the platform and external components used by the project.</p>
 <p>Networked browser panels can run on phones and tablets while the Windows host performs the mappings and device output.</p>
-<h2 id="installation_1">Installation<a class="headerlink" href="#installation_1" title="Permanent link">¶</a></h2>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">¶</a></h2>
 <p>The packaged application includes its Python 3.14 runtime and application libraries, so a separate Python installation is not needed to use that package. Extract the distribution to an application folder and retain its supporting files.</p>
 <p>Configure the external components required by the outputs you intend to use, such as a virtual-controller driver, HidHide, or a simulator bridge. Optional speech/OCR features can also need models or tools downloaded on first use.</p>
 <h3 id="optional-modules">Optional modules<a class="headerlink" href="#optional-modules" title="Permanent link">¶</a></h3>
@@ -3358,7 +3384,17 @@ Some outputs can only be momentary (example, SimConnect), and thus only have a p
 <h3 id="microsoft-flight-simulator-simconnect-sdk-support">Microsoft Flight Simulator SimConnect SDK support<a class="headerlink" href="#microsoft-flight-simulator-simconnect-sdk-support" title="Permanent link">¶</a></h3>
 <p>GremlinEx comes with a WASM module for Microsoft Flight Simulator that must be placed in the community folder.  This module enables GremlinEx to send calculator expressions to the simulator to control aircraft and systems not available yet via the SimConnect SDK.</p>
 <p>GremlinEx was tested with MSFS 2024 including all current beta versions.</p>
-<h3 id="vjoy-support">VJoy support<a class="headerlink" href="#vjoy-support" title="Permanent link">¶</a></h3>
+<h3 id="gex-bridge-support-for-virtual-joysticks-and-gamepads">GEX Bridge support for virtual joysticks and gamepads<a class="headerlink" href="#gex-bridge-support-for-virtual-joysticks-and-gamepads" title="Permanent link">¶</a></h3>
+<p>As of m77, GremlinEx includes the GEX Bridge module that can be installed as an option with the main GEX distribution.  The bridge module replaces both vJoy (virtual joystick) and VIGEM (virtual gamepad) and implements its own virtual joystick and gamepad drivers through the embedded HID Maestro virtual drivers.  These drivers run in user-mode, do not require a kernel mode driver, and the GEX Bridge is provided as a Windows Service.</p>
+<p>The bridge module enables the virtual device configuration to be completely managed within GEX.  Virtual joysticks are exposed to the DINPUT interface, and gamepad devices are exposed to both DINPUT and XINPUT interfaces.</p>
+<p>GEX provides an automated migration path from the legacy vJoy virtual driver to the bridge driver in one of two ways:</p>
+<ol>
+<li>By providing a failover mode if a profile has mappings to vJoy and GEX will route these outputs to the corresponding GEX device.</li>
+<li>By providing a conversion tool via the Tools &gt; Device Remap... dialog that lets you convert the profile to the GEX devices automatically.</li>
+</ol>
+<p>The main benefit of the bridge module is that virtual driver support is embedded in the GEX ecosystem, the devices are all 128 buttons, 8 axes and 4 hats, and up to four gamepad devices are supported and exposed via XINPUT, each with 6 axes, 32 buttons and one hat.</p>
+<h3 id="vjoy-support-legacy">VJoy support (legacy)<a class="headerlink" href="#vjoy-support-legacy" title="Permanent link">¶</a></h3>
+<p>As of m77, virtual joystick output should be migrated to the new GEX Bridge Module instead of using this legacy API.  This is supported for older profiles.</p>
 <p>GremlinEx was tested with VJOY 2.1.9.1 64bit.  There are several releases of VJOY however however 2.1.9.1 is the one tested and verified to function with Windows 11.  Please see the <a href="../resources/">resource section</a>.</p>
 <p>GremlinEx does not currently support force feedback inputs, nor output via VJOY.</p>
 <p>GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY devices.</p>

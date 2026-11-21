@@ -821,6 +821,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#place-gates-with-a-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Place gates with a curve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convert-a-gate-to-a-deadzone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convert a gate to a deadzone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#normalize-positions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1290,6 +1312,11 @@
 <li>Reducing the count prompts for confirmation because it can remove gate configurations and normalize positions.</li>
 </ul>
 <p>Use the actual range rows shown by the editor to confirm the resulting layout.</p>
+<h3 id="place-gates-with-a-curve">Place gates with a curve<a class="headerlink" href="#place-gates-with-a-curve" title="Permanent link">¶</a></h3>
+<p>Select <strong>Gates from Curve...</strong>, choose the total number of gates, and open <strong>Edit Source Curve...</strong> to draw a curve or load a preset. Gated Axis samples evenly spaced inputs from -1 to +1 and places the gates at the resulting outputs. The source curve is saved with the action. Reopen the same dialog to edit it and apply new positions.</p>
+<h3 id="convert-a-gate-to-a-deadzone">Convert a gate to a deadzone<a class="headerlink" href="#convert-a-gate-to-a-deadzone" title="Permanent link">¶</a></h3>
+<p>Right-click a gate handle and select <strong>Convert to Deadzone...</strong>. Enter the total width in normalized axis units, or select <strong>2%</strong>, <strong>5%</strong>, or <strong>10%</strong> of the full axis travel. The deadzone is centered on the old gate where there is room. At an end of the axis, it shifts inward to keep the requested width. The original crossing actions stay with the nearer boundary.</p>
+<p>Choose <strong>Hold the original gate value</strong> to supply the old gate value to the new range's <strong>In Range</strong> actions. Add an axis output action to that range to send the value to a device. Choose <strong>No axis output</strong> to suppress the range's axis updates.</p>
 <h3 id="normalize-positions">Normalize positions<a class="headerlink" href="#normalize-positions" title="Permanent link">¶</a></h3>
 <table>
 <thead>
