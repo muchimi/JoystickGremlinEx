@@ -52,6 +52,27 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T107)
+- New: API (DILL): DILL (the GEX C++ component) was updated to use XINPUT for gamepads XINPUT instead of DINPUT.  DINPUT is not well supported by current generation gamepads nor by Microsoft which has presented some odd issues. This will change the device GUID in an existing profile and it will need to be remapped via Tools > Device Remap...  There is no change in functionality as all of this is handled/translated at the C++ level.  New DILL version 1.6.2.0 bundled with GEX.  This will be installed with the\ GEX update and is not separately installed.  
+
+**IMPORTANT**
+
+1. This change will update gamepad device GUIDs and it will need to be changed in Tools > Device Remap... to the new device.  Both the name and the GUID will change so a default cannot be selected automatically for you by GEX.
+2. XINPUT devices not previously showing may now appear since they are now detected. 
+2. Gamepad controller axis reporting and API level mapping is different under DINPUT and XINPUT.  You may need to also remap axes in any older profiles.  To do this you can use the copy/paste but it may be a bit more involved.  You can run the old version of GEX and use the template save feature, and load that into the new version if you have a complex mapping for the axes.
+3. Buttons and hats should be the same however should be verified just in case.
+ 
+- New: Virtual Remap: new curved output option to **button to axis** modes.  An optional output curve can be applied to the previously computed axis output when using encoders or stepped axis.
+- New: Curve Editor: Added ability to select segments, segment drag and ability to spit a segment.  Smooth and straighten options apply to selected segment.
+- New: Curve Editor: Added mathematical curve computational presets for logarithmic and s-curve (cubic smoothstep) curves, and an option for low/center/high as to where the curve inflection. The presets have stength modes applied as well.  These can be manually edited once set as they all map to Bezier points.
+- New: Curve Editor: added fit option from a list of points - either single values for evenly spaced data, or curve coordinates (x, y pair per line).  This is to facilitate the entry of curves that need to go through a very specific data point or if a external curve data needs to be imported into a GEX curve.
+- New: Curve Editor: added mirror x/y buttons.
+- New: Curve Editor: GEX can smooth or straighten curve segments via a button.  
+
+- Fix: UI: exception on message box call when the profile is running and attempting to remap device GUIDs.
+- Fix: API: Further polish on profile button state sync when they conflict.  The active button will take precedence over a sync over an inactive button on profile start, if sync is selected and the buttons are latched.
+ 
+
 ### (m77T106)
 
 #### This patch includes major enhancements related to remote control.

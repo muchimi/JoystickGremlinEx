@@ -1322,7 +1322,7 @@ class GremlinUi(QRememberMainWindow):
 
     def _remap_profile_devices_cb(self):
         if gremlin.shared_state.is_running:
-            gremlin.ui.dialogs.ok_message_box("Deactivate the profile before remapping device GUIDs.")
+            MessageBoxWarning("Deactivate the profile before remapping device GUIDs.")
             return
         profile = gremlin.shared_state.current_profile
         if not profile or not profile.profile_file or not os.path.isfile(profile.profile_file):
@@ -1333,6 +1333,7 @@ class GremlinUi(QRememberMainWindow):
     def _show_profile_device_remap(self, profile, startup_missing=None):
         """Return None when skipped, False on cancel, or True after saving and requesting a reload."""
         from lxml import etree
+
         from gremlin.device_remap import write_remapped_profile
         from gremlin.ui.device_remap import ProfileDeviceRemapDialog
 
@@ -3006,7 +3007,10 @@ class GremlinUi(QRememberMainWindow):
 
         if position is not None and position >= 0:
             status = "Connected" if device.connected else "Disconnected - referenced by this profile"
-            self.ui.devices_tab_header_widget.setTabToolTip(position, f"{device.name}\nGUID: {device_id}\n{status}")
+            tooltip = f"{device.name}\nGUID: {device_id}\n{status}"
+            if other_names := device.data.get("xinput_other_names"):
+                tooltip += f"\n\nOther possible names\n{other_names}"
+            self.ui.devices_tab_header_widget.setTabToolTip(position, tooltip)
             # determine the status
             # device.update()  # update connection state
             if not device.connected:

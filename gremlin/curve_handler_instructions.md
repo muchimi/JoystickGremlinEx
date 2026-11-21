@@ -3,9 +3,13 @@
 
 ## General usage
 
-This tool lets you configure a response curve for an axis input.  Two types of response curves are supported.  A cubic spline, and a bezier spline.
+Use **Curve Type** to choose a response curve. **Cubic Spline** and **Cubic Bezier Spline** let you shape the curve with control points.
 
-The type of curve is selected in the drop down.
+Select **Undo** or press **Ctrl+Z** to restore the previous curve. Dragging a point, handle, or deadzone slider counts as one edit.
+
+## Full Axis
+
+Use **Full Axis** for a lever, pedal, or other axis that travels continuously from one end to the other. Set **Inflection point** to **Low**, **Center**, or **High** to place the bend at 25%, 50%, or 75% of the active range. The active range runs between the two end dead zones.
 
 ## Cubic spline
 
@@ -20,11 +24,13 @@ A bezier spline is a curve fitted through control points.  End control points ha
 
 Handles are points anchored to the control point that are used to define the curvature of the spline passing through the control point.
 
-Handles always produce a smooth spline.
+Use **Smooth handles** to align mismatched tangents where segments meet. Existing smooth joins and end handles stay in place. Click a Bézier segment to highlight it, then use **Straighten selected segment** to make it a straight line between its control points. Click an empty part of the graph or press Escape to clear the selection. With no segment selected, **Straighten segments** applies to the whole curve.
+
+Drag a Bézier segment to move its control points and handles. Axis endpoints stay at their existing input positions, and a locked center stays at zero. With **Diagonal Symmetry** enabled, the opposite segment moves in the opposite direction. A segment that mirrors onto itself stays in place. One **Undo** restores the previous curve. Both tools keep the control points in place.
 
 ## Adding points
 
-A new point (cubic or bezier) can be added by double-clicking on the curve at any point.
+Select a Bézier segment and click **Insert point** to split it without changing its shape. When **Diagonal Symmetry** is enabled, the editor also splits the opposite segment. You can also double-click the graph to place a point manually.
 
 
 ## Moving points and handles
@@ -55,13 +61,21 @@ Press both the X and Y buttons to place the handle directly on the control point
 
 The point can be selected (will highlight in red) and you can press the DEL key to delete it.
 
+## Curve values
+
+Open **Curve values...** to sample the response at evenly spaced inputs from -1 to +1. **Sample curve** writes one floating-point output per line, and **Copy text** copies those values to the clipboard. Sampling uses the response curve alone, before deadzones and filtering.
+
+Paste 2 to 501 lines and click **Fit Bézier**. With one **Y** value per line, inputs are spaced evenly from -1 to +1. With two values per line, use **X, Y** pairs separated by a comma or whitespace. X and Y must both be between -1 and +1. If the X values cover only part of the axis, the curve holds the nearest output at either end. The editor fits the samples with editable control points and clears the center lock if the fitted curve shifts neutral. **Undo** restores the previous curve.
+
 ## Presets
 
 Presets can be saved or recalled via the save preset and load preset respectively.  When saving a preset, the current configuration will be saved to an xml file of your choosing. 
 
 You can later recall that preset by reloading that xml file into the tool.
 
-A number of additional presets are also available 1 through 4.
+The **Bézier presets** row offers **S-curve** and **Logarithmic** shapes. Choose **Low**, **Center**, or **High** to make small movements gentler in that part of the axis. Choose a strength from **Gentle** to **Very aggressive**, then select **Apply** to load editable Bézier points. Both endpoints stay fixed. **Low** and **High** can shift the neutral output on a non-centered curve. Enable **Lock center at zero** to anchor neutral. Centered curves keep neutral at zero. Clearing the lock also turns off **Centered**.
+
+For cubic smoothstep across the whole axis, choose **S-curve**, **Both ends**, and **Very aggressive**. Lower strengths blend the curve with a linear response.
 
 ## Dead zones
 

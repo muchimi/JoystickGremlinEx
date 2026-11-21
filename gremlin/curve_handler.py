@@ -15,7 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+import math
 import os
+import re
 from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui  # QtWebEngineWidgets
 import traceback
@@ -54,6 +56,7 @@ from gremlin.ui.ui_common import (
     Buttons,
     Color,
     MessageBox,
+    QDataLabel,
     QAxisRepeaterProgressbar,
     QDataCheckbox,
     QDataComboBox,
@@ -71,6 +74,7 @@ syslog = logging.getLogger("system")
 
 
 g_scene_size = 250.0
+_max_curve_samples = 501
 
 
 class CurvePreset(enum.IntEnum):
@@ -94,6 +98,91 @@ _curve_preset_string_lookup = {
     CurvePreset.Bezier4: "Bezier 4",
     CurvePreset.Reset: "Reset",
 }
+
+
+class BezierPresetShape(enum.Enum):
+    Smoothstep = "S-curve"
+    Logarithmic = "Logarithmic"
+
+
+class BezierPresetRange(enum.Enum):
+    Low = "Low"
+    Center = "Center"
+    High = "High"
+    BothEnds = "Both ends"
+
+
+def bezier_preset_points(
+    shape: BezierPresetShape, region: BezierPresetRange, strength: float, *, lock_center: bool = False
+) -> list[tuple[float, float]]:
+    """Build editable Bézier segments with fixed endpoints and optional neutral anchoring."""
+    logarithmic = shape == BezierPresetShape.Logarithmic
+    log_factor = 15.0
+    log_scale = math.log1p(log_factor)
+
+    def ease(value):
+        """Return the eased value and slope for a half-axis starting at its soft end."""
+        if logarithmic:
+            eased = 1.0 - math.log1p(log_factor * (1.0 - value)) / log_scale
+            slope = log_factor / ((1.0 + log_factor * (1.0 - value)) * log_scale)
+            if lock_center and region != BezierPresetRange.Center:
+                # Blend into the linear half with unit slope at neutral.
+                distance = 1.0 - value
+                slope = 1.0 + distance * (slope - 1.0) - (eased - value)
+                eased = value + distance * (eased - value)
+            return eased, slope
+        if region == BezierPresetRange.Center:
+            return value**3, 3.0 * value**2
+        return value * value * (2.0 - value), value * (4.0 - 3.0 * value)
+
+    def response(value):
+        if region == BezierPresetRange.BothEnds:
+            t = (value + 1.0) / 2.0
+            eased, slope = 2.0 * t * t * (3.0 - 2.0 * t) - 1.0, 6.0 * t * (1.0 - t)
+        elif region == BezierPresetRange.Center:
+            eased, slope = ease(abs(value))
+            eased = math.copysign(eased, value)
+        elif not lock_center:
+            # Use the full travel to ease toward the selected end.
+            if region == BezierPresetRange.Low:
+                eased, slope = ease((value + 1.0) / 2.0)
+                eased = 2.0 * eased - 1.0
+            else:
+                eased, slope = ease((1.0 - value) / 2.0)
+                eased = 1.0 - 2.0 * eased
+        elif region == BezierPresetRange.Low and value <= 0.0:
+            eased, slope = ease(value + 1.0)
+            eased -= 1.0
+        elif region == BezierPresetRange.High and value >= 0.0:
+            eased, slope = ease(1.0 - value)
+            eased = 1.0 - eased
+        else:
+            return value, 1.0
+        return value + strength * (eased - value), 1.0 + strength * (slope - 1.0)
+
+    knots = [-1.0, 0.0, 1.0]
+    if logarithmic:
+        # Additional knots fit the log shape in each curved half.
+        if not lock_center or region != BezierPresetRange.High:
+            knots[1:1] = [-0.75, -0.5, -0.25]
+        if not lock_center or region != BezierPresetRange.Low:
+            knots[-1:-1] = [0.25, 0.5, 0.75]
+
+    values, slopes = zip(*(response(knot) for knot in knots))
+    return _bezier_points_from_tangents(knots, values, slopes)
+
+
+def _bezier_points_from_tangents(knots, values, slopes):
+    points = [(knots[0], values[0])]
+    for index, (left, right) in enumerate(zip(knots, knots[1:])):
+        offset = (right - left) / 3.0
+        # Match each endpoint's slope with its handle and keep x linear within the segment.
+        points.extend([
+            (left + offset, values[index] + offset * slopes[index]),
+            (right - offset, values[index + 1] - offset * slopes[index + 1]),
+            (right, values[index + 1]),
+        ])
+    return points
 
 
 class Point2D:
@@ -147,11 +236,86 @@ class Point2D:
         return hash((self.x, self.y))
 
 
+def _subdivide_bezier(left, outgoing, incoming, right, fraction=0.5):
+    """Return the two portions of a cubic Bézier segment using de Casteljau's algorithm."""
+
+    def blend(a, b):
+        return Point2D(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction)
+
+    left_handle = blend(left, outgoing)
+    middle = blend(outgoing, incoming)
+    right_handle = blend(incoming, right)
+    incoming = blend(left_handle, middle)
+    outgoing = blend(middle, right_handle)
+    return left, left_handle, incoming, blend(incoming, outgoing), outgoing, right_handle, right
+
+
+def _parse_curve_samples(text: str) -> list[tuple[float, float]]:
+    """Read one Y value or one X,Y pair per nonblank line."""
+    lines = [line.strip().removesuffix("\\").strip() for line in text.splitlines() if line.strip()]
+    if not 2 <= len(lines) <= _max_curve_samples:
+        raise ValueError(f"Paste between 2 and {_max_curve_samples} lines of values.")
+    rows = [re.split(r"[\s,]+", line) for line in lines]
+    columns = len(rows[0])
+    if columns not in (1, 2) or any(len(row) != columns for row in rows):
+        raise ValueError("Use one Y value per line or one X,Y pair per line throughout.")
+
+    try:
+        samples = [tuple(float(token) for token in row) for row in rows]
+    except ValueError as error:
+        raise ValueError("Use numbers with a decimal point, such as -0.25.") from error
+    if any(not math.isfinite(value) or not -1.0 <= value <= 1.0 for row in samples for value in row):
+        raise ValueError("Every X and Y value must be between -1 and +1.")
+    if columns == 1:
+        return [(-1.0 + 2.0 * index / (len(samples) - 1), row[0]) for index, row in enumerate(samples)]
+
+    samples.sort(key=lambda row: row[0])
+    if any(left[0] == right[0] for left, right in zip(samples, samples[1:])):
+        raise ValueError("Each X position must be unique.")
+    return samples
+
+
+def _fit_sampled_bezier(samples: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Interpolate the supplied coordinates with shape-preserving cubic Bézier segments."""
+    knots, values = map(list, zip(*samples))
+    if knots[0] > -1.0:
+        knots.insert(0, -1.0)
+        values.insert(0, values[0])
+    if knots[-1] < 1.0:
+        knots.append(1.0)
+        values.append(values[-1])
+
+    widths = [right - left for left, right in zip(knots, knots[1:])]
+    secants = [(right - left) / width for left, right, width in zip(values, values[1:], widths)]
+    slopes = [secants[0]]
+    for index, (left, right) in enumerate(zip(secants, secants[1:])):
+        if left * right > 0.0:
+            # A weighted harmonic mean accounts for uneven spacing.
+            left_width, right_width = widths[index:index + 2]
+            left_weight = 2.0 * right_width + left_width
+            right_weight = right_width + 2.0 * left_width
+            slopes.append((left_weight + right_weight) / (left_weight / left + right_weight / right))
+        else:
+            slopes.append(0.0)
+    slopes.append(secants[-1])
+    points = _bezier_points_from_tangents(knots, values, slopes)
+    if 0.0 not in knots:
+        # Add a point at neutral while preserving the fit between its neighboring samples.
+        index = next(index for index, knot in enumerate(knots) if knot > 0.0) - 1
+        start = 3 * index
+        segment = [Point2D(*point) for point in points[start:start + 4]]
+        split = _subdivide_bezier(*segment, fraction=-knots[index] / widths[index])
+        split[3].x = 0.0
+        points[start:start + 4] = [tuple(point) for point in split]
+    return points
+
+
 class CurveType(enum.Enum):
     """supported curve types"""
 
     Cubic = 0
     Bezier = 1
+    FullAxis = 2
 
     @staticmethod
     def to_string(value: CurveType) -> str:  # noqa: F821
@@ -169,17 +333,28 @@ class CurveType(enum.Enum):
 _curve_type_to_string_lookup = {
     CurveType.Cubic: "cubic-spline",
     CurveType.Bezier: "cubic-bezier-spline",
+    CurveType.FullAxis: "full-axis",
 }
 
 _curve_type_to_enum_lookup = {
     "cubic-spline": CurveType.Cubic,
     "cubic-bezier-spline": CurveType.Bezier,
+    "full-axis": CurveType.FullAxis,
 }
 
 _curve_type_to_display_name = {
     CurveType.Cubic: "Cubic Spline",
     CurveType.Bezier: "Cubic Bezier Spline",
+    CurveType.FullAxis: "Full Axis",
 }
+
+
+class FullAxisInflection(enum.Enum):
+    """Inflection positions on the normalized axis."""
+
+    Low = -0.5
+    Center = 0.0
+    High = 0.5
 
 
 class SymmetryMode(enum.Enum):
@@ -266,6 +441,9 @@ class ControlPoint:
             model changes
         """
         eh = CurveEventHandler()
+        if self._model.is_point_locked(self) and (point.x != self.x or point.y != self.y):
+            eh.message.emit("The center point is locked.")
+            return
         if self._model.is_valid_point(point, self.identifier):
             # Update handle locations if any are present
             delta = self.center - point
@@ -375,6 +553,16 @@ class AbstractCurveModel(QtCore.QObject):
         self.save_to_profile()
         self.content_modified.emit()
 
+    def mirror_x(self):
+        for control_point in self._control_points:
+            control_point.center.x = -control_point.center.x
+            for handle in control_point.handles:
+                handle.x = -handle.x
+            control_point.handles.reverse()
+        self._control_points.sort(key=lambda point: point.x)
+        self.save_to_profile()
+        self.content_added.emit()
+
     def model_updated(self):
         # If symmetry is enabled ensure that symmetry is preserved after
         # any changes
@@ -408,7 +596,7 @@ class AbstractCurveModel(QtCore.QObject):
         cp = self._create_control_point(point, handles)
         self._control_points.append(cp)
 
-        if self.symmetry_mode == SymmetryMode.Diagonal:
+        if self.symmetry_mode == SymmetryMode.Diagonal and (point.x != 0.0 or point.y != 0.0):
             self._control_points.append(self._create_control_point(Point2D(-point.x, -point.y), handles))
         self.save_to_profile()
         self.content_added.emit()
@@ -424,13 +612,16 @@ class AbstractCurveModel(QtCore.QObject):
         """
         raise gremlin.error.MissingImplementationError("AbstractCurveModel::_add_control_point not implemented")
 
+    def is_point_locked(self, control_point):
+        return False
+
     def remove_control_point(self, control_point):
         """Removes the specified control point if it exists in the model.
 
         :param control_point the control point to remove
         """
         idx = self._control_points.index(control_point)
-        if idx:
+        if idx and not self.is_point_locked(control_point):
             del self._control_points[idx]
             self.save_to_profile()
             self.content_added.emit()
@@ -574,6 +765,24 @@ class CubicBezierSplineModel(AbstractCurveModel):
         super().__init__(profile_data)
         self.handle_symmetry_enabled = False
 
+    def is_point_locked(self, control_point):
+        return control_point.x == 0.0 and control_point.y == 0.0 and self._action_data.center_is_locked
+
+    def anchor_center(self):
+        """Make neutral a fixed knot while preserving the ordering of output values."""
+        center = next((point for point in self._control_points if point.x == 0.0), None)
+        if center is None:
+            self.add_control_point(Point2D(0.0, 0.0))
+        elif 0.0 < abs(center.y) < 1.0:
+            offset = center.y
+            for control_point in self._control_points:
+                for point in (control_point.center, *control_point.handles):
+                    y = gremlin.util.clamp(point.y)
+                    point.y = (y - offset) / (1.0 - offset * y)
+            self.model_updated()
+        elif center.y != 0.0:
+            center.set_center(Point2D(0.0, 0.0))
+
     def get_curve_function(self):
         """Returns the curve function corresponding to the model.
 
@@ -596,6 +805,143 @@ class CubicBezierSplineModel(AbstractCurveModel):
             return None
         else:
             return gremlin.spline.CubicBezierSpline(points)
+
+    def move_segment(self, segment_index: int, delta: Point2D) -> Point2D:
+        """Move a segment and return the offset allowed by its anchors and neighbors."""
+        points = sorted(self._control_points, key=lambda point: point.x)
+        if not 0 <= segment_index < len(points) - 1:
+            return Point2D()
+
+        indices = (segment_index, segment_index + 1)
+        directions = [0] * len(points)
+        for index in indices:
+            opposite = len(points) - 1 - index
+            if self.symmetry_mode == SymmetryMode.Diagonal:
+                if opposite in indices:
+                    # A shared center or a segment mirrored onto itself cannot translate.
+                    continue
+                directions[opposite] = -1
+            directions[index] = 1
+
+        y_directions = [0 if self.is_point_locked(point) else direction for point, direction in zip(points, directions)]
+        x_directions = [0 if abs(point.x) == 1.0 else direction for point, direction in zip(points, y_directions)]
+
+        x_min, x_max = -2.0, 2.0
+        for index, (left, right) in enumerate(zip(points, points[1:])):
+            difference = x_directions[index + 1] - x_directions[index]
+            if difference:
+                # Keep knots ordered and avoid pushing a handle past a neighboring knot.
+                gap = max(0.0, min(right.x - left.x - 0.001, right.x - left.handles[-1].x, right.handles[0].x - left.x))
+                if difference > 0:
+                    x_min = max(x_min, -gap / difference)
+                else:
+                    x_max = min(x_max, -gap / difference)
+
+        y_min, y_max = -2.0, 2.0
+        for point, direction in zip(points, y_directions):
+            if direction:
+                for coordinate in (point.center, *point.handles):
+                    height = coordinate.y * direction
+                    y_min = max(y_min, min(0.0, -1.0 - height))
+                    y_max = min(y_max, max(0.0, 1.0 - height))
+
+        dx = gremlin.util.clamp(delta.x, x_min, x_max) if any(x_directions) else 0.0
+        dy = gremlin.util.clamp(delta.y, y_min, y_max) if any(y_directions) else 0.0
+        if dx or dy:
+            for point, horizontal, vertical in zip(points, x_directions, y_directions):
+                for coordinate in (point.center, *point.handles):
+                    coordinate.x += dx * horizontal
+                    coordinate.y += dy * vertical
+            self.save_to_profile()
+            self._action_data.curve_update()
+            self.content_modified.emit()
+        return Point2D(dx, dy)
+
+    def split_segment(self, segment_index: int) -> ControlPoint | None:
+        """Subdivide a Bézier segment at t=0.5 without changing its shape."""
+        points = sorted(self._control_points, key=lambda point: point.x)
+        if not 0 <= segment_index < len(points) - 1:
+            return None
+        indices = [segment_index]
+        if self.symmetry_mode == SymmetryMode.Diagonal:
+            mirrored_index = len(points) - 2 - segment_index
+            if mirrored_index != segment_index:
+                indices.append(mirrored_index)
+
+        splits = []
+        for index in indices:
+            left, right = points[index:index + 2]
+            _, left_handle, incoming, center, outgoing, right_handle, _ = _subdivide_bezier(
+                left.center, left.handles[-1], right.handles[0], right.center
+            )
+            if not left.x < center.x < right.x:
+                return None
+            point = self._create_control_point(center, (incoming, outgoing))
+            splits.append((left, left_handle, point, right_handle, right))
+
+        for left, left_handle, point, right_handle, right in splits:
+            left.handles[-1] = left_handle
+            right.handles[0] = right_handle
+            self._control_points.append(point)
+        self.save_to_profile()
+        self._action_data.curve_update()
+        self.content_added.emit()
+        return splits[0][2]
+
+    def adjust_handles(self, *, smooth: bool, segment_index: int | None = None):
+        """Align mismatched joins or straighten the requested spans between control points."""
+        points = sorted(self._control_points, key=lambda point: point.x)
+        if len(points) < 2 or any(left.x == right.x for left, right in zip(points, points[1:])):
+            return
+        if smooth:
+            if not self._smooth_handle_joins(points):
+                return
+        else:
+            if segment_index is not None:
+                if not 0 <= segment_index < len(points) - 1:
+                    return
+                points = points[segment_index:segment_index + 2]
+            for left, right in zip(points, points[1:]):
+                offset = Point2D((right.x - left.x) / 3.0, (right.y - left.y) / 3.0)
+                left.handles[-1] = left.center + offset
+                right.handles[0] = right.center - offset
+
+        self.save_to_profile()
+        self._action_data.curve_update()
+        self.content_modified.emit()
+
+    def _smooth_handle_joins(self, points):
+        """Blend the existing tangent directions at interior joins."""
+        changed = False
+        for previous, point, following in zip(points, points[1:], points[2:]):
+            incoming = point.center - point.handles[0]
+            outgoing = point.handles[1] - point.center
+            incoming_length = math.hypot(incoming.x, incoming.y)
+            outgoing_length = math.hypot(outgoing.x, outgoing.y)
+            # Preserve collapsed handles and skip handles that loop back along the input axis.
+            if not incoming_length or not outgoing_length or incoming.x < 0 or outgoing.x < 0:
+                continue
+
+            incoming_angle = math.atan2(incoming.y, incoming.x)
+            outgoing_angle = math.atan2(outgoing.y, outgoing.x)
+            if math.isclose(incoming_angle, outgoing_angle, abs_tol=1e-10):
+                continue
+
+            angle = (incoming_angle + outgoing_angle) / 2.0
+            if (point.y - previous.y) * (following.y - point.y) <= 0.0:
+                # A flat span or a local extremum needs a horizontal tangent.
+                angle = 0.0
+            dx, dy = math.cos(angle), math.sin(angle)
+            for index, length, limit, direction in (
+                (0, incoming_length, point.x - previous.x, -1.0),
+                (1, outgoing_length, following.x - point.x, 1.0),
+            ):
+                # Keep each handle in its own span if rotation would carry it past the next knot.
+                if dx * length > limit:
+                    length = limit / dx
+                point.handles[index] = point.center + Point2D(direction * dx * length, direction * dy * length)
+            changed = True
+        return changed
 
     def set_handle_symmetry(self, is_enabled):
         """Enables and disables the handle symmetry mode.
@@ -703,6 +1049,16 @@ class CubicBezierSplineModel(AbstractCurveModel):
                 self._action_data.control_points.append([cp.handles[1].x, cp.handles[1].y])
 
 
+class FullAxisCurveModel(AbstractCurveModel):
+    """Displays a generated curve without editable control points."""
+
+    def _init_from_profile_data(self):
+        pass
+
+    def get_curve_function(self):
+        return self._action_data.full_axis_curve
+
+
 class DataPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
     """UI Item representing a data point center of a control point."""
 
@@ -790,14 +1146,9 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         """
         scene = self.scene()
         if scene is not None:
-            if is_active:
-                self.setBrush(QtGui.QBrush(QtCore.Qt.red))
-                if scene.mouseGrabberItem() != self:
-                    self.grabMouse()
-            else:
-                self.setBrush(QtGui.QBrush(QtCore.Qt.gray))
-                if scene.mouseGrabberItem() == self:
-                    self.ungrabMouse()
+            self.setBrush(QtGui.QBrush(QtCore.Qt.red if is_active else QtCore.Qt.gray))
+            if not is_active and scene.mouseGrabberItem() == self:
+                self.ungrabMouse()
 
     def mouseReleaseEvent(self, evt):
         """Releases the mouse grab when the mouse is released.
@@ -888,14 +1239,9 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         if self.scene() is None:
             return
 
-        if is_active:
-            self.setBrush(QtGui.QBrush(QtCore.Qt.red))
-            if self.scene().mouseGrabberItem() != self:
-                self.grabMouse()
-        else:
-            self.setBrush(QtGui.QBrush(QtCore.Qt.gray))
-            if self.scene().mouseGrabberItem() == self:
-                self.ungrabMouse()
+        self.setBrush(QtGui.QBrush(QtCore.Qt.red if is_active else QtCore.Qt.gray))
+        if not is_active and self.scene().mouseGrabberItem() == self:
+            self.ungrabMouse()
 
     def mouseReleaseEvent(self, evt):
         """Releases the mouse grab when the mouse is released.
@@ -983,6 +1329,11 @@ class CurveGraphicsView(QtWidgets.QGraphicsView):
 class CurveView(QtWidgets.QGraphicsScene):
     """Visualization of the entire curve editor UI element."""
 
+    curve_changed = QtCore.Signal()
+    segment_selection_changed = QtCore.Signal()
+    drag_started = QtCore.Signal()
+    drag_finished = QtCore.Signal()
+
     def __init__(self, curve_model, point_editor, show_input_axis=True, parent=None):
         """Creates a new instance.
 
@@ -995,9 +1346,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         self._redraw = False
         self.id = gremlin.util.get_guid()
 
-        self.model = curve_model
-        self.model.content_modified.connect(self._model_changed)
-        self.model.content_added.connect(self._populate_from_model)
+        self.model = None
         self.point_editor = point_editor
         from gremlin.util import load_image
 
@@ -1011,11 +1360,15 @@ class CurveView(QtWidgets.QGraphicsScene):
 
         self.show_input_axis = show_input_axis
         self.current_item = None
+        self.selected_segment: int | None = None
+        self._drag_press_pos: QtCore.QPoint | None = None
+        self._dragging = False
+        self._segment_drag_origin: QtCore.QPointF | None = None
+        self._segment_drag_offset = Point2D()
         self.tracker = None
         self.value = 0.0
         self.item_list = []  # list of items by index
         self.item_list_map = {}  # map of points to items
-        self._populate_from_model()
 
         eh = CurveEventHandler()
         eh.next_point.connect(self._next_item)
@@ -1024,19 +1377,40 @@ class CurveView(QtWidgets.QGraphicsScene):
         eh.handle_match_y.connect(self._handle_match_y)
         eh.delete_point.connect(self._delete_point)
 
+        self.set_model(curve_model)
+
+    def set_model(self, curve_model):
+        if self.model is not None:
+            self.model.content_modified.disconnect(self._model_changed)
+            self.model.content_added.disconnect(self._model_points_changed)
+        self.model = curve_model
+        self.model.content_modified.connect(self._model_changed)
+        self.model.content_added.connect(self._model_points_changed)
+        self.current_item = None
+        self._clear_segment_selection()
+        self._populate_from_model()
         if self.item_list:
             self._select_item(self.item_list[0])
+        else:
+            CurveEventHandler().selected_item.emit(self.point_editor, None, -1)
 
     def _model_changed(self):
-        ch = CurveEventHandler()
         self.redraw_scene()
-        ch.value_changed.emit(self.value)
+        CurveEventHandler().value_changed.emit(self.value)
+        self.curve_changed.emit()
+
+    def _model_points_changed(self):
+        self._clear_segment_selection()
+        self._populate_from_model()
+        self.curve_changed.emit()
 
     def _dist(self, a, b):
         return ((b.x - a.x) ** 2 + (b.y - a.y) ** 2) ** 0.5
 
     def _shortest_path(self, points):
         """sorts the points by the shortest distance"""
+        if not points:
+            return []
         start = points[0]
         pass_by = points
         path = [start]
@@ -1072,12 +1446,6 @@ class CurveView(QtWidgets.QGraphicsScene):
 
         self.redraw_scene()
 
-    def pointExists(self, point) -> bool:
-        for cp in self.model.get_control_points():
-            if point == cp:
-                return True
-        return False
-
     def add_control_point(self, point, handles=()):
         """Adds a new control point to the model and scene.
 
@@ -1085,8 +1453,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param handles list of potential handles
         """
 
-        if self.pointExists(point):
-            # point already exists, ignore
+        if isinstance(self.model, FullAxisCurveModel) or not self.model.is_valid_point(point):
             return
 
         cp = self.model.add_control_point(point, handles)
@@ -1122,7 +1489,7 @@ class CurveView(QtWidgets.QGraphicsScene):
     @QtCore.Slot()
     def _next_item(self, point_editor):
         """selects the next item"""
-        if self.point_editor != point_editor:
+        if self.point_editor != point_editor or not self.item_list:
             return
         item = self.current_item
         if item and isinstance(item, CurveHandleGraphicsItem):
@@ -1194,6 +1561,9 @@ class CurveView(QtWidgets.QGraphicsScene):
                 MessageBox(prompt="At least two points must exist.")
                 return
 
+            if self.model.is_point_locked(item.control_point):
+                return
+
             # don't remove the edges
             if abs(self.current_item.control_point.center.x) == 1.0:
                 MessageBox(prompt="Enpoints cannot be removed.")
@@ -1255,7 +1625,8 @@ class CurveView(QtWidgets.QGraphicsScene):
         """
 
         # Ensure we want / can select the provided item
-        if isinstance(item, ControlPointGraphicsItem) or isinstance(item, CurveHandleGraphicsItem):
+        if isinstance(item, (ControlPointGraphicsItem, CurveHandleGraphicsItem)):
+            self._select_segment(None)
             if self.current_item and item != self.current_item:
                 self.current_item.set_active(False)
             self.current_item = item
@@ -1266,6 +1637,44 @@ class CurveView(QtWidgets.QGraphicsScene):
             else:
                 index = -1
             eh.selected_item.emit(self.point_editor, item, index)
+
+    def _clear_segment_selection(self):
+        if self.selected_segment is not None:
+            self.selected_segment = None
+            self.segment_selection_changed.emit()
+
+    def _select_segment(self, index: int | None):
+        if index == self.selected_segment:
+            return
+        self.selected_segment = index
+        if index is not None and self.current_item is not None:
+            self.current_item.set_active(False)
+            self.current_item = None
+            CurveEventHandler().selected_item.emit(self.point_editor, None, -1)
+        self.redraw_scene()
+        self.segment_selection_changed.emit()
+
+    def insert_point_on_selected_segment(self):
+        if self.selected_segment is None or not isinstance(self.model, CubicBezierSplineModel):
+            return
+        point = self.model.split_segment(self.selected_segment)
+        if point is not None:
+            self._select_item(self.item_list_map[point])
+
+    def _draw_curve_path(self, curve_fn, left: float, right: float, segment_index: int | None = None):
+        start, end = left * g_scene_size, right * g_scene_size
+        steps = max(1, math.ceil((end - start) / 2.0))
+        path = QtGui.QPainterPath(QtCore.QPointF(start, -g_scene_size * curve_fn(left)))
+        for step in range(1, steps + 1):
+            x = start + (end - start) * step / steps
+            path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
+
+        selected = segment_index is not None and segment_index == self.selected_segment
+        color = Color().activeColor() if selected else Color().selectColor()
+        item = self.addPath(path, QtGui.QPen(QtGui.QColor(color), 7 if selected else 4))
+        if segment_index is not None:
+            item.setData(0, segment_index)
+            item.setCursor(QtCore.Qt.CursorShape.OpenHandCursor)
 
     def redraw_scene(self):
         """Updates the scene
@@ -1289,13 +1698,12 @@ class CurveView(QtWidgets.QGraphicsScene):
         # Redraw response curve
         curve_fn = self.model.get_curve_function()
         if curve_fn:
-            path = QtGui.QPainterPath(QtCore.QPointF(int(-g_scene_size), int(-g_scene_size * curve_fn(-1))))
-            for x in range(-int(g_scene_size), int(g_scene_size + 1), 2):
-                path.lineTo(x, -g_scene_size * curve_fn(x / g_scene_size))
-            self.addPath(
-                path,
-                QtGui.QPen(QtGui.QColor(Color().selectColor()), 4),
-            )
+            if isinstance(self.model, CubicBezierSplineModel):
+                knots = sorted(point.x for point in self.model.get_control_points())
+                for index, (left, right) in enumerate(zip(knots, knots[1:])):
+                    self._draw_curve_path(curve_fn, left, right, index)
+            else:
+                self._draw_curve_path(curve_fn, -1.0, 1.0)
 
             # update the tracking item
             if self.show_input_axis:
@@ -1305,19 +1713,87 @@ class CurveView(QtWidgets.QGraphicsScene):
                 # self.tracker.redraw()
 
         # Update editor widget fields
-        if self.current_item:
-            if isinstance(self.current_item, ControlPointGraphicsItem):
-                self.point_editor.set_values(self.current_item.control_point.center)
+        if isinstance(self.current_item, ControlPointGraphicsItem):
+            self.point_editor.set_values(self.current_item.control_point.center)
+        elif isinstance(self.current_item, CurveHandleGraphicsItem):
+            handle = self.current_item
+            self.point_editor.set_values(handle.parent.control_point.handles[handle.index])
 
         self._redraw = False
 
     def mousePressEvent(self, evt):
-        """Informs the model about point selection if a point is clicked.
+        """Select a point, handle, or segment and prepare for a possible drag."""
+        if evt.button() != QtCore.Qt.LeftButton:
+            super().mousePressEvent(evt)
+            return
 
-        :param evt the mouse event to process
-        """
-        if evt.button() == QtCore.Qt.LeftButton:
-            self._select_item(self.itemAt(evt.scenePos(), QtGui.QTransform()))
+        pos = evt.scenePos()
+        item = next(
+            (item for item in self.items(pos) if isinstance(item, (ControlPointGraphicsItem, CurveHandleGraphicsItem))),
+            None,
+        )
+        if item is not None:
+            self._select_item(item)
+            item.grabMouse()
+        elif isinstance(self.model, CubicBezierSplineModel):
+            # A small hit area makes thin or steep segments easier to select.
+            area = QtCore.QRectF(pos.x() - 5.0, pos.y() - 5.0, 10.0, 10.0)
+            index = next((item.data(0) for item in self.items(area) if isinstance(item, QtWidgets.QGraphicsPathItem)), None)
+            self._select_segment(index)
+            if index is None:
+                return
+            self._segment_drag_origin = pos
+            self._segment_drag_offset = Point2D()
+        else:
+            return
+
+        self._drag_press_pos = evt.screenPos()
+        evt.accept()
+
+    def _move_dragged_segment(self, pos):
+        if self.selected_segment is not None:
+            total = pos - self._segment_drag_origin
+            offset = Point2D(total.x() / g_scene_size, -total.y() / g_scene_size)
+            applied = self.model.move_segment(self.selected_segment, offset - self._segment_drag_offset)
+            self._segment_drag_offset += applied
+
+    def mouseMoveEvent(self, evt):
+        if self._drag_press_pos is None or not evt.buttons() & QtCore.Qt.LeftButton:
+            super().mouseMoveEvent(evt)
+            return
+        if not self._dragging:
+            distance = (evt.screenPos() - self._drag_press_pos).manhattanLength()
+            if distance < QtWidgets.QApplication.startDragDistance():
+                evt.accept()
+                return
+            self._dragging = True
+            self.drag_started.emit()
+            if self._segment_drag_origin is not None and evt.widget() is not None:
+                evt.widget().setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
+        if self._segment_drag_origin is None:
+            super().mouseMoveEvent(evt)
+        else:
+            self._move_dragged_segment(evt.scenePos())
+            evt.accept()
+
+    def mouseReleaseEvent(self, evt):
+        if evt.button() != QtCore.Qt.LeftButton:
+            super().mouseReleaseEvent(evt)
+            return
+
+        if self._segment_drag_origin is not None:
+            if self._dragging:
+                self._move_dragged_segment(evt.scenePos())
+                if evt.widget() is not None:
+                    evt.widget().unsetCursor()
+            self._segment_drag_origin = None
+            evt.accept()
+        else:
+            super().mouseReleaseEvent(evt)
+        self._drag_press_pos = None
+        if self._dragging:
+            self._dragging = False
+            self.drag_finished.emit()
 
     def mouseDoubleClickEvent(self, evt):
         """Adds or removes a control point.
@@ -1327,8 +1803,7 @@ class CurveView(QtWidgets.QGraphicsScene):
         :param evt the mouse event to process
         """
         if evt.button() == QtCore.Qt.LeftButton:
-            item = self.itemAt(evt.scenePos(), QtGui.QTransform())
-            if not isinstance(item, ControlPointGraphicsItem):
+            if not any(isinstance(item, ControlPointGraphicsItem) for item in self.items(evt.scenePos())):
                 self.add_control_point(
                     Point2D(
                         evt.scenePos().x() / g_scene_size,
@@ -1345,8 +1820,8 @@ class CurveView(QtWidgets.QGraphicsScene):
         key = evt.key()
         item = self.current_item
         if key == QtCore.Qt.Key_Delete and isinstance(item, ControlPointGraphicsItem):
-            # Disallow removing edge points
-            if abs(self.current_item.control_point.center.x) == 1.0:
+            # Disallow removing endpoints or locked points.
+            if abs(item.control_point.x) == 1.0 or self.model.is_point_locked(item.control_point):
                 return
 
             # Otherwise remove the currently active control point
@@ -1354,9 +1829,11 @@ class CurveView(QtWidgets.QGraphicsScene):
             self._populate_from_model()
             self.current_item = None
 
-        elif key == QtCore.Qt.Key_Escape and isinstance(item, CurveHandleGraphicsItem):
-            # return control to the control point
-            self._select_item(item.parent)
+        elif key == QtCore.Qt.Key_Escape:
+            if self.selected_segment is not None:
+                self._select_segment(None)
+            elif isinstance(item, CurveHandleGraphicsItem):
+                self._select_item(item.parent)
 
     def drawBackground(self, painter, rect):
         """Draws the grid background image.
@@ -1543,6 +2020,12 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
 class AxisCurveWidget(QtWidgets.QWidget):
     """response curve standalone widget - displays the curve option UI"""
 
+    _undo_fields = (
+        "id", "mapping_type", "full_axis_inflection", "full_axis_inverted", "symmetry_mode", "isCentered", "lock_center",
+        "isFiltered", "filterSamples", "filterWindow", "filterOrder",
+    )
+    _undo_limit = 20
+
     def __init__(self, curve_data: AxisCurveData, parent=None):  # noqa: F821
         """Creates a new instance.
 
@@ -1556,12 +2039,62 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.is_inverted = False
         self.last_value = 0
         self.curve_model = None
+        self._undo_history = []
+        self._last_curve_edit = None
+        self._curve_edit_in_progress = False
         self._create_ui()
+        self._last_curve_edit = self._curve_edit_state()
         ch = CurveEventHandler()
         ch.value_changed.connect(self.update_value)
 
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.clipboard_changed.connect(self._update_clipboard)
+
+    def _curve_edit_state(self):
+        values = {name: getattr(self.curve_data, name) for name in self._undo_fields}
+        values["deadzone"] = tuple(self.curve_data.deadzone)
+        values["control_points"] = tuple(tuple(point) for point in self.curve_data.control_points)
+        return values, self.handle_symmetry_widget.isChecked()
+
+    def _begin_curve_edit(self):
+        self._curve_edit_in_progress = True
+
+    def _finish_curve_edit(self):
+        self._curve_edit_in_progress = False
+        self._record_curve_edit()
+
+    def _record_curve_edit(self):
+        if self._last_curve_edit is None or self._curve_edit_in_progress or self.curve_data is None:
+            return
+        state = self._curve_edit_state()
+        if state != self._last_curve_edit:
+            self._undo_history.append(self._last_curve_edit)
+            if len(self._undo_history) > self._undo_limit:
+                self._undo_history.pop(0)
+            self._last_curve_edit = state
+            self.undo_button.setEnabled(True)
+
+    def _undo_curve_edit(self):
+        if not self._undo_history or self._curve_edit_in_progress:
+            return
+        values, smooth_handles = self._undo_history.pop()
+        self._begin_curve_edit()
+        try:
+            for name, value in values.items():
+                if name in ("deadzone", "control_points"):
+                    value = list(value)
+                setattr(self.curve_data, name, value)
+            self._change_curve_type(self.curve_data.mapping_type, self.curve_data.control_points)
+            self.curve_model.symmetry_mode = self.curve_data.symmetry_mode
+            self.curve_symmetry.setChecked(self.curve_data.symmetry_mode == SymmetryMode.Diagonal)
+            if isinstance(self.curve_model, CubicBezierSplineModel):
+                self.handle_symmetry_widget.setChecked(smooth_handles)
+            self.curve_data.curve_update()
+            self._update_ui()
+            self._last_curve_edit = self._curve_edit_state()
+        finally:
+            self._curve_edit_in_progress = False
+            self.undo_button.setEnabled(bool(self._undo_history))
 
     def update_value(self, value: float):
         """handler to update a visual input value on the curve"""
@@ -1617,21 +2150,29 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Dropdown menu for the different curve types
         self.curve_type_selection = QDataComboBox()
-        self.curve_type_selection.addItem("Cubic Spline", CurveType.Cubic)
-        self.curve_type_selection.addItem("Cubic Bezier Spline", CurveType.Bezier)
+        for curve_type in CurveType:
+            self.curve_type_selection.addItem(CurveType.to_display(curve_type), curve_type)
         self.curve_type_selection.setCurrentIndex(0)
         self.curve_type_selection.currentIndexChanged.connect(self._curve_type_changed)
 
+        self.inflection_selection = QDataComboBox()
+        for inflection in FullAxisInflection:
+            self.inflection_selection.addItem(inflection.name, inflection)
+        self.inflection_selection.setToolTip("Select the inflection point at 25%, 50%, or 75% of the active axis range.")
+        self.inflection_selection.currentIndexChanged.connect(self._inflection_changed)
+        self.inflection_label = QtWidgets.QLabel("Inflection point:")
+        self.inflection_label.setBuddy(self.inflection_selection)
+
         # filter widget
 
-        widget = QDataCheckbox(
+        self.filter_enabled_widget = QDataCheckbox(
             "Noise Filter (experimental)",
             value=self.curve_data.isFiltered,
             callback=self._handle_filter_changed,
             tooltip="Enables a Savitzky-Golay low-pass noise filter to the input.",
         )
 
-        widgets = [widget]
+        widgets = [self.filter_enabled_widget]
 
         grids = []
 
@@ -1702,6 +2243,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.container_options_layout.addWidget(QtWidgets.QLabel("Curve Type:"))
         self.container_options_layout.addWidget(self.curve_type_selection)
+        self.container_options_layout.addWidget(self.inflection_label)
+        self.container_options_layout.addWidget(self.inflection_selection)
 
         # Curve inversion
         self.curve_inversion = QDataPushButton("Invert", callback=self._invert_curve, tooltip="Inverts the current response curve")
@@ -1716,11 +2259,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         # Handle symmetry
         self.handle_symmetry_widget = QtWidgets.QCheckBox("Force smooth curves")
 
-        if self.curve_data.mapping_type == "cubic-bezier-spline":
-            self.handle_symmetry_widget.setChecked(self.curve_model.handle_symmetry_enabled)
-            self.handle_symmetry_widget.stateChanged.connect(self._handle_symmetry_cb)
-        else:
-            self.handle_symmetry_widget.setVisible(False)
+        self.handle_symmetry_widget.stateChanged.connect(self._handle_symmetry_cb)
 
         self.container_options_layout.addWidget(self.handle_symmetry_widget)
 
@@ -1737,6 +2276,14 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.paste_button_widget.setMaximumWidth(24)
         self._update_clipboard()
 
+        self.undo_button = QDataPushButton(
+            "Undo", clicked=self._undo_curve_edit, tooltip="Undo the last curve edit (Ctrl+Z).", enabled=False
+        )
+        undo_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Undo, self)
+        undo_shortcut.setContext(QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        undo_shortcut.setAutoRepeat(False)
+        undo_shortcut.activated.connect(self._undo_curve_edit)
+        self.container_options_layout.addWidget(self.undo_button)
         self.container_options_layout.addWidget(self.copy_button_widget)
         self.container_options_layout.addWidget(self.paste_button_widget)
         self.container_options_layout.addWidget(help_button)
@@ -1762,7 +2309,41 @@ class AxisCurveWidget(QtWidgets.QWidget):
             button.data = preset
             button.clicked.connect(self._curve_set_preset_cb)
             self.container_presets_layout.addWidget(button)
+        curve_values_button = QDataPushButton("Curve values...", clicked=self._show_curve_values)
+        self.container_presets_layout.addWidget(curve_values_button)
         self.container_presets_layout.addStretch()
+
+        self.bezier_preset_shape = QDataComboBox(
+            source=[(shape.value, shape) for shape in BezierPresetShape],
+            tooltip="Choose cubic smoothing or a logarithmic response.",
+        )
+        self.bezier_preset_range = QDataComboBox(tooltip="Choose where small input movements should produce smaller output changes.")
+        self.bezier_preset_shape.currentIndexChanged.connect(self._update_bezier_preset_ranges)
+        self._update_bezier_preset_ranges()
+        self.bezier_preset_strength = QDataComboBox(
+            source=[("Gentle", 0.25), ("Moderate", 0.5), ("Strong", 0.75), ("Very aggressive", 1.0)],
+            value=0.5,
+            tooltip="Choose how far the preset bends away from a linear response.",
+        )
+        self.lock_center_widget = QtWidgets.QCheckBox("Lock center at zero")
+        self.lock_center_widget.setToolTip(
+            "Keep the Bézier curve at zero output when the input is zero. Unlocking also turns off Centered."
+        )
+        self.lock_center_widget.clicked.connect(self._lock_center_changed)
+        self.apply_bezier_preset_button = QDataPushButton(
+            "Apply", clicked=self._apply_bezier_preset, tooltip="Replace the current curve with editable Bézier points."
+        )
+        self.container_bezier_presets = getHContainer(
+            [
+                "Bézier presets:",
+                self.bezier_preset_shape,
+                self.bezier_preset_range,
+                self.bezier_preset_strength,
+                self.lock_center_widget,
+                self.apply_bezier_preset_button,
+            ],
+            widget_only=True,
+        )
 
         self.container_control_widget = QtWidgets.QWidget()
         self.container_control_widget.setContentsMargins(0, 0, 0, 0)
@@ -1785,12 +2366,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.input_curved_widget.setReadOnly(True)
 
         # Response curve model used
-        if self.curve_data.mapping_type == CurveType.Cubic:
-            self.curve_model = CubicSplineModel(self.curve_data)
-        elif self.curve_data.mapping_type == CurveType.Bezier:
-            self.curve_model = CubicBezierSplineModel(self.curve_data)
-        else:
-            raise gremlin.error.ProfileError("Invalid curve type")
+        self.curve_model = AxisCurveData.model_map[self.curve_data.mapping_type](self.curve_data)
 
         # mode
         self.curve_model.set_symmetry_mode(self.curve_data.symmetry_mode)
@@ -1802,14 +2378,46 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_curve_layout = QtWidgets.QHBoxLayout(self.container_curve_widget)
 
         # Graphical curve editor
-        self.curve_scene = CurveView(
-            self.curve_model,
-            self.control_point_editor,
-        )
+        self.curve_scene = CurveView(self.curve_model, self.control_point_editor, self.curve_data.show_input_axis)
+        self.curve_scene.curve_changed.connect(self._record_curve_edit)
+        self.curve_scene.drag_started.connect(self._begin_curve_edit)
+        self.curve_scene.drag_finished.connect(self._finish_curve_edit)
 
         # Create view displaying the curve scene
 
         self._configure_response_curve_view()
+
+        self.smooth_handles_button = QDataPushButton(
+            "Smooth handles",
+            clicked=lambda: self._adjust_bezier_handles(smooth=True),
+            tooltip="Align mismatched tangents at interior control points while keeping smooth sections and end handles.",
+        )
+        mirror_x_button = QDataPushButton(
+            "Mirror X",
+            clicked=lambda: self._mirror_curve(x=True),
+            tooltip="Flip the curve left to right by reversing the input axis.",
+        )
+        mirror_y_button = QDataPushButton(
+            "Mirror Y",
+            clicked=self._invert_curve,
+            tooltip="Flip the curve top to bottom by reversing the output axis.",
+        )
+        self.straighten_segments_button = QDataPushButton(
+            "Straighten segments",
+            clicked=lambda: self._adjust_bezier_handles(smooth=False),
+            tooltip="Straighten all segments. Click a curve segment to straighten it on its own.",
+        )
+        self.insert_point_button = QDataPushButton(
+            "Insert point",
+            clicked=self.curve_scene.insert_point_on_selected_segment,
+            tooltip="Split the highlighted Bézier segment while keeping its shape.",
+            enabled=False,
+        )
+        self.curve_scene.segment_selection_changed.connect(self._update_segment_controls)
+        self.container_curve_buttons = getHContainer(
+            [self.smooth_handles_button, self.straighten_segments_button, self.insert_point_button, "|", mirror_x_button, mirror_y_button,],
+            widget_only=True,
+        )
 
         self.container_repeater_widget = QtWidgets.QWidget()
         self.container_repeater_widget.setContentsMargins(0, 0, 0, 0)
@@ -1826,12 +2434,17 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         self.deadzone_widget = DeadzoneWidget(self.curve_data)
         self.deadzone_widget.changed.connect(self._deadzone_modified_cb)
+        for slider in (self.deadzone_widget.slider, self.deadzone_widget.left_slider, self.deadzone_widget.right_slider):
+            slider.handleDragStart.connect(self._begin_curve_edit)
+            slider.handleDragStop.connect(self._finish_curve_edit)
 
         # Add all widgets to the layout
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.container_filter_widget)
         self.main_layout.addWidget(self.container_presets_widget)
+        self.main_layout.addWidget(self.container_bezier_presets)
         self.main_layout.addWidget(self.container_curve_widget)
+        self.main_layout.addWidget(self.container_curve_buttons)
         self.main_layout.addWidget(self.container_repeater_widget)
         self.main_layout.addWidget(self.container_control_widget)
         self.main_layout.addWidget(self.deadzone_widget)
@@ -1848,26 +2461,74 @@ class AxisCurveWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.curve_type_selection):
             self.curve_type_selection.setCurrentIndex(index)
 
+        is_full_axis = self.curve_data.mapping_type == CurveType.FullAxis
+        self.inflection_label.setVisible(is_full_axis)
+        self.inflection_selection.setVisible(is_full_axis)
+        with QtCore.QSignalBlocker(self.inflection_selection):
+            self.inflection_selection.setCurrentIndex(self.inflection_selection.findData(self.curve_data.full_axis_inflection))
+
+        self.container_control_widget.setVisible(not is_full_axis)
+        self.curve_inversion.setVisible(not is_full_axis)
+        self.curve_symmetry.setVisible(not is_full_axis)
+        self.centered_widget.setVisible(not is_full_axis)
+        is_bezier = self.curve_data.mapping_type == CurveType.Bezier
+        self.handle_symmetry_widget.setVisible(is_bezier)
+        for button in (self.smooth_handles_button, self.straighten_segments_button, self.insert_point_button):
+            button.setVisible(is_bezier)
+
         self.curve_scene.redraw_scene()
 
+        is_centered = self.curve_data.isCentered and not is_full_axis
         with QtCore.QSignalBlocker(self.centered_widget):
-            self.centered_widget.setChecked(self.curve_data.isCentered)
+            self.centered_widget.setChecked(is_centered)
 
-        # Set deadzone values
         self.deadzone_widget.setValues(self.curve_data.deadzone)
-        self.deadzone_widget.isCentered = self.curve_data.isCentered
+        self.deadzone_widget.isCentered = is_centered
+        self._update_center_lock()
 
-        # update repeater
-        self._update_value_ui(0)  # assume centered as a default
+        self._update_value_ui(self.last_value)
 
         # filter
         visible = self.curve_data.isFiltered
         self.container_filter_options.setVisible(visible)
+        with QtCore.QSignalBlocker(self.filter_enabled_widget):
+            self.filter_enabled_widget.setChecked(visible)
+        for widget, value in (
+            (self.filter_sample_widget, self.curve_data.filterSamples),
+            (self.filter_order_widget, self.curve_data.filterOrder),
+            (self.filter_window_widget, self.curve_data.filterWindow),
+        ):
+            with QtCore.QSignalBlocker(widget):
+                widget.setValue(value)
 
     @QtCore.Slot(bool)
     def _centered_changed_cb(self, checked: bool):
         self.curve_data.isCentered = checked
         self.deadzone_widget.isCentered = checked
+        self._update_center_lock()
+        if checked:
+            self._anchor_bezier_center()
+        self._record_curve_edit()
+
+    def _update_center_lock(self):
+        self.lock_center_widget.setChecked(self.curve_data.center_is_locked)
+
+    @QtCore.Slot(bool)
+    def _lock_center_changed(self, checked: bool):
+        self.curve_data.lock_center = checked
+        if checked:
+            self._anchor_bezier_center()
+        elif self.curve_data.isCentered:
+            self.curve_data.isCentered = False
+            self._update_ui()
+        self._record_curve_edit()
+
+    def _anchor_bezier_center(self):
+        if isinstance(self.curve_model, CubicBezierSplineModel):
+            self.curve_model.anchor_center()
+            self.curve_data.curve_update()
+            self.curve_scene.redraw_scene()
+            self._update_value_ui(self.last_value)
 
     @QtCore.Slot()
     def _show_help(self):
@@ -1888,6 +2549,60 @@ class AxisCurveWidget(QtWidgets.QWidget):
             return
         else:
             MessageBox(prompt="Unable to locate help file")
+
+    def _show_curve_values(self):
+        dialog = QRememberDialog("AxisCurveValuesDialog", width=500, height=460, parent=self)
+        dialog.setWindowTitle("Curve Values")
+        layout = QtWidgets.QVBoxLayout(dialog)
+        instructions = QDataLabel(
+            "Paste one Y value per line for evenly spaced inputs, or one X,Y pair per line. Values must be between -1 and +1."
+        )
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+        values = QtWidgets.QPlainTextEdit(parent=dialog)
+        values.setPlaceholderText("-1.0, -0.3225\n-0.8947, -0.8076\n…")
+        samples = QIntLineEdit(min_range=2, max_range=_max_curve_samples, value=21, chars=4)
+
+        def export_values():
+            count = samples.value()
+            if count is None or not 2 <= count <= _max_curve_samples:
+                MessageBox(title="Cannot sample curve", prompt=f"Choose between 2 and {_max_curve_samples} samples.", parent=dialog)
+                return
+            if self.curve_data.mapping_type == CurveType.FullAxis:
+                response = self.curve_data.full_axis_response
+            else:
+                response = self.curve_model.get_curve_function()
+            if response is not None:
+                output = (gremlin.util.clamp(response(-1.0 + 2.0 * index / (count - 1))) for index in range(count))
+                values.setPlainText("\n".join(format(value, ".16g") for value in output))
+
+        def import_values():
+            try:
+                points = _fit_sampled_bezier(_parse_curve_samples(values.toPlainText()))
+            except (ValueError, ArithmeticError) as error:
+                MessageBox(title="Cannot fit curve", prompt=str(error), parent=dialog)
+                return
+            centered = self.curve_data.isCentered
+            if self.curve_data.center_is_locked:
+                center_index = next(index for index in range(0, len(points), 3) if points[index][0] == 0.0)
+                if math.isclose(points[center_index][1], 0.0, abs_tol=1e-12):
+                    points[center_index] = (0.0, 0.0)
+                else:
+                    centered = False
+                    self.curve_data.lock_center = False
+            self._apply_curve_preset(CurveType.Bezier, points, centered)
+            dialog.accept()
+
+        export_button = QDataPushButton("Sample curve", clicked=export_values)
+        copy_button = QDataPushButton("Copy text", clicked=lambda: QtWidgets.QApplication.clipboard().setText(values.toPlainText()))
+        layout.addWidget(getHContainer([QDataLabel("Samples", min_width=0), samples, export_button, copy_button], widget_only=True))
+        layout.addWidget(values)
+        fit_button = QDataPushButton("Fit Bézier", clicked=import_values)
+        close_button = QDataPushButton("Close", clicked=dialog.reject)
+        layout.addWidget(getHContainer(["||", fit_button, close_button], widget_only=True))
+        export_values()
+        dialog.exec()
+        dialog.deleteLater()
 
     @QtCore.Slot()
     def _save_preset_cb(self):
@@ -1940,6 +2655,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 self.curve_data.curve_update()
                 self._update_ui()
                 self.update_value(self.last_value)
+                self._record_curve_edit()
 
             except Exception as err:
                 MessageBox(prompt=f"Error loading preset: {err}")
@@ -1974,6 +2690,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 self.curve_data.curve_update()
                 self._update_ui()
                 self.update_value(self.last_value)
+                self._record_curve_edit()
             except Exception:
                 # invalid
                 return
@@ -1990,11 +2707,24 @@ class AxisCurveWidget(QtWidgets.QWidget):
     def _curve_type_changed(self):
         curve_type = self.curve_type_selection.currentData()
         self._change_curve_type(curve_type)
+        if curve_type != CurveType.FullAxis:
+            self.curve_data.isCentered = curve_type == CurveType.Bezier
+        self.curve_data.curve_update()
+        self._update_ui()
+        self._record_curve_edit()
+
+    @QtCore.Slot(int)
+    def _inflection_changed(self, index: int):
+        self.curve_data.full_axis_inflection = self.inflection_selection.itemData(index)
+        self.curve_scene.redraw_scene()
+        self._update_value_ui(self.last_value)
+        self._record_curve_edit()
 
     @QtCore.Slot(bool)
     def _handle_filter_changed(self, checked: bool):
         self.curve_data.isFiltered = checked
         self._update_ui()
+        self._record_curve_edit()
 
     @QtCore.Slot(int)
     def _handle_filter_samples_changed(self, value: int):
@@ -2004,12 +2734,15 @@ class AxisCurveWidget(QtWidgets.QWidget):
             self.curve_data.filterSamples = value
             if self.curve_data.filterWindow > value:
                 # sliding window must be less than the total samples
-                if value % 0 == 0:
+                if value % 2 == 0:
                     # even
                     value -= 1
                 if value < 1:
                     value = 1
                 self.curve_data.filterWindow = value
+                with QtCore.QSignalBlocker(self.filter_window_widget):
+                    self.filter_window_widget.setValue(value)
+        self._record_curve_edit()
 
     @QtCore.Slot(int)
     def _handle_filter_order_changed(self, widget, value: int):
@@ -2019,6 +2752,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 widget.setValue(2)
 
             self.curve_data.filterOrder = value
+        self._record_curve_edit()
 
     @QtCore.Slot(int)
     def _handle_filter_window_changed(self, widget, value: int):
@@ -2033,12 +2767,15 @@ class AxisCurveWidget(QtWidgets.QWidget):
             if p_value != value:
                 # update the correct value
                 widget.setValue(value)
+        self._record_curve_edit()
 
     @QtCore.Slot()
     def _handle_filter_default(self):
-        self.filter_window_widget.setValue(200)
-        self.filter_order_widget.setValue(2)
-        self.filter_window_widget.setValule(51)
+        self.curve_data.filterSamples = 200
+        self.curve_data.filterOrder = 2
+        self.curve_data.filterWindow = 51
+        self._update_ui()
+        self._record_curve_edit()
 
     def _change_curve_type(self, curve_type: CurveType, control_points=None):
         """Changes the type of curve used.
@@ -2050,6 +2787,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
         if control_points is None:
             if curve_type == CurveType.Cubic:
                 self.curve_data.control_points = [(-1.0, -1.0), (1.0, 1.0)]
+            elif curve_type == CurveType.FullAxis:
+                self.curve_data.control_points = []
             elif curve_type == CurveType.Bezier:
                 self.curve_data.control_points = [
                     (-1.0, -1.0),
@@ -2067,33 +2806,23 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_data.mapping_type = curve_type
         self.curve_model = AxisCurveData.model_map[curve_type](self.curve_data)
 
-        # Update curve settings UI
-        if self.curve_data.mapping_type == CurveType.Cubic:
-            self.handle_symmetry_widget.setVisible(False)
-        elif self.curve_data.mapping_type == CurveType.Bezier:
-            self.handle_symmetry_widget.setVisible(True)
-            self.handle_symmetry_widget.stateChanged.connect(self._handle_symmetry_cb)
+        with QtCore.QSignalBlocker(self.handle_symmetry_widget):
+            self.handle_symmetry_widget.setChecked(False)
 
         self.curve_symmetry.setChecked(False)
 
-        # Recreate the UI components
-        self.curve_scene = CurveView(self.curve_model, self.control_point_editor, self.curve_data.show_input_axis)
-        self._configure_response_curve_view()
-
-        # update the deadzone widget
-        is_centered = curve_type == CurveType.Bezier
-        self.deadzone_widget.isCentered = is_centered
+        self.curve_scene.set_model(self.curve_model)
 
     @QtCore.Slot(bool)
     def _curve_symmetry_cb(self, checked: bool):
-        if checked:
-            self.curve_data.symmetry_mode = SymmetryMode.Diagonal
-            self.curve_model.set_symmetry_mode(SymmetryMode.Diagonal)
-        else:
-            self.curve_data.symmetry_mode = SymmetryMode.NoSymmetry
-            self.curve_model.set_symmetry_mode(SymmetryMode.NoSymmetry)
-
-        self.curve_scene.redraw_scene()
+        self._begin_curve_edit()
+        try:
+            self.curve_data.symmetry_mode = SymmetryMode.Diagonal if checked else SymmetryMode.NoSymmetry
+            self.curve_model.set_symmetry_mode(self.curve_data.symmetry_mode)
+            self.curve_model.save_to_profile()
+            self.curve_scene.redraw_scene()
+        finally:
+            self._finish_curve_edit()
 
     @QtCore.Slot()
     def _curve_set_preset_cb(self):
@@ -2166,13 +2895,37 @@ class AxisCurveWidget(QtWidgets.QWidget):
                 syslog.error(f"Curve preset: don't know how to handle {preset}")
                 return
 
+        self._apply_curve_preset(curve_type, control_points, is_centered)
+
+    @QtCore.Slot()
+    def _update_bezier_preset_ranges(self):
+        selection = self.bezier_preset_range.currentData()
+        shape = self.bezier_preset_shape.currentData()
+        self.bezier_preset_range.clear()
+        for region in BezierPresetRange:
+            if region != BezierPresetRange.BothEnds or shape == BezierPresetShape.Smoothstep:
+                self.bezier_preset_range.addItem(region.value, region)
+        index = self.bezier_preset_range.findData(selection)
+        if index < 0:
+            index = self.bezier_preset_range.findData(BezierPresetRange.Center)
+        self.bezier_preset_range.setCurrentIndex(index)
+
+    def _apply_bezier_preset(self):
+        control_points = bezier_preset_points(
+            self.bezier_preset_shape.currentData(),
+            self.bezier_preset_range.currentData(),
+            self.bezier_preset_strength.currentData(),
+            lock_center=self.curve_data.center_is_locked,
+        )
+        self._apply_curve_preset(CurveType.Bezier, control_points, self.curve_data.isCentered)
+
+    def _apply_curve_preset(self, curve_type, control_points, is_centered):
         self.curve_data.symmetry_mode = SymmetryMode.NoSymmetry
-        self.curve_data.mapping_type = curve_type
         self.curve_data.isCentered = is_centered
         self._change_curve_type(curve_type, control_points)
-        self._update_ui()
         self.curve_data.curve_update()
-        self.update_value(self.last_value)
+        self._update_ui()
+        self._record_curve_edit()
 
     @QtCore.Slot()
     def _deadzone_preset_cb(self):
@@ -2227,14 +2980,27 @@ class AxisCurveWidget(QtWidgets.QWidget):
     @QtCore.Slot()
     def _deadzone_modified_cb(self):
         """called when deadzones are modified"""
+        self.curve_data.deadzone = self.deadzone_widget.values()
         self.curve_data.curve_update()
-        values = self.deadzone_widget.values()
-        # print (f"deadzone: {values}")
-        for index, value in enumerate(values):
-            self.curve_data.deadzone[index] = value
-
         self._update_ui()
-        self.update_value(self.last_value)
+        self._record_curve_edit()
+
+    def _update_segment_controls(self):
+        segment_selected = self.curve_scene.selected_segment is not None
+        self.control_point_editor.setEnabled(not segment_selected)
+        self.insert_point_button.setEnabled(segment_selected)
+        if not segment_selected:
+            self.straighten_segments_button.setText("Straighten segments")
+            self.straighten_segments_button.setToolTip("Straighten all segments. Click a curve segment to straighten it on its own.")
+        else:
+            self.straighten_segments_button.setText("Straighten selected segment")
+            self.straighten_segments_button.setToolTip(
+                "Straighten the highlighted segment. Drag it to move it, or click an empty part of the graph to clear the selection."
+            )
+
+    def _adjust_bezier_handles(self, *, smooth: bool):
+        if isinstance(self.curve_model, CubicBezierSplineModel):
+            self.curve_model.adjust_handles(smooth=smooth, segment_index=self.curve_scene.selected_segment)
 
     def _handle_symmetry_cb(self, state):
         if not isinstance(self.curve_model, CubicBezierSplineModel):
@@ -2242,6 +3008,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
             return
 
         self.curve_model.set_handle_symmetry(state == QtCore.Qt.Checked.value)
+        self._record_curve_edit()
 
     def _configure_response_curve_view(self):
         """Create a view that scales the graph and its items to the layout bounds."""
@@ -2250,7 +3017,28 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_curve_layout.addWidget(self.curve_view)
 
     def _invert_curve(self):
-        self.curve_model.invert()
+        self._mirror_curve(x=False)
+
+    def _mirror_curve(self, *, x: bool):
+        self._begin_curve_edit()
+        try:
+            if x:
+                # Input deadzones move with the mirrored input axis.
+                self.curve_data.deadzone = [
+                    -value if value is not None else None for value in reversed(self.curve_data.deadzone)
+                ]
+            if self.curve_data.mapping_type == CurveType.FullAxis:
+                if x:
+                    self.curve_data.full_axis_inflection = FullAxisInflection(-self.curve_data.full_axis_inflection.value)
+                self.curve_data.full_axis_inverted = not self.curve_data.full_axis_inverted
+            elif x:
+                self.curve_model.mirror_x()
+            else:
+                self.curve_model.invert()
+            self.curve_data.curve_update()
+            self._update_ui()
+        finally:
+            self._finish_curve_edit()
 
 
 class SmoothingFilter:
@@ -2304,6 +3092,7 @@ class AxisCurveData:
     model_map = {
         CurveType.Cubic: CubicSplineModel,
         CurveType.Bezier: CubicBezierSplineModel,
+        CurveType.FullAxis: FullAxisCurveModel,
     }
 
     def __init__(self):
@@ -2311,12 +3100,15 @@ class AxisCurveData:
         self.deadzone = [-1, 0, 0, 1]
         self.sensitivity = 1.0
         self._mapping_type = CurveType.Cubic
+        self.full_axis_inflection = FullAxisInflection.Center
+        self.full_axis_inverted = False
         self.control_points = [(-1.0, -1.0), (1.0, 1.0)]
         self.symmetry_mode = SymmetryMode.NoSymmetry
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
         self.deadzone_fn = None
         self.response_fn = None
         self.isCentered = False
+        self.lock_center = False
         self.curve_filter = None
         self.isFiltered = False  # true if filtered
         self.filterSamples = 200  # number of samples to use for filtering
@@ -2350,6 +3142,10 @@ class AxisCurveData:
         return table.to_html()
 
     @property
+    def center_is_locked(self) -> bool:
+        return self.isCentered or self.lock_center
+
+    @property
     def mapping_type(self) -> CurveType:
         return self._mapping_type
 
@@ -2379,8 +3175,8 @@ class AxisCurveData:
             mode = node.get("mode")
             self.symmetry_mode = SymmetryMode.to_enum(mode)
 
-        if "centered" in node.attrib:
-            self.isCentered = safe_read(node, "centered", bool, False)
+        self.isCentered = safe_read(node, "centered", bool, False)
+        self.lock_center = safe_read(node, "lock-center", bool, False)
 
         # filter data
         self.isFiltered = safe_read(node, "filtered", bool, False)
@@ -2388,6 +3184,8 @@ class AxisCurveData:
         self.filterWindow = safe_read(node, "window", int, 51)
         self.filterOrder = safe_read(node, "poly", int, 2)
 
+        self.full_axis_inflection = FullAxisInflection.Center
+        self.full_axis_inverted = False
         self.control_points = []
         for child in node:
             if child.tag == "deadzone":
@@ -2400,6 +3198,10 @@ class AxisCurveData:
             elif child.tag == "mapping":
                 curve_type = child.get("type")
                 self.mapping_type = CurveType.to_enum(curve_type)
+                if self.mapping_type == CurveType.FullAxis:
+                    inflection = child.get("inflection", "").capitalize()
+                    self.full_axis_inflection = FullAxisInflection.__members__.get(inflection, FullAxisInflection.Center)
+                    self.full_axis_inverted = safe_read(child, "inverted", bool, False)
                 self.control_points = []
                 for point in child.iter("control-point"):
                     self.control_points.append((float(point.get("x")), float(point.get("y"))))
@@ -2467,6 +3269,8 @@ class AxisCurveData:
         node = ElementTree.Element("curve-data")
         node.set("mode", SymmetryMode.to_string(self.symmetry_mode))
         node.set("centered", str(self.isCentered))
+        if self.lock_center:
+            node.set("lock-center", safe_format(self.lock_center, bool))
         node.set("id", self.id)
 
         # filter data
@@ -2476,15 +3280,25 @@ class AxisCurveData:
         node.set("window", safe_format(self.filterWindow, int))
 
         # Response curve mapping
-        if len(self.control_points) > 0:
-            mapping_node = ElementTree.Element("mapping")
+        if self.mapping_type == CurveType.FullAxis:
+            mapping_node = ElementTree.SubElement(node, "mapping")
+            mapping_node.set("type", CurveType.to_string(self.mapping_type))
+            mapping_node.set("inflection", self.full_axis_inflection.name.lower())
+            if self.full_axis_inverted:
+                mapping_node.set("inverted", safe_format(True, bool))
+        elif self.control_points:
+            mapping_node = ElementTree.SubElement(node, "mapping")
             mapping_node.set("type", CurveType.to_string(self.mapping_type))
             for point in self.control_points:
                 cp_node = ElementTree.Element("control-point")
-                cp_node.set("x", float_to_xml(point[0]))
-                cp_node.set("y", float_to_xml(point[1]))
+                if self.mapping_type == CurveType.Bezier:
+                    # Preserve straight and tangent-aligned handles across save and reload.
+                    cp_node.set("x", repr(float(point[0])))
+                    cp_node.set("y", repr(float(point[1])))
+                else:
+                    cp_node.set("x", float_to_xml(point[0]))
+                    cp_node.set("y", float_to_xml(point[1]))
                 mapping_node.append(cp_node)
-            node.append(mapping_node)
 
         # Deadzone settings
         deadzone_node = ElementTree.Element("deadzone")
@@ -2531,11 +3345,34 @@ class AxisCurveData:
         else:
             self.curve_filter = None
 
+    def full_axis_curve(self, value: float) -> float:
+        """Evaluate a monotonic cubic over the active range between the end deadzones."""
+        low, high = (self.deadzone[0], self.deadzone[-1]) if self.deadzone else (-1.0, 1.0)
+        low = -1.0 if low is None else low
+        high = 1.0 if high is None else high
+        if low < high:
+            value = gremlin.util.scale_to_range(value, source_min=low, source_max=high)
+        else:
+            value = gremlin.util.clamp(value)
+        return self.full_axis_response(value)
+
+    def full_axis_response(self, value: float) -> float:
+        """Evaluate the Full Axis response before end deadzones are applied."""
+        inflection = self.full_axis_inflection.value
+        # The cubic term vanishes at the endpoints. Its second derivative is zero at the selected inflection.
+        response = value + 0.15 * (1.0 - value * value) * (value - 3.0 * inflection)
+        return -response if self.full_axis_inverted else response
+
     def curve_update(self):
         """updates the curve params"""
 
         # update filter options
         self.filter_update()
+
+        if self.mapping_type == CurveType.FullAxis:
+            self.deadzone_fn = None
+            self.response_fn = self.full_axis_curve
+            return
 
         self.deadzone_fn = lambda value: gremlin.input_devices.deadzone(
             value,
@@ -2551,9 +3388,9 @@ class AxisCurveData:
         else:
             raise gremlin.error.GremlinError("Invalid curve type")
 
-    def curve_value(self, value: float, update: bool = False):
+    def curve_value(self, value: float, update: bool = False, *, apply_filter: bool = True):
         """processes an input value -1 to +1 and outputs the curved value based on the current curve model"""
-        if update or self.deadzone_fn is None or self.response_fn is None:
+        if update or self.response_fn is None:
             self.curve_update()
         if self.deadzone_fn is not None:
             # v1 = self.deadzone_fn(value)
@@ -2562,7 +3399,7 @@ class AxisCurveData:
         if self.response_fn is not None:
             value = self.response_fn(value)
 
-        if self.curve_filter:
+        if apply_filter and self.curve_filter:
             value = self.curve_filter.update(value)
 
         return value
@@ -2639,6 +3476,6 @@ class AxisCurveDialog(QRememberDialog):
     def keyPressEvent(self, event):
         """disable escape key to prevent conflict with handle deselect"""
         if event.key() == QtCore.Qt.Key_Escape:
-            pass
+            self.widget.curve_scene.keyPressEvent(event)
         else:
             super().keyPressEvent(event)

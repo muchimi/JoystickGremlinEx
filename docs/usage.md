@@ -89,6 +89,8 @@ The direct Stream Deck bridge supplies button and dial events without Companion 
 
 ### Outputs
 
+Xbox-compatible controllers show their Windows device name followed by the XInput slot, for example **Xbox One Controller (XInput 1)**. When Windows provides multiple names, GEX shows the first with a **+**. Hover over the device tab to see the other names. If Windows provides no usable name, GEX shows **XInput Gamepad** followed by the slot number. Bindings follow the Windows slot. If a profile used an Xbox controller before XInput support, rebind it to the corresponding slot. The left and right triggers appear as separate Z and Rz axes.
+
 Use [Map to vJoy](actions/map_to_vjoy_user_guide.md) for virtual joystick axes, buttons, and hats, or Map to GamePad for a virtual Xbox controller when its required driver is installed. vJoy is optional for profiles that use other output types; configure a vJoy device before selecting it as a destination.
 
 Use [Map to Keyboard/Mouse Ex](actions/keyboard_ex_user_guide.md) for keyboard combinations and mouse commands. Windows can restrict input sent to an application running with higher privileges, so check the target application's privilege level if it does not receive the output.

@@ -659,10 +659,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vjoy" class="md-nav__link">
+  <a href="#gex-bridge-module-m77" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJOY
+        GEX Bridge module (m77+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VJOY (legacy)
       
     </span>
   </a>
@@ -692,10 +703,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gremlinex-dinput-module" class="md-nav__link">
+  <a href="#gremlinex-dinputxinput-module" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GremlinEx DInput module
+        GremlinEx DINPUT/XINPUT module
       
     </span>
   </a>
@@ -847,10 +858,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vjoy" class="md-nav__link">
+  <a href="#gex-bridge-module-m77" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VJOY
+        GEX Bridge module (m77+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VJOY (legacy)
       
     </span>
   </a>
@@ -880,10 +902,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#gremlinex-dinput-module" class="md-nav__link">
+  <a href="#gremlinex-dinputxinput-module" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GremlinEx DInput module
+        GremlinEx DINPUT/XINPUT module
       
     </span>
   </a>
@@ -954,8 +976,15 @@
 <h1 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">¶</a></h1>
 <p>GremlinEx includes all dependencies in the release.  There are however some companion applications that are highly recommended for full functionality:</p>
 <h2 id="required-modules">Required modules<a class="headerlink" href="#required-modules" title="Permanent link">¶</a></h2>
-<h3 id="vjoy">VJOY<a class="headerlink" href="#vjoy" title="Permanent link">¶</a></h3>
-<p>VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: <a href="https://github.com/jshafer817/vJoy/releases">https://github.com/jshafer817/vJoy/releases</a> </p>
+<h3 id="gex-bridge-module-m77">GEX Bridge module (m77+)<a class="headerlink" href="#gex-bridge-module-m77" title="Permanent link">¶</a></h3>
+<p>The GEX bridge module replaces the vJoy and VIGEM virtual drivers for joysticks and gamepads.</p>
+<p>The bridge module runs as a service and is optionally installed when you install GEX.</p>
+<p>The module lets you directly manage virtual devices from within the GEX application.  There is a migration path provided for older vJoy devices, including an automatic failover mode, or a migration of device outputs that the GEX device remapper.</p>
+<p>It is recommended that new profiles use the bridge module as it avoids using deprecated driver libraries, simplifies the installation and unlike the older virtual drivers, support the full capabilities of DINPUT and XINPUT for game and application support.</p>
+<p>The bridge module is written in C# and is available from <a href="https://github.com/muchimi/GEXMaestroBridgeService">https://github.com/muchimi/GEXMaestroBridgeService</a>.</p>
+<p>Installation of the bridge is compatible with vJoy however vJoy devices should be disabled to avoid conflicts.</p>
+<h3 id="vjoy-legacy">VJOY (legacy)<a class="headerlink" href="#vjoy-legacy" title="Permanent link">¶</a></h3>
+<p>VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: <a href="https://github.com/jshafer817/vJoy/releases">https://github.com/jshafer817/vJoy/releases</a></p>
 <p>Version recommended: 2.1.9.1 for Windows 10/11 x64.</p>
 <p>Other versions may work, however the DLLs must match as the DLL included in GremlinEx is only for 2.1.9.1.</p>
 <h3 id="hidhide">HIDHide<a class="headerlink" href="#hidhide" title="Permanent link">¶</a></h3>
@@ -963,16 +992,15 @@
 <p>HIDHide and documentation is available here: <a href="https://github.com/nefarius/HidHide">https://github.com/nefarius/HidHide</a></p>
 <p>Version recommended: 1.5.230.0 or later.</p>
 <h3 id="gremlinex-wasm-msfs-module">GremlinEX WASM (MSFS) module<a class="headerlink" href="#gremlinex-wasm-msfs-module" title="Permanent link">¶</a></h3>
-<p>This module is included in the GremlinEx release.  </p>
+<p>This module is included in the GremlinEx release.</p>
 <p>This C++ module is part of GremlinEx and is necessary for GremlinEx to be able to access internal simulator variables and run SimConnect "expressions" not otherwise exposed via the SimConnect SDK.   This module is written in C++ and included with GremlinEx relases as a zip file.</p>
 <p>The module is compatible with Microsoft Flight Simulator 2024 and may work with MSFS 2020 (untested).</p>
 <p>The project source code can be found here:</p>
 <p><a href="https://github.com/muchimi/JoystickGremlinBridge">https://github.com/muchimi/JoystickGremlinBridge</a></p>
 <p>The release is also included in the GremlinEx repository:</p>
 <p><a href="https://github.com/muchimi/JoystickGremlinEx/releases/tag/msfs_wasm">https://github.com/muchimi/JoystickGremlinEx/releases/tag/msfs_wasm</a></p>
-<h3 id="gremlinex-dinput-module">GremlinEx DInput module<a class="headerlink" href="#gremlinex-dinput-module" title="Permanent link">¶</a></h3>
-<p>This module is a depency of GremlinEx and included in the GremlinEx releases.</p>
-<p>This C++ module is part of GremlinEx and is the interface to the Microsoft DirectInput (part of DirectX) API to access HID input devices.  Installation is not necessary as the required files are already included as a dependency in the GremlinEx releases.  </p>
+<h3 id="gremlinex-dinputxinput-module">GremlinEx DINPUT/XINPUT module<a class="headerlink" href="#gremlinex-dinputxinput-module" title="Permanent link">¶</a></h3>
+<p>This module is a depency of GremlinEx and included in the GremlinEx releases and interfaces GEX with the Microsoft DINPUT and XINPUT joystick and gamepad interfaces.</p>
 <p>The project source code is located here:</p>
 <p><a href="https://github.com/muchimi/dinput">https://github.com/muchimi/dinput</a></p>
 <h2 id="recommended-tools">Recommended Tools<a class="headerlink" href="#recommended-tools" title="Permanent link">¶</a></h2>
@@ -998,7 +1026,7 @@
 <p><a href="https://www.tobias-erichsen.de/software/rtpmidi.html">rtpMidi</a>.</p>
 <h4 id="midi-loop">MIDI loop<a class="headerlink" href="#midi-loop" title="Permanent link">¶</a></h4>
 <p>Another utility that is useful lets you define a loopback port on the local machine.  The MIDI device connected locally can send to that MIDI device, and GremlinEx can get MIDI input from it without connecting directly to each MIDI device.</p>
-<p><a href="https://www.tobias-erichsen.de/software/loopmidi.html">loopMidi</a>.  </p>
+<p><a href="https://www.tobias-erichsen.de/software/loopmidi.html">loopMidi</a>.</p>
 <h4 id="pdf-visualization">PDF Visualization<a class="headerlink" href="#pdf-visualization" title="Permanent link">¶</a></h4>
 <p>To view PDF graph output, the recommended application is the open source Sumatra PDF viewer here: https://www.sumatrapdfreader.org/free-pdf-reader.</p>
 <p>This viewer will easily handle potentially large PDF files generated by the GremlinEx profile visualizer.</p>

@@ -38,6 +38,7 @@ GEX_PID_BASE = MAESTRO_PID_BASE  # base product id (sequential) for GEX managed 
 GEX_PID_MAX = GEX_PID_BASE + 16 - 1  # maximum product id for GEX managed devices
 VJOY_VID = 0x1234  # vendor ID for vJoy devices
 VJOY_PID = 0xBEAD  # product ID used by the vJoy driver
+_XINPUT_SLOT_GUID_PREFIX = "6456d62099d947b0ad7621ffedf4ae"  # DILL's GUID namespace for XInput slots
 
 syslog = logging.getLogger("system")
 
@@ -540,6 +541,12 @@ class DeviceSummary:
             if not self.name:
                 syslog.error(f"Unable to decode device name: {data.name} - contains invalid characters.  Defaulting.")
                 self.name = f"Unable to decode {self.device_id} "
+
+            if self.device_id.startswith(_XINPUT_SLOT_GUID_PREFIX):
+                # DILL sends the tab label on the first line, followed by any alternate names.
+                self.name, _, other_names = self.name.partition("\n")
+                if other_names:
+                    self.data["xinput_other_names"] = other_names
 
             # Older/custom Maestro drivers may expose cached product names and
             # placeholder VID/PID values. Only recognized legacy GEX descriptors

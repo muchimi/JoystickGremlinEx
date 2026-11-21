@@ -22,6 +22,7 @@ import threading
 import time
 import unittest
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import Mock, patch
@@ -65,7 +66,7 @@ def load_remote(source=None):
     })
     services = NS(singleton_decorator=NS(SingletonDecorator=lambda cls: cls))
     namespace = dict(
-        gremlin=services, socket=socket, socketserver=socketserver, queue=queue,
+        gremlin=services, socket=socket, socketserver=socketserver, queue=queue, contextmanager=contextmanager,
         threading=threading, struct=struct, time=time, uuid=uuid, enum=enum,
         msgpack=msgpack, DeviceType=DeviceType, GamePadOutput=GamePadOutput, MouseButton=MouseButton, VJoyError=VJoyError,
         QtCore=QtCore, QtWidgets=QtWidgets, Signal=Signal, VjoyAction=VjoyAction,
@@ -647,6 +648,22 @@ class RemoteChecks(unittest.TestCase):
         control.applyClientOperation(operations.EnableAll, None)
         control.applyOutputMode(modes.LocalOnly)
         self.assertEqual(control.filterClientTargets((0,)), (0,))
+        self.assertEqual((control.is_local, control.is_remote), (True, False))
+
+    def test_held_startup_command_wins_over_released_command(self):
+        control = self.make_master()
+        commands = [(VjoyAction.VJoyEnableRemoteOnly, True), (VjoyAction.VJoyEnableLocalOnly, False)]
+        for order in (commands, commands[::-1]):
+            with self.subTest(order=order):
+                control.mode = VjoyAction.VJoyEnableLocalOnly
+                with control.collect_startup_commands():
+                    for command, pressed in order:
+                        control.sync_startup_command(command, pressed)
+                    self.assertTrue(control.is_local)
+                self.assertEqual((control.is_local, control.is_remote), (False, True))
+
+        with control.collect_startup_commands():
+            control.sync_startup_command(VjoyAction.VJoyEnableLocalOnly, False)
         self.assertEqual((control.is_local, control.is_remote), (True, False))
 
     def test_default_mapping_multicasts_once_without_discovery(self):

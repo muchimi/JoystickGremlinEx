@@ -63,7 +63,7 @@ joystick_handling = NS(
     get_output_target=lambda key: output_target if key == 1 else None,
     get_output_device=lambda key: output_device if key == 1 else None,
 )
-gremlin = NS(pid=NS(PIDAxisTransition=PIDAxisTransition), util=NS(clamp=lambda value, low, high: max(low, min(high, value))), joystick_handling=joystick_handling, remote=NS(remote_control=remote_control), config=NS(Configuration=lambda: NS(verbose_mode_outputs=False, verbose_mode_vjoy=False)), keyboard=NS(sort_keys=lambda keys: keys), shared_state=NS(keyboard_tab_guid='keyboard'))
+gremlin = NS(pid=NS(PIDAxisTransition=PIDAxisTransition), util=NS(clamp=lambda value, low=-1.0, high=1.0: max(low, min(high, value))), joystick_handling=joystick_handling, remote=NS(remote_control=remote_control), config=NS(Configuration=lambda: NS(verbose_mode_outputs=False, verbose_mode_vjoy=False)), keyboard=NS(sort_keys=lambda keys: keys), shared_state=NS(keyboard_tab_guid='keyboard'))
 namespace = dict(enum=enum, threading=threading, time=time, math=math, gremlin=gremlin, joystick_handling=joystick_handling, remote_control=remote_control, InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, ButtonOutputMode=ButtonOutputMode, syslog=logging.getLogger('pid-check'), VJoyRemapWidget=NS(input_type_buttons=[InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched]))
 namespace['ActionDataFixture'] = ActionDataFixture
 code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), encoder, *classes, action_fixture], type_ignores=[])
@@ -86,7 +86,7 @@ class PIDChecks(unittest.TestCase):
         f.hardware_device_guid, f.hardware_input_id = 'primary', 1
         f.action_mode = VjoyAction.VJoySetAxisStepped
         f.input_item, f.device = NS(identifier=1), device
-        f.action_data = CheckActionData(input_item=f.input_item, step_mode=mode or StepMode.PID, _stepped_latched=True, latched_input_type=InputType.JoystickButton, stepped_device_guid='secondary', stepped_input_type=InputType.JoystickButton, stepped_input_id=2, stepped_hat_direction=(0, 1), target_step_direction=1, exec_on_press=True, exec_on_release=False, pid_step=0.1, pid_response_time=0.05, pid_acceleration=acceleration, pid_accel_multiplier=4.0, pid_accel_start_hz=2.0, pid_accel_full_hz=12.0, pid_accel_curve=2.0, pid_accel_timeout=0.75, axis_start_value=0.0, axis_last_value=0.0, target_step_auto=False, target_step_start_index=2, target_step_list=[-1.0, -0.5, 0.0, 0.5, 1.0], sync_mode=SyncMode.Default, sendFlags=lambda: (True, False), remote_config=NS(getClientList=lambda: [0]), vjoy_id=1, vjoy_input_id=1, hardware_device_guid='primary', hardware_input_id=1, hardware_raw_input_type=InputType.JoystickButton)
+        f.action_data = CheckActionData(input_item=f.input_item, step_mode=mode or StepMode.PID, _stepped_latched=True, latched_input_type=InputType.JoystickButton, stepped_device_guid='secondary', stepped_input_type=InputType.JoystickButton, stepped_input_id=2, stepped_hat_direction=(0, 1), target_step_direction=1, exec_on_press=True, exec_on_release=False, pid_step=0.1, pid_response_time=0.05, pid_acceleration=acceleration, pid_accel_multiplier=4.0, pid_accel_start_hz=2.0, pid_accel_full_hz=12.0, pid_accel_curve=2.0, pid_accel_timeout=0.75, axis_start_value=0.0, axis_last_value=0.0, curve_data=None, target_step_auto=False, target_step_start_index=2, target_step_list=[-1.0, -0.5, 0.0, 0.5, 1.0], sync_mode=SyncMode.Default, sendFlags=lambda: (True, False), remote_config=NS(getClientList=lambda: [0]), vjoy_id=1, vjoy_input_id=1, hardware_device_guid='primary', hardware_input_id=1, hardware_raw_input_type=InputType.JoystickButton)
         f._pid_axis_condition = threading.Condition()
         f._pid_axis = f._pid_axis_thread = f._pid_accelerator = None
         f._pid_axis_stopping = True
@@ -98,7 +98,6 @@ class PIDChecks(unittest.TestCase):
             axis.value = value
             f.outputs.append((value, kwargs.get('force_remote', False)))
         f._set_axis = output
-        f.synced, f._step_start_pending = True, False
         self.addCleanup(f._stop_pid_axis)
         return f
 
@@ -113,6 +112,60 @@ class PIDChecks(unittest.TestCase):
                     self.assertFalse(f._pid_axis_stopping)
                     self.assertEqual(f._pid_axis.target, 0.25 if automatic else -0.5)
                     f._stop_pid_axis()
+
+    def test_output_curve_keeps_the_first_step_in_step_coordinates(self):
+        f = self.make_functor(StepMode.Stepped)
+        f.action_data.target_step_list = [-1.0, 0.0, 0.2, 0.5, 1.0]
+        f.action_data.axis_start_value = 0.25
+        f.action_data.curve_data = NS(curve_value=lambda value: value * 0.5)
+        f.profile_start()
+
+        self.assertEqual(axis.value, 0.125)
+        f.process_event(event(), NS(current=True, raw=True))
+        self.assertEqual(axis.value, 0.25)
+        self.assertEqual(device.data[f.getSteppedIndexDataKey()], 3)
+
+    def test_each_preset_curves_its_position_once(self):
+        f = self.make_functor(StepMode.Stepped)
+        f.action_data.target_step_list = [-1.0, -0.5, 0.0, 0.2, 0.5, 0.8, 1.0]
+        f.action_data.axis_start_value = 0.25
+        curve_inputs = []
+
+        def cube(position):
+            curve_inputs.append(position)
+            return position ** 3
+
+        f.action_data.curve_data = NS(curve_value=cube)
+        f.profile_start()
+        for button in (event(), event(), event(primary=False), event(primary=False, pressed=False)):
+            f.process_event(button, NS(current=button.is_pressed, raw=button.is_pressed))
+
+        self.assertEqual(curve_inputs, [0.25, 0.5, 0.8, 0.5])
+        self.assertEqual(f.outputs, [(position ** 3, False) for position in curve_inputs])
+        self.assertEqual(f.action_data.axis_last_value, 0.5)
+        self.assertEqual(device.data[f.getSteppedIndexDataKey()], 4)
+
+    def test_auto_start_preserves_the_current_axis_output(self):
+        f = self.make_functor(StepMode.Stepped)
+        f.action_data.target_step_auto = True
+        f.action_data.curve_data = NS(curve_value=lambda value: value * 0.5)
+        axis.value = 0.25
+        f.profile_start()
+
+        self.assertEqual(axis.value, 0.25)
+
+    def test_stepped_pid_curves_the_transition_output(self):
+        f = self.make_functor(StepMode.SteppedPID)
+        f.action_data.curve_data = NS(curve_value=lambda value: value * 0.5)
+        f.profile_start()
+        with f._pid_axis_condition:
+            f.process_event(event(force_remote=True), NS(current=True, raw=True))
+            f.completed.clear()
+
+        self.assertTrue(f.completed.wait(2.0))
+        self.assertEqual(f._pid_axis.target, 0.5)
+        self.assertTrue(any(0.0 < value < 0.25 for value, _ in f.outputs))
+        self.assertEqual(f.outputs[-1], (0.25, True))
 
     def test_primary_secondary_retarget_and_reverse(self):
         for direction in (1, -1):
@@ -256,8 +309,6 @@ class PIDChecks(unittest.TestCase):
         f = self.make_functor(StepMode.SteppedPID)
         f.action_data.target_step_list = [-1.0, -0.6, 0.1, 0.25, 0.85, 1.0]
         f._start_pid_axis(0.25)
-        f.synced = False
-        f._step_start_pending = False
         f.process_event(event(), NS(current=True, raw=True))
         self.assertEqual(f._pid_axis.target, 0.85)
 

@@ -1,4 +1,4 @@
-"""Hardware-free Qt output selector checks: python tools/test_vjoy_remap_selector.py."""
+"""Hardware-free Qt Virtual Remap selector checks: python tools/test_vjoy_remap_selector.py."""
 
 import ast
 import logging
@@ -9,6 +9,7 @@ from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock
 
+import numpy as np
 from PySide6 import QtCore, QtWidgets
 from psygnal import Signal
 from shiboken6 import Shiboken
@@ -30,6 +31,9 @@ source.bases = [ast.Attribute(value=ast.Name(id="QtWidgets", ctx=ast.Load()), at
 source.body = [node for node in source.body if getattr(node, "name", None) in {
     "_update_device_selector", "_handle_virtual_device_input_changed", "_update_device_input_list",
     "_handle_virtual_button_usage_changed", "_populate_grid_ui", "_selected_output_uses_failover",
+    "_is_stepped_latch_input", "_update_button_ui", "_stepped_device_changed_cb",
+    "_update_stepped_selectors", "_stepped_input_changed_cb", "_stepped_input_type_changed_cb",
+    "_distribute_curve_steps", "_update_curve_icon",
 }]
 
 
@@ -45,7 +49,7 @@ class Events:
     device_change_event = Signal()
 
 
-namespace = dict(QtCore=QtCore, QtWidgets=QtWidgets, Shiboken=Shiboken, gremlin=SERVICES,
+namespace = dict(np=np, QtCore=QtCore, QtWidgets=QtWidgets, Shiboken=Shiboken, gremlin=SERVICES,
                  InputType=InputType, VjoyAction=VjoyAction, QIconLabel=IconLabel,
                  syslog=logging.getLogger("selector-checks"))
 exec(compile(ast.fix_missing_locations(ast.Module(body=[*ast.parse("from __future__ import annotations").body,
@@ -206,6 +210,101 @@ class OutputSelectorTests(unittest.TestCase):
 
     def test_button_usage_notification_without_a_target_is_harmless(self):
         self.ui._handle_virtual_button_usage_changed("vjoy", 1)
+
+
+class SteppedLatchSelectorTests(unittest.TestCase):
+    def setUp(self):
+        self.ui = Selector()
+        self.addCleanup(self.ui.close)
+        self.button = InputType.JoystickButton
+        self.hat = InputType.JoystickHat
+        self.ui.action_data = NS(
+            stepped_device_id="first", stepped_input_type=self.hat, stepped_input_id=1, stepped_hat_direction=(0, 1)
+        )
+        self.ui.stepped_input_map = {
+            "first": {self.button: [2], self.hat: [1]},
+            "second": {self.button: [1, 2, 3, 4, 5], self.hat: [1, 2]},
+        }
+        self.ui.stepped_selector_device_widget = QtWidgets.QComboBox(self.ui)
+        self.ui.stepped_selector_input_type_widget = QtWidgets.QComboBox(self.ui)
+        self.ui.stepped_selector_input_widget = QtWidgets.QComboBox(self.ui)
+        self.ui.stepped_hat_container = QtWidgets.QWidget(self.ui)
+        self.ui.stepped_direction_widget = NS(setValue=Mock())
+        for device_id in self.ui.stepped_input_map:
+            self.ui.stepped_selector_device_widget.addItem(device_id, device_id)
+        for widget, callback in (
+            (self.ui.stepped_selector_device_widget, self.ui._stepped_device_changed_cb),
+            (self.ui.stepped_selector_input_type_widget, self.ui._stepped_input_type_changed_cb),
+            (self.ui.stepped_selector_input_widget, self.ui._stepped_input_changed_cb),
+        ):
+            widget.currentIndexChanged.connect(lambda _, combo=widget, update=callback: update(combo.currentData()))
+        self.ui._update_stepped_selectors()
+
+    def test_listen_updates_device_and_type_before_selecting_button(self):
+        self.ui._update_button_ui(NS(device_id="second", event_type=self.button, identifier=5))
+        data = self.ui.action_data
+        self.assertEqual((data.stepped_device_id, data.stepped_input_type, data.stepped_input_id), ("second", self.button, 5))
+        self.assertEqual(self.ui.stepped_selector_device_widget.currentData(), "second")
+        self.assertEqual(self.ui.stepped_selector_input_type_widget.currentData(), self.button)
+        self.assertEqual(self.ui.stepped_selector_input_widget.currentText(), "Button 5")
+        self.assertTrue(self.ui.stepped_hat_container.isHidden())
+
+    def test_listen_captures_hat_direction_and_ignores_unavailable_inputs(self):
+        for event in (
+            NS(device_id="first", event_type=InputType.JoystickAxis, identifier=1),
+            NS(device_id="first", event_type=self.button, identifier=1),
+            NS(device_id="unavailable", event_type=self.button, identifier=1),
+        ):
+            self.assertFalse(self.ui._is_stepped_latch_input(event))
+            self.ui._update_button_ui(event)
+        self.assertEqual(self.ui.action_data.stepped_device_id, "first")
+        self.assertEqual(self.ui.action_data.stepped_input_type, self.hat)
+
+        self.ui._update_button_ui(NS(device_id="second", event_type=self.hat, identifier=2, value=(1, -1)))
+        self.assertEqual(self.ui.action_data.stepped_hat_direction, (1, -1))
+        self.assertEqual(self.ui.stepped_selector_input_widget.currentText(), "Hat 2")
+        self.ui.stepped_direction_widget.setValue.assert_called_with((1, -1))
+        self.assertFalse(self.ui.stepped_hat_container.isHidden())
+
+
+class CurveStepDistributionTests(unittest.TestCase):
+    def setUp(self):
+        self.ui = Selector()
+        self.addCleanup(self.ui.close)
+        self.ui.action_data = NS(target_step_list=np.linspace(-0.8, 0.8, 9).tolist(), curve_data=None)
+        self.ui._update_steps_ui = Mock()
+
+    def test_flatter_center_gets_closer_steps(self):
+        def cube(position, *, apply_filter):
+            self.assertFalse(apply_filter)
+            return position ** 3
+
+        self.ui.action_data.curve_data = NS(curve_value=cube)
+        self.ui._distribute_curve_steps()
+        steps = self.ui.action_data.target_step_list
+        self.assertEqual(len(steps), 9)
+        self.assertEqual((steps[0], steps[-1]), (-0.8, 0.8))
+        np.testing.assert_allclose(steps, -np.array(steps[::-1]), atol=1e-12)
+        self.assertGreater(min(np.diff(steps)), 0.0)
+        self.assertLess(steps[5] - steps[4], steps[-1] - steps[-2])
+        self.ui._update_steps_ui.assert_called_once()
+
+    def test_straight_or_constant_curve_keeps_even_spacing(self):
+        for slope in (-0.4, 0.0, 0.4):
+            with self.subTest(slope=slope):
+                self.ui.action_data.curve_data = NS(curve_value=lambda x, **_: slope * x)
+                self.ui._distribute_curve_steps()
+                np.testing.assert_allclose(np.diff(self.ui.action_data.target_step_list), 0.2, atol=1e-12)
+
+    def test_distribution_button_tracks_curve_definition(self):
+        self.ui.distribute_curve_steps_widget = QtWidgets.QPushButton(self.ui)
+        self.ui._output_curve_controls = []
+        self.ui.curve_icon_active = self.ui.curve_icon_inactive = None
+        self.ui._update_curve_icon()
+        self.assertTrue(self.ui.distribute_curve_steps_widget.isHidden())
+        self.ui.action_data.curve_data = NS()
+        self.ui._update_curve_icon()
+        self.assertFalse(self.ui.distribute_curve_steps_widget.isHidden())
 
 
 if __name__ == "__main__":

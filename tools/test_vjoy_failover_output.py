@@ -496,6 +496,7 @@ class FailoverOutputChecks(unittest.TestCase):
         services = self.namespace["gremlin"]
         services.shared_state.current_profile.get_mode_ancestors = lambda mode, include_self: [mode]
         remote_control = services.remote.remote_control
+        remote_control.sync_startup_command.side_effect = lambda mode, pressed: setattr(remote_control, "mode", mode)
         base_mode = VjoyAction.VJoyEnableLocalAndRemote
         for pressed, expected in ((True, VjoyAction.VJoyEnableRemoteOnly), (False, VjoyAction.VJoyEnableLocalOnly)):
             with self.subTest(pressed=pressed):
@@ -527,6 +528,24 @@ class FailoverOutputChecks(unittest.TestCase):
                     command.profile_mode_changed("Default")
                 self.assertEqual(remote_control.mode, base_mode)
                 self.start.setStartState.assert_not_called()
+
+    def test_initial_mode_sync_bypasses_runtime_queue_even_when_mode_is_unchanged(self):
+        services = self.namespace["gremlin"]
+        services.shared_state.is_running = True
+        services.singleton_decorator = NS(SingletonDecorator=lambda cls: cls)
+        load("gremlin/event_handler.py", {"EventHandler"}, self.namespace, {"change_mode"})
+        handler = self.namespace["EventHandler"]()
+        handler.current_mode = "Default"
+        handler._mode_queue_enabled = True
+        handler._change_mode = Mock()
+        handler.queueModeChange = Mock()
+
+        handler.change_mode("Default", force_update=True, startup=True)
+        handler._change_mode.assert_called_once_with("Default", (True, True, True, True), startup=True)
+        handler.queueModeChange.assert_not_called()
+
+        handler.change_mode("Combat")
+        handler.queueModeChange.assert_called_once_with("Combat", (True, False, True, True))
 
     def test_startup_routing_skips_unsynced_and_inactive_commands(self):
         services = self.namespace["gremlin"]

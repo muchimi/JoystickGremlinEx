@@ -147,6 +147,16 @@ Enter the required total in **Set gate count**, then select **Set**.
 
 Use the actual range rows shown by the editor to confirm the resulting layout.
 
+### Place gates with a curve
+
+Select **Gates from Curve...**, choose the total number of gates, and open **Edit Source Curve...** to draw a curve or load a preset. Gated Axis samples evenly spaced inputs from -1 to +1 and places the gates at the resulting outputs. The source curve is saved with the action. Reopen the same dialog to edit it and apply new positions.
+
+### Convert a gate to a deadzone
+
+Right-click a gate handle and select **Convert to Deadzone...**. Enter the total width in normalized axis units, or select **2%**, **5%**, or **10%** of the full axis travel. The deadzone is centered on the old gate where there is room. At an end of the axis, it shifts inward to keep the requested width. The original crossing actions stay with the nearer boundary.
+
+Choose **Hold the original gate value** to supply the old gate value to the new range's **In Range** actions. Add an axis output action to that range to send the value to a device. Choose **No axis output** to suppress the range's axis updates.
+
 ### Normalize positions
 
 | Control | Effect |

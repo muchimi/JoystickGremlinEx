@@ -3520,9 +3520,12 @@ class EventHandler(QtCore.QObject):
             else:
                 abort_event.wait(0.05)
 
-    def change_mode(self, new_mode, emit=True, force_update=False, tts=True, validate=True):
+    def change_mode(self, new_mode, emit=True, force_update=False, tts=True, validate=True, *, startup=False):
         args = (emit, force_update, tts, validate)
-        if gremlin.shared_state.is_running and self._mode_queue_enabled:
+        if startup:
+            # Complete the initial mode setup before the profile start returns.
+            self._change_mode(new_mode, args, startup=True)
+        elif gremlin.shared_state.is_running and self._mode_queue_enabled:
             # runtime - queue the request based on options
             self.queueModeChange(new_mode, args)
         else:
@@ -3554,7 +3557,7 @@ class EventHandler(QtCore.QObject):
             syslog.info(f"Mode: update selector to: [{mode}]")
         el.edit_mode_ui_update.emit(mode)
 
-    def _change_mode(self, new_mode: str, args: tuple = None):
+    def _change_mode(self, new_mode: str, args: tuple = None, *, startup=False):
         """Changes the GremlinEx currently active mode.
 
         :param new_mode: the new mode to use
@@ -3723,7 +3726,13 @@ class EventHandler(QtCore.QObject):
                         if verbose:
                             syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
                         if emit:
-                            el.runtime_mode_changed.emit(new_mode)
+                            if startup:
+                                import gremlin.remote
+
+                                with gremlin.remote.remote_control.collect_startup_commands():
+                                    el.runtime_mode_changed.emit(new_mode)
+                            else:
+                                el.runtime_mode_changed.emit(new_mode)
                             el.update_mode_status_bar.emit(new_mode)
 
                         # fire mode change for mode enter (press + release)

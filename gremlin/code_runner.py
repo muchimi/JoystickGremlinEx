@@ -773,7 +773,7 @@ class CodeRunner:
 
             # change to the start mode
             syslog.info(f"PROFILE START: Using profile start mode: '{mode}'")
-            self.event_handler.change_mode(mode, force_update=True)  # force change to execute any startup triggers
+            self.event_handler.change_mode(mode, force_update=True, startup=True)
 
             return load_state
 

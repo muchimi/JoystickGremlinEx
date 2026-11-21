@@ -1786,16 +1786,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_output_range(self):
         """creates the output range widget"""
 
-        self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
-
+        self._output_curve_controls = []
         active_color = Color().activeColor()
         normal_color = Color().normalColor()
         self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
         self.curve_icon_active = util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
-        self.curve_button_widget.setToolTip("Curve output")
-        self.curve_button_widget.clicked.connect(self._curve_button_cb)
-
-        self.curve_clear_widget = Buttons.getDeleteWidget(tooltip="Removes the curve output", callback=self._curve_delete_button_cb)
+        curve_controls = self._create_output_curve_controls()
 
         self.output_range_min_widget = QFloatLineEdit()
         self.output_range_min_widget.setValue(self.action_data.output_range_min)
@@ -1810,13 +1806,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         reset_widget.setToolTip("Resets the output range to default")
         reset_widget.clicked.connect(self._reset_output_range)
 
-        widgets = [
-            self.curve_button_widget,
-            self.curve_clear_widget,
-        ]
-
         self.container_output_curve_widget = getHContainer(
-            widgets,
+            curve_controls,
             "Output Curve Options",
             min_height=self.container_height,
             widget_only=True,
@@ -1837,7 +1828,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             "Allows you to set limits to the output range of an axis to constrain the output to a particular reduced range from normal."
         )
 
-        self._update_curve_icon()
         self.main_layout.addWidget(self.container_output_range_widget)
 
     def event(self, event):
@@ -2050,23 +2040,34 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                         self.merge_selector_input_widget.setCurrentIndex(index)
                         self.action_data.merge_input_id = input_id
 
+    def _create_output_curve_controls(self):
+        edit_button = QtWidgets.QPushButton("Output Curve")
+        edit_button.setToolTip("Curve output")
+        edit_button.clicked.connect(self._curve_button_cb)
+        clear_button = Buttons.getDeleteWidget(tooltip="Removes the curve output", callback=self._curve_delete_button_cb)
+        self._output_curve_controls.append((edit_button, clear_button))
+        self._update_curve_icon()
+        return [edit_button, clear_button]
+
     def _update_curve_icon(self):
-        if self.action_data.curve_data:
-            self.curve_button_widget.setIcon(self.curve_icon_active)
-            self.curve_clear_widget.setEnabled(True)
-        else:
-            self.curve_button_widget.setIcon(self.curve_icon_inactive)
-            self.curve_clear_widget.setEnabled(False)
+        has_curve = self.action_data.curve_data is not None
+        icon = self.curve_icon_active if has_curve else self.curve_icon_inactive
+        for edit_button, clear_button in self._output_curve_controls:
+            edit_button.setIcon(icon)
+            clear_button.setEnabled(has_curve)
+        if hasattr(self, "distribute_curve_steps_widget"):
+            self.distribute_curve_steps_widget.setVisible(has_curve)
 
     QtCore.Slot()
 
     def _curve_button_cb(self):
         if not self.action_data.curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
-            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
-                self.action_data.hardware_device_guid,
-                self.action_data.hardware_input_id,
-            )
+            if self.action_data.input_is_axis():
+                curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
+                    self.action_data.hardware_device_guid,
+                    self.action_data.hardware_input_id,
+                )
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
 
@@ -2824,6 +2825,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         auto = self.action_data.target_step_auto
         step_count = len(self.action_data.target_step_list)
         enabled = not auto and step_count > 0
+        self.distribute_curve_steps_widget.setEnabled(step_count > 2)
         self.step_start_index_widget.setEnabled(enabled)
         self.stepped_axis_start_widget.setEnabled(enabled)
         self.stepped_axis_start_slider.setEnabled(enabled)
@@ -2863,12 +2865,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.step_count_widget.setValue(step_count, False)
 
             self.action_data: VjoyRemap
-            if not 0 <= self.action_data.target_step_start_index < step_count:
+            start_index = self.action_data.target_step_start_index
+            if auto:
+                start_index = 0
+            elif not 0 <= start_index < step_count:
                 # reset the default if no longer in the list
-                self.action_data.target_step_start_index = 0
+                self.action_data.target_step_start_index = start_index = 0
 
             self.step_start_value_widget.setValue(
-                self.action_data.target_step_list[self.action_data.target_step_start_index],
+                self.action_data.target_step_list[start_index],
                 emit=False,
             )
 
@@ -3304,44 +3309,26 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # joystick latch mode ----------------------------
 
         device_items = []
+        input_types = (InputType.JoystickButton, InputType.JoystickHat)
+        devices = sorted(joystick_handling.filtered_input_devices(input_types), key=lambda device: device.name)
+        self.stepped_input_map = {}
+        for device in devices:
+            buttons = [
+                input_id for input_id in range(1, device.button_count + 1)
+                if not (
+                    self.action_data.hardware_raw_input_type == InputType.JoystickButton
+                    and device.device_guid == self.action_data.hardware_device_guid
+                    and input_id == self.action_data.hardware_input_id
+                )
+            ]
+            hats = list(range(1, device.hat_count + 1))
+            if buttons or hats:
+                self.stepped_input_map[device.device_id] = {InputType.JoystickButton: buttons, InputType.JoystickHat: hats}
+                device_items.append((device.name, device.device_id))
 
-        devices = sorted(joystick_handling.button_input_devices(), key=lambda x: x.name)
-        self.stepped_device_map = {}  # holds the device information keyed by device_id (str)
-        self.stepped_input_map = {}  # holds the list of buttons for the given device by device_id(str)
-
-        for dev in devices:
-            self.stepped_device_map[dev.device_id] = dev
-            button_list = {}
-            for input_id in range(1, dev.button_count + 1):
-                if dev.device_guid == self.action_data.hardware_device_guid and input_id == self.action_data.hardware_input_id:
-                    # skip self as a possible input
-                    continue
-                button_list[input_id] = f"Button {input_id}"
-
-            if button_list:
-                self.stepped_input_map[dev.device_id] = button_list
-                device_items.append((dev.name, dev.device_id, f"Latched input device: {dev.name}"))
-
-        dev = gremlin.joystick_handling.getDevice(self.action_data.stepped_device_id)
-        if dev is None:
-            # change to the first valid device
-            dev = devices[0] if devices else None
-
-        self.stepped_selector_device_widget = QDataComboBox(
-            source=device_items, value=self.action_data.stepped_device_id, callback=self._stepped_device_changed_cb
-        )
-
-        self.stepped_selector_input_type_widget = QDataComboBox(
-            source=[("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)],
-            value=self.action_data.stepped_input_type,
-            callback=self._stepped_input_type_changed_cb,
-        )
-
-        stub = "Button" if self.action_data.stepped_input_type == InputType.JoystickButton else "Hat"
-        button_items = [(f"{stub} {i}", i) for i in range(1, dev.button_count + 1)] if dev else []
-        self.stepped_selector_input_widget = QDataComboBox(
-            source=button_items, value=self.action_data.stepped_input_id, callback=self._stepped_input_changed_cb
-        )
+        self.stepped_selector_device_widget = QDataComboBox(source=device_items, callback=self._stepped_device_changed_cb)
+        self.stepped_selector_input_type_widget = QDataComboBox(callback=self._stepped_input_type_changed_cb)
+        self.stepped_selector_input_widget = QDataComboBox(callback=self._stepped_input_changed_cb)
         self.stepped_direction_widget = QHatSelectorComboBox(value=self.action_data.stepped_hat_direction, callback=self._handle_direction_changed)
 
         w1 = ["Reverse Device:", self.stepped_selector_device_widget, listen_widget]
@@ -3369,7 +3356,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         return container
 
     def _handle_direction_changed(self, direction):
-        self.action_data.stepped_hat_direction = direction
+        self.action_data.stepped_hat_direction = direction.value
 
     def _create_pid_visualizer(self):
         container, layout = getVContainer()
@@ -3706,6 +3693,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.step_value_container_layout.addStretch()
 
+        self.distribute_curve_steps_widget = QDataPushButton(
+            "Distribute by Curve",
+            callback=self._distribute_curve_steps,
+            tooltip="Keep the step count and range, with closer spacing where the output curve is flatter",
+        )
         widgets = [
             "Distribution:",
             self.normalize_widget,
@@ -3714,6 +3706,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.cubic_progression_low_widget,
             self.cubic_progression_high_widget,
             self.cubic_progression_center_widget,
+            *self._create_output_curve_controls(),
+            self.distribute_curve_steps_widget,
         ]
 
         self.progression_container_widget = getHContainer(widgets, widget_only=True)
@@ -3803,6 +3797,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 self.latched_visualizer_container.setCurrentIndex(0)
             case InputType.JoystickButton:
                 self.latched_visualizer_container.setCurrentIndex(1)
+                self._update_stepped_selectors()
 
     def _update_latched_keys(self):
         """displays latched keys for the latched input"""
@@ -3871,6 +3866,38 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         index = self.action_data.target_step_start_index
         value = self.action_data.target_step_list[index]
         self.step_start_value_widget.setValue(value)
+
+    @QtCore.Slot()
+    def _distribute_curve_steps(self):
+        """Redistribute input positions using the slope of the output curve."""
+        curve = self.action_data.curve_data
+        steps = self.action_data.target_step_list
+        if curve is None or len(steps) < 3:
+            return
+
+        low, high = min(steps), max(steps)
+        if low >= high:
+            return
+
+        samples = np.linspace(low, high, 1025)
+        outputs = np.array([curve.curve_value(float(position), apply_filter=False) for position in samples])
+        if not np.isfinite(outputs).all():
+            syslog.warning("VJOY REMAP: Cannot distribute steps because the output curve returned a non-finite value.")
+            return
+
+        # Samples are evenly spaced, so the change in output is proportional to the
+        # local slope. Use its magnitude so falling sections work like rising ones.
+        changes = np.abs(np.diff(np.clip(outputs, -1.0, 1.0)))
+        average_change = changes.mean()
+        if average_change > np.finfo(float).eps:
+            density = 1.0 / (1.0 + changes / average_change)
+            cumulative = np.concatenate(([0.0], np.cumsum(density)))
+            positions = np.interp(np.linspace(0.0, cumulative[-1], len(steps)), cumulative, samples)
+        else:
+            positions = np.linspace(low, high, len(steps))
+
+        self.action_data.target_step_list = positions.tolist()
+        self._update_steps_ui()
 
     @QtCore.Slot()
     def _normalize_steps(self):
@@ -4005,7 +4032,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """listens for the button to use as the down step - runs on UI thread"""
 
         gremlin.shared_state.push_suspend_highlighting()
-        button_press_dialog = InputListenerWidget(return_kb_event=False)
+        button_press_dialog = InputListenerWidget(
+            event_types=[InputType.JoystickButton, InputType.JoystickHat],
+            filter_func=self._is_stepped_latch_input,
+        )
+        self._stepped_listen_dialog = button_press_dialog
 
         button_press_dialog.item_selected.connect(self._update_button)
         button_press_dialog.closed.connect(self._stepped_listen_closed_cb)
@@ -4026,6 +4057,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _stepped_listen_closed_cb(self, accepted: bool):
         """called when the button listen dialog is closed"""
+        self._stepped_listen_dialog = None
         gremlin.shared_state.pop_suspend_highlighting()
 
     def _keyboard_dialog(self):
@@ -4059,72 +4091,63 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _update_button(self, event: gremlin.event_handler.Event):
         gremlin.util.InvokeUiMethod(self._update_button_ui, event)
 
-    def _update_button_ui(self, event_or_list: gremlin.event_handler.Event | list[gremlin.event_handler.Event]):
-        """called when a button input is selected - runs on ui thread"""
-        if isinstance(event_or_list, list):
-            event = event_or_list[0]
-        else:
-            event = event_or_list
+    def _is_stepped_latch_input(self, event: gremlin.event_handler.Event) -> bool:
+        inputs = self.stepped_input_map.get(event.device_id, {})
+        return event.identifier in inputs.get(event.event_type, ())
 
-        hardware_index = self.stepped_selector_device_widget.findData(event.device_id)
-        self.stepped_selector_device_widget.setCurrentIndex(hardware_index)
-        input_index = self.stepped_selector_input_widget.findData(event.identifier)
-        self.stepped_selector_input_widget.setCurrentIndex(input_index)
+    def _update_button_ui(self, event: gremlin.event_handler.Event):
+        """Store the captured reverse input before refreshing the selectors."""
+        if not self._is_stepped_latch_input(event):
+            return
+
+        self.action_data.stepped_device_id = event.device_id
+        self.action_data.stepped_input_type = event.event_type
+        self.action_data.stepped_input_id = event.identifier
+        if event.event_type == InputType.JoystickHat:
+            self.action_data.stepped_hat_direction = event.value
+        self._update_stepped_selectors()
 
     @QtCore.Slot()
     def _stepped_device_changed_cb(self, device_id):
-        """stepped device changed"""
         self.action_data.stepped_device_id = device_id
+        self._update_stepped_selectors()
 
     def _update_stepped_selectors(self):
         device_id = self.action_data.stepped_device_id
-        input_id = self.action_data.stepped_input_id
+        device_widget = self.stepped_selector_device_widget
+        type_widget = self.stepped_selector_input_type_widget
+        input_widget = self.stepped_selector_input_widget
+        choices = self.stepped_input_map.get(device_id, {})
+        input_types = [(label, kind) for label, kind in (
+            ("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)
+        ) if choices.get(kind)]
 
-        dev = gremlin.joystick_handling.getDevice(device_id)
-        input_types = []
-        if dev.button_count:
-            input_types.append(("Button", InputType.JoystickButton))
-        if dev.hat_count:
-            input_types.append(("Hat", InputType.JoystickHat))
-        with QtCore.QSignalBlocker(self.stepped_selector_input_type_widget):
-            self.stepped_selector_input_type_widget.clear()
-            for name, input_type in input_types:
-                self.stepped_selector_input_type_widget.addItem(name, input_type)
-            index = self.stepped_selector_input_type_widget.findData(self.action_data.stepped_input_type)
-            if index != -1:
-                self.stepped_selector_input_type_widget.setCurrentIndex(index)
-            else:
-                # not found, reset the input type to the first
-                self.action_data.stepped_input_type = input_types[0][1]
-                self.stepped_selector_input_type_widget.setCurrentIndex(0)
+        with QtCore.QSignalBlocker(device_widget), QtCore.QSignalBlocker(type_widget), QtCore.QSignalBlocker(input_widget):
+            device_widget.setCurrentIndex(device_widget.findData(device_id))
+            type_widget.clear()
+            input_widget.clear()
+            for label, input_type in input_types:
+                type_widget.addItem(label, input_type)
+            if input_types:
+                type_index = max(0, type_widget.findData(self.action_data.stepped_input_type))
+                type_widget.setCurrentIndex(type_index)
+                label, input_type = input_types[type_index]
+                self.action_data.stepped_input_type = input_type
+                for input_id in choices[input_type]:
+                    input_widget.addItem(f"{label} {input_id}", input_id)
+                input_widget.setCurrentIndex(max(0, input_widget.findData(self.action_data.stepped_input_id)))
+                self.action_data.stepped_input_id = input_widget.currentData()
 
-        # populate hat or button ID list
-        with QtCore.QSignalBlocker(self.stepped_selector_input_widget):
-            match self.action_data.stepped_input_type:
-                case InputType.JoystickButton:
-                    self.stepped_selector_input_widget.setSource([(f"Button {i}", i) for i in range(1, dev.button_count + 1)])
-                case InputType.JoystickHat:
-                    self.stepped_selector_input_widget.setSource([(f"Hat {i}", i) for i in range(1, dev.hat_count + 1)])
-
-            index = self.stepped_selector_input_widget.findData(input_id)
-            if index != -1:
-                self.stepped_selector_input_widget.setCurrentIndex(index)
-            else:
-                index = 0
-                self.stepped_selector_input_widget.setCurrentIndex(index)
-                self.action_data.stepped_input_id = self.stepped_selector_input_widget.itemData(index)
-
-        # UI component visibility
-        self._update_ui()
+        hat_selected = type_widget.currentData() == InputType.JoystickHat
+        self.stepped_hat_container.setVisible(hat_selected)
+        if hat_selected:
+            self.stepped_direction_widget.setValue(self.action_data.stepped_hat_direction)
 
     @QtCore.Slot()
     def _stepped_input_changed_cb(self, input_id):
-        """stepped input changed"""
         self.action_data.stepped_input_id = input_id
-        self._update_stepped_selectors()
 
     def _stepped_input_type_changed_cb(self, input_type):
-        """stepped input type changed"""
         self.action_data.stepped_input_type = input_type
         self._update_stepped_selectors()
 
@@ -4649,6 +4672,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             #     output_mode_visible = True
             case VjoyAction.VJoySetAxis:
                 output_range_visible = False
+                output_curve_visible = True
                 relative_visible = True
                 output_mode_visible = True
                 set_target_visible = not self.action_data.target_use_last
@@ -5406,7 +5430,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.target_value_valid = action_data.target_value_valid
         self.step_index = action_data.target_step_start_index
         self.step_direction = 1.0  # assume going up for linear step mode
-        self.synced = False  # true if synchronized, resets on profile start
         self.scale_factor = 1.0
 
         v1 = action_data.button_range_min
@@ -5692,7 +5715,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         input_id = self.action_data.hardware_input_id
         raw_input_type = self.action_data.hardware_raw_input_type
         self.pressed_hat_buttons = {}
-        self.synced = False  # indicate not synchronized
         self._last_time = time.time()
         self.encoder_timer = None
         self.device = self._target_device(self.action_data.vjoy_id)
@@ -6021,7 +6043,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             return
 
         if (action.exec_on_press and pressed) or (action.exec_on_release and not pressed):
-            gremlin.remote.remote_control.mode = self.action_mode
+            gremlin.remote.remote_control.sync_startup_command(self.action_mode, pressed)
 
     def profile_stop(self):
         """called when profile stops"""
@@ -6342,6 +6364,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     value = target_value
 
                 value = gremlin.util.clamp(value)
+                if self.action_data.curve_data is not None:
+                    value = gremlin.util.clamp(self.action_data.curve_data.curve_value(value))
                 if verbose:
                     syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
@@ -7107,122 +7131,41 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     self._pulse_input_type = None
 
                         case StepMode.Stepped | StepMode.SteppedPID:
-                            # non linear step mode
-                            # trigger = False
-                            # verbose = True
+                            steps = self.action_data.target_step_list
+                            if not fire_event or not steps:
+                                return True
 
-                            # primary = self.action_data.isInputPrimary(event)
-                            secondary = self.action_data.isInputLatched(event)
-                            primary = fire_event and not secondary
+                            direction = self.action_data.target_step_direction
+                            if self.action_data.isInputLatched(event):
+                                direction = -direction
+                            key = self.getSteppedIndexDataKey()
 
-                            if verbose:
-                                syslog.info(f"Event received: Primary: {primary}, Secondary: {secondary}")
-
-
-                            if primary or secondary:
-                                # determine if we should use PID smooth mode for stepping
-                                use_pid = self.action_data.step_mode == StepMode.SteppedPID
-                                identifier = self.action_data.input_item.identifier
-
-
-                                # determine if the trigger is the primary trigger or the latched trigger
-
-                                # determine the stepping direction
-                                direction = 1 if primary else -1
-
-                                if verbose:
-                                    device = gremlin.joystick_handling.getDevice(event.device_guid)
-                                    syslog.info("--------")
-                                    syslog.info(
-                                        f"New step event triggered by [{device.name}] input: {event.identifier} type: {event.event_type.name} primary: {primary} direction: {direction}"
-                                    )
-
-                                # get the unique key for this axis
-                                key = self.getSteppedIndexDataKey()
-                                if key not in self.device.data:
-                                    # not initialized yet, determine the closest step value and index based on direction of step
-                                    current_index = -1
-                                    current_value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                                    value = self._closest_step_value(current_value, direction)
-                                    # get the index of that closest step value
-                                    index = self._closest_step_index(value)
-                                    if verbose:
-                                        syslog.info(f"Closest step value: {value}  Closest step index: {index}")
-
-                                    self.device.data[key] = index
-                                else:
-                                    # existing index step - increment or decrement based on direction
-                                    current_index = self.device.data[key]
-                                    index = current_index
-                                    if verbose:
-                                        syslog.info(f"Current index: {current_index}  Direction: {direction}")
-                                    index += direction  # previous or next step
-                                    # clamp the index within valid range if we're already at min/max
-                                    count = len(self.action_data.target_step_list)
-                                    index = max(0, min(index, count - 1))
-                                    if verbose:
-                                        syslog.info(
-                                            f"New step: direction: {direction}  current index: {current_index}  new index: {index}  new value: {self.action_data.target_step_list[index]:0.4f}"
-                                        )
-                                    if index == current_index:
-                                        # can't move further in this direction, already at min/max step
+                            if self.action_data.step_mode == StepMode.SteppedPID:
+                                if self._pid_axis is None:
+                                    self._start_pid_axis()
+                                with self._pid_axis_condition:
+                                    if self._pid_axis_stopping or self._pid_axis is None:
                                         return True
-                                    # remember the new step index
+                                    index = self._first_step_index(self._pid_axis.target, direction)
+                                    position = steps[index]
+                                    self._pid_set_target(position, force_remote=force_remote)
                                     self.device.data[key] = index
-                                    # get the value for that step
-                                    value = self.action_data.target_step_list[index]
-
-                                if use_pid:
-                                    # Step from the commanded setpoint while the output is still moving.
-                                    target = self._pid_axis.target if self._pid_axis is not None else value
-                                    index = self._first_step_index(target, direction)
-                                    self._step_start_pending = False
-                                    self.synced = True
-                                elif getattr(self, "_step_start_pending", False):
-                                    index = self._first_step_index(value, direction)
-                                    self._step_start_pending = False
-                                    self.synced = True
-                                elif not self.synced:
-                                    # synchronize index if needed
-                                    if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
-                                        # sync the current index with the current axis value
-                                        v1 = v2 = None
-
-                                        # syslog.info(f"Sync mode: {value:0.3f}")
-                                        for i in range(count):
-                                            v2 = self.action_data.target_step_list[i]
-                                            if v1 is not None:
-                                                if value >= v1 and value <= v2:
-                                                    index = i
-                                                    break
-                                                v1 = v2
-                                    self.synced = True
+                            else:
+                                current_index = self.device.data.get(key)
+                                if current_index is None:
+                                    # A curved output cannot be used as the current step position.
+                                    position = self.action_data.axis_last_value
+                                    if position is None:
+                                        position = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                                    index = self._first_step_index(position, direction)
                                 else:
-                                    # get the next or prior index
-
-                                    index += direction
-                                    if index < 0:
-                                        index = 0
-                                    elif index == count:
-                                        index = count - 1
-                                    index = gremlin.util.clamp(index, 0, count - 1)
-                                value = self.action_data.target_step_list[index]
-
-                                if use_pid:
-                                    # syslog.info(f"set PID target: {value:0.4f}")
-                                    if self._pid_axis is None:
-                                        self._start_pid_axis()
-                                    self._pid_set_target(value, force_remote=force_remote)
-                                else:
-                                    self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
-
-                                self.device.data[key] = index  # remember the last step index used
-
-                                if verbose:
-                                    syslog.info(f"STEPPED AXIS: previous index: [{current_index}] new index: [{index}] new value: {value:0.4f}")
-
-                                # remember the last value
-                                self.action_data.axis_last_value = value
+                                    index = max(0, min(current_index + direction, len(steps) - 1))
+                                    if index == current_index:
+                                        return True
+                                position = steps[index]
+                                self._set_stepped_axis(position, force_remote=force_remote)
+                                self.device.data[key] = index
+                                self.action_data.axis_last_value = position
 
                         case StepMode.Encoder:
                             # encoder mode - use a timer to determine the rate of change
@@ -7333,8 +7276,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._start_time = None
         self._start_value = value
         self.encoder_target = value
-        self.synced = False
-        self._step_start_pending = True
         self.step_index = self.action_data.target_step_start_index
         self.encoder = None
         if self.action_data.step_mode == StepMode.Encoder:
@@ -7351,7 +7292,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             )
         elif self.action_data.step_mode in (StepMode.PID, StepMode.SteppedPID):
             self._start_pid_axis(value)
-        self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+        if target is None:
+            self._set_stepped_axis(value)
+        else:
+            # Auto starts from the axis's current output, which may already be curved.
+            self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
         self.action_data.axis_last_value = value
 
     def _first_step_index(self, value, direction):
@@ -7367,7 +7312,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._stop_pid_axis()
         if value is None:
             value = self.action_data.axis_last_value
-            if self._is_output_connected(self.vjoy_id):
+            use_step_value = self.action_data.step_mode == StepMode.SteppedPID and self.action_data.curve_data is not None
+            if (value is None or not use_step_value) and self._is_output_connected(self.vjoy_id):
                 value = self._output_device(self.vjoy_id).axis(self.vjoy_input_id).value
         if value is None or not math.isfinite(value):
             value = 0.0
@@ -7462,47 +7408,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 return None  # Or raise an error if no lower value exists
             return min(filtered, key=lambda x: abs(x - target))
 
-    def _closest_step_value(self, value: float = None, direction: int = 0):
-        """returns the closest step value to the current vjoy axis value, based on the specified direction
-        direction values:
-         0 = closest value regardless of direction
-         1 = next greatest (or equal) value
-        -1 = next lowest (or equal) value
-        """
-        if value is None:
-            value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-        if self.action_data.step_mode in (StepMode.Stepped, StepMode.SteppedPID):
-            match direction:
-                case 1:
-                    filtered = [x for x in self.action_data.target_step_list if x >= value]
-
-                case -1:
-                    filtered = [x for x in self.action_data.target_step_list if x <= value]
-
-                case 0:
-                    # closest in any direction
-                    filtered = self.action_data.target_step_list
-
-            if not filtered:
-                return value
-            return min(filtered, key=lambda x: abs(x - value))
-
-        return value  # as is if no steps
-
-    def _closest_step_index(self, value: float = None, direction: int = 0):
-        """returns the index of the closest step value to the current vjoy axis value, based on the specified direction
-        direction values:
-         0 = closest value regardless of direction
-         1 = next greatest (or equal) value
-        -1 = next lowest (or equal) value
-        """
-        if value is None:
-            value = self._closest_step_value(direction)
-        try:
-            return self.action_data.target_step_list.index(value)
-        except ValueError:
-            return None
-
     def _pid_set_target(self, value: float, force_remote: bool = False):
         """Set an absolute PID target and wake the output worker."""
         with self._pid_axis_condition:
@@ -7535,12 +7440,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         before = self._pid_axis.value
                         value = self._pid_axis.advance(min(elapsed, 0.1))
                         if value != before:
-                            self._set_axis(
-                                self.vjoy_id,
-                                self.vjoy_input_id,
-                                value,
-                                force_remote=self._pid_force_remote,
-                            )
+                            self._set_stepped_axis(value, force_remote=self._pid_force_remote)
                             self.action_data.axis_last_value = value
                         if self._pid_axis.settled:
                             self.functor_complete.emit()
@@ -7549,6 +7449,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.exception("PID axis transition stopped after an output error")
             with self._pid_axis_condition:
                 self._pid_axis_stopping = True
+
+    def _set_stepped_axis(self, position: float, force_remote=False):
+        """Convert a step position to an output value at the point of writing the axis."""
+        output = position
+        if self.action_data.step_mode in (StepMode.Stepped, StepMode.SteppedPID):
+            curve_data = self.action_data.curve_data
+            if curve_data is not None:
+                output = gremlin.util.clamp(curve_data.curve_value(position))
+        self._set_axis(self.vjoy_id, self.vjoy_input_id, output, force_remote=force_remote)
 
     def _return_encoder_to_center(self):
         """called when the timer for encoder pulses has lapsed"""
@@ -9339,7 +9248,10 @@ Supports axis merging, curved output, command, hat and button mappings.
 
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()
-                self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
+                if self.input_is_axis():
+                    self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
+                        self.hardware_device_guid, self.hardware_input_id
+                    )
                 self.curve_data._parse_xml(curve_node)
                 self.curve_data.curve_update()
 

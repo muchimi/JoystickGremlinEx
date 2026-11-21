@@ -4,9 +4,23 @@ GremlinEx includes all dependencies in the release.  There are however some comp
 
 ## Required modules
 
-### VJOY
+### GEX Bridge module (m77+)
 
-VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: [https://github.com/jshafer817/vJoy/releases](https://github.com/jshafer817/vJoy/releases) 
+The GEX bridge module replaces the vJoy and VIGEM virtual drivers for joysticks and gamepads.
+
+The bridge module runs as a service and is optionally installed when you install GEX.
+
+The module lets you directly manage virtual devices from within the GEX application.  There is a migration path provided for older vJoy devices, including an automatic failover mode, or a migration of device outputs that the GEX device remapper.
+
+It is recommended that new profiles use the bridge module as it avoids using deprecated driver libraries, simplifies the installation and unlike the older virtual drivers, support the full capabilities of DINPUT and XINPUT for game and application support.
+
+The bridge module is written in C# and is available from [https://github.com/muchimi/GEXMaestroBridgeService](https://github.com/muchimi/GEXMaestroBridgeService).
+
+Installation of the bridge is compatible with vJoy however vJoy devices should be disabled to avoid conflicts.
+
+### VJOY (legacy)
+
+VJOY is an open source virtual joystick driver used by GremlinEx as output.  VJOY can be installed from: [https://github.com/jshafer817/vJoy/releases](https://github.com/jshafer817/vJoy/releases)
 
 Version recommended: 2.1.9.1 for Windows 10/11 x64.
 
@@ -22,7 +36,7 @@ Version recommended: 1.5.230.0 or later.
 
 ### GremlinEX WASM (MSFS) module
 
-This module is included in the GremlinEx release.  
+This module is included in the GremlinEx release.
 
 This C++ module is part of GremlinEx and is necessary for GremlinEx to be able to access internal simulator variables and run SimConnect "expressions" not otherwise exposed via the SimConnect SDK.   This module is written in C++ and included with GremlinEx relases as a zip file.
 
@@ -36,15 +50,14 @@ The release is also included in the GremlinEx repository:
 
 [https://github.com/muchimi/JoystickGremlinEx/releases/tag/msfs_wasm](https://github.com/muchimi/JoystickGremlinEx/releases/tag/msfs_wasm)
 
-### GremlinEx DInput module
+### GremlinEx DINPUT/XINPUT module
 
-This module is a depency of GremlinEx and included in the GremlinEx releases.
-
-This C++ module is part of GremlinEx and is the interface to the Microsoft DirectInput (part of DirectX) API to access HID input devices.  Installation is not necessary as the required files are already included as a dependency in the GremlinEx releases.  
+This module is a depency of GremlinEx and included in the GremlinEx releases and interfaces GEX with the Microsoft DINPUT and XINPUT joystick and gamepad interfaces.
 
 The project source code is located here:
 
 [https://github.com/muchimi/dinput](https://github.com/muchimi/dinput)
+
 
 
 
@@ -93,8 +106,8 @@ RTP-MIDI is a MIDI virtual driver (freeware) that lets you network MIDI data ove
 #### MIDI loop
 
  Another utility that is useful lets you define a loopback port on the local machine.  The MIDI device connected locally can send to that MIDI device, and GremlinEx can get MIDI input from it without connecting directly to each MIDI device.
- 
- [loopMidi](https://www.tobias-erichsen.de/software/loopmidi.html).  
+
+ [loopMidi](https://www.tobias-erichsen.de/software/loopmidi.html).
 
 #### PDF Visualization
 

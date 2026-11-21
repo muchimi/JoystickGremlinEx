@@ -23,6 +23,7 @@ GEX is an open source application, distributed as source code, or a packaged app
 | GEX m77 main feature set | Description |
 | --- | --- |
 | Virtual joystick/gamepad support | GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats. |
+| XINPUT and DINPUT suport | GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT. |
 | Network output support | GEX can send outputs to other GEX clients on the network allowing them to accept mappings from a master GEX instance on a local network computer.  This feature can enabled on the fly via profile controls. |
 | Vendor agnostic | GEX does not require any software from a hardware vendor provided the device is recognized by Windows. It thus replaces vendor specific programming/mapping software and works with any supported Windows controller. |
 | Full support for HID Hide | GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game. |
@@ -510,7 +511,7 @@ The main GremlinEx application runs on **Windows x64**. m77 uses **Python 3.14**
 
 Networked browser panels can run on phones and tablets while the Windows host performs the mappings and device output.
 
-## Installation
+## Setup
 
 The packaged application includes its Python 3.14 runtime and application libraries, so a separate Python installation is not needed to use that package. Extract the distribution to an application folder and retain its supporting files.
 
@@ -528,7 +529,22 @@ GremlinEx comes with a WASM module for Microsoft Flight Simulator that must be p
 
 GremlinEx was tested with MSFS 2024 including all current beta versions.
 
-### VJoy support
+### GEX Bridge support for virtual joysticks and gamepads
+
+As of m77, GremlinEx includes the GEX Bridge module that can be installed as an option with the main GEX distribution.  The bridge module replaces both vJoy (virtual joystick) and VIGEM (virtual gamepad) and implements its own virtual joystick and gamepad drivers through the embedded HID Maestro virtual drivers.  These drivers run in user-mode, do not require a kernel mode driver, and the GEX Bridge is provided as a Windows Service.
+
+The bridge module enables the virtual device configuration to be completely managed within GEX.  Virtual joysticks are exposed to the DINPUT interface, and gamepad devices are exposed to both DINPUT and XINPUT interfaces.
+
+GEX provides an automated migration path from the legacy vJoy virtual driver to the bridge driver in one of two ways:
+
+1. By providing a failover mode if a profile has mappings to vJoy and GEX will route these outputs to the corresponding GEX device.
+2. By providing a conversion tool via the Tools > Device Remap... dialog that lets you convert the profile to the GEX devices automatically.
+
+The main benefit of the bridge module is that virtual driver support is embedded in the GEX ecosystem, the devices are all 128 buttons, 8 axes and 4 hats, and up to four gamepad devices are supported and exposed via XINPUT, each with 6 axes, 32 buttons and one hat.
+
+### VJoy support (legacy)
+
+As of m77, virtual joystick output should be migrated to the new GEX Bridge Module instead of using this legacy API.  This is supported for older profiles.
 
 GremlinEx was tested with VJOY 2.1.9.1 64bit.  There are several releases of VJOY however however 2.1.9.1 is the one tested and verified to function with Windows 11.  Please see the [resource section](resources.md).
 

@@ -29,6 +29,7 @@ import tempfile
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable  # noqa: UP035
 
@@ -2319,6 +2320,7 @@ class RemoteControl:
         self._all_clients_active = True
         self._broadcast_to_all_clients = True
 
+        self._startup_commands: list[tuple[bool, VjoyAction]] | None = None
         self._mode = VjoyAction.VJoyEnableLocalOnly
         self._update(self._mode)
         el = gremlin.event_handler.EventListener()
@@ -2646,6 +2648,27 @@ class RemoteControl:
             _do()
         else:
             gremlin.util.InvokeUiMethod(_do)
+
+    @contextmanager
+    def collect_startup_commands(self):
+        """Apply startup commands after reading the inputs for the initial mode."""
+        commands = []
+        self._startup_commands = commands
+        try:
+            yield
+        finally:
+            self._startup_commands = None
+
+        # Released inputs establish the fallback routing. Held inputs then
+        # take precedence, independent of which mapping was registered first.
+        for _, command in sorted(commands, key=lambda item: item[0]):
+            self.mode = command
+
+    def sync_startup_command(self, command: VjoyAction, pressed: bool):
+        if self._startup_commands is None:
+            self.mode = command
+        else:
+            self._startup_commands.append((pressed, command))
 
     def _update(self, value):
         is_local = self._is_local

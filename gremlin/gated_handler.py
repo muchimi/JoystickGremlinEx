@@ -48,6 +48,7 @@ import threading
 import time
 import html
 import logging
+import math
 from gremlin.ui.ui_common import (
     Color,
     Icons,
@@ -1267,6 +1268,7 @@ class GateData:
     """
 
     max_gates = 20
+    min_gate_spacing = 0.001
 
     def __init__(
         self,
@@ -1325,6 +1327,7 @@ class GateData:
         self._trigger_callbacks = []  # list of registered trigger callbacks
 
         self._active_ranges = []
+        self.source_curve: gremlin.curve_handler.AxisCurveData | None = None
 
         self._axis_value = 0.0
 
@@ -2259,6 +2262,89 @@ class GateData:
 
         return gate
 
+    def curveGateValues(self, curve, count: int) -> list[float]:
+        """Sample a source curve at evenly spaced inputs and validate the resulting gates."""
+        if not 2 <= count <= self.max_gates:
+            raise ValueError(f"Choose between 2 and {self.max_gates} gates.")
+        curve.curve_update()
+        values = [curve.curve_value(-1.0 + 2.0 * index / (count - 1), apply_filter=False) for index in range(count)]
+        if any(not math.isfinite(value) or not -1.0 <= value <= 1.0 for value in values):
+            raise ValueError("The curve must produce gate positions between -1 and +1.")
+        values = sorted(round(value, _decimals) for value in values)
+        if any(right - left + 1e-12 < self.min_gate_spacing for left, right in pairwise(values)):
+            raise ValueError("The curve places some gates too close together. Choose fewer gates or adjust the curve.")
+        return values
+
+    def setCurveGates(self, curve, values: list[float]):
+        """Apply validated positions, keeping existing gates in their relative order."""
+        gates = self.getGates()
+        count = len(values)
+        old_count = len(gates)
+        if old_count > count:
+            gates = [gates[round(index * (old_count - 1) / (count - 1))] for index in range(count)]
+        span = max(1, len(gates) - 1)
+        slots = {round(index * (count - 1) / span): gate for index, gate in enumerate(gates)}
+        new_gates = []
+        for index, value in enumerate(values):
+            gate = slots.get(index)
+            if gate is None:
+                gate = GateInfo(value=value, used=True, parent=self)
+            else:
+                gate._value = value
+            new_gates.append(gate)
+        self.source_curve = curve
+        self.setUsedGates(new_gates)
+
+    def deadzoneBounds(self, gate: GateInfo, width: float) -> tuple[float, float]:
+        """Return boundaries for a deadzone with the given total width in axis units."""
+        if not any(item is gate for item in self._gates):
+            raise ValueError("This gate is no longer available.")
+        if len(self._gates) >= self.max_gates:
+            raise ValueError(f"A deadzone requires another gate. The limit is {self.max_gates} gates.")
+        if not math.isfinite(width) or not self.min_gate_spacing <= width <= 2.0:
+            raise ValueError(f"Use a width from {self.min_gate_spacing:g} to 2 axis units.")
+
+        # Shift the interval inward at the axis endpoints to preserve its full width.
+        low = round(max(-1.0, min(gate.value - width / 2.0, 1.0 - width)), _decimals)
+        high = min(1.0, round(low + width, _decimals))
+        prior, following = self.getGateSiblings(gate)
+        if (prior and low - prior.value + 1e-12 < self.min_gate_spacing) or (
+            following and following.value - high + 1e-12 < self.min_gate_spacing
+        ):
+            raise ValueError("The deadzone would overlap or get too close to a neighboring gate. Choose a smaller width.")
+        return low, high
+
+    def convertGateToDeadzone(self, gate: GateInfo, width: float, *, suppress_output: bool = False) -> RangeInfo:
+        """Replace a gate with two boundaries and preserve the adjacent range mappings."""
+        low, high = self.deadzoneBounds(gate, width)
+        center = gate.value
+        prior, following = self.getGateSiblings(gate)
+        left_range = self.findRange(prior, gate) if prior else None
+        right_range = self.findRange(gate, following) if following else None
+
+        # Keep the original ID and crossing actions on the nearest boundary.
+        if center > (low + high) / 2.0 + 1e-12:
+            lower = GateInfo(value=low, used=True, parent=self)
+            upper = gate
+            gate._value = high
+            self._gates.append(lower)
+        else:
+            lower = gate
+            upper = GateInfo(value=high, used=True, parent=self)
+            gate._value = low
+            self._gates.append(upper)
+
+        if left_range is not None:
+            left_range.g2 = lower
+        if right_range is not None:
+            right_range.g1 = upper
+        self._update()
+        deadzone = self.findRange(lower, upper)
+        deadzone.mode = GateRangeOutputMode.FilterOut if suppress_output else GateRangeOutputMode.Fixed
+        if not suppress_output:
+            deadzone.fixed_value = center
+        return deadzone
+
     def setGateCount(self, total_gates):
         """sets the required number of gates to the gated axis - gates are added or removed as needed"""
 
@@ -3010,12 +3096,8 @@ class GateData:
                     in_range = r.valueInRange(current_value)
 
                     if in_range:
-                        # current axis value is in range - fire three triggers - in range and enter range
-                        modes = (
-                            TriggerMode.RangeEnter,
-                            TriggerMode.ValueInRange,
-                            TriggerMode.RangeHold,
-                        )
+                        # In-range axis output is handled below using the range's output mode.
+                        modes = (TriggerMode.RangeEnter, TriggerMode.RangeHold)
                     else:
                         # current axis is not not in range, two triggers - out of range,
                         modes = (
@@ -3042,8 +3124,6 @@ class GateData:
                                 condition = GateConditionType.ExitRange
                                 td.is_button = True
                                 td.is_pressed = False
-                            case TriggerMode.ValueInRange:
-                                condition = GateConditionType.InRange
                             case TriggerMode.ValueOutOfRange:
                                 condition = GateConditionType.OutsideRange
                             case TriggerMode.RangeHold:
@@ -3064,7 +3144,9 @@ class GateData:
             last_range = self._last_range
 
             is_running = gremlin.shared_state.is_running
-            if last_range is not None:
+            if last_range is not None and (
+                range_info is None or range_info.mode not in (GateRangeOutputMode.Fixed, GateRangeOutputMode.FilterOut)
+            ):
                 v1, v2 = last_range.range()
 
                 if current_value < v1 or current_value > v2:
@@ -3357,6 +3439,9 @@ class GateData:
         verbose = config.verbose_mode_gate and config.verbose_mode_extra
 
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
+        if self.source_curve is not None:
+            source_node = ElementTree.SubElement(node, "source-curve")
+            source_node.append(self.source_curve._generate_xml())
 
         # save gate data
         gate_info: GateInfo
@@ -3486,6 +3571,14 @@ class GateData:
         else:
             mode = safe_read(node, "show_mode", str, "")
             self.display_mode = DisplayMode.to_enum(mode)
+
+        self.source_curve = None
+        curve_node = node.find("source-curve/curve-data")
+        if curve_node is not None:
+            from gremlin.curve_handler import AxisCurveData
+
+            self.source_curve = AxisCurveData()
+            self.source_curve._parse_xml(curve_node)
 
         # read gate configurations
         node_gates = node.xpath("./gate")

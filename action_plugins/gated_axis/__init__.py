@@ -39,11 +39,14 @@ from gremlin.ui.ui_common import (
     MessageBox,
     QDataCheckbox,
     QDataComboBox,
+    QDataLabel,
     QDataPushButton,
+    QFloatLineEdit,
     QHLine,
     QHelper,
     QHorizontalLine,
     QInfoBox,
+    QIntLineEdit,
     QRememberDialog,
     getFlowContainer,
     getHContainer,
@@ -535,6 +538,14 @@ making changes that impact the order of gates or ranges."""
         if key is None or gremlin.shared_state.is_running or gremlin.shared_state.ui_keyinput_suspended():
             return
         if key.lookup_name == "Z":
+            modal = QtWidgets.QApplication.activeModalWidget()
+            if modal is not None:
+                from gremlin.curve_handler import AxisCurveDialog, AxisCurveWidget
+
+                while modal is not None:
+                    if isinstance(modal, (AxisCurveDialog, AxisCurveWidget)):
+                        return
+                    modal = modal.parentWidget()
             eh = gremlin.event_handler.EventListener()
             if eh.get_control_state():
                 # undo requested
@@ -1133,6 +1144,8 @@ making changes that impact the order of gates or ranges."""
         menu = QtWidgets.QMenu(self)
 
         gate = self._gate_data.getGateSliderIndex(handle_index)
+        if gate is None:
+            return
         msg = f"<b>Gate [{handle_index + 1}]</b> {gate.value:0.{_decimals}f}"
         line = QHLine()
         color = Color().menuSeparatorColor()
@@ -1152,8 +1165,61 @@ making changes that impact the order of gates or ranges."""
 
         menu.addAction(action_gate_info)
         menu.addAction(action_configure)
+        menu.addAction("Convert to Deadzone...", lambda: self._convert_gate_to_deadzone(gate))
         menu.addAction(action_delete)
         menu.exec_(QtGui.QCursor.pos())
+
+    def _convert_gate_to_deadzone(self, gate):
+        dialog = QRememberDialog("GatedAxisDeadzoneDialog", parent=self)
+        dialog.setWindowTitle("Convert Gate to Deadzone")
+        layout = QtWidgets.QFormLayout(dialog)
+
+        presets = QDataComboBox(
+            source=[("2%", 0.04), ("5%", 0.10), ("10%", 0.20), ("Custom width", None)],
+            value=0.10,
+            tooltip="Percent of the full axis travel (-1 to +1).",
+        )
+        layout.addRow(QDataLabel("Width preset"), presets)
+        width = QFloatLineEdit(
+            min_range=GateData.min_gate_spacing,
+            max_range=2.0,
+            decimals=_decimals,
+            value=0.10,
+            tooltip="Total width in normalized axis units.",
+        )
+        width.setEnabled(False)
+        layout.addRow(QDataLabel("Width in axis units"), width)
+
+        def update_width():
+            value = presets.currentData()
+            width.setEnabled(value is None)
+            if value is not None:
+                width.setValue(value)
+
+        presets.currentIndexChanged.connect(update_width)
+        output = QDataComboBox(source=[("Hold the original gate value", False), ("No axis output", True)])
+        layout.addRow(QDataLabel("Output inside the deadzone"), output)
+
+        def apply():
+            ok_button.setFocus()  # Commit the width if Enter was pressed in the field.
+            deadzone_width = width.value()
+            try:
+                self._gate_data.deadzoneBounds(gate, deadzone_width)
+            except ValueError as error:
+                MessageBox(title="Cannot create deadzone", prompt=str(error), parent=dialog)
+                return
+            self._pushState()
+            self._gate_data.convertGateToDeadzone(gate, deadzone_width, suppress_output=output.currentData())
+            self._refresh_gate_layout()
+            dialog.accept()
+
+        ok_button = QDataPushButton("OK", clicked=apply)
+        ok_button.setDefault(True)
+        cancel_button = QDataPushButton("Cancel", clicked=dialog.reject)
+        cancel_button.setAutoDefault(False)
+        layout.addRow(getHContainer(["||", ok_button, cancel_button], widget_only=True))
+        dialog.exec()
+        dialog.deleteLater()
 
     def _trigger_add_gate(self):
         """context menu add gate trigger"""
@@ -1347,6 +1413,10 @@ making changes that impact the order of gates or ranges."""
         self.set_steps_widget.setToolTip("Sets the number of gates")
         self.set_steps_widget.clicked.connect(self._set_steps_cb)
 
+        curve_gates_button = QtWidgets.QPushButton("Gates from Curve...")
+        curve_gates_button.setToolTip("Edit a source curve and use it to position the gates.")
+        curve_gates_button.clicked.connect(self._configure_curve_gates)
+
         self.normalize_widget = QtWidgets.QPushButton("Normalize")
         self.normalize_widget.setToolTip("Normalizes the position of gates evenly on the existing range")
         self.normalize_widget.clicked.connect(lambda _checked: self._normalize_cb())
@@ -1366,10 +1436,67 @@ making changes that impact the order of gates or ranges."""
         self.container_steps_layout.addWidget(self.sb_steps_widget)
 
         self.container_steps_layout.addWidget(self.set_steps_widget)
+        self.container_steps_layout.addWidget(curve_gates_button)
         self.container_steps_layout.addWidget(self.normalize_widget)
         self.container_steps_layout.addWidget(self.normalize_reset_widget)
         self.container_steps_layout.addWidget(QtWidgets.QLabel("Right-click range to add new gate, right click gate for configuration"))
         self.container_steps_layout.addStretch()
+
+    def _configure_curve_gates(self):
+        from gremlin.curve_handler import AxisCurveData, AxisCurveDialog
+
+        curve = AxisCurveData()
+        if self._gate_data.source_curve is not None:
+            curve._parse_xml(self._gate_data.source_curve._generate_xml())
+
+        dialog = QRememberDialog("GatedAxisCurveDialog", parent=self)
+        dialog.setWindowTitle("Gates from Curve")
+        layout = QtWidgets.QFormLayout(dialog)
+        current_count = self._gate_data.gateCount()
+        default_count = max(5, current_count) if self._gate_data.source_curve is None else current_count
+        count = QIntLineEdit(min_range=2, max_range=GateData.max_gates, value=default_count, chars=4)
+        layout.addRow(QDataLabel("Gate count"), count)
+
+        def edit_curve():
+            editor = AxisCurveDialog(curve, dialog)
+            editor.exec()
+            editor.deleteLater()
+
+        edit_button = QDataPushButton("Edit Source Curve...", clicked=edit_curve)
+        edit_button.setAutoDefault(False)
+        layout.addRow(edit_button)
+
+        def apply():
+            gate_count = count.value()
+            if gate_count is None:
+                MessageBox(title="Cannot place gates", prompt="Enter a gate count.", parent=dialog)
+                return
+            try:
+                positions = self._gate_data.curveGateValues(curve, gate_count)
+            except (ValueError, ArithmeticError) as error:
+                MessageBox(title="Cannot place gates", prompt=str(error), parent=dialog)
+                return
+            if gate_count < self._gate_data.gateCount() and any(
+                item.hasAnyContainers() for item in (*self._gate_data.getGates(), *self._gate_data.getRanges())
+            ):
+                if not self._prompt_delete():
+                    return
+            self._pushState()
+            self._gate_data.setCurveGates(curve, positions)
+            self._refresh_gate_layout()
+            dialog.accept()
+
+        ok_button = QDataPushButton("OK", clicked=apply)
+        ok_button.setDefault(True)
+        cancel_button = QDataPushButton("Cancel", clicked=dialog.reject)
+        cancel_button.setAutoDefault(False)
+        layout.addRow(getHContainer(["||", ok_button, cancel_button], widget_only=True))
+        dialog.exec()
+        dialog.deleteLater()
+
+    def _refresh_gate_layout(self):
+        self.sb_steps_widget.setValue(self._gate_data.gateCount())
+        GateEventHandler().gatedata_stepsChanged.emit(self._gate_data)
 
     def _add_gate(self, value, check_exists=True):
         """adds gate"""

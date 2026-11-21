@@ -43,6 +43,7 @@ def clear_layout(layout):
 
 class Listener(QtCore.QObject):
     config_option_changed = QtCore.Signal()
+    profile_start = QtCore.Signal()
     keyboard_event = QtCore.Signal(object)
 
 
@@ -89,22 +90,24 @@ class Slider(QtWidgets.QWidget):
 
 LISTENER = Listener()
 CONFIG = NS(verbose_mode_gate=False, verbose_mode_extra=False, verbose_mode_details=False,
-            verbose=False, gated_axis_display_events=True)
+            verbose=False, gated_axis_display_events=True, verbose_mode_exec=False)
 COLOR = NS(inactiveColor=lambda: "#888888", activeContentColor=lambda: "#ffffff", recordColor=lambda: "#ff0000")
 GREMLIN = NS(config=NS(Configuration=lambda: CONFIG), util=NS(
     InvokeUiMethod=invoke, assert_ui_thread=lambda: None, clear_layout=clear_layout,
     delete_widget=delete_widget, clamp=lambda value, low, high: max(low, min(high, value)),
-    is_close=math.isclose, load_icon=lambda *args, **kwargs: QtGui.QIcon(),
+    is_close=math.isclose, valueInRange=lambda value, low, high, strict: low < value < high if strict else low <= value <= high,
+    load_icon=lambda *args, **kwargs: QtGui.QIcon(),
     get_guid=lambda: str(uuid4()), ansiText=str,
 ), ui=NS(ui_common=NS(QDataPushButton=DataButton, Color=lambda: COLOR, MessageBox=Mock(),
                      Icons=NS(gearIcon=lambda **kwargs: QtGui.QIcon()))),
-    event_handler=NS(EventListener=lambda: LISTENER), shared_state=NS(char_width=8),
+    event_handler=NS(EventListener=lambda: LISTENER), shared_state=NS(char_width=8, is_running=True),
     singleton_decorator=NS(SingletonDecorator=lambda cls: cls))
 UI = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, QWidget=QtWidgets.QWidget,
           QSize=QtCore.QSize, Shiboken=Shiboken, gremlin=GREMLIN, threading=threading,
           syslog=logging.getLogger("system"), Signal=Signal,
           Enum=Enum, auto=auto, html=html, logging=logging, math=math, copy=copy,
           ElementTree=ElementTree, MAX_UNDO=20, InputType=NS(JoystickAxis=1, JoystickButton=2), pairwise=pairwise,
+          QDataPushButton=DataButton, Color=lambda: COLOR, Icons=GREMLIN.ui.ui_common.Icons, MessageBox=lambda **kwargs: GREMLIN.ui.ui_common.MessageBox(**kwargs),
           load_icon=GREMLIN.util.load_icon,
           get_text_width=lambda text: QtGui.QFontMetrics(APP.font()).horizontalAdvance(text))
 load("gremlin/util.py", {"scale_to_range", "safe_format", "safe_read", "get_xml_child", "isNumeric", "is_close", "triplets"}, UI)
@@ -117,7 +120,7 @@ GREMLIN.ui.ui_common.QDataLabel = UI["QDataLabel"]
 GREMLIN.ui.ui_common.QFloatLineEdit = UI["QFloatLineEdit"]
 load("gremlin/gated_handler.py", {
     "DisplayMode", "GateConditionType", "GateRangeOutputMode", "TriggerMode", "GateInfo", "RangeInfo",
-    "GateInfoWidget", "RangeInfoWidget", "GateData", "GateEventHandler", "_decimals", "_single_step",
+    "GateInfoWidget", "RangeInfoWidget", "GateData", "GateEventHandler", "TriggerData", "TriggerTracking", "RangeTracking", "_decimals", "_single_step",
     "_display_mode_to_string", "_display_mode_to_enum", "_gate_condition_to_name", "_gate_condition_to_enum",
     "_gate_range_to_string", "_gate_range_to_enum", "_trigger_mode_to_string",
     "_gate_condition_to_display_name", "_gate_range_to_display_name",
@@ -136,7 +139,13 @@ class GateDataFixture(UI["GateData"]):
         self._hooked = False
         self._action_data = action_data
         self._ranges = []
+        self._process_trigger_lock = threading.Lock()
+        self._active_ranges = []
+        self._last_value = self._last_range = None
+        self._last_range_exit_trigger = self._last_range_enter_trigger = None
+        self._last_in_range_trigger_map = {}
         self._range_item_map = {}
+        self.source_curve = None
         self.filter_map = dict.fromkeys(UI["TriggerMode"], True)
         self.display_mode = UI["DisplayMode"].Normal
         self.range_min = self.display_range_min = -1.0
@@ -581,6 +590,76 @@ class GateWidgetTests(unittest.TestCase):
         widget.deleteGate(widget.gate_data.getGates()[1])
         self.assert_consistent(widget, 3)
 
+
+class GateCreationTests(unittest.TestCase):
+    def model(self, values=(-1.0, 0.2, 1.0)):
+        return GateDataFixture(values, NS(get_input_item=InputItem))
+
+    def test_curve_samples_and_keeps_existing_gate_ids_in_order(self):
+        model = self.model()
+        original = model.getUsedGates().copy()
+        curve = NS(curve_value=Mock(side_effect=lambda value, apply_filter: value**3), curve_update=Mock())
+        positions = model.curveGateValues(curve, 5)
+        self.assertEqual(positions, [-1.0, -0.125, 0.0, 0.125, 1.0])
+        self.assertTrue(all(call.kwargs == {"apply_filter": False} for call in curve.curve_value.call_args_list))
+        model.setCurveGates(curve, positions)
+        self.assertEqual(model.getGateValues(), positions)
+        self.assertEqual(model.getUsedGates()[::2], original)
+        self.assertIs(model.source_curve, curve)
+        self.assertEqual(len(model.getRanges()), 4)
+
+    def test_flat_curve_and_overlapping_deadzone_leave_gates_unchanged(self):
+        model = self.model((-1.0, 0.0, 0.02, 1.0))
+        old_positions = model.getGateValues()
+        curve = NS(curve_value=lambda value, apply_filter: 0.0, curve_update=Mock())
+        with self.assertRaisesRegex(ValueError, "too close"):
+            model.curveGateValues(curve, 5)
+        with self.assertRaisesRegex(ValueError, "neighboring gate"):
+            model.convertGateToDeadzone(model.getUsedGates()[1], 0.10)
+        self.assertEqual(model.getGateValues(), old_positions)
+
+    def test_fixed_deadzone_preserves_neighbors_and_original_value(self):
+        model = self.model()
+        left, right = model.getRanges()
+        condition = UI["GateConditionType"].InRange
+        right.itemData(condition).containers = ["right output"]
+        gate = model.getUsedGates()[1]
+        zone = model.convertGateToDeadzone(gate, 0.10)
+        self.assertEqual(model.getGateValues(), [-1.0, 0.15, 0.25, 1.0])
+        self.assertEqual(zone.fixed_value, 0.2)
+        self.assertIs(model.getRanges()[0], left)
+        self.assertIs(model.getRanges()[2], right)
+        self.assertEqual(right.itemData(condition).containers, ["right output"])
+
+        zone.itemData(condition).containers = ["deadzone output"]
+        triggers = [trigger for trigger in model.process_triggers(0.18) if trigger.condition == condition]
+        self.assertEqual([(trigger.mode, trigger.value) for trigger in triggers], [(UI["TriggerMode"].FixedValue, 0.2)])
+
+        restored = self.model()
+        node = ElementTree.fromstring(ElementTree.tostring(model.to_xml()))
+        restored.from_xml(node, InputItem())
+        self.assertEqual(restored.getGateValues(), model.getGateValues())
+        self.assertEqual(restored.getRanges()[1].fixed_value, 0.2)
+
+    def test_deadzone_at_axis_end_retains_boundary_gate_and_width(self):
+        model = self.model()
+        gate = model.getUsedGates()[-1]
+        zone = model.convertGateToDeadzone(gate, 0.20)
+        self.assertIs(zone.g2, gate)
+        self.assertEqual((zone.v1, zone.v2), (0.8, 1.0))
+        self.assertEqual(zone.fixed_value, 1.0)
+
+    def test_filtered_deadzone_suppresses_axis_updates_at_startup_and_entry(self):
+        model = self.model()
+        left = model.getRanges()[0]
+        gate = model.getUsedGates()[1]
+        zone = model.convertGateToDeadzone(gate, 0.10, suppress_output=True)
+        condition = UI["GateConditionType"].InRange
+        zone.itemData(condition).containers = ["deadzone output"]
+        left.itemData(condition).containers = ["normal output"]
+        for value, expected_outputs in ((0.20, []), (-0.1, [-0.1]), (0.18, []), (0.22, [])):
+            triggers = model.process_triggers(value)
+            self.assertEqual([trigger.value for trigger in triggers if trigger.condition == condition], expected_outputs)
 
 class GateConditionEditorTests(unittest.TestCase):
     @classmethod
