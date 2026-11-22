@@ -1,5 +1,7 @@
-
-# Copyright (C) 2015 - 2021 Lionel Ott
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -8,15 +10,15 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
 
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable  # noqa: UP035
 
 from gremlin import error
 
@@ -27,7 +29,7 @@ class TreeNode:
     Supports basic functionaolity for tree construction and modification.
     """
 
-    def __init__(self, value: Optional[Any] = None, parent: Optional[TreeNode] = None):
+    def __init__(self, value: Any | None = None, parent: TreeNode | None = None):
         """Creates a new tree instance.
 
         Args:
@@ -197,7 +199,7 @@ class TreeNode:
 
         raise error.GremlinError(f"No node with index {index} exists.")
 
-    def nodes_matching(self, predicate: Callable[[TreeNode], bool]) -> List[TreeNode]:
+    def nodes_matching(self, predicate: Callable[[TreeNode], bool]) -> list[TreeNode]:
         """Returns the list of nodes for which the predicate is true.
 
         Args:

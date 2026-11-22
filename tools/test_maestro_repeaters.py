@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Real Qt viewer/repeater checks with retained Maestro state and mocked OSC.
 
 Run: python tools/test_maestro_repeaters.py
@@ -199,6 +216,7 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.addCleanup(singleton.stop)
         self.targets[self.maestro.device_guid].maestro = self.output
         self.targets[self.key].maestro = self.output
+        ENV["get_output_target"] = macro.get_output_target
         macro.gremlin.joystick_handling.get_axis = lambda guid, axis: self.service._read_axis_raw(1, axis) / 32767
         ENV["get_axis"] = macro.gremlin.joystick_handling.get_axis
         macro.gremlin.joystick_handling.get_virtual_output_axis = get_virtual_output_axis
@@ -261,6 +279,23 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.assertAlmostEqual(widget.axis_widgets[2].value()[0], 0.5)
         self.assertEqual(widget.percent_widgets[2].text(), "75.0 %")
         self.assertEqual(self.service.client.write.call_count, 1)
+
+    def test_vjoy_axis_preview_receives_and_writes_failover_output(self):
+        self.targets[1] = self.targets[self.key]
+        self.vjoy.getAxisInputIdList = lambda: [2]
+        self.vjoy.getAxisLinearId = lambda input_id: 1
+        self.vjoy.getAxisName = self.vjoy.get_axis_name
+        self.output.axis(2).value = 0.5
+        widget = ENV["JoystickDeviceAxisStateWidget"](self.vjoy)
+        self.widgets.append(widget)
+        editor = widget.value_label_widgets[2]
+        self.assertAlmostEqual(editor.value(), 0.5, places=3)
+
+        self.output.axis(2).value = -0.5
+        pump_until(lambda: abs(editor.value() + 0.5) < 0.001)
+        editor.setValue(0.25)
+        self.assertAlmostEqual(self.output.axis(2).value, 0.25, places=3)
+        self.factory.assert_not_called()
 
     def test_vjoyremap_updates_published_maestro_after_directinput_discovery_clears_matches(self):
         for local in (False, True):

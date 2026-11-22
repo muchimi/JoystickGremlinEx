@@ -52,6 +52,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T108)
+
+- New: Map to Application action: added an application picker similar to Spy++'s picker.
+- Change: Map to Application action: added presets folder in the plugin (courtesy @johnb_vhgjb)
+- Change: Map to Application action: moved to updated standards (widgets, linter).
+- Change: UI: vjoy conditions are renamed to virtual conditions to reflect that a virtual device can be a bridge device or a vJoy device.
+- Fix: Virtual Remap action: in failover mode, initial profile start axis state did not use the failover device causing a device not found exception.
+- Fix: Virtual Remap action: in failover mode, it was possible for a vjoy condition to not use the failover device.
+- Fix: Overlay: in failover mode, the overlay module may still be looking for vjoy devices, not the failover device, causing an exception.
+- Fix: API (Modes): resolved an issue where some mode parenting information is lost and persisted to the profile as a top level mode due to new API supporting multiple virtual devices causing it to think the modes are separate.
+
 ### (m77T107)
 - New: API (DILL): DILL (the GEX C++ component) was updated to use XINPUT for gamepads XINPUT instead of DINPUT.  DINPUT is not well supported by current generation gamepads nor by Microsoft which has presented some odd issues. This will change the device GUID in an existing profile and it will need to be remapped via Tools > Device Remap...  There is no change in functionality as all of this is handled/translated at the C++ level.  New DILL version 1.6.2.0 bundled with GEX.  This will be installed with the\ GEX update and is not separately installed.  
 

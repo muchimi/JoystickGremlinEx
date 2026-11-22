@@ -1,4 +1,7 @@
-﻿# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -7,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 import copy
@@ -967,6 +970,13 @@ def get_axis(device_guid: str | dinput.GUID | int | DeviceSummary, input_id: int
 
 def get_virtual_output_axis(device: DeviceSummary, input_id: int) -> float:
     """Read retained virtual output when the provider exposes it."""
+    target = get_output_target(virtual_device_key(device))
+    if target is not None:
+        if target.kind == "maestro":
+            if input_id in target.device.axis_id_map:
+                return target.maestro.axis(input_id).value
+            return 0.0
+        device = target.device
     if device.device_type == DeviceType.VJoy:
         vjoy_device = VJoyProxy.vjoy_devices.get(device.vjoy_id)
         if vjoy_device is not None and vjoy_device.acquired and vjoy_device.is_axis_valid(axis_id=input_id):

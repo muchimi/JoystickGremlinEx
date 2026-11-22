@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Cross-feature virtual output regression checks with Qt and mocked providers.
 
 Run: python tools/test_virtual_output_selectors.py
@@ -43,7 +60,7 @@ def load(path, name, methods=None, base=None, env=ENV):
     return env[name]
 
 
-for name in ("parse_virtual_device_key", "virtual_device_key", "get_virtual_device", "get_output_device",
+for name in ("parse_virtual_device_key", "virtual_device_key", "get_virtual_device", "get_output_device", "get_virtual_output_axis",
              "getDeviceFromVjoyId", "getVjoyDeviceGuid", "getVjoyDeviceGuidStr", "is_vjoy_connected",
              "select_first_valid_vjoy_input", "VJoyProxy", "VjoyStart"):
     load("gremlin/joystick_handling.py", name)
@@ -56,6 +73,7 @@ Split = load("action_plugins/split_axis/__init__.py", "SplitAxis", {
 SplitFunctor = load("action_plugins/split_axis/__init__.py", "SplitAxisFunctor", {"process_event"}, "object")
 Remap = load("action_plugins/remap/__init__.py", "Remap", {"vjoy_id", "virtual_device", "_parse_xml", "_generate_xml"}, "object")
 RemapFunctor = load("action_plugins/remap/__init__.py", "RemapFunctor", {"process_event", "relative_axis_thread"}, "object")
+VjoyRemapReversal = load("action_plugins/map_to_vjoy/__init__.py", "VjoyRemap", {"reverse"}, "object")
 Profile = load("gremlin/base_profile.py", "Profile", {
     "list_unused_vjoy_inputs", "list_vjoy_mappings", "_parse_merge_axis",
 }, "object")
@@ -190,6 +208,35 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         Proxy()[1].axis(2).value = -0.5
         self.factory.assert_called_once_with(1)
 
+    def test_axis_preview_reads_direct_maestro_and_vjoy_failover(self):
+        target = self.targets[self.key]
+        self.targets[self.native_key] = target
+        target.maestro.axis(1).value = -0.625
+
+        self.assertEqual(ENV["get_virtual_output_axis"](self.vjoy, 1), -0.625)
+        self.assertEqual(ENV["get_virtual_output_axis"](self.maestro, 1), -0.625)
+        self.assertEqual(ENV["get_virtual_output_axis"](self.vjoy, 8), 0.0)
+        self.factory.assert_not_called()
+
+    def test_reverse_axis_sets_inversion_on_resolved_output(self):
+        action = VjoyRemapReversal()
+        action.usage_data = Mock()
+        action.vjoy_axis_id = 2
+        action.virtual_device = self.vjoy
+        action.reverse = True
+        action.usage_data.set_inverted.assert_called_once_with(self.vjoy.device_guid, 2, True)
+
+        action.usage_data.reset_mock()
+        self.targets[self.native_key] = self.targets[self.key]
+        action.reverse = False
+        action.usage_data.set_inverted.assert_called_once_with(self.maestro.device_guid, 2, False)
+
+        action.usage_data.reset_mock()
+        action.virtual_device = self.maestro
+        action.reverse = True
+        action.usage_data.set_inverted.assert_called_once_with(self.maestro.device_guid, 2, True)
+        self.assertTrue(action.reverse)
+
     def test_legacy_selector_offers_both_providers_and_serializable_keys(self):
         selector = Selector(Mock(), [macro.InputType.JoystickAxis])
         self.widgets.append(selector)
@@ -199,6 +246,19 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         selector.set_selection(macro.InputType.JoystickAxis, 1, 8)
         self.assertEqual(selector.get_selection()["device_id"], 1)
         self.assertEqual(selector.get_selection()["input_id"], 8)
+
+    def test_virtual_condition_selector_includes_defined_disconnected_vjoy(self):
+        self.vjoy.connected = False
+        selector = Selector(Mock(), [macro.InputType.JoystickAxis], include_disconnected=True)
+        self.widgets.append(selector)
+
+        self.assertEqual(selector.device_dropdown.count(), 2)
+        selector.set_selection(macro.InputType.JoystickAxis, self.vjoy.device_guid, 8)
+        self.assertEqual(selector.device_dropdown.currentText(), f"{self.vjoy.name} (disconnected)")
+        self.assertEqual(selector.get_selection()["device_id"], self.native_key)
+        selector.set_selection(macro.InputType.JoystickAxis, self.maestro.device_guid, 2)
+        self.assertEqual(selector.device_dropdown.currentText(), self.maestro.name)
+        self.assertEqual(selector.get_selection()["device_id"], self.key)
 
     def test_first_valid_plugin_output_uses_maestro_when_vjoy_is_absent(self):
         self.devices = [self.maestro]
@@ -445,6 +505,32 @@ class VirtualOutputSelectorTests(unittest.TestCase):
             self.assertTrue(ConditionFunctor(self.condition(kind)).process_event(NS(is_pressed=True), None))
         self.factory.assert_not_called()
 
+    def test_vjoy_conditions_read_maestro_failover_with_or_without_vjoy_metadata(self):
+        backend = self.backends[self.maestro.device_guid]
+        backend.axis(1).value = 0.5
+        backend.button(1).is_pressed = True
+        backend.hat(1).direction = (0, 1)
+        target = self.targets[self.key]
+        legacy_guid = str(self.vjoy.device_guid)
+        self.targets[self.native_key] = self.targets[legacy_guid] = target
+
+        with patch.object(macro.gremlin.input_devices, "JoystickProxy") as proxy:
+            for devices in ([self.vjoy, self.maestro], [self.maestro]):
+                self.devices = devices
+                for key in (self.native_key, legacy_guid):
+                    for kind in (macro.InputType.JoystickAxis, macro.InputType.JoystickButton, macro.InputType.JoystickHat):
+                        with self.subTest(key=key, kind=kind, has_placeholder=self.vjoy in devices):
+                            data = self.condition(kind).to_xml()
+                            data.set("vjoy-id", str(key))
+                            restored = Condition()
+                            restored.from_xml(data)
+                            self.assertEqual(restored.device_name, self.maestro.name)
+                            self.assertTrue(ConditionFunctor(restored).process_event(NS(is_pressed=True), None))
+                            saved = restored.to_xml()
+                            self.assertEqual(saved.get("condition-type"), "vjoy")
+                            self.assertEqual(saved.get("vjoy-id"), str(key))
+            proxy.assert_not_called()
+
     def binding(self, kind="axis"):
         return {"source": "vjoy", "device_guid": self.key, "vjoy_id": 1, "input_type": kind, "input_id": 1}
 
@@ -452,6 +538,15 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         self.assertEqual(len(ENV["overlay_vjoy_devices"]("axis")), 2)
         self.assertEqual(ENV["overlay_virtual_key"](self.binding()), self.key)
         self.assertIs(ENV["_vjoy_target"](self.binding())[1], self.maestro)
+
+    def test_overlay_uses_routed_vjoy_guid_without_configured_metadata(self):
+        self.devices.remove(self.vjoy)
+        binding = dict(self.binding(), device_guid=str(self.vjoy.device_guid))
+        self.targets[binding["device_guid"]] = self.targets[self.key]
+
+        self.assertTrue(ENV["write_axis"](binding, 0.5))
+        self.assertEqual(ENV["read_axis"](binding, 1), 0.5)
+        self.factory.assert_not_called()
 
     def test_overlay_writes_and_reads_all_maestro_input_types(self):
         self.assertTrue(ENV["write_axis"](self.binding(), -0.625))
@@ -547,8 +642,9 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         spec = ENV["_normalize_node"]({"kind": "output", "props": {"vjoy_id": self.key, "axis_id": 12}})
         self.assertEqual(json.loads(json.dumps(spec))["props"]["vjoy_id"], self.key)
         self.assertEqual(spec["props"]["axis_id"], 12)
-        ENV["_write_output"](self.key, 1, 0.875)
+        ENV["_write_output"](self.key, 1, 0.875, is_remote=True, client_list=[1])
         self.assertEqual(self.backends[self.maestro.device_guid].axis(1).value, 0.875)
+        macro.REMOTE.send_axis.assert_called_once_with(self.key, 1, 0.875, client_list=[1])
         self.factory.assert_not_called()
 
     def test_afcs_graph_load_and_capture_preserve_maestro_target(self):

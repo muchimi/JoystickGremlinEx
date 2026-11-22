@@ -1,17 +1,7 @@
-# -*- coding: utf-8; -*-
-
-# GremlinEx (GEX) action "Map to Application" 1.0 (EN) - Joop de Hoog, 14-11-2026
-# The presets stay in <Joystick Gremlin Ex>\gex_apps when GremlinEx's option
-# "Version based Configuration Data" is on (GremlinEx then uses <Joystick Gremlin Ex>_<version>).
-#
-# Based on GremlinEx's own action "Map to Keyboard/Mouse Ex" (action_plugins/map_to_keyboard_ex),
-# Gremlin Ex is (C) EMCS 2026, based in part on original Joystick Gremlin work by Lionel Ott and
-# other contributors. Also inspired by the AutoHotkey tool ryanwoodie/XCSoar-LK8000-LXSim-hotkeys.
-#
-# Changes from map_to_keyboard_ex: the remote options are removed (delivery is local only); a target
-# application with a DELIVERY (Window / Focus and return) is added; Source Preset / Manual with preset
-# files <Joystick Gremlin Ex>\gex_apps\*.ini; UI element functions (presets only); keys and mouse
-# buttons are delivered by gex_core.py instead of gremlin.keyboard / gremlin.macro.
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Module created by Joop de Hoog, 14-11-2026 for the map to application action
+# Modified for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,13 +10,16 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 
 """Map to Application: send keys or mouse buttons to an application, with or without a focus change.
+
+Modified for m77 by Muchimi for UI consistency with other plugins
 
 Delivery
   window  PostMessage into the application's main window (or the window_class child from the preset);
@@ -34,8 +27,8 @@ Delivery
   focus   Focus and return: the application comes to the front, real input (SendInput), the focus goes
           back to the window that was in front, or to the main application 'sim' (CoMoMap, Discord ...)
 Application
-  <preset>  choose an application preset (gex_apps\\*.ini), then a function; the values are STORED in the
-            profile, so the profile works without the ini (changes to an ini: run gex_update_presets)
+  <preset>  choose a preset from the plugin's presets folder or the user's gex_apps folder, then a function;
+            the values are stored in the profile, so the profile works without the ini file
   (none)    target application, window title, delivery and key combination set by hand
 Shared code: gex_core.py (copied into this folder by install_gex_actions.bat).
 """
@@ -43,10 +36,12 @@ Shared code: gex_core.py (copied into this folder by install_gex_actions.bat).
 import html
 import logging
 import math
+from pathlib import Path
 import time
 
 from lxml import etree as ElementTree
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QLabel
 from shiboken6 import Shiboken
 
 import gremlin.base_profile
@@ -57,54 +52,95 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.repeater
 import gremlin.shared_state
-import gremlin.ui.ui_common
 import gremlin.ui.virtual_keyboard
 import gremlin.util
+import gremlin.win32_core as core
 import vjoy.vjoy
 from gremlin.input_types import InputType
 from gremlin.keyboard import sort_keys
 from gremlin.types import KeyboardOutputMode, SyncMode
+from gremlin.ui.ui_common import (
+    Buttons,
+    Color,
+    InputListenerWidget,
+    QDataComboBox,
+    QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
+    QDelayWidget,
+    QExecuteWidget,
+    QFloatLineEdit,
+    QHorizontalLine,
+    QIconPushButton,
+    QInfoBox,
+    QIntLineEdit,
+    QSyncModeWidget,
+    QWarningWidget,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
+    synchronize_grids,
+)
 from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 from gremlin.util import load_icon
-
-from . import gex_core as core
+from gremlin.window_picker import WindowPickerButton
 
 syslog = logging.getLogger("system")
 VERSION = "1.0"
+PLUGIN_PRESETS_FOLDER = Path(__file__).with_name("presets")
+
+
+def _load_application_presets(warn):
+    """Load optional plugin presets and let user presets override matching names."""
+    presets = {}
+    if PLUGIN_PRESETS_FOLDER.is_dir():
+        presets.update(core.load_presets(PLUGIN_PRESETS_FOLDER, warn=warn))
+    presets.update(core.load_presets(warn=warn))
+    return dict(sorted(presets.items(), key=lambda entry: entry[0].casefold()))
 
 syslog.info(f"{core.TAG}: Map to Application {VERSION} loaded (gex_core {core.VERSION})")
 if core.VERSION != VERSION:
     syslog.warning(f"{core.TAG}: Map to Application {VERSION} expects gex_core {VERSION}, found {core.VERSION}")
 try:
     core.log_presets_folder()
-except Exception as e:
+    if PLUGIN_PRESETS_FOLDER.is_dir():
+        syslog.info(f"{core.TAG}: additional presets from {PLUGIN_PRESETS_FOLDER}")
+except Exception as e:  # noqa: BLE001
     syslog.warning(f"{core.TAG}: presets folder not determined: {e}")
 
 DELIVERY = [("window", "Window (no focus change)"), ("focus", "Focus and return")]
 DELIVERY_SHORT = {"window": "Window", "focus": "Focus and return"}
 DELIVERY_HELP = {
     "window": "<b>Window</b>: the input goes only into the target application's main window (or into the child "
-              "window set with window_class in the preset). A mouse button clicks on the fixed point, or where "
-              "the mouse is when it is over the application, otherwise in the middle of its window; the mouse "
-              "pointer does not move. The application in front keeps the focus and never sees the input. For "
-              "applications that read input from their own window (for example LXSim, XCSoar, LK8000).",
+    "window set with window_class in the preset). A mouse button clicks on the fixed point, or where "
+    "the mouse is when it is over the application, otherwise in the middle of its window; the mouse "
+    "pointer does not move. The application in front keeps the focus and never sees the input. For "
+    "applications that read input from their own window (for example LXSim, XCSoar, LK8000).",
     "focus": "<b>Focus and return</b>: the target application is brought to the front, the input is sent as real "
-             "keystrokes or mouse clicks (on the fixed point - the mouse moves there and back - or where the mouse "
-             "is), then the focus goes back to the window that was in front. For applications that react only "
-             "while they are in front, or that listen to the keyboard globally (for example CoMoMap, Discord, "
-             "TeamSpeak). The application in front loses the focus for a moment. Every output mode acts as Pulse "
-             "Single; Duration is the time the input is held.",
+    "keystrokes or mouse clicks (on the fixed point - the mouse moves there and back - or where the mouse "
+    "is), then the focus goes back to the window that was in front. For applications that react only "
+    "while they are in front, or that listen to the keyboard globally (for example CoMoMap, Discord, "
+    "TeamSpeak). The application in front loses the focus for a moment. Every output mode acts as Pulse "
+    "Single; Duration is the time the input is held.",
     "uia": "<b>UI element</b>: the named control in the application is pressed through UI Automation, without "
-           "keys. If the application takes the focus doing so, the focus is given back. Every output mode acts "
-           "as Pulse Single.",
+    "keys. If the application takes the focus doing so, the focus is given back. Every output mode acts "
+    "as Pulse Single.",
 }
 
 # mouse button -> Windows virtual key (used to find GremlinEx's own Key object for display)
 _MOUSE_VK = {"left": 0x01, "right": 0x02, "middle": 0x04, "x1": 0x05, "x2": 0x06}
-_MOUSE_LABEL = {"left": "Mouse Left", "right": "Mouse Right", "middle": "Mouse Middle", "x1": "Mouse Back",
-                "x2": "Mouse Forward", "wheel_up": "Wheel Up", "wheel_down": "Wheel Down",
-                "wheel_left": "Wheel Left", "wheel_right": "Wheel Right"}
-_KEY_CACHE = {}                 # item -> GremlinEx Key object (for display and the virtual keyboard)
+_MOUSE_LABEL = {
+    "left": "Mouse Left",
+    "right": "Mouse Right",
+    "middle": "Mouse Middle",
+    "x1": "Mouse Back",
+    "x2": "Mouse Forward",
+    "wheel_up": "Wheel Up",
+    "wheel_down": "Wheel Down",
+    "wheel_left": "Wheel Left",
+    "wheel_right": "Wheel Right",
+}
+_KEY_CACHE = {}  # item -> GremlinEx Key object (for display and the virtual keyboard)
 
 
 def _bool(node, key, default):
@@ -123,19 +159,31 @@ def _num(node, key, kind, default):
         if not math.isfinite(value):
             raise ValueError("number must be finite")
         return int(value) if kind is int else value
-    except (TypeError, ValueError, OverflowError):
-        syslog.warning(f"{core.TAG}: Map to Application: bad value {key}=\"{v}\" in the profile; using {default}")
+    except TypeError, ValueError, OverflowError:
+        syslog.warning(f'{core.TAG}: Map to Application: bad value {key}="{v}" in the profile; using {default}')
         return default
 
 
 # ============================================================================ items <-> GremlinEx keys
 # Joystick Gremlin MouseButton values (gremlin.types.MouseButton)
-_MOUSE_VALUE = {1: "left", 2: "right", 3: "middle", 4: "x1", 5: "x2",
-                10: "wheel_up", 11: "wheel_down", 12: "wheel_left", 13: "wheel_right"}
-_MOUSE_WORDS = (("wheel up", "wheel_up"), ("wheel down", "wheel_down"), ("wheel left", "wheel_left"),
-                ("wheel right", "wheel_right"), ("wheelup", "wheel_up"), ("wheeldown", "wheel_down"),
-                ("wheelleft", "wheel_left"), ("wheelright", "wheel_right"), ("left", "left"), ("right", "right"),
-                ("middle", "middle"), ("back", "x1"), ("forward", "x2"), ("x1", "x1"), ("x2", "x2"))
+_MOUSE_VALUE = {1: "left", 2: "right", 3: "middle", 4: "x1", 5: "x2", 10: "wheel_up", 11: "wheel_down", 12: "wheel_left", 13: "wheel_right"}
+_MOUSE_WORDS = (
+    ("wheel up", "wheel_up"),
+    ("wheel down", "wheel_down"),
+    ("wheel left", "wheel_left"),
+    ("wheel right", "wheel_right"),
+    ("wheelup", "wheel_up"),
+    ("wheeldown", "wheel_down"),
+    ("wheelleft", "wheel_left"),
+    ("wheelright", "wheel_right"),
+    ("left", "left"),
+    ("right", "right"),
+    ("middle", "middle"),
+    ("back", "x1"),
+    ("forward", "x2"),
+    ("x1", "x1"),
+    ("x2", "x2"),
+)
 
 
 def _mouse_item_from_key(key):
@@ -150,15 +198,14 @@ def _mouse_item_from_key(key):
             name = _MOUSE_VALUE.get(int(getattr(mb, "value", mb)))
             if name:
                 return core.mouse_item(name)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
     for text in (str(mb or ""), str(getattr(key, "name", "") or "")):
         low = text.lower()
         for word, name in _MOUSE_WORDS:
             if word in low:
                 return core.mouse_item(name)
-    syslog.warning(f"{core.TAG}: Map to Application: unknown mouse button {mb!r} ({type(mb).__name__}) "
-                   f"name [{getattr(key, 'name', '')}]")
+    syslog.warning(f"{core.TAG}: Map to Application: unknown mouse button {mb!r} ({type(mb).__name__}) name [{getattr(key, 'name', '')}]")
     return None
 
 
@@ -190,7 +237,7 @@ def key_from_item(item):
             if k is None or getattr(k, "virtual_code", vk) != vk:
                 k = km.find_virtual(vk) or k
             key = k
-    except Exception:
+    except Exception:  # noqa: BLE001
         key = None
     if key is not None and getattr(key, "name", None):
         _KEY_CACHE[item] = key
@@ -204,7 +251,7 @@ def item_label(item):
     key = key_from_item(item)
     try:
         name = gremlin.keyboard.KeyMap.get_name(key) if key is not None else ""
-    except Exception:
+    except Exception:  # noqa: BLE001
         name = ""
     return name or core.items_to_text([item])
 
@@ -221,81 +268,75 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        a = self.action_data
-        uic = gremlin.ui.ui_common
+        action_data = self.action_data
         self.presets = {}
         self._listened = []
         self._kbd_suspended = False
 
         # 1. application: a preset, or (none) for manual settings
-        self.preset_app_cb = QtWidgets.QComboBox()
-        self.preset_app_cb.setMinimumWidth(200)
-        self.preset_app_cb.setToolTip(f"Choose an application preset (from {core.presets_folder()}), "
-                                      "or (none) to set target, delivery and keys yourself")
-        self.reload_btn = QtWidgets.QPushButton("Reload")
-        self.reload_btn.setToolTip(f"Read the preset files again from {core.presets_folder()}")
-        self.preset_func_cb = QtWidgets.QComboBox()
-        self.preset_func_cb.setMinimumWidth(260)
-        self.preset_func_cb.setToolTip("Choosing a function fills in the input; the values are stored in the profile")
-        app_row = uic.getHContainer([self.preset_app_cb, self.reload_btn], "Application:", widget_only=True)
-        func_row = uic.getHContainer(self.preset_func_cb, "Function:", widget_only=True)
+        self.preset_app_cb = QDataComboBox(
+            tooltip="Choose a preset from the plugin's presets folder or your gex_apps folder, or choose (none) to set the target, delivery and keys yourself"
+        )
+        self.reload_btn = QDataPushButton("Reload", tooltip="Read the preset files again from the plugin and user folders")
+        self.preset_func_cb = QDataComboBox(tooltip="Choosing a function fills in the input; the values are stored in the profile")
+        app_row = getHContainer([self.preset_app_cb, self.reload_btn], "Application:", widget_only=True)
+        func_row = getHContainer(self.preset_func_cb, "Function:", widget_only=True)
         self.preset_info = QtWidgets.QLabel()
         self.preset_info.setWordWrap(True)
         self.running_lbl = QtWidgets.QLabel()
-        info_row = QtWidgets.QWidget()
-        il = QtWidgets.QHBoxLayout(info_row)
-        il.setContentsMargins(0, 0, 0, 0)
-        il.addWidget(self.preset_info, 1)
-        il.addWidget(self.running_lbl)
+        info_row = getHContainer([(self.preset_info, 1), self.running_lbl], right_stretch=False, set_alignment=False, widget_only=True)
         self.uia_lbl = QtWidgets.QLabel()
-        self.list_elements_btn = QtWidgets.QPushButton("List elements...")
-        self.list_elements_btn.setToolTip("Show the pressable UI elements of the running application "
-                                          "(the chosen one is copied to the clipboard as a preset line)")
-        self.uia_row = uic.getHContainer([self.uia_lbl, self.list_elements_btn], widget_only=True)
-        self.preset_container = uic.getVContainer([func_row, info_row, self.uia_row], widget_only=True)
+        self.list_elements_btn = QDataPushButton(
+            "List elements...", tooltip="Show the pressable UI elements of the running application (the chosen one is copied to the clipboard as a preset line)"
+        )
+        self.uia_row = getHContainer([self.uia_lbl, self.list_elements_btn], widget_only=True)
+        self.preset_container = getVContainer([func_row, info_row, self.uia_row], widget_only=True)
 
         # 2. manual (application = none)
-        self.program_ed = QtWidgets.QLineEdit(a.program)
+        self.program_ed = QDataLineEdit(action_data.program)
         self.program_ed.setPlaceholderText("process name, e.g. LXSim.exe")
-        self.pick_btn = QtWidgets.QPushButton("Select...")
-        self.pick_btn.setToolTip("Choose from the running programs")
-        self.title_ed = QtWidgets.QLineEdit(a.window_title)
+        self.pick_btn = QDataPushButton("Select...", tooltip="Choose from the running programs")
+        self.window_picker = WindowPickerButton(parent=self)
+        self.window_picker.picking_started.connect(self._window_pick_started)
+        self.window_picker.window_picked.connect(self._window_picked)
+        self.window_picker.status_changed.connect(self._set_status)
+        self.title_ed = QDataLineEdit(action_data.window_title)
         self.title_ed.setPlaceholderText("optional")
-        target_row = uic.getHContainer([self.program_ed, self.pick_btn], "Target app:", widget_only=True)
-        title_row = uic.getHContainer(self.title_ed, "Window title:", widget_only=True)
+        target_row = getHContainer([self.program_ed, self.pick_btn, self.window_picker], "Target app:", widget_only=True)
+        title_row = getHContainer(self.title_ed, "Window title:", widget_only=True)
         self.delivery_buttons = []
         for key, label in DELIVERY:
-            rb = uic.QDataRadioButton(label, key)
-            rb.setChecked(a.delivery == key)
+            rb = QDataRadioButton(label, key)
+            rb.setChecked(action_data.delivery == key)
             rb.clicked.connect(self._delivery_changed)
             self.delivery_buttons.append(rb)
-        delivery_row = uic.getHContainer(self.delivery_buttons, "Delivery:", widget_only=True)
+        delivery_row = getHContainer(self.delivery_buttons, "Delivery:", widget_only=True)
 
         # key combination (as Map to Keyboard/Mouse Ex)
         self.key_combination = QtWidgets.QLabel("<b>Key combination:</b>")
-        self.display_container_widget, self.display_container_layout = uic.getVContainer()
-        self.key_combination_widget, self.key_combination_layout = uic.getHContainer()
+        self.display_container_widget, self.display_container_layout = getVContainer()
+        self.key_combination_widget, self.key_combination_layout = getHContainer()
         widget = gremlin.ui.virtual_keyboard.QKeyWidget()
         self._key_height = widget.desiredHeight
         self.display_container_widget.setMinimumHeight(self._key_height + 4)
         self.display_container_layout.addWidget(self.key_combination_widget)
 
-        self.listen_multi_widget = uic.Buttons.getListenWidget(label="Listen (multi)", callback=self._record_multi_keys_cb)
+        self.listen_multi_widget = Buttons.getListenWidget(label="Listen (multi)", callback=self._record_multi_keys_cb)
         self.listen_multi_widget.setToolTip(
             "Listen for multiple inputs.  Click on ok when done.  Clicks on the buttons will not be included in the recorded list."
         )
-        self.listen_widget = uic.Buttons.getListenWidget(callback=self._record_keys_cb)
-        self.listen_widget.setToolTip("Listen for a single input.")
-        self.show_keyboard_widget = uic.QIconPushButton("Select...")
-        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=uic.Color().listenColor()))
-        self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
-        self.show_keyboard_widget.setToolTip("Select keys using the virtual keyboard")
-        self.show_keyboard_widget.setFixedHeight(24)  # match the other buttons
-        self.clear_widget = uic.Buttons.getClearWidget(callback=self._clear_keys_cb)
-        self.clear_widget.setToolTip("Clears the current keys")
-        self.copy_line_btn = QtWidgets.QPushButton("Copy as preset line")
-        self.copy_line_btn.setToolTip("Copy this input as a line for a preset file ([functions] section) to the clipboard")
-        self.container_action_widget = uic.getHContainer(
+        self.listen_widget = Buttons.getListenWidget(callback=self._record_keys_cb, tooltip="Listen for a single input.")
+
+        self.show_keyboard_widget = QIconPushButton("Select...", callback=self._select_keys_cb, tooltip="Select keys using the virtual keyboard")
+        self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color=Color().listenColor()))
+
+        # self.show_keyboard_widget.setFixedHeight(24)  # match the other buttons
+        self.clear_widget = Buttons.getClearWidget(callback=self._clear_keys_cb, tooltip="Clear the current keys")
+        self.copy_line_btn = QDataPushButton(
+            "Copy as preset line", tooltip="Copy this input as a line for a preset file ([functions] section) to the clipboard"
+        )
+
+        self.container_action_widget = getHContainer(
             [self.clear_widget, self.listen_widget, self.listen_multi_widget, self.show_keyboard_widget, self.copy_line_btn],
             widget_only=True,
         )
@@ -303,70 +344,64 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         # click position (only when the input has a mouse button)
         self.click_buttons = []
         for key, label in (("mouse", "Where the mouse is"), ("fixed", "Fixed point")):
-            rb = uic.QDataRadioButton(label, key)
-            rb.setChecked(a.click_pos == key)
+            rb = QDataRadioButton(label, key)
+            rb.setChecked(action_data.click_pos == key)
             rb.clicked.connect(self._click_pos_changed)
             self.click_buttons.append(rb)
         self.click_buttons[0].setToolTip("Click where the mouse is when it is over the application, otherwise in the middle of its window")
         self.click_buttons[1].setToolTip("Always click on the same spot in the application's window")
-        self.click_x_box = QtWidgets.QDoubleSpinBox()
-        self.click_y_box = QtWidgets.QDoubleSpinBox()
-        for box, value in ((self.click_x_box, a.click_x), (self.click_y_box, a.click_y)):
-            box.setDecimals(1)
-            box.setRange(0, 100 if a.click_unit == "%" else 10000)
-            box.setValue(value)
+        self.click_x_box = QFloatLineEdit(decimals=1, step=1.0)
+        self.click_y_box = QFloatLineEdit(decimals=1, step=1.0)
+        self._sync_click_fields()
+        for box in (self.click_x_box, self.click_y_box):
             box.setMinimumWidth(70)
             box.valueChanged.connect(self._click_xy_changed)
-        self.click_unit_lbl = QtWidgets.QLabel()
-        self.pick_btn2 = QtWidgets.QPushButton("Pick...")
-        self.pick_btn2.setToolTip("Then click on the spot in the application (Esc to cancel)")
-        self.pick_btn2.clicked.connect(self._pick_start)
-        self.click_row = uic.getHContainer(
-            self.click_buttons + [QtWidgets.QLabel("X:"), self.click_x_box, QtWidgets.QLabel("Y:"), self.click_y_box,
-                                  self.click_unit_lbl, self.pick_btn2],
-            "Click position:", widget_only=True,
+        self.click_unit_lbl = QLabel("")
+        self.pick_btn2 = QDataPushButton("Pick...", tooltip="Then click on the spot in the application (Esc to cancel)", callback=self._pick_start)
+
+        self.click_row = getHContainer(
+            self.click_buttons + [QLabel("X:"), self.click_x_box, QLabel("Y:"), self.click_y_box, self.click_unit_lbl, self.pick_btn2],
+            "Click position:",
+            widget_only=True,
         )
         self._pick_timer = None
 
-        self.manual_container = uic.getVContainer(
-            [target_row, title_row, delivery_row, self.key_combination, self.display_container_widget,
-             self.container_action_widget, self.click_row],
+        self.manual_container = getVContainer(
+            [target_row, title_row, delivery_row, self.key_combination, self.display_container_widget, self.container_action_widget, self.click_row],
             widget_only=True,
         )
 
         # 4. always: output mode, duration, interval, execute on (as Map to Keyboard/Mouse Ex)
-        self.delay_box = uic.QDelayWidget(a.delay)
-        self.autorepeat_delay_box = uic.QDelayWidget(a.autorepeat_delay)
-        self.delay_box.setValue(a.delay)
-        self.autorepeat_delay_box.setValue(a.autorepeat_delay)
+        self.delay_box = QDelayWidget(action_data.delay)
+        self.autorepeat_delay_box = QDelayWidget(action_data.autorepeat_delay)
+        self.delay_box.setValue(action_data.delay)
+        self.autorepeat_delay_box.setValue(action_data.autorepeat_delay)
         widgets = []
         for mode in KeyboardOutputMode:
-            rb = uic.QDataRadioButton(KeyboardOutputMode.to_displayname(mode), mode)
-            rb.setChecked(a.mode == mode)
+            rb = QDataRadioButton(KeyboardOutputMode.to_displayname(mode), mode)
+            rb.setChecked(action_data.mode == mode)
             rb.clicked.connect(self._mode_changed)
             widgets.append(rb)
         self.delay_box.valueChanged.connect(self._delay_changed)
         self.autorepeat_delay_box.valueChanged.connect(self._autorepeat_changed)
-        self.container_options_widget = uic.getGridContainer(
-            uic.getGridContainer(widgets, widget_only=True), "Output Mode:", widget_only=True, left_margin=12
-        )
-        self.delay_row = uic.getGridContainer(self.delay_box, "Duration (ms):", widget_only=True)
-        self.autorepeat_row = uic.getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only=True)
+        self.container_options_widget = getGridContainer(getGridContainer(widgets, widget_only=True), "Output Mode:", widget_only=True, left_margin=12)
+        self.delay_row = getGridContainer(self.delay_box, "Duration (ms):", widget_only=True)
+        self.autorepeat_row = getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only=True)
         widgets = [self.delay_row, self.autorepeat_row]
-        self.container_delay_widget = uic.getVContainer(widgets, widget_only=True, left_margin=12)
+        self.container_delay_widget = getVContainer(widgets, widget_only=True, left_margin=12)
         widgets.append(self.container_options_widget)
-        uic.synchronize_grids(widgets)
+        synchronize_grids(widgets)
 
-        self._execute_widget = uic.QExecuteWidget(a.exec_on_press, a.exec_on_release)
+        self._execute_widget = QExecuteWidget(action_data.exec_on_press, action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
-        exec_container = uic.getHContainer([self._execute_widget], widget_only=True)
-        self._sync_widget = uic.QSyncModeWidget(
-            mode=a.sync_mode, label="State on profile start:", sync_modes=[SyncMode.Ignore, SyncMode.Input], callback=self._sync_changed
+        exec_container = getHContainer([self._execute_widget], widget_only=True)
+        self._sync_widget = QSyncModeWidget(
+            mode=action_data.sync_mode, label="State on profile start:", sync_modes=[SyncMode.Ignore, SyncMode.Input], callback=self._sync_changed
         )
-        sync_container = uic.getHContainer(self._sync_widget, left_margin=12, widget_only=True)
-        widget = uic.QIntLineEdit(value=a.wheel_factor, min_range=1, max_range=100, callback=self._handle_wheel_factor_changed)
-        self.wheel_factor_container = uic.getHContainer(
+        sync_container = getHContainer(self._sync_widget, left_margin=12, widget_only=True)
+        widget = QIntLineEdit(value=action_data.wheel_factor, min_range=1, max_range=100, callback=self._handle_wheel_factor_changed)
+        self.wheel_factor_container = getHContainer(
             widget,
             "Mouse Wheel Factor:",
             widget_only=True,
@@ -375,17 +410,27 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         # 5. test, information, warnings
-        self.test_btn = QtWidgets.QPushButton("Test now")
+        self.test_btn = QDataPushButton("Test now")
         self.test_btn.setToolTip("Send the input once (Pulse Single) to the application")
-        self.status_lbl = QtWidgets.QLabel("")
-        test_row = uic.getHContainer([self.test_btn, self.status_lbl], widget_only=True)
-        self.description_widget = uic.QInfoBox(hide_key=self.__class__.__name__)
-        self.warning_widget = uic.QWarningWidget()
+        self.status_lbl = QLabel("")
+        test_row = getHContainer([self.test_btn, self.status_lbl], widget_only=True)
+        self.description_widget = QInfoBox(hide_key=self.__class__.__name__)
+        self.warning_widget = QWarningWidget()
 
-        for w in (app_row, self.preset_container, self.manual_container,
-                  uic.QHorizontalLine(), self.container_options_widget, self.container_delay_widget,
-                  self.wheel_factor_container, exec_container, sync_container, test_row,
-                  self.description_widget, self.warning_widget):
+        for w in (
+            app_row,
+            self.preset_container,
+            self.manual_container,
+            QHorizontalLine(),
+            self.container_options_widget,
+            self.container_delay_widget,
+            self.wheel_factor_container,
+            exec_container,
+            sync_container,
+            test_row,
+            self.description_widget,
+            self.warning_widget,
+        ):
             self.main_layout.addWidget(w)
         self.main_layout.addStretch()
 
@@ -413,7 +458,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
     def _modified(self):
         try:
             self.action_modified.emit()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     # ------------------------------------------------------------------ application / presets
@@ -423,7 +468,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
 
     def _fill_presets(self, warn=False):
         a = self.action_data
-        self.presets = core.load_presets(warn=warn)
+        self.presets = _load_application_presets(warn)
         cb = self.preset_app_cb
         current = a.preset_app if self._uses_preset() else ""
         with QtCore.QSignalBlocker(cb):
@@ -436,7 +481,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
             cb.setCurrentIndex(max(0, cb.findData(current)))
         self._fill_functions()
         if warn:
-            self.status_lbl.setText(f"{len(self.presets)} preset(s) read from {core.presets_folder()}")
+            self.status_lbl.setText(f"{len(self.presets)} preset(s) loaded")
             self._update_ui()
 
     def _fill_functions(self):
@@ -480,9 +525,9 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
             self._modified()
             return
         if preset is None:
-            return                                   # 'file not found' entry: keep the stored values
+            return  # 'file not found' entry: keep the stored values
         if self._uses_preset() and a.preset_app == preset.name:
-            return                                   # the same application chosen again: nothing changes
+            return  # the same application chosen again: nothing changes
         a.source = "preset"
         a.preset_app, a.preset_function = preset.name, ""
         self._apply_app_settings(preset)
@@ -498,7 +543,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         preset = self.presets.get(self.preset_app_cb.currentData() or "")
         func = preset.function(self.preset_func_cb.currentData() or "") if preset else None
         if func is None:
-            self._fill_functions()                   # placeholder chosen: show the stored function again
+            self._fill_functions()  # placeholder chosen: show the stored function again
             return
         a.source = "preset"
         a.preset_app, a.preset_function = preset.name, func.name
@@ -549,7 +594,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         def job():
             try:
                 names = core.uia_names(program, title)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 syslog.warning(f"{core.TAG}: List elements: {e}")
                 names = []
             gremlin.util.InvokeUiMethod(self._show_elements, names)
@@ -564,8 +609,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
             self.status_lbl.setText("No pressable UI elements found")
             return
         self.status_lbl.setText(f"{len(names)} UI element(s)")
-        item, ok = QtWidgets.QInputDialog.getItem(self, "UI elements", f"Pressable UI elements in {a.program}:",
-                                                  names, 0, False)
+        item, ok = QtWidgets.QInputDialog.getItem(self, "UI elements", f"Pressable UI elements in {a.program}:", names, 0, False)
         if ok and item:
             QtWidgets.QApplication.clipboard().setText(f"{item} = uia:{item}")
             self.status_lbl.setText("Copied to the clipboard as a preset line")
@@ -596,6 +640,18 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
             self.program_ed.setText(item)
             self._target_changed()
 
+    def _window_pick_started(self):
+        if self._pick_timer is not None:
+            self._pick_stop("Click position pick cancelled")
+
+    def _window_picked(self, program, title):
+        a = self.action_data
+        if (program, title, "") != (a.program, a.window_title, a.window_class):
+            a.program, a.window_title, a.window_class = program, title, ""
+            self._sync_manual_fields()
+            self._update_ui()
+            self._modified()
+
     def _delivery_changed(self):
         self.action_data.delivery = self.sender().data
         self._update_ui()
@@ -606,20 +662,29 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         a = self.action_data
         for rb in self.click_buttons:
             rb.setChecked(rb.data == a.click_pos)
+        maximum = 100 if a.click_unit == "%" else 10000
         for box, value in ((self.click_x_box, a.click_x), (self.click_y_box, a.click_y)):
             with QtCore.QSignalBlocker(box):
-                box.setRange(0, 100 if a.click_unit == "%" else 10000)
-                box.setValue(value)
+                box.setRange(0, maximum)
+                box.setValue(round(min(max(value, 0.0), maximum), 1))
 
     def _click_pos_changed(self):
         self.action_data.click_pos = self.sender().data
         self._update_ui()
         self._modified()
 
-    def _click_xy_changed(self, *_):
+    def _click_xy_changed(self, value):
+        if not math.isfinite(value):
+            self._sync_click_fields()
+            return
+
         a = self.action_data
-        a.click_x, a.click_y = float(self.click_x_box.value()), float(self.click_y_box.value())
-        self._modified()
+        box = self.sender()
+        box.setValue(round(min(max(value, 0.0), box.maximum()), 1), emit=False)
+        coordinates = self.click_x_box.value(), self.click_y_box.value()
+        if coordinates != (a.click_x, a.click_y):
+            a.click_x, a.click_y = coordinates
+            self._modified()
 
     def _pick_start(self):
         a = self.action_data
@@ -629,7 +694,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if not core.is_running(a.program, a.window_title):
             self.status_lbl.setText(f"{a.program or 'Target app'} not running")
             return
-        self._pick_wait_release = True               # the click on Pick... itself does not count
+        self._pick_wait_release = True  # the click on Pick... itself does not count
         self._pick_deadline = time.time() + 15
         self._pick_timer = QtCore.QTimer(self)
         self._pick_timer.setInterval(20)
@@ -651,7 +716,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
         a = self.action_data
-        if core.button_down(0x1B):                   # Esc
+        if core.button_down(0x1B):  # Esc
             self._pick_stop("Pick cancelled")
             return
         if time.time() > self._pick_deadline:
@@ -660,7 +725,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if self._pick_wait_release:
             self._pick_wait_release = core.button_down(0x01)
             return
-        down = core.button_down(0x01, or_since_last=True)   # left mouse button (also a very short click)
+        down = core.button_down(0x01, or_since_last=True)  # left mouse button (also a very short click)
         if not down:
             return
         click = core.click_from_screen(a.program, a.window_title, core.cursor_pos())
@@ -695,10 +760,9 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if not a.items:
             if a.function_kind == "uia" and a.uia_name:
                 text = f"UI element <i>{html.escape(a.uia_name)}</i> (from a preset). Choose keys to replace it."
-                self.key_combination_layout.addWidget(QtWidgets.QLabel(text))
+                self.key_combination_layout.addWidget(QLabel(text))
             else:
-                self.key_combination_layout.addWidget(
-                    gremlin.ui.ui_common.QWarningWidget("No input selected. Please select at least one input."))
+                self.key_combination_layout.addWidget(QWarningWidget("No input selected. Please select at least one input."))
             self.key_combination_layout.addStretch()
             return
         for item in a.items:
@@ -717,7 +781,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
                 tooltip = gremlin.keyboard.KeyMap.get_description(key)
                 if tooltip:
                     widget.setToolTip(tooltip)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
         widget.setText(item_label(item))
         widget.keySize = 2
@@ -727,7 +791,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         layout = self.key_combination_layout
         idx = layout.count()
         if idx and layout.itemAt(idx - 1).spacerItem() is not None:
-            idx -= 1                                 # keep the stretch at the end
+            idx -= 1  # keep the stretch at the end
         layout.insertWidget(idx, widget)
 
     def _handle_key_context(self, widget):
@@ -753,7 +817,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         keys = [k for k in keys if k is not None]
         try:
             keys = sort_keys(keys)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         items = []
         for k in keys:
@@ -765,9 +829,11 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
                 _KEY_CACHE.setdefault(item, k)
                 items.append(item)
         # press order: modifiers, other keys, mouse buttons (released in reverse)
-        items = ([i for i in items if not core.is_mouse(i) and i[0] in core.MODIFIER_VKS]
-                 + [i for i in items if not core.is_mouse(i) and i[0] not in core.MODIFIER_VKS]
-                 + [i for i in items if core.is_mouse(i)])
+        items = (
+            [i for i in items if not core.is_mouse(i) and i[0] in core.MODIFIER_VKS]
+            + [i for i in items if not core.is_mouse(i) and i[0] not in core.MODIFIER_VKS]
+            + [i for i in items if core.is_mouse(i)]
+        )
         a = self.action_data
         a.setItems(items)
         a.function_kind, a.uia_name = "key", ""
@@ -816,9 +882,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
     def _record_keys_ui(self, multi_keys):
         """Prompts the user to press the desired key combination. - runs on UI thread"""
         gremlin.shared_state.push_suspend_highlighting()
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.Keyboard, InputType.Mouse], return_kb_event=False, multi_keys=multi_keys
-        )
+        button_press_dialog = InputListenerWidget([InputType.Keyboard, InputType.Mouse], return_kb_event=False, multi_keys=multi_keys)
         button_press_dialog.item_selected.connect(self._listen_selected)
         button_press_dialog.keyInput.connect(self._listen_key_input)
         button_press_dialog.closed.connect(self._listen_closed)
@@ -914,11 +978,14 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
                 self.preset_info.setText("The preset has no program.")
             else:
                 what = f"UI element: {a.uia_name}" if uia else (core.value_text(a.items, a.click) or "no input")
-                origin = f"from gex_apps\\{a.preset_app}.ini" if a.preset_app else "not from a preset"
+                preset = self.presets.get(a.preset_app)
+                path = Path(preset.path) if preset is not None else None
+                origin = f"from {path.parent.name}/{path.name}" if path is not None else f"saved preset {a.preset_app}"
+                origin = html.escape(origin)
                 text = f"{a.program} · {DELIVERY_SHORT.get(a.delivery, a.delivery)} · {what} · {origin}"
                 diff = self._preset_differences()
                 if diff:
-                    text += f"<br><i>Stored {', '.join(diff)} differs from the preset file (update with gex_update_presets).</i>"
+                    text += f"<br><i>Stored {', '.join(diff)} differs from the preset file. Select the function again to update the stored values.</i>"
                 self.preset_info.setText(text)
             self.running_lbl.setText("running" if running else ("not running" if a.program else ""))
         if a.program:
@@ -951,8 +1018,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if not holdable:
             delay_visible, autorepeat_visible = True, False
             if a.mode != KeyboardOutputMode.Pulse:
-                warnings.append("With " + ("a UI element" if uia else "Focus and return") +
-                                " every output mode acts as Pulse Single.")
+                warnings.append("With " + ("a UI element" if uia else "Focus and return") + " every output mode acts as Pulse Single.")
         self.container_delay_widget.setVisible(delay_visible)
         self.autorepeat_row.setVisible(autorepeat_visible)
         self.wheel_factor_container.setVisible(any(core.is_wheel(i) for i in a.items))
@@ -991,8 +1057,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
             args = (a.program, a.window_title, a.uia_name)
             core.UiaWorker.put(lambda: self._test_result(core.deliver_uia(*args)))
         elif a.items:
-            args = (a.program, a.window_title, a.delivery, list(a.items), True, True, a.sim, a.delay / 1000.0,
-                    a.window_class, a.wheel_factor, a.click)
+            args = (a.program, a.window_title, a.delivery, list(a.items), True, True, a.sim, a.delay / 1000.0, a.window_class, a.wheel_factor, a.click)
             core.Worker.put(lambda: self._test_result(core.deliver(*args)))
         else:
             self.status_lbl.setText("Nothing to send")
@@ -1013,7 +1078,7 @@ def _report(result, action, release_only=False):
     ok, msg = result
     if not ok:
         if release_only and msg.endswith("not running"):
-            return                     # already reported at the press: one warning per press is enough
+            return  # already reported at the press: one warning per press is enough
         syslog.warning(f"{core.TAG}: Map to Application: {msg}")
     elif gremlin.config.Configuration().verbose_mode_keyboard:
         syslog.info(f"{core.TAG}: Map to Application: sent to {action.program} ({action.delivery})")
@@ -1026,7 +1091,7 @@ class MapToApplicationFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action
         self.verbose = gremlin.config.Configuration().verbose_mode_keyboard
         self._pulse_worker = None
-        self._down = False          # input sent down and not yet released (window delivery)
+        self._down = False  # input sent down and not yet released (window delivery)
         self._toggled = False
         self._hold_id = object()
         self._startup_sync_pending = False
@@ -1056,8 +1121,9 @@ class MapToApplicationFunctor(gremlin.base_profile.AbstractFunctor):
         elif up:
             self._down = False
         if self.verbose:
-            syslog.info(f"{core.TAG}: Map to Application: {'down' if down else ''}{'up' if up else ''} "
-                        f"{uia or core.items_to_text(items)} -> {program} ({delivery})")
+            syslog.info(
+                f"{core.TAG}: Map to Application: {'down' if down else ''}{'up' if up else ''} {uia or core.items_to_text(items)} -> {program} ({delivery})"
+            )
 
         if uia:
             if down:
@@ -1066,9 +1132,11 @@ class MapToApplicationFunctor(gremlin.base_profile.AbstractFunctor):
             return
         # Separate Press and Release actions can share a matching binding.
         hold_id = None if a.mode in (KeyboardOutputMode.Press, KeyboardOutputMode.Release) else self._hold_id
-        core.Worker.put(lambda: _report(
-            core.deliver(program, title, delivery, items, down, up, sim, hold_s, wclass, wheel, click, hold_id), a,
-            release_only=up and not down))
+        core.Worker.put(
+            lambda: _report(
+                core.deliver(program, title, delivery, items, down, up, sim, hold_s, wclass, wheel, click, hold_id), a, release_only=up and not down
+            )
+        )
 
     # GremlinEx's PulseWorker passes 'data' only when it is set: accept both call forms
     def _pulse_on(self, *_data):
@@ -1081,7 +1149,7 @@ class MapToApplicationFunctor(gremlin.base_profile.AbstractFunctor):
         """pulse (interval < 0) or repeated pulses, as Map to Keyboard/Mouse Ex"""
         worker = self._pulse_worker
         if worker is not None and worker.is_running:
-            return                                   # already pulsing - ignore
+            return  # already pulsing - ignore
         self._pulse_worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data=None)
         self._pulse_worker.start()
 
@@ -1222,7 +1290,7 @@ without a focus change (Window) or with a brief focus change (Focus and return).
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
 
-    input_types = [
+    input_types = [  # noqa: RUF012
         InputType.JoystickButton,
         InputType.JoystickHat,
     ]
@@ -1230,10 +1298,10 @@ without a focus change (Window) or with a brief focus change (Focus and return).
     functor = MapToApplicationFunctor
     widget = MapToApplicationWidget
 
-    def __init__(self, parent, extra_data: dict = None):
+    def __init__(self, parent, extra_data: dict | None = None):
         super().__init__(parent, extra_data=extra_data)
         self.parent = parent
-        self._items = []                    # [(vk, scan, extended) | 'mouse:<name>'] in press order
+        self._items = []  # [(vk, scan, extended) | 'mouse:<name>'] in press order
         self.mode = KeyboardOutputMode.Pulse
         config = gremlin.config.Configuration()
         self._delay = config.last_keyboard_mapper_pulse_value  # delay between make/break in milliseconds
@@ -1242,7 +1310,7 @@ without a focus change (Window) or with a brief focus change (Focus and return).
         self.exec_on_press = True
         self.exec_on_release = False
         self.wheel_factor = 1
-        self.source = "manual"              # preset = an application preset is chosen in the panel
+        self.source = "manual"  # preset = an application preset is chosen in the panel
         self.program = ""
         self.window_title = ""
         self.window_class = ""
@@ -1250,12 +1318,12 @@ without a focus change (Window) or with a brief focus change (Focus and return).
         self.sim = "Condor.exe"
         self.preset_app = ""
         self.preset_function = ""
-        self.function_kind = "key"          # key (keys and/or mouse buttons) | uia
+        self.function_kind = "key"  # key (keys and/or mouse buttons) | uia
         self.uia_name = ""
-        self.click_pos = "mouse"            # mouse = where the mouse is (else the centre) | fixed
+        self.click_pos = "mouse"  # mouse = where the mouse is (else the centre) | fixed
         self.click_x = 50.0
         self.click_y = 50.0
-        self.click_unit = "%"               # % of the window's client area | px
+        self.click_unit = "%"  # % of the window's client area | px
 
     # ------------------------------------------------------------------ click position
     @property
@@ -1297,8 +1365,7 @@ without a focus change (Window) or with a brief focus change (Focus and return).
 
     @delay.setter
     def delay(self, value):
-        if value < 0:
-            value = 0
+        value = max(value, 0)
         self._delay = value
         gremlin.config.Configuration().last_keyboard_mapper_pulse_value = value
 
@@ -1308,8 +1375,7 @@ without a focus change (Window) or with a brief focus change (Focus and return).
 
     @autorepeat_delay.setter
     def autorepeat_delay(self, value):
-        if value < 0:
-            value = 0
+        value = max(value, 0)
         self._autorepeat_delay = value
         gremlin.config.Configuration().last_keyboard_mapper_interval_value = value
 
@@ -1335,10 +1401,14 @@ without a focus change (Window) or with a brief focus change (Focus and return).
     def _parse_xml(self, node, data=None, extra_data=None):
         mode = node.get("mode", "pulse")
         self.mode = {
-            "make": KeyboardOutputMode.Press, "press": KeyboardOutputMode.Press,
-            "break": KeyboardOutputMode.Release, "release": KeyboardOutputMode.Release,
-            "both": KeyboardOutputMode.Pulse, "pulse": KeyboardOutputMode.Pulse,
-            "hold": KeyboardOutputMode.Hold, "autorepeat": KeyboardOutputMode.AutoRepeat,
+            "make": KeyboardOutputMode.Press,
+            "press": KeyboardOutputMode.Press,
+            "break": KeyboardOutputMode.Release,
+            "release": KeyboardOutputMode.Release,
+            "both": KeyboardOutputMode.Pulse,
+            "pulse": KeyboardOutputMode.Pulse,
+            "hold": KeyboardOutputMode.Hold,
+            "autorepeat": KeyboardOutputMode.AutoRepeat,
             "toggle": KeyboardOutputMode.Toggle,
         }.get(str(mode).lower(), KeyboardOutputMode.Pulse)
         if "delay" in node.attrib:
@@ -1347,7 +1417,7 @@ without a focus change (Window) or with a brief focus change (Focus and return).
             self.autorepeat_delay = _num(node, "interval", int, 250)
         try:
             self.sync_mode = SyncMode(_num(node, "sync-mode", int, 0))
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.sync_mode = SyncMode.Ignore
         self.exec_on_press = _bool(node, "exec_on_press", True)
         self.exec_on_release = _bool(node, "exec_on_release", False)
@@ -1393,14 +1463,27 @@ without a focus change (Window) or with a brief focus change (Focus and return).
     def _generate_xml(self):
         node = ElementTree.Element(MapToApplication.tag)
         for k, v in (
-            ("mode", self.mode.name.lower()), ("delay", str(int(self.delay))),
-            ("interval", str(int(self.autorepeat_delay))), ("sync-mode", str(int(getattr(self.sync_mode, "value", self.sync_mode)))),
-            ("exec_on_press", str(bool(self.exec_on_press))), ("exec_on_release", str(bool(self.exec_on_release))),
-            ("wheel-factor", str(int(self.wheel_factor))), ("source", self.source), ("program", self.program),
-            ("window_title", self.window_title), ("window_class", self.window_class), ("delivery", self.delivery),
-            ("sim", self.sim), ("preset_app", self.preset_app), ("preset_function", self.preset_function),
-            ("function_kind", self.function_kind), ("uia_name", self.uia_name), ("click_pos", self.click_pos),
-            ("click_x", f"{float(self.click_x):g}"), ("click_y", f"{float(self.click_y):g}"), ("click_unit", self.click_unit),
+            ("mode", self.mode.name.lower()),
+            ("delay", str(int(self.delay))),
+            ("interval", str(int(self.autorepeat_delay))),
+            ("sync-mode", str(int(getattr(self.sync_mode, "value", self.sync_mode)))),
+            ("exec_on_press", str(bool(self.exec_on_press))),
+            ("exec_on_release", str(bool(self.exec_on_release))),
+            ("wheel-factor", str(int(self.wheel_factor))),
+            ("source", self.source),
+            ("program", self.program),
+            ("window_title", self.window_title),
+            ("window_class", self.window_class),
+            ("delivery", self.delivery),
+            ("sim", self.sim),
+            ("preset_app", self.preset_app),
+            ("preset_function", self.preset_function),
+            ("function_kind", self.function_kind),
+            ("uia_name", self.uia_name),
+            ("click_pos", self.click_pos),
+            ("click_x", f"{float(self.click_x):g}"),
+            ("click_y", f"{float(self.click_y):g}"),
+            ("click_unit", self.click_unit),
         ):
             node.set(k, v or "")
         for item in self._items:

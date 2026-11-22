@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Hardware-free profile failover checks: python tools/test_vjoy_failover.py."""
 
 import ast
@@ -82,6 +99,7 @@ class VJoyFailoverChecks(unittest.TestCase):
             '<vjoyremap device-type="Maestro" virtual-id="1"/></device></devices>'
             '<settings><maestro-input id="1"/></settings>',
             '<devices><device type="maestro" name="VJoy (1)"/></devices>',
+            '<condition condition-type="vjoy" vjoy-id="00000000-0000-0000-0000-000000000002"/>',
             '<vjoyremap virtual-id="0"/><remap vjoy="17"/>',
         ):
             with self.subTest(content=content):
@@ -107,6 +125,18 @@ class VJoyFailoverChecks(unittest.TestCase):
                 self.configure(content)
                 self.assertTrue(self.config.vjoy_failover)
                 self.devices.configure_vjoy_failover.assert_called_once_with(2, None)
+
+    def test_condition_only_profile_registers_legacy_vjoy_failover(self):
+        guid = "00000000-0000-0000-0000-000000000002"
+        for key, metadata, saved_guid in (
+            ("2", "", None),
+            (guid, f'<settings><input-filter><device name="vJoy (2)" device="{guid}"/></input-filter></settings>', UUID(guid)),
+        ):
+            with self.subTest(key=key):
+                self.devices.configure_vjoy_failover.reset_mock()
+                self.configure(f'{metadata}<activation-condition><condition condition-type="vjoy" vjoy-id="{key}"/></activation-condition>')
+                self.assertTrue(self.config.vjoy_failover)
+                self.devices.configure_vjoy_failover.assert_called_once_with(2, saved_guid)
 
     def test_profile_switch_clears_prior_devices_and_state(self):
         guid = "00000000-0000-0000-0000-000000000002"

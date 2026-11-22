@@ -1,23 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
 #
-# Remote video return feed: client capture/publish + master subscribe/decode.
-# Separate from UDP remote control (gremlin.remote).
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
-# Process model (client):
-#   Main JG Ex process     – UDP VJoy/KVM only; supervises video worker
-#   Video helper process   – TCP publish + capture/encode (gremlinEx --remote-video-worker)
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-# Thread model (video worker process):
-#   GexRemoteVideoListen  – TCP accept only
-#   GexRemoteVideo-Capture – GDI grab scaled at capture (CPU), latest-frame slot
-#   GexRemoteVideo-Encode  – H.264 (GPU HW preferred) or JPEG; latest-packet slot
-#   GexRemoteVideo-Send-*  – TCP send of the latest encoded packet only
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
 #
-# Thread model (master):
-#   GexRemoteVideo-Recv-*  – TCP receive + H.264 decode (GPU HW preferred)
-#   UI thread              – pixmap swap only (via InvokeUiMethod)
-#
-# Based in part on original Joystick Gremlin work by Lionel Ott and other
-# contributors - Gremlin Ex is (C) EMCS 2026
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 

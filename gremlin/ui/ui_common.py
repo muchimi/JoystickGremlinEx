@@ -1,4 +1,7 @@
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -7,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
 
@@ -4193,7 +4196,7 @@ class JoystickSelector(AbstractInputSelector):
 class VJoySelector(AbstractInputSelector):
     """Virtual output selector preserving numeric IDs for legacy vJoy callers."""
 
-    def __init__(self, change_cb, valid_types, invalid_ids: list | None = None, parent=None, show_connected_only=True):
+    def __init__(self, change_cb, valid_types, invalid_ids: list | None = None, parent=None, show_connected_only=True, *, include_disconnected=False):
         """Creates a widget to select a virtual joystick output.
 
         :param change_cb callback to execute when the widget changes
@@ -4202,17 +4205,19 @@ class VJoySelector(AbstractInputSelector):
         :param parent of this widget
         :param show_connected_only: if True, connected virtual outputs are shown.
             If False, only vJoy devices configured as input are shown.
+        :param include_disconnected: include defined devices when listing all virtual outputs.
         """
 
         assert invalid_ids is None or isinstance(invalid_ids, list), "invalid_ids must be a list or None"
         self.invalid_ids = invalid_ids
         self.show_connected_only = show_connected_only
+        self.include_disconnected = include_disconnected
         super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
 
     def _initialize(self):
         if self.show_connected_only:
             potential_devices = sorted(
-                gremlin.joystick_handling.virtual_devices(connected_only=True),
+                gremlin.joystick_handling.virtual_devices(connected_only=not self.include_disconnected),
                 key=lambda x: (x.name, str(x.device_guid)),
             )
         else:
@@ -4252,6 +4257,8 @@ class VJoySelector(AbstractInputSelector):
                 self.device_list.append(dev)
 
     def _format_device_name(self, device):
+        if self.include_disconnected and not device.connected:
+            return f"{device.name} (disconnected)"
         return device.name
 
     def _device_identifier(self, device):
@@ -8172,6 +8179,11 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
 
         self._manual_lock = False  # semaphore for manual updates
         self.device = device
+        self._event_device = device
+        if device.device_type == gremlin.types.DeviceType.VJoy:
+            target = gremlin.joystick_handling.get_output_target(device.vjoy_id)
+            if target is not None and target.kind == "maestro":
+                self._event_device = target.device
         self._readonly = True
         self._min_range = -1.0
         self._max_range = 1.0
@@ -8232,12 +8244,12 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
 
                 # hook the input both runtime and design time
                 jep.registerListenerUICallback(
-                    device_guid=device.device_guid,
+                    device_guid=self._event_device.device_guid,
                     input_type=InputType.JoystickAxis,
                     input_id=input_id,
                     callback=self.process_event_ui,
                     mode=CallbackMode.All,
-                    source=_viewer_event_source(device),
+                    source=_viewer_event_source(self._event_device),
                 )
 
                 if not self._readonly:
@@ -8297,7 +8309,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         jep = gremlin.event_handler.JoystickEventProcessor()
         for input_id in self.axis_widgets:
             jep.unregisterListenerUICallback(
-                device_guid=self.device.device_guid,
+                device_guid=self._event_device.device_guid,
                 input_type=InputType.JoystickAxis,
                 input_id=input_id,
                 callback=self.process_event_ui,
@@ -8321,7 +8333,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         """Refresh the bar, numeric value and percentage without writing back."""
         assert gremlin.util.is_ui_thread()
         assert event.is_axis, "axis event required"
-        if event.device_guid != self.device.device_guid or event.identifier not in self.axis_widgets:
+        if event.device_guid != self._event_device.device_guid or event.identifier not in self.axis_widgets:
             return
         if self.device.is_virtual or event.source == EventSourceType.Virtual:
             values = gremlin.event_handler.AxisValues(event.value)
@@ -8355,7 +8367,8 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 widget = self.sender()
                 axis_id = widget.data
                 value = widget.value()
-                gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+                key = gremlin.joystick_handling.virtual_device_key(self.device)
+                gremlin.joystick_handling.set_axis(key, axis_id, value)
             finally:
                 self._manual_lock = False
 
@@ -8371,7 +8384,8 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 widget = self.sender()
                 axis_id = widget.data
                 value = widget.value()
-                gremlin.joystick_handling.set_axis(self.device.device_guid, axis_id, value)
+                key = gremlin.joystick_handling.virtual_device_key(self.device)
+                gremlin.joystick_handling.set_axis(key, axis_id, value)
             finally:
                 self._manual_lock = False
 

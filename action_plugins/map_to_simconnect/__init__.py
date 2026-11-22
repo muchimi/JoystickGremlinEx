@@ -1,5 +1,7 @@
-
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -8,65 +10,45 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+
+import logging
 import os
+import re
+import threading
+import time
+import traceback
+from enum import Enum, IntEnum, auto
 
-from PySide6 import QtWidgets, QtCore, QtGui
+from lxml import etree
+from psygnal import Signal
+from PySide6 import QtCore, QtGui, QtWidgets
+from shiboken6 import Shiboken
 
+import gremlin.actions
 import gremlin.base_profile
 import gremlin.config
+import gremlin.curve_handler
 import gremlin.event_handler
 import gremlin.gated_handler
-from gremlin.input_types import InputType
-import gremlin.shared_state
-import traceback
-from gremlin.singleton_decorator import SingletonDecorator
-import gremlin.ui.ui_common
-import gremlin.input_item
 import gremlin.input_devices
-
-
-# import gremlin.gated_handler
-from gremlin.util import safe_format, safe_read
+import gremlin.input_item
+import gremlin.joystick_handling
+import gremlin.repeater
+import gremlin.shared_state
+import gremlin.ui.ui_common
 import gremlin.util
-from .SimConnectManager import (
-    SimConnectManager,
-    SimConnectCommandType,
-    SimConnectActionMode,
-    SimConnectTriggerMode,
-    RangeEvent,
-    SimConnectBlock,
-    SimConnectEventCategory,
-)
-
-from .SimConnect.SimConnect import SimConnectEventHandler
-
-import re
-from lxml import etree
+from gremlin.input_types import InputType
+from gremlin.singleton_decorator import SingletonDecorator
 
 # from gremlin.gated_handler import *
 from gremlin.ui.qdatawidget import QDataWidget
-import gremlin.config
-import gremlin.joystick_handling
-import gremlin.actions
-import gremlin.curve_handler
-from psygnal import Signal
-from shiboken6 import Shiboken
-import gremlin.repeater
-import logging
-from . import SimConnect
-
-import threading
-import time
-
-
-from enum import auto, Enum, IntEnum
 from gremlin.ui.ui_common import (
     Buttons,
     Color,
@@ -76,8 +58,8 @@ from gremlin.ui.ui_common import (
     ModeSelectorWidget,
     QAxisRepeaterProgressbar,
     QContentWidget,
-    QDataCheckbox,
     QDataCheckBox,
+    QDataCheckbox,
     QDataComboBox,
     QDataLineEdit,
     QDataPushButton,
@@ -87,18 +69,33 @@ from gremlin.ui.ui_common import (
     QInfoBox,
     QJoystickRangeWidget,
     QPaginator,
+    QPathLineItem,
     QRememberDialog,
     QRowSelectorFrame,
-    QPathLineItem,
     clear_layout,
+    get_mode_list,
+    get_text_width,
     getGridContainer,
     getHContainer,
     getRadioContainer,
     getVContainer,
-    get_mode_list,
-    get_text_width,
-    synchronize_grids,
     load_icon,
+    synchronize_grids,
+)
+
+# import gremlin.gated_handler
+from gremlin.util import safe_format, safe_read
+
+from . import SimConnect
+from .SimConnect.SimConnect import SimConnectEventHandler
+from .SimConnectManager import (
+    RangeEvent,
+    SimConnectActionMode,
+    SimConnectBlock,
+    SimConnectCommandType,
+    SimConnectEventCategory,
+    SimConnectManager,
+    SimConnectTriggerMode,
 )
 
 syslog = logging.getLogger("system")
@@ -128,7 +125,7 @@ class CommandValidator(QtGui.QValidator):
             r = re.compile(clean_value + "*")
             for _ in filter(r.match, self.commands):
                 return QtGui.QValidator.State.Intermediate
-        except Exception:  # noqa: E722
+        except Exception:  # noqa: BLE001, S110
             # invalid regex - probably a special char
             pass
         return QtGui.QValidator.State.Intermediate
@@ -151,7 +148,7 @@ class LvarValidator(QtGui.QValidator):
             r = re.compile(clean_value + "*", re.IGNORECASE)
             for _ in filter(r.match, self.manager.lvars):
                 return QtGui.QValidator.State.Intermediate
-        except Exception:  # noqa: E722
+        except Exception:  # noqa: BLE001, S110
             # invalid regex - probably a special char
             pass
         return QtGui.QValidator.State.Intermediate
@@ -2545,7 +2542,7 @@ class SimconnectOptionsUi(QRememberDialog):
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
             row_selector.data = (item, selected_widget)
 
-            
+
             delete_widget = QDataPushButton()
             delete_widget.setIcon(delete_icon)
             delete_widget.setMaximumWidth(24)

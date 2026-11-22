@@ -1,5 +1,7 @@
-
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -8,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 from abc import abstractmethod, ABCMeta
@@ -7117,7 +7119,9 @@ class BaseVJoyCondition(BaseAbstractCondition):
 
     @property
     def device_name(self):
-        device = gremlin.joystick_handling.get_virtual_device(self.vjoy_id)
+        handling = gremlin.joystick_handling
+        target = handling.get_output_target(self.vjoy_id)
+        device = target.device if target is not None else handling.get_virtual_device(self.vjoy_id)
         return device.name if device is not None else f"Virtual output {self.vjoy_id}"
 
     def is_valid(self):
@@ -7129,16 +7133,16 @@ class BaseVJoyCondition(BaseAbstractCondition):
         return super().is_valid() and self.input_type is not None and valid_key and self.input_id > 0
 
     def __str__(self):
-        return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[1]:0.3f}]"
+        return f"Virtual Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[1]:0.3f}]"
 
     def to_html(self) -> str:
         """html output version"""
         from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
-        table.addField("Condition", "Virtual Device")
+        table.addField("Condition", "Virtual Condition")
         table.addField("Comparison", self.comparison)
-        table.addField("Vjoy Device", self.vjoy_id)
+        table.addField("Device", self.device_name)
         table.addField("Type", self.input_type.name)
         table.addField("ID", f"{self.input_id}")
         table.addField("Ignore release", "Yes" if self.ignore_release else "No")
@@ -11678,10 +11682,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         self.input_event = None
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
-        self.setTitle("Virtual Device Condition")
-
-        # Initialize UI fully
-        self._modify_vjoy(self.vjoy_selector.get_selection())
+        self.setTitle("Virtual Condition")
 
     def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
@@ -11695,8 +11696,17 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.vjoy_selector = VJoySelector(
             self._modify_vjoy,
             [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+            include_disconnected=True,
         )
-        self.vjoy_selector.set_selection(self.condition.input_type, self.condition.vjoy_id, self.condition.input_id)
+        handling = gremlin.joystick_handling
+        key = self.condition.vjoy_id
+        device = handling.get_virtual_device(key)
+        if device is None:
+            target = handling.get_output_target(key)
+            device = target.device if target is not None else None
+        if device is not None:
+            key = device.device_guid
+        self.vjoy_selector.set_selection(self.condition.input_type, key, self.condition.input_id)
 
         self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
         self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
@@ -11805,7 +11815,6 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.condition.input_type = event.event_type
         self.condition.input_id = event.identifier
 
-        self.condition.device_name = gremlin.joystick_handling.device_name_from_guid(event.device_guid)  # input_devices.JoystickProxy()[event.device_guid].name
         if event.event_type == InputType.JoystickAxis:
             self.condition.comparison = "inside"
         elif event.event_type == InputType.JoystickButton:
@@ -12048,7 +12057,7 @@ class ConditionView(AbstractView):
         self.condition_map = {
             "Keyboard": [BaseKeyboardCondition, KeyboardConditionWidget],
             "Joystick": [BaseJoystickCondition, JoystickConditionWidget],
-            "Virtual Device": [BaseVJoyCondition, VJoyConditionWidget],
+            "Virtual": [BaseVJoyCondition, VJoyConditionWidget],
             "Action": [BaseInputActionCondition, InputActionConditionWidget],
             "State": [BaseStateCondition, StateConditionWidget],
             "Mode": [BaseModeCondition, ModeConditionWidget],
@@ -12086,7 +12095,9 @@ class ConditionView(AbstractView):
         # Condition selector
         config = gremlin.config.Configuration()
         last_selector = config.condition_selector
-        items = ["Keyboard Condition", "Joystick Condition", "vJoy Condition", "Action Condition", "State Condition", "Mode Condition"]
+        if last_selector in ("vJoy Condition", "Virtual Device Condition"):
+            last_selector = "Virtual Condition"
+        items = [f"{name} Condition" for name in self.condition_map]
         self.condition_selector = QDataComboBox(source=items, value=last_selector, callback=self._handle_condition_selector_changed)
 
         self.condition_selector.currentIndexChanged.connect(self._handle_condition_selector_changed)

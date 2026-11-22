@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 """Evaluate the AFCS DAG and write vJoy. Live meters share the last pass."""
 
@@ -170,12 +187,9 @@ def _write_output(vjoy_id, axis_id: int, value: float, is_local: bool = True,
             gremlin.joystick_handling.set_axis(key, aid, current)
         except Exception as error:
             syslog.debug("AFCS: virtual output write failed %s:%s: %s", key, aid, error)
-    if is_remote:
+    if is_remote and (isinstance(key, str) or isinstance(key, int) and key > 0):
         try:
-            device = gremlin.joystick_handling.get_virtual_device(key)
-            index = device.virtual_id if device is not None else key
-            if isinstance(index, int) and index > 0:
-                gremlin.remote.remote_client.send_axis(index, aid, current, client_list=client_list)
+            gremlin.remote.remote_client.send_axis(key, aid, current, client_list=client_list)
         except Exception as error:
             syslog.debug("AFCS: remote output write failed %s:%s: %s", key, aid, error)
 

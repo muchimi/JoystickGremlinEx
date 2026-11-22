@@ -1,4 +1,7 @@
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -7,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
 import re
@@ -3304,8 +3307,15 @@ class Profile:
                         mode_node = device.modes[mode_name]
                         if mode_name not in mode_map:
                             node = ModeNode(mode_name)
-                            parent_name = mode_node.inherit
-                            node.parent = mode_map[parent_name] if parent_name in mode_map else self._mode_tree
+                            node.parent_name = mode_node.inherit
+                            mode_map[mode_name] = node
+
+            for node in mode_map.values():
+                try:
+                    node.parent = mode_map.get(node.parent_name, self._mode_tree)
+                except anytree.LoopError:
+                    syslog.warning("Ignoring cyclic inheritance for profile mode [%s]", node.name)
+                    node.parent = self._mode_tree
 
             # add default mode
             if "Default" not in mode_map:
@@ -3715,11 +3725,12 @@ class Profile:
     def modeExists(self, mode: str, force=True) -> bool:
         """true if the profile mode exists"""
         mode_list = self.get_modes()
-        if mode not in mode_list:
-            # force a data reload if mode not found
+        if mode in mode_list:
+            return True
+        if force and self._loaded and any(mode in device.modes for device in self.devices.values()):
             self._ensure_mode_tree(True)
-            return mode_list in self.get_modes()
-        return True
+            return mode in self.get_modes()
+        return False
 
     def get_modes(self, casefold=False) -> list[str]:
         """get all profile mode names as a list"""

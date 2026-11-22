@@ -1,4 +1,7 @@
-﻿# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -7,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 import logging
@@ -182,6 +185,9 @@ def vjoy_references(root, *, include_filter_guids=False):
                 add(node.get(attribute, "1"))
         elif node.tag == "vjoy" and node.get("vjoy-id") is not None:
             add(node.get("device-guid") or node.get("vjoy-id"))
+        elif node.tag == "condition" and node.get("condition-type") == "vjoy":
+            value = node.get("vjoy-id")
+            add(value, value if guid_key(value) in sources else None)
         elif node.tag == "variable" and node.get("type") == "VirtualInput":
             add(node.get("vjoy-id"))
     for node in root.findall("./settings/vjoy-input"):
@@ -361,6 +367,10 @@ def remap_vjoy_outputs(root, devices, replacements=None, *, source_guids=None):
             target = target_for(node.get("vjoy-id"))
             if target is not None:
                 node.set("vjoy-id", str(target.device_guid))
+        elif node.tag == "condition" and node.get("condition-type") == "vjoy":
+            target = target_for(node.get("vjoy-id"))
+            if target is not None:
+                node.set("vjoy-id", str(target.device_guid))
         elif node.tag == "vjoy" and node.get("vjoy-id") is not None:
             # Macro actions carry an optional GUID; merge-axis outputs use a key.
             if node.get("input-type") is not None:
@@ -495,6 +505,8 @@ def output_device_sources(root, devices, *, saved_root=None):
             values.extend(node.get(attribute) for attribute in ("device-low-vjoy-id", "device-high-vjoy-id"))
         elif node.tag == "vjoy" or (node.tag == "variable" and node.get("type") == "VirtualInput"):
             values.append(node.get("device-guid") or node.get("vjoy-id"))
+        elif node.tag == "condition" and node.get("condition-type") == "vjoy":
+            values.append(node.get("vjoy-id"))
         elif node.tag == "device" and node.getparent().tag == "devices" and node.getparent().getparent().tag == "start":
             values.append(node.get("device-guid"))
         for value in values:

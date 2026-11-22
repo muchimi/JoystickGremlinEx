@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Hardware-free checks: python tools/test_profile_device_remap.py."""
 
 import ast
@@ -128,6 +145,18 @@ def maestro(slot=7, **kwargs):
 
 
 class OutputRemapChecks(unittest.TestCase):
+    def test_condition_only_profile_remaps_legacy_vjoy_reference(self):
+        root = etree.fromstring('<profile><condition condition-type="vjoy" vjoy-id="1" input="button" id="3"/></profile>')
+        target = maestro()
+        self.assertEqual(remap.output_device_sources(root, [target])[0]["key"], 1)
+
+        result, _ = remap.remap_output_devices(root, [target], {1: target})
+
+        self.assertEqual(result[0].get("vjoy-id"), NEW)
+        self.assertEqual(result[0].get("condition-type"), "vjoy")
+        self.assertEqual(result[0].get("id"), "3")
+        self.assertEqual(root[0].get("vjoy-id"), "1")
+
     def test_missing_output_guid_without_declaration_is_offered_and_remapped_everywhere(self):
         old = "dde8a0111f5251cca3315b66849e9991"
         target = maestro(data={"maestro_key": "maestro://127.0.0.1:8010/gex-1"})

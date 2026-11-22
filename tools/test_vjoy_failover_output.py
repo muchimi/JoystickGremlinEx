@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Hardware-free failover output checks: python tools/test_vjoy_failover_output.py."""
 
 import ast
@@ -237,6 +254,38 @@ class FailoverOutputChecks(unittest.TestCase):
         self.assertIs(self.functor.device, self.maestro)
         self.assertTrue(self.button.is_pressed)
         self.assertTrue(self.functor._valid)
+        self.native.assert_not_called()
+
+    def test_axis_profile_start_registers_range_on_maestro_with_stale_vjoy_guid(self):
+        self.devices.clear()
+        self.use_maestro()
+        self.namespace["dinput"].GUID = str
+        self.namespace["gremlin"].singleton_decorator = NS(SingletonDecorator=lambda cls: cls)
+        load("gremlin/joystick_handling.py", {"VirtualDeviceUsageState"}, self.namespace, {
+            "_ensure_maps", "set_range", "get_range",
+        })
+        f = self.functor
+        f.usage_data = self.namespace["VirtualDeviceUsageState"]()
+        f.usage_data._axis_invert_map = {}
+        f.usage_data._axis_range_map = {}
+        f.usage_data._button_usage_map = {}
+        f.input_type = f.action_data.hardware_raw_input_type = InputType.JoystickAxis
+        f.action_mode = f.action_data.action_mode = VjoyAction.VJoyAxis
+        f.range_low, f.range_high = -0.5, 0.75
+        f.action_data.virtual_device_guid = self.vjoy.device_guid
+        f.action_data.axis_start_value = 0.25
+        f.action_data.get_filtered_axis_value = Mock(return_value=0.0)
+        f.action_data.get_ranged_axis_value = Mock(return_value=0.0)
+        f.getCurveData = Mock(return_value=[])
+        self.namespace["gremlin"].event_handler = NS(
+            AxisState=lambda: NS(getAxisValues=lambda *args: NS(actual=0.0)),
+        )
+
+        f.profile_start()
+
+        self.assertIs(f.device, self.maestro)
+        self.assertEqual(f.usage_data.get_range(self.maestro.device_guid, 1), [-0.5, 0.75])
+        self.start.setStartValue.assert_called_once_with(1, 1, 0.25)
         self.native.assert_not_called()
 
     def test_failover_uses_gex_identity_for_all_vjoy_ids_despite_slot_order(self):

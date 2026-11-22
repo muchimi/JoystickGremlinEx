@@ -1,5 +1,7 @@
-
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -8,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from abc import abstractmethod, ABCMeta
 import logging
@@ -504,11 +506,18 @@ class VJoyCondition(AbstractCondition):
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
 
-        if self.device_guid is None:
+        target = gremlin.joystick_handling.get_output_target(self.vjoy_id)
+        maestro_target = target is not None and target.kind == "maestro"
+        read_output = maestro_target or self._maestro_output
+        if maestro_target:
+            joy = target.maestro
+        elif self._maestro_output:
+            joy = gremlin.joystick_handling.get_output_device(self.vjoy_id)
+        elif self.device_guid is not None:
+            joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
+        else:
             syslog.warning(f"VJoyCondition: GUID for vJoy {self.vjoy_id} not found")
             return False
-        joy = (gremlin.joystick_handling.get_output_device(self.vjoy_id) if self._maestro_output
-               else gremlin.input_devices.JoystickProxy()[self.device_guid])
         if joy is None:
             # device not found - ignore
             if verbose:
@@ -518,7 +527,7 @@ class VJoyCondition(AbstractCondition):
             return False
 
         if verbose:
-            info = gremlin.joystick_handling.getDevice(self.device_guid)
+            info = target.device if read_output and target is not None else gremlin.joystick_handling.getDevice(self.device_guid)
 
         if self.input_type == InputType.JoystickAxis:
             retval = False
@@ -536,7 +545,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickButton:
-            is_pressed = joy.button(self.input_id).is_pressed if self._maestro_output else gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
+            is_pressed = joy.button(self.input_id).is_pressed if read_output else gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if not event.is_pressed and not is_pressed and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -562,7 +571,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickHat:
-            direction = joy.hat(self.input_id).direction if self._maestro_output else gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)
+            direction = joy.hat(self.input_id).direction if read_output else gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)
             if not event.is_pressed and direction == (0, 0) and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -582,8 +591,7 @@ class VJoyCondition(AbstractCondition):
             return False
 
     def condition_name(self) -> str:
-        info = gremlin.joystick_handling.getDevice(self.device_guid)
-        return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name if info else '(device not found)'} "
+        return f"Virtual Condition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {self.condition.device_name} "
 
     def __str__(self):
         return self.condition_name()

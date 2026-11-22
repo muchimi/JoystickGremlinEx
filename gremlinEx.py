@@ -1,4 +1,7 @@
-﻿# Based on original Joystick Gremlin work by Lionel Ott and other contributors - GremlinEx is (C) EMCS 2026
+﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -7,11 +10,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 """
 Main entry point and UI of GremlinEx (GEX)
@@ -41,7 +44,7 @@ import uuid
 import webbrowser
 from collections.abc import Iterator
 from threading import Lock
-from typing import Callable
+from typing import Callable  # noqa: UP035
 
 # Remote-video helper process: take this path before UI / gremlinEx circular imports.
 if __name__ == "__main__" and "--remote-video-worker" in sys.argv:
@@ -527,7 +530,7 @@ class GremlinUi(QRememberMainWindow):
             from gremlin.remote_video import RemoteVideoPublisher
 
             RemoteVideoPublisher().stop()
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
     def _update_start_tab(self):
@@ -730,7 +733,7 @@ class GremlinUi(QRememberMainWindow):
             for mode_name in device_data.modes:
                 mode_data = device_data.modes[mode_name]
                 mode_map[mode_name] = False
-                for input_type, input_items in mode_data.config.items():
+                for input_items in mode_data.config.values():
                     # account for delay loaded input mappings
                     input_item_list = [item for item in input_items.values() if item is not None]
                     for input_item in input_item_list:
@@ -1068,7 +1071,7 @@ class GremlinUi(QRememberMainWindow):
 
         try:
             _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"TabSelectedWorker: get_last_input failed: {err}\n{traceback.format_exc()}")
             restore_input_type = None
             restore_input_id = None
@@ -1282,7 +1285,7 @@ class GremlinUi(QRememberMainWindow):
         """removes all mappings from the given device in the active mode"""
 
         mode = device.modes[mode_name]
-        for input_type in mode.config.keys():
+        for input_type in mode.config:
             for entry in mode.config[input_type].values():
                 entry.containers.clear()
         self.setTabsDirty(True)
@@ -1464,7 +1467,7 @@ class GremlinUi(QRememberMainWindow):
             try:
                 if self.ui.tray_icon:
                     self.ui_tray_icon = None
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
             QtCore.QCoreApplication.quit()
 
@@ -1887,7 +1890,7 @@ class GremlinUi(QRememberMainWindow):
 
                 el.profile_deactivated.emit()  # stopped
 
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"Activate: error: {err}\n{traceback.format_exc()}")
 
         finally:
@@ -1978,7 +1981,7 @@ class GremlinUi(QRememberMainWindow):
 
             visible = toggle_overlay_control_panel()
             self.ui.actionOverlayControl.setChecked(bool(visible) or overlay_control_panel_is_open())
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.warning(f"OBS OVERLAY: toolbar control panel toggle failed: {err}")
             self.ui.actionOverlayControl.setChecked(False)
 
@@ -2171,7 +2174,7 @@ class GremlinUi(QRememberMainWindow):
                             and not os.path.isfile(new_file)
                         ):
                             shutil.copyfile(old_file, new_file)  # overwrite if necessary
-                    except Exception as err:
+                    except Exception as err:  # noqa: BLE001
                         syslog.warning(f"SAVE AS: could not copy file {old_file} to {new_file}: {err}")
 
             self.profile.setProfileFile(fname)
@@ -2524,8 +2527,8 @@ class GremlinUi(QRememberMainWindow):
         if not Shiboken.isValid(self.status_bar_module_container_widget):
             return
         clear_layout(self.status_bar_module_container_layout)
-        index = 0
-        for label, state, callback in self._status_bar_module_states.values():
+
+        for index, (label, state, callback) in enumerate(self._status_bar_module_states.values()):
             pixmap = None
             widget = None
             if state is not None:
@@ -2565,7 +2568,7 @@ class GremlinUi(QRememberMainWindow):
             if widget:
                 self.status_bar_module_container_layout.addWidget(widget)
 
-            index += 1
+
 
         self.status_bar_module_container_layout.addStretch()
 
@@ -2843,7 +2846,7 @@ class GremlinUi(QRememberMainWindow):
 
     def getFirstTabDeviceGuid(self):
         """gets the device for the first tab"""
-        for device_guid in self._tab_device_map.keys():
+        for device_guid in self._tab_device_map:
             return device_guid
         return None
 
@@ -3427,7 +3430,7 @@ class GremlinUi(QRememberMainWindow):
         # verbose = True
         if verbose:
             syslog.info("Derived sorted device list:")
-            index = 0
+
             for key, item_list in data.items():
                 syslog.info(f"\t[{key}] -----------------")
                 if isinstance(item_list, list):
@@ -3440,9 +3443,8 @@ class GremlinUi(QRememberMainWindow):
                             continue
                         syslog.info(f"\t\t{dev!s}  visible: [{gremlin.util.ansiBool(dev.visible)}]")
             syslog.info("-" * 40)
-            for id, name, dev in sorted_device_tuples:
+            for index, (id, name, dev) in enumerate(sorted_device_tuples):
                 syslog.info(f"\t[{index}] [{dev.device_category.name}] [{name}] [{id}] ")
-                index += 1
 
         return data
 
@@ -3597,12 +3599,11 @@ class GremlinUi(QRememberMainWindow):
 
                 if fixed_tab:
                     device.visible = True
-                elif not device.visible:
-                    if not self._has_mapping(device.device_guid, True):
-                        # check if the profile has a mapping in which case the device should still be shown
-                        if verbose_l1:
-                            syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
-                        continue
+                elif not device.visible and not self._has_mapping(device.device_guid, True):
+                    # check if the profile has a mapping in which case the device should still be shown
+                    if verbose_l1:
+                        syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
+                    continue
 
                 # check device visibility filter - this is a sparse matrix so if a device is not on that list, the default is visible.
                 visible = visible_map.get(device_id, True)
@@ -3929,7 +3930,7 @@ class GremlinUi(QRememberMainWindow):
                                     device = gremlin.joystick_handling.getDevice(device_guid)
                                     widget = self.getRegisteredWidget(device_guid)
                                     if not widget:
-                                        import gremlin.ui.obs_overlay as obs_overlay
+                                        from gremlin.ui import obs_overlay
 
                                         manager = obs_overlay.OverlayManager()
                                         widget = obs_overlay.OverlayDesignerWidget(
@@ -3945,7 +3946,7 @@ class GremlinUi(QRememberMainWindow):
                                         )
                                     if add_tab_if_missing(device, TabDeviceType.Overlay):
                                         index += 1
-                                except Exception as err:
+                                except Exception as err:  # noqa: BLE001
                                     syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
                                     syslog.error(traceback.format_exc())
 
@@ -3959,7 +3960,7 @@ class GremlinUi(QRememberMainWindow):
                                     device = gremlin.joystick_handling.getDevice(device_guid)
                                     widget = self.getRegisteredWidget(device_guid)
                                     if not widget:
-                                        import gremlin.ui.afcs as afcs
+                                        from gremlin.ui import afcs
 
                                         manager = afcs.AfcsManager()
                                         widget = manager.designer_widget()
@@ -3972,7 +3973,7 @@ class GremlinUi(QRememberMainWindow):
                                         )
                                     if add_tab_if_missing(device, TabDeviceType.Afcs):
                                         index += 1
-                                except Exception as err:
+                                except Exception as err:  # noqa: BLE001
                                     syslog.error(f"DEVICE TABS: AFCS tab failed: {err}")
                                     syslog.error(traceback.format_exc())
 
@@ -4037,7 +4038,7 @@ class GremlinUi(QRememberMainWindow):
 
             gremlin.shared_state.is_tab_loading = False
 
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             syslog.error(f"DEVICE TABS: (step 1) failed: {err}")
             tb_msg = traceback.format_exc()
             syslog.error(tb_msg)

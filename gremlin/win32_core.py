@@ -1,3 +1,22 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Module created by Joop de Hoog, 14-11-2026 for the map to application action
+# Modified for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+
 """gex_core.py 1.0 - shared core of the GremlinEx (GEX) action "Map to Application"
 (Joop de Hoog, 14-11-2026; the presets are shared when GremlinEx uses a version based folder).
 Copied into the action folder by install_gex_actions.bat.
@@ -14,12 +33,15 @@ Contents
               focus  : bring the app to the front, SendInput (keys or mouse where the mouse is),
                        give the focus back to the previous window (or the sim)
   - UI element (UI Automation, own ctypes COM, no extra packages)
+
+
   - preset files <Joystick Gremlin Ex>\\gex_apps\\*.ini (shared by all GremlinEx versions, also with
     GremlinEx's option "Version based Configuration Data")
   - a background worker, so the GremlinEx event thread is never blocked
 Only Python's standard library (ctypes) is used; GremlinEx is imported lazily where needed.
 License: GPL-3.0 (as GremlinEx).
 """
+
 import ctypes
 import logging
 import os
@@ -43,25 +65,38 @@ _WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, _H, wintypes.LPARAM)
 
 
 class _GUITHREADINFO(ctypes.Structure):
-    _fields_ = [("cbSize", wintypes.DWORD), ("flags", wintypes.DWORD), ("hwndActive", _H),
-                ("hwndFocus", _H), ("hwndCapture", _H), ("hwndMenuOwner", _H), ("hwndMoveSize", _H),
-                ("hwndCaret", _H), ("rcCaret", wintypes.RECT)]
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("hwndActive", _H),
+        ("hwndFocus", _H),
+        ("hwndCapture", _H),
+        ("hwndMenuOwner", _H),
+        ("hwndMoveSize", _H),
+        ("hwndCaret", _H),
+        ("rcCaret", wintypes.RECT),
+    ]
 
 
 for _n, _a, _r in [
     ("EnumWindows", [_WNDENUMPROC, wintypes.LPARAM], wintypes.BOOL),
     ("EnumChildWindows", [_H, _WNDENUMPROC, wintypes.LPARAM], wintypes.BOOL),
-    ("IsWindow", [_H], wintypes.BOOL), ("IsWindowVisible", [_H], wintypes.BOOL),
-    ("IsIconic", [_H], wintypes.BOOL), ("IsChild", [_H, _H], wintypes.BOOL),
-    ("GetWindow", [_H, wintypes.UINT], _H), ("GetAncestor", [_H, wintypes.UINT], _H),
+    ("IsWindow", [_H], wintypes.BOOL),
+    ("IsWindowVisible", [_H], wintypes.BOOL),
+    ("IsIconic", [_H], wintypes.BOOL),
+    ("IsChild", [_H, _H], wintypes.BOOL),
+    ("GetWindow", [_H, wintypes.UINT], _H),
+    ("GetAncestor", [_H, wintypes.UINT], _H),
     ("GetWindowThreadProcessId", [_H, ctypes.POINTER(wintypes.DWORD)], wintypes.DWORD),
     ("GetGUIThreadInfo", [wintypes.DWORD, ctypes.POINTER(_GUITHREADINFO)], wintypes.BOOL),
     ("GetWindowTextW", [_H, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
     ("GetClassNameW", [_H, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
     ("PostMessageW", [_H, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM], wintypes.BOOL),
     ("MapVirtualKeyW", [wintypes.UINT, wintypes.UINT], wintypes.UINT),
-    ("GetForegroundWindow", [], _H), ("SetForegroundWindow", [_H], wintypes.BOOL),
-    ("BringWindowToTop", [_H], wintypes.BOOL), ("ShowWindow", [_H, ctypes.c_int], wintypes.BOOL),
+    ("GetForegroundWindow", [], _H),
+    ("SetForegroundWindow", [_H], wintypes.BOOL),
+    ("BringWindowToTop", [_H], wintypes.BOOL),
+    ("ShowWindow", [_H, ctypes.c_int], wintypes.BOOL),
     ("AttachThreadInput", [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL], wintypes.BOOL),
     ("GetWindowRect", [_H, ctypes.POINTER(wintypes.RECT)], wintypes.BOOL),
     ("GetClientRect", [_H, ctypes.POINTER(wintypes.RECT)], wintypes.BOOL),
@@ -78,8 +113,7 @@ for _n, _a, _r in [
 _k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
 _k32.OpenProcess.restype = wintypes.HANDLE
 _k32.CloseHandle.argtypes = [wintypes.HANDLE]
-_k32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
-                                            ctypes.POINTER(wintypes.DWORD)]
+_k32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
 _k32.GetCurrentThreadId.restype = wintypes.DWORD
 
 WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP = 0x0100, 0x0101, 0x0104, 0x0105
@@ -89,13 +123,18 @@ MK_SHIFT, MK_CONTROL = 0x0004, 0x0008
 
 
 class _KEYBDINPUT(ctypes.Structure):
-    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
-                ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
 
 
 class _MOUSEINPUT(ctypes.Structure):
-    _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD),
-                ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_size_t),
+    ]
 
 
 class _INPUTUNION(ctypes.Union):
@@ -113,24 +152,52 @@ _u32.SendInput.restype = wintypes.UINT
 # A key is a tuple (vk, scan, extended). A mouse item is a string "mouse:<name>".
 # A list of items is in press order (modifiers first); releases happen in reverse order.
 VK = {
-    "enter": (0x0D, False), "return": (0x0D, False), "escape": (0x1B, False), "esc": (0x1B, False),
-    "tab": (0x09, False), "space": (0x20, False), "backspace": (0x08, False), "pause": (0x13, False),
-    "capslock": (0x14, False), "pgup": (0x21, True), "pageup": (0x21, True), "pgdn": (0x22, True),
-    "pagedown": (0x22, True), "end": (0x23, True), "home": (0x24, True), "left": (0x25, True),
-    "up": (0x26, True), "right": (0x27, True), "down": (0x28, True), "insert": (0x2D, True),
-    "ins": (0x2D, True), "delete": (0x2E, True), "del": (0x2E, True),
-    "numpadmult": (0x6A, False), "numpadadd": (0x6B, False), "numpadsub": (0x6D, False),
-    "numpaddot": (0x6E, False), "numpaddiv": (0x6F, True), "numpadenter": (0x0D, True),
-    "-": (0xBD, False), "=": (0xBB, False), ",": (0xBC, False), ".": (0xBE, False), "/": (0xBF, False),
-    ";": (0xBA, False), "'": (0xDE, False), "[": (0xDB, False), "]": (0xDD, False), "\\": (0xDC, False),
+    "enter": (0x0D, False),
+    "return": (0x0D, False),
+    "escape": (0x1B, False),
+    "esc": (0x1B, False),
+    "tab": (0x09, False),
+    "space": (0x20, False),
+    "backspace": (0x08, False),
+    "pause": (0x13, False),
+    "capslock": (0x14, False),
+    "pgup": (0x21, True),
+    "pageup": (0x21, True),
+    "pgdn": (0x22, True),
+    "pagedown": (0x22, True),
+    "end": (0x23, True),
+    "home": (0x24, True),
+    "left": (0x25, True),
+    "up": (0x26, True),
+    "right": (0x27, True),
+    "down": (0x28, True),
+    "insert": (0x2D, True),
+    "ins": (0x2D, True),
+    "delete": (0x2E, True),
+    "del": (0x2E, True),
+    "numpadmult": (0x6A, False),
+    "numpadadd": (0x6B, False),
+    "numpadsub": (0x6D, False),
+    "numpaddot": (0x6E, False),
+    "numpaddiv": (0x6F, True),
+    "numpadenter": (0x0D, True),
+    "-": (0xBD, False),
+    "=": (0xBB, False),
+    ",": (0xBC, False),
+    ".": (0xBE, False),
+    "/": (0xBF, False),
+    ";": (0xBA, False),
+    "'": (0xDE, False),
+    "[": (0xDB, False),
+    "]": (0xDD, False),
+    "\\": (0xDC, False),
     "`": (0xC0, False),
 }
 for _i in range(1, 25):
     VK[f"f{_i}"] = (0x6F + _i, False)
 for _i in range(10):
     VK[f"numpad{_i}"] = (0x60 + _i, False)
-MODS = {"ctrl": (0x11, False), "control": (0x11, False), "shift": (0x10, False),
-        "alt": (0x12, False), "win": (0x5B, True)}
+MODS = {"ctrl": (0x11, False), "control": (0x11, False), "shift": (0x10, False), "alt": (0x12, False), "win": (0x5B, True)}
 ALT_VKS = {0x12, 0xA4, 0xA5}
 CTRL_VKS = {0x11, 0xA2, 0xA3}
 SHIFT_VKS = {0x10, 0xA0, 0xA1}
@@ -145,12 +212,18 @@ MOUSE_BUTTONS = {
     "x2": (0x020B, 0x020C, 0x0040, 2, 0x0080, 0x0100),
 }
 # wheel: name -> (vertical?, sign)
-MOUSE_WHEELS = {"wheel_up": (True, 1), "wheel_down": (True, -1),
-                "wheel_left": (False, -1), "wheel_right": (False, 1)}
+MOUSE_WHEELS = {"wheel_up": (True, 1), "wheel_down": (True, -1), "wheel_left": (False, -1), "wheel_right": (False, 1)}
 MOUSE_NAMES = tuple(MOUSE_BUTTONS) + tuple(MOUSE_WHEELS)
-_MOUSE_ALIASES = {"back": "x1", "forward": "x2", "xbutton1": "x1", "xbutton2": "x2",
-                  "wheelup": "wheel_up", "wheeldown": "wheel_down", "wheelleft": "wheel_left",
-                  "wheelright": "wheel_right"}
+_MOUSE_ALIASES = {
+    "back": "x1",
+    "forward": "x2",
+    "xbutton1": "x1",
+    "xbutton2": "x2",
+    "wheelup": "wheel_up",
+    "wheeldown": "wheel_down",
+    "wheelleft": "wheel_left",
+    "wheelright": "wheel_right",
+}
 
 
 def is_mouse(item):
@@ -216,7 +289,7 @@ def click_to_text(click):
     if not click:
         return ""
     x, y, pct = click
-    fmt = (lambda v: f"{v:g}") if pct else (lambda v: str(int(round(v))))
+    fmt = (lambda v: f"{v:g}") if pct else (lambda v: str(round(v)))
     unit = "%" if pct else ""
     return f"@{fmt(x)}{unit},{fmt(y)}{unit}"
 
@@ -248,8 +321,8 @@ def parse_items(text):
             out.append(make_key(*VK[low]))
         elif len(low) == 1 and low.isascii() and (low.isalpha() or low.isdigit()):
             out.append(make_key(ord(low.upper())))
-        elif re.fullmatch(r"vk[0-9a-f]{2}", low):            # any other key by its virtual key code, e.g. vk5D
-            out.append(make_key(int(low[2:], 16)))
+        elif re.fullmatch(r"vk[0-9a-f]{2}", low):  # any other key by its virtual key code, e.g. vk5D
+            out.append(make_key(int(low, 0)))
         else:
             return None
     return out
@@ -258,11 +331,38 @@ def parse_items(text):
 _VK_TO_NAME = {}
 for _name, (_vk, _ext) in VK.items():
     _VK_TO_NAME.setdefault(_vk, _name)
-_NICE = {"pgup": "PgUp", "pgdn": "PgDn", "enter": "Enter", "escape": "Escape", "tab": "Tab", "space": "Space",
-         "backspace": "Backspace", "pause": "Pause", "capslock": "CapsLock", "end": "End", "home": "Home",
-         "left": "Left", "up": "Up", "right": "Right", "down": "Down", "insert": "Insert", "delete": "Delete"}
-_MOD_NAME = {0x11: "ctrl", 0xA2: "ctrl", 0xA3: "ctrl", 0x10: "shift", 0xA0: "shift", 0xA1: "shift",
-             0x12: "alt", 0xA4: "alt", 0xA5: "alt", 0x5B: "win", 0x5C: "win"}
+_NICE = {
+    "pgup": "PgUp",
+    "pgdn": "PgDn",
+    "enter": "Enter",
+    "escape": "Escape",
+    "tab": "Tab",
+    "space": "Space",
+    "backspace": "Backspace",
+    "pause": "Pause",
+    "capslock": "CapsLock",
+    "end": "End",
+    "home": "Home",
+    "left": "Left",
+    "up": "Up",
+    "right": "Right",
+    "down": "Down",
+    "insert": "Insert",
+    "delete": "Delete",
+}
+_MOD_NAME = {
+    0x11: "ctrl",
+    0xA2: "ctrl",
+    0xA3: "ctrl",
+    0x10: "shift",
+    0xA0: "shift",
+    0xA1: "shift",
+    0x12: "alt",
+    0xA4: "alt",
+    0xA5: "alt",
+    0x5B: "win",
+    0x5C: "win",
+}
 
 
 def vk_to_name(vk):
@@ -455,7 +555,7 @@ def fixed_point(hwnd, click):
     r = wintypes.RECT()
     if not _u32.GetClientRect(hwnd, ctypes.byref(r)) or r.right <= 0 or r.bottom <= 0:
         return None
-    cx, cy = (int(round(r.right * x / 100.0)), int(round(r.bottom * y / 100.0))) if pct else (int(x), int(y))
+    cx, cy = (round(r.right * x / 100.0), round(r.bottom * y / 100.0)) if pct else (int(x), int(y))
     cx, cy = min(max(cx, 0), r.right - 1), min(max(cy, 0), r.bottom - 1)
     pt = _P(cx, cy)
     _u32.ClientToScreen(hwnd, ctypes.byref(pt))
@@ -516,7 +616,7 @@ def child_at(hwnd, pt):
     for _ in range(16):
         cp = _P(pt.x, pt.y)
         _u32.ScreenToClient(dest, ctypes.byref(cp))
-        child = _u32.ChildWindowFromPointEx(dest, cp, 0x0003)      # skip invisible + disabled
+        child = _u32.ChildWindowFromPointEx(dest, cp, 0x0003)  # skip invisible + disabled
         if not child or child == dest:
             break
         dest = child
@@ -533,7 +633,7 @@ def _lp(scan, ext, up, alt):
 
 REFUSED = "the application did not accept the input (is it running as administrator?)"
 NO_POINT = "the fixed click point is not available (is the window minimized?)"
-_held = {}      # (application binding, hold identity, input) -> destination of the press
+_held = {}  # (application binding, hold identity, input) -> destination of the press
 
 
 def _post(hwnd, msg, wp, lp):
@@ -583,7 +683,7 @@ def _post_mouse(hwnd, name, down, up, mods, wheel_factor, click, hold_key):
         vertical, sign = MOUSE_WHEELS[name]
         delta = 120 * max(1, int(wheel_factor)) * sign
         wp = ((delta & 0xFFFF) << 16) | mods
-        lp = ((pt.y & 0xFFFF) << 16) | (pt.x & 0xFFFF)                 # wheel: screen coordinates
+        lp = ((pt.y & 0xFFFF) << 16) | (pt.x & 0xFFFF)  # wheel: screen coordinates
         return "" if _post(dest, WM_MOUSEWHEEL if vertical else WM_MOUSEHWHEEL, wp, lp) else REFUSED
     md, mu, mk, xb, _sd, _su = MOUSE_BUTTONS[name]
     ok = True
@@ -749,7 +849,7 @@ def focus_send(program, title, items, sim="Condor.exe", hold_s=0.05, wheel_facto
         if restore is not None:
             _u32.SetCursorPos(restore.x, restore.y)
         if previous and previous != hwnd and _u32.GetForegroundWindow() == hwnd:
-            for _ in range(3):                     # retry: the target may still be activating
+            for _ in range(3):  # retry: the target may still be activating
                 if activate(previous):
                     break
                 time.sleep(0.05)
@@ -758,8 +858,7 @@ def focus_send(program, title, items, sim="Condor.exe", hold_s=0.05, wheel_facto
 
 # =========================================================================== UI Automation
 class _GUID(ctypes.Structure):
-    _fields_ = [("d1", ctypes.c_uint32), ("d2", ctypes.c_uint16), ("d3", ctypes.c_uint16),
-                ("d4", ctypes.c_ubyte * 8)]
+    _fields_ = [("d1", ctypes.c_uint32), ("d2", ctypes.c_uint16), ("d3", ctypes.c_uint16), ("d4", ctypes.c_ubyte * 8)]
 
     def __init__(self, s):
         super().__init__()
@@ -768,8 +867,7 @@ class _GUID(ctypes.Structure):
 
 _oleaut.SysFreeString.argtypes = [ctypes.c_void_p]
 _ole.CoInitializeEx.argtypes = [ctypes.c_void_p, wintypes.DWORD]
-_ole.CoCreateInstance.argtypes = [ctypes.POINTER(_GUID), ctypes.c_void_p, wintypes.DWORD,
-                                  ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)]
+_ole.CoCreateInstance.argtypes = [ctypes.POINTER(_GUID), ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)]
 _uia_tls = threading.local()
 
 
@@ -788,8 +886,13 @@ def _uia():
     if obj is None:
         _ole.CoInitializeEx(None, 0)
         p = ctypes.c_void_p()
-        hr = _ole.CoCreateInstance(ctypes.byref(_GUID("{FF48DBA4-60EF-4201-AA87-54103EEF594E}")), None, 1,
-                                   ctypes.byref(_GUID("{30CBE57D-D9D0-452A-AB13-7AC5AC4825EE}")), ctypes.byref(p))
+        hr = _ole.CoCreateInstance(
+            ctypes.byref(_GUID("{FF48DBA4-60EF-4201-AA87-54103EEF594E}")),
+            None,
+            1,
+            ctypes.byref(_GUID("{30CBE57D-D9D0-452A-AB13-7AC5AC4825EE}")),
+            ctypes.byref(p),
+        )
         if hr < 0 or not p.value:
             raise OSError("UI Automation not available")
         obj = _uia_tls.obj = p.value
@@ -823,20 +926,20 @@ def _all_elements(root):
 
 
 # pattern id -> (interface id, vtable slot of the press method): Invoke, Toggle, LegacyIAccessible.DoDefaultAction
-_PATTERNS = ((10000, "{FB377FBE-8EA6-46D5-9C73-6499642D3059}", 3),
-             (10015, "{94CF8058-9B8D-4AB9-8BFD-4CD0A33C8C70}", 3),
-             (10018, "{828055AD-355B-4435-86D5-3B51C14A9B1B}", 4))
+_PATTERNS = (
+    (10000, "{FB377FBE-8EA6-46D5-9C73-6499642D3059}", 3),
+    (10015, "{94CF8058-9B8D-4AB9-8BFD-4CD0A33C8C70}", 3),
+    (10018, "{828055AD-355B-4435-86D5-3B51C14A9B1B}", 4),
+)
 
 
 def _pattern(el, pid, iid):
     """the pattern interface of an element (QueryInterface on what GetCurrentPattern returns), or None"""
     unk = ctypes.c_void_p()
-    if _vcall(el, 16, pid, ctypes.byref(unk), argtypes=(ctypes.c_int, ctypes.POINTER(ctypes.c_void_p))) < 0 \
-            or not unk.value:
+    if _vcall(el, 16, pid, ctypes.byref(unk), argtypes=(ctypes.c_int, ctypes.POINTER(ctypes.c_void_p))) < 0 or not unk.value:
         return None
     pat = ctypes.c_void_p()
-    hr = _vcall(unk.value, 0, ctypes.byref(_GUID(iid)), ctypes.byref(pat),
-                argtypes=(ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)))
+    hr = _vcall(unk.value, 0, ctypes.byref(_GUID(iid)), ctypes.byref(pat), argtypes=(ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)))
     _release(unk.value)
     return pat.value if hr >= 0 and pat.value else None
 
@@ -930,8 +1033,7 @@ DELIVERIES = ("window", "focus")
 DELIVERY_LABEL = {"window": "Window (no focus change)", "focus": "Focus and return"}
 
 
-def deliver(program, title, delivery, items, down=True, up=True, sim="Condor.exe", hold_s=0.05,
-            wclass="", wheel_factor=1, click=None, hold_id=None):
+def deliver(program, title, delivery, items, down=True, up=True, sim="Condor.exe", hold_s=0.05, wclass="", wheel_factor=1, click=None, hold_id=None):
     """one press and/or release of the items with the chosen delivery -> (ok, message).
     Focus and return always sends a complete pulse, on the press only. click = fixed click point or None."""
     try:
@@ -944,7 +1046,7 @@ def deliver(program, title, delivery, items, down=True, up=True, sim="Condor.exe
         else:
             reason = window_send(program, title, items, down, up, wclass, wheel_factor, click, hold_id)
         return (not reason), reason
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return False, f"error: {e}"
 
 
@@ -953,7 +1055,7 @@ def deliver_uia(program, title, name):
     try:
         ok = uia_press(program, title, name)
         return ok, ("" if ok else f"UI element '{name}' not found or {program} not running")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return False, f"error: {e}"
 
 
@@ -986,12 +1088,12 @@ class _Worker:
             job = self._q.get()
             try:
                 job()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 log.warning(f"{TAG}: {e}")
 
 
-Worker = _Worker(TAG)                   # keys and mouse: fast, keeps press / release in order
-UiaWorker = _Worker(TAG + "_uia")       # UI Automation (COM in one thread); may be slow, never delays a release
+Worker = _Worker(TAG)  # keys and mouse: fast, keeps press / release in order
+UiaWorker = _Worker(TAG + "_uia")  # UI Automation (COM in one thread); may be slow, never delays a release
 
 
 # =========================================================================== presets (.ini)
@@ -1002,8 +1104,8 @@ UiaWorker = _Worker(TAG + "_uia")       # UI Automation (COM in one thread); may
 #              'mouse:wheel_up|wheel_down|wheel_left|wheel_right', may follow modifiers: 'ctrl+mouse:left',
 #              optional fixed click point in % or pixels of the window: 'mouse:left@30%,84%', 'mouse:left@176,789')
 #              or a UI element ('uia:<name>')
-_LINE = re.compile(r"^\s*(?P<name>[^=]+?)\s*=\s*(?P<value>.*?)\s*(?:\[(?P<opt>window|focus|keyboard)\])?\s*$", re.I)
-LEGACY_DELIVERY = {"keyboard": "focus"}            # v3 'keyboard' (SendInput) -> Focus and return
+_LINE = re.compile(r"^\s*(?P<name>[^=]+?)\s*=\s*(?P<value>.*?)\s*(?:\[(?P<opt>window|focus|keyboard)\])?\s*$", re.IGNORECASE)
+LEGACY_DELIVERY = {"keyboard": "focus"}  # v3 'keyboard' (SendInput) -> Focus and return
 
 
 def norm_delivery(value, default="window"):
@@ -1055,8 +1157,10 @@ def value_problem(value):
     if parse_items(v):
         return ""
     if "mouse:" in low:
-        return ("unknown mouse button or click point; use mouse:left|right|middle|x1|x2|wheel_up|wheel_down|"
-                "wheel_left|wheel_right, optional @x%,y% (0-100) or @x,y (pixels)")
+        return (
+            "unknown mouse button or click point; use mouse:left|right|middle|x1|x2|wheel_up|wheel_down|"
+            "wheel_left|wheel_right, optional @x%,y% (0-100) or @x,y (pixels)"
+        )
     return "unknown key; e.g. ctrl+z, F5, PgUp, q"
 
 
@@ -1064,8 +1168,8 @@ class Preset:
     def __init__(self, name, path, settings, functions, skipped):
         self.name, self.path = name, path
         self.settings = settings
-        self.functions = functions                 # valid functions only
-        self.skipped = skipped                     # [(name, value, reason)]
+        self.functions = functions  # valid functions only
+        self.skipped = skipped  # [(name, value, reason)]
 
     @property
     def program(self):
@@ -1091,8 +1195,7 @@ class Preset:
     def function(self, name):
         """by name; exact first, then ignoring case (as gex_update_presets.ps1 does)"""
         low = (name or "").lower()
-        return next((f for f in self.functions if f.name == name), None) or \
-            next((f for f in self.functions if low and f.name.lower() == low), None)
+        return next((f for f in self.functions if f.name == name), None) or next((f for f in self.functions if low and f.name.lower() == low), None)
 
     def delivery_of(self, func):
         return func.option or self.delivery
@@ -1104,12 +1207,13 @@ def gex_user_folder():
     <Joystick Gremlin Ex>_1_0ex_m77t100"""
     try:
         import gremlin.util as u
+
         for name in ("userprofile_path", "get_user_folder"):
             if hasattr(u, name):
                 p = getattr(u, name)()
                 if p and os.path.isdir(p):
                     return os.path.normpath(p)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     return os.path.join(os.path.expanduser("~"), "Joystick Gremlin Ex")
 
@@ -1122,11 +1226,10 @@ def shared_folder(user=None):
     user = os.path.normpath(user or gex_user_folder())
     parent, name = os.path.split(user)
     best = ""
-    low = name.lower()   # Windows names are case-insensitive; GremlinEx returns the path in lower case
+    low = name.lower()  # Windows names are case-insensitive; GremlinEx returns the path in lower case
     try:
         for d in os.listdir(parent):
-            if len(d) > len(best) and low.startswith(d.lower() + "_") and len(name) > len(d) + 1 \
-                    and os.path.isdir(os.path.join(parent, d)):
+            if len(d) > len(best) and low.startswith(d.lower() + "_") and len(name) > len(d) + 1 and os.path.isdir(os.path.join(parent, d)):
                 best = d
     except OSError:
         pass
@@ -1167,7 +1270,8 @@ def read_ini(path):
     """tolerant ini reader -> {section (lower case): [(name, value)]}, or None if the file cannot be read.
     Lines without '=' and lines before the first section are skipped; names keep their case."""
     try:
-        raw = open(path, "rb").read()
+        with open(path, "rb") as file:  # @IgnoreException
+            raw = file.read()
     except OSError as e:
         log.warning(f"{TAG}: cannot read {path}: {e}")
         return None

@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Windows delivery and lifecycle regressions without sending real input."""
 
 import ast
@@ -7,6 +24,7 @@ import logging
 import math
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, call, patch
@@ -33,7 +51,7 @@ class FunctorBase:
 
 
 PLUGIN_DIR = ROOT / "action_plugins" / "map_to_application"
-spec = importlib.util.spec_from_file_location("gex_core", PLUGIN_DIR / "gex_core.py")
+spec = importlib.util.spec_from_file_location("win32_core", ROOT / "gremlin" / "win32_core.py")
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 services = SimpleNamespace(
@@ -45,14 +63,37 @@ services = SimpleNamespace(
 plugin = SimpleNamespace(
     core=core, gremlin=services, math=math, syslog=logging.getLogger("application-checks"), QtCore=QtCore,
     InputType=InputType, KeyboardOutputMode=KeyboardOutputMode, SyncMode=SyncMode, MapToApplicationWidget=object,
+    PLUGIN_PRESETS_FOLDER=PLUGIN_DIR / "presets",
 )
 source = PLUGIN_DIR / "__init__.py"
 nodes = [node for node in ast.parse(source.read_bytes()).body
-         if getattr(node, "name", None) in ("_num", "MapToApplicationFunctor", "MapToApplication")]
+         if getattr(node, "name", None) in ("_num", "_load_application_presets", "MapToApplicationFunctor", "MapToApplication")]
 exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), vars(plugin))
 
 KEY_A = (65, 30, False)
 KEY_B = (66, 48, False)
+
+
+class PresetTests(unittest.TestCase):
+    def test_optional_plugin_presets_merge_with_user_presets_on_each_load(self):
+        with TemporaryDirectory() as temporary:
+            bundled = Path(temporary) / "presets"
+            user = Path(temporary) / "gex_apps"
+            user.mkdir()
+            (user / "Shared.ini").write_text("[app]\nprogram = user.exe\n", encoding="utf-8")
+
+            with patch.object(plugin, "PLUGIN_PRESETS_FOLDER", bundled), patch.object(core, "presets_folder", return_value=user):
+                self.assertEqual(list(plugin._load_application_presets(warn=False)), ["Shared"])
+
+                bundled.mkdir()
+                (bundled / "Bundled.ini").write_text("[app]\nprogram = bundled.exe\n", encoding="utf-8")
+                (bundled / "Shared.ini").write_text("[app]\nprogram = default.exe\n", encoding="utf-8")
+                (bundled / "_Example.ini").write_text("[app]\nprogram = example.exe\n", encoding="utf-8")
+
+                presets = plugin._load_application_presets(warn=True)
+                self.assertEqual(list(presets), ["Bundled", "Shared"])
+                self.assertEqual(presets["Bundled"].program, "bundled.exe")
+                self.assertEqual(presets["Shared"].program, "user.exe")
 
 
 class DeliveryTests(unittest.TestCase):

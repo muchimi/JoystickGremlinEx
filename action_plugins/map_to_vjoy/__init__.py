@@ -1,3 +1,20 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # Based on original concept / code by Lionel Ott - Copyright (C) 2015 - 2019 Lionel Ott
 #
@@ -3099,7 +3116,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.action_data.target_step_start_index = index  # -1 for auto
             if index == -1:
                 # auto mode
-                value = gremlin.joystick_handling.get_axis(self.action_data.vjoy_id, self.action_data.vjoy_input_id)
+                device = self.action_data.virtual_device
+                value = joystick_handling.get_virtual_output_axis(device, self.action_data.vjoy_input_id) if device is not None else 0.0
                 self.action_data.target_step_list[index] = value
 
             self._stepped_axis_start_changed(self.action_data.target_step_list[index])
@@ -5763,7 +5781,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
 
-            self.usage_data.set_range(self.action_data.virtual_device_guid, self.vjoy_input_id, self.range_low, self.range_high)
+            self.usage_data.set_range(self.device.device_guid, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
 
             match self.action_mode:
@@ -8639,8 +8657,15 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @reverse.setter
     def reverse(self, value):
-        self.usage_data.set_inverted(self.virtual_device_guid, self.vjoy_axis_id, value)
         self._reverse = value
+        device = self.virtual_device
+        if device is None:
+            return
+        target = joystick_handling.get_output_target(joystick_handling.virtual_device_key(device))
+        if target is not None:
+            self.usage_data.set_inverted(target.device.device_guid, self.vjoy_axis_id, value)
+        elif joystick_handling.getDevice(device.device_guid) is not None:
+            self.usage_data.set_inverted(device.device_guid, self.vjoy_axis_id, value)
 
     def toggle_reverse(self):
         # toggles reverse mode for the axis

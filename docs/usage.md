@@ -181,8 +181,8 @@ Each action in the container can have a condition as well, and these conditions 
 | ----------- | ----------- | ----------- |
 | Joystick condition - Axis | The condition looks for a physical input axis to be in a specific range |
 | Joystick condition - Button | The condition looks for a physical button to be pressed, released, or changed. |
-| VJoy condition - Axis | The condition looks for a vjoy input axis to be in a specific range |
-| VJoy condition - Button | The condition looks for a vjoy button to be pressed, released, or changed. |
+| Virtual Condition - Axis | Checks whether an axis on a GEX Maestro or vJoy device is in a specific range. |
+| Virtual Condition - Button | Checks whether a button on a GEX Maestro or vJoy device is pressed or released. |
 | Action condition | The condition looks at the state of the input trigger |
 | State condition | The condition looks for a state value.  | This is extremely powerful because a state can itself derive from other states, making complex boolean compound conditions possible. |
 | Keyboard condition | The condition looks for a specific key press |
@@ -675,7 +675,7 @@ Conditions are cummulative and apply in the order of evaluation, so conditions o
 
 | Condition      | Description |
 | ----------- | ----------- |
-| vJoy condition | This condition checks for a vJoy (virtual joystick) state, such as an axis in a given range, hat or button pressed or released.|
+| Virtual Condition | Checks the axis, button, or hat state of a GEX Maestro or vJoy device. Saved vJoy conditions use the active Maestro device when failover is enabled and a replacement is available. |
 | Joystick condition | This condition checks for a joystick or controller input state, such as an axis in a given range, hat or button pressed or released. |
 | Keyboard (mouse) condition | This condition checks for keyboard and mouse states. |
 | State condition | This condition checks for a state value. |

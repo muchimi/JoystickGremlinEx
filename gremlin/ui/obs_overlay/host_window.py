@@ -1,7 +1,21 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Module created by Lolo350 for GremlinEx
 #
-# Parent the live overlay HWND into another window so Discord / similar
-# application-share capture can include it. Screen share already composites
-# a separate overlay; app share only captures that process's window tree.
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 
