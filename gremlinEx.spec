@@ -232,6 +232,9 @@ a = Analysis(
         "gremlin.ui.obs_overlay.visibility_preview",
         "gremlin.ui.obs_overlay.widgets",
         "gremlin.remote_video",
+        # Map to Application is loaded from the bundled plugin files at runtime.
+        "gremlin.win32_core",
+        "gremlin.window_picker",
         "gremlin.ui.afcs",
         "gremlin.ui.afcs.designer",
         "gremlin.ui.afcs.model",

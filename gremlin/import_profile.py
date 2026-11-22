@@ -39,6 +39,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.joystick_handling
 import gremlin.plugin_manager
+import gremlin.profile
 import gremlin.util
 import gremlin.base_profile
 import gremlin.config
@@ -68,7 +69,6 @@ import enum
 from gremlin.ui import midi_device, osc_device, keyboard_device
 
 # from xml.dom import minidom
-from lxml import etree as ElementTree
 import html
 from gremlin.ui.ui_common import (
     MessageBox,
@@ -909,7 +909,7 @@ class ImportProfileDialog(QRememberDialog):
         self.source_profile.from_xml(self.profile_path)
 
         # read the xml
-        tree = ElementTree.parse(self.profile_path)
+        tree = gremlin.profile.parse_profile_xml(self.profile_path)
         self.root = tree.getroot()
 
         # load the modes hierarchy for the source profile

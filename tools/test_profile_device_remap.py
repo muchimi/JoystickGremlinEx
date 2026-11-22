@@ -830,6 +830,7 @@ class DialogChecks(unittest.TestCase):
         sidecar = Mock()
         gremlin = NS(joystick_handling=NS(all_joystick_devices=lambda: [panel], virtual_devices=list),
                      event_handler=NS(EventListener=lambda: NS(update_sidecar=sidecar)),
+                     profile=NS(parse_profile_xml=etree.parse),
                      util=NS(centerDialog=Mock()))
         namespace = dict(os=os, gremlin=gremlin, QtWidgets=QtWidgets, syslog=logging.getLogger(__name__))
         exec(compile(ast.Module(body=[method], type_ignores=[]), "gremlinEx.py", "exec"), namespace)

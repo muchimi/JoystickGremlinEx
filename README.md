@@ -52,6 +52,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T108A)
+
+- Fix: Missing references in the package to moved files for map to application 
+- Fix: XML handling of special characters due to change in encoding handling in the project.
+
 ### (m77T108)
 
 - New: Map to Application action: added an application picker similar to Spy++'s picker.

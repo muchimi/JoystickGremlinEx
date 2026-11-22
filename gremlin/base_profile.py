@@ -1045,7 +1045,7 @@ class Settings:
         self.loadFilterDefaults()  # loads the default input filter
         fname = self.profile.profile_file
         if fname and os.path.isfile(fname):
-            tree = etree.parse(fname)
+            tree = gremlin.profile.parse_profile_xml(fname)
             root = tree.getroot()
             settings_node = root.find("settings")
             self.from_xml(settings_node)
@@ -4327,7 +4327,8 @@ class Profile:
 
         if fname_is_xml:
             # fname is an xml stream
-            root = etree.fromstring(fname)
+            tree = gremlin.profile.parse_profile_xml(fname, from_memory=True)
+            root = tree.getroot()
         else:
             profile_converter = gremlin.profile.ProfileConverter()
 
@@ -4337,12 +4338,12 @@ class Profile:
                 profile_was_updated = True
 
             # run integrity checks
-            tree = etree.parse(fname)
+            tree = gremlin.profile.parse_profile_xml(fname)
             root = tree.getroot()
 
             profile_converter.run_integrity_check(root, fname)
 
-        if verbose:
+        if verbose and not fname_is_xml:
             syslog.info(f"XML: parsing profile [{gremlin.util.toUrl(fname)}]")
 
         # profile id
@@ -4351,9 +4352,8 @@ class Profile:
         else:
             # regenerate the profile
             root.set("guid", self.id)
-            tree.write(
-                fname, encoding="utf-8", xml_declaration=True
-            )  # update the file with the new profile ID if it's missing
+            if not fname_is_xml:
+                tree.write(fname, encoding="utf-8", xml_declaration=True)
 
         self._start_mode = None
         if "start_mode" in root.attrib:
@@ -4865,8 +4865,7 @@ class Profile:
         if fname:
             tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
         else:
-            # return the xml string
-            return etree.tostring(tree)
+            return etree.tostring(tree, encoding="utf-8")
 
     def _attach_device_summary(
         self,
@@ -5793,7 +5792,7 @@ class Profile:
         import gremlin.ui.ui_common
         from PySide6 import QtWidgets
 
-        tree = etree.parse(fname)
+        tree = gremlin.profile.parse_profile_xml(fname)
         root = tree.getroot()
 
         nodes = list(root.xpath("//text-to-speech"))
@@ -5971,7 +5970,7 @@ class Profile:
         import gremlin.ui.ui_common
         from PySide6 import QtWidgets
 
-        tree = etree.parse(fname)
+        tree = gremlin.profile.parse_profile_xml(fname)
         root = tree.getroot()
 
         nodes = list(root.xpath("//macro"))
@@ -6842,7 +6841,7 @@ class ProfileMapItem:
             if os.path.isfile(profile):
                 try:
                     parser = etree.XMLParser(remove_blank_text=True)
-                    tree = etree.parse(profile, parser)
+                    tree = gremlin.profile.parse_profile_xml(profile, parser)
                     for element in tree.xpath("//mode"):
                         mode = element.get("name")
                         mode_list.add(mode)
@@ -6911,7 +6910,7 @@ class ProfileMapItem:
             # write the xml
             try:
                 parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.parse(profile, parser)
+                tree = gremlin.profile.parse_profile_xml(profile, parser)
                 for element in tree.xpath("//profile"):
                     element.set("restore_last", str(self._restore_mode_on_auto_activate))
                     if self._default_mode:

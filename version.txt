@@ -16,12 +16,12 @@ VSVersionInfo(
             StringTable('040904b0', [
                 StringStruct('CompanyName', 'EMCS'),
                 StringStruct('FileDescription', 'GremlinEx'),
-                StringStruct('FileVersion', '1.0ex (m77T108)'),
+                StringStruct('FileVersion', '1.0ex (m77T108A)'),
                 StringStruct('InternalName', 'gremlinex'),
                 StringStruct('LegalCopyright', 'Copyright (C) EMCS 2026'),
                 StringStruct('OriginalFilename', 'gremlinex.exe'),
                 StringStruct('ProductName', 'GremlinEx'),
-                StringStruct('ProductVersion', '1.0ex (m77T108)')
+                StringStruct('ProductVersion', '1.0ex (m77T108A)')
             ]),
         ]),
         VarFileInfo([VarStruct('Translation', [1033, 1200])]),

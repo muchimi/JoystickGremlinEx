@@ -20,8 +20,10 @@ from __future__ import annotations  # deprecated with python 3.14+
 import copy
 import logging
 import os
+import re
 import shutil
 import uuid
+from io import BytesIO
 
 # from xml.dom import minidom
 import lxml
@@ -50,6 +52,37 @@ from gremlin.ui.ui_common import (
 
 
 syslog = logging.getLogger("system")
+
+
+def parse_profile_xml(source, parser=None, *, from_memory=False):
+    """Parse profile XML from a path or serialized data, honoring its encoding."""
+    try:
+        if from_memory:
+            return etree.ElementTree(etree.fromstring(source, parser))
+        return etree.parse(source, parser)
+    except etree.XMLSyntaxError as exc:
+        if "Input is not proper UTF-8" not in exc.msg:
+            raise
+
+        if from_memory:
+            payload = source
+        else:
+            with open(source, "rb") as stream:
+                payload = stream.read()
+
+        # Preserve valid UTF-8 and reinterpret only undecodable bytes as Windows-1252.
+        text = payload.decode("utf-8", errors="surrogateescape")
+        try:
+            repaired = re.sub(
+                r"[\udc80-\udcff]+",
+                lambda match: match[0].encode("utf-8", errors="surrogateescape").decode("cp1252"),
+                text,
+            )
+        except UnicodeDecodeError:
+            raise exc from None
+
+        base_url = None if from_memory else os.fsdecode(source)
+        return etree.parse(BytesIO(repaired.encode("utf-8")), parser, base_url=base_url)
 
 
 def mode_list(profile=None):
@@ -194,7 +227,7 @@ class ProfileConverter:
             return True
         try:
             parser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
-            tree = etree.parse(fname, parser)
+            tree = parse_profile_xml(fname, parser)
             root = tree.getroot()
         except Exception:
             # error reading file
@@ -209,7 +242,7 @@ class ProfileConverter:
         import gremlin.util
 
         try:
-            tree = etree.parse(fname)
+            tree = parse_profile_xml(fname)
             root = tree.getroot()
 
             new_root = self._convert_to_ex(root, fname)
@@ -224,7 +257,7 @@ class ProfileConverter:
         :param fname path to the profile to convert
         """
         # Load the profile
-        tree = etree.parse(fname)
+        tree = parse_profile_xml(fname)
         root = tree.getroot()
         verbose = False
 
@@ -1256,7 +1289,7 @@ class ProfileConverter:
                 syslog.error(err)
                 return False
 
-        tree = etree.parse(fname)
+        tree = parse_profile_xml(fname)
         root = tree.getroot()
         converted = False  # true if something was converted
         keyboard_count = 0

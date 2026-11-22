@@ -1,9 +1,13 @@
-"""Hardware-free regression tests for saving and reloading profile modes."""
+"""Hardware-free regression tests for profile XML and mode persistence."""
 
 import ast
 import html
 import logging
+import os
+import re
+from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -19,6 +23,18 @@ NAMESPACE = dict(
     safe_read=lambda node, key, cast, default: cast(node.get(key)) if key in node.attrib else default,
     gremlin=SimpleNamespace(shared_state=shared_state, profile=SimpleNamespace(ProfileConverter=SimpleNamespace(current_version=1))),
 )
+
+
+def load_profile_parser():
+    path = ROOT / "gremlin/profile.py"
+    tree = ast.parse(path.read_bytes())
+    node = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "parse_profile_xml")
+    namespace = dict(etree=etree, BytesIO=BytesIO, os=os, re=re)
+    exec(compile(ast.Module(body=[node], type_ignores=[]), str(path), "exec"), namespace)
+    return namespace["parse_profile_xml"]
+
+
+parse_profile_xml = load_profile_parser()
 
 
 def load_class(path, name, methods=None, base=None):
@@ -112,6 +128,49 @@ class ModePersistenceTests(unittest.TestCase):
 
         self.assertFalse(profile.modeExists("Removed mode"))
         self.assert_mode_xml(profile.to_xml())
+
+
+class ProfileXmlEncodingTests(unittest.TestCase):
+    def test_profile_exports_round_trip_special_characters_as_utf8(self):
+        profile = profile_fixture()
+        profile._ensure_mode_tree()
+        device = 'RØDE & "東京" <U0001f3a4>'
+        command = "Décollage — 起飛"
+        voices = etree.Element("voices", device=device)
+        etree.SubElement(voices, "voice-input").text = command
+        profile.voice.to_xml = lambda: voices
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.xml"
+            profile.to_xml(path)
+            on_disk = path.read_bytes()
+            in_memory = profile.to_xml()
+            self.assertEqual(etree.parse(path).docinfo.encoding.upper(), "UTF-8")
+            for payload in (on_disk, in_memory):
+                self.assertIn("RØDE".encode(), payload)
+                self.assertIn("&amp;".encode(), payload)
+                self.assertIn("&lt;".encode(), payload)
+                node = parse_profile_xml(payload, from_memory=True).find("voices")
+                self.assertEqual(node.get("device"), device)
+                self.assertEqual(node.findtext("voice-input"), command)
+
+    def test_file_and_memory_loads_honor_unicode_encodings_and_recover_legacy_bytes(self):
+        name = "RØDE — 東京"
+        utf8_document = f'<?xml version="1.0" encoding="UTF-8"?><profile name="{name}"/>'
+        utf16_document = utf8_document.replace('encoding="UTF-8"', 'encoding="UTF-16"')
+        utf8 = utf8_document.encode("utf-8")
+        mixed = utf8.replace("Ø".encode(), b"\xd8").replace("—".encode(), b"\x97")
+        for payload in (utf8, utf8_document.encode("utf-8-sig"), utf16_document.encode("utf-16"), mixed):
+            with self.subTest(prefix=payload[:8]), TemporaryDirectory() as directory:
+                path = Path(directory) / "profile.xml"
+                path.write_bytes(payload)
+                self.assertEqual(parse_profile_xml(path).getroot().get("name"), name)
+                self.assertEqual(parse_profile_xml(payload, from_memory=True).getroot().get("name"), name)
+                self.assertEqual(path.read_bytes(), payload)
+
+    def test_recovery_still_rejects_malformed_xml(self):
+        with self.assertRaises(etree.XMLSyntaxError):
+            parse_profile_xml(b'<profile name="R\xd8DE"><item></profile>', from_memory=True)
 
 
 if __name__ == "__main__":

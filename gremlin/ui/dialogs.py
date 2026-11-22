@@ -40,6 +40,7 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.process
+import gremlin.profile
 import gremlin.shared_state
 import gremlin.types
 import gremlin.util
@@ -5319,7 +5320,7 @@ class SubstituteDialog(QRememberDialog):
                 return
 
             parser = etree.XMLParser(remove_blank_text=True)
-            root = etree.parse(xml_file, parser)
+            root = gremlin.profile.parse_profile_xml(xml_file, parser)
 
             nodes = root.xpath("//device")  # iterate through all because we need to compare case for guid
             for node in nodes:
