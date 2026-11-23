@@ -51,7 +51,7 @@ class FunctorBase:
 
 
 PLUGIN_DIR = ROOT / "action_plugins" / "map_to_application"
-spec = importlib.util.spec_from_file_location("win32_core", ROOT / "gremlin" / "win32_core.py")
+spec = importlib.util.spec_from_file_location("win32_core", PLUGIN_DIR / "win32_core.py")
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 services = SimpleNamespace(
@@ -63,11 +63,14 @@ services = SimpleNamespace(
 plugin = SimpleNamespace(
     core=core, gremlin=services, math=math, syslog=logging.getLogger("application-checks"), QtCore=QtCore,
     InputType=InputType, KeyboardOutputMode=KeyboardOutputMode, SyncMode=SyncMode, MapToApplicationWidget=object,
-    PLUGIN_PRESETS_FOLDER=PLUGIN_DIR / "presets",
+    Path=Path,
 )
 source = PLUGIN_DIR / "__init__.py"
 nodes = [node for node in ast.parse(source.read_bytes()).body
-         if getattr(node, "name", None) in ("_num", "_load_application_presets", "MapToApplicationFunctor", "MapToApplication")]
+         if getattr(node, "name", None) in ("_num", "_load_application_presets", "MapToApplicationFunctor", "MapToApplication")
+         or isinstance(node, ast.Assign)
+         and any(getattr(target, "id", None) in ("PLUGIN_PRESETS_FOLDER", "USER_PRESETS_FILENAME") for target in node.targets)]
+plugin.__file__ = str(source)
 exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), vars(plugin))
 
 KEY_A = (65, 30, False)
@@ -75,14 +78,20 @@ KEY_B = (66, 48, False)
 
 
 class PresetTests(unittest.TestCase):
-    def test_optional_plugin_presets_merge_with_user_presets_on_each_load(self):
+    def test_bundled_legacy_and_sidecar_presets_merge_on_each_load(self):
         with TemporaryDirectory() as temporary:
-            bundled = Path(temporary) / "presets"
-            user = Path(temporary) / "gex_apps"
+            profile = Path(temporary)
+            bundled = profile / "presets"
+            user = profile / "gex_apps"
+            sidecar = profile / "map_to_application.ini"
             user.mkdir()
             (user / "Shared.ini").write_text("[app]\nprogram = user.exe\n", encoding="utf-8")
 
-            with patch.object(plugin, "PLUGIN_PRESETS_FOLDER", bundled), patch.object(core, "presets_folder", return_value=user):
+            with (
+                patch.object(plugin, "PLUGIN_PRESETS_FOLDER", bundled),
+                patch.object(core, "presets_folder", return_value=user),
+                patch.object(core, "gex_user_folder", return_value=profile),
+            ):
                 self.assertEqual(list(plugin._load_application_presets(warn=False)), ["Shared"])
 
                 bundled.mkdir()
@@ -94,6 +103,28 @@ class PresetTests(unittest.TestCase):
                 self.assertEqual(list(presets), ["Bundled", "Shared"])
                 self.assertEqual(presets["Bundled"].program, "bundled.exe")
                 self.assertEqual(presets["Shared"].program, "user.exe")
+
+                sidecar.write_text(
+                    "[App: Shared]\nprogram = custom.exe\n"
+                    "[Functions: shared]\nSave = ctrl+s [focus]\nInvalid = not-a-key\n"
+                    "[app: Another App]\nprogram = another.exe\n"
+                    "[functions: Another App]\nHelp = F1\n"
+                    "[functions: Unknown App]\nIgnored = f2\n",
+                    encoding="utf-8-sig",
+                )
+
+                with self.assertLogs(core.log, level="WARNING") as logs:
+                    presets = plugin._load_application_presets(warn=True)
+                self.assertIn("preset Shared: 'Invalid = not-a-key' skipped", logs.output[0])
+                self.assertEqual(list(presets), ["Another App", "Bundled", "Shared"])
+                self.assertEqual(presets["Shared"].path, sidecar)
+                self.assertEqual(presets["Shared"].program, "custom.exe")
+                save, = presets["Shared"].functions
+                self.assertEqual((save.name, save.value, save.option), ("Save", "ctrl+s", "focus"))
+                self.assertEqual(presets["Another App"].function("Help").value, "F1")
+
+                sidecar.unlink()
+                self.assertEqual(plugin._load_application_presets(warn=False)["Shared"].program, "user.exe")
 
 
 class DeliveryTests(unittest.TestCase):

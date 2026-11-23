@@ -763,6 +763,7 @@ class OptionsDialog(BaseDialogUi):
         self._create_reporting_page()
         self._create_runtime_page()
         self._create_modules_page()
+        self._create_hidhide_page()
 
         # closing bar
         close_button = QDataPushButton("Close")
@@ -850,6 +851,14 @@ class OptionsDialog(BaseDialogUi):
     def _tab_changed_cb(self, new_index):
         """occurs on tab change, save the last used tab index so we can restore it later"""
         self.config.last_options_tab = new_index
+
+    def _create_hidhide_page(self):
+        from gremlin.hidhide import is_installed
+
+        if is_installed():
+            from gremlin.ui.hidhide import HidHideDeviceWidget
+
+            self.tab_container.addTab(HidHideDeviceWidget(self.tab_container), "HidHide")
 
     def _create_exec_page(self):
         """Creates the general execution page."""

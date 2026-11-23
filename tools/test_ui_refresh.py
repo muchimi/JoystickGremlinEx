@@ -90,7 +90,7 @@ SERVICES = NS(
             compare_guid=lambda a, b: a == b, singleShot=lambda callback: QtCore.QTimer.singleShot(0, callback),
             get_ext=lambda path: Path(path).suffix, swap_ext=lambda path, ext: f"{path}.{ext}"),
     config=NS(Configuration=lambda: CONFIG), clipboard=NS(Clipboard=lambda: CLIPBOARD),
-    maestro=NS(Maestro=lambda: NS(offerDefaultJoysticks=Mock())),
+    maestro=NS(Maestro=lambda: NS(offerProfileDevices=Mock(return_value=()), waitForProfileInputDiscovery=Mock())),
     shared_state=NS(profile_loading=False, current_profile=object(), current_mode="Default", is_running=False),
     ui=NS(ui_common=NS(getVContainer=vertical_container, QEmptyWidget=LoadingHolder,
                        QHorizontalLine=QtWidgets.QFrame)),
@@ -552,6 +552,9 @@ class MainRefreshTests(unittest.TestCase):
         SERVICES.event_handler = NS(EventListener=lambda: listener, EventHandler=lambda: handler, JoystickState=Mock())
         SERVICES.execution_graph = Mock()
         SERVICES.joystick_handling = Mock()
+        input_device, output_device = object(), object()
+        SERVICES.joystick_handling.maestro_info_from_index.side_effect = {4: input_device, 7: output_device}.get
+        bridge = NS(offerProfileDevices=Mock(return_value=(4, 7)), waitForProfileInputDiscovery=Mock())
         SERVICES.ui.axis_calibration = Mock()
         for name in ("push_redraw", "pop_redraw", "push_suspend_save_input", "pop_suspend_save_input"):
             setattr(SERVICES.shared_state, name, Mock())
@@ -560,7 +563,8 @@ class MainRefreshTests(unittest.TestCase):
         profile_data = NS(
             from_xml=Mock(return_value=False), to_xml=Mock(), get_modes=lambda: ["Default"],
             get_default_start_mode=lambda: "Default", getMappingHash=lambda: "profile-hash",
-            setLoaded=Mock(), settings=NS(input_visible_map=True), unload=Mock(), list_vjoy_mappings=lambda: {},
+            setLoaded=Mock(), settings=NS(input_visible_map=True, setAllVisibleDevice=Mock(),
+                getVirtualAsInput=lambda device: device is input_device), unload=Mock(), list_vjoy_mappings=lambda: {},
         )
         SERVICES.base_profile = NS(Profile=lambda: profile_data, ProfileImportData=lambda: NS(used_ids=set()))
         self.ui.profile = profile_data
@@ -574,7 +578,8 @@ class MainRefreshTests(unittest.TestCase):
         paths = list(sys.path)
         results = []
         try:
-            with tempfile.NamedTemporaryFile(suffix=".xml", dir=ROOT / "tools") as profile:
+            with patch.object(SERVICES.maestro, "Maestro", return_value=bridge), \
+                 tempfile.NamedTemporaryFile(suffix=".xml", dir=ROOT / "tools") as profile:
                 profile.write(b"<profile/>")
                 profile.flush()
                 self.ui._comparative_file = profile.name + ".comparison"
@@ -589,6 +594,8 @@ class MainRefreshTests(unittest.TestCase):
                 worker.start()
                 worker.join()
                 self.assertEqual(results, [None])  # successful worker has no explicit return
+                bridge.waitForProfileInputDiscovery.assert_called_once_with()
+                profile_data.settings.setAllVisibleDevice.assert_called_once_with(input_device, additive=True)
                 self.ui.mode_selector.populate_selector.assert_not_called()
                 pump_until(lambda: self.ui._create_tabs_ui.called)
                 self.ui._create_tabs_ui.assert_called_once()

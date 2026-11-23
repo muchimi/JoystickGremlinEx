@@ -52,6 +52,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T109)
+
+- New: HID Hide integration: GEX can now manage HID Hide directly within GEX. Added support for the low level IOCTL API for HID Hide. GEX will also prompt on load if it is not white listed, and has a new dialog to HID Hide device visibility.  This requires HID Hide to be installed.  
+
+- New: Profile statistics:  Tools > Profile Statistics brings up a dialog with data about about the currently loaded profile.  This includes various statistics and a list of all the mappings from an input perspective, but also a reverse mapping table that shows outputs and what their inputs are.  The data can be exported as a markdown (.md) or PDF file. The PDF will be called up in the default viewer when generated.
+
+
+- Change: State Visualizer: Pagination controls are added to manage exceeding large numbers of states. When too many states (hundreds or even thousands as in one use-case), this could crash QT and exceed the widget limit. This also helps to keep the dialog responsive.
+- Fix: Voice: verbose mode was ignored in log entries for the voice matching tree.
+- Fix: Map to Application action: presets added by the user will be in a sidecar file in the profile folder where the profile is.  This reverts a prior change however the action will still come with default presets installed when the app is re-installed.  The sidecar file name is changed to **map_to_application.ini**.
+
 ### (m77T108A)
 
 - Fix: Missing references in the package to moved files for map to application 

@@ -48,6 +48,7 @@ from psygnal import Signal
 import gremlin.input_item
 from gremlin.input_item import (
     AbstractCondition,
+    AbstractPaginatedView,
     InputItemWidget,
     BaseAbstractCondition,
     AbstractConditionWidget,
@@ -57,6 +58,7 @@ from gremlin.input_item import (
     AdvancedInputItemListModel,
     FilterChip,
     FilterControlWidget,
+    PaginationWidget,
 )
 from shiboken6 import Shiboken
 import html
@@ -3711,15 +3713,19 @@ class StateRepeaterButton(QDataPushButton):
                 self.setChecked(value)
 
 
-class StateVisualizerWidget(QWidget):
+class StateVisualizerWidget(AbstractPaginatedView):
     """state visualization widget - input viewer"""
 
     VISUALIZER_FILTER = "visualizer"
+    PAGE_SIZE_PRESETS = gremlin.config.STATE_VISUALIZER_PAGE_SIZES
+    PAGE_SIZE_SETTING = "state_visualizer_page_size"
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-
-        import gremlin.ui.state_device
+        # Keep the viewer's model independent of the States tab and its lifetime.
+        profile = gremlin.shared_state.current_profile
+        model = StateInputItemModel(profile, custom_load_handler=self._load_states)
+        model.registerFilter(self.VISUALIZER_FILTER)
+        super().__init__(model=model, parent=parent)
 
         # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
 
@@ -3745,13 +3751,6 @@ class StateVisualizerWidget(QWidget):
         group_layout = QVBoxLayout(self.group_widget)
 
         count_widget = StateFilterCountWidget(filter=self.VISUALIZER_FILTER, suffix="states")
-
-        # The States tab may be hidden or still rebuilding when the viewer opens.
-        # Keep the viewer's model independent of the tab and its lifetime.
-        profile = gremlin.shared_state.current_profile
-        self.model = StateInputItemModel(profile, custom_load_handler=self._load_states)
-        self.model.registerFilter(self.VISUALIZER_FILTER)  # new filter type for the model
-        self.model.addCallback(self._handle_model_changed)
 
         self._state_filter_widget = StateFilterWidget(model=self.model, profile=profile, count_widget=count_widget, filter=self.VISUALIZER_FILTER)
         self._state_filter_widget.changed.connect(self._populateState_ui)  # update on filter change
@@ -3779,6 +3778,8 @@ class StateVisualizerWidget(QWidget):
         widget = getHContainer(widgets, widget_only=True)
         group_layout.addWidget(widget)
 
+        self._pagination = PaginationWidget(self)
+        group_layout.addWidget(self._pagination)
         self._button_widget = QWidget()
         self._button_layout = QFlowLayout(self._button_widget)
 
@@ -3786,40 +3787,37 @@ class StateVisualizerWidget(QWidget):
 
         self.main_layout.addWidget(self.group_widget)
 
-        self._populateState_ui()
-
-        self.initialized = True
-
-        # apply the filter to refresh the data
         self.model.applyFilter(filter=self.VISUALIZER_FILTER, emit=True)
         self._state_filter_widget.updateFilter()
-
+        self.initialized = True
+        self._populateState_ui()
         StateData().crud.connect(self._state_crud)
 
-    def _load_states(self, model):
+    @staticmethod
+    def _load_states(model):
         """Load profile states without requiring the States configuration tab."""
         # Reset this view's data without announcing deletion of profile inputs.
         AbstractCallbackModel.clear(model, emit=False)
         states = StateData().getStates()
-        for index, key in enumerate(sorted(states)):
-            model.setItemAt(index, states[key], emit=False)
-        model.applyFilter(emit=False)
+        model.setItems((states[key] for key in sorted(states)), emit=False)
 
-    def _handle_model_changed(self, data, force):
+    def _handle_model_changed(self, data=None, force=False):
         # update the data
         if self.initialized:
             gremlin.util.InvokeUiMethod(self._populateState_ui)
 
     def _cleanup_ui(self):
+        model = self.model
+        if model is None:
+            return
         self.initialized = False
         self.unhook()
         self._state_filter_widget.changed.disconnect(self._populateState_ui)  # disconnect filter change signal
         self._clear_state_buttons()
-        model = self.model
+        self._pagination._cleanup_ui()
         self._state_filter_widget.setModel(None)
-        self.model = None
-        if model is not None:
-            model.dispose()
+        self.setModel(None)
+        model.dispose()
         StateData().crud.disconnect(self._state_crud)
         config = gremlin.config.Configuration()
         config.changed.disconnect(self._config_changed)
@@ -3856,10 +3854,24 @@ class StateVisualizerWidget(QWidget):
     def _reload_states_ui(self):
         if not self.initialized or not Shiboken.isValid(self):
             return
-        self.model.refresh()
-        self._state_filter_widget.setInputItems(self.model.unfilteredItemsList())
-        self.model.applyFilter(filter=self.VISUALIZER_FILTER)
-        self._state_filter_widget.updateFilter(force=True)
+        self.initialized = False
+        try:
+            self.model.refresh()
+            self._state_filter_widget.setInputItems(self.model.unfilteredItemsList())
+            self._state_filter_widget.updateFilter(force=True)
+        finally:
+            self.initialized = True
+        self._populateState_ui()
+
+    def _item_count(self) -> int:
+        return self.model.count(filter=self.VISUALIZER_FILTER) if self.model is not None else 0
+
+    def setPageSize(self, size: int):
+        if isinstance(size, int) and size in self.PAGE_SIZE_PRESETS:
+            super().setPageSize(size)
+
+    def redraw(self, force=False):
+        gremlin.util.InvokeUiMethod(self._populateState_ui)
 
     def _filter_data(self, input_item, filter) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -3891,22 +3903,20 @@ class StateVisualizerWidget(QWidget):
         verbose = config.verbose_mode_state
         # verbose = True
 
-        i = 0
-
-        items = self.model.getFilteredItems(self.VISUALIZER_FILTER)
-
         self._clear_state_buttons()
+        self._pagination.refresh()
+        start, end = self.pageRange()
 
-        state_count = self.model.unfilteredCount()
+        state_count = self.unfilteredCount()
         has_states = state_count > 0  # has states
 
         self._state_filter_widget.setVisible(has_states)
         if verbose:
-            syslog.info(f"viewer state: {len(items)} items to display, total states: {state_count}")
+            syslog.info(f"viewer state: {end - start} items on this page, total states: {state_count}")
 
-        if items:
-            state: StateInputItem
-            for state in items:
+        if start < end:
+            for index in range(start, end):
+                state = self.model.filteredData(index, filter=self.VISUALIZER_FILTER)
                 if state.value is None:
                     syslog.warning(f"viewer state: bad state data for state: {state.key} id [{state.id}] - null value - skipping display")
                     continue
@@ -3925,11 +3935,10 @@ class StateVisualizerWidget(QWidget):
                     gremlin.util.delete_widget(self._state_buttons[state.key])
 
                 self._state_buttons[state.key] = btn
-                i += 1
 
         else:
             icon = Icons.warningIcon(Color().yellowColor())
-            stub = f"Showing {len(items)} out of {state_count}" if has_states else "No states available"
+            stub = f"Showing 0 out of {state_count}" if has_states else "No states available"
             widget = QWarningWidget(stub, icon=icon)
             layout.addWidget(widget)
 
@@ -4230,9 +4239,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             if not category:
                 category = default_category
 
-        changed = False
-        index = 0
-        # model.pushFilter()
         for key in keys:
             data = state[key]
             if category:
@@ -4241,16 +4247,12 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 if item_category != category:
                     continue  # filter out
 
-            input_item = data
-            self._input_items[key] = input_item
-            changed = True
-            model.setItemAt(index, input_item)
-            index += 1
+            self._input_items[key] = data
 
-        # model.popFilter()
-        model.applyFilter()  # update model filters and sort
+        model.setItems(self._input_items.values(), emit=False)
         model.popSuspend()
 
+        changed = bool(self._input_items)
         if changed and emit:
             model.trigger()  # causes an update
         return changed

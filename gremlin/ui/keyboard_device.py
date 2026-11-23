@@ -490,7 +490,10 @@ class BaseKeyboardCondition(BaseAbstractCondition):
 
         super().from_xml(node, data, extra_data)
 
-        syslog.info(f"node source line: {node.sourceline} {etree.tostring(node)} ")
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+
+        if verbose:
+            syslog.info(f"node source line: {node.sourceline} {etree.tostring(node)} ")
 
         self.comparison = safe_read(node, "comparison", str, "")
 
@@ -1034,8 +1037,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_list = registry.getInputItems(self.device_guid, mode, (InputType.KeyboardLatched, InputType.Keyboard))
         if len(input_list) > 0:
             input_list.sort(key=lambda x: x.sortKey)
-            for index, input_item in enumerate(input_list):
-                model.setItemAt(index, input_item)
+        model.setItems(input_list, emit=False)
 
         model.popSuspend()  # resume triggers
         if emit:

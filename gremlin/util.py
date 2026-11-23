@@ -16,45 +16,43 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import collections
 import ctypes
+import functools
 import gc
+import hashlib
+import html
 import importlib
+import inspect
+import json
 import logging
 import math
 import os
+import random
 import re
+import shutil
 import sys
 import threading
 import time
-import shutil
+import traceback
 import uuid
-import json
+from ctypes import Structure, c_long
+from typing import Any, Callable
 
-
-import dinput
+import qtawesome as qta
 import win32api
 import win32con
-from ctypes import Structure, c_long
-import collections
-import qtawesome as qta
 from lxml import etree as ElementTree
-from typing import Callable, Any
-import hashlib
-import random
-
-from PySide6 import QtCore, QtWidgets, QtGui
-from win32api import GetFileVersionInfo, LOWORD, HIWORD
-from PySide6.QtGui import QColor
 from psygnal import Signal
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtGui import QColor
 from shiboken6 import Shiboken
-import inspect
-import html
-import gremlin.singleton_decorator
-import functools
+from win32api import HIWORD, LOWORD, GetFileVersionInfo
 
+import dinput
+import gremlin.singleton_decorator
 
 from . import error
-import traceback
 
 syslog = logging.getLogger("system")
 
@@ -529,8 +527,7 @@ def _hold_cyclic_gc():
 def _release_cyclic_gc():
     global _gc_holds
     _gc_holds -= 1
-    if _gc_holds < 0:
-        _gc_holds = 0
+    _gc_holds = max(_gc_holds, 0)
 
 
 def _pin_deleted_widget(widget):
@@ -611,7 +608,7 @@ def get_widget_references(instance, type: type = QtWidgets.QWidget) -> list:
     """returns a list of widget references in the given instance"""
     widgets = []
     for name, value in list(vars(instance).items()):
-        if isinstance(value, QtWidgets.QWidget):
+        if isinstance(value, QtWidgets.QWidget):  # noqa: SIM102
             if type is None or isinstance(value, type):
                 widgets.append(value)
     return widgets

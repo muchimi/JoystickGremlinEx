@@ -102,6 +102,8 @@ class StateStore:
 class Config:
     changed = Signal(str, object)
     input_viewer_button_size = 12
+    device_page_size = 32
+    state_visualizer_page_size = 16
     verbose_mode_state = False
 
     def verbose_mode_ui_level(self, level):
@@ -115,6 +117,22 @@ class DataButton(QtWidgets.QPushButton):
 
     def setCallback(self, callback):
         self.clicked.connect(lambda: callback(self))
+
+
+class UsedButton(DataButton):
+    def __init__(self, label, data, callback, tooltip, **kwargs):
+        super().__init__(label, data)
+        self.setToolTip(tooltip)
+        self.setCallback(callback)
+
+    def setUsed(self, used):
+        self.used = used
+
+
+def icon_button(icon, callback):
+    button = QtWidgets.QPushButton(icon, "")
+    button.clicked.connect(callback)
+    return button
 
 
 class Colors:
@@ -142,13 +160,13 @@ STORE = StateStore()
 CONFIG = Config()
 BUS = NS(all_inputs_deleted=Mock(), input_deleted=Mock())
 SERVICES = NS(
-    config=NS(Configuration=lambda: CONFIG),
+    config=NS(Configuration=lambda: CONFIG, STATE_VISUALIZER_PAGE_SIZES=(8, 16, 32, 64)),
     shared_state=NS(current_profile=Profile(), master_mode="Master", is_running=False,
                     ui=NS(getRegisteredWidget=Mock(return_value=None))),
     base_profile=NS(Profile=Profile),
     joystick_handling=NS(getDevice=lambda guid: NS(name="States", device_type=DeviceType.State)),
     event_handler=NS(EventListener=lambda: BUS),
-    util=NS(InvokeUiMethod=invoke, clear_layout=clear_layout, get_guid=uuid.uuid4),
+    util=NS(InvokeUiMethod=invoke, clear_layout=clear_layout, get_guid=uuid.uuid4, get_uuid=uuid.uuid4),
     ui=NS(ui_common=NS(Color=Colors)),
     input_item=NS(InputItem=State),
 )
@@ -163,7 +181,8 @@ NAMESPACE.update(
     InputType=InputType, DeviceType=DeviceType, InputItem=State,
     StateDeviceTabWidget=NS(device_guid="state-device"), StateData=lambda: STORE,
     StateCategory=type("StateCategory", (), {}), Color=Colors,
-    Icons=NS(warningIcon=lambda *args: QtGui.QIcon()), QDataPushButton=DataButton,
+    Icons=NS(**{name: QtGui.QIcon for name in ("arrowFirst", "arrowPrevious", "arrowNext", "arrowLast")}, warningIcon=lambda *args: QtGui.QIcon()),
+    QDataPushButton=DataButton, QIconPushButton=icon_button, QUsedPushButton=UsedButton,
     QFlowLayout=QtWidgets.QHBoxLayout, QHorizontalLine=QtWidgets.QFrame,
     QWarningWidget=lambda text, icon=None: QtWidgets.QLabel(text),
     getHContainer=container, syslog=logging.getLogger("state-viewer-checks"),
@@ -183,7 +202,10 @@ def load(path, names):
 
 load("gremlin/util.py", {"TriggerDict"})
 load("gremlin/base_classes.py", {"AbstractModel", "AbstractCallbackModel"})
-load("gremlin/input_item.py", {"InputItemListModel", "AdvancedInputItemListModel", "FilterChip", "FilterControlWidget"})
+load("gremlin/input_item.py", {
+    "InputItemListModel", "AdvancedInputItemListModel", "FilterChip", "FilterControlWidget",
+    "AbstractView", "AbstractPaginatedView", "PaginationWidget",
+})
 SERVICES.input_item.AdvancedInputItemListModel = NAMESPACE["AdvancedInputItemListModel"]
 load("gremlin/ui/ui_common.py", {"QDataRadioButton"})
 load("gremlin/ui/state_device.py", {
@@ -195,6 +217,7 @@ SERVICES.ui.state_device = NS(StateData=lambda: STORE)
 class StateVisualizerTests(unittest.TestCase):
     def setUp(self):
         STORE.states = {"beta": State("beta", "other"), "alpha": State("alpha", attributes=["tag"])}
+        CONFIG.state_visualizer_page_size = 16
         BUS.all_inputs_deleted.reset_mock()
         self.widgets = []
 
@@ -217,6 +240,64 @@ class StateVisualizerTests(unittest.TestCase):
         self.assertIs(widget._state_buttons["alpha"].data, STORE.states["alpha"])
         self.assertIn("showing 2 of 2", widget._state_filter_widget.count_widget.text())
         BUS.all_inputs_deleted.emit.assert_not_called()
+
+    def test_visualizer_paginates_filtered_states_and_keeps_its_own_size(self):
+        STORE.states = {f"state-{index:02}": State(f"state-{index:02}") for index in range(35)}
+        widget = self.viewer()
+        pager = widget._pagination
+        self.assertEqual(pager._label.text(), "1 / 3")
+        self.assertEqual(list(widget._state_buttons), list(STORE.states)[:16])
+        pager._next_button.click()
+        self.assertEqual(list(widget._state_buttons), list(STORE.states)[16:32])
+        self.assertEqual(len(STORE.states["state-00"].changed), 0)
+        pager._last_button.click()
+        self.assertEqual(pager._label.text(), "3 / 3")
+        self.assertEqual(list(widget._state_buttons), list(STORE.states)[32:])
+
+        widget._state_filter_widget.search_input.setText("state-0")
+        self.assertEqual(pager._label.text(), "1 / 1")
+        self.assertTrue(pager._paginator_widget.isHidden())
+        self.assertFalse(pager._page_size_widget.isHidden())
+        self.assertEqual(list(widget._state_buttons), list(STORE.states)[:10])
+        widget._state_filter_widget.search_input.clear()
+        self.assertEqual(pager._label.text(), "1 / 3")
+        self.assertFalse(pager._paginator_widget.isHidden())
+        self.assertEqual(len(widget._state_buttons), 16)
+
+    def test_page_size_presets_cap_rendering_and_persist_independently(self):
+        STORE.states = {f"state-{index:03}": State(f"state-{index:03}") for index in range(130)}
+        widget = self.viewer()
+        pager = widget._pagination
+        presets = {button.data: button for button in pager.page_size_widgets}
+        self.assertEqual(list(presets), [8, 16, 32, 64])
+        self.assertTrue(presets[16].used)
+
+        for size in (8, 32, 64):
+            widget.setPage(1)
+            presets[size].click()
+            self.assertEqual(widget.page_index, 0)
+            self.assertEqual(len(widget._state_buttons), size)
+            self.assertEqual([count for count, button in presets.items() if button.used], [size])
+        self.assertEqual(pager._label.text(), "1 / 3")
+        pager._last_button.click()
+        self.assertEqual(list(widget._state_buttons), list(STORE.states)[128:])
+
+        widget.setPageSize(0)
+        widget.setPageSize(128)
+        self.assertEqual(widget.page_size, 64)
+        self.assertEqual(CONFIG.device_page_size, 32)
+        self.assertEqual(CONFIG.state_visualizer_page_size, 64)
+        self.assertEqual(len(self.viewer()._state_buttons), 64)
+
+    def test_bulk_insert_rebuilds_each_filter_once(self):
+        widget = self.viewer()
+        model = widget.model
+        widget._state_filter_widget.search_input.setText("alpha")
+        with patch.object(model, "applyFilter", wraps=model.applyFilter) as apply_filter:
+            model.refresh()
+        self.assertEqual([call.kwargs["filter"] for call in apply_filter.call_args_list], ["default", "visualizer"])
+        self.assertEqual([s.key for s in model.getFilteredItems()], ["alpha", "beta"])
+        self.assertEqual(list(widget._state_buttons), ["alpha"])
 
     def test_opens_with_no_main_ui_and_no_states(self):
         STORE.states.clear()

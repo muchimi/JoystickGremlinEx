@@ -2639,12 +2639,13 @@ class ProfileGraph:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{node!s}")
 
-    def from_xml(self, source_xml: str, data=None, fname_is_xml: bool = False):
+    def from_xml(self, source_xml: str, data=None, fname_is_xml: bool = False, *, profile_xml=None):
         """reads a profile from XML"""
         from gremlin.profile import parse_profile_xml
 
         parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-        tree = parse_profile_xml(source_xml, parser, from_memory=fname_is_xml)
+        xml_source = profile_xml if profile_xml is not None else source_xml
+        tree = parse_profile_xml(xml_source, parser, from_memory=fname_is_xml or profile_xml is not None)
         root = tree.getroot()
 
         # self._root = ProfileRootNode(source_xml) # root node

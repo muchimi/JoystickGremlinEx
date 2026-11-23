@@ -205,6 +205,17 @@ class CodeRunner:
             self.stop()
             return False
 
+        from gremlin.trigger_loops import find_trigger_loops
+
+        loops = find_trigger_loops(ec.graph, profile, gremlin.shared_state.master_mode)
+        if loops:
+            from gremlin.ui.trigger_loops import confirm_trigger_loops
+
+            if not confirm_trigger_loops(loops, parent=gremlin.shared_state.ui):
+                gremlin.shared_state.profile_message_issued = True
+                el.profile_deactivated.emit()
+                return False
+
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_exec
 

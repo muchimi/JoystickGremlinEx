@@ -1266,9 +1266,9 @@ def clean_value(value):
     return re.sub(r"\s+;.*$", "", value)
 
 
-def read_ini(path):
-    """tolerant ini reader -> {section (lower case): [(name, value)]}, or None if the file cannot be read.
-    Lines without '=' and lines before the first section are skipped; names keep their case."""
+def read_ini(path, *, keep_section_case=False):
+    """Read INI entries by section, or return None if the file cannot be read.
+    Section names default to lowercase. Entry names keep their case."""
     try:
         with open(path, "rb") as file:  # @IgnoreException
             raw = file.read()
@@ -1284,7 +1284,8 @@ def read_ini(path):
         s = line.strip()
         m = re.fullmatch(r"\[(.+)\]", s)
         if m:
-            cur = sections.setdefault(m.group(1).strip().lower(), [])
+            section = m.group(1).strip()
+            cur = sections.setdefault(section if keep_section_case else section.lower(), [])
             continue
         if cur is None or not s or s[0] in ";#" or "=" not in s:
             continue
@@ -1294,26 +1295,50 @@ def read_ini(path):
     return sections
 
 
-def read_preset(path):
+def read_preset(path, *, warn=False):
     """-> Preset, or None if the file cannot be read"""
     sections = read_ini(path)
     if sections is None:
         return None
-    settings = {k.lower(): v for k, v in sections.get("app", [])}
-    funcs, skipped = [], []
-    if "functions" in sections:
-        for key, val in sections["functions"]:
-            m = _LINE.match(f"{key} = {val}")
-            if not m or not m.group("value"):
-                skipped.append((key, val, "invalid line"))
-                continue
-            problem = value_problem(m.group("value"))
-            if problem:
-                skipped.append((m.group("name"), m.group("value"), problem))
-                continue
-            funcs.append(Function(m.group("name"), m.group("value"), m.group("opt") or ""))
     name = os.path.splitext(os.path.basename(path))[0]
+    return _build_preset(name, path, sections.get("app", []), sections.get("functions", []), warn)
+
+
+def _build_preset(name, path, app_entries, function_entries, warn):
+    settings = {k.lower(): v for k, v in app_entries}
+    funcs, skipped = [], []
+    for key, val in function_entries:
+        m = _LINE.match(f"{key} = {val}")
+        if not m or not m.group("value"):
+            skipped.append((key, val, "invalid line"))
+            continue
+        problem = value_problem(m.group("value"))
+        if problem:
+            skipped.append((m.group("name"), m.group("value"), problem))
+            continue
+        funcs.append(Function(m.group("name"), m.group("value"), m.group("opt") or ""))
+    if warn:
+        for key, value, reason in skipped:
+            log.warning(f"{TAG}: preset {name}: '{key} = {value}' skipped: {reason}")
     return Preset(name, path, settings, funcs, skipped)
+
+
+def load_preset_sidecar(path, warn=True):
+    """Load each [app: Name] with its optional [functions: Name] from the same INI."""
+    sections = read_ini(path, keep_section_case=True) or {}
+    apps, functions = {}, {}
+    for section, entries in sections.items():
+        kind, _, name = (part.strip() for part in section.partition(":"))
+        if not name:
+            continue
+        if kind.lower() == "app":
+            apps.setdefault(name, []).extend(entries)
+        elif kind.lower() == "functions":
+            functions.setdefault(name.casefold(), []).extend(entries)
+    return {
+        name: _build_preset(name, path, entries, functions.get(name.casefold(), []), warn)
+        for name, entries in apps.items()
+    }
 
 
 def load_presets(folder=None, warn=True):
@@ -1325,10 +1350,7 @@ def load_presets(folder=None, warn=True):
         return out
     for fn in sorted(os.listdir(folder), key=str.lower):
         if fn.lower().endswith(".ini") and not fn.startswith("_"):
-            p = read_preset(os.path.join(folder, fn))
+            p = read_preset(os.path.join(folder, fn), warn=warn)
             if p is not None:
                 out[p.name] = p
-                if warn:
-                    for n, v, why in p.skipped:
-                        log.warning(f"{TAG}: preset {p.name}: '{n} = {v}' skipped: {why}")
     return out

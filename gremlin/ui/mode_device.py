@@ -448,8 +448,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _update_model(self, model: ModeInputItemModel):
         """updates the model with any changed data"""
         # ensure inputs are defined
-        from gremlin.input_item import InputItem
-
         mode = self.current_mode
         master_mode = gremlin.shared_state.master_mode
         registry = self.profile.registry
@@ -474,15 +472,9 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             input_stop,
         ]
 
-        model.pushSuspend()  # suspend triggers
-        input_item: InputItem
-        for index, input_item in enumerate(input_items):
-            assert input_item is not None, "invalid input item - should be defined here"
+        for input_item in input_items:
             assert input_item.input_id is not None, "invalid input id for input item"
-            model.setItemAt(index, input_item)
-            # syslog.info(f"Mode model: index [{index}] contains input item id {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] container count: [{input_item.containers.count()}]")
-
-        model.popSuspend()
+        model.setItems(input_items)
 
     def _remove_handler(self, model: ModeInputItemModel, index, emit_change=True):
         """clears a single index"""

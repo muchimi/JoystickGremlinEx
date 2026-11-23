@@ -704,9 +704,10 @@ class MaestroOscClient:
             # fixed destination port. Never enable SO_REUSEADDR here.
             if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
                 self._rx.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            self._rx.bind((reply_host, reply_port))
+            self._rx.bind((reply_host, reply_port)) # @IgnoreException
             self._rx.settimeout(0.2)
         except OSError:
+            # socket already used is the likely issue
             self._tx.close()
             self._rx.close()
             raise
@@ -1716,6 +1717,114 @@ class Maestro:
         finally:
             dialog.deleteLater()
 
+    def offerProfileDevices(self, filename, parent=None) -> tuple[int, ...]:
+        """Offer to provision the missing bridge targets before profile parsing."""
+        from lxml import etree
+        from gremlin import profile
+        from gremlin.device_remap import maestro_profile_slots, vjoy_references
+
+        config = gremlin.config.Configuration()
+        if not config.maestro_enabled:
+            return ()
+        try:
+            parser = etree.XMLParser(resolve_entities=False, remove_comments=True)
+            root = profile.parse_profile_xml(filename, parser).getroot()
+            slots = maestro_profile_slots(root, GEX_MAX_DEVICES)
+            fallback_ids = vjoy_references(root) if not config.vjoy_installed and config.virtual_output_failover else {}
+        except (OSError, ValueError, etree.XMLSyntaxError):
+            return ()  # The profile loader reports unreadable files.
+
+        if not (slots or fallback_ids):
+            return ()
+
+        added = []
+        try:
+            if not self.ensureConnected():
+                return ()
+            with self._lock:
+                attached = {c.id: c.index for c in self._controller_map.values()}
+            attached_slots = set(attached.values())
+            if attached_slots.issuperset(slots) and all(self._joystick_id(i - 1) in attached for i in fallback_ids):
+                return ()
+
+            active = {row["id"] for row in self.client.list("/maestro_devices")}
+            defined = {row["id"] for row in self.client.list("/maestro_definitions")}
+            previous_map = config.maestro_device_map
+            selection = {**(previous_map or {}), **attached}
+            occupied = {slot: name for name, slot in selection.items()}
+            missing = {}
+            reserved = active | defined | set(selection) | set(slots.values())
+            reserved.update(self._joystick_id(i - 1) for i in fallback_ids)
+            for slot, saved_name in sorted(slots.items()):
+                if slot in attached_slots:
+                    continue
+                name = saved_name if self._service_index(saved_name) is not None else occupied.get(slot, self._joystick_id(slot))
+                if not saved_name and (selection.get(name, slot) != slot or name in missing):
+                    name = next((self._joystick_id(i) for i in range(GEX_MAX_DEVICES) if self._joystick_id(i) not in reserved), None)
+                if name and name not in missing and selection.get(name, slot) == slot and occupied.get(slot, name) == name:
+                    missing[name] = slot
+                    occupied[slot] = name
+                    reserved.add(name)
+            for index in sorted(fallback_ids):
+                name = self._joystick_id(index - 1)
+                if name in attached or name in missing:
+                    continue
+                slot = selection.get(name, index - 1)
+                if name not in selection and occupied.get(slot, name) != name:
+                    slot = next((i for i in range(16) if i not in occupied), None)
+                if slot is not None:
+                    missing[name] = slot
+                    occupied[slot] = name
+            if not missing:
+                return ()
+
+            dialog = MaestroProfileDevicesDialog(tuple(missing), parent=parent)
+            try:
+                if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                    return ()
+            finally:
+                dialog.deleteLater()
+
+            listener = gremlin.event_handler.EventListener()
+            listener.pushDeviceChangeSuppression()
+            config.maestro_device_map = selection.copy()
+            try:
+                for name, slot in missing.items():
+                    if name in defined and name not in active:
+                        result = self.client.request("/maestro_activate", name).raise_for_error()
+                        if not result:
+                            raise RuntimeError(f"Could not activate {name}: {result.message}")
+                    elif name not in active:
+                        create = self.createGamepadController if name.startswith("gex-gp-") else self.createJoystickController
+                        controller = create(name=name, at_index=slot, refresh=False)
+                        if controller is None:
+                            raise RuntimeError(f"Could not create {name}.")
+                    selection[name] = slot
+                    added.append(slot)
+            finally:
+                try:
+                    config.maestro_device_map = selection if added else previous_map
+                    config.save()
+                    self.refreshDevices()
+                finally:
+                    listener.popDeviceChangeSuppression()
+        except (OSError, RuntimeError, ValueError, TimeoutError) as error:
+            syslog.exception("MAESTRO: unable to provision profile devices")
+            MessageBoxWarning(
+                title="Maestro devices unavailable",
+                prompt=str(error),
+                informative_text="You can manage Maestro devices from Tools > Maestro Devices.",
+                parent=parent,
+            )
+        return tuple(added)
+
+    def waitForProfileInputDiscovery(self):
+        """Allow hot-plug discovery to publish native inputs before parsing."""
+        with self._sync_lock:
+            worker = self._sync_worker
+        if worker is not None:
+            worker.join(timeout=2)
+
     def createDefaultJoysticks(self, count: int) -> int:
         """Create missing gex-1..gex-N joysticks, preserving definitions and slots."""
         if type(count) is not int or not 1 <= count <= GEX_MAX_DEVICES:
@@ -2388,6 +2497,8 @@ class Maestro:
         hat_count=4,
         definition: str | None = None,
         at_index=None,
+        *,
+        refresh=True,
     ) -> None | MaestroController:
         """Create a service-owned custom joystick controller.
 
@@ -2427,7 +2538,8 @@ class Maestro:
                 result.data, {"kind": "custom", "axes": axis_count, "buttons": button_count, "hats": hat_count}, index
             )
             self._register_controller(controller)
-            self.refreshDevices(reload=False)
+            if refresh:
+                self.refreshDevices(reload=False)
             return controller
         except (OSError, RuntimeError, ValueError) as error:
             syslog.error(f"MAESTRO: failed to create controller {index}: {error}")
@@ -2501,7 +2613,7 @@ class Maestro:
         return renamed
 
     def createGamepadController(
-        self, name: str | None = None, definition: str | None = None, at_index=None
+        self, name: str | None = None, definition: str | None = None, at_index=None, *, refresh=True
     ) -> None | MaestroController:
         """Create a service-owned Xbox 360 gamepad controller.
 
@@ -2541,7 +2653,8 @@ class Maestro:
             result = self.client.request("/maestro_create_gamepad", name, name, True).raise_for_error()
             controller = self._cache_controller(result.data, {"kind": "gamepad"}, index)
             self._register_controller(controller)
-            self.refreshDevices(reload=False)
+            if refresh:
+                self.refreshDevices(reload=False)
             return controller
         except (OSError, RuntimeError, ValueError) as error:
             syslog.error(f"MAESTRO: failed to create gamepad controller {index}: {error}")
@@ -2927,6 +3040,37 @@ class MaestroProfileInfo:
             profile_id=data.get("profileId", ""),
             service_device_id=service_device_id,
         )
+
+
+class MaestroProfileDevicesDialog(QRememberDialog):
+    """Confirm the devices needed to load a profile."""
+
+    def __init__(self, device_names: tuple[str, ...], parent=None):
+        super().__init__("MaestroProfileDevicesDialog", width=480, height=240, parent=parent)
+        self.setWindowTitle("Missing Maestro devices")
+        self.setModal(True)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_QuitOnClose, False)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        count = len(device_names)
+        noun = "device" if count == 1 else "devices"
+        description = QDataLabel(
+            f"This profile needs {count} additional Maestro {noun}. GEX will reuse any saved definitions."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        names = QDataLabel("\n".join(device_names))
+        names.setTextFormat(QtCore.Qt.TextFormat.PlainText)
+        names.setWordWrap(True)
+        layout.addWidget(QScrollableWidget(names, horizontal_scroll=False))
+
+        self.create_button = QDataPushButton("Create devices", clicked=self.accept)
+        self.create_button.setAutoDefault(False)
+        self.cancel_button = QDataPushButton("Continue without devices", clicked=self.reject)
+        self.cancel_button.setDefault(True)
+        self.cancel_button.setFocus()
+        layout.addWidget(getHContainer(["||", self.create_button, self.cancel_button], widget_only=True, auto_size=True))
 
 
 class MaestroDefaultDevicesDialog(QRememberDialog):

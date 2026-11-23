@@ -1170,7 +1170,20 @@ class AbstractCallbackModel(AbstractModel):
     def setItemAt(self, index: int, item, emit=True, filter: str = DEFAULT_FILTER):
         self._set_item_at(index, item, emit, "setItemAt", filter)
 
-    def _set_item_at(self, index: int, item, emit=True, operation: str = "add", filter: str = DEFAULT_FILTER):
+    def setItems(self, items, emit=True):
+        """Load consecutive entries and rebuild each registered filter once."""
+        self.pushSuspend()
+        try:
+            for index, item in enumerate(items):
+                self._set_item_at(index, item, operation="setItemAt", refilter=False)
+        finally:
+            try:
+                for filter_name in tuple(self._filtered_index_map):
+                    self.applyFilter(emit=False, filter=filter_name)
+            finally:
+                self.popSuspend(emit=emit)
+
+    def _set_item_at(self, index: int, item, emit=True, operation: str = "add", filter: str = DEFAULT_FILTER, *, refilter=True):
         """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
@@ -1181,8 +1194,9 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map[index] = item
         self._item_map[item] = index
         self._register_content(item)
-        self.applyFilter(emit=emit, filter=filter)
-        self._fireChanged()
+        if refilter:
+            self.applyFilter(emit=emit, filter=filter)
+            self._fireChanged()
         self._notify_changed(data=item, operation=operation)
         self.onItemChanged(self, index, item, old_item, operation)
         self.markDirty()

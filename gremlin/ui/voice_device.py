@@ -2226,27 +2226,17 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _load_handler(self, model: VoiceInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
         voice = self.profile.voice
-        self._input_items = {}
-
         keys = [key for key in voice]
         keys.sort()
 
         model.pushSuspend()
         model.clear(emit=False)
 
-        changed = False
-        index = 0
-        for key in keys:
-            data = voice[key]
-            input_item = data
-            self._input_items[key] = input_item
-            changed = True
-            model.setItemAt(index, input_item)
-            index += 1
-
-        model.applyFilter()  # update model filters and sort
+        self._input_items = {key: voice[key] for key in keys}
+        model.setItems(self._input_items.values(), emit=False)
         model.popSuspend()
 
+        changed = bool(self._input_items)
         if changed and emit:
             model.trigger()  # causes an update
         return changed

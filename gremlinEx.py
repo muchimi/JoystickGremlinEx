@@ -120,7 +120,7 @@ import gremlin.version
 import gremlin.virtual_output_startup
 import gremlin.voice
 import gremlin.windows_event_hook  # reference needed for packaging
-import gremlin.win32_core
+import action_plugins.map_to_application.win32_core
 import gremlin.window_picker
 from dinput import DeviceSummary
 from gremlin.input_item import BaseDeviceTabWidget, InputItem, InputItemWidget, ansiFail
@@ -1094,8 +1094,10 @@ class GremlinUi(QRememberMainWindow):
         device_guid = args[0] if args else None
         self.popLoading(device_guid)
 
-    def add_custom_tools_menu(self, menuTools):
+    def add_custom_tools_menu(self, menuTools, profile_visualization_action):
         """adds custom tools to the menu"""
+        from gremlin.hidhide import is_installed as hidhide_installed
+
         self._actionTabDisplayDevice = QtGui.QAction("Device List...", self, triggered=self._tab_display_device_cb)
         self._actionTabDisplayDevice.setToolTip("Displays the selected device in the profile")
 
@@ -1114,14 +1116,35 @@ class GremlinUi(QRememberMainWindow):
         self._actionRemapProfileDevices = QtGui.QAction(Icons.deviceMappingIcon(), "Remap Profile Device...", self, triggered=self._remap_profile_devices_cb)
         self._actionRemapProfileDevices.setToolTip("Replace saved profile device GUIDs with connected device identities")
 
+        menuTools.addAction("Profile Statistics...", self._show_profile_statistics)
+        menuTools.addAction(profile_visualization_action)
         menuTools.addAction(self._actionRemapProfileDevices)
         menuTools.addAction(self._actionTabDisplayDevice)
         menuTools.addAction(self._ationTabCopyAssignments)
         menuTools.addAction(self._actionTabClearMap)
         menuTools.addAction(self._actionMaestro)
+        hidhide_action = menuTools.addAction("HidHide...", self._show_hidhide)
+        hidhide_action.setVisible(hidhide_installed())
+        menuTools.aboutToShow.connect(lambda: hidhide_action.setVisible(hidhide_installed()))
         action = QtGui.QAction("Remote Clients…", self, triggered=self._show_remote_clients)
         action.setIcon(QtGui.QIcon("fa6s.network-wired"))
         menuTools.addAction(action)
+
+    def _show_profile_statistics(self):
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and not self.isProfileLoading():
+            from gremlin.ui.profile_statistics import ProfileStatisticsDialog
+
+            ProfileStatisticsDialog(profile, parent=self).exec()
+
+    def _show_hidhide(self):
+        from gremlin.ui.hidhide import HidHideDialog
+
+        dialog = HidHideDialog(parent=self)
+        try:
+            dialog.exec()
+        finally:
+            dialog.deleteLater()
 
     def _show_remote_clients(self):
         from gremlin.ui.dialogs import show_remote_clients
@@ -5818,7 +5841,7 @@ class GremlinUi(QRememberMainWindow):
         if emit and gremlin.shared_state.is_running:
             self._activate_ui(False)
         self.setUIState(False)
-        gremlin.maestro.Maestro().offerDefaultJoysticks(parent=self)
+        added_maestro_slots = gremlin.maestro.Maestro().offerProfileDevices(source_xml, parent=self)
         # Clear the old Qt objects on their owning thread, before parsing on a
         # worker. The worker must not poll QTabBar or destroy cached widgets.
         self._startup_restore_target = None
@@ -5834,6 +5857,7 @@ class GremlinUi(QRememberMainWindow):
                 source_xml,
                 as_new_profile,
                 emit,
+                added_maestro_slots,
             ),
         )
         return True
@@ -5863,7 +5887,7 @@ class GremlinUi(QRememberMainWindow):
 
         source_xml: str
         as_new_profile: bool
-        source_xml, as_new_profile, emit = args
+        source_xml, as_new_profile, emit, added_maestro_slots = args
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -5873,6 +5897,9 @@ class GremlinUi(QRememberMainWindow):
         if self._profile_load_stack:
             self._profile_load_stack.append(source_xml)
             return
+
+        if added_maestro_slots:
+            gremlin.maestro.Maestro().waitForProfileInputDiscovery()
 
         eh = gremlin.event_handler.EventHandler()
         el = gremlin.event_handler.EventListener()
@@ -6050,6 +6077,10 @@ class GremlinUi(QRememberMainWindow):
             if not new_profile.settings.input_visible_map:
                 # default to mapped mode for older profiles without data
                 new_profile.settings.setAllVisible("mapped")
+            for slot in added_maestro_slots:
+                device = gremlin.joystick_handling.maestro_info_from_index(slot)
+                if device and new_profile.settings.getVirtualAsInput(device):
+                    new_profile.settings.setAllVisibleDevice(device, additive=True)
 
             # reload the calibration data if the profile has custom calibration
             mgr = gremlin.ui.axis_calibration.CalibrationManager()
@@ -6809,6 +6840,10 @@ if __name__ == "__main__":
         syslog.info(f"GremlinEx (GEX) version {gremlin.version.Version().version}  (P{gremlin.util.getPythonVersion()})")
 
         syslog.info(f"ENV: {'production' if PACKAGED else 'dev'}")
+
+        from gremlin.ui.hidhide import offer_startup_access
+
+        offer_startup_access()
 
         # Initialize the vjoy interface
         from vjoy.vjoy_interface import VJoyInterface

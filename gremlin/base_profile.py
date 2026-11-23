@@ -1182,7 +1182,10 @@ class Settings:
                         and not device.data.get("failover", False)
                     )
                     sd.setInputEnabled(device.device_guid, input_enabled)
-                self.setVirtualAsInput(index, enabled, device_type=device_type, emit=False)
+                key = index
+                if device_type == DeviceType.Maestro and device and device.device_type == device_type and device.input_enabled:
+                    key = device
+                self.setVirtualAsInput(key, enabled, device_type=device_type, emit=False)
 
         # vjoy initialization values
         self.vjoy_initial_values = {}
@@ -1271,7 +1274,11 @@ class Settings:
 
     def getVirtualAsInput(self, device, device_type=DeviceType.VJoy) -> bool:
         device_type, index = self._virtual_input_key(device, device_type)
-        return self._virtual_as_input.get(device_type, {}).get(index, False)
+        selected = self._virtual_as_input.get(device_type, {})
+        if isinstance(index, str) and device_type == DeviceType.Maestro and index not in selected:
+            # A gamepad can acquire its native input identity after profile load.
+            index = getattr(device, "virtual_id", index)
+        return selected.get(index, False)
 
     def getVirtualAsInputList(self, device_type=DeviceType.VJoy) -> list[int | str]:
         """Return enabled indices or native GUIDs for one virtual joystick provider."""
@@ -4309,6 +4316,32 @@ class Profile:
             for vjoy_id in sorted(vjoy_ids):
                 gremlin.joystick_handling.configure_vjoy_failover(vjoy_id, vjoy_guid_map.get(vjoy_id))
 
+    def _bind_maestro_profile_devices(self, root):
+        """Match saved bridge inputs to their local DirectInput identities."""
+        from gremlin.device_remap import guid_key, remap_profile_devices
+
+        replacements = {}
+        devices = gremlin.joystick_handling.virtual_device_map().get(DeviceType.Maestro, {})
+        if not devices:
+            return root
+        saved_devices = root.findall("./devices/device")
+        saved_guids = {guid_key(node.get("device-guid")) for node in saved_devices}
+        live_guids = {guid_key(device.device_guid) for device in devices.values()}
+        used_targets = set()
+        for node in saved_devices:
+            if node.get("type", "").casefold() != "maestro":
+                continue
+            slot = node.get("virtual-id", "")
+            guid = guid_key(node.get("device-guid"))
+            device = devices.get(int(slot)) if slot.isascii() and slot.isdecimal() else None
+            if not guid or guid in live_guids or not device or not device.input_enabled:
+                continue
+            target = guid_key(device.device_guid)
+            if target not in saved_guids and target not in used_targets and node.get("name", "").casefold() == device.name.casefold():
+                replacements[guid] = (device.device_guid, device.name)
+                used_targets.add(target)
+        return remap_profile_devices(root, replacements) if replacements else root
+
     def from_xml(self, fname, data=None, extra_data=None, fname_is_xml: bool = False):
         """Parses the profile XML document into the profile data structure.
 
@@ -4373,6 +4406,9 @@ class Profile:
             self._force_numlock_off = safe_read(root, "force_numlock", bool, False)
         if "force_numlock_on" in root.attrib:
             self._force_numlock_on = safe_read(root, "force_numlock_on", bool, False)
+
+        original_root = root
+        root = self._bind_maestro_profile_devices(root)
 
         # settings data
         self.settings.from_xml(root.find("settings"), data, extra_data)
@@ -4637,7 +4673,8 @@ class Profile:
 
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
-        self._profile_graph.from_xml(fname, fname_is_xml=fname_is_xml)
+        graph_xml = etree.tostring(root) if root is not original_root else None
+        self._profile_graph.from_xml(fname, fname_is_xml=fname_is_xml, profile_xml=graph_xml)
 
         # load the mode tree
         self.reload_modes(update_devices=True)

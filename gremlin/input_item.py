@@ -567,6 +567,8 @@ class AbstractPaginatedView(AbstractView):
     """
 
     page_changed = QtCore.Signal(int, int)  # (page index, page count)
+    PAGE_SIZE_PRESETS = (0, 8, 16, 32, 64)
+    PAGE_SIZE_SETTING = "device_page_size"
 
     def __init__(
         self,
@@ -582,10 +584,9 @@ class AbstractPaginatedView(AbstractView):
         config = gremlin.config.Configuration()
         if page_size is not None:
             self._page_size = max(0, page_size)
-            config.device_page_size = self._page_size
+            setattr(config, self.PAGE_SIZE_SETTING, self._page_size)
         else:
-            # use configuration page size
-            self._page_size = config.device_page_size
+            self._page_size = getattr(config, self.PAGE_SIZE_SETTING)
         self._page_index = 0
 
     def _item_count(self) -> int:
@@ -594,6 +595,9 @@ class AbstractPaginatedView(AbstractView):
         if model is None:
             return 0
         return model.count()
+
+    def unfilteredCount(self) -> int:
+        return self._model.unfilteredCount() if self._model is not None else 0
 
     def _get_hash_key(self, filter=AbstractCallbackModel.DEFAULT_FILTER):
         self._clamp_page()
@@ -631,7 +635,7 @@ class AbstractPaginatedView(AbstractView):
         self.redraw(force=True)
         self.page_changed.emit(self._page_index, self.page_count)
         config = gremlin.config.Configuration()
-        config.device_page_size = self._page_size
+        setattr(config, self.PAGE_SIZE_SETTING, self._page_size)
 
     def setPage(self, index: int):
         """shows the page at the given 0 based index (clamped to the valid range)"""
@@ -670,7 +674,7 @@ class AbstractPaginatedView(AbstractView):
 class PaginationWidget(QtWidgets.QWidget):
     """Previous/next controls with a "Page x / y" label for a PaginatedAbstractView.
 
-    Hidden automatically when the view has a single page or pagination is disabled.
+    Navigation is hidden when the view has a single page or pagination is disabled.
     """
 
     def __init__(self, view: AbstractPaginatedView, parent=None):
@@ -684,14 +688,6 @@ class PaginationWidget(QtWidgets.QWidget):
         self._prev_button = QIconPushButton(icon=Icons.arrowPrevious(), callback=self._view.previousPage)
         self._next_button = QIconPushButton(icon=Icons.arrowNext(), callback=self._view.nextPage)
         self._last_button = QIconPushButton(icon=Icons.arrowLast(), callback=lambda: self._view.setPage(self._view.page_count - 1))
-
-        page_sizes = [
-            ("Off", 0, "Turns pagination off (this could significantly impact UI performance and memory utilization for high count inputs)"),
-            ("8", 8, "Paginate over 8 items"),
-            ("16", 16, "Paginate over 16 items"),
-            ("32", 32, "Paginate over 32 items"),
-            ("64", 64, "Paginate over 64 items"),
-        ]
 
         self._current_size_widget = QtWidgets.QLabel("")
 
@@ -708,8 +704,16 @@ class PaginationWidget(QtWidgets.QWidget):
             button.setToolTip(tooltip)
 
         self.page_size_widgets = [
-            QUsedPushButton(text, data=value, callback=self._handle_page_size_changed, tooltip=tooltip, interactive=False, size=32, font_size=8)
-            for text, value, tooltip in page_sizes
+            QUsedPushButton(
+                str(size) if size else "Off",
+                data=size,
+                callback=self._handle_page_size_changed,
+                tooltip=f"Paginate over {size} items" if size else "Turns pagination off (this could significantly impact UI performance and memory utilization for high count inputs)",
+                interactive=False,
+                size=32,
+                font_size=8,
+            )
+            for size in view.PAGE_SIZE_PRESETS
         ]
 
         self._page_size_widget = getHContainer(self.page_size_widgets, widget_only=True)
@@ -726,9 +730,8 @@ class PaginationWidget(QtWidgets.QWidget):
 
         self._paginator_widget = getHContainer(pagination_widgets, widget_only=True)
 
-        widget = getHContainer([self._page_size_widget, "||", self._paginator_widget], widget_only=True)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(widget)
+        layout.addWidget(getHContainer([self._page_size_widget, "||", self._paginator_widget], widget_only=True))
 
         view.page_changed.connect(self._handle_page_changed)
         view.model.addCallback(self._handle_model_changed)  # page count changes when items are added or removed
@@ -3930,8 +3933,6 @@ class InputItemListModel(AbstractCallbackModel):
             device_guid = self._device_guid
             mode = self.mode
 
-            source_index = 0
-
             device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
 
             # load initial inputs from the registry
@@ -3957,22 +3958,12 @@ class InputItemListModel(AbstractCallbackModel):
                 input_items.sort(key=lambda x: self.sortKey(x))
 
             self.clear()  # rebuild the list
-            source_index = 0
-            for item in input_items:
-                # process all possible inputs and build the filtered list vs the full list (source)
-                self.setItemAt(source_index, item)
-                source_index += 1
             if self._show_master_mode:
                 master_mode = gremlin.shared_state.master_mode
                 if master_mode in self._device_data.modes:
                     # older profile may not have master mode defined until saved
-                    input_items = registry.getInputItems(device_guid, master_mode)
-                    for input_item in input_items:
-                        self.place(input_item, source_index)
-                        source_index += 1
-
-            # apply sort/filter
-            self.applyFilter(emit=False)
+                    input_items = [*input_items, *registry.getInputItems(device_guid, master_mode)]
+            self.setItems(input_items, emit=False)
 
         finally:
             self.popSuspend()

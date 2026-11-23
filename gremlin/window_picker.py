@@ -24,7 +24,7 @@ import win32con
 import win32gui
 from PySide6 import QtCore, QtGui, QtWidgets
 
-import gremlin.win32_core as core
+import action_plugins.map_to_application.win32_core as core
 from gremlin.ui.ui_common import QIconPushButton
 
 

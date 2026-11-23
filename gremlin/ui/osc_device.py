@@ -3994,8 +3994,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         input_list = registry.getInputItems(self.device_guid, mode, InputType.OpenSoundControl)
         if len(input_list) > 0:
             input_list.sort(key=lambda x: x.sortKey)
-            for index, input_item in enumerate(input_list):
-                model.setItemAt(index, input_item)
+        model.setItems(input_list, emit=False)
 
         model.popSuspend()  # resume triggers
         if emit:

@@ -1040,12 +1040,13 @@ class CommandMatcher:
         if not self._started:
             self._started = True
 
-            syslog.info("Search Tree stats:")
-            syslog.info(f"\tCommands: {len(self._commands)}")
-            syslog.info(f"\tMax command words: {self._max_command_words}")
-            syslog.info("Search Tree:")
-            self.tree.dump()
-            pass
+            if self.verbose:
+                syslog.info("Search Tree stats:")
+                syslog.info(f"\tCommands: {len(self._commands)}")
+                syslog.info(f"\tMax command words: {self._max_command_words}")
+                syslog.info("Search Tree:")
+                self.tree.dump()
+
 
     def stop(self):
         self._buffer.clear()

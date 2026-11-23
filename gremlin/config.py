@@ -40,6 +40,7 @@ from gremlin.util import safeReplace
 syslog = logging.getLogger("system")
 
 GEX_PROFILE_FOLDER = "Joystick Gremlin Ex"
+STATE_VISUALIZER_PAGE_SIZES = (8, 16, 32, 64)
 
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
 PACKAGED = not GEX_DEV_ENABLED and hasattr(sys, "_MEIPASS")
@@ -3531,6 +3532,16 @@ class Configuration(QtCore.QObject):
         self._data["input_viewer_button_size"] = value
         self.save()
         self.changed.emit("input_viewer_button_size", value)
+
+    @property
+    def state_visualizer_page_size(self) -> int:
+        value = self._get_data("state_visualizer_page_size", 16)
+        return value if isinstance(value, int) and value in STATE_VISUALIZER_PAGE_SIZES else 16
+
+    @state_visualizer_page_size.setter
+    def state_visualizer_page_size(self, value: int):
+        if isinstance(value, int) and value in STATE_VISUALIZER_PAGE_SIZES:
+            self._set_data("state_visualizer_page_size", value)
 
     # state device filter options
 

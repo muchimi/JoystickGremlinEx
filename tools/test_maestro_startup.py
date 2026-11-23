@@ -35,6 +35,7 @@ import unittest
 from unittest.mock import MagicMock, Mock, call, patch
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from lxml import etree
 from shiboken6 import Shiboken
 from test_qt_marshalling import APP, flush_deletes
 from test_device_change_suppression import listener_fixture
@@ -66,7 +67,7 @@ COMMON = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, Qt=QtCore.Qt,
               Color=lambda: NS(cssButton=lambda: ""), syslog=logging.getLogger("system"),
               get_text_width=lambda text: QtGui.QFontMetrics(APP.font()).horizontalAdvance(text))
 load_definitions("gremlin/ui/ui_common.py", {
-    "IntValidator", "QIntLineEdit", "QDataLabel", "QDataPushButton", "QRememberDialog",
+    "IntValidator", "QIntLineEdit", "QDataLabel", "QDataPushButton", "QRememberDialog", "QScrollableWidget",
     "getHContainer", "getVContainer",
 }, COMMON)
 
@@ -81,7 +82,10 @@ NAMESPACE = dict(COMMON, SingletonDecorator=lambda cls: cls, Signal=lambda *args
                  GEX_VENDOR_ID=1, GEX_PRODUCT_ID=1, GEX_JOYSTICK_PID_BASE=0x4700, GEX_GAMEPAD_PID_BASE=0x4800,
                  QWarningWidget=WarningLabel,
                  MessageBoxWarning=Mock(), _GEX_ID_PATTERN=re.compile(r"gex-(?:gp-)?(\d+)"))
-load_definitions("gremlin/maestro.py", {"is_valid_gex_id", "gex_product_id", "gex_device_sort_key", "MaestroResult", "Maestro", "MaestroDefaultDevicesDialog"}, NAMESPACE)
+load_definitions("gremlin/maestro.py", {
+    "is_valid_gex_id", "gex_product_id", "gex_device_sort_key", "MaestroResult", "Maestro",
+    "MaestroDefaultDevicesDialog", "MaestroProfileDevicesDialog",
+}, NAMESPACE)
 Maestro = NAMESPACE["Maestro"]
 Dialog = NAMESPACE["MaestroDefaultDevicesDialog"]
 
@@ -111,6 +115,39 @@ class DefaultDeviceChecks(unittest.TestCase):
         logger = patch.dict(NAMESPACE, syslog=Mock())
         logger.start()
         self.addCleanup(logger.stop)
+
+    def test_missing_profile_devices_reuse_definitions_and_fill_requested_slots(self):
+        import gremlin
+
+        CONFIG.maestro_device_map = {"gex-1": 0, "gex-5": 4}
+        self.maestro._controller_map = {0: NS(id="gex-1", index=0)}
+        self.maestro.client.list.side_effect = lambda address: (
+            [{"id": "gex-1"}, {"id": "gex-5"}] if address == "/maestro_definitions" else [{"id": "gex-1"}]
+        )
+        self.maestro.createJoystickController = Mock(return_value=NS(index=7))
+        tree = etree.ElementTree(etree.fromstring(b"""
+            <profile>
+                <settings><maestro-input id="4" enabled="True" /></settings>
+                <vjoyremap device-type="Maestro" virtual-id="7" mode="VJoyButtonPress" />
+                <vjoyremap device-type="Maestro" virtual-id="9" mode="VJoyDisableLocal" />
+            </profile>
+        """))
+        dialog = Mock()
+        dialog.exec.side_effect = [QtWidgets.QDialog.DialogCode.Rejected, QtWidgets.QDialog.DialogCode.Accepted]
+        with patch.object(CONFIG, "vjoy_installed", True, create=True), \
+             patch.object(gremlin, "profile", NS(parse_profile_xml=lambda *_: tree), create=True), \
+             patch.dict(NAMESPACE, MaestroProfileDevicesDialog=Mock(return_value=dialog)):
+            prompt = NAMESPACE["MaestroProfileDevicesDialog"]
+            self.assertEqual(self.maestro.offerProfileDevices("profile.xml"), ())
+            self.maestro.client.request.assert_not_called()
+            self.maestro.createJoystickController.assert_not_called()
+            self.assertEqual(self.maestro.offerProfileDevices("profile.xml"), (4, 7))
+        self.assertEqual(prompt.call_args_list, [call(("gex-5", "gex-8"), parent=None)] * 2)
+        self.assertEqual(dialog.deleteLater.call_count, 2)
+        self.maestro.client.request.assert_called_once_with("/maestro_activate", "gex-5")
+        self.maestro.createJoystickController.assert_called_once_with(name="gex-8", at_index=7, refresh=False)
+        self.assertEqual(CONFIG.maestro_device_map, {"gex-1": 0, "gex-5": 4, "gex-8": 7})
+        self.maestro.refreshDevices.assert_called_once_with()
 
     def test_disabled_or_disconnected_does_not_prompt_or_create(self):
         CONFIG.maestro_enabled = False
@@ -421,13 +458,30 @@ class DefaultDialogChecks(unittest.TestCase):
         self.assertFalse(self.dialog.testAttribute(QtCore.Qt.WidgetAttribute.WA_QuitOnClose))
 
 
+class ProfileDevicesDialogChecks(unittest.TestCase):
+    def test_shared_dialog_lists_devices_and_supports_both_choices(self):
+        dialog = NAMESPACE["MaestroProfileDevicesDialog"](("gex-5", "gex-8"))
+        try:
+            self.assertIsInstance(dialog, COMMON["QRememberDialog"])
+            self.assertTrue(dialog.cancel_button.isDefault())
+            device_list = dialog.findChild(COMMON["QScrollableWidget"])
+            self.assertEqual(device_list.findChild(COMMON["QDataLabel"]).text(), "gex-5\ngex-8")
+            dialog.cancel_button.click()
+            self.assertEqual(dialog.result(), QtWidgets.QDialog.DialogCode.Rejected)
+            dialog.create_button.click()
+            self.assertEqual(dialog.result(), QtWidgets.QDialog.DialogCode.Accepted)
+        finally:
+            dialog.deleteLater()
+            flush_deletes()
+
+
 class ProfileOrderingChecks(unittest.TestCase):
     def test_offer_precedes_profile_worker_and_startup_enumeration(self):
         tree = ast.parse((ROOT / "gremlinEx.py").read_bytes())
         ui = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GremlinUi")
         load = next(node for node in ui.body if isinstance(node, ast.FunctionDef) and node.name == "_do_load_profile_ui")
         calls = list(ast.walk(load))
-        offer = next(node for node in calls if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "offerDefaultJoysticks")
+        offer = next(node for node in calls if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "offerProfileDevices")
         submit = next(node for node in calls if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "submit")
         self.assertLess(offer.lineno, submit.lineno)
         main = next(node for node in tree.body if isinstance(node, ast.If)

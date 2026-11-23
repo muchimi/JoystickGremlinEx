@@ -27,7 +27,8 @@ Delivery
   focus   Focus and return: the application comes to the front, real input (SendInput), the focus goes
           back to the window that was in front, or to the main application 'sim' (CoMoMap, Discord ...)
 Application
-  <preset>  choose a preset from the plugin's presets folder or the user's gex_apps folder, then a function;
+  <preset>  choose a preset from the plugin's presets folder, the user's gex_apps folder or
+            map_to_application.ini in the user profile folder, then choose a function;
             the values are stored in the profile, so the profile works without the ini file
   (none)    target application, window title, delivery and key combination set by hand
 Shared code: gex_core.py (copied into this folder by install_gex_actions.bat).
@@ -36,8 +37,8 @@ Shared code: gex_core.py (copied into this folder by install_gex_actions.bat).
 import html
 import logging
 import math
-from pathlib import Path
 import time
+from pathlib import Path
 
 from lxml import etree as ElementTree
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -54,7 +55,6 @@ import gremlin.repeater
 import gremlin.shared_state
 import gremlin.ui.virtual_keyboard
 import gremlin.util
-import gremlin.win32_core as core
 import vjoy.vjoy
 from gremlin.input_types import InputType
 from gremlin.keyboard import sort_keys
@@ -85,17 +85,23 @@ from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 from gremlin.util import load_icon
 from gremlin.window_picker import WindowPickerButton
 
+from . import win32_core as core
+
 syslog = logging.getLogger("system")
 VERSION = "1.0"
 PLUGIN_PRESETS_FOLDER = Path(__file__).with_name("presets")
+USER_PRESETS_FILENAME = "map_to_application.ini"
 
 
 def _load_application_presets(warn):
-    """Load optional plugin presets and let user presets override matching names."""
+    """Load bundled presets, legacy user presets and user sidecar presets in that order."""
     presets = {}
     if PLUGIN_PRESETS_FOLDER.is_dir():
         presets.update(core.load_presets(PLUGIN_PRESETS_FOLDER, warn=warn))
     presets.update(core.load_presets(warn=warn))
+    sidecar = Path(core.gex_user_folder()) / USER_PRESETS_FILENAME
+    if sidecar.is_file():
+        presets.update(core.load_preset_sidecar(sidecar, warn=warn))
     return dict(sorted(presets.items(), key=lambda entry: entry[0].casefold()))
 
 syslog.info(f"{core.TAG}: Map to Application {VERSION} loaded (gex_core {core.VERSION})")
@@ -103,6 +109,7 @@ if core.VERSION != VERSION:
     syslog.warning(f"{core.TAG}: Map to Application {VERSION} expects gex_core {VERSION}, found {core.VERSION}")
 try:
     core.log_presets_folder()
+    syslog.info(f"{core.TAG}: optional custom presets from {Path(core.gex_user_folder()) / USER_PRESETS_FILENAME}")
     if PLUGIN_PRESETS_FOLDER.is_dir():
         syslog.info(f"{core.TAG}: additional presets from {PLUGIN_PRESETS_FOLDER}")
 except Exception as e:  # noqa: BLE001
@@ -275,9 +282,10 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
 
         # 1. application: a preset, or (none) for manual settings
         self.preset_app_cb = QDataComboBox(
-            tooltip="Choose a preset from the plugin's presets folder or your gex_apps folder, or choose (none) to set the target, delivery and keys yourself"
+            tooltip=f"Choose a bundled preset or a custom preset from gex_apps or {USER_PRESETS_FILENAME} "
+            "in your Gremlin Ex user profile folder. Choose (none) to set the target, delivery and keys yourself."
         )
-        self.reload_btn = QDataPushButton("Reload", tooltip="Read the preset files again from the plugin and user folders")
+        self.reload_btn = QDataPushButton("Reload", tooltip="Read the bundled and custom preset files again")
         self.preset_func_cb = QDataComboBox(tooltip="Choosing a function fills in the input; the values are stored in the profile")
         app_row = getHContainer([self.preset_app_cb, self.reload_btn], "Application:", widget_only=True)
         func_row = getHContainer(self.preset_func_cb, "Function:", widget_only=True)
@@ -1040,7 +1048,7 @@ class MapToApplicationWidget(gremlin.input_item.AbstractActionWidget):
         if not a.items and not uia and not clears_autorepeat:
             warnings.append("No input selected.")
         if is_preset and a.preset_app and a.preset_app not in self.presets:
-            warnings.append(f"Preset file {a.preset_app}.ini not found; the stored values are used.")
+            warnings.append(f"Preset {a.preset_app} is missing. The stored values are used.")
         if not a.exec_on_press and not a.exec_on_release and a.mode not in (KeyboardOutputMode.Hold, KeyboardOutputMode.AutoRepeat):
             warnings.append("Neither execute on press nor on release is selected: the action does nothing.")
         self.warning_widget.setVisible(bool(warnings))

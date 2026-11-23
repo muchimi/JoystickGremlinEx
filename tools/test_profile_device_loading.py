@@ -23,6 +23,8 @@ from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock
 
+from lxml import etree
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -84,6 +86,24 @@ class ProfileTabPopulationChecks(unittest.TestCase):
         namespace = {"gremlin": services, "InputType": NS(JoystickAxis="axis", JoystickButton="button", JoystickHat="hat")}
         exec(compile(ast.fix_missing_locations(ast.Module(body=[future, method], type_ignores=[])), filename, "exec"), namespace)
         return namespace[method_name]
+
+    def test_saved_maestro_input_binds_to_local_native_guid(self):
+        saved_guid = "c8d925a058e311f08002444553540000"
+        native_guid = "ec787120dc1b11f18009444553540000"
+        device = NS(name="gex-5", device_guid=native_guid, input_enabled=True)
+        services = NS(joystick_handling=NS(virtual_device_map=lambda: {"maestro": {4: device}}))
+        bind = self.load_method("gremlin/base_profile.py", "Profile", "_bind_maestro_profile_devices", services)
+        bind.__globals__["DeviceType"] = NS(Maestro="maestro")
+        root = etree.fromstring(f"""
+            <profile>
+                <devices><device type="maestro" name="gex-5" virtual-id="4" device-guid="{saved_guid}" /></devices>
+                <settings><maestro-input guid="{saved_guid}" enabled="True" /></settings>
+            </profile>
+        """)
+        bound = bind(None, root)
+        self.assertEqual(bound.find("./devices/device").get("device-guid"), native_guid)
+        self.assertEqual(bound.find("./settings/maestro-input").get("guid"), native_guid)
+        self.assertEqual(root.find("./settings/maestro-input").get("guid"), saved_guid)
 
     def populate(self, count, *, connected=False, emit=True):
         class Item:

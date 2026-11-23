@@ -3449,8 +3449,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_list.sort(key=lambda x: x.sortKey)
             except Exception:
                 pass
-            for index, input_item in enumerate(input_list):
-                model.setItemAt(index, input_item)
+        model.setItems(input_list, emit=False)
         model.popSuspend()
         if emit:
             model.trigger()

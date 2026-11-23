@@ -131,6 +131,67 @@ def remap_profile_devices(root, replacements):
     return result
 
 
+def maestro_profile_slots(root, slot_count):
+    """Return required Maestro slots and any saved service names for them."""
+    declarations = {}
+    names_by_guid = {}
+    for node in root.findall("./devices/device"):
+        if node.get("type", "").casefold() == "maestro":
+            slot = _vjoy_source_id(node.get("virtual-id"), {})
+            name = node.get("name", "").casefold()
+            if name.startswith("gex-"):
+                names_by_guid[guid_key(node.get("device-guid"))] = name
+            if slot is not None and 0 <= slot < slot_count:
+                declarations[slot] = name if name.startswith("gex-") else ""
+    for node in root.findall("./settings/input-filter/device"):
+        name = node.get("name", "").casefold()
+        if name.startswith("gex-"):
+            names_by_guid.setdefault(guid_key(node.get("device")), name)
+    names_by_guid.pop(None, None)
+
+    required = {}
+    named = {name: slot for slot, name in declarations.items()}
+
+    def add(value):
+        slot = _vjoy_source_id(value, {})
+        if slot is not None and 0 <= slot < slot_count:
+            required.setdefault(slot, declarations.get(slot, ""))
+            return
+        name = names_by_guid.get(guid_key(value))
+        if name:
+            canonical = re.fullmatch(r"gex-([1-9][0-9]*)", name)
+            slot = named.get(name, int(canonical[1]) - 1 if canonical else -1)
+            if 0 <= slot < slot_count:
+                required.setdefault(slot, name)
+
+    from gremlin.types import VjoyAction
+
+    for node in root.iter("vjoyremap", "vjoy", "remap", "split-axis", "condition", "variable"):
+        if node.tag == "vjoyremap" and node.get("device-type", "").casefold() == "maestro":
+            try:
+                mode = VjoyAction.from_string(node.get("mode", ""))
+            except (ValueError, AttributeError):
+                mode = None
+            if not VjoyAction.is_command(mode):
+                add(node.get("virtual-id"))
+        elif node.tag in ("vjoy", "remap", "split-axis", "condition", "variable"):
+            for attribute in ("device-guid", "vjoy-id", "vjoy", "device-low-vjoy-id", "device-high-vjoy-id"):
+                value = node.get(attribute)
+                if guid_key(value) in names_by_guid:
+                    add(value)
+    for node in root.findall("./settings/maestro-input"):
+        if node.get("enabled", "true").casefold() in ("true", "1"):
+            add(node.get("guid") or node.get("id"))
+    for node in root.findall("./devices/device"):
+        if node.get("type", "").casefold() == "maestro" and node.find(".//container") is not None:
+            add(node.get("virtual-id"))
+    for node in root.findall("./start/devices/device"):
+        value = node.get("device-guid")
+        if guid_key(value) in names_by_guid:
+            add(value)
+    return required
+
+
 def vjoy_references(root, *, include_filter_guids=False):
     """Return native vJoy IDs and saved GUIDs needed by profile failover.
 
