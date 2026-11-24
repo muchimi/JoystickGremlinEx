@@ -25,6 +25,7 @@ import ast
 import collections
 from enum import Enum, auto
 import inspect
+from itertools import islice
 import json
 import logging
 import os
@@ -104,6 +105,7 @@ class Config:
     input_viewer_button_size = 12
     device_page_size = 32
     state_visualizer_page_size = 16
+    state_visualizer_rolling_updates = False
     verbose_mode_state = False
 
     def verbose_mode_ui_level(self, level):
@@ -177,12 +179,12 @@ NAMESPACE = {name: getattr(QtWidgets, name) for name in (
 NAMESPACE.update(
     QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, Qt=QtCore.Qt, Shiboken=Shiboken,
     Callable=Callable, Signal=Signal, collections=collections, _collections_abc=_collections_abc,
-    inspect=inspect, uuid=uuid, os=os, json=json, Path=Path, gremlin=SERVICES,
+    inspect=inspect, islice=islice, uuid=uuid, os=os, json=json, Path=Path, gremlin=SERVICES,
     InputType=InputType, DeviceType=DeviceType, InputItem=State,
     StateDeviceTabWidget=NS(device_guid="state-device"), StateData=lambda: STORE,
     StateCategory=type("StateCategory", (), {}), Color=Colors,
     Icons=NS(**{name: QtGui.QIcon for name in ("arrowFirst", "arrowPrevious", "arrowNext", "arrowLast")}, warningIcon=lambda *args: QtGui.QIcon()),
-    QDataPushButton=DataButton, QIconPushButton=icon_button, QUsedPushButton=UsedButton,
+    QDataCheckbox=QtWidgets.QCheckBox, QDataPushButton=DataButton, QIconPushButton=icon_button, QUsedPushButton=UsedButton,
     QFlowLayout=QtWidgets.QHBoxLayout, QHorizontalLine=QtWidgets.QFrame,
     QWarningWidget=lambda text, icon=None: QtWidgets.QLabel(text),
     getHContainer=container, syslog=logging.getLogger("state-viewer-checks"),
@@ -218,6 +220,7 @@ class StateVisualizerTests(unittest.TestCase):
     def setUp(self):
         STORE.states = {"beta": State("beta", "other"), "alpha": State("alpha", attributes=["tag"])}
         CONFIG.state_visualizer_page_size = 16
+        CONFIG.state_visualizer_rolling_updates = False
         BUS.all_inputs_deleted.reset_mock()
         self.widgets = []
 
@@ -288,6 +291,78 @@ class StateVisualizerTests(unittest.TestCase):
         self.assertEqual(CONFIG.device_page_size, 32)
         self.assertEqual(CONFIG.state_visualizer_page_size, 64)
         self.assertEqual(len(self.viewer()._state_buttons), 64)
+
+    def test_rolling_updates_keep_the_latest_distinct_states_in_display_order(self):
+        names = [f"state-{index:02}" for index in range(12)]
+        STORE.states = {name: State(name) for name in names}
+        widget = self.viewer()
+        widget.setPageSize(8)
+        widget._rolling_widget.click()
+        self.assertTrue(CONFIG.state_visualizer_rolling_updates)
+        self.assertEqual(list(widget._state_buttons), names[:8])
+        self.assertTrue(widget._pagination._paginator_widget.isHidden())
+        self.assertFalse(widget._pagination._page_size_widget.isHidden())
+
+        for name in names:
+            STORE.toggle(name)
+        self.assertEqual(list(widget._state_buttons), names[-8:])
+
+        reused = widget._state_buttons[names[5]]
+        STORE.toggle(names[5])
+        expected = names[4:5] + names[6:] + [names[5]]
+        self.assertEqual(list(widget._state_buttons), expected)
+        self.assertEqual([widget._button_layout.itemAt(i).widget().data.key for i in range(8)], expected)
+        self.assertIs(widget._state_buttons[names[5]], reused)
+        self.assertFalse(reused.isChecked())
+        STORE.toggle(names[5])
+        self.assertEqual(list(widget._state_buttons), expected)
+        self.assertTrue(reused.isChecked())
+        self.assertIn("showing 8 of 12", widget._state_filter_widget.count_widget.text())
+
+        widget.setPageSize(16)
+        self.assertEqual(len(widget._state_buttons), 12)
+        self.assertEqual(list(widget._state_buttons)[-1], names[5])
+
+    def test_rolling_updates_start_with_the_current_page_and_roll_off_the_oldest_state(self):
+        names = [f"state-{index:02}" for index in range(18)]
+        STORE.states = {name: State(name) for name in names}
+        widget = self.viewer()
+        widget.setPageSize(8)
+        widget.setPage(1)
+        widget._rolling_widget.click()
+        self.assertEqual(list(widget._state_buttons), names[8:16])
+
+        STORE.toggle(names[10])
+        self.assertEqual(list(widget._state_buttons), names[8:10] + names[11:16] + [names[10]])
+        STORE.toggle(names[17])
+        self.assertEqual(list(widget._state_buttons), names[9:10] + names[11:16] + [names[10], names[17]])
+
+    def test_rolling_updates_follow_filters_and_drop_removed_state_objects(self):
+        widget = self.viewer()
+        widget._rolling_widget.click()
+        widget._state_filter_widget.search_input.setText("alpha")
+        STORE.toggle("beta")
+        STORE.toggle("alpha")
+        self.assertEqual(list(widget._state_buttons), ["alpha"])
+        widget._state_filter_widget.search_input.clear()
+        self.assertEqual(list(widget._state_buttons), ["beta", "alpha"])
+
+        old_alpha = STORE.states["alpha"]
+        STORE.states["alpha"] = State("alpha")
+        STORE.crud.emit()
+        self.assertEqual(len(old_alpha.changed), 0)
+        self.assertEqual(list(widget._state_buttons), ["beta"])
+
+        STORE.toggle("alpha")
+        self.assertEqual(list(widget._state_buttons), ["beta", "alpha"])
+        widget._rolling_widget.click()
+        self.assertEqual(list(widget._state_buttons), ["alpha", "beta"])
+        self.assertFalse(CONFIG.state_visualizer_rolling_updates)
+
+        widget._rolling_widget.click()
+        reopened = self.viewer()
+        self.assertTrue(reopened._rolling_widget.isChecked())
+        self.assertEqual(list(reopened._state_buttons), ["alpha", "beta"])
 
     def test_bulk_insert_rebuilds_each_filter_once(self):
         widget = self.viewer()

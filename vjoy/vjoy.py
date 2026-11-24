@@ -28,6 +28,7 @@ from functools import cache
 from typing import ClassVar
 
 import gremlin.spline
+from gremlin.axis_bump import output_lock
 import gremlin.types
 import gremlin.util
 from gremlin.error import VJoyError
@@ -188,6 +189,7 @@ class Axis:
         self.device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self.vjoy_id)
         self.axis_id = axis_id
         self._value = 0.0
+        self.last_output = None
 
         # Retrieve axis minimum and maximum values
         tmp = ctypes.c_ulong()
@@ -271,19 +273,8 @@ class Axis:
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
-        self._value = self._response_curve_fn(self._deadzone_fn(p_value))
-
-        vjm = self.vjoy_dev._vjoy_monitor
-        vjm.ensure_ownership(self.vjoy_id)
-
-
-
-        if not VJoyInterface.SetAxis(
-            int(self._half_range + self._half_range * self._value),
-            self.vjoy_id,
-            self.axis_id,
-        ):
-            syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
+        value = self._response_curve_fn(self._deadzone_fn(p_value))
+        self._write_output(value)
 
         self.vjoy_dev.used()
 
@@ -315,7 +306,7 @@ class Axis:
                 )
             )
 
-    def set_absolute_value(self, value):
+    def set_absolute_value(self, value, *, remember=True):
         """Sets the position of the axis based on a value between [-1, 1].
 
         In comparison to the value setter this function bypasses the
@@ -328,18 +319,18 @@ class Axis:
         if 1.0 - abs(value) < -0.001:
             syslog.warning(f"Wrong data type provided, has to be float in [-1, 1], provided value was {value:.2f}")
 
-        # Normalize value to [-1, 1] and apply response curve and deadzone
-        # settings
-        self._value = value
-
-        if not VJoyInterface.SetAxis(
-            int(self._half_range + self._half_range * self._value),
-            self.vjoy_id,
-            self.axis_id,
-        ):
-            syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
-
+        self._write_output(value, remember=remember)
         self.vjoy_dev.used()
+
+    def _write_output(self, value, *, remember=True):
+        self.vjoy_dev._vjoy_monitor.ensure_ownership(self.vjoy_id)
+        with output_lock:
+            self._value = value
+            if VJoyInterface.SetAxis(int(self._half_range + self._half_range * value), self.vjoy_id, self.axis_id):
+                if remember:
+                    self.last_output = (value,)
+            else:
+                syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, value)}")
 
 
 class Button:
@@ -916,7 +907,7 @@ class VJoy:
         # Restore input states based on what we recorded
         if success:
             for i in self._axis:
-                self._axis[i].set_absolute_value(axis_states[i])
+                self._axis[i].set_absolute_value(axis_states[i], remember=False)
             for i in self._button:
                 self._button[i].is_pressed = button_states[i]
             for i in self._hat:

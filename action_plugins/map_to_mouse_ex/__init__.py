@@ -45,6 +45,7 @@ import gremlin.types
 
 import gremlin.util
 from shiboken6 import Shiboken
+from gremlin.remote import RemoteClientWidget
 from gremlin.ui.ui_common import (
     Buttons,
     Color,
@@ -58,7 +59,6 @@ from gremlin.ui.ui_common import (
     QExecuteWidget,
     QIntLineEdit,
     QProcessSelectorWidget,
-    RemoteClientWidget,
     getHContainer,
     getVContainer,
 )

@@ -64,7 +64,9 @@ EVENTS = Events()
 GREMLIN = NS(config=NS(Configuration=lambda: CONFIG), shared_state=STATE,
              event_handler=NS(EventListener=lambda: EVENTS), util=NS(
                  clear_layout=clear_layout, InvokeUiMethod=lambda callback, *args: callback(*args)))
-UI = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, QWidget=QtWidgets.QWidget,
+from html import escape
+
+UI = dict(QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, QWidget=QtWidgets.QWidget, escape=escape,
           Qt=QtCore.Qt, QSize=QtCore.QSize, QIcon=QtGui.QIcon, inspect=inspect,
           Callable=Callable, Shiboken=Shiboken, gremlin=GREMLIN,
           Buttons=NS(_default_parent=None), syslog=logging.getLogger("system"),
@@ -83,6 +85,7 @@ class ProfileFixture:
         self.parents = dict(modes or {"Default": None, "Combat": "Default", "Landing": "Combat"})
         self.start_mode = "Combat" if "Combat" in self.parents else next(iter(self.parents))
         self.remove_mode = Mock(side_effect=self._remove_mode)
+        self.get_mode_removal_usage = Mock(return_value={"Inputs mapped in this mode": 2})
         self.rename_mode = Mock(side_effect=self._rename_mode)
         self.set_start_mode = Mock(side_effect=lambda name: setattr(self, "start_mode", name))
 
@@ -126,7 +129,7 @@ class ModeManagerChecks(unittest.TestCase):
     def setUp(self):
         self.profile = ProfileFixture()
         STATE.current_profile = self.profile
-        STATE.edit_mode = STATE.runtime_mode = "Combat"
+        STATE.edit_mode = STATE.runtime_mode = STATE.previous_runtime_mode = "Combat"
         self.changed = Mock()
         EVENTS.profile_modes_changed.connect(self.changed)
         self.addCleanup(lambda: EVENTS.profile_modes_changed.disconnect(self.changed))
@@ -158,6 +161,7 @@ class ModeManagerChecks(unittest.TestCase):
         self.assertEqual(self.profile.parents["Landing"], "Default")
         self.assertEqual(STATE.edit_mode, "Default")
         self.assertEqual(STATE.runtime_mode, "Default")
+        self.assertEqual(STATE.previous_runtime_mode, "Default")
         self.assertEqual(self.dialog.selected_mode, "Default")
         self.changed.assert_called_once_with()
 
@@ -179,10 +183,19 @@ class ModeManagerChecks(unittest.TestCase):
         UI["ConfirmBox"].return_value = False
         self.click_delete("Combat")
         UI["ConfirmBox"].assert_called_once()
+        warning = UI["ConfirmBox"].call_args.kwargs
+        self.assertIn("used in the profile", warning["prompt"])
+        self.assertIn("Inputs mapped in this mode: 2", warning["informative_text"])
         self.profile.remove_mode.assert_not_called()
         self.assertEqual(set(self.dialog.mode_delete), set(self.profile.parents))
         self.assertEqual(self.dialog.selected_mode, "Combat")
         self.changed.assert_not_called()
+
+    def test_unused_mode_shows_a_plain_delete_confirmation(self):
+        self.profile.get_mode_removal_usage.return_value = {"Inputs mapped in this mode": 0}
+        self.click_delete("Landing")
+        self.assertIsNone(UI["ConfirmBox"].call_args.kwargs["informative_text"])
+        self.profile.remove_mode.assert_called_once_with("Landing", emit=False)
 
     def test_rejected_removal_keeps_the_list_and_does_not_notify(self):
         self.profile.remove_mode.side_effect = None

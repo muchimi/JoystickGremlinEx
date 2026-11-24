@@ -204,7 +204,7 @@ class ProfileRootNode(ProfileBaseNode):
         self._graph_modes.clear()
         if node_list:
             mode_nodes = node_list[0]
-            for mode_node in mode_nodes:
+            for mode_node in mode_nodes.iterchildren(tag=etree.Element):
                 profile_mode_node = ProfileModeNode()
                 profile_mode_node.from_xml(mode_node)
                 self._graph_modes[profile_mode_node.name] = profile_mode_node
@@ -213,7 +213,7 @@ class ProfileRootNode(ProfileBaseNode):
             profile_mode_node = self._graph_modes[mode_name]
             parent_name = profile_mode_node.inherit
             if parent_name:
-                parent_mode_node = self._graph_modes[parent_name]
+                parent_mode_node = self._graph_modes.get(parent_name)
                 profile_mode_node.parent = parent_mode_node
 
         # Parse each device
@@ -1930,7 +1930,7 @@ class ProfileDeviceNode(ProfileBaseNode):
 
         # load modes
         child: Element
-        for child in node:
+        for child in node.iterchildren(tag=etree.Element):
             mode_node = ProfileModeNode()
             mode_node.from_xml(child, data)
             mode_node.parent = self
@@ -2018,7 +2018,7 @@ class ProfileInputTypeNode(ProfileBaseNode):
         value = safe_read(node, "input-type", int, 0)
         self.input_type = InputType(value)
         device_node = self.parent.deviceNode
-        for child in node:
+        for child in node.iterchildren(tag=etree.Element):
             input_node = ProfileInputItemNode(device_node=device_node, parent=self)
             input_node.from_xml(child, data, extra_data)
 
@@ -2117,7 +2117,7 @@ class ProfileModeNode(ProfileBaseNode):
 
         if self.parent:
             child: Element
-            for child in node:
+            for child in node.iterchildren(tag=etree.Element):
                 # input types
                 type_node = ProfileInputTypeNode(parent=self)
                 type_node.from_xml(child, data, extra_data)
@@ -2317,7 +2317,7 @@ class ProfileInputItemNode(ProfileBaseNode):
 
         elif self.input_type == InputType.JoystickAxis:
             # check for curve data
-            for child in node:
+            for child in node.iterchildren(tag=etree.Element):
                 if gremlin.input_item._is_curve_tag(child.tag):
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
@@ -2357,7 +2357,7 @@ class ProfileInputItemNode(ProfileBaseNode):
 
         # add container nodes to the input node
         child: Element
-        for child in node:
+        for child in node.iterchildren(tag=etree.Element):
             if child.tag in ("latched", "input", "keylatched") or gremlin.input_item._is_curve_tag(child.tag):
                 # not a container
                 continue
@@ -2626,6 +2626,28 @@ class ProfileGraph:
             return self._root._graph_modes[mode_name]
         return None  # not found
 
+    def rename_mode(self, old_mode: str, new_mode: str):
+        """Update the cached mode definitions used when reloading the mode tree."""
+        modes = self._root._graph_modes
+        if old_mode in modes:
+            mode = modes.pop(old_mode)
+            mode.name = new_mode
+            modes[new_mode] = mode
+        for mode in modes.values():
+            if mode.inherit == old_mode:
+                mode.inherit = new_mode
+
+    def remove_mode(self, name: str, parent_name: str | None):
+        """Drop a cached mode definition and retain its children's inheritance."""
+        modes = self._root._graph_modes
+        removed = modes.pop(name, None)
+        if removed is not None:
+            removed.parent = None
+        for mode in modes.values():
+            if mode.inherit == name:
+                mode.inherit = parent_name
+                mode.parent = modes.get(parent_name)
+
     def get_device_node(self, device_guid) -> ProfileDeviceNode:
         """gets the profile device node for the given device_guid, None if not found"""
         device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
@@ -2639,14 +2661,15 @@ class ProfileGraph:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{node!s}")
 
-    def from_xml(self, source_xml: str, data=None, fname_is_xml: bool = False, *, profile_xml=None):
-        """reads a profile from XML"""
-        from gremlin.profile import parse_profile_xml
+    def from_xml(self, source_xml: str, data=None, fname_is_xml: bool = False, *, profile_xml=None, root=None):
+        """Read the graph from a parsed profile root or an XML source."""
+        if root is None:
+            from gremlin.profile import parse_profile_xml
 
-        parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-        xml_source = profile_xml if profile_xml is not None else source_xml
-        tree = parse_profile_xml(xml_source, parser, from_memory=fname_is_xml or profile_xml is not None)
-        root = tree.getroot()
+            parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
+            xml_source = profile_xml if profile_xml is not None else source_xml
+            tree = parse_profile_xml(xml_source, parser, from_memory=fname_is_xml or profile_xml is not None)
+            root = tree.getroot()
 
         # self._root = ProfileRootNode(source_xml) # root node
         self._root.from_xml(root, data)

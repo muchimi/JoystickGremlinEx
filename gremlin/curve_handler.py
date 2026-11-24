@@ -2050,7 +2050,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
         ch.value_changed.connect(self.update_value)
 
         clipboard = gremlin.clipboard.Clipboard()
-        clipboard.clipboard_changed.connect(self._update_clipboard)
+        clipboard.clipboard_changed.connect(self._clipboard_changed)
+        if not clipboard.enabled:
+            QtCore.QTimer.singleShot(0, self, self._update_clipboard)
 
     def _curve_edit_state(self):
         values = {name: getattr(self.curve_data, name) for name in self._undo_fields}
@@ -2666,8 +2668,8 @@ class AxisCurveWidget(QtWidgets.QWidget):
     def _clipboard_valid(self, clipboard) -> bool:
         """true if the clipboard data is valid"""
         data = clipboard.data
-        if gremlin.util.is_binary_string(data):
-            data = data.decode("utf-8")
+        if isinstance(data, bytes):
+            return b"</curve-data>" in data
         return isinstance(data, str) and "</curve-data>" in data
 
     @QtCore.Slot()
@@ -2677,7 +2679,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
         xml = etree.tostring(node)
         clipboard = gremlin.clipboard.Clipboard()
         clipboard.data = xml
-        self._update_clipboard()
 
     @QtCore.Slot()
     def _paste_curve_cb(self):
@@ -2696,6 +2697,9 @@ class AxisCurveWidget(QtWidgets.QWidget):
             except Exception:
                 # invalid
                 return
+
+    def _clipboard_changed(self, clipboard):
+        gremlin.util.InvokeUiMethod(self._update_clipboard, clipboard)
 
     def _update_clipboard(self, clipboard=None):
         """updates the state of the clipboard buttons"""

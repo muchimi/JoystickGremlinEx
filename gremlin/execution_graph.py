@@ -685,8 +685,13 @@ class ExecutionContext:
 
         self.used_items = {}  # nodes can only be used once
         self._build_error = False  # true if a build error occurred
-        result = self._build_execution_tree()
-        assert len(self.graph.children) > 0
+        try:
+            result = self._build_execution_tree()
+            assert len(self.graph.children) > 0
+        except Exception:
+            self._reset()
+            self._build_error = True
+            raise
 
         self._is_built = result
         if verbose:
@@ -697,10 +702,8 @@ class ExecutionContext:
             el = gremlin.event_handler.EventListener()
             el.execution_context_changed.emit()
         else:
-            # reset data
-            self._functor_map.clear()
-            self._node_map.clear()
-            self._exec_map.clear()
+            self._reset()
+            self._build_error = True
 
     def getLastBuildError(self) -> bool:
         """true if build errored out"""
@@ -1709,7 +1712,7 @@ class ExecutionContext:
             gremlin.shared_state.popLog()
 
     def _build_input(self, device_node, input_items, parent_node, mode_name):
-        for input_item in input_items.values():
+        for input_item in input_items.copy().values():
             # Only add callbacks for input items that actually
             # contain actions
             if not input_item:
@@ -1850,7 +1853,8 @@ class ExecutionContext:
 
         """
 
-        for device in profile.devices.values():
+        # Input discovery can change the profile dictionaries while functors are being built.
+        for device in gremlin.util.TriggerDict.copyFrom(profile.devices).values():
             device_node = ExecutionGraphDeviceNode()
             device_node.device = device
             device_node.parent = self.graph
@@ -1874,7 +1878,7 @@ class ExecutionContext:
             else:
                 # mode mapped device
 
-                for mode in device.modes.values():
+                for mode in gremlin.util.TriggerDict.copyFrom(device.modes).values():
                     mode_name = mode.name
                     if mode_name not in mode_nodes:
                         syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.device.name}")
@@ -1891,7 +1895,7 @@ class ExecutionContext:
 
                     mode_node.mode = mode_name
                     mode_node.parent = device_node
-                    for input_items in mode.config.values():
+                    for input_items in mode.config.copy().values():
                         if input_items:
                             self._build_input(device_node, input_items, mode_node, mode_name)
 

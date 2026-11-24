@@ -215,11 +215,14 @@ class ProfileConverter:
     def __init__(self):
         pass
 
-    def is_current(self, fname):
+    def is_current(self, fname, *, root=None):
         """Returns whether or not the provided profile is current.
 
         :param fname path to the profile to evaluate
+        :param root optional root of the already parsed profile
         """
+        if root is not None:
+            return self._determine_version(root) == self.current_version
         if not os.path.isfile(fname):
             return True
         # file length
@@ -251,19 +254,20 @@ class ProfileConverter:
         except Exception:
             gremlin.util.message_box(f"Error converting profile: {fname}")
 
-    def convert_profile(self, fname):
-        """Converts the provided profile to the current version.
+    def convert_profile(self, fname, *, tree=None):
+        """Converts the profile to the current version and returns its XML tree.
 
         :param fname path to the profile to convert
+        :param tree optional parsed profile tree
         """
-        # Load the profile
-        tree = parse_profile_xml(fname)
+        if tree is None:
+            tree = parse_profile_xml(fname)
         root = tree.getroot()
-        verbose = False
+        old_version = self._determine_version(root)
+        if old_version == self.current_version:
+            return tree
 
-        # Check if a conversion is required
-        if self.is_current(fname):
-            return
+        verbose = False
 
         conversion_map = {
             1: self._convert_from_v1,
@@ -286,7 +290,6 @@ class ProfileConverter:
         }
 
         # Create a backup of the outdated profile
-        old_version = self._determine_version(root)
         shutil.copyfile(fname, f"{fname}.v{old_version:d}")
 
         # Convert the profile
@@ -318,6 +321,8 @@ class ProfileConverter:
                 tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")
+
+        return tree
 
     def _determine_version(self, root):
         """Returns the version of the provided profile.

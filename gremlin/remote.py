@@ -40,6 +40,7 @@ import msgpack
 from lxml import etree as ElementTree
 from psygnal import Signal
 from PySide6 import QtCore, QtNetwork, QtWidgets
+from shiboken6 import Shiboken
 
 import gremlin.base_classes
 import gremlin.config
@@ -52,6 +53,7 @@ import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.types
 import gremlin.util
+from gremlin.axis_bump import output_lock
 from gremlin.error import VJoyError
 from gremlin.network import REMOTE_CONTROL_MULTICAST_GROUP
 from gremlin.types import DeviceType, GamePadOutput, MouseButton, VjoyAction
@@ -850,6 +852,7 @@ class RemoteClient:
         self._sock = None
         self._socket_lock = threading.RLock()
         self._socket_settings = None
+        self._last_axis_outputs = {}
         config = gremlin.config.Configuration()
         self._verbose_remote_extra = config.verbose_mode_remote_extra
         self._verbose_remote = config.verbose_mode_remote
@@ -1067,8 +1070,10 @@ class RemoteClient:
         else:
             targets = tuple(dict.fromkeys(int(client_id) for client_id in client_list))
 
+        sent = False
         for client_id in self.remote_control.filterClientTargets(targets):
-            self.send(data, client_id)
+            sent = self.send(data, client_id) or sent
+        return sent
 
     def _alive_ticker(self):
         """sends an alive packet to keep the socket alive"""
@@ -1105,6 +1110,10 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")
             self._send_joystick("toggle", ButtonData.key, device_id, button_id, None, client_list)
 
+    def last_axis_output(self, device_id, axis_id):
+        key = gremlin.joystick_handling.parse_virtual_device_key(device_id), axis_id
+        return self._last_axis_outputs.get(key)
+
     def send_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends axis data to clients"""
         if self.enabled or force_remote:
@@ -1112,7 +1121,10 @@ class RemoteClient:
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            self._send_joystick("axis", AxisData.key, device_id, axis_id, value, client_list)
+            key = gremlin.joystick_handling.parse_virtual_device_key(device_id), axis_id
+            with output_lock:
+                if self._send_joystick("axis", AxisData.key, device_id, axis_id, value, client_list):
+                    self._last_axis_outputs[key] = (value,)
 
     def send_relative_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
         """sends relative axis data to clients"""
@@ -1121,7 +1133,10 @@ class RemoteClient:
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            self._send_joystick("axis", AxisData.key, device_id, axis_id, None, client_list, relative_value=value)
+            key = gremlin.joystick_handling.parse_virtual_device_key(device_id), axis_id
+            with output_lock:
+                if self._send_joystick("axis", AxisData.key, device_id, axis_id, None, client_list, relative_value=value):
+                    self._last_axis_outputs[key] = (None,)
 
     def send_hat(self, device_id, hat_id, direction, client_list=None, force_remote=False):
         """sends joystick hats to clients"""
@@ -1155,7 +1170,7 @@ class RemoteClient:
         }
         if key == AxisData.key:
             payload["rvalue"] = relative_value
-        self._dispatch({"action": action, "key": key, "data": payload}, client_list)
+        return self._dispatch({"action": action, "key": key, "data": payload}, client_list)
 
     def send_key(
         self,
@@ -2137,10 +2152,7 @@ def read_client_selection(node) -> frozenset[str] | None:
     """Read the saved checklist. An absent element represents Select All."""
     if node is None:
         return None
-    return frozenset(
-        address for client in node.findall("client")
-        if (address := _client_address_key(client.get("address", "")))
-    )
+    return frozenset(address for client in node.findall("client") if (address := _client_address_key(client.get("address", ""))))
 
 
 def write_client_selection(parent, tag: str, selection: frozenset[str] | None):
@@ -2252,7 +2264,9 @@ class ClientData:
         return None
 
     def __hash__(self):
-        return hash((self.client_id, self.client_name, self.custom_name, self.client_version, self.video_enabled, self.video_port, self.host_ip, self.host_name))
+        return hash(
+            (self.client_id, self.client_name, self.custom_name, self.client_version, self.video_enabled, self.video_port, self.host_ip, self.host_name)
+        )
 
     def __eq__(self, other):
         if not isinstance(other, ClientData):
@@ -2398,7 +2412,8 @@ class RemoteControl:
             addresses, solo = next(reversed(self._client_overrides.values()))
             self._broadcast_to_all_clients = addresses is None
             matches = frozenset(
-                client_id for client_id, client in self._clients.items()
+                client_id
+                for client_id, client in self._clients.items()
                 if client_id != self.clientId and (addresses is None or not addresses.isdisjoint(client.addresses()))
             )
             self._active_client_ids = frozenset() if solo and len(matches) != 1 else matches
@@ -2406,8 +2421,10 @@ class RemoteControl:
 
         self._broadcast_to_all_clients = self._all_clients_active and not self._active_client_map
         self._active_client_ids = frozenset(
-            client_id for client_id, client in self._clients.items()
-            if client_id != self.clientId and self._active_client_map.get(
+            client_id
+            for client_id, client in self._clients.items()
+            if client_id != self.clientId
+            and self._active_client_map.get(
                 client_id,
                 self._all_clients_active or any(self._active_client_map.get(address) for address in client.addresses()),
             )
@@ -2488,6 +2505,11 @@ class RemoteControl:
                 return self._active_client_ids if self.clientFiltered else (0,)
             return tuple(client_id for client_id in targets if self._client_active(client_id))
 
+    def resolveClientAddresses(self, addresses: frozenset[str]) -> list[int]:
+        """Resolve configured names or IP addresses to current remote clients."""
+        with self._client_lock:
+            return [client_id for client_id, client in self._clients.items() if client_id != self.clientId and not addresses.isdisjoint(client.addresses())]
+
     @property
     def serverEnabled(self) -> bool:
         """true if remote control enabled for broadcast/server"""
@@ -2515,16 +2537,12 @@ class RemoteControl:
 
     def _load_known_clients(self) -> dict[str, str]:
         try:
-            with self._clients_path.open(encoding="utf-8") as stream: # @IgnoreException
+            with self._clients_path.open(encoding="utf-8") as stream:  # @IgnoreException
                 clients = json.load(stream)["clients"]
-            return {
-                normalize_client_address(address): details
-                for address, details in clients.items()
-                if isinstance(details, str)
-            }
+            return {normalize_client_address(address): details for address, details in clients.items() if isinstance(details, str)}
         except FileNotFoundError:
             return {}
-        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        except OSError, ValueError, KeyError, TypeError, AttributeError:
             syslog.exception("RPC: unable to load remote clients from %s", self._clients_path)
             return {}
 
@@ -2532,9 +2550,7 @@ class RemoteControl:
         self._clients_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=self._clients_path.parent, delete=False
-            ) as stream:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self._clients_path.parent, delete=False) as stream:
                 temporary = Path(stream.name)
                 json.dump({"clients": clients}, stream, ensure_ascii=False, indent=2, sort_keys=True)
                 stream.write("\n")
@@ -2609,7 +2625,8 @@ class RemoteControl:
                 if addresses:
                     address = next((value for value in addresses if value in self._known_clients), addresses[0])
                     labels = (
-                        value for value in (data.host_name, data.getClientName(), data.host_ip)
+                        value
+                        for value in (data.host_name, data.getClientName(), data.host_ip)
                         if isinstance(value, str) and value and _client_address_key(value) != address
                     )
                     details = ", ".join(dict.fromkeys(labels))
@@ -3056,6 +3073,8 @@ class RemoteConfig:
             remote_profile_enabled  # true when remote profile is enabled for this configuration (this is set by actions that don't allow this mode)
         )
 
+        self._mapping_client_selection: frozenset[str] | None = None
+        self._mapping_client_selection_enabled = False
         self._is_custom: bool = False  # true if the configuration is custom set
 
         self._profile_remote_mode_enabled: bool = remote_enabled  # true if the action can send to a remote client
@@ -3143,9 +3162,31 @@ class RemoteConfig:
 
     def getClientList(self) -> list:
         """gets the list of active output clients"""
-        if not self.isCustom or self.anySelected():
-            return [0]  # any
-        return [client.client_id for client in self._clients.values() if client.selected and client.client_id != 0]
+        if not self.isCustom:
+            return [0]
+        if self.mappingClientSelectionEnabled:
+            selection = self.mappingClientSelection
+            return remote_control.resolveClientAddresses(selection) if selection else [0]
+        if self._mapping_client_selection is not None or self.anySelected():
+            return [0]
+        return [client.client_id for client in tuple(self._clients.values()) if client.selected and client.client_id != 0]
+
+    @property
+    def mappingClientSelectionEnabled(self) -> bool:
+        return self._mapping_client_selection_enabled
+
+    @mappingClientSelectionEnabled.setter
+    def mappingClientSelectionEnabled(self, enabled: bool):
+        self._mapping_client_selection = self.mappingClientSelection
+        self._mapping_client_selection_enabled = enabled
+
+    @property
+    def mappingClientSelection(self) -> frozenset[str]:
+        return self._mapping_client_selection or frozenset()
+
+    @mappingClientSelection.setter
+    def mappingClientSelection(self, selection: frozenset[str]):
+        self._mapping_client_selection = selection
 
     @property
     def isCustom(self) -> bool:
@@ -3361,6 +3402,9 @@ class RemoteConfig:
             node.set("process", safe_format(self.process, str, escape=True))
         node.set("target-process", safe_format(self.isProcess, bool))
         node.set("partial-title", safe_format(self.partialMatch, bool))
+        if self.mappingClientSelectionEnabled or self._mapping_client_selection is not None:
+            write_client_selection(node, "mapping-clients", self.mappingClientSelection)
+            node.find("mapping-clients").set("enabled", safe_format(self.mappingClientSelectionEnabled, bool))
 
         client: RemoteClientData
         for client in self._clients.values():
@@ -3382,11 +3426,15 @@ class RemoteConfig:
         self.isProcess = safe_read(node, "target-process", bool, False)
         self.partialMatch = safe_read(node, "partial-title", bool, True)
 
-        # list of clients
+        selection = node.find("mapping-clients")
+        self._mapping_client_selection = read_client_selection(selection)
+        self._mapping_client_selection_enabled = selection is not None and safe_read(selection, "enabled", bool, True)
+
+        # list of legacy clients
         self.ensureAnyClient()
         for client in self._clients.values():
             client.selected = False
-        client_nodes = node.xpath(".//client")
+        client_nodes = node.xpath(".//client[not(ancestor::mapping-clients)]")
         for client_node in client_nodes:
             client = RemoteClientData()
             client.from_xml(client_node)
@@ -3428,6 +3476,8 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
         parent=None,
         *,
         show_solo=False,
+        show_controls=True,
+        explicit_select_all=False,
         empty_selection_text="No clients selected. All clients are enabled.",
     ):
         from gremlin.ui.ui_common import QDataPushButton, QScrollableWidget
@@ -3436,6 +3486,7 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
         self._selection = selection
         self._show_solo = show_solo
         self._empty_selection_text = empty_selection_text
+        self._show_controls = show_controls
         self._catalog_entries = None
         self._checks = {}
 
@@ -3445,28 +3496,41 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
         self._clients.setMinimumHeight(110)
         self._clients.setMaximumHeight(180)
 
-        select_all = QDataPushButton("Select All", clicked=lambda: self._set_selection(None))
-        select_none = QDataPushButton("Select None", clicked=lambda: self._set_selection(frozenset()))
-        edit = QDataPushButton("Edit Clients…", clicked=self._manage_clients)
-        for button in (select_all, select_none, edit):
-            button.setAutoDefault(False)
-
-        buttons = QtWidgets.QHBoxLayout()
-        buttons.addWidget(select_all)
-        buttons.addWidget(select_none)
-        buttons.addStretch()
-        buttons.addWidget(edit)
-
-        self._status = QtWidgets.QLabel()
-        self._status.setWordWrap(True)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._clients)
-        layout.addLayout(buttons)
+        if show_controls:
+            select_all = QDataPushButton(
+                "Select All",
+                clicked=lambda: self.setSelection(frozenset(self._checks) if explicit_select_all else None),
+            )
+            select_none = QDataPushButton("Select None", clicked=lambda: self.setSelection(frozenset()))
+            edit = QDataPushButton("Edit Clients…", clicked=self._manage_clients)
+            for button in (select_all, select_none, edit):
+                button.setAutoDefault(False)
+
+            buttons = QtWidgets.QHBoxLayout()
+            buttons.addWidget(select_all)
+            buttons.addWidget(select_none)
+            buttons.addStretch()
+            buttons.addWidget(edit)
+            layout.addLayout(buttons)
+
+        self._status = QtWidgets.QLabel()
+        self._status.setWordWrap(True)
         layout.addWidget(self._status)
 
         gremlin.event_handler.EventListener().remote_control_client_change.connect(self._refresh)
         self._refresh()
+
+    @property
+    def selection(self):
+        return self._selection
+
+    def refreshClients(self):
+        """Reload the client catalog and ask running clients to identify themselves."""
+        self._refresh()
+        gremlin.event_handler.EventListener().remote_control_identify.emit()
 
     @QtCore.Slot()
     def _refresh(self):
@@ -3480,7 +3544,10 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
             self._clients.clear()
             self._checks.clear()
             if not known:
-                self._clients.addWidget(QDataLabel("No clients are saved. Use Edit Clients to add a client."))
+                text = "No clients are saved."
+                if self._show_controls:
+                    text += " Use Edit Clients to add a client."
+                self._clients.addWidget(QDataLabel(text))
             for address, details in sorted(known.items()):
                 checkbox = QDataCheckbox()
                 checkbox.setAccessibleName(f"Include {address}")
@@ -3491,7 +3558,7 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
                 if self._show_solo:
                     solo = QDataPushButton(
                         "Solo",
-                        clicked=lambda _checked=False, address=address: self._set_selection(frozenset({address})),
+                        clicked=lambda _checked=False, address=address: self.setSelection(frozenset({address})),
                         tooltip=f"Select only {address}",
                     )
                     solo.setAccessibleName(f"Solo {address}")
@@ -3511,7 +3578,7 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
         else:
             self._status.setText(self._empty_selection_text)
 
-    def _set_selection(self, selection):
+    def setSelection(self, selection):
         if self._selection != selection:
             self._selection = selection
             self._refresh()
@@ -3528,6 +3595,460 @@ class RemoteClientSelectionWidget(QtWidgets.QWidget):
         from gremlin.ui.dialogs import show_remote_clients
 
         show_remote_clients(self)
+
+
+class RemoteClientWidget(QtWidgets.QWidget):
+    """UI element that shows the list of available network clients"""
+
+    def __init__(self, config, parent=None, *, client_picker=False):
+        from gremlin.ui.ui_common import (
+            Buttons,
+            Color,
+            Icons,
+            QDataCheckbox,
+            QDataPushButton,
+            QGroupBoxV,
+            QHorizontalLine,
+            QIconLabel,
+            QRoundedGroupBox,
+            QWarningWidget,
+            getHContainer,
+            getVContainer,
+        )
+
+        super().__init__(parent=parent)
+
+        self.config: RemoteConfig = config
+        self.config.client_changed.connect(self._handle_client_changed)
+        self._refresh_pending = False
+        self._client_picker = client_picker
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.custom_widget = QDataCheckbox(
+            "Custom output configuration",
+            value=self.config.isCustom,
+            callback=self._handle_custom_changed,
+            tooltip="Enable custom send targets",
+        )
+
+        self.group_widget = QRoundedGroupBox(title="Output Configuration", color=Color().groupBoxBlueColor()) if self._client_picker else QGroupBoxV()
+        widget = QtWidgets.QLabel("List of clients:")
+
+        self.any_widget = QDataCheckbox(
+            "Any",
+            value=self.config.anySelected(),
+            callbackEx=self._handle_client_selected,
+            tooltip="Sends to all remote clients when selected",
+            data=0,
+        )
+
+        self.send_local_widget = QDataCheckbox(
+            "Local",
+            value=self.config.local,
+            callback=self._handle_local_changed,
+            tooltip="Send to the local instance.",
+        )
+
+        self.send_remote_widget = QDataCheckbox(
+            "Remote",
+            value=self.config.remote,
+            callback=self._handle_remote_changed,
+            tooltip="Send to remote clients.",
+        )
+
+        self.send_remote_profile_widget = QDataCheckbox(
+            "Only send to remote when profile is in remote mode",
+            value=self.config.remoteProfile,
+            callback=self._handle_remote_profile_changed,
+            tooltip="Send to remote clients when profile is in remote mode.  In this mode, any local output is disabled while the profile is in remote control mode.",
+        )
+
+        self.warning_remote_widget = QWarningWidget("<i>Remote control is currently disabled</i>")
+        self.warning_no_output_widget = QWarningWidget("No output mode selected")
+
+        widgets = [
+            "Enable output to:",
+            self.send_local_widget,
+            self.send_remote_widget,
+            self.warning_remote_widget,
+            self.warning_no_output_widget,
+        ]
+
+        if self._client_picker:
+            self.selected_clients_widget = QDataCheckbox(
+                "Selected clients",
+                value=self.config.mappingClientSelectionEnabled,
+                callback=self._handle_selected_clients_changed,
+                tooltip="Limit this mapping's remote output to the checked clients.",
+            )
+            self.select_clients_widget = QDataPushButton(
+                "Select…", clicked=self._select_mapping_clients, tooltip="Selects the clients for this mapping and optionally edits the list of known clients."
+            )
+            self.select_clients_widget.setAutoDefault(False)
+            widgets[3:3] = [self.selected_clients_widget, self.select_clients_widget]
+
+        output_container = getHContainer(widgets, widget_only=True)
+
+        widgets = [
+            output_container,
+            getHContainer(self.send_remote_profile_widget, widget_only=True, left_margin=12),
+        ]
+
+        widget = getVContainer(widgets, widget_only=True)
+        self.group_widget.addWidget(widget)
+
+        self.refresh_widget = Buttons.getRefreshWidget(
+            "Refresh",
+            callback=self._trigger_identify,
+            tooltip="This will refresh the list of available network instances.\nClients must be running and allowed to communicate with the current instance to be detected.",
+        )
+        self.select_all_widget = QDataPushButton("All", callback=self._handle_select_all)
+        self.select_none_widget = QDataPushButton("Clear", callback=self._handle_select_none)
+
+        widgets = [
+            self.refresh_widget,
+            self.select_all_widget,
+            self.select_none_widget,
+        ]
+
+        self.container_buttons = getHContainer(widgets, widget_only=True)
+
+        widget = getHContainer(widget, widget_only=True)
+        self.group_widget.addWidget(widget)
+
+        self.flow_container_widget, self.flow_container_layout = getVContainer(left_margin=12)
+
+        self.client_count_widget = QtWidgets.QLabel()
+
+        icon = Icons.remoteControlIcon()
+        client_widget = getHContainer(
+            [QIconLabel(icon, "Target Client(s):"), self.client_count_widget],
+            widget_only=True,
+        )
+
+        # any client
+        widgets = [
+            client_widget,
+            getHContainer(self.any_widget, widget_only=True, left_margin=12),
+            self.flow_container_widget,
+            QHorizontalLine(),
+            self.container_buttons,
+        ]
+
+        self.container_client = getVContainer(widgets, widget_only=True, left_margin=12)
+        self.group_widget.addWidget(self.container_client)
+        if self._client_picker:
+            self.mapping_clients_widget = RemoteClientSelectionWidget(
+                self.config.mappingClientSelection,
+                show_controls=False,
+            )
+            self.mapping_clients_widget.selectionChanged.connect(self._handle_mapping_selection_changed)
+            self.group_widget.addWidget(self.mapping_clients_widget)
+
+        self.main_layout.addWidget(self.custom_widget)
+        widget = getVContainer(self.group_widget, widget_only=True)
+        self.main_layout.addWidget(widget)
+        self.main_layout.addStretch()
+
+        self.refreshClients()
+
+        self._update_ui()
+
+    def _update_ui(self):
+        """updates UI widget states and visibility based on context"""
+
+        config = self.config
+
+        if not config.isCustom:
+            # custom output disabled - only show the checkbox
+            self.group_widget.setVisible(False)
+            return
+
+        self.group_widget.setVisible(True)
+
+        enabled = config.enabled
+
+        # remote control only visible if remote control is allowed
+        self.send_remote_widget.setEnabled(config.remoteEnabled)
+        self.send_remote_profile_widget.setEnabled(config.remote)
+        self.send_remote_profile_widget.setVisible(config.remoteProfileEnabled)
+
+        self.warning_remote_widget.setVisible(not enabled)
+
+        self.warning_no_output_widget.setVisible(not (config.local or config.remote))
+
+        visible = enabled and config.remote
+        if self._client_picker:
+            selecting = config.mappingClientSelectionEnabled and config.remote
+            self.selected_clients_widget.setEnabled(config.remoteEnabled)
+            self.select_clients_widget.setVisible(selecting)
+            self.mapping_clients_widget.setVisible(selecting)
+            with QtCore.QSignalBlocker(self.send_remote_widget), QtCore.QSignalBlocker(self.selected_clients_widget):
+                self.send_remote_widget.setChecked(config.remote and not selecting)
+                self.selected_clients_widget.setChecked(selecting)
+            # Keep legacy client-ID selections available for profiles that still use them.
+            visible = visible and not selecting and not config.anySelected()
+        self.container_buttons.setVisible(visible)
+        self.container_client.setVisible(visible)
+
+        if visible:
+            count = config.getClientCount()
+            self.client_count_widget.setText(f"({count - 1} found)" if count - 1 else "(none detected)")
+            selected_count = config.getSelectedCount()
+            self.select_all_widget.setEnabled(count > 0 and selected_count < count)
+            self.select_none_widget.setEnabled(selected_count > 0)
+
+            # disable individual client selection if "any" is selected
+            enabled = not config.anySelected()
+            self.flow_container_widget.setEnabled(enabled)
+
+        count = config.getClientCount()
+        self.select_all_widget.setEnabled(count > 0)
+        selected_count = config.getSelectedCount()
+        self.select_none_widget.setEnabled(selected_count > 0)
+
+    def _handle_client_changed(self):
+        """update on client change"""
+        # syslog.info("remote config client change")
+        if not Shiboken.isValid(self):
+            # unregister if called and we're deleted already
+            self.config.unregisterClientChangeCallback(self._handle_client_changed)
+            return
+        # Debounce: identify replies from several peers used to rebuild the
+        # checkbox flow on every packet and hard-crash Qt (0xC0000005).
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
+        QtCore.QTimer.singleShot(100, self._deferred_refresh_clients)
+
+    def _deferred_refresh_clients(self):
+        self._refresh_pending = False
+        if not Shiboken.isValid(self):
+            return
+        self.refreshClients()
+
+    def _handle_custom_changed(self, checked: bool):
+        self.config.isCustom = checked
+        self._update_ui()
+
+    def _handle_identify(self, widget):
+        # Ensure UDP listener + send socket are up (needed after Options/version folder changes).
+        remote_server.start()
+        remote_client.start()
+        remote_client.requestIdentify()
+
+    def _handle_client_response(self, data: PacketData):
+        syslog.info("REMOTE: received client response:")
+        syslog.info(f"client [{data.client_id}]")
+        syslog.info(f"Status: [{data.status.name}]")
+
+    def _handle_remote_control_changed(self, enabled: bool):
+        """called when GEX remote control state changes"""
+
+        gremlin.util.InvokeUiMethod(self._handle_remote_control_ui, enabled)
+
+    def _handle_remote_control_ui(self, enabled: bool):
+        if Shiboken.isValid(self):
+            self._update_ui()
+
+    def _handle_local_changed(self, checked):
+        self.config.local = checked
+        self._update_ui()
+
+    def _handle_remote_profile_changed(self, checked):
+        self.config.remoteProfile = checked
+        if checked:
+            # ensure at least one client is selected
+            count = self.config.getSelectedCount()
+            if not count:
+                self.any_widget.setChecked(True)
+
+        self._update_ui()
+
+    def _handle_remote_changed(self, checked):
+        self.config.remote = checked
+        if self._client_picker and checked:
+            self.config.mappingClientSelectionEnabled = False
+            self.config.getClient(0).selected = True
+        if checked:
+            # ensure at least one client is selected
+            count = self.config.getSelectedCount()
+            if not count:
+                self.any_widget.setChecked(True)
+
+        self._update_ui()
+
+    def _handle_selected_clients_changed(self, checked):
+        self.config.mappingClientSelectionEnabled = checked
+        self.config.remote = checked
+        self._update_ui()
+
+    def _handle_mapping_selection_changed(self, selection):
+        self.config.mappingClientSelection = selection or frozenset()
+
+    def _select_mapping_clients(self):
+        from gremlin.ui.ui_common import Buttons, QRememberDialog, getHContainer
+
+        dialog = QRememberDialog("VirtualRemapRemoteClientsDialog", width=550, height=320, parent=self)
+        dialog.setWindowTitle("Select Remote Clients")
+        checklist = RemoteClientSelectionWidget(
+            self.config.mappingClientSelection,
+            dialog,
+            explicit_select_all=True,
+        )
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addWidget(checklist, stretch=1)
+        refresh = Buttons.getRefreshWidget(
+            "Refresh",
+            callback=checklist.refreshClients,
+            tooltip="Refresh the client list and discover running remote clients.",
+        )
+        refresh.setAutoDefault(False)
+        cancel = Buttons.getCancelWidget(callback=dialog.reject)
+        ok = Buttons.getOkWidget(no_keyboard=False)
+        ok.clicked.connect(dialog.accept)
+        layout.addWidget(getHContainer([refresh, "||", cancel, ok], widget_only=True))
+        ok.setDefault(True)
+        try:
+            if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                self.mapping_clients_widget.setSelection(checklist.selection)
+        finally:
+            dialog.deleteLater()
+
+    def _handle_client_selected(self, widget, checked):
+        client_id = widget.data
+        client = self.config.getClient(client_id)
+        if client:
+            client.selected = checked
+            self._refresh_clients_ui()
+            self._update_ui()
+
+    def _getClientWidgets(self) -> list:
+        widgets = [self.any_widget]
+        widgets.extend(self.flow_widget.getWidgets())
+        return widgets
+
+    def _handle_singleton_changed(self, checked):
+        self.config.singleton = checked
+        if checked:
+            # ensure only one client is selected
+            count = self.config.getSelectedCount()
+            if count > 1:
+                # pick the first one that is selected, clear the others
+                selected = True
+                for widget in self._getClientWidgets():
+                    client: RemoteClientData = widget.data
+                    if selected and client.selected:
+                        selected = False
+                        continue
+                    widget.setChecked(selected)
+
+    def _trigger_identify(self):
+        """refreshes the list of network clients"""
+        try:
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_identify.emit()
+        except Exception as err:
+            syslog.error(f"REMOTE: identify request failed: {err}")
+        # Do not rebuild UI here — wait for debounced client_changed after replies.
+
+    def _handle_select_all(self, widget):
+        """selects all widgets"""
+        self.config.selectAll()
+        self._refresh_clients_ui()
+        self._update_ui()
+
+    def _handle_select_none(self, widget):
+        """clears selection"""
+        self.config.selectNone()
+        if self._client_picker:
+            self.config.getClient(0).selected = True
+        self._refresh_clients_ui()
+        self._update_ui()
+
+    def _handle_select_any(self):
+        """only selects the ANY"""
+        self.any_widget.setChecked(True)
+        self._update_ui()
+
+    def refreshClients(self):
+        self._refresh_clients()
+        self._update_ui()
+
+    def _refresh_clients(self):
+        gremlin.util.InvokeUiMethod(self._refresh_clients_ui)  # ensure on UI thread
+
+    def _refresh_clients_ui(self):
+        from gremlin.ui.ui_common import QDataCheckbox, QFlowLayout
+
+        if not Shiboken.isValid(self):
+            # already deleted
+            return
+
+        _verbose = gremlin.config.Configuration().verbose_mode_remote
+
+        config = self.config
+        client = config.getClient(0)
+
+        self.send_local_widget.setEnabled(config.localEnabled)
+        self.send_remote_widget.setEnabled(config.remoteEnabled)
+
+        with QtCore.QSignalBlocker(self.send_local_widget):
+            self.send_local_widget.setChecked(config.local)
+        with QtCore.QSignalBlocker(self.send_remote_widget):
+            self.send_remote_widget.setChecked(config.remote)
+        with QtCore.QSignalBlocker(self.any_widget):
+            self.any_widget.setChecked(client.selected)
+
+        gremlin.util.clear_layout(self.flow_container_layout)
+
+        flow_layout = QFlowLayout()
+        self.flow_container_layout.addLayout(flow_layout)
+
+        # ANY client is not selected, show the distinct list of clients
+        clients = config.getClients()
+        client_id = config.getLocalClientId()  # local client ID
+
+        any_selected = config.anySelected()
+
+        used_names = []
+        for client in clients:
+            # if verbose: syslog.info(f"got client: [{client.client_name}]")
+            if client.client_id != 0:
+                # only add the specific connected clients
+                if not client.connected:
+                    continue  # client is not connected
+                client_name = client.getClientName()
+                if client_name in used_names:
+                    # custom name duplicated
+                    client_name = f"{client.custom_name} [{client.client_name}]"
+                used_names.append(client_name)
+                if client.client_id == client_id:
+                    # local
+                    client_name = f"{client_name} (self)"
+                    enabled = False  # cannot send to self but display the data
+                else:
+                    enabled = not any_selected
+                widget = QDataCheckbox(
+                    client_name,
+                    data=client.client_id,
+                    value=client.selected,
+                    callbackEx=self._handle_client_selected,
+                    tooltip=str(client),
+                )
+
+                widget.setEnabled(enabled)
+
+                flow_layout.addWidget(widget)
+
+        self._update_ui()
+
+    def setClientId(self, client_id):
+        """sets the client id"""
+        index = self.client_selector.findData(client_id)
+        if index != -1:
+            self.client_selector.setCurrentIndex(index)
 
 
 class RemoteClientOptionsWidget(QtWidgets.QWidget):
@@ -3554,35 +4075,37 @@ class RemoteClientOptionsWidget(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QDataRadioButtonGroup(
-            options=[
-                ("No change", ClientOperation.Unchanged, "Keep the current remote client filter"),
-                ("Selection", ClientOperation.Select, "Choose clients from the checklist"),
-                ("Enable all", ClientOperation.EnableAll, "Enable all remote clients"),
-                ("Mute all", ClientOperation.DisableAll, "Mute all remote clients"),
-            ],
-            value=operation,
-            label="Mode",
-            callback=self._operation_changed,
-        ))
-        layout.addWidget(QDataRadioButtonGroup(
-            options=[
-                ("No change", OutputMode.Unchanged, "Keep the current profile output routing"),
-                ("Local", OutputMode.LocalOnly),
-                ("Remote", OutputMode.RemoteOnly),
-                ("Both", OutputMode.LocalAndRemote),
-            ],
-            value=output_mode,
-            label="Routing",
-            callback=self._output_changed,
-        ))
+        layout.addWidget(
+            QDataRadioButtonGroup(
+                options=[
+                    ("No change", ClientOperation.Unchanged, "Keep the current remote client filter"),
+                    ("Selection", ClientOperation.Select, "Choose clients from the checklist"),
+                    ("Enable all", ClientOperation.EnableAll, "Enable all remote clients"),
+                    ("Mute all", ClientOperation.DisableAll, "Mute all remote clients"),
+                ],
+                value=operation,
+                label="Mode",
+                callback=self._operation_changed,
+            )
+        )
+        layout.addWidget(
+            QDataRadioButtonGroup(
+                options=[
+                    ("No change", OutputMode.Unchanged, "Keep the current profile output routing"),
+                    ("Local", OutputMode.LocalOnly),
+                    ("Remote", OutputMode.RemoteOnly),
+                    ("Both", OutputMode.LocalAndRemote),
+                ],
+                value=output_mode,
+                label="Routing",
+                callback=self._output_changed,
+            )
+        )
 
         if behavior is not None:
             self._hold_widget = QDataCheckbox("Hold", tooltip="Apply the remote client filter while the mapped input is held.")
             self._hold_widget.toggled.connect(self._hold_changed)
-            self._toggle_widget = QDataCheckbox(
-                "Toggle on each trigger", tooltip="Apply or remove this client selection each time the action executes."
-            )
+            self._toggle_widget = QDataCheckbox("Toggle on each trigger", tooltip="Apply or remove this client selection each time the action executes.")
             self._toggle_widget.toggled.connect(self._toggle_changed)
             self._behavior_container = getHContainer(["Behavior", self._hold_widget, self._toggle_widget], widget_only=True)
             layout.addWidget(self._behavior_container)

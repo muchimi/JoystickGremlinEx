@@ -103,7 +103,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         is_warning = False
 
         with QtCore.QSignalBlocker(self.mode_selector_widget):
-            current_mode = self.mode_selector_widget.currentData()
+            current_mode = self.action_data.mode
             edit_mode = gremlin.shared_state.edit_mode
             self.mode_selector_widget.clear()
             for display, mode in mode_list:
@@ -112,9 +112,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
                 self.mode_selector_widget.addItem(display, mode)
 
             if current_mode:
-                index = self.mode_selector_widget.findData(current_mode)
-                if index != -1:
-                    self.mode_selector_widget.setCurrentIndex(index)
+                self._select_configured_mode(current_mode)
 
         if not self.mode_selector_widget.count():
             is_warning = True
@@ -150,12 +148,18 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
 
             if modes:
                 if current_mode:
-                    index = self.mode_selector_widget.findData(current_mode)
-                    if index != -1:
-                        self.mode_selector_widget.setCurrentIndex(index)
+                    self._select_configured_mode(current_mode)
                 else:
                     # pick the default
                     self.action_data.mode = self.mode_selector_widget.currentData()
+
+    def _select_configured_mode(self, mode):
+        index = self.mode_selector_widget.findData(mode)
+        if index == -1 and mode not in gremlin.shared_state.current_profile.get_mode_map():
+            self.mode_selector_widget.addItem(f"{mode} (missing)", mode)
+            index = self.mode_selector_widget.count() - 1
+        if index != -1:
+            self.mode_selector_widget.setCurrentIndex(index)
 
     def _mode_selected_changed(self):
         if not Shiboken.isValid(self.mode_selector_widget):

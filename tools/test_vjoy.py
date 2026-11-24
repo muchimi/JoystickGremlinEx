@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from gremlin.axis_bump import output_lock  # noqa: E402
 from gremlin.error import VJoyError  # noqa: E402
 from gremlin.input_types import InputType  # noqa: E402
 from gremlin.singleton_decorator import SingletonDecorator  # noqa: E402
@@ -83,7 +84,7 @@ def load_vjoy(source=None):
     ], type_ignores=[])
     services = NS()
     namespace = dict(
-        ctypes=ctypes, enum=enum, logging=logging, threading=threading, time=time,
+        ctypes=ctypes, enum=enum, logging=logging, threading=threading, time=time, output_lock=output_lock,
         os=os, cache=cache, gremlin=services, VJoyState=VJoyState, VJoyError=VJoyError,
         InputType=InputType, EventSourceType=EventSourceType,
         SingletonDecorator=SingletonDecorator, syslog=logging.getLogger("vjoy-checks"),
@@ -220,6 +221,11 @@ class VJoyChecks(unittest.TestCase):
         self.assertEqual(self.axis.value, 0.5)
         self.driver.SetAxis.assert_called_once_with(24574, 1, 0x35)
         self.assertEqual(self.listener.vjoy_output_event.events, [])
+        output = self.axis.last_output
+        self.assertEqual(output, (0.5,))
+        self.axis.set_absolute_value(0.25, remember=False)
+        self.assertEqual(self.axis.value, 0.25)
+        self.assertIs(self.axis.last_output, output)
 
     def test_axis_output_signals_preserve_axis_id_value_and_source(self):
         self.axis.value = 0.25

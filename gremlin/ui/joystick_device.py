@@ -41,7 +41,7 @@ from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
 from gremlin.util import parse_bool, safe_read, safe_format, parse_guid, write_guid, load_icon
-from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction, AbstractCondition
+from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction, AbstractCondition, ConditionHelper
 from gremlin.ui.ui_common import (
     Buttons,
     Color,
@@ -195,7 +195,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         clear_layout(self.main_layout)
 
         self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
-        self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+        self.paste_widget = ConditionHelper().get_paste_widget(self._paste_condition)
 
         self.record_button_widget = Buttons.getEditWidget(label="Listen", callback=self._request_user_input)
         self.delete_button_widget = Buttons.getDeleteWidget(

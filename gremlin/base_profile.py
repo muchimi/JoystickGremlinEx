@@ -637,26 +637,25 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
             return
 
         group_node = self.container_node.children[0]  # group node is the only child of the container node
-        self.action_set_nodes = [
-            node
-            for node in group_node.children
+        self._indexed_action_set_nodes = [
+            node for node in group_node.children
             if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet
-            and node.action_set
-            and node.has_actions
+        ]
+        self.action_set_nodes = [
+            node for node in self._indexed_action_set_nodes if node.action_set and node.has_actions
         ]
 
         self._valid = True
 
-    def _trigger(self, index: int, event, value, extra_data: dict = None) -> bool:
-        """executes an action set node
-
-        :param index: the index of the action set, use None to execute all action sets, 0 based so index = 0 is the first action set of the container
-        :param event: the event
-        :param value: the action value
-        :param extra_data : extra data dictionary, optional
-        """
-        if self.valid:
-            return self._ec.execute_node(self.action_set_nodes[index], event, value, extra_data)
+    def _trigger(self, index: int, event, value, extra_data: dict = None, *, skip_empty=False) -> bool:
+        """Execute one action set, preserving positional triggers such as press and release."""
+        if not self.valid:
+            return False
+        nodes = self.action_set_nodes if skip_empty else self._indexed_action_set_nodes
+        if 0 <= index < len(nodes):
+            node = nodes[index]
+            if skip_empty or (node.action_set and node.has_actions):
+                return self._ec.execute_node(node, event, value, extra_data)
         return False
 
     def _execute(self, event, value, extra_data, verbose=None) -> bool:
@@ -785,10 +784,13 @@ class AbstractContainerAction(AbstractAction):
             input_item.is_action = True  # indicate this input item is a special action input item
 
             if child is not None:
-                # has a node and the node contains data
-                child.tag = child.get("type")
                 index = safe_read(child, "index", int, 0)
-                input_item.from_xml(child, data, extra_data)
+                original_tag = child.tag
+                child.tag = child.get("type")
+                try:
+                    input_item.from_xml(child, data, extra_data)
+                finally:
+                    child.tag = original_tag
                 self._item_data_map[index] = input_item
 
     def to_xml(self):
@@ -2641,7 +2643,6 @@ class Profile:
 
         self.override_start_mode = None  # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.connect(self._edit_mode_changed_cb)
         el.shutdown.connect(self._shutdown_handler)
 
         self._profile_registry = ProfileRegistry(self)
@@ -2913,7 +2914,6 @@ class Profile:
     def unload(self):
         """unloads the current profile - clears all references and unhooks events"""
         el = gremlin.event_handler.EventListener()
-        el.edit_mode_changed.disconnect(self._edit_mode_changed_cb)
         self.devices: dict[ProfileDeviceNode] = {}  # holds devices attached to this profile
         self.vjoy_devices = {}
         self.merge_axes = []
@@ -3069,33 +3069,6 @@ class Profile:
         if verbose:
             syslog.info(f"Profile: SimConnectMode: no saved mode found for [{key}]")
         return None
-
-    def _edit_mode_changed_cb(self):
-        """available mode list has changed - check data"""
-
-        # remove any merged axis data using a missing mode
-        modes = self.get_modes()
-        valid_list = []
-        for entry in self.merge_axes:
-            if entry["mode"] in modes:
-                valid_list.append(entry)
-        self.merge_axes = valid_list
-
-        # update vjoy device list
-        remove_list = []
-        for device in self.vjoy_devices.values():
-            for mode in device.modes:
-                if mode not in modes:
-                    remove_list.append(mode)
-
-            for mode in remove_list:
-                if mode in device.modes:
-                    del device.modes[mode]
-
-        # check default startup mode
-        mode = self._default_start_mode
-        if mode not in modes:
-            self._default_start_mode = self.get_default_mode()
 
     def getDeviceLabel(self, device_guid):
         """gets the display label for a given device guid"""
@@ -3555,6 +3528,7 @@ class Profile:
             node_parent = root
 
         node.parent = node_parent
+        node.parent_name = inherited_name
 
         mode_list = self.mode_list()
         if name in mode_list and (inherited_name is None or inherited_name in mode_list):
@@ -3661,53 +3635,51 @@ class Profile:
         el.request_reload.emit()
 
     def remove_mode(self, name, force=False, emit=True):
-        """removes a mode from this profile"""
-
-        import gremlin.event_handler
-
+        """Remove a mode and its dependent profile mappings."""
         mode_list = self.mode_list()
-        if name not in self.mode_list():
+        if name not in mode_list:
             syslog.warning(f"Remove Mode: error: mode {name} not found")
             return False
 
         if not force and len(mode_list) == 1:
             QMessageBox.warning(
-                self,
+                gremlin.shared_state.ui,
                 title="Warning",
                 text=f"Cannot delete mode [{name}]: The profile must have at least one mode",
             )
             return False
 
-        parent_of_deleted = None
-        for mode in list(self.devices.values())[0].modes.values():
-            if mode.name == name:
-                parent_of_deleted = mode.inherit
+        node = anytree.find(self._mode_tree, lambda node: node.name == name)
+        if node is None:
+            return False
+        parent = node.parent
+        parent_name = parent.name or None
+        surviving_modes = [mode for mode in mode_list if mode != name]
+        fallback = parent_name if parent_name in surviving_modes else next(iter(surviving_modes), None)
 
-        # Assign the inherited mode of the the deleted one to all modes that
-        # inherit from the mode to be deleted
-        for device in self.devices.values():
+        self._remove_mode_references(name, fallback)
+        for device in (*self.devices.values(), *self.vjoy_devices.values()):
+            removed = device.modes.pop(name, None)
+            if removed:
+                for items in removed.config.values():
+                    for item in items.values():
+                        if item is not None:
+                            for container in list(item.containers):
+                                item.remove_container(container)
             for mode in device.modes.values():
                 if mode.inherit == name:
-                    mode.inherit = parent_of_deleted
+                    mode.inherit = parent_name
 
-        # Remove the mode from the profile
-        for device in self.devices.values():
-            del device.modes[name]
-
-        if self._mode_tree:
-            node = next(
-                (node for node in self._mode_tree.descendants if node.name == name),
-                None,
-            )
-            if node:
-                # reparent children
-                for child in node.children:
-                    child.parent = node.parent
-                node.parent = None  # delete the node
+        for child in node.children:
+            child.parent = parent
+            child.parent_name = parent_name
+        node.parent = None
+        if self._profile_graph is not None:
+            self._profile_graph.remove_mode(name, parent_name)
 
         if emit:
             eh = gremlin.event_handler.EventListener()
-            eh.edit_mode_changed.emit()
+            eh.profile_modes_changed.emit()
 
         return True
 
@@ -3935,36 +3907,28 @@ class Profile:
         # self._mode_tree = Node("") # root node
         self._ensure_mode_tree(True)
 
-        mode_list = []
-        node_map = {}
-        node_map[""] = self._mode_tree
-        inherit_map = {}
-
+        node_map = {node.name: node for node in self._mode_tree.descendants}
         mode_list = self._profile_graph.getModeList()
-
-        # mode_nodes = [node for node in self._profile_graph.root.descendants if node.nodeType == gremlin.profile_graph.ProfileNodeType.Mode]
         for mode_name in mode_list:
-            m_node = anytree.find_by_attr(self._mode_tree, mode_name)
-            if not m_node:
-                m_node = Node(mode_name)
-                m_node.parent = self._mode_tree  # default parent node
-            node_map[mode_name] = m_node
-            mode_node = self._profile_graph.getModeNode(mode_name)
-            inherit_map[mode_name] = mode_node.inherit
+            if mode_name not in node_map:
+                node = ModeNode(mode_name)
+                node.parent = self._mode_tree
+                node_map[mode_name] = node
 
         for mode_name in mode_list:
-            m_node = node_map[mode_name]
-            parent_mode_name = inherit_map[mode_name]
-            if parent_mode_name:
-                m_parent_node = node_map[parent_mode_name]
-                m_node.parent = m_parent_node
-
-        # verbose = gremlin.config.Configuration().verbose
-        # if verbose: self.dumpModeTree()
-        # pass
+            parent_name = self._profile_graph.getModeNode(mode_name).inherit
+            if parent_name:
+                node = node_map[mode_name]
+                # Retain unresolved references so activation can report them.
+                node.parent_name = parent_name
+                node.parent = node_map.get(parent_name, self._mode_tree)
 
     def rename_mode(self, old_mode: str, new_mode: str, emit=False) -> bool:
-        """renames an existing mode to a new mode"""
+        """Rename a mode and keep the device mappings and inheritance in sync."""
+        new_mode = new_mode.strip()
+        if not new_mode:
+            return False
+
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose
         if old_mode == new_mode:
@@ -3979,9 +3943,9 @@ class Profile:
                 syslog.error(f"PROFILE: rename [{old_mode}] to [{new_mode}] - [{old_mode}] not found in the profile")
             return False
 
+        devices = [*self.devices.values(), *self.vjoy_devices.values()]
         new_node = anytree.find(self._mode_tree, lambda node: node.name == new_mode)
-        if new_node:
-            # already exist
+        if new_node or any(new_mode in device.modes for device in devices):
             if verbose:
                 syslog.error(
                     f"PROFILE: rename [{old_mode}] to [{new_mode}] - [{old_mode}] already exists in the profile"
@@ -3989,19 +3953,277 @@ class Profile:
             return False
 
         node.name = new_mode
+        for child in node.children:
+            child.parent_name = new_mode
 
-        # mode device objects — ProfileModeNode.id is unchanged; only the name moves
-        mode: ProfileModeNode
-        for device in self.devices.values():
+        for device in devices:
+            if old_mode in device.modes:
+                mode = device.modes.pop(old_mode)
+                mode.name = new_mode
+                device.modes[new_mode] = mode
             for mode in device.modes.values():
-                if mode.name == old_mode:
-                    # if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
-                    mode.name = new_mode
+                if mode.inherit == old_mode:
+                    mode.inherit = new_mode
+
+        if self._profile_graph is not None:
+            self._profile_graph.rename_mode(old_mode, new_mode)
+
+        for setting in ("_start_mode", "_default_start_mode", "_last_runtime_mode", "_last_edit_mode", "override_start_mode"):
+            if getattr(self, setting) == old_mode:
+                setattr(self, setting, new_mode)
+
+        self._rename_mode_references(old_mode, new_mode)
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.emit(old_mode, new_mode)
 
         return True
+
+    def _rename_mode_references(self, old_mode: str, new_mode: str):
+        """Update the profile settings and mappings that refer to a mode by name."""
+        if self.settings.startup_mode == old_mode:
+            self.settings.startup_mode = new_mode
+        for mapping in self.merge_axes:
+            if mapping.get("mode") == old_mode:
+                mapping["mode"] = new_mode
+        for aircraft, mode in self._simconnect_modes.items():
+            if mode == old_mode:
+                self._simconnect_modes[aircraft] = new_mode
+        for variable in self._mode_plugin_variables(old_mode):
+            variable.value = new_mode
+
+        if gremlin.shared_state.current_profile is self:
+            for field in ("edit_mode", "runtime_mode", "previous_runtime_mode"):
+                if getattr(gremlin.shared_state, field) == old_mode:
+                    setattr(gremlin.shared_state, field, new_mode)
+        if self._profile_fname:
+            config = gremlin.config.Configuration()
+            if config.get_last_edit_mode(self._profile_fname) == old_mode:
+                config.set_last_edit_mode(self._profile_fname, new_mode)
+            if config.get_last_runtime_mode(self._profile_fname) == old_mode:
+                config.set_last_runtime_mode(self._profile_fname, new_mode)
+
+        for _, _, container, action_set, action in self._iter_mode_mappings():
+            owner = container if action_set is None else action
+            for condition in self._mode_conditions(owner, old_mode):
+                condition.mode = new_mode
+            if action is None:
+                continue
+            if action.tag in ("switch-mode", "temporary-mode-switch") and action.mode == old_mode:
+                action.mode = new_mode
+            if action.tag == "temporary-mode-switch" and action.return_mode == old_mode:
+                action.return_mode = new_mode
+            if action.tag == "cycle-modes":
+                action.mode_list[:] = [new_mode if mode == old_mode else mode for mode in action.mode_list]
+            if action.tag == "gated-axis":
+                for gate_data in action.gates:
+                    if gate_data.profile_mode == old_mode:
+                        gate_data.profile_mode = new_mode
+
+    @staticmethod
+    def _mode_conditions(owner, mode):
+        if owner.activation_condition:
+            for condition in owner.activation_condition.conditions:
+                if isinstance(condition, gremlin.input_item.BaseModeCondition) and condition.mode == mode:
+                    yield condition
+
+    def _iter_mode_mappings(self, exclude_mode=None):
+        """Yield the source input, owning input, container, and actions for each mapping."""
+        pending = [(item, item) for source in (self.state, self.voice) for item in source.getInputItems().values()]
+        for device in (*self.devices.values(), *self.vjoy_devices.values()):
+            for name, mode in device.modes.items():
+                if name != exclude_mode:
+                    for items in mode.config.values():
+                        pending.extend((item, item) for item in items.values())
+
+        seen = set()
+        while pending:
+            source, item = pending.pop()
+            if item is None or id(item) in seen:
+                continue
+            seen.add(id(item))
+            for container in item.containers:
+                yield source, item, container, None, None
+                for action_set in container.get_action_sets():
+                    for action in action_set or ():
+                        if action is None:
+                            continue
+                        yield source, item, container, action_set, action
+                        if isinstance(action, AbstractContainerAction):
+                            pending.extend((source, nested) for nested in action._item_data_map.values())
+                        if action.tag == "gated-axis":
+                            for gate_data in action.gates:
+                                for branch in (*gate_data.getGates(), *gate_data.getRanges()):
+                                    pending.extend((source, nested) for nested in branch.item_data_map.values())
+
+    def get_missing_mode_references(self, start_mode=None):
+        """Return missing mode names and the profile locations that reference them."""
+        tree = self.build_inheritance_tree()
+        known_modes = {node.name for node in tree.descendants}
+        missing = {}
+
+        def is_missing(mode):
+            return bool(mode) and mode not in known_modes
+
+        def record(mode, location):
+            if is_missing(mode):
+                missing.setdefault(mode, set()).add(location)
+
+        def input_location(item, mode=None):
+            name = f"State: {item.display_name}" if item.input_type == InputType.State else item.display_name
+            return f"{name} (mapped in {gremlin.shared_state.translateMode(mode)})" if mode else name
+
+        for node in tree.descendants:
+            record(getattr(node, "parent_name", None), f"Parent of mode {node.name}")
+
+        for device in (*self.devices.values(), *self.vjoy_devices.values()):
+            for name, mode in device.modes.items():
+                missing_modes = [(name, "Input mapping"), (mode.inherit, "Inherited input mapping")]
+                for mode_name, detail in missing_modes:
+                    if not is_missing(mode_name):
+                        continue
+                    inputs = {
+                        input_location(item, name)
+                        for items in mode.config.values()
+                        for item in items.values()
+                        if item is not None and (item.containers or item.curve_data)
+                    }
+                    for location in inputs or {f"{device.name} (mode {name})"}:
+                        record(mode_name, f"{location} — {detail}")
+
+        for source, _, container, action_set, action in self._iter_mode_mappings():
+            owner = container if action_set is None else action
+            references = [
+                (condition.mode, "Mode condition")
+                for condition in (owner.activation_condition.conditions if owner.activation_condition else ())
+                if isinstance(condition, gremlin.input_item.BaseModeCondition)
+            ]
+            if action is not None:
+                if action.tag in ("switch-mode", "temporary-mode-switch"):
+                    references.append((action.mode, action.name))
+                if action.tag == "temporary-mode-switch" and action.enable_return_mode:
+                    references.append((action.return_mode, "Temporary mode switch return"))
+                if action.tag == "cycle-modes":
+                    references.extend((mode, "Cycle Modes") for mode in action.mode_list)
+                if action.tag == "gated-axis":
+                    references.extend((gate.profile_mode, "Gated Axis") for gate in action.gates)
+            for mode, detail in references:
+                if is_missing(mode):
+                    location = input_location(source, source.profile_mode)
+                    record(mode, f"{location} — {detail}")
+
+        for entry in self.merge_axes:
+            mode = entry.get("mode")
+            if mode == "none" or not is_missing(mode):
+                continue
+            sources = [entry[key] for key in ("lower", "upper") if key in entry]
+            if not sources:
+                record(mode, "Merged axis mapping")
+            for source in sources:
+                guid = source["device_guid"]
+                device_name = self.getDeviceLabel(guid) or str(guid)
+                record(mode, f"{device_name}: Axis {source['axis_id']} — Merged axis mapping")
+
+        for aircraft, mode in self._simconnect_modes.items():
+            record(mode, f"SimConnect aircraft {', '.join(aircraft)}")
+        for plugin in self.plugins:
+            for instance in plugin.instances:
+                for variable in instance.variables.values():
+                    if variable.type == PluginVariableType.Mode and variable.value != "none":
+                        record(variable.value, f"Plugin {plugin.file_name}, instance {instance.name}, setting {variable.name}")
+
+        record(self.settings.startup_mode, "Profile settings startup mode")
+        record(self._start_mode, "Profile startup mode")
+        record(self._default_start_mode, "Profile default startup mode")
+        record(start_mode, "Selected runtime startup mode")
+        return {
+            mode: sorted(locations, key=str.casefold)
+            for mode, locations in sorted(missing.items(), key=lambda entry: entry[0].casefold())
+        }
+
+    def _mode_mapping_removals(self, name):
+        """Collect dependent containers, actions, and mode cycles in other mappings."""
+        removed_containers = set()
+        for _, item, container, action_set, action in self._iter_mode_mappings(exclude_mode=name):
+            if action_set is None:
+                if any(self._mode_conditions(container, name)):
+                    removed_containers.add(id(container))
+                    yield item, container, None, None, None
+                continue
+            if id(container) in removed_containers:
+                continue
+            if (
+                any(self._mode_conditions(action, name))
+                or (action.tag in ("switch-mode", "temporary-mode-switch") and action.mode == name)
+                or (action.tag == "temporary-mode-switch" and action.return_mode == name)
+                or (action.tag == "gated-axis" and any(gate.profile_mode == name for gate in action.gates))
+            ):
+                yield item, container, action_set, action, None
+            elif action.tag == "cycle-modes" and name in action.mode_list:
+                remaining = [mode for mode in action.mode_list if mode != name]
+                yield item, container, action_set, action, remaining or None
+
+    def _mode_plugin_variables(self, name):
+        for plugin in self.plugins:
+            for instance in plugin.instances:
+                for variable in instance.variables.values():
+                    if variable.type == PluginVariableType.Mode and variable.value == name:
+                        yield variable
+
+    def get_mode_removal_usage(self, name):
+        """Summarize profile references for the mode deletion confirmation."""
+        owned_items = set()
+        for device in (*self.devices.values(), *self.vjoy_devices.values()):
+            mode = device.modes.get(name)
+            if mode:
+                for items in mode.config.values():
+                    owned_items.update(id(item) for item in items.values() if item is not None and item.containers)
+        removals = list(self._mode_mapping_removals(name))
+        node = anytree.find(self._mode_tree, lambda node: node.name == name)
+        return {
+            "Inputs mapped in this mode": len(owned_items),
+            "Actions or containers elsewhere that will be removed": sum(remaining is None for *_, remaining in removals),
+            "Mode cycle lists that will be updated": sum(remaining is not None for *_, remaining in removals),
+            "Modes that inherit from this mode": len(node.children) if node else 0,
+            "Merged axis mappings": sum(mapping.get("mode") == name for mapping in self.merge_axes),
+            "SimConnect aircraft mappings": sum(mode == name for mode in self._simconnect_modes.values()),
+            "Plugin mode settings": sum(1 for _ in self._mode_plugin_variables(name)),
+            "Startup or remembered mode settings": sum(value == name for value in (
+                self.settings.startup_mode, self._start_mode, self._default_start_mode,
+                self._last_edit_mode, self._last_runtime_mode, self.override_start_mode,
+            )),
+        }
+
+    def _remove_mode_references(self, name, fallback):
+        # Remove dependent actions and containers without broadening any mode conditions.
+        affected = {}
+        for item, container, action_set, action, remaining in reversed(list(self._mode_mapping_removals(name))):
+            if action_set is None:
+                item.remove_container(container)
+            elif remaining is not None:
+                action.mode_list[:] = remaining
+            else:
+                action_set.remove_action(action)
+                affected[id(container)] = item, container
+        for item, container in affected.values():
+            if container in item.containers and not any(container.get_action_sets()):
+                item.remove_container(container)
+
+        self.merge_axes[:] = [mapping for mapping in self.merge_axes if mapping.get("mode") != name]
+        self._simconnect_modes = {aircraft: mode for aircraft, mode in self._simconnect_modes.items() if mode != name}
+        for variable in self._mode_plugin_variables(name):
+            variable.value = None
+        if self.settings.startup_mode == name:
+            self.settings.startup_mode = fallback
+        for field in ("_start_mode", "_default_start_mode", "_last_edit_mode", "_last_runtime_mode", "override_start_mode"):
+            if getattr(self, field) == name:
+                setattr(self, field, fallback)
+        if self._profile_fname and fallback:
+            config = gremlin.config.Configuration()
+            if config.get_last_edit_mode(self._profile_fname) == name:
+                config.set_last_edit_mode(self._profile_fname, fallback)
+            if config.get_last_runtime_mode(self._profile_fname) == name:
+                config.set_last_runtime_mode(self._profile_fname, fallback)
 
     def getDeviceNode(self, device_guid, autocreate=False, disconnected=False) -> ProfileDeviceNode:
         """gets a device node for this profile
@@ -4358,21 +4580,15 @@ class Profile:
         if extra_data is None:
             extra_data = {}
 
-        if fname_is_xml:
-            # fname is an xml stream
-            tree = gremlin.profile.parse_profile_xml(fname, from_memory=True)
-            root = tree.getroot()
-        else:
+        tree = gremlin.profile.parse_profile_xml(fname, from_memory=fname_is_xml)
+        root = tree.getroot()
+        if not fname_is_xml:
             profile_converter = gremlin.profile.ProfileConverter()
-
-            if not profile_converter.is_current(fname):
+            if not profile_converter.is_current(fname, root=root):
                 syslog.warning("Outdated profile, converting")
-                profile_converter.convert_profile(fname)
+                tree = profile_converter.convert_profile(fname, tree=tree)
+                root = tree.getroot()
                 profile_was_updated = True
-
-            # run integrity checks
-            tree = gremlin.profile.parse_profile_xml(fname)
-            root = tree.getroot()
 
             profile_converter.run_integrity_check(root, fname)
 
@@ -4407,7 +4623,6 @@ class Profile:
         if "force_numlock_on" in root.attrib:
             self._force_numlock_on = safe_read(root, "force_numlock_on", bool, False)
 
-        original_root = root
         root = self._bind_maestro_profile_devices(root)
 
         # settings data
@@ -4540,7 +4755,7 @@ class Profile:
             node_list = root.xpath("//devices/device/mode")
         if node_list:
             mode_nodes = node_list[0]
-            for mode_node in mode_nodes:
+            for mode_node in mode_nodes.iterchildren(tag=etree.Element):
                 mode_name = html.unescape(mode_node.get("name"))
                 # if verbose: syslog.info(f"PROFILE MODE: [{mode_name}] ")
                 if mode_name in mode_node_map:
@@ -4557,12 +4772,7 @@ class Profile:
                     if parent_mode_name in ("True", "False"):
                         parent_mode_name = None
 
-                    if parent_mode_name is not None:
-                        if parent_mode_name not in mode_node_map:
-                            tree_parent_mode = ModeNode(parent_mode_name)
-                            mode_tree_nodes[parent_mode_name] = tree_parent_mode
-
-                        mode_tree_node.parent_name = parent_mode_name
+                    mode_tree_node.parent_name = parent_mode_name
 
         # link parent nodes in the tree
         for mode_name in mode_tree_nodes:
@@ -4571,7 +4781,7 @@ class Profile:
             tree_node = mode_tree_nodes[mode_name]
             parent_name = tree_node.parent_name
             if parent_name:
-                parent_tree_node = mode_tree_nodes[parent_name]
+                parent_tree_node = mode_tree_nodes.get(parent_name, mode_tree_root)
                 tree_node.parent = parent_tree_node
             else:
                 # no parent - parent to root
@@ -4609,7 +4819,7 @@ class Profile:
                     self.vjoy_devices[dev.device_guid] = new_device
 
         # Parse merge axis entries
-        for child in root.iter("merge-axis"):
+        for child in root.findall("merge-axis"):
             self.merge_axes.append(self._parse_merge_axis(child))
 
         # Parse plugin entries
@@ -4673,8 +4883,7 @@ class Profile:
 
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
-        graph_xml = etree.tostring(root) if root is not original_root else None
-        self._profile_graph.from_xml(fname, fname_is_xml=fname_is_xml, profile_xml=graph_xml)
+        self._profile_graph.from_xml(fname, root=root)
 
         # load the mode tree
         self.reload_modes(update_devices=True)
@@ -5020,13 +5229,7 @@ class Profile:
         """gets the start mode for this profile"""
         mode = self.find_mode(self._start_mode)
         # verify the mode is in the mode list
-        if not mode:
-            modes = self.get_modes()
-            mode = modes[0]
-            self._start_mode = mode
-        if not mode:
-            return self.get_default_start_mode()
-        return mode
+        return mode or self.get_modes()[0]
 
     def set_start_mode(self, value: str):
         """sets the profile auto-activated start up mode"""
@@ -5051,14 +5254,8 @@ class Profile:
 
     def get_default_start_mode(self):
         """gets the profile's default startup mode"""
-        if not self._default_start_mode:
-            # use the default mode if not setup
-            self._default_start_mode = self.get_default_mode()
-        mode = self._default_start_mode
-        modes = self.get_modes()
-        if mode not in modes:
-            self._default_start_mode = self.get_root_mode()
-        return self._default_start_mode
+        mode = self._default_start_mode or self.get_default_mode()
+        return mode if mode in self.get_modes() else self.get_root_mode()
 
     def get_restore_mode(self) -> bool:
         """gets the start mode for this profile"""
@@ -6148,16 +6345,11 @@ class ProfileModeNode:
             self.parent = parent
 
     def getInputItem(self, input_type: InputType, input_id):
-        """gets the input item for a given entry"""
-        if input_type not in self._config:
-            self._config[input_type] = {}
-        input_id_key = self.registry.getInputIdKey(input_id)
-        if input_id_key not in self._config[input_type]:
-            # syslog.info(
-            #     f"input type: [{input_type.name}] create input id [{input_id_key}] mode node id: [{self.id}] mode name: [{self.name}]  device id: [{self.parent.id}] device name: [{self.parent.name}] profile id: [{self.profile.id}]"
-            # )
-            self._config[input_type][input_id_key] = None
-        return self._config[input_type][input_id_key]
+        """Look up an input without modifying the mode's configuration."""
+        input_items = self._config.get(input_type)
+        if input_items is None:
+            return None
+        return input_items.get(self.registry.getInputIdKey(input_id))
 
     def hasInputItems(self, has_mappings=False):
         """true if the mode node contains defined inputs

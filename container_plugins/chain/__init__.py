@@ -278,7 +278,7 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         verbose = gremlin.config.Configuration().verbose_mode_container
         if verbose:
             syslog.info(f"Chain: index {self.index}")
-        self._trigger(self.index, event, value, extra_data)
+        self._trigger(self.index, event, value, extra_data, skip_empty=True)
         # result = self.container.action_sets[self.index].process_event(event, value)
 
         if is_pressed == self.switch_on_press:

@@ -39,11 +39,11 @@ from gremlin.types import SyncMode
 import gremlin.joystick_handling
 import gremlin.event_handler
 import gremlin.raw_input
+from gremlin.remote import RemoteClientWidget
 from gremlin.ui.ui_common import (
     QDataCheckbox,
     QInfoBox,
     QSyncModeWidget,
-    RemoteClientWidget,
     getHContainer,
     getVContainer,
 )

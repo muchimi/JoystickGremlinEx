@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
 #
 # Written for Gremlin Ex by Muchimi
 # Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
@@ -1260,10 +1260,10 @@ def get_maestro_failover_devices():
     )
 
 
-def get_output_device(key):
-    """Get axis/button/hat access through the configured output backend."""
-    key = parse_virtual_device_key(key)
-    target = get_output_target(key)
+def get_output_device(key, *, target=None):
+    """Get the output backend, reusing the resolved target if supplied."""
+    if target is None:
+        target = get_output_target(parse_virtual_device_key(key))
     if target is None:
         return None
     return target.maestro if target.kind == "maestro" else VJoyProxy()[target.out_id]
@@ -3331,6 +3331,8 @@ class VjoyStart:
 
         self._axis_data = {}  # map of start profile values indexed by [vjoyid][axis] = float
         self._button_data = {}  # map of start profile buttons indexed by [vjoyid][axis] = bool
+        self._axis_routes = {}
+        self._button_routes = {}
         self._connected = False  # tracks event hook (we don't hook on init because of possible python import issue and load order)
         self._device: DeviceSummary = None  # vjoy device info
 
@@ -3346,7 +3348,7 @@ class VjoyStart:
             el.profile_started.connect(self.apply)
             self._connected = True
 
-    def setStartValue(self, device_id, id: int, value: float):
+    def setStartValue(self, device_id, id: int, value: float, *, route=None):
         """registers an axis start value"""
 
         self._ensure_device(device_id)
@@ -3357,8 +3359,13 @@ class VjoyStart:
         if vjoy_id not in self._axis_data:
             self._axis_data[vjoy_id] = {}
         self._axis_data[vjoy_id][id] = value
+        self._axis_routes[vjoy_id, id] = route
 
-    def setStartState(self, device_id, id: int, state: bool):
+    def getStartValue(self, device_id, axis_id):
+        """Return the queued profile startup value for this axis, if configured."""
+        return self._axis_data.get(parse_virtual_device_key(device_id), {}).get(axis_id)
+
+    def setStartState(self, device_id, id: int, state: bool, *, route=None):
         """registers a button start value"""
 
         self._ensure_device(device_id)
@@ -3369,6 +3376,7 @@ class VjoyStart:
         if vjoy_id not in self._button_data:
             self._button_data[vjoy_id] = {}
         self._button_data[vjoy_id][id] = state
+        self._button_routes[vjoy_id, id] = route
 
     def reset(self):
         """resets the start data"""
@@ -3376,8 +3384,10 @@ class VjoyStart:
 
     def clear(self):
         """resets the start data"""
-        self._axis_data = {}
-        self._button_data = {}
+        self._axis_data.clear()
+        self._button_data.clear()
+        self._axis_routes.clear()
+        self._button_routes.clear()
 
     def apply(self):
         import gremlin.remote
@@ -3387,16 +3397,32 @@ class VjoyStart:
             device = getDeviceFromVjoyId(key)
             for axis_id, value in axes.items():
                 if value is not None:
-                    set_axis(key, axis_id, value)
-                    if device is not None:
-                        remote_client.send_axis(key if isinstance(key, int) else device.virtual_id, axis_id, value)
+                    route = self._axis_routes.get((key, axis_id))
+                    if route is None:
+                        set_axis(key, axis_id, value)
+                        if device is not None:
+                            remote_client.send_axis(key if isinstance(key, int) else device.virtual_id, axis_id, value)
+                    else:
+                        local, remote, clients = route
+                        if local:
+                            set_axis(key, axis_id, value)
+                        if remote:
+                            remote_client.send_axis(key, axis_id, value, client_list=clients)
         for key, buttons in self._button_data.items():
             device = getDeviceFromVjoyId(key)
             for button_id, state in buttons.items():
                 state = bool(state)
-                set_button(key, button_id, state)
-                if device is not None:
-                    remote_client.send_button(key if isinstance(key, int) else device.virtual_id, button_id, state)
+                route = self._button_routes.get((key, button_id))
+                if route is None:
+                    set_button(key, button_id, state)
+                    if device is not None:
+                        remote_client.send_button(key if isinstance(key, int) else device.virtual_id, button_id, state)
+                else:
+                    local, remote, clients = route
+                    if local:
+                        set_button(key, button_id, state)
+                    if remote:
+                        remote_client.send_button(key, button_id, state, client_list=clients)
 
 
 # instance

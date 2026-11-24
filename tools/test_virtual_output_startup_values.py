@@ -109,6 +109,17 @@ class StartupOutputChecks(unittest.TestCase):
         self.assertEqual(self.axis, {("native-guid", 2): 0.6})
         self.assertEqual(self.buttons, {("native-guid", 4): True})
 
+    def test_mapping_startup_routes_to_selected_clients_only(self):
+        self.startup.setStartValue(1, 5, 0.4, route=(False, True, [20]))
+        self.startup.setStartState(1, 2, True, route=(False, True, [30]))
+        self.startup.setStartState(1, 3, True, route=(True, False, [20]))
+        self.startup.apply()
+
+        self.assertEqual(self.axis, {})
+        self.assertEqual(self.buttons, {("maestro-guid", 3): True})
+        self.remote.send_axis.assert_called_once_with(1, 5, 0.4, client_list=[20])
+        self.remote.send_button.assert_called_once_with(1, 2, True, client_list=[30])
+
     def test_disabled_and_unconfigured_axes_do_not_override_defaults(self):
         self.defaults.append((1, 5, 0.4))
         self.profile._start_state["native-guid"] = {"axis": {5: -0.7, 6: 0.8}, "enabled": {5: False}}
@@ -162,6 +173,7 @@ class MaestroSlotStartupChecks(unittest.TestCase):
                 namespace["getDeviceFromVjoyId"] = lambda key: device
                 start = namespace["VjoyStart"]()
                 start._axis_data = {}
+                start._axis_routes = start._button_routes = {}
                 start._button_data = {1: {128: True, 1: False}}
                 remote.remote_client.send_button.reset_mock()
                 with patch.dict(sys.modules, {"gremlin": services, "gremlin.event_handler": events,

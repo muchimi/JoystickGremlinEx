@@ -23,7 +23,7 @@ from pathlib import Path
 import sys
 import threading
 import time
-from types import SimpleNamespace as NS
+from types import ModuleType, SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from gremlin.axis_bump import AxisBump, output_lock
 from gremlin.input_types import InputType
 from gremlin.types import DeviceCategory, DeviceType, SyncMode, VjoyAction
 
@@ -92,8 +93,8 @@ class FailoverOutputChecks(unittest.TestCase):
         )
         self.namespace = dict(
             gremlin=services, dinput=NS(GEX_MAX_DEVICES=256), joystick_handling=self.handling, DeviceType=DeviceType,
-            InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, time=time,
-            syslog=logging.getLogger("failover-output-checks"), VJoyProxy=self.native,
+            InputType=InputType, AxisBump=AxisBump, output_lock=output_lock, VjoyAction=VjoyAction, SyncMode=SyncMode, time=time,
+            syslog=logging.getLogger("failover-output-checks"), VJoyProxy=self.native, remote_control=services.remote.remote_control,
             MessageBoxWarning=self.warning,
             getDevice=self.handling.getDevice, _output_targets={}, _output_targets_failover=None, _OUTPUT_MISSING=object(),
             _raw_vjoy_target_map={}, _maestro_failover_map={}, _maestro_devices=[],
@@ -118,7 +119,7 @@ class FailoverOutputChecks(unittest.TestCase):
         self.handling.is_vjoy_connected = lambda index: True  # Failover metadata is connected.
         load("action_plugins/map_to_vjoy/__init__.py", {"VJoyRemapFunctor"}, self.namespace, {
             "_is_maestro_target", "_output_key", "_target_device", "_is_output_connected", "_output_device",
-            "_can_broadcast", "_send_flags", "getSteppedIndexDataKey", "profile_start", "profile_mode_changed", "_set_axis", "_get_axis", "_process_event",
+            "_can_broadcast", "_send_flags", "client_list", "getSteppedIndexDataKey", "profile_start", "profile_mode_changed", "_set_axis", "_get_axis", "_bump_axis", "_process_event",
         })
         self.functor = self.namespace["VJoyRemapFunctor"]()
         f = self.functor
@@ -127,7 +128,6 @@ class FailoverOutputChecks(unittest.TestCase):
         f.input_type = InputType.JoystickButton
         f.action_mode = VjoyAction.VJoyButton
         f.vjoy_id = f.vjoy_input_id = 1
-        f.client_list = [0]
         f.remote_client = self.remote
         f.functor_complete = Mock()
         f.usage_data = NS(is_inverted=lambda *args: False)
@@ -141,6 +141,7 @@ class FailoverOutputChecks(unittest.TestCase):
         self.runner = self.namespace["CodeRunner"]()
         self.actions, self.initial_values = [], []
         self.profile = NS(
+            get_missing_mode_references=Mock(return_value={}),
             filter_actions=lambda tags, callback: [callback(action, None) for action in self.actions if action.tag in tags],
             merge_axes=[], settings=NS(
                 get_initial_vjoy_axis_value_list=lambda: self.initial_values, startup_remote_clients=None,
@@ -337,6 +338,7 @@ class FailoverOutputChecks(unittest.TestCase):
                 self.resolve_targets()
                 startup = self.namespace["VjoyStart"]()
                 startup._axis_data = {}
+                startup._axis_routes = startup._button_routes = {}
                 startup._button_data = {1: {128: True, 1: False}}
                 self.remote.reset_mock()
                 with patch.dict(sys.modules, {
@@ -415,6 +417,25 @@ class FailoverOutputChecks(unittest.TestCase):
         self.assertEqual(self.functor._get_axis(1, 1), 0.0)
         self.remote.send_axis.assert_called_once_with(1, 1, 0.75, client_list=[0], force_remote=False)
         self.native.assert_not_called()
+
+    def test_remap_remote_output_forwards_each_mappings_recipients(self):
+        event = NS(is_axis=False, force_remote=False, getInputType=lambda: InputType.JoystickHat)
+        for clients in ([0], [20, 30], []):
+            with self.subTest(clients=clients):
+                self.functor.action_data.remote_config.getClientList = lambda: clients
+                self.functor.action_data.sendFlags = lambda: (False, True)
+                self.remote.reset_mock()
+                self.functor._set_axis(1, 1, 0.75)
+                self.functor._process_event(event, NS(current=(0, 1)), None)
+                self.remote.send_axis.assert_called_once_with(1, 1, 0.75, client_list=clients, force_remote=False)
+                self.remote.send_hat.assert_called_once_with(1, 1, (0, 1), client_list=clients)
+
+                self.functor.action_data.sendFlags = lambda: (True, False)
+                self.remote.reset_mock()
+                self.functor._set_axis(1, 1, 0.75)
+                self.functor._process_event(event, NS(current=(0, 1)), None)
+                self.remote.send_axis.assert_not_called()
+                self.remote.send_hat.assert_not_called()
 
     def test_axis_access_uses_maestro_fallback(self):
         self.use_maestro()
@@ -715,6 +736,122 @@ class FailoverOutputChecks(unittest.TestCase):
         self.runner._warn_missing_virtual_outputs(profile)
         self.warning.assert_called_once()
         self.assertIn("- VJoy 1", self.warning.call_args.kwargs["prompt"])
+
+    def test_bump_axis_routes_to_native_vjoy(self):
+        self.vjoy.data["failover"] = False
+        self.vjoy.axis_id_map = {1: 1}
+        self.handling.get_axis = Mock(return_value=0.6)
+        self.assertEqual(self.target().kind, "vjoy")
+
+        self.check_axis_bump(current_value=0.6)
+
+        self.native.assert_called()
+        self.handling.get_axis.assert_called_with(self.vjoy, 1)
+
+    def test_bump_axis_routes_directly_to_maestro_without_a_vjoy_slot(self):
+        self.devices = [self.maestro]
+        self.maestro.virtual_id = 31
+        self.maestro.data["maestro_key"] = "maestro://localhost:8010/gex-32"
+        self.functor.action_data.virtual_device = self.maestro
+        self.functor.vjoy_id = self.maestro.virtual_id
+        target = self.target(self.maestro.device_guid)
+        self.assertEqual(target.kind, "maestro")
+        target._maestro = self.backend
+
+        self.check_axis_bump()
+
+        self.native.assert_not_called()
+
+    def test_bump_axis_routes_to_maestro_failover(self):
+        self.assertEqual(self.use_maestro().kind, "maestro")
+
+        self.check_axis_bump()
+
+        self.native.assert_not_called()
+
+    def check_axis_bump(self, current_value=-1.0):
+        self.functor.action_mode = VjoyAction.VJoyBumpAxis
+        self.functor.action_data.bump_offset = 0.1
+        self.functor.action_data.bump_delay_ms = 125
+        self.functor.action_data.exec_on_press = True
+        self.functor.action_data.exec_on_release = False
+        self.functor.action_data.sendFlags = lambda: (True, False)
+        self.functor._axis_bumps = {}
+        self.axis.last_output = (1.0,)
+        self.axis.set_absolute_value = Mock(side_effect=lambda value: setattr(self.axis, "last_output", (value,)))
+        read_start = self.start.getStartValue = Mock(return_value=-0.3)
+        self.namespace["joystick_handling"].VjoyStart = lambda: self.start
+        event = NS(force_remote=False, is_axis=False, is_pressed=True, getInputType=lambda: InputType.JoystickButton)
+        with patch("gremlin.axis_bump.threading.Timer") as timer:
+            def press():
+                self.functor._process_event(event, NS(), None)
+
+            press()
+            self.axis.set_absolute_value.assert_called_once_with(0.9)
+            read_start.assert_not_called()
+            delay, finish = timer.call_args.args
+            self.assertEqual(delay, 0.125)
+            finish()
+            self.axis.set_absolute_value.assert_called_with(1.0)
+
+            press()
+            old_finish = timer.call_args.args[1]
+            press()
+            new_finish = timer.call_args.args[1]
+            writes = self.axis.set_absolute_value.call_count
+            old_finish()
+            self.assertEqual(self.axis.set_absolute_value.call_count, writes)
+            new_finish()
+            self.assertEqual(self.axis.last_output, (1.0,))
+
+            press()
+            finish_pending = timer.call_args.args[1]
+            self.axis.last_output = (0.4,)
+            finish_pending()
+            self.assertEqual(self.axis.last_output, (0.4,))
+
+            self.axis.last_output = None
+            press()
+            self.assertAlmostEqual(self.axis.last_output[0], -0.2)
+            timer.call_args.args[1]()
+            self.assertEqual(self.axis.last_output, (-0.3,))
+
+            self.axis.last_output = None
+            read_start.return_value = None
+            self.axis.value = current_value
+            press()
+            expected = current_value - 0.1 if current_value >= 0 else current_value + 0.1
+            self.assertAlmostEqual(self.axis.last_output[0], expected)
+            timer.call_args.args[1]()
+            self.assertEqual(self.axis.last_output, (current_value,))
+
+            writes = self.axis.set_absolute_value.call_count
+            event.is_pressed = False
+            press()
+            self.assertEqual(self.axis.set_absolute_value.call_count, writes)
+
+    def test_missing_modes_abort_before_startup_or_graph_build(self):
+        missing = {"Deleted Mode": ["Flight Stick: Button 1", "State: Flight Check"]}
+        self.profile.get_missing_mode_references.return_value = missing
+        services = self.namespace["gremlin"]
+        services.shared_state.ui = Mock()
+        services.shared_state.profile_state = True
+        listener = Mock()
+        services.event_handler = NS(EventListener=lambda: listener, EventHandler=Mock())
+        services.execution_graph = NS(ExecutionContext=Mock())
+        self.handling.resolve_output_targets = Mock()
+        dialog = ModuleType("gremlin.ui.missing_profile_modes")
+        dialog.show_missing_profile_modes = Mock()
+        with patch.dict(sys.modules, {dialog.__name__: dialog}), self.assertLogs("failover-output-checks", "ERROR"):
+            self.assertFalse(self.runner.start({}, self.profile.settings, "Default", self.profile))
+        self.profile.get_missing_mode_references.assert_called_once_with("Default")
+        dialog.show_missing_profile_modes.assert_called_once_with(missing, parent=services.shared_state.ui)
+        listener.profile_deactivated.emit.assert_called_once()
+        listener.profile_before_start.emit.assert_not_called()
+        services.execution_graph.ExecutionContext.assert_not_called()
+        self.handling.resolve_output_targets.assert_not_called()
+        self.assertTrue(services.shared_state.profile_message_issued)
+        self.assertFalse(services.shared_state.profile_state)
 
     def test_start_refreshes_targets_then_warns_and_continues_startup(self):
         self.actions.append(self.remap(self.vjoy))

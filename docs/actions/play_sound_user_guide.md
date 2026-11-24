@@ -4,6 +4,8 @@
 
 The current action offers **Audio file**, **TTS (local)**, **AI (Edge-TTS)**, and **Stop Playback** modes. Playback uses a shared audio queue, with options for device selection, overlap, repetition, fades, silence trimming, and duplicate suppression.
 
+This guide applies to GEX m77 and later.
+
 ## Contents
 
 - [Play Sound — User Guide](#play-sound--user-guide)
@@ -60,7 +62,7 @@ The preview tests the sound configuration. Runtime playback also depends on the 
 | --- | --- | --- |
 | Audio file | An existing WAV or MP3 file. | The file remains accessible on disk. |
 | TTS (local) | Text generated using an installed operating-system voice. | A working local voice; no online synthesis service is used. |
-| AI (Edge-TTS) | Text generated through Edge-TTS, then converted to WAV. | A connection for new speech generation and a working FFmpeg conversion. |
+| AI (Edge-TTS) | Text generated through Edge-TTS, then converted to WAV. | A connection to the Internet for new speech generation and a working FFmpeg conversion. |
 | Stop Playback | Stops shared playback and clears pending audio. | No audio file. Saving/reloading this mode has a current limitation; see the behavior notes. |
 
 ### Audio file

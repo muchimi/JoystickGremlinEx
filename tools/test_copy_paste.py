@@ -265,7 +265,8 @@ load("gremlin/clipboard.py", "ObjectEncoder")
 win32clipboard = NS(CF_TEXT=1, CF_UNICODETEXT=13)
 load("gremlin/clipboard.py", "Clipboard")
 ClipboardClass = Clipboard
-module("gremlin.clipboard", Clipboard=lambda: CLIPBOARD, ObjectEncoder=ObjectEncoder, EncoderType=EncoderType)
+Clipboard = lambda: CLIPBOARD
+module("gremlin.clipboard", Clipboard=Clipboard, ObjectEncoder=ObjectEncoder, EncoderType=EncoderType)
 ObjectEncoder.__module__ = EncoderType.__module__ = "gremlin.clipboard"
 load("gremlin/plugin_manager.py", "clone_xml_for_paste")
 load("gremlin/plugin_manager.py", "discard_pasted_conditions")
@@ -442,6 +443,67 @@ class CopyPasteTests(unittest.TestCase):
         pump_until(lambda: bool(calls))
         self.assertEqual(calls, [True])
         self.assert_action_data(self.target.action_sets[0][0])
+
+    def test_action_paste_button_updates_for_actions_and_containers_when_unlocked(self):
+        selector_type = load("gremlin/input_item.py", "ActionSelector", {
+            "__init__", "_clipboard_changed", "_update_paste_button_ui", "_handle_lock_changed",
+            "_handle_lock_changed_ui",
+        })
+
+        class SelectorInput(QtCore.QObject):
+            lockedChanged = QtCore.Signal(object)
+            locked = False
+
+            def getInputType(self):
+                return 0
+
+        selector_type._action_changed = lambda self: None
+        selector_type._handle_action_list_refresh = lambda self: None
+        selector_type._handle_add_action = lambda self: None
+        selector_type._handle_paste_action = lambda self: None
+        selector_type._last_action_changed = lambda self: None
+        selector_type.refresh = lambda self: None
+        button_factory = lambda **kwargs: QtWidgets.QPushButton()
+        buttons = NS(getAddWidget=button_factory, getPasteWidget=button_factory)
+        lock_item = SelectorInput()
+        with (
+            patch.object(gremlin.input_item, "InputItem", SelectorInput),
+            patch.object(gremlin.event_handler, "EventHandler", create=True, return_value=NS(last_action_changed=Mock())),
+            patch.object(EVENTS, "request_action_list_refresh", create=True, new=Mock()),
+            patch.dict(globals(), Buttons=buttons, QDataComboBox=QtWidgets.QComboBox,
+                       getHContainer=lambda _widgets: (QtWidgets.QWidget(), None)),
+        ):
+            selector = selector_type(0, lock_item)
+        self.widgets.append(selector)
+        self.assertFalse(selector.paste_button.isEnabled())
+
+        for payload in (encoded(ACTION_XML), encoded(CONTAINER_XML, EncoderType.Container)):
+            CLIPBOARD.data = payload
+            self.assertTrue(selector.paste_button.isEnabled())
+            selector._lock_input_item.locked = True
+            CLIPBOARD.data = payload
+            self.assertFalse(selector.paste_button.isEnabled())
+            selector._lock_input_item.locked = False
+
+        CLIPBOARD.data = encoded(b"<condition/>", EncoderType.Condition)
+        self.assertFalse(selector.paste_button.isEnabled())
+
+    def test_condition_paste_button_restores_clipboard_after_editor_rebuild(self):
+        action = self.action()
+        HELPER.copy_condition(action.conditions)
+        CLIPBOARD.disable()
+        try:
+            with patch.dict(globals(), Buttons=NS(getPasteWidget=lambda *args, **kwargs: QtWidgets.QPushButton())):
+                button = HELPER.get_paste_widget(lambda: None)
+            self.widgets.append(button)
+            self.assertFalse(button.isEnabled())
+        finally:
+            CLIPBOARD.enable()
+        pump_until(button.isEnabled)
+        CLIPBOARD.data = encoded(ACTION_XML)
+        self.assertFalse(button.isEnabled())
+        HELPER.copy_condition(action.conditions[0])
+        self.assertTrue(button.isEnabled())
 
     def test_clipboard_selector_defers_deserialization(self):
         CLIPBOARD._data = encoded(ACTION_XML)

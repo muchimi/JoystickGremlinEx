@@ -20,6 +20,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 import logging
 import fnmatch
 import random
+from itertools import islice
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QModelIndex
 
@@ -2816,6 +2817,8 @@ class StateAttributeEditorWidget(QtWidgets.QWidget):
             callback=self._handle_paste, tooltip="Paste attributes from clipboard.\nThe pasted content should be text and contain one attribute per line."
         )
 
+        QtWidgets.QApplication.clipboard().dataChanged.connect(self._update_paste_button)
+
         widgets = [self._add_button, self._edit_button, self._remove_button, self._sort_button, self._clear_button, self._copy_button, self._paste_button]
         button_widget = getHContainer(widgets, widget_only=True, auto_size=True)
 
@@ -2870,16 +2873,17 @@ class StateAttributeEditorWidget(QtWidgets.QWidget):
     def _clipboard_valid(self):
         clipboard = QtWidgets.QApplication.clipboard()
         mime_data = clipboard.mimeData()
-        if not mime_data.hasText():
+        if mime_data is None or not mime_data.hasText():
             return False
         for mime_type in mime_data.formats():
             if "xml" in mime_type.lower():
                 return False
         text = mime_data.text()
         stripped_text = text.strip()
-        if stripped_text.startswith("<?xml") or stripped_text.startswith("<"):
-            return False
-        return True
+        return bool(stripped_text) and not stripped_text.startswith("<")
+
+    def _update_paste_button(self):
+        self._paste_button.setEnabled(self._clipboard_valid())
 
     def _update_buttons(self):
         selected = len(self._list.selectedItems())
@@ -2888,7 +2892,7 @@ class StateAttributeEditorWidget(QtWidgets.QWidget):
         self._edit_button.setEnabled(selected == 1)
         self._remove_button.setEnabled(selected > 0)
         self._copy_button.setEnabled(has_items)
-        self._paste_button.setEnabled(self._clipboard_valid())
+        self._update_paste_button()
         self._clear_button.setEnabled(has_items)
 
     def _add_clicked(self):
@@ -3541,6 +3545,7 @@ class StateFilterCountWidget(QtWidgets.QLabel):
         self._filter = filter
         self._prefix = prefix
         self._suffix = suffix
+        self._visible_count = None
         self.setModel(model)
 
     def setModel(self, model):
@@ -3568,6 +3573,10 @@ class StateFilterCountWidget(QtWidgets.QLabel):
         self._prefix = prefix
         self.updateCounts()
 
+    def setVisibleCount(self, count=None):
+        self._visible_count = count
+        self.updateCounts()
+
     def updateCounts(self):
         if not Shiboken.isValid(self):
             return
@@ -3575,7 +3584,9 @@ class StateFilterCountWidget(QtWidgets.QLabel):
         if model is None:
             self.setText("")
             return
-        count = model.count(filter=self._filter)  # total filtered in the model
+        count = self._visible_count
+        if count is None:
+            count = model.count(filter=self._filter)
         total = model.rows()  # total items in the model
         if total == 0:
             self.setText("")
@@ -3721,6 +3732,12 @@ class StateVisualizerWidget(AbstractPaginatedView):
     PAGE_SIZE_SETTING = "state_visualizer_page_size"
 
     def __init__(self, parent=None):
+        config = gremlin.config.Configuration()
+        self._rolling_updates = config.state_visualizer_rolling_updates
+        self._observed_states = {}
+        self._recent_states = {}  # insertion order, oldest update first
+        self._rolling_filter = set()
+
         # Keep the viewer's model independent of the States tab and its lifetime.
         profile = gremlin.shared_state.current_profile
         model = StateInputItemModel(profile, custom_load_handler=self._load_states)
@@ -3739,7 +3756,6 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
         self._widget_list = []  # list of widgets to include in max height computation
 
-        config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
 
         self._hooked = False
@@ -3764,7 +3780,11 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
         current_size = config.input_viewer_button_size
         font_sizes = (("small", 12), ("medium", 16), ("large", 20))
-        widgets = [count_widget, "|", "Button size:"]
+        self._rolling_widget = QDataCheckbox("Rolling Updates")
+        self._rolling_widget.setToolTip("Show recently changed states with the newest last.")
+        self._rolling_widget.setChecked(self._rolling_updates)
+        self._rolling_widget.toggled.connect(self._set_rolling_updates)
+        widgets = [count_widget, "|", self._rolling_widget, "|", "Button size:"]
         for label, size in font_sizes:
             rb = QDataRadioButton(label, size)
             if current_size == size:
@@ -3789,6 +3809,9 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
         self.model.applyFilter(filter=self.VISUALIZER_FILTER, emit=True)
         self._state_filter_widget.updateFilter()
+        if self._rolling_updates:
+            filtered = self.model.getFilteredItems(filter=self.VISUALIZER_FILTER)
+            self._recent_states = {state.id: state for state in islice(filtered, self.page_size) if state.value is not None}
         self.initialized = True
         self._populateState_ui()
         StateData().crud.connect(self._state_crud)
@@ -3813,6 +3836,8 @@ class StateVisualizerWidget(AbstractPaginatedView):
         self.initialized = False
         self.unhook()
         self._state_filter_widget.changed.disconnect(self._populateState_ui)  # disconnect filter change signal
+        self._observe_states(())
+        self._recent_states.clear()
         self._clear_state_buttons()
         self._pagination._cleanup_ui()
         self._state_filter_widget.setModel(None)
@@ -3822,11 +3847,31 @@ class StateVisualizerWidget(AbstractPaginatedView):
         config = gremlin.config.Configuration()
         config.changed.disconnect(self._config_changed)
 
+    def _observe_states(self, states):
+        observed = {state.id: state for state in states}
+        for state_id, state in self._observed_states.items():
+            if observed.get(state_id) is not state:
+                state.changed.disconnect(self._state_changed)
+                self._recent_states.pop(state_id, None)
+        for state_id, state in observed.items():
+            if self._observed_states.get(state_id) is not state:
+                state.changed.connect(self._state_changed)
+        self._observed_states = observed
+
     def _clear_state_buttons(self):
-        for btn in self._state_buttons.values():
-            btn.data.changed.disconnect(self._state_changed)
         self._state_buttons.clear()
         gremlin.util.clear_layout(self._button_layout)
+
+    @QtCore.Slot(bool)
+    def _set_rolling_updates(self, enabled):
+        self._rolling_updates = enabled
+        self._recent_states = {button.data.id: button.data for button in self._state_buttons.values()} if enabled else {}
+        gremlin.config.Configuration().state_visualizer_rolling_updates = enabled
+        self._populateState_ui()
+
+    @property
+    def page_count(self) -> int:
+        return 1 if self._rolling_updates else super().page_count
 
     @QtCore.Slot()
     def _font_size_cb(self):
@@ -3905,12 +3950,19 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
         self._clear_state_buttons()
         self._pagination.refresh()
-        start, end = self.pageRange()
 
         state_count = self.unfilteredCount()
-        has_states = state_count > 0  # has states
-
+        has_states = state_count > 0
         self._state_filter_widget.setVisible(has_states)
+
+        if self._rolling_updates:
+            self._observe_states(self.model.getUnfilteredItems())
+            self._rolling_filter = {state.id for state in self.model.getFilteredItems(filter=self.VISUALIZER_FILTER)}
+            self._render_rolling_states()
+            return
+
+        self._state_filter_widget.count_widget.setVisibleCount()
+        start, end = self.pageRange()
         if verbose:
             syslog.info(f"viewer state: {end - start} items on this page, total states: {state_count}")
 
@@ -3928,8 +3980,6 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
                 layout.addWidget(btn)
 
-                state.changed.connect(self._state_changed)
-
                 if state.key in self._state_buttons:
                     # remove the prior button reference
                     gremlin.util.delete_widget(self._state_buttons[state.key])
@@ -3942,6 +3992,37 @@ class StateVisualizerWidget(AbstractPaginatedView):
             widget = QWarningWidget(stub, icon=icon)
             layout.addWidget(widget)
 
+        self._observe_states(btn.data for btn in self._state_buttons.values())
+        self.updateLayout()
+
+    def _render_rolling_states(self, changed=None):
+        recent = (state for state_id, state in reversed(self._recent_states.items()) if state_id in self._rolling_filter)
+        visible = list(islice(recent, self.page_size))[::-1]
+        self._state_filter_widget.count_widget.setVisibleCount(len(visible))
+
+        layout = self._button_layout
+        if not visible:
+            text = "No state updates yet" if self.unfilteredCount() else "No states available"
+            layout.addWidget(QWarningWidget(text, icon=Icons.warningIcon(Color().yellowColor())))
+        else:
+            if not self._state_buttons:
+                gremlin.util.clear_layout(layout)  # remove the empty message
+            previous = self._state_buttons
+            self._state_buttons = {}
+            for state in visible:
+                button = previous.pop(state.key, None)
+                if button is None:
+                    button = StateRepeaterButton(state, callback=self._state_toggle)
+                else:
+                    layout.removeWidget(button)
+                    if state is changed:
+                        button.setState(state.value)
+                layout.addWidget(button)
+                self._state_buttons[state.key] = button
+            for button in previous.values():
+                layout.removeWidget(button)
+                button.hide()
+                button.deleteLater()
         self.updateLayout()
 
     def updateLayout(self):
@@ -3959,6 +4040,18 @@ class StateVisualizerWidget(AbstractPaginatedView):
 
     def _state_changed_ui(self, state):
         """called on state changes"""
+        if not self.initialized or self._observed_states.get(state.id) is not state:
+            return
+        if self._rolling_updates:
+            self._recent_states.pop(state.id, None)
+            self._recent_states[state.id] = state
+            if state.id in self._rolling_filter:
+                last_button = next(reversed(self._state_buttons.values()), None)
+                if last_button is not None and last_button.data is state:
+                    last_button.setState(state.value)
+                else:
+                    self._render_rolling_states(changed=state)
+            return
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose:
             syslog.info(f"State Visualizer: state {state.key} changed {state.value}")

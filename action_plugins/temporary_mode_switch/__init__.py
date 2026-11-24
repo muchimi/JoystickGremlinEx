@@ -128,20 +128,26 @@ class TemporaryModeSwitchWidget(gremlin.input_item.AbstractActionWidget):
                     if select_index is None and mode == current_mode and current_mode is not None:
                         select_index = index
                     index += 1
+                if current_mode and select_index is None:
+                    if current_mode not in gremlin.shared_state.current_profile.get_mode_map():
+                        self.mode_selector_widget.addItem(f"{current_mode} (missing)", current_mode)
+                        select_index = self.mode_selector_widget.count() - 1
                 if select_index is not None:
                     self.mode_selector_widget.setCurrentIndex(select_index)
 
-                if self.action_data.enable_return_mode and self.action_data.return_mode:
-                    # select the correct return mode if specified
-                    index = self.return_mode_selector_widget.findData(self.action_data.return_mode)
+                return_mode = self.action_data.return_mode
+                if self.action_data.enable_return_mode and return_mode:
+                    index = self.return_mode_selector_widget.findData(return_mode)
+                    if index == -1 and return_mode not in gremlin.shared_state.current_profile.get_mode_map():
+                        self.return_mode_selector_widget.addItem(f"{return_mode} (missing)", return_mode)
+                        index = self.return_mode_selector_widget.count() - 1
                     if index != -1:
                         self.return_mode_selector_widget.setCurrentIndex(index)
 
         self.return_mode_selector_widget.setEnabled(self.action_data.enable_return_mode)
 
-        # ensure the displayed mode is saved
-        mode = self.mode_selector_widget.currentData()
-        self.action_data.mode = mode
+        if not current_mode:
+            self.action_data.mode = self.mode_selector_widget.currentData()
 
     def _mode_selected_changed(self):
         if not Shiboken.isValid(self.mode_selector_widget):

@@ -34,12 +34,15 @@ from gremlin.device_remap import (
     suggest_target,
 )
 from gremlin.ui.ui_common import (
+    Color,
     MessageBoxYesNo,
     QDataCheckbox,
     QDataPushButton,
     QHtmlDataComboBox,
     QInfoBox,
     QRememberDialog,
+    QRoundedGroupBox,
+    QWarningWidget,
     getHContainer,
 )
 
@@ -109,15 +112,11 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         sections = QtWidgets.QVBoxLayout(content)
 
         # input grid
-        input_section = QtWidgets.QGroupBox("Input devices")
+        accent = Color().groupBoxGreenColor()
+        grid = QtWidgets.QGridLayout()
+        input_section = QRoundedGroupBox("Input devices", color=accent, layout=grid)
         input_section.setObjectName("inputDevices")
-        accent = "#0f8633" if dark else "#0e5016"
-        input_section.setStyleSheet(
-            f"QGroupBox#inputDevices {{ border: 1px solid {accent}; border-radius: 4px; margin-top: 10px; padding-top: 12px; }}"
-            f"QGroupBox#inputDevices::title {{ color: {accent}; subcontrol-origin: margin; left: 10px; padding: 0 4px; }}"
-        )
-        grid = QtWidgets.QGridLayout(input_section)
-        for column, title in enumerate(("Status", "Apply", "Profile device / old GUID", "Connected device / new GUID")):
+        for column, title in enumerate(("Status", "Select", "Profile device / old GUID", "Connected device / new GUID")):
             grid.addWidget(QtWidgets.QLabel(title), 0, column)
         sources = [node for node in self._root.findall("./devices/device") if node.get("type", "").casefold() == "joystick"]
         if saved_root is not None:
@@ -144,15 +143,10 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         grid.setColumnStretch(3, 1)
         sections.addWidget(input_section)
         input_section.setVisible(not startup or bool(self._rows))
-        output_section = QtWidgets.QGroupBox("Output devices")
+        output_grid = QtWidgets.QGridLayout()
+        output_section = QRoundedGroupBox("Output devices", layout=output_grid)
         output_section.setObjectName("outputDevices")
-
-        accent = "#78c5ff" if dark else "#075a9c"
-        output_section.setStyleSheet(
-            f"QGroupBox#outputDevices {{ border: 1px solid {accent}; border-radius: 4px; margin-top: 10px; padding-top: 12px; }}"
-            f"QGroupBox#outputDevices::title {{ color: {accent}; subcontrol-origin: margin; left: 10px; padding: 0 4px; }}"
-        )
-        output_grid = QtWidgets.QGridLayout(output_section)
+        accent = output_section.color
         for column, title in enumerate(("Status", "Apply", "Output device / saved identity", "Target output device")):
             output_grid.addWidget(QtWidgets.QLabel(title), 0, column)
         output_targets = sorted(
@@ -190,10 +184,14 @@ class ProfileDeviceRemapDialog(QRememberDialog):
         sections.addStretch()
         scroll.setWidget(content)
         layout.addWidget(scroll)
+        self._no_selection = QWarningWidget("No devices selected.")
+        self._no_selection.setVisible(False)
+        layout.addWidget(self._no_selection)
         self._status = QtWidgets.QLabel()
         self._status.setWordWrap(True)
         self._status.setTextFormat(QtCore.Qt.TextFormat.PlainText)
         layout.addWidget(self._status)
+        layout.addWidget(self._no_selection)
         self._apply_button = QDataPushButton("Apply and Reload")
         self._apply_button.clicked.connect(self._apply_confirmation)
         cancel = QDataPushButton("Cancel")
@@ -367,6 +365,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
             if root is None:
                 self._status.setText(self._validation_message)
                 self._apply_button.setEnabled(False)
+                self._no_selection.setVisible(True)
                 return
             count = sum(check.isChecked() for _, check, _ in self._rows)
             self._status.setText(
@@ -375,6 +374,7 @@ class ProfileDeviceRemapDialog(QRememberDialog):
                 + ("\n" + "\n".join(self._output_changes) if self._output_changes else "")
             )
             self._apply_button.setEnabled(True)
+            self._no_selection.setVisible(count == 0)
 
     def _apply(self, result):
         if not result:

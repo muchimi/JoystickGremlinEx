@@ -176,6 +176,18 @@ class CodeRunner:
         el = gremlin.event_handler.EventListener()
         gremlin.shared_state.profile_message_issued = False
 
+        missing_modes = profile.get_missing_mode_references(start_mode)
+        if missing_modes:
+            from gremlin.ui.missing_profile_modes import show_missing_profile_modes
+
+            for mode, locations in missing_modes.items():
+                syslog.error("Profile start aborted: mode %r is missing. Referenced by: %s", mode, "; ".join(locations))
+            gremlin.shared_state.profile_message_issued = True
+            gremlin.shared_state.profile_state = False
+            el.profile_deactivated.emit()
+            show_missing_profile_modes(missing_modes, parent=gremlin.shared_state.ui)
+            return False
+
         # automatic failover for virtual output devices
         # build a cache of resolved failovers based on current configuration
         # this enables missing vjoy devices to output to maestro devices if they exist

@@ -8249,7 +8249,8 @@ class ActionSelector(QtWidgets.QWidget):
 
         self._cleaned = False
         self._input_item = input_item
-        self._input_item.lockedChanged.connect(self._handle_lock_changed)
+        self._lock_input_item = input_item
+        input_item.lockedChanged.connect(self._handle_lock_changed)
         # self._input_type = input_type if input_type else self._input_item.getInputType()
         self._input_type = self._input_item.getInputType()
         self._callback_pasted = callback_paste
@@ -8269,7 +8270,6 @@ class ActionSelector(QtWidgets.QWidget):
         # clipboard
         self.paste_button = Buttons.getPasteWidget(callback=self._handle_paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.paste_button.setToolTip("Paste Action")
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -8296,7 +8296,11 @@ class ActionSelector(QtWidgets.QWidget):
 
         self._container = None
 
-        self._handle_lock_changed_ui(self._input_item)  # initial lock state
+        clipboard = Clipboard()
+        clipboard.clipboard_changed.connect(self._clipboard_changed)
+        self._handle_lock_changed_ui(input_item)
+        if not clipboard.enabled:
+            QtCore.QTimer.singleShot(0, self, lambda: self._update_paste_button_ui(clipboard))
 
     def registerCallback(self, callback: Callable):
         """registers a change callback"""
@@ -8322,10 +8326,12 @@ class ActionSelector(QtWidgets.QWidget):
         if self._cleaned:
             return
         self._cleaned = True
+        Clipboard().clipboard_changed.disconnect(self._clipboard_changed)
         try:
-            self._input_item.lockedChanged.disconnect(self._handle_lock_changed)
+            self._lock_input_item.lockedChanged.disconnect(self._handle_lock_changed)
         except (AttributeError, RuntimeError, TypeError):
             pass
+        self._lock_input_item = None
         el = gremlin.event_handler.EventListener()
         try:
             el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
@@ -8363,7 +8369,7 @@ class ActionSelector(QtWidgets.QWidget):
         if Shiboken.isValid(self.add_button) and Shiboken.isValid(self.paste_button):
             unlocked = not input_item.locked
             self.add_button.setEnabled(unlocked)
-            self.paste_button.setEnabled(unlocked)
+            self._update_paste_button_ui(Clipboard())
 
     def refresh(self):
         """reloads the selector based on the input"""
@@ -8546,13 +8552,24 @@ class ActionSelector(QtWidgets.QWidget):
             )
 
     def _clipboard_changed(self, clipboard):
-        """handles paste button state based on clipboard data"""
-        self.paste_button.setEnabled(clipboard.is_action)
-        """ updates the paste button tooltip with the current clipboard contents"""
-        if clipboard.is_action:
-            self.paste_button.setToolTip(f"Paste action ({clipboard.data.name})")
-        else:
-            self.paste_button.setToolTip("Paste action (not available)")
+        if not self._cleaned:
+            gremlin.util.InvokeUiMethod(self._update_paste_button_ui, clipboard)
+
+    def _update_paste_button_ui(self, clipboard):
+        if self._cleaned or not Shiboken.isValid(self) or not Shiboken.isValid(self.paste_button):
+            return
+        if not Shiboken.isValid(self._lock_input_item):
+            self.paste_button.setEnabled(False)
+            return
+        data = clipboard.data
+        tooltip = None
+        if data is not None and clipboard.is_action:
+            tooltip = f"Paste action ({data.name})"
+        elif isinstance(data, ObjectEncoder) and clipboard.is_container:
+            # The action paste reader can extract actions from copied containers.
+            tooltip = "Paste actions from copied containers"
+        self.paste_button.setEnabled(tooltip is not None and not self._lock_input_item.locked)
+        self.paste_button.setToolTip(tooltip or "Paste action (not available)")
 
 
 class ContainerSelector(QtWidgets.QWidget):
@@ -8603,6 +8620,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.copy_button_widget = Buttons.getCopyWidget(callback=self._copy_container, tooltip="Copy container(s)")
         self.paste_button_widget = Buttons.getPasteWidget(callback=self._paste_container, tooltip="Paste container(s)")
         self.paste_button_widget.data = self.data  # input item doing the paste
+        Clipboard().clipboard_changed.connect(self._clipboard_changed)
 
         # delete all containers
         self.delete_button = Buttons.getDeleteWidget(
@@ -8653,7 +8671,7 @@ class ContainerSelector(QtWidgets.QWidget):
             unlocked = not input_item.locked
             self._update_template_controls_ui()
             self.add_container_widget.setEnabled(unlocked)
-            self.paste_button_widget.setEnabled(unlocked and Clipboard().is_container)
+            self._update_paste_button_ui(Clipboard())
             self.delete_button.setEnabled(unlocked)
 
     def refresh(self, input_item):
@@ -8735,10 +8753,15 @@ class ContainerSelector(QtWidgets.QWidget):
             )
 
     def _clipboard_changed(self, clipboard):
-        """handles paste button state based on clipboard data"""
-        self.paste_button_widget.setEnabled(not self.data.locked and clipboard.is_container)
-        """ updates the paste button tooltip with the current clipboard contents"""
-        if clipboard.is_container:
+        gremlin.util.InvokeUiMethod(self._update_paste_button_ui, clipboard)
+
+    def _update_paste_button_ui(self, clipboard):
+        """Update Paste Container from the clipboard and the mapping lock."""
+        if not Shiboken.isValid(self):
+            return
+        has_container = clipboard.is_container
+        self.paste_button_widget.setEnabled(not self.data.locked and has_container)
+        if has_container:
             self.paste_button_widget.setToolTip(f"Paste container ({clipboard.data.name})")
         else:
             self.paste_button_widget.setToolTip("Paste container (not available)")
@@ -11432,6 +11455,32 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 class ConditionHelper:
     """helper class to manipulate conditions"""
 
+    _clipboard_tags = {
+        EncoderType.Condition: "condition",
+        EncoderType.ActivationCondition: "activation-condition",
+    }
+
+    @classmethod
+    def get_paste_widget(cls, callback):
+        button = Buttons.getPasteWidget("Paste Condition", callback=callback)
+        clipboard = Clipboard()
+
+        def update_button(current_clipboard):
+            if Shiboken.isValid(button):
+                data = current_clipboard.data
+                button.setEnabled(isinstance(data, ObjectEncoder) and data.encoder_type in cls._clipboard_tags)
+
+        def clipboard_changed(current_clipboard):
+            gremlin.util.InvokeUiMethod(update_button, current_clipboard)
+
+        clipboard.clipboard_changed.connect(clipboard_changed)
+        button.destroyed.connect(lambda: clipboard.clipboard_changed.disconnect(clipboard_changed))
+        update_button(clipboard)
+        if not clipboard.enabled:
+            # Action editors can be built while clipboard access is suspended.
+            QtCore.QTimer.singleShot(0, button, lambda: update_button(clipboard))
+        return button
+
     def __init__(self):
         el = gremlin.event_handler.EventListener()
         el.paste_condition.connect(self.paste_condition)
@@ -11458,7 +11507,7 @@ class ConditionHelper:
         input_item = container.input_item
         if input_item is None or not isinstance(oc, ObjectEncoder):
             return False
-        expected_tag = {EncoderType.Condition: "condition", EncoderType.ActivationCondition: "activation-condition"}.get(oc.encoder_type)
+        expected_tag = self._clipboard_tags.get(oc.encoder_type)
         if expected_tag is None:
             return False
 
@@ -11700,7 +11749,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.vjoy_selector.set_selection(self.condition.input_type, key, self.condition.input_id)
 
         self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
-        self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+        self.paste_widget = ConditionHelper().get_paste_widget(self._paste_condition)
 
         self.record_button_widget = Buttons.getEditWidget(label="Listen", callback=self._request_user_input)
         self.delete_button_widget = Buttons.getDeleteWidget(
@@ -11978,7 +12027,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
         self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
 
         self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
-        self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+        self.paste_widget = ConditionHelper().get_paste_widget(self._paste_condition)
 
         self.state_dropdown = QDataComboBox()
         self.state_dropdown.addItem("Pressed")
@@ -12101,7 +12150,7 @@ class ConditionView(AbstractView):
         self.controls_layout.addWidget(self.help_button)
 
         copy_widget = Buttons.getCopyWidget(callback=self._copy_condition)
-        paste_widget = Buttons.getPasteWidget(callback=self._paste_condition)
+        paste_widget = ConditionHelper().get_paste_widget(self._paste_condition)
 
         self.controls_layout.addWidget(copy_widget)
         self.controls_layout.addWidget(paste_widget)

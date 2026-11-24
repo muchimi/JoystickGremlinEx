@@ -1381,6 +1381,7 @@ class VjoyAction(enum.Enum):
     VJoyButtonInverted = 24  # hold state (inverted = off means pressed, on means released)
     VJoyHatPress = 25  # hat press mode
     VJoyHatPulse = 26  # hat pulse mode
+    VJoyBumpAxis = 27  # pulse and restore the intended axis output
 
     @staticmethod
     def is_button_action(mode):
@@ -1401,6 +1402,7 @@ class VjoyAction(enum.Enum):
         return mode in (
             VjoyAction.VJoyAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyRangeAxis,
             VjoyAction.VJoyMergeAxis,
@@ -1465,6 +1467,8 @@ class VjoyAction(enum.Enum):
                 return "Pulse the vjoy button for a given duration"
             case VjoyAction.VJoySetAxis:
                 return "Sets the vjoy axis to a specific value (-1..+1)"
+            case VjoyAction.VJoyBumpAxis:
+                return "Momentarily changes the virtual axis and restores its intended value to force a target application re-read"
             case VjoyAction.VJoyToggle:
                 return "Toggles the vjoy button state"
             case VjoyAction.VJoyRangeAxis:
@@ -1530,6 +1534,8 @@ class VjoyAction(enum.Enum):
                 return "Button (Pulse)"
             case VjoyAction.VJoySetAxis:
                 return "Set Fixed Axis Value"
+            case VjoyAction.VJoyBumpAxis:
+                return "Bump Axis"
             case VjoyAction.VJoyToggle:
                 return "Button (Toggle)"
             case VjoyAction.VJoyRangeAxis:

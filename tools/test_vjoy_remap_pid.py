@@ -83,7 +83,11 @@ joystick_handling = NS(
 gremlin = NS(pid=NS(PIDAxisTransition=PIDAxisTransition), util=NS(clamp=lambda value, low=-1.0, high=1.0: max(low, min(high, value))), joystick_handling=joystick_handling, remote=NS(remote_control=remote_control), config=NS(Configuration=lambda: NS(verbose_mode_outputs=False, verbose_mode_vjoy=False)), keyboard=NS(sort_keys=lambda keys: keys), shared_state=NS(keyboard_tab_guid='keyboard'))
 namespace = dict(enum=enum, threading=threading, time=time, math=math, gremlin=gremlin, joystick_handling=joystick_handling, remote_control=remote_control, InputType=InputType, VjoyAction=VjoyAction, SyncMode=SyncMode, ButtonOutputMode=ButtonOutputMode, syslog=logging.getLogger('pid-check'), VJoyRemapWidget=NS(input_type_buttons=[InputType.JoystickButton, InputType.Keyboard, InputType.KeyboardLatched]))
 namespace['ActionDataFixture'] = ActionDataFixture
-code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), encoder, *classes, action_fixture], type_ignores=[])
+pid_constants = [
+    node for node in module.body if isinstance(node, ast.Assign)
+    and any(isinstance(target, ast.Name) and target.id == "_PID_MIN_DURATION" for target in node.targets)
+]
+code = ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), *pid_constants, encoder, *classes, action_fixture], type_ignores=[])
 exec(compile(ast.fix_missing_locations(code), str(source), 'exec'), namespace)
 Functor, StepMode = namespace['VJoyRemapFunctor'], namespace['StepMode']
 CheckActionData = namespace['CheckActionData']
@@ -104,10 +108,12 @@ class PIDChecks(unittest.TestCase):
         f.action_mode = VjoyAction.VJoySetAxisStepped
         f.input_item, f.device = NS(identifier=1), device
         f.action_data = CheckActionData(input_item=f.input_item, step_mode=mode or StepMode.PID, _stepped_latched=True, latched_input_type=InputType.JoystickButton, stepped_device_guid='secondary', stepped_input_type=InputType.JoystickButton, stepped_input_id=2, stepped_hat_direction=(0, 1), target_step_direction=1, exec_on_press=True, exec_on_release=False, pid_step=0.1, pid_response_time=0.05, pid_acceleration=acceleration, pid_accel_multiplier=4.0, pid_accel_start_hz=2.0, pid_accel_full_hz=12.0, pid_accel_curve=2.0, pid_accel_timeout=0.75, axis_start_value=0.0, axis_last_value=0.0, curve_data=None, target_step_auto=False, target_step_start_index=2, target_step_list=[-1.0, -0.5, 0.0, 0.5, 1.0], sync_mode=SyncMode.Default, sendFlags=lambda: (True, False), remote_config=NS(getClientList=lambda: [0]), vjoy_id=1, vjoy_input_id=1, hardware_device_guid='primary', hardware_input_id=1, hardware_raw_input_type=InputType.JoystickButton)
+        f.action_data.pid_gains = PIDAxisTransition.DEFAULT_GAINS
         f._pid_axis_condition = threading.Condition()
         f._pid_axis = f._pid_axis_thread = f._pid_accelerator = None
         f._pid_axis_stopping = True
         f._pid_force_remote = False
+        f._fixed_pid_deadline = None
         f.outputs, f.completed = [], threading.Event()
         f.functor_complete = NS(emit=f.completed.set)
         f._get_axis = lambda *args: axis.value
@@ -117,6 +123,88 @@ class PIDChecks(unittest.TestCase):
         f._set_axis = output
         self.addCleanup(f._stop_pid_axis)
         return f
+
+    def make_fixed_functor(self, target, duration=0.12, enabled=True):
+        f = self.make_functor()
+        f.action_mode = VjoyAction.VJoySetAxis
+        f.target_value = target
+        f.target_value_valid = True
+        f.action_data.target_use_last = False
+        f.action_data.use_relative_value = False
+        f.action_data.fixed_pid_enabled = enabled
+        f.action_data.fixed_pid_duration = duration
+        f._pid_axis_stopping = False
+        return f
+
+    def test_fixed_pid_runs_from_live_output_and_lands_on_curved_target_at_duration(self):
+        f = self.make_fixed_functor(0.8)
+        f.action_data.curve_data = NS(curve_value=lambda position: position * 0.5)
+        axis.value = -0.5
+        started = time.monotonic()
+        f.process_event(event(force_remote=True), NS(current=True, raw=True))
+
+        self.assertTrue(f.completed.wait(2.0))
+        self.assertGreaterEqual(time.monotonic() - started, f.action_data.fixed_pid_duration)
+        self.assertTrue(any(-0.5 < value < 0.4 for value, _ in f.outputs[:-1]))
+        self.assertTrue(all(force_remote for _, force_remote in f.outputs))
+        self.assertEqual(f.outputs[-1], (0.4, True))
+        self.assertEqual(f.action_data.axis_last_value, 0.4)
+
+    def test_auto_fixed_pid_settles_without_a_deadline_and_releases_the_axis(self):
+        f = self.make_fixed_functor(0.7, duration=0.0)
+        axis.value = -0.4
+        with f._pid_axis_condition:
+            f.process_event(event(), NS(current=True, raw=True))
+            self.assertIsNone(f._fixed_pid_deadline)
+            self.assertEqual(f._pid_axis.response_time, namespace["_PID_MIN_DURATION"])
+
+        self.assertTrue(f.completed.wait(2.0))
+        self.assertTrue(any(-0.4 < value < 0.7 for value, _ in f.outputs[:-1]))
+        self.assertEqual(axis.value, 0.7)
+        self.assertNotIn(f._fixed_pid_key(), device.data)
+
+    def test_fixed_pid_uses_tuned_gains_and_eases_into_deadline(self):
+        f = self.make_fixed_functor(0.8, duration=0.25)
+        f.action_data.pid_gains = (0.01, 0.0, 0.15)
+        with f._pid_axis_condition:
+            f.process_event(event(), NS(current=True, raw=True))
+            self.assertEqual(f._pid_axis.controller.tunings, f.action_data.pid_gains)
+
+        self.assertTrue(f.completed.wait(2.0))
+        values = [value for value, _ in f.outputs]
+        self.assertEqual(values[-1], 0.8)
+        self.assertTrue(any(0.4 < value < 0.8 for value in values))
+        self.assertEqual(sorted(values), values)
+
+    def test_stepped_pid_uses_tuned_gains(self):
+        for mode in (StepMode.PID, StepMode.SteppedPID):
+            with self.subTest(mode=mode):
+                f = self.make_functor(mode)
+                f.action_data.pid_gains = (6.0, 1.0, 0.1)
+                f.profile_start()
+                self.assertEqual(f._pid_axis.controller.tunings, f.action_data.pid_gains)
+
+    def test_new_fixed_command_supersedes_earlier_transition_on_same_axis(self):
+        earlier = self.make_fixed_functor(0.9, duration=0.4)
+        later = self.make_fixed_functor(-0.75, enabled=False)
+        earlier.process_event(event(), NS(current=True, raw=True))
+        later.process_event(event(), NS(current=True, raw=True))
+
+        self.assertFalse(earlier.completed.wait(0.5))
+        self.assertEqual(axis.value, -0.75)
+        self.assertEqual(later.outputs, [(-0.75, False)])
+
+    def test_stop_cancels_fixed_transition_and_ignores_later_triggers(self):
+        f = self.make_fixed_functor(0.8, duration=0.4)
+        f.process_event(event(), NS(current=True, raw=True))
+        f._stop_pid_axis()
+        count = len(f.outputs)
+        f.process_event(event(), NS(current=True, raw=True))
+
+        self.assertIsNone(f._pid_axis_thread)
+        self.assertNotIn(f._fixed_pid_key(), device.data)
+        self.assertEqual(len(f.outputs), count)
+        self.assertFalse(f.completed.is_set())
 
     def test_profile_start_initializes_both_pid_modes(self):
         for mode in (StepMode.PID, StepMode.SteppedPID):

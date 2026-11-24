@@ -39,11 +39,12 @@ import test_remote
 import test_vjoy
 from test_qt_marshalling import APP, Colors, flush_deletes, pump_until
 from gremlin import maestro_identity
+from gremlin.axis_bump import output_lock
 from gremlin.types import CallbackMode, EventSourceType, HatDirection, VisualizationType, VjoyAction
 
 
 macro = outputs.macro
-ENV = dict(outputs.ENV, math=math, struct=struct, threading=threading, time=time,
+ENV = dict(outputs.ENV, math=math, struct=struct, threading=threading, time=time, output_lock=output_lock,
            CallbackMode=CallbackMode, EventSourceType=EventSourceType, HatDirection=HatDirection,
            VisualizationType=VisualizationType, Callable=Callable, Qt=QtCore.Qt,
            QWidget=QtWidgets.QWidget, QtGui=QtGui, VjoyAction=VjoyAction)
@@ -201,7 +202,7 @@ class MaestroRepeaterTests(unittest.TestCase):
         self.service.enabled, self.service._lock, self.service._stopping = True, threading.RLock(), threading.Event()
         self.service.client = NS(write=Mock())
         controller = NS(id="gex-1", key="controller-1", axis_count=2, button_count=40, hat_count=2, axis_names=["X", "Y"],
-                        instance_token=None, profile=NS(VendorId=1, ProductId=0x4701))
+                        instance_token=None, profile=NS(VendorId=1, ProductId=0x4701), last_axis_outputs={})
         self.service._controller_map = {1: controller}
         self.service._active_service_devices = {}
         self.service._native_gamepad_inputs = []

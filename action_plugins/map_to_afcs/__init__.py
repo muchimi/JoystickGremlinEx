@@ -27,9 +27,7 @@ import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
-from gremlin.ui.ui_common import (
-    RemoteClientWidget,
-)
+from gremlin.remote import RemoteClientWidget
 
 syslog = logging.getLogger("system")
 

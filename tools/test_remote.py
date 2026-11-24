@@ -54,6 +54,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from gremlin.types import DeviceType, GamePadOutput, MouseButton, VjoyAction  # noqa: E402
+from gremlin.axis_bump import output_lock  # noqa: E402
 from gremlin.error import VJoyError  # noqa: E402
 from gremlin.input_types import InputType  # noqa: E402
 from gremlin.network import REMOTE_CONTROL_MULTICAST_GROUP  # noqa: E402
@@ -84,10 +85,11 @@ def load_remote(source=None):
     services = NS(singleton_decorator=NS(SingletonDecorator=lambda cls: cls))
     namespace = dict(
         gremlin=services, socket=socket, socketserver=socketserver, queue=queue, contextmanager=contextmanager,
-        threading=threading, struct=struct, time=time, uuid=uuid, enum=enum,
+        threading=threading, struct=struct, time=time, uuid=uuid, enum=enum, output_lock=output_lock,
         msgpack=msgpack, DeviceType=DeviceType, GamePadOutput=GamePadOutput, MouseButton=MouseButton, VJoyError=VJoyError,
         QtCore=QtCore, QtWidgets=QtWidgets, Signal=Signal, VjoyAction=VjoyAction,
         ipaddress=ipaddress, json=json, re=re, Path=Path, tempfile=tempfile, ElementTree=etree,
+        safe_format=lambda value, kind, **kwargs: str(kind(value)),
         safe_read=lambda node, attr, kind, default: (
             (node.get(attr).casefold() == "true" if kind is bool else kind(node.get(attr)))
             if attr in node.attrib else default
@@ -206,6 +208,7 @@ class RemoteChecks(unittest.TestCase):
         client._sock = MemorySocket()
         client._socket_lock = threading.RLock()
         client._socket_settings = (6012, "127.0.0.1", True)
+        client._last_axis_outputs = {}
         client._callbacks_lock = threading.Lock()
         client._address = ("224.3.29.72", 6012)
         client._started = False
@@ -695,6 +698,47 @@ class RemoteChecks(unittest.TestCase):
         self.axes[6].value = 0.0
         self.transfer(receiver=other)
         self.assertEqual(self.axes[6].value, 0.75)
+
+    def test_mapping_checklist_routes_virtual_outputs_by_name_or_ip(self):
+        control = self.make_master()
+        self.register_peer(20, "left-pc", "192.0.2.20")
+        self.register_peer(30, "right-pc", "192.0.2.30")
+        self.register_peer(40, "middle-pc", "192.0.2.40")
+        self.ns["remote_control"] = control
+        routing = self.ns["RemoteConfig"]()
+        routing.isCustom = True
+        routing.mappingClientSelectionEnabled = True
+        for selected, expected in (
+            (frozenset(), [0]),
+            (frozenset({"left-pc", "192.0.2.30"}), [20, 30]),
+            (frozenset({"offline-pc"}), []),
+        ):
+            with self.subTest(selected=selected):
+                routing.mappingClientSelection = selected
+                saved = routing.to_xml()
+                restored = self.ns["RemoteConfig"]()
+                restored.from_xml(saved)
+                self.assertTrue(restored.mappingClientSelectionEnabled)
+                self.assertEqual(restored.mappingClientSelection, selected)
+                self.assertEqual(restored.getClientList(), expected)
+                self.sender._sock.packets.clear()
+                self.sender.send_axis(1, 6, 0.5, client_list=restored.getClientList())
+                self.sender.send_button(1, 1, True, client_list=restored.getClientList())
+                self.sender.send_hat(1, 1, (0, 1), client_list=restored.getClientList())
+                self.assertEqual([msgpack.unpackb(packet)["to"] for packet in self.sender._sock.packets], expected * 3)
+
+        routing.mappingClientSelection = frozenset({"left-pc", "192.0.2.30"})
+        control.setActiveClients(frozenset({"right-pc", "middle-pc"}))
+        self.sender._sock.packets.clear()
+        self.sender.send_axis(1, 6, 0.8, client_list=routing.getClientList())
+        self.assertEqual([msgpack.unpackb(packet)["to"] for packet in self.sender._sock.packets], [30])
+
+        routing.mappingClientSelectionEnabled = False
+        restored = self.ns["RemoteConfig"]()
+        restored.from_xml(routing.to_xml())
+        self.assertFalse(restored.mappingClientSelectionEnabled)
+        self.assertEqual(restored.mappingClientSelection, routing.mappingClientSelection)
+        self.assertEqual(restored.getClientList(), [0])
 
     def test_saved_specific_mapping_uses_multicast_and_filters_non_targets(self):
         routing = self.make_routing()

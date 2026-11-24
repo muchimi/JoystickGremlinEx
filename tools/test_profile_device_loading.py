@@ -55,6 +55,27 @@ class ProfileDeviceLoadingChecks(unittest.TestCase):
             self.assertIsNone(self.namespace["maestro_info_from_index"](7, connected_only=False))
         self.reset.assert_not_called()
 
+    def test_mode_input_lookup_does_not_mutate_configuration(self):
+        tree = ast.parse((ROOT / "gremlin/base_profile.py").read_bytes())
+        mode = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "ProfileModeNode")
+        lookup = next(node for node in mode.body if isinstance(node, ast.FunctionDef) and node.name == "getInputItem")
+        lookup.decorator_list = []
+        namespace = {"InputType": str}
+        exec(compile(ast.Module(body=[lookup], type_ignores=[]), "base_profile.py", "exec"), namespace)
+        existing = object()
+        config = {"button": {"1": existing, "2": None}}
+        fixture = NS(_config=config, registry=NS(getInputIdKey=str))
+        get_input = namespace["getInputItem"]
+
+        input_types = iter(config.values())
+        self.assertIs(next(input_types), config["button"])
+        self.assertIsNone(get_input(fixture, "axis", 1))
+        self.assertIsNone(next(input_types, None))
+        self.assertIsNone(get_input(fixture, "button", 3))
+        self.assertIsNone(get_input(fixture, "button", 2))
+        self.assertIs(get_input(fixture, "button", 1), existing)
+        self.assertEqual(config, {"button": {"1": existing, "2": None}})
+
     def test_known_devices_remain_available_during_load(self):
         device = NS(device_guid="known-device")
         self.devices[3] = device

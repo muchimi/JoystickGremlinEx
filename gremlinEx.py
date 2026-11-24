@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
 #
 # Written for Gremlin Ex by Muchimi
 # Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
@@ -7012,16 +7012,16 @@ if __name__ == "__main__":
 
         gremlin.shared_state.terminating = True
 
-        # stop the config file watcher
-        config.stop()
+        try:
+            # Terminate potentially running EventListener loop
+            gremlin.joystick_handling.VJoyProxy.reset()
+            el = gremlin.event_handler.EventListener()
+            el.terminate()  # terminates and sends the relevant shutdown triggers
 
-        # Terminate potentially running EventListener loop
-        gremlin.joystick_handling.VJoyProxy.reset()
-        el = gremlin.event_handler.EventListener()
-        el.terminate()  # terminates and sends the relevant shutdown triggers
-
-        # Stop active profiles using either vJoy or Maestro output.
-        ui.runner.stop()
+            # Stop active profiles using either vJoy or Maestro output.
+            ui.runner.stop()
+        finally:
+            config.stop()
 
         # Relinquish control over all VJoy devices used
         gremlin.joystick_handling.VJoyProxy.reset()

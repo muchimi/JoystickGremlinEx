@@ -75,7 +75,6 @@ from gremlin.ui.ui_common import (
     QSyncModeWidget,
     QUsedPushButton,
     QWarningWidget,
-    RemoteClientWidget,
     synchronize_grids,
     QFailoverWidget,
 )

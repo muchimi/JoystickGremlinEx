@@ -199,6 +199,18 @@ class ChainChecks(unittest.TestCase):
         self.ns["time"].monotonic.return_value = now
         return functor.process_event(NS(event_type=event_type), Value(pressed))
 
+    def test_indexed_trigger_keeps_release_in_its_original_slot_when_press_is_empty(self):
+        functor = self.functor()
+        press = NS(action_set=[], has_actions=True)
+        release = NS(action_set=[object()], has_actions=True)
+        functor._indexed_action_set_nodes = [press, release]
+        event, value = object(), object()
+
+        self.assertFalse(functor._trigger(0, event, value))
+        functor._ec.execute_node.assert_not_called()
+        functor._trigger(1, event, value)
+        functor._ec.execute_node.assert_called_once_with(release, event, value, None)
+
     def test_add_and_paste_create_separate_visible_steps_and_reuse_initial_set(self):
         widget = self.widget()
         initial = self.container.action_sets[0]

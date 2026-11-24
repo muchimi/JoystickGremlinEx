@@ -128,6 +128,9 @@ class Configuration(QtCore.QObject):
         str, object
     )  # fires on some configuration value changes, passes the method to get the value that has changed
 
+    _save_requested = QtCore.Signal()
+    _SAVE_DELAY_MS = 200
+
     def get_config(self) -> str:
         """local config file (version based)"""
         config_file = os.path.join(self.data_path(), "config.json")
@@ -158,6 +161,11 @@ class Configuration(QtCore.QObject):
         super().__init__()
 
         self._lock = threading.Lock()
+        self._save_request_lock = threading.Lock()
+        self._pending_save = False
+        self._save_timer = None
+        self._started = False
+        self._save_requested.connect(self._schedule_save_ui)
         self._data = {}  # gremlin items - version specific
         self._profile_data = {}  # profile specific options
         self._profile_loaded = False
@@ -168,6 +176,7 @@ class Configuration(QtCore.QObject):
         self._visuals_hidden_map = None
         self._last_version = None  # version string of the last version that ran
         self._last_version_path = None  # path to last used version
+        self._saved_version = None
         self._startup_options = {}
 
         self._midi_enabled = None
@@ -179,6 +188,8 @@ class Configuration(QtCore.QObject):
             msg = f"CONFIG: Unable to create data folder: {basedir}.\nCheck that you have the permissions to create this folder or create it manually."
             gremlin.util.display_error(msg)
             syslog.error(msg)
+
+        self.getLastVersion()
 
         if not os.path.isfile(fname):
             # create a stub - first time run
@@ -194,11 +205,7 @@ class Configuration(QtCore.QObject):
 
         self._last_reload = None
         self._last_profile_reload = None
-        data_path = self.data_path()
-        self.getLastVersion()
-        gremlin.shared_state.data_path = data_path
-
-        self._started = False
+        gremlin.shared_state.data_path = self.data_path()
 
         self.reload()
 
@@ -214,21 +221,32 @@ class Configuration(QtCore.QObject):
         syslog.info(f"\tAFCS module: {enabled_text if self.afcs_enabled else disabled_text}")
 
     def start(self):
-        """starts the file watcher"""
+        """Start the config watcher and deferred saves on the UI thread."""
         if not self._started:
-            self._started = True
+            self._save_timer = QtCore.QTimer(self)
+            self._save_timer.setSingleShot(True)
+            self._save_timer.setInterval(self._SAVE_DELAY_MS)
+            self._save_timer.timeout.connect(self._flush_pending_save_ui)
+
             fname = self.get_config()
             self.watcher = QtCore.QFileSystemWatcher([fname])
             self.watcher.fileChanged.connect(self.reload)
+            with self._save_request_lock:
+                self._started = True
 
     def stop(self):
-        """stops the file watcher"""
-        if self._started:
+        """Stop watching and write any pending config before shutting down."""
+        with self._save_request_lock:
             self._started = False
-            if hasattr(self, "watcher"):
-                self.watcher.fileChanged.disconnect(self.reload)
-                self.watcher.removePaths(self.watcher.files())
-                del self.watcher
+        if self._save_timer is not None:
+            self._save_timer.stop()
+            self._save_timer.deleteLater()
+            self._save_timer = None
+        if hasattr(self, "watcher"):
+            self.watcher.fileChanged.disconnect(self.reload)
+            del self.watcher
+
+        self._flush_pending_save_ui()
 
     def setup_userprofile(self):
         """Initializes the data folder in the user's profile folder."""
@@ -370,6 +388,7 @@ class Configuration(QtCore.QObject):
 
                     self._last_version = data.get("last_version", None)
                     self._last_version_path = data.get("last_version_path", None)
+                    self._saved_version = (version_file, data)
                     if not self._last_version:
                         self._last_version = self.versionString()
                         self._last_version_path = self.data_path()
@@ -383,18 +402,17 @@ class Configuration(QtCore.QObject):
         return self._last_version
 
     def saveVersion(self):
-        """saves the current version information to the version file"""
+        """Write the version marker if its contents have changed."""
         version_file = self.getVersionFile()
         data = {
             "last_version": self.versionString(),
             "last_version_path": self.data_path(),
         }
-        try:
-            self.ensureProfilePath()
-            with open(version_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4)
-        except Exception as err:  # noqa: BLE001
-            syslog.error(f"Unable to save version file: {err}")
+        marker = (version_file, data)
+        if marker == self._saved_version and os.path.isfile(version_file):
+            return
+        if self._write_json_atomic(version_file, data):
+            self._saved_version = marker
 
     def data_path(self):
         """returns a path to the data folder for the current application version - this folder is located in the user profile
@@ -430,6 +448,10 @@ class Configuration(QtCore.QObject):
         return self._app_path
 
     def reload(self, force=False):
+        with self._save_request_lock:
+            if self._pending_save:
+                # A watcher notification can refer to an older config snapshot.
+                return
 
         if not force and self._last_reload is not None and time.time() - self._last_reload < 1:
             return
@@ -562,8 +584,17 @@ class Configuration(QtCore.QObject):
         import gremlin.event_handler
         import gremlin.util
 
-        if QtWidgets.QApplication.instance():
-            gremlin.util.InvokeUiMethod(self._save_ui, fname, save_profile)  # ensure on UI thread
+        with self._save_request_lock:
+            deferred = self._started and fname is None and not save_profile
+            if deferred:
+                # Record the request before queuing work on the UI thread so
+                # stop() can flush it even after the event loop has exited.
+                self._pending_save = True
+
+        if deferred:
+            self._save_requested.emit()
+        elif QtWidgets.QApplication.instance():
+            gremlin.util.InvokeUiMethod(self._save_ui, fname, save_profile)
         else:
             self._save_ui(fname, save_profile)
 
@@ -571,6 +602,22 @@ class Configuration(QtCore.QObject):
 
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
+
+    @QtCore.Slot()
+    def _schedule_save_ui(self):
+        if self._save_timer is not None:
+            self._save_timer.start()
+
+    @QtCore.Slot()
+    def _flush_pending_save_ui(self):
+        with self._save_request_lock:
+            if not self._pending_save:
+                return
+            self._pending_save = False
+
+        if not self._save_ui():
+            with self._save_request_lock:
+                self._pending_save = True
 
     def getTemporaryFile(self, ext=None, dir=None):
         """gets a temporary file - the temporary file location is in the user folder"""
@@ -695,39 +742,27 @@ class Configuration(QtCore.QObject):
             return False
 
     def _save_ui(self, fname: str = None, save_profile: bool = False):
-        """Writes the version specific configuration file to disk."""
+        """Write the version-specific configuration and report whether it persisted."""
         if not self._lock.acquire(blocking=False):
-            # ignore concurrent save requests (technically not necessary due to UI thread placement)
-            return
-        self.ensureProfilePath()
-        is_error = False
+            return False
+
+        saved = False
         try:
+            self.ensureProfilePath()
             if not fname:
                 fname = self.get_config()
-            if not self._write_json_atomic(fname, self._data):
-                is_error = True
-
-            self._last_version_path = self.data_path()
-            last_version_file = os.path.join(self._profile_path, "version.json")
-            try:
-                with open(last_version_file, "w", encoding="utf-8") as hdl:
-                    json.dump({"last_version_path": self._last_version_path}, hdl, indent=4)
-            except Exception as ex:
-                syslog.error(f"CONFIG: unable to write last version file: {last_version_file}")
-                syslog.error(ex)
-
+            saved = self._write_json_atomic(fname, self._data)
+            if saved:
+                self.saveVersion()
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)
-            # is_error = True
         finally:
             self._lock.release()
 
-        # if is_error:
-        #     syslog.warning(f"CONFIG: keeping existing config at {fname} because the write failed")
-
         if save_profile:
             self._save_profile_settings_ui()
+        return saved
 
     def save_profile_settings(self):
         """Saves the profile specific configuration file."""
@@ -3542,6 +3577,14 @@ class Configuration(QtCore.QObject):
     def state_visualizer_page_size(self, value: int):
         if isinstance(value, int) and value in STATE_VISUALIZER_PAGE_SIZES:
             self._set_data("state_visualizer_page_size", value)
+
+    @property
+    def state_visualizer_rolling_updates(self) -> bool:
+        return self._get_data("state_visualizer_rolling_updates", False) is True
+
+    @state_visualizer_rolling_updates.setter
+    def state_visualizer_rolling_updates(self, enabled: bool):
+        self._set_data("state_visualizer_rolling_updates", enabled)
 
     # state device filter options
 

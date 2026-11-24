@@ -1159,7 +1159,9 @@ class PIDAxisTransition:
     The caller supplies elapsed seconds and schedules output updates.
     """
 
-    def __init__(self, value=0.0, response_time=1.0, limits=(-1.0, 1.0), tolerance=1e-5):
+    DEFAULT_GAINS = (4.6, 0.0, 0.0)
+
+    def __init__(self, value=0.0, response_time=1.0, limits=(-1.0, 1.0), tolerance=1e-5, *, gains=DEFAULT_GAINS):
         if not math.isfinite(response_time) or response_time <= 0:
             raise ValueError("response_time must be positive and finite")
         lower, upper = limits
@@ -1172,9 +1174,7 @@ class PIDAxisTransition:
         self.tolerance = tolerance
         self.value = max(lower, min(upper, value))
         self.target = self.value
-        # P-only tuning of the PID gives a monotonic exponential response,
-        # without integral windup, derivative kicks, or overshoot.
-        self.controller = SimplePID(4.6, 0.0, 0.0, setpoint=self.target, sample_time=None)
+        self.controller = SimplePID(*gains, setpoint=self.target, sample_time=None)
 
     @property
     def settled(self):
@@ -1184,8 +1184,11 @@ class PIDAxisTransition:
         if not math.isfinite(target):
             raise ValueError("target must be finite")
         lower, upper = self.limits
-        self.target = max(lower, min(upper, target))
-        self.controller.setpoint = self.target
+        target = max(lower, min(upper, target))
+        if target != self.target:
+            self.target = target
+            self.controller.setpoint = target
+            self.controller.reset()
         return self.target
 
     def advance(self, elapsed):

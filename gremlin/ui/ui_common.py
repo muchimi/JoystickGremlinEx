@@ -166,6 +166,10 @@ class Color:
                 "greenColor": "#2abd38",
                 "yellowColor": "#d9eb34",
                 "grayColor": "#949494",
+                "groupBoxGreenColor": "#0f8633",
+                "groupBoxBlueColor": "#78c5ff",
+                "groupBoxOrangeColor": "#f4a261",
+                "groupBoxGrayColor": "#949494",
                 "buttonGradientStartColor": "#757575",
                 "buttonGradientEndColor": "#5A5A5A",
                 "buttonTextColor": "#AAAAAA",
@@ -291,6 +295,10 @@ class Color:
                 "greenColor": "#088814",
                 "yellowColor": "#818b20",
                 "grayColor": "#585858",
+                "groupBoxGreenColor": "#0e5016",
+                "groupBoxBlueColor": "#075a9c",
+                "groupBoxOrangeColor": "#a24a00",
+                "groupBoxGrayColor": "#585858",
                 "buttonGradientStartColor": "#E2E2E2",
                 "buttonGradientEndColor": "#BDBDBD",
                 "buttonTextColor": "#000000",
@@ -451,6 +459,10 @@ class Color:
             "greenColor": "Green accent color",
             "yellowColor": "Yellow accent color",
             "grayColor": "Gray accent color",
+            "groupBoxGreenColor": "Green group box border and title",
+            "groupBoxBlueColor": "Blue group box border and title",
+            "groupBoxOrangeColor": "Orange group box border and title",
+            "groupBoxGrayColor": "Gray group box border and title",
             "buttonGradientStartColor": "Button gradient start color",
             "buttonGradientEndColor": "Button gradient end color",
             "buttonTextColor": "Button text color",
@@ -718,6 +730,18 @@ class Color:
 
     def grayColor(self):
         return self._get_color("grayColor")
+
+    def groupBoxGreenColor(self):
+        return self._get_color("groupBoxGreenColor")
+
+    def groupBoxBlueColor(self):
+        return self._get_color("groupBoxBlueColor")
+
+    def groupBoxOrangeColor(self):
+        return self._get_color("groupBoxOrangeColor")
+
+    def groupBoxGrayColor(self):
+        return self._get_color("groupBoxGrayColor")
 
     def buttonGradientStartColor(self):
         return self._get_color("buttonGradientStartColor")
@@ -10227,9 +10251,8 @@ class QDelayWidget(QWidget):
 
         self.main_layout.addWidget(getHContainer(widgets, widget_only=True))
 
+        self._shortcut_buttons = {}
         if show_shortcuts:
-            widgets = []
-
             if shortcut_map is not None:
                 shortcuts = shortcut_map  # use direct
 
@@ -10247,14 +10270,17 @@ class QDelayWidget(QWidget):
                     del shortcuts["0s"]
 
             for lbl, value in shortcuts.items():
-                widgets.append(QDataPushButton(lbl, data=value, callback=self._handle_shortcut))
+                self._shortcut_buttons[lbl] = QDataPushButton(lbl, data=value, callback=self._handle_shortcut)
 
-            self.main_layout.addWidget(getHContainer(widgets, widget_only=True))
+            self.main_layout.addWidget(getHContainer(list(self._shortcut_buttons.values()), widget_only=True))
 
         self.main_layout.addStretch()
 
         if tooltip:
             self.setToolTip(tooltip)
+
+    def setShortcutVisible(self, label: str, visible: bool):
+        self._shortcut_buttons[label].setVisible(visible)
 
     def _handle_shortcut(self, widget):
         value = widget.data
@@ -14174,8 +14200,59 @@ class QGroupBox(QtWidgets.QGroupBox):
     pass
 
 
+class QRoundedGroupBox(QtWidgets.QGroupBox):
+    """a group box with a rounded accent border, color, and an optional title."""
+
+    def __init__(
+        self,
+        title: str | None = None,
+        parent=None,
+        *,
+        radius: int = 4,
+        color: str | None = None,
+        layout: QtWidgets.QLayout | None = None,
+    ):
+        super().__init__(parent)
+        self._radius = radius
+        self._color = color or Color().groupBoxGrayColor()
+        self.setLayout(layout if layout is not None else QtWidgets.QVBoxLayout())
+        self.setTitle(title)
+
+    @property
+    def color(self) -> str:
+        return self._color
+
+    def setTitle(self, title: str | None):
+        super().setTitle(title or "")
+        title_spacing = "margin-top: 10px; padding-top: 12px;" if title else ""
+        self.setStyleSheet(
+            f"QRoundedGroupBox {{ border: 1px solid {self.color}; border-radius: {self._radius}px; {title_spacing} }}"
+            f"QRoundedGroupBox::title {{ color: {self.color}; subcontrol-origin: margin; left: 10px; padding: 0 4px; }}"
+        )
+
+    def addWidget(self, widget: QWidget):
+        """Add a child to the content layout."""
+        self.layout().addWidget(widget)
+
+    def removeWidget(self, widget: QWidget):
+        """Detach a child so it can be used elsewhere."""
+        layout = self.layout()
+        if layout.indexOf(widget) >= 0:
+            layout.removeWidget(widget)
+            widget.setParent(None)
+
+    def clearWidget(self, widget: QWidget | None = None):
+        """Delete a child, or clear the content layout if no child is given."""
+        layout = self.layout()
+        if widget is None:
+            gremlin.util.clear_layout(layout)
+        elif layout.indexOf(widget) >= 0:
+            layout.removeWidget(widget)
+            gremlin.util.delete_widget(widget)
+
+
 class QGroupBoxV(QtWidgets.QGroupBox):
-    def __init__(self, title: str = None, value: bool = None, callback=None, parent=None):
+    def __init__(self, title: str | None = None, value: bool | None = None, callback=None, parent=None):
         super().__init__(parent)
         self.setContentsMargins(0, 0, 0, 0)
 
@@ -16877,372 +16954,6 @@ class QNoWheelPlainTextEdit(QtWidgets.QPlainTextEdit):
         return False
 
 
-class RemoteClientWidget(QWidget):
-    """UI element that shows the list of available network clients"""
-
-    def __init__(self, config, parent=None):
-
-        super().__init__(parent=parent)
-
-        self.config: gremlin.remote.RemoteConfig = config
-        self.config.client_changed.connect(self._handle_client_changed)
-        self._refresh_pending = False
-
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-
-        self.custom_widget = QDataCheckbox(
-            "Custom output configuration",
-            value=self.config.isCustom,
-            callback=self._handle_custom_changed,
-            tooltip="Enable custom send targets",
-        )
-
-        self.group_widget = QGroupBoxV()
-        widget = QtWidgets.QLabel("List of clients:")
-
-        self.any_widget = QDataCheckbox(
-            "Any",
-            value=self.config.anySelected(),
-            callbackEx=self._handle_client_selected,
-            tooltip="Sends to all remote clients when selected",
-            data=0,
-        )
-
-        self.send_local_widget = QDataCheckbox(
-            "Local",
-            value=self.config.local,
-            callback=self._handle_local_changed,
-            tooltip="Send to the local instance.",
-        )
-
-        self.send_remote_widget = QDataCheckbox(
-            "Remote",
-            value=self.config.remote,
-            callback=self._handle_remote_changed,
-            tooltip="Send to remote clients.",
-        )
-
-        self.send_remote_profile_widget = QDataCheckbox(
-            "Only send to remote when profile is in remote mode",
-            value=self.config.remoteProfile,
-            callback=self._handle_remote_profile_changed,
-            tooltip="Send to remote clients when profile is in remote mode.  In this mode, any local output is disabled while the profile is in remote control mode.",
-        )
-
-        self.warning_remote_widget = QWarningWidget("<i>Remote control is currently disabled</i>")
-        self.warning_no_output_widget = QWarningWidget("No output mode selected")
-
-        widgets = [
-            "Enable output to:",
-            self.send_local_widget,
-            self.send_remote_widget,
-            self.warning_remote_widget,
-            self.warning_no_output_widget,
-        ]
-
-        output_container = getHContainer(widgets, widget_only=True)
-
-        widgets = [
-            output_container,
-            getHContainer(self.send_remote_profile_widget, widget_only=True, left_margin=12),
-        ]
-
-        widget = getVContainer(widgets, widget_only=True)
-        self.group_widget.addWidget(widget)
-
-        self.refresh_widget = Buttons.getRefreshWidget(
-            "Refresh",
-            callback=self._trigger_identify,
-            tooltip="This will refresh the list of available network instances.\nClients must be running and allowed to communicate with the current instance to be detected.",
-        )
-        self.select_all_widget = QDataPushButton("All", callback=self._handle_select_all)
-        self.select_none_widget = QDataPushButton("Clear", callback=self._handle_select_none)
-
-        widgets = [
-            self.refresh_widget,
-            self.select_all_widget,
-            self.select_none_widget,
-        ]
-
-        self.container_buttons = getHContainer(widgets, widget_only=True)
-
-        widget = getHContainer(widget, widget_only=True)
-        self.group_widget.addWidget(widget)
-
-        self.flow_container_widget, self.flow_container_layout = getVContainer(left_margin=12)
-
-        self.client_count_widget = QtWidgets.QLabel()
-
-        icon = Icons.remoteControlIcon()
-        client_widget = getHContainer(
-            [QIconLabel(icon, "Target Client(s):"), self.client_count_widget],
-            widget_only=True,
-        )
-
-        # any client
-        widgets = [
-            client_widget,
-            getHContainer(self.any_widget, widget_only=True, left_margin=12),
-            self.flow_container_widget,
-            QHorizontalLine(),
-            self.container_buttons,
-        ]
-
-        self.container_client = getVContainer(widgets, widget_only=True, left_margin=12)
-        self.group_widget.addWidget(self.container_client)
-
-        self.main_layout.addWidget(self.custom_widget)
-        widget = getVContainer(self.group_widget, widget_only=True)
-        self.main_layout.addWidget(widget)
-        self.main_layout.addStretch()
-
-        self.refreshClients()
-
-        self._update_ui()
-
-    def _update_ui(self):
-        """updates UI widget states and visibility based on context"""
-
-        config = self.config
-
-        if not config.isCustom:
-            # custom output disabled - only show the checkbox
-            self.group_widget.setVisible(False)
-            return
-
-        self.group_widget.setVisible(True)
-
-        enabled = config.enabled
-
-        # remote control only visible if remote control is allowed
-        self.send_remote_widget.setEnabled(config.remoteEnabled)
-        self.send_remote_profile_widget.setEnabled(config.remote)
-        self.send_remote_profile_widget.setVisible(config.remoteProfileEnabled)
-
-        self.warning_remote_widget.setVisible(not enabled)
-
-        self.warning_no_output_widget.setVisible(not (config.local or config.remote))
-
-        visible = enabled and config.remote
-        self.container_buttons.setVisible(visible)
-        self.container_client.setVisible(visible)
-
-        if visible:
-            count = config.getClientCount()
-            self.client_count_widget.setText(f"({count - 1} found)" if count - 1 else "(none detected)")
-            selected_count = config.getSelectedCount()
-            self.select_all_widget.setEnabled(count > 0 and selected_count < count)
-            self.select_none_widget.setEnabled(selected_count > 0)
-
-            # disable individual client selection if "any" is selected
-            enabled = not config.anySelected()
-            self.flow_container_widget.setEnabled(enabled)
-
-        count = config.getClientCount()
-        self.select_all_widget.setEnabled(count > 0)
-        selected_count = config.getSelectedCount()
-        self.select_none_widget.setEnabled(selected_count > 0)
-
-    def _handle_client_changed(self):
-        """update on client change"""
-        # syslog.info("remote config client change")
-        if not Shiboken.isValid(self):
-            # unregister if called and we're deleted already
-            self.config.unregisterClientChangeCallback(self._handle_client_changed)
-            return
-        # Debounce: identify replies from several peers used to rebuild the
-        # checkbox flow on every packet and hard-crash Qt (0xC0000005).
-        if self._refresh_pending:
-            return
-        self._refresh_pending = True
-        QtCore.QTimer.singleShot(100, self._deferred_refresh_clients)
-
-    def _deferred_refresh_clients(self):
-        self._refresh_pending = False
-        if not Shiboken.isValid(self):
-            return
-        self.refreshClients()
-
-    def _handle_custom_changed(self, checked: bool):
-        self.config.isCustom = checked
-        self._update_ui()
-
-    def _handle_identify(self, widget):
-        # Ensure UDP listener + send socket are up (needed after Options/version folder changes).
-        gremlin.remote.remote_server.start()
-        gremlin.remote.remote_client.start()
-        gremlin.remote.remote_client.requestIdentify()
-
-    def _handle_client_response(self, data: gremlin.remote.PacketData):
-        syslog.info("REMOTE: received client response:")
-        syslog.info(f"client [{data.client_id}]")
-        syslog.info(f"Status: [{data.status.name}]")
-
-    def _handle_remote_control_changed(self, enabled: bool):
-        """called when GEX remote control state changes"""
-
-        gremlin.util.InvokeUiMethod(self._handle_remote_control_ui, enabled)
-
-    def _handle_remote_control_ui(self, enabled: bool):
-        if Shiboken.isValid(self):
-            self._update_ui()
-
-    def _handle_local_changed(self, checked):
-        self.config.local = checked
-        self._update_ui()
-
-    def _handle_remote_profile_changed(self, checked):
-        self.config.remoteProfile = checked
-        if checked:
-            # ensure at least one client is selected
-            count = self.config.getSelectedCount()
-            if not count:
-                self.any_widget.setChecked(True)
-
-        self._update_ui()
-
-    def _handle_remote_changed(self, checked):
-        self.config.remote = checked
-        if checked:
-            # ensure at least one client is selected
-            count = self.config.getSelectedCount()
-            if not count:
-                self.any_widget.setChecked(True)
-
-        self._update_ui()
-
-    def _handle_client_selected(self, widget, checked):
-        client_id = widget.data
-        client = self.config.getClient(client_id)
-        if client:
-            client.selected = checked
-            self._refresh_clients_ui()
-            self._update_ui()
-
-    def _getClientWidgets(self) -> list:
-        widgets = [self.any_widget]
-        widgets.extend(self.flow_widget.getWidgets())
-        return widgets
-
-    def _handle_singleton_changed(self, checked):
-        self.config.singleton = checked
-        if checked:
-            # ensure only one client is selected
-            count = self.config.getSelectedCount()
-            if count > 1:
-                # pick the first one that is selected, clear the others
-                selected = True
-                for widget in self._getClientWidgets():
-                    client: gremlin.remote.RemoteClientData = widget.data
-                    if selected and client.selected:
-                        selected = False
-                        continue
-                    widget.setChecked(selected)
-
-    def _trigger_identify(self):
-        """refreshes the list of network clients"""
-        try:
-            el = gremlin.event_handler.EventListener()
-            el.remote_control_identify.emit()
-        except Exception as err:
-            syslog.error(f"REMOTE: identify request failed: {err}")
-        # Do not rebuild UI here — wait for debounced client_changed after replies.
-
-    def _handle_select_all(self, widget):
-        """selects all widgets"""
-        self.config.selectAll()
-        self._refresh_clients_ui()
-        self._update_ui()
-
-    def _handle_select_none(self, widget):
-        """clears selection"""
-        self.config.selectNone()
-        self._refresh_clients_ui()
-        self._update_ui()
-
-    def _handle_select_any(self):
-        """only selects the ANY"""
-        self.any_widget.setChecked(True)
-        self._update_ui()
-
-    def refreshClients(self):
-        self._refresh_clients()
-        self._update_ui()
-
-    def _refresh_clients(self):
-        gremlin.util.InvokeUiMethod(self._refresh_clients_ui)  # ensure on UI thread
-
-    def _refresh_clients_ui(self):
-
-        if not Shiboken.isValid(self):
-            # already deleted
-            return
-
-        _verbose = gremlin.config.Configuration().verbose_mode_remote
-
-        config = self.config
-        client = config.getClient(0)
-
-        self.send_local_widget.setEnabled(config.localEnabled)
-        self.send_remote_widget.setEnabled(config.remoteEnabled)
-
-        with QtCore.QSignalBlocker(self.send_local_widget):
-            self.send_local_widget.setChecked(config.local)
-        with QtCore.QSignalBlocker(self.send_remote_widget):
-            self.send_remote_widget.setChecked(config.remote)
-        with QtCore.QSignalBlocker(self.any_widget):
-            self.any_widget.setChecked(client.selected)
-
-        gremlin.util.clear_layout(self.flow_container_layout)
-
-        flow_layout = QFlowLayout()
-        self.flow_container_layout.addLayout(flow_layout)
-
-        # ANY client is not selected, show the distinct list of clients
-        clients = config.getClients()
-        client_id = config.getLocalClientId()  # local client ID
-
-        any_selected = config.anySelected()
-
-        used_names = []
-        for client in clients:
-            # if verbose: syslog.info(f"got client: [{client.client_name}]")
-            if client.client_id != 0:
-                # only add the specific connected clients
-                if not client.connected:
-                    continue  # client is not connected
-                client_name = client.getClientName()
-                if client_name in used_names:
-                    # custom name duplicated
-                    client_name = f"{client.custom_name} [{client.client_name}]"
-                used_names.append(client_name)
-                if client.client_id == client_id:
-                    # local
-                    client_name = f"{client_name} (self)"
-                    enabled = False  # cannot send to self but display the data
-                else:
-                    enabled = not any_selected
-                widget = QDataCheckbox(
-                    client_name,
-                    data=client.client_id,
-                    value=client.selected,
-                    callbackEx=self._handle_client_selected,
-                    tooltip=str(client),
-                )
-
-                widget.setEnabled(enabled)
-
-                flow_layout.addWidget(widget)
-
-        self._update_ui()
-
-    def setClientId(self, client_id):
-        """sets the client id"""
-        index = self.client_selector.findData(client_id)
-        if index != -1:
-            self.client_selector.setCurrentIndex(index)
-
-
 class TargetProcessWidget(QWidget):
     """UI element that lets the user pick a target process name"""
 
@@ -18376,8 +18087,7 @@ class QSideBarContainer(QWidget):
 
         # 1. Create and style the vertical bar
         self.vertical_bar = QWidget()
-        if bar_width < 2:
-            bar_width = 2  # Ensure the bar has a minimum width of 1 pixel
+        bar_width = max(bar_width, 2)  # Ensure the bar has a minimum width of 2 pixels
         self.vertical_bar.setFixedWidth(bar_width)
         css = f"background-color: {bar_color}; border-radius: {int(bar_width / 2)}px;"
         self.vertical_bar.setStyleSheet(css)

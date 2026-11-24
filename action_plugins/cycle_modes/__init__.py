@@ -193,16 +193,10 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
                 if mode:
                     self.mode_list_widget.addItem(display, mode)
 
-        modes = [mode for _, mode in mode_list]
-        # verify the modes in the cycle are valid
-        mode_list = self.action_data.mode_list
-
-        for mode in mode_list:
-            if mode is None or mode not in modes:
-                mode_list.remove(mode)
         self.model.clear()
-        for mode in mode_list:
-            self.model.addItem(mode, mode)
+        for mode in self.action_data.mode_list:
+            if mode:
+                self.model.addItem(mode, mode)
 
     def _edit_mode_changed(self):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui)  # ensure on UI thread
@@ -316,20 +310,12 @@ on a round robin sequence."""
         """reads action XML data"""
         self.mode_list.clear()
 
-        # get defined profile modes in the xml
-        profile = gremlin.shared_state.current_profile
-        mode_list = profile.get_xml_modes(node)
-
         # get modes in the action
         mode_nodes = node.xpath("./mode")
         for child in mode_nodes:
             mode = child.get("name")
             if not mode:
                 syslog.error(f"CYCLE MODE: null mode in profile XML -  offending line: {child.sourceline}")
-                continue
-            if mode not in mode_list:
-                syslog.error(f"CYCLE MODE: mode [{mode}] does not exist in the profile -  offending line: {child.sourceline}")
-                syslog.error(f"\tValid modes: {''.join(f'[{m}] ' for m in mode_list)}")
                 continue
             self.mode_list.append(mode)
 

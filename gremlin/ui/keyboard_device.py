@@ -38,6 +38,7 @@ from gremlin.input_item import (
     InputItemListModel,
     BaseAbstractCondition,
     AbstractConditionWidget,
+    ConditionHelper,
     AbstractContainer,
     AbstractAction,
 )
@@ -615,7 +616,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self.key_widget = QKeyboardKeysWidget()
 
         self.copy_widget = Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
-        self.paste_widget = Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+        self.paste_widget = ConditionHelper().get_paste_widget(self._paste_condition)
 
         self.record_button_widget = Buttons.getEditWidget(label="Listen", callback=self._listen_cb)
         self.select_button_widget = Buttons.getKeyboardWidget(label="Select Keys", callback=self._select_user_input)

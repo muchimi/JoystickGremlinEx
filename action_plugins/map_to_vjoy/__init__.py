@@ -69,9 +69,10 @@ import gremlin.ui.osc_device
 import gremlin.util
 import vjoy.vjoy
 from gremlin import input_devices, joystick_handling, util
+from gremlin.axis_bump import AxisBump, output_lock
 from gremlin.error import ProfileError
 from gremlin.input_types import InputType
-from gremlin.remote import remote_control
+from gremlin.remote import RemoteClientWidget, remote_control
 from gremlin.repeater import AcceleratedEncoder, PulseWorker
 from gremlin.types import ActivationRule, ButtonOutputMode, DeviceType, SendType, SyncMode, VjoyAction
 from gremlin.ui.qsliderwidget import QSliderWidget
@@ -104,12 +105,12 @@ from gremlin.ui.ui_common import (
     QIconLabel,
     QIntLineEdit,
     QProgressBar,
+    QRoundedGroupBox,
     QShowAtCursorDialog,
     QSideBarContainer,
     QSyncModeWidget,
     QUsedPushButton,
     QWarningWidget,
-    RemoteClientWidget,
     clear_layout,
     get_text_width,
     getGridContainer,
@@ -125,6 +126,14 @@ IdMapToButton = -2  # map to button special ID
 # os.environ['LINE_PROFILE'] = "1"
 
 syslog = logging.getLogger("system")
+
+_PID_MIN_DURATION = 0.05
+_PID_MAX_DURATION = 120.0
+_PID_GAIN_SETTINGS = (
+    ("kp", "P gain", 0.01, 100.0, "Correction proportional to the remaining distance."),
+    ("ki", "I gain", 0.0, 100.0, "Correction based on accumulated error."),
+    ("kd", "D gain", 0.0, 0.99, "Damping based on the rate of axis movement."),
+)
 
 
 class EncoderMode(enum.Enum):
@@ -412,7 +421,7 @@ class MergeWidget(QDataWidget):
         if self.data.device_id:
             default_device: dinput.DeviceSummary = next((dev for dev in devices if dev.device_id == self.data.device_id), None)
             if default_device:
-                if default_device.device_guid == self.action_data.hardware_device_guid:
+                if default_device.device_guid == self.action_data.hardware_device_guid:  # noqa: SIM102
                     # the merge device to pick is the same as the current device
                     if default_device.axis_count == 1:
                         # there is only one input which is already used
@@ -664,11 +673,10 @@ class MergeWidget(QDataWidget):
                         self.data.device_guid = gremlin.util.parse_guid(device_id)
 
                 index = self.merge_selector_input_widget.findData(input_id)
-                if index != -1:
-                    if index != self.merge_selector_input_widget.currentIndex():
-                        with QtCore.QSignalBlocker(self.merge_selector_input_widget):
-                            self.merge_selector_input_widget.setCurrentIndex(index)
-                            self.data.input_id = input_id
+                if index != -1 and index != self.merge_selector_input_widget.currentIndex():
+                    with QtCore.QSignalBlocker(self.merge_selector_input_widget):
+                        self.merge_selector_input_widget.setCurrentIndex(index)
+                        self.data.input_id = input_id
 
 
 class StepWidget(QDataWidget):
@@ -761,7 +769,7 @@ class MergeOperationType(enum.IntEnum):
     ScaleHalfCentered = 12
 
     @staticmethod
-    def to_display_name(value: MergeOperationType):  # noqa: F821
+    def to_display_name(value: MergeOperationType):
         return _merge_operation_display_lookup[value]
 
     @staticmethod
@@ -769,11 +777,11 @@ class MergeOperationType(enum.IntEnum):
         return _merge_operation_to_enum_lookup[value]
 
     @staticmethod
-    def to_string(value: MergeOperationType):  # noqa: F821
+    def to_string(value: MergeOperationType):
         return _merge_operation_to_string_lookup[value]
 
     @staticmethod
-    def to_description(value: MergeOperationType):  # noqa: F821
+    def to_description(value: MergeOperationType):
         return _merge_operation_to_description_lookup[value]
 
 
@@ -914,6 +922,177 @@ class GridPopupWindow(QShowAtCursorDialog):
 
     def _handle_close(self, widget):
         self.close()
+
+
+class PIDSettingsWidget(QRoundedGroupBox):
+    """Edit the PID settings for a fixed value or a stepped axis."""
+
+    def __init__(self, action_data, parent=None):
+        super().__init__("PID settings", parent)
+        self.setObjectName("pidSettings")
+        self.action_data = action_data
+        self._duration_setting = "pid_response_time"
+        self._duration_widget = QDelayWidget(
+            value=action_data.pid_response_time,
+            min_value_seconds=_PID_MIN_DURATION,
+            max_value_seconds=_PID_MAX_DURATION,
+            is_seconds=True,
+            display_in_seconds=True,
+            shortcut_map={"auto": 0, **{f"{seconds}s": seconds for seconds in (1, 2, 3, 5, 10)}},
+            label="Transition time (s):",
+            callback=self._set_duration,
+            validation_callback=self._valid_duration,
+        )
+        self._duration_widget.setShortcutVisible("auto", False)
+        self.addWidget(getHContainer([self._duration_widget, "||"], widget_only=True))
+
+        row = []
+        self._gain_controls = {}
+        for name, label, low, high, tooltip in _PID_GAIN_SETTINGS:
+            setting = f"pid_{name}"
+            control = QFloatLineEdit(
+                min_range=low,
+                max_range=high,
+                value=getattr(action_data, setting),
+                callback=lambda value, setting=setting, low=low, high=high: self._set_gain(setting, value, low, high),
+                tooltip=tooltip,
+            )
+            self._gain_controls[setting] = control
+            row.extend((f"{label}:", control))
+        self.addWidget(getHContainer(row, widget_only=True))
+
+        presets = (
+            ("auto", gremlin.pid.PIDAxisTransition.DEFAULT_GAINS, "Restore the normal PID gains."),
+            ("Slow start", (0.30, 2.40, 0.15), "Start gently and pick up speed through the middle."),
+            ("Fast start", (7.00, 0.0, 0.0), "Cover most of the distance early, then ease into the target."),
+            ("Smooth", (2.50, 0.0, 0.15), "Spread the motion across more of the transition."),
+        )
+        buttons = [
+            QDataPushButton(label, data=gains, tooltip=tooltip, callback=self._apply_gain_preset)
+            for label, gains, tooltip in presets
+        ]
+        self.addWidget(getHContainer(["Gain presets:", *buttons, "||"], widget_only=True))
+
+        self._step_settings, step_layout = getVContainer()
+        self.addWidget(self._step_settings)
+        self._create_step_settings(step_layout)
+
+    def set_mode(self, *, fixed, incremental):
+        self._duration_setting = "fixed_pid_duration" if fixed else "pid_response_time"
+        self._duration_widget.setShortcutVisible("auto", fixed)
+        self._duration_widget.setLabel("PID transition time (s, 0 = auto):" if fixed else "PID response time (s):")
+        self._duration_widget.setToolTip(
+            "Time to reach the fixed value. Use auto to settle as quickly as the configured gains allow."
+            if fixed
+            else "Time scale of the response. With the default gains, about 99% of the gap closes in this time."
+        )
+        self._duration_widget.setValue(getattr(self.action_data, self._duration_setting), emit=False)
+        self._step_direction.setValue(self.action_data.target_step_direction, emit=False)
+        self._step_settings.setVisible(incremental)
+
+    def _valid_duration(self, seconds):
+        return _PID_MIN_DURATION <= seconds <= _PID_MAX_DURATION or (seconds == 0 and self._duration_setting == "fixed_pid_duration")
+
+    def _set_duration(self, value):
+        setattr(self.action_data, self._duration_setting, value)
+
+    def _set_gain(self, setting, value, low, high):
+        if low <= value <= high:
+            setattr(self.action_data, setting, value)
+        else:
+            self._gain_controls[setting].setValue(getattr(self.action_data, setting), emit=False)
+
+    def _apply_gain_preset(self, button):
+        for (setting, control), value in zip(self._gain_controls.items(), button.data, strict=True):
+            setattr(self.action_data, setting, value)
+            control.setValue(value, emit=False)
+
+    def _create_step_settings(self, layout):
+        self.pid_step_widget = QFloatLineEdit(
+            min_range=0.001,
+            max_range=2.0,
+            value=self.action_data.pid_step,
+            callback=lambda value: setattr(self.action_data, "pid_step", value),
+            tooltip="Target change per press, in axis units (-1 to +1).",
+        )
+        layout.addWidget(getHContainer(["Setpoint change per press:", self.pid_step_widget], widget_only=True))
+        self.pid_acceleration_widget = QDataCheckbox(
+            "Accelerate setpoint steps with faster input",
+            tooltip="Increase the setpoint step when inputs arrive more quickly.",
+            value=self.action_data.pid_acceleration,
+            callback=self._handle_pid_acceleration_mode_changed,
+        )
+
+        layout.addWidget(self.pid_acceleration_widget)
+
+        widgets = []
+        self.pid_acceleration_controls = {}
+        settings = (
+            (
+                "pid_accel_multiplier",
+                "Maximum step multiplier:",
+                1.0,
+                100.0,
+                4.0,
+                "Maximum accelerated step relative to the base step. Output remains within -1 to +1.",
+            ),
+            ("pid_accel_start_hz", "Acceleration starts (triggers/s):", 0.0, 100.0, 2.0, "At or below this trigger frequency, use the base step."),
+            (
+                "pid_accel_full_hz",
+                "Full acceleration (triggers/s):",
+                0.01,
+                1000.0,
+                12.0,
+                "At or above this frequency, use the maximum step. Must exceed the start frequency.",
+            ),
+            ("pid_accel_curve", "Acceleration curve:", 0.1, 10.0, 2.0, "Higher values delay the increase toward the maximum step."),
+            ("pid_accel_timeout", "Idle reset (s):", 0.05, 10.0, 0.75, "A pause this long resets acceleration. Direction changes also reset it."),
+        )
+        for name, title, low, high, default, tooltip in settings:
+            control = QFloatLineEdit(
+                min_range=low,
+                max_range=high,
+                value=getattr(self.action_data, name, default),
+                callback=lambda value, name=name: self._pid_accel_setting_changed(name, value),
+                tooltip=tooltip,
+            )
+            self.pid_acceleration_controls[name] = control
+            control.setEnabled(self.pid_acceleration_widget.isChecked())
+            self.pid_acceleration_widget.toggled.connect(control.setEnabled)
+            widget = getHContainer([title, control], widget_only=True)
+            widgets.append(widget)
+
+        self.pid_acceleration_controls_container = getVContainer(widgets, widget_only=True, left_margin=8)
+        layout.addWidget(self.pid_acceleration_controls_container)
+
+        directions = [("Primary increases", 1, "Latched input decreases"), ("Primary decreases", -1, "Latched input increases")]
+        self._step_direction = QDataRadioButtonGroup(
+            directions,
+            value=self.action_data.target_step_direction,
+            callbackEx=self._handle_pid_direction_changed,
+        )
+        layout.addWidget(self._step_direction)
+
+        self.pid_acceleration_controls_container.setVisible(self.action_data.pid_acceleration)
+
+    def _handle_pid_acceleration_mode_changed(self, enabled):
+        self.pid_acceleration_controls_container.setVisible(enabled)
+
+    def _pid_accel_setting_changed(self, name, value):
+        setattr(self.action_data, name, value)
+        start = self.action_data.pid_accel_start_hz
+        full = self.action_data.pid_accel_full_hz
+        if full <= start:
+            other = "pid_accel_full_hz" if name == "pid_accel_start_hz" else "pid_accel_start_hz"
+            adjusted = start + 0.01 if other == "pid_accel_full_hz" else max(0.0, full - 0.01)
+            setattr(self.action_data, other, adjusted)
+            control = self.pid_acceleration_controls.get(other)
+            if control is not None:
+                control.setValue(adjusted, emit=False)
+
+    def _handle_pid_direction_changed(self, widget, checked):
+        if checked:
+            self.action_data.target_step_direction = widget.data
 
 
 class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
@@ -1081,6 +1260,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             # set the action type from the input type
             self.load_actions_from_input_type()
+            self._update_pid_settings_ui()
 
             # hook repeater
             self._update_merge_data()
@@ -1093,7 +1273,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         finally:
             VJoyRemapWidget.locked = False
             self._ui_loaded = True
-
 
     def _handle_virtual_button_usage_changed(self, device_type: DeviceType, virtual_id: int):
         """called when a virtual button assignment changes in the profile"""
@@ -1161,6 +1340,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         if input_type in VJoyRemapWidget.input_type_buttons and self.action_data.action_mode in (
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyRangeAxis,
             VjoyAction.VJoySetAxisStepped,
@@ -2624,7 +2804,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self.remote_widget = RemoteClientWidget(self.action_data.remote_config)
+        self.remote_widget = RemoteClientWidget(self.action_data.remote_config, client_picker=True)
 
         self.chkb_ignore_release = QDataCheckbox(
             "Ignore release", tooltip="If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF"
@@ -2712,11 +2892,18 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="When enabled, sends a wiggle axis to force the target application to re-read the input axis to the last axis value.",
         )
 
+        self.fixed_pid_checkbox = QDataCheckbox(
+            "Enable PID",
+            value=self.action_data.fixed_pid_enabled,
+            callback=self._handle_fixed_pid_changed,
+            tooltip="Move from the current axis output to the target over the transition time.",
+        )
         widgets = [
             "Set Value:",
             self.button_to_axis_value_widget,
             self.target_use_last,
             self.target_is_relative,
+            self.fixed_pid_checkbox,
         ]
 
         self.target_value_container_widget = getHContainer(widgets, widget_only=True)
@@ -2727,6 +2914,23 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.axis_range_container_widget)
         self.main_layout.addWidget(self.target_value_container_widget)
+        bump_offset = QFloatLineEdit(
+            value=self.action_data.bump_offset,
+            min_range=0.001,
+            max_range=1.0,
+            callback=self._bump_offset_changed,
+            tooltip="Magnitude of the change on the normalized axis.",
+        )
+        bump_delay = QDelayWidget(
+            value=self.action_data.bump_delay_ms,
+            min_value_seconds=0.001,
+            label="Bump delay (ms):",
+            tooltip="How long to hold the bumped value before restoring the axis.",
+            show_shortcuts=False,
+            callback=self._bump_delay_changed,
+        )
+        self.bump_axis_container = getHContainer(["Bump offset:", bump_offset, bump_delay, "||"], widget_only=True)
+        self.main_layout.addWidget(self.bump_axis_container)
 
         # hook events
 
@@ -2801,7 +3005,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 )
                 self.action_data.virtual_device = self.virtual_device_selector_widget.currentData()
 
-
             # update warning if needed
             self._handle_virtual_device_input_changed(self.virtual_device_selector_widget.currentIndex())
 
@@ -2857,7 +3060,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.latch_configuration_container.setVisible(self.action_data._stepped_latched)
 
         # select the visual for the current mode
-        self.stepped_page_visualizer_container.setCurrentIndex(self._stepped_mode_map.get(self.action_data.step_mode, 0))
+        show_step_page = self.action_data.step_mode != StepMode.PID
+        self.stepped_page_visualizer_container.setVisible(show_step_page)
+        if show_step_page:
+            self.stepped_page_visualizer_container.setCurrentIndex(self._stepped_mode_map.get(self.action_data.step_mode, 0))
 
         self.slider_widget.setTickMarks(self.action_data.target_step_list)
 
@@ -3139,8 +3345,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         container = QtWidgets.QWidget()
         container_layout = QtWidgets.QVBoxLayout(container)
         self.step_container = QSideBarContainer(widget=container)
+        self._step_content_layout = container_layout
 
         self.main_layout.addWidget(self.step_container)
+        self.pid_settings_widget = None
+        self.pid_settings_container = None
         container_layout.addWidget(QHorizontalLine())
 
         # step mode header
@@ -3248,15 +3457,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         container = self._create_encoder_visualizer()
         self.stepped_page_visualizer_container.addWidget(container)  # index 2 - encoder mode
 
-        # PID data
-        self.stepped_page_visualizer_container.addWidget(self._create_pid_visualizer())
-
         self._stepped_mode_map = {
             StepMode.Velocity: 0,
             StepMode.Stepped: 1,
             StepMode.SteppedPID: 1,
             StepMode.Encoder: 2,
-            StepMode.PID: 3,
         }
 
         self._step_ui_loaded = True
@@ -3268,20 +3473,19 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_latched_selector(self):
         """creates the selector that allows the user to enable or disable latched input for the secondary action"""
-        container, container_layout = getVContainer()
+        container = QRoundedGroupBox("Latched Input")
 
         self.step_latched_enabled_widget = QtWidgets.QCheckBox("Latch secondary input for reverse action")
         self.step_latched_enabled_widget.setToolTip("If enabled, allows binding of another input to trigger a down step")
         self.step_latched_enabled_widget.setChecked(self.action_data._stepped_latched)
         self.step_latched_enabled_widget.clicked.connect(self._step_latched_changed)
 
-        container_layout.addWidget(QHorizontalLine())
-        container_layout.addWidget(self.step_latched_enabled_widget)
+        container.addWidget(self.step_latched_enabled_widget)
 
         self.latch_configuration_container = QtWidgets.QWidget()
         sub_container_layout = QtWidgets.QVBoxLayout(self.latch_configuration_container)
         sub_container_layout.setContentsMargins(4, 0, 0, 0)
-        container_layout.addWidget(self.latch_configuration_container)
+        container.addWidget(self.latch_configuration_container)
 
         # latch mode selector
         latched_inputs = [
@@ -3332,7 +3536,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.stepped_input_map = {}
         for device in devices:
             buttons = [
-                input_id for input_id in range(1, device.button_count + 1)
+                input_id
+                for input_id in range(1, device.button_count + 1)
                 if not (
                     self.action_data.hardware_raw_input_type == InputType.JoystickButton
                     and device.device_guid == self.action_data.hardware_device_guid
@@ -3375,115 +3580,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_direction_changed(self, direction):
         self.action_data.stepped_hat_direction = direction.value
-
-    def _create_pid_visualizer(self):
-        container, layout = getVContainer()
-        label = QtWidgets.QLabel(
-            "Primary and latched inputs move the target in opposite directions. "
-            "Each press changes the target once. The axis follows a curved response, "
-            "moving faster at first and easing into the target."
-        )
-        label.setWordWrap(True)
-        layout.addWidget(label)
-        self.pid_step_widget = QFloatLineEdit(
-            min_range=0.001,
-            max_range=2.0,
-            value=self.action_data.pid_step,
-            callback=lambda value: setattr(self.action_data, "pid_step", value),
-            tooltip="Target change per press, in axis units (-1 to +1).",
-        )
-        self.pid_response_time_widget = QFloatLineEdit(
-            min_range=0.05,
-            max_range=120.0,
-            value=self.action_data.pid_response_time,
-            callback=lambda value: setattr(self.action_data, "pid_response_time", value),
-            tooltip="Approximate seconds to close 99% of the gap. Lower values speed up the entire curve.",
-        )
-        layout.addWidget(
-            getHContainer(
-                ["Setpoint change per press:", self.pid_step_widget, "Response time (s):", self.pid_response_time_widget],
-                widget_only=True,
-            )
-        )
-        self.pid_acceleration_widget = QDataCheckbox(
-            "Accelerate setpoint steps with faster input",
-            tooltip="Enable acceleration of setpoint steps based on input speed.  In this mode, faster inputs will accelerate the setpoint changes with the frequency of the inputs received for non linear response times.",
-            value=self.action_data.pid_acceleration,
-            callback=self._handle_pid_acceleration_mode_changed,
-        )
-
-        layout.addWidget(self.pid_acceleration_widget)
-
-        widgets = []
-        self.pid_acceleration_controls = {}
-        settings = (
-            (
-                "pid_accel_multiplier",
-                "Maximum step multiplier:",
-                1.0,
-                100.0,
-                4.0,
-                "Maximum accelerated step relative to the base step. Output remains within -1 to +1.",
-            ),
-            ("pid_accel_start_hz", "Acceleration starts (triggers/s):", 0.0, 100.0, 2.0, "At or below this trigger frequency, use the base step."),
-            (
-                "pid_accel_full_hz",
-                "Full acceleration (triggers/s):",
-                0.01,
-                1000.0,
-                12.0,
-                "At or above this frequency, use the maximum step. Must exceed the start frequency.",
-            ),
-            ("pid_accel_curve", "Acceleration curve:", 0.1, 10.0, 2.0, "Higher values delay the increase toward the maximum step."),
-            ("pid_accel_timeout", "Idle reset (s):", 0.05, 10.0, 0.75, "A pause this long resets acceleration. Direction changes also reset it."),
-        )
-        for name, title, low, high, default, tooltip in settings:
-            control = QFloatLineEdit(
-                min_range=low,
-                max_range=high,
-                value=getattr(self.action_data, name, default),
-                callback=lambda value, name=name: self._pid_accel_setting_changed(name, value),
-                tooltip=tooltip,
-            )
-            self.pid_acceleration_controls[name] = control
-            control.setEnabled(self.pid_acceleration_widget.isChecked())
-            self.pid_acceleration_widget.toggled.connect(control.setEnabled)
-            widget = getHContainer([title, control], widget_only=True)
-            widgets.append(widget)
-
-        self.pid_acceleration_controls_container = getVContainer(widgets, widget_only=True, left_margin=8)
-        layout.addWidget(self.pid_acceleration_controls_container)
-
-        directions = [("Primary increases", 1, "Latched input decreases"), ("Primary decreases", -1, "Latched input increases")]
-        layout.addWidget(
-            QDataRadioButtonGroup(
-                directions,
-                value=self.action_data.target_step_direction,
-                callbackEx=self._handle_pid_direction_changed,
-            )
-        )
-
-        self.pid_acceleration_controls_container.setVisible(self.action_data.pid_acceleration)
-        return container
-
-    def _handle_pid_acceleration_mode_changed(self, enabled):
-        self.pid_acceleration_controls_container.setVisible(enabled)
-
-    def _pid_accel_setting_changed(self, name, value):
-        setattr(self.action_data, name, value)
-        start = self.action_data.pid_accel_start_hz
-        full = self.action_data.pid_accel_full_hz
-        if full <= start:
-            other = "pid_accel_full_hz" if name == "pid_accel_start_hz" else "pid_accel_start_hz"
-            adjusted = start + 0.01 if other == "pid_accel_full_hz" else max(0.0, full - 0.01)
-            setattr(self.action_data, other, adjusted)
-            control = self.pid_acceleration_controls.get(other)
-            if control is not None:
-                control.setValue(adjusted, emit=False)
-
-    def _handle_pid_direction_changed(self, widget, checked):
-        if checked:
-            self.action_data.target_step_direction = widget.data
 
     def _create_encoder_visualizer(self):
         container = QtWidgets.QWidget()
@@ -4136,9 +4232,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         type_widget = self.stepped_selector_input_type_widget
         input_widget = self.stepped_selector_input_widget
         choices = self.stepped_input_map.get(device_id, {})
-        input_types = [(label, kind) for label, kind in (
-            ("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)
-        ) if choices.get(kind)]
+        input_types = [(label, kind) for label, kind in (("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)) if choices.get(kind)]
 
         with QtCore.QSignalBlocker(device_widget), QtCore.QSignalBlocker(type_widget), QtCore.QSignalBlocker(input_widget):
             device_widget.setCurrentIndex(device_widget.findData(device_id))
@@ -4198,6 +4292,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     VjoyAction.VJoyHatPulse,  # pulse hat
                     VjoyAction.VJoyInvertAxis,  # invert axis
                     VjoyAction.VJoySetAxis,  # set axis
+                    VjoyAction.VJoyBumpAxis,
                     VjoyAction.VJoySetAxisStepped,  # stepped axis
                     VjoyAction.VJoyRangeAxis,  # range axis
                     VjoyAction.VJoyMergeAxis,  # merge axis
@@ -4415,14 +4510,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             device = self.action_data.virtual_device
             if action_mode in (
                 VjoyAction.VJoySetAxis,
+                VjoyAction.VJoyBumpAxis,
                 VjoyAction.VJoySetAxisStepped,
                 VjoyAction.VJoyRangeAxis,
                 VjoyAction.VJoyAxis,
                 VjoyAction.VJoyInvertAxis,
                 VjoyAction.VJoyMergeAxis,
             ):
-                count = device.axis_count
-                for id in range(1, count + 1):
+                axis_ids = range(1, device.axis_count + 1)
+                if action_mode == VjoyAction.VJoyBumpAxis and device.axis_id_map:
+                    axis_ids = device.axis_id_map
+                for id in axis_ids:
                     axis_name = device.get_axis_name(id)
                     if not axis_name.lower().startswith("axis"):
                         axis_name = f"Axis {axis_name}"
@@ -4548,6 +4646,33 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_target_use_last_changed(self, checked: bool):
         self.action_data.target_use_last = checked
         self._update_ui()
+
+    def _handle_fixed_pid_changed(self, checked: bool):
+        self.action_data.fixed_pid_enabled = checked
+        self._update_ui()
+
+    def _update_pid_settings_ui(self):
+        """updates the PID settings and if needed creates the PID parameters visualization widget"""
+        action = self.action_data.action_mode
+        step_mode = self.action_data.step_mode
+        fixed = action == VjoyAction.VJoySetAxis and not self.action_data.target_use_last  # used in the set value mode
+        self.fixed_pid_checkbox.setVisible(fixed)
+        fixed_pid = fixed and self.action_data.fixed_pid_enabled
+        stepped_pid = action == VjoyAction.VJoySetAxisStepped and step_mode in (StepMode.PID, StepMode.SteppedPID)  # used in the stepped axis mode
+        visible = fixed_pid or stepped_pid
+        if visible:
+            if self.pid_settings_container is None:
+                self.pid_settings_widget = PIDSettingsWidget(self.action_data)
+                self.pid_settings_container = getHContainer([self.pid_settings_widget, "||"], widget_only=True)
+            if stepped_pid:
+                if self._step_content_layout.indexOf(self.pid_settings_container) == -1:
+                    self._step_content_layout.addWidget(self.pid_settings_container)
+            elif self.main_layout.indexOf(self.pid_settings_container) == -1:
+                index = self.main_layout.indexOf(self.step_container)
+                self.main_layout.insertWidget(index + 1, self.pid_settings_container)
+            self.pid_settings_widget.set_mode(fixed=fixed_pid, incremental=stepped_pid and step_mode == StepMode.PID)
+        if self.pid_settings_container is not None:
+            self.pid_settings_container.setVisible(visible)
 
     def _update_ui(self):
         """updates ui based on the current action requested to show/hide needed components"""
@@ -4763,6 +4888,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # self._execute_widget.setVisible()
         self.chkb_paired.setVisible(paired_visible)
         self.target_value_container_widget.setVisible(button_to_axis_visible)
+        self.bump_axis_container.setVisible(action == VjoyAction.VJoyBumpAxis)
 
         self.virtual_device_label_widget.setVisible(selector_visible)
         self.virtual_device_selector_widget.setVisible(selector_visible)
@@ -4782,6 +4908,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.virtual_output_label_widget.setVisible(input_selector_visible)
 
         self.button_to_axis_value_widget.setEnabled(set_target_visible)
+        self._update_pid_settings_ui()
 
         self.container_axis_to_button_range_widget.setVisible(button_range_visible)
         self.container_button_mode_widget.setVisible(button_range_visible)
@@ -4845,6 +4972,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         return action
 
     @QtCore.Slot(int)
+    def _bump_offset_changed(self, value):
+        self.action_data.bump_offset = value
+
+    def _bump_delay_changed(self, value):
+        self.action_data.bump_delay_ms = value
+
     def _pulse_value_changed(self, value):
         """called when the pulse value changes"""
         self.action_data.pulse_delay = value
@@ -5326,6 +5459,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     """Executes a remap action when called."""
 
+    _fixed_pid_lock = threading.Lock()
+
     def _is_maestro_target(self):
         device = getattr(self.action_data, "virtual_device", None)
         return device is not None and device.device_type == DeviceType.Maestro
@@ -5364,7 +5499,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     def _register_button_release(self, target, event, **options):
         device_id, button_id = target
         input_devices.CallbackActions().register_button_release(
-            (self._output_key(device_id), button_id), event, client_list=self.client_list, **options,
+            (self._output_key(device_id), button_id),
+            event,
+            client_list=self.client_list,
+            **options,
         )
 
     def findMainWindow(self):
@@ -5375,7 +5513,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 return widget
         return None
 
-    def __init__(self, action_data: VjoyRemap, parent=None):  # noqa: F821
+    def __init__(self, action_data: VjoyRemap, parent=None):
         super().__init__(action_data, parent)
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
@@ -5421,9 +5559,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         f"VJOY: [{self.action_data.id}] invalid axis id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
                     )
 
-        elif VjoyAction.is_button_action(action_data.action_mode):
-            # check the button is found
-            if self.vjoy_input_id < 1 or self.vjoy_input_id > dev.button_count:
+        # check the button is found
+        elif VjoyAction.is_button_action(action_data.action_mode) and \
+             self.vjoy_input_id < 1 or self.vjoy_input_id > dev.button_count:
                 self._valid = False
                 if self.verbose:
                     syslog.warning(
@@ -5513,15 +5651,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._pid_axis_thread = None
         self._pid_axis_stopping = True
         self._pid_force_remote = False
+        self._fixed_pid_deadline = None
+        self._axis_bumps = {}
 
     def _step_runner(self, tick: float, start: float, target: float, offset: float):
         value = start
         wait_event = threading.Event()
         while self._step_is_running:
             value += offset
-            if offset < 0 and value <= target:
-                break
-            elif offset > 0 and value >= target:
+            if (offset < 0 and value <= target) or (offset > 0 and value >= target):
                 break
             self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
             time_stop = time.monotonic() + tick
@@ -5560,10 +5698,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         curves = []
         if actions:
             for action in actions:
-                if action.curve_data:
-                    # see if the curve should apply
-                    if event is None or self.shouldExecute(event, value, action):
-                        curves.append(action.curve_data)
+                # see if the curve should apply
+                if action.curve_data and \
+                   (event is None or self.shouldExecute(event, value, action)):
+                    curves.append(action.curve_data)
 
         # add self
         if self.action_data.curve_data is not None:
@@ -5718,6 +5856,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         # Rebuild topology-derived curve metadata for every profile run.
         self.curve_actions = None
 
+        if self.action_mode == VjoyAction.VJoyBumpAxis:
+            with output_lock:
+                self._axis_bumps = {}
+            return
+
         if VjoyAction.is_command(self.action_mode):
             # CodeRunner selects the actual startup mode after the start hooks.
             self._startup_command_pending = self._valid and self.action_data.sync_mode != SyncMode.Ignore
@@ -5738,8 +5881,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.device = self._target_device(self.action_data.vjoy_id)
         key = self.getSteppedIndexDataKey()
         if not self.device:
-            self._valid = False # mark the mapping as invalid
-            syslog.error(f"VJOYRemap: profile start:  target device with vjoy id [{self.action_data.vjoy_id}] not found and unable to locate a failover device.  Mapping disabled.")
+            self._valid = False  # mark the mapping as invalid
+            syslog.error(
+                f"VJOYRemap: profile start:  target device with vjoy id [{self.action_data.vjoy_id}] not found and unable to locate a failover device.  Mapping disabled."
+            )
             return
         if key in self.device.data:
             # force a re-read of the data
@@ -5750,6 +5895,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             self._initialize_stepped_axis(target)
             return
 
+        if self.action_mode == VjoyAction.VJoySetAxis and self.action_data.fixed_pid_enabled:
+            with self._pid_axis_condition:
+                self._pid_axis_stopping = False
+
         # get the current mode
         mode = gremlin.shared_state.runtime_mode
         # get the profile start mode
@@ -5757,10 +5906,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         # vjoy startup config
         vs = gremlin.joystick_handling.VjoyStart()
+        remote_config = getattr(self.action_data, "remote_config", None)
+        scoped_startup = getattr(remote_config, "mappingClientSelectionEnabled", False) and remote_config.isCustom
+        startup_route = {"route": (is_local, is_remote or is_paired, self.client_list)} if scoped_startup else {}
+        startup_device = self._output_key(self.vjoy_id) if scoped_startup else self.vjoy_id
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # sync the start button state
-            if self.action_data.button_start_value is not None and self._is_output_connected(self.action_data.virtual_id):
+            if (is_local or not scoped_startup) and self.action_data.button_start_value is not None and self._is_output_connected(self.action_data.virtual_id):
                 if verbose:
                     syslog.info(
                         f"VJOY REMAP: startup vjoy: [{self.action_data.virtual_id}] button [{self.action_data.vjoy_button_id}] set to {'pressed' if self.action_data.button_start_value else 'released'}"
@@ -5846,7 +5999,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             pass  # do nothing
 
                     if trigger and start_mode == mode:
-                        vs.setStartValue(self.vjoy_id, self.vjoy_input_id, value)
+                        vs.setStartValue(startup_device, self.vjoy_input_id, value, **startup_route)
                         self.action_data.axis_last_value = value
 
                     if raw_input_type == InputType.OpenSoundControl and self.action_data.axis_start_value_enabled:
@@ -6015,7 +6168,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     # button output
 
-                    vs.setStartState(self.vjoy_id, self.vjoy_input_id, value)
+                    vs.setStartState(startup_device, self.vjoy_input_id, value, **startup_route)
                     self.action_data.button_last_value = value
                     if is_local:
                         if self._is_output_connected(self.vjoy_id):
@@ -6067,6 +6220,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """called when profile stops"""
 
         self._startup_command_pending = False
+        if self.action_mode == VjoyAction.VJoyBumpAxis:
+            with output_lock:
+                bumps = self._axis_bumps or {}
+                self._axis_bumps = None
+                for bump in bumps.values():
+                    bump.finish()
+            return
         self._stop_pid_axis()  # stop any PID activity
         self.curve_actions = None
         # clear any pulse workers still active
@@ -6334,8 +6494,53 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     force_remote=force_remote,
                 )
 
-    def _set_axis_value(self):
-        """sets the axis value"""
+    def _bump_axis(self, is_local, is_remote, force_remote):
+        """Pulse in output coordinates, so inversion and curves are applied only once.
+           Forces a game re-read of the output by changing the value momentarily for a short duration.
+        """
+        key = self._output_key(self.vjoy_id)
+        axis_id = self.vjoy_input_id
+        target = joystick_handling.get_output_target(key)
+        current_value = None
+        if target is not None and target.kind == "vjoy" and axis_id in target.device.axis_id_map:
+            # Opening a fresh vJoy backend resets it. Read the current position first.
+            current_value = joystick_handling.get_axis(target.device, axis_id)
+        device = joystick_handling.get_output_device(key, target=target) if target is not None else None
+        axis = device.axis(axis_id) if device is not None else None
+        offset = self.action_data.bump_offset
+        delay_ms = self.action_data.bump_delay_ms
+
+        def fallback(prefer_local_output=False):
+            if prefer_local_output and axis is not None and axis.last_output is not None:
+                return axis.last_output[0]
+            startup = joystick_handling.VjoyStart().getStartValue(key, axis_id)
+            if startup is not None:
+                return startup
+            if current_value is not None:
+                return current_value
+            return axis.value if axis is not None else None
+
+        def start(pulse_key, read, write, find_fallback):
+            bump = AxisBump.start(pulse_key, read, write, find_fallback, offset, delay_ms)
+            if bump is not None:
+                self._axis_bumps[pulse_key] = bump
+
+        if is_remote:
+            clients = self.client_list
+            start(
+                ("remote", key, axis_id),
+                lambda: self.remote_client.last_axis_output(key, axis_id),
+                lambda value: self.remote_client.send_axis(
+                    key, axis_id, value, client_list=clients, force_remote=force_remote
+                ),
+                lambda: fallback(prefer_local_output=True),
+            )
+
+        if is_local and axis is not None:
+            start(("local", target.kind, target.out_id, axis_id), lambda: axis.last_output, axis.set_absolute_value, fallback)
+
+    def _set_axis_value(self, force_remote=False):
+        """Set the requested axis value or start a fixed-value PID transition."""
         if self._is_output_connected(self.vjoy_id):
             verbose = self.verbose
             if self.action_data.target_use_last:
@@ -6362,7 +6567,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                 if verbose:
                     syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
-                self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
+                self._write_immediate_fixed_axis(wiggle_value)
                 timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
                 timer.start()
 
@@ -6386,7 +6591,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     value = gremlin.util.clamp(self.action_data.curve_data.curve_value(value))
                 if verbose:
                     syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+                if self.action_data.fixed_pid_enabled:
+                    self._set_fixed_pid_target(value, force_remote)
+                    return True
+                self._write_immediate_fixed_axis(value)
 
                 # remember the last value
                 self.action_data.axis_last_value = value
@@ -6436,11 +6644,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # axis input
             verbose = self.verbose
 
-            if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
-                # make sure conditions are valid for latched input
-                # the reason is conditions are only evaluated for the actual mapped input, not the latched inputs
-                # therfore we need to evaluate the conditions for the latched input as well
-                if event.device_guid != self.hardware_device_guid or event.identifier != self.hardware_input_id:
+
+            # make sure conditions are valid for latched input
+            # the reason is conditions are only evaluated for the actual mapped input, not the latched inputs
+            # therfore we need to evaluate the conditions for the latched input as well
+            if self.action_data.action_mode == VjoyAction.VJoyMergeAxis and \
+                (event.device_guid != self.hardware_device_guid or event.identifier != self.hardware_input_id):
                     # event is for a latched input = run conditions if any are applied
 
                     # check for condition applied to container
@@ -6633,9 +6842,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         if verbose:
                             syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
                         self.action_data.button_last_value = is_pressed
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
-                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
+                        if is_local and self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote:
                             self.remote_client.send_button(
                                 self._output_key(self.vjoy_id),
@@ -6751,8 +6959,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     continue
                                 release_input_id = self.pressed_hat_buttons[pressed_position]
                                 if release_input_id > 0:
-                                    if is_local:
-                                        if self._is_output_connected(device_id):
+                                    if is_local and self._is_output_connected(device_id):
                                             self._output_device(device_id).button(release_input_id).is_pressed = False
                                     if is_remote:
                                         self.remote_client.send_button(
@@ -6778,8 +6985,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # press the new button
                 self.pressed_hat_buttons[position] = input_id
                 self.action_data.button_last_value = is_pressed
-                if is_local:
-                    if self._is_output_connected(device_id):
+                if is_local and self._is_output_connected(device_id):
                         self._output_device(device_id).button(input_id).is_pressed = is_pressed
                 if is_remote:
                     self.remote_client.send_button(self._output_key(device_id), input_id, is_pressed, client_list=self.client_list)
@@ -6800,9 +7006,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if input_id > 0:
                         if verbose:
                             syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
-                                self._output_device(self.vjoy_id).button(input_id).is_pressed = False
+                        if is_local and self._is_output_connected(self.vjoy_id):
+                            self._output_device(self.vjoy_id).button(input_id).is_pressed = False
                         if is_remote:
                             self.remote_client.send_button(
                                 self._output_key(self.vjoy_id),
@@ -6836,11 +7041,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if not is_pressed and self.action_data.exec_on_release:
                         pressed_value = not pressed_value
 
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
-                                if verbose:
-                                    syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
-                                self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = pressed_value
+                        if is_local and self._is_output_connected(self.vjoy_id):
+                            if verbose:
+                                syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
+                            self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = pressed_value
                         if is_remote or is_paired:
                             self.remote_client.send_button(
                                 self._output_key(self.vjoy_id),
@@ -6893,8 +7097,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         trigger = True
 
                     if trigger:
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
+                        if is_local and self._is_output_connected(self.vjoy_id):
                                 if verbose:
                                     syslog.info(f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]")
                                 self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = pressed_value
@@ -6983,8 +7186,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if fire_event:
                         self.action_data.button_last_value = True
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
+                        if is_local and self._is_output_connected(self.vjoy_id):
                                 self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = True
                         if is_remote or is_paired:
                             self.remote_client.send_button(
@@ -7001,8 +7203,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False")
                     if fire_event:
                         self.action_data.button_last_value = False
-                        if is_local:
-                            if self._is_output_connected(self.vjoy_id):
+                        if is_local and self._is_output_connected(self.vjoy_id):
                                 self._output_device(self.vjoy_id).button(self.vjoy_input_id).is_pressed = False
                         if is_remote or is_paired:
                             self.remote_client.send_button(
@@ -7016,10 +7217,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 case VjoyAction.VJoyToggle:
                     # toggle action
 
-                    if fire_event:
-                        if input_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed:
-                            if is_local:
-                                if self._is_output_connected(self.vjoy_id):
+                    if fire_event and \
+                        input_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed:
+                            if is_local and self._is_output_connected(self.vjoy_id):
                                     button = self._output_device(self.vjoy_id).button(self.vjoy_input_id)
                                     button.is_pressed = not button.is_pressed
                                     self.action_data.button_last_value = button.is_pressed
@@ -7027,7 +7227,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                         syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}")
                             if is_remote:
                                 self.remote_client.toggle_button(
-                                    self._output_key(self.vjoy_id), self.vjoy_input_id, client_list=self.client_list,
+                                    self._output_key(self.vjoy_id),
+                                    self.vjoy_input_id,
+                                    client_list=self.client_list,
                                 )
 
                 case VjoyAction.VJoyPulse:
@@ -7061,10 +7263,17 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if fire_event:
                         self.toggle_reverse()
 
+                case VjoyAction.VJoyBumpAxis:
+                    # bump the axis to force a game re-read of the value
+                    if fire_event:
+                        with output_lock:
+                            if self._axis_bumps is not None:
+                                self._bump_axis(is_local and not force_remote, is_remote or force_remote, force_remote)
+
                 case VjoyAction.VJoySetAxis:
                     # set the value on the specified axis
                     if fire_event:
-                        return self._set_axis_value()
+                        return self._set_axis_value(event.force_remote)
 
                 case VjoyAction.VJoyRangeAxis:
                     # changes the output range on the target device / axis
@@ -7339,6 +7548,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             self._pid_axis = gremlin.pid.PIDAxisTransition(
                 value,
                 response_time=self.action_data.pid_response_time,
+                gains=self.action_data.pid_gains,
             )
             self._pid_accelerator = None
             if getattr(self.action_data, "pid_acceleration", False):
@@ -7365,9 +7575,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # leak into the next profile run.
             thread.join()
         with self._pid_axis_condition:
+            if self.action_mode == VjoyAction.VJoySetAxis and self._pid_axis is not None:
+                with self._fixed_pid_lock:
+                    key = self._fixed_pid_key()
+                    if self.device.data.get(key) is self._pid_axis:
+                        del self.device.data[key]
             self._pid_axis_thread = None
             self._pid_axis = None
             self._pid_accelerator = None
+            self._fixed_pid_deadline = None
 
     @staticmethod
     def _pid_identifier_matches(actual, configured):
@@ -7426,6 +7642,55 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 return None  # Or raise an error if no lower value exists
             return min(filtered, key=lambda x: abs(x - target))
 
+    def _fixed_pid_key(self):
+        return ("fixed-pid-transition", self.vjoy_input_id)
+
+    def _write_immediate_fixed_axis(self, value: float):
+        with self._fixed_pid_lock:
+            self.device.data.pop(self._fixed_pid_key(), None)
+            self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+
+    def _set_fixed_pid_target(self, value: float, force_remote: bool):
+        with self._pid_axis_condition:
+            if self._pid_axis_stopping:
+                return
+
+            with self._fixed_pid_lock:
+                # Read in output coordinates, including inversion, after any previous write.
+                current = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                duration = self.action_data.fixed_pid_duration
+                transition = gremlin.pid.PIDAxisTransition(
+                    current,
+                    response_time=duration or _PID_MIN_DURATION,
+                    tolerance=1e-12 if duration else 1e-5,
+                    gains=self.action_data.pid_gains,
+                )
+                self._pid_axis = transition
+                key = self._fixed_pid_key()
+                if transition.value == value:
+                    self._fixed_pid_deadline = None
+                    self.device.data.pop(key, None)
+                    self._set_axis(self.vjoy_id, self.vjoy_input_id, value, force_remote=force_remote)
+                    self.action_data.axis_last_value = value
+                else:
+                    self.device.data[key] = transition
+                    self._fixed_pid_deadline = time.monotonic() + duration if duration else None
+                    self._pid_set_target(value, force_remote=force_remote)
+                    return
+
+            self.functor_complete.emit()
+
+    def _write_fixed_pid_axis(self, transition, value, finished):
+        with self._fixed_pid_lock:
+            key = self._fixed_pid_key()
+            if self.device.data.get(key) is not transition:
+                return False
+
+            self._set_axis(self.vjoy_id, self.vjoy_input_id, value, force_remote=self._pid_force_remote)
+            if finished:
+                del self.device.data[key]
+            return True
+
     def _pid_set_target(self, value: float, force_remote: bool = False):
         """Set an absolute PID target and wake the output worker."""
         with self._pid_axis_condition:
@@ -7444,23 +7709,46 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _pid_axis_loop(self):
         last_time = time.monotonic()
+        fixed = self.action_mode == VjoyAction.VJoySetAxis
         try:
             with self._pid_axis_condition:
                 while not self._pid_axis_stopping:
-                    if self._pid_axis.settled:
+                    transition = self._pid_axis
+                    deadline = self._fixed_pid_deadline
+                    if transition.settled and deadline is None:
                         self._pid_axis_condition.wait()
                         last_time = time.monotonic()
                         continue
                     now = time.monotonic()
-                    elapsed = now - last_time
+                    started = deadline - transition.response_time if deadline is not None else last_time
+                    elapsed = now - max(last_time, started)
                     last_time = now
-                    if elapsed > 0:
-                        before = self._pid_axis.value
-                        value = self._pid_axis.advance(min(elapsed, 0.1))
-                        if value != before:
-                            self._set_stepped_axis(value, force_remote=self._pid_force_remote)
+                    finished = deadline is not None and now >= deadline
+                    if elapsed > 0 or finished:
+                        before = transition.value
+                        if finished:
+                            # Timed transitions land exactly on the target at the deadline.
+                            transition.value = transition.target
+                        else:
+                            transition.advance(elapsed if deadline is not None else min(elapsed, 0.1))
+
+                        value = transition.value
+                        if deadline is not None and not finished:
+                            # Close any residual PID error gradually as the fixed deadline approaches.
+                            blend = max(0.0, 1.0 - 2.0 * (deadline - now) / transition.response_time)
+                            value += (transition.target - value) * blend**2 * (3.0 - 2.0 * blend)
+                        finished = finished or (deadline is None and transition.settled)
+                        if value != before or finished:
+                            if not fixed:
+                                self._set_stepped_axis(value, force_remote=self._pid_force_remote)
+                            elif not self._write_fixed_pid_axis(transition, value, finished):
+                                # Another fixed-value command has taken over this output.
+                                self._fixed_pid_deadline = None
+                                transition.value = transition.target
+                                continue
                             self.action_data.axis_last_value = value
-                        if self._pid_axis.settled:
+                        if finished:
+                            self._fixed_pid_deadline = None
                             self.functor_complete.emit()
                     self._pid_axis_condition.wait(0.01)
         except Exception:
@@ -7641,9 +7929,7 @@ class MergeData:
             return False
         if self.device_id != other.device_id:
             return False
-        if self.input_id != other.input_id:
-            return False
-        return True
+        return self.input_id == other.input_id
 
     def to_xml(self):
         """saves data to xml and return that xml node"""
@@ -7698,12 +7984,11 @@ class MergeData:
                 self.curve_data = curve_data
 
 
-
 class VjoyRemap(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
     name = "Virtual Remap"
-    aliases = ["Vjoy Remap", "Map to Vjoy"]
+    aliases: list[str] = ["Vjoy Remap", "Map to Vjoy", "Map to Virtual"]  # noqa: RUF012
     tag = "vjoyremap"
     hint = """Advanced VJOY mapper.
 This action maps an input to a VJOY device.
@@ -7826,6 +8111,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._action_mode = VjoyAction.VJoyButton
         self.pid_step = 0.05
         self.pid_response_time = 1.0
+        self.pid_kp, self.pid_ki, self.pid_kd = gremlin.pid.PIDAxisTransition.DEFAULT_GAINS
         self.pid_acceleration = False
         self.pid_accel_multiplier = 4.0
         self.pid_accel_start_hz = 2.0
@@ -7898,6 +8184,10 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.target_value_valid = True
         self.target_is_relative = False  # true if the set value axis is a relative value (+ or -)
         self.target_use_last = False  # true if the last sent axis value is sent again
+        self.bump_offset = 0.1
+        self.bump_delay_ms = 125
+        self.fixed_pid_enabled = False
+        self.fixed_pid_duration = 0.0
         self.relative_value = 0.2  # relative value to add or remove
         self.relative_pulse_delay = 100  # relative pulse delay in miliseconds
         self.use_relative_value = False  # true if set value should use relative value
@@ -7979,7 +8269,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._latched_keys.clear()
         latch_key = gremlin.keyboard.Key.fromKeys(value)
         self._latched_keys = [latch_key] if latch_key else []
-
 
     def addKey(self, key):
         if key not in self._latched_keys and key is not self:
@@ -8536,6 +8825,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         if self.action_mode in (
             VjoyAction.VJoyAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyAxisToButton,
         ):
@@ -8589,6 +8879,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         input_type = None
         if self.action_mode in (
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyAxis,
             VjoyAction.VJoyMergeAxis,
@@ -8823,6 +9114,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyMergeAxis,
             VjoyAction.VJoySetAxisStepped,
         ):
@@ -8854,6 +9146,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
         ):
             return self.vjoy_axis_id
         elif self.action_mode in (
@@ -8865,12 +9158,19 @@ Supports axis merging, curved output, command, hat and button mappings.
         else:
             return self.vjoy_button_id
 
+    @property
+    def pid_gains(self):
+        return self.pid_kp, self.pid_ki, self.pid_kd
+
     def _read_pid_settings(self, node):
+        for (name, _, low, high, _), default in zip(_PID_GAIN_SETTINGS, gremlin.pid.PIDAxisTransition.DEFAULT_GAINS):
+            value = safe_read(node, f"pid-{name}", float, default)
+            setattr(self, f"pid_{name}", value if value is not None and low <= value <= high else default)
         self.pid_step = safe_read(node, "pid-step", float, 0.05)
         self.pid_response_time = safe_read(node, "pid-response-time", float, 1.0)
-        if not math.isfinite(self.pid_step) or not 0.001 <= self.pid_step <= 2.0:
+        if self.pid_step is None or not 0.001 <= self.pid_step <= 2.0:
             self.pid_step = 0.05
-        if not math.isfinite(self.pid_response_time) or not 0.05 <= self.pid_response_time <= 120.0:
+        if self.pid_response_time is None or not _PID_MIN_DURATION <= self.pid_response_time <= _PID_MAX_DURATION:
             self.pid_response_time = 1.0
 
         self.pid_acceleration = safe_read(node, "pid-acceleration", bool, False)
@@ -8882,13 +9182,15 @@ Supports axis merging, curved output, command, hat and button mappings.
             ("pid_accel_timeout", "pid-accel-timeout", 0.75, 0.05, 10.0),
         ):
             value = safe_read(node, xml_name, float, default)
-            setattr(self, name, value if math.isfinite(value) and low <= value <= high else default)
+            setattr(self, name, value if value is not None and low <= value <= high else default)
         if self.pid_accel_full_hz <= self.pid_accel_start_hz:
             self.pid_accel_start_hz, self.pid_accel_full_hz = 2.0, 12.0
 
     def _write_pid_settings(self, node):
         node.set("pid-step", safe_format(self.pid_step, float))
         node.set("pid-response-time", safe_format(self.pid_response_time, float))
+        for (name, *_), gain in zip(_PID_GAIN_SETTINGS, self.pid_gains):
+            node.set(f"pid-{name}", safe_format(gain, float))
         node.set("pid-acceleration", safe_format(getattr(self, "pid_acceleration", False), bool))
         for name, xml_name, default in (
             ("pid_accel_multiplier", "pid-accel-multiplier", 4.0),
@@ -8898,7 +9200,6 @@ Supports axis merging, curved output, command, hat and button mappings.
             ("pid_accel_timeout", "pid-accel-timeout", 0.75),
         ):
             node.set(xml_name, safe_format(getattr(self, name, default), float))
-        node.set("step-dir", safe_format(self.target_step_direction, int))
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the data storage with data from the XML node.
@@ -8963,6 +9264,11 @@ Supports axis merging, curved output, command, hat and button mappings.
                     default_action_mode = VjoyAction.VJoyAxis
                 self.action_mode = default_action_mode
 
+            self.fixed_pid_enabled = safe_read(node, "fixed-pid-enabled", bool, False)
+            duration = safe_read(node, "fixed-pid-duration", float, 0.0)
+            self.fixed_pid_duration = 0.0
+            if duration is not None and _PID_MIN_DURATION <= duration <= _PID_MAX_DURATION:
+                self.fixed_pid_duration = duration
             self._read_pid_settings(node)
             self.step_mode = StepMode.Stepped  # default
             if "step-mode" in node.attrib:
@@ -9115,6 +9421,10 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "target_value" in node.attrib:
                 self.target_value = safe_read(node, "target_value", float, 0.0)
                 self.target_value_valid = True
+
+            if self.action_mode == VjoyAction.VJoyBumpAxis:
+                self.bump_offset = min(1.0, max(0.001, safe_read(node, "bump-offset", float, 0.1)))
+                self.bump_delay_ms = min(60000, max(1, safe_read(node, "bump-delay-ms", int, 125)))
 
             if "target-use-last" in node.attrib:
                 self.target_use_last = safe_read(node, "target-use-last", bool, False)
@@ -9345,6 +9655,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyButtonPress,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyPulse,
         )
 
@@ -9410,8 +9721,15 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 node.set("paired", safe_format(self.paired, bool))
 
+            case VjoyAction.VJoyBumpAxis:
+                node.set("bump-offset", safe_format(self.bump_offset, float))
+                node.set("bump-delay-ms", safe_format(self.bump_delay_ms, int))
+
             case VjoyAction.VJoySetAxis:
                 node.set("target-use-last", safe_format(self.target_use_last, bool))
+                node.set("fixed-pid-enabled", safe_format(self.fixed_pid_enabled, bool))
+                node.set("fixed-pid-duration", safe_format(self.fixed_pid_duration, float))
+                self._write_pid_settings(node)
 
             case VjoyAction.VJoyMergeAxis:
                 node.set("invert-merged-output", safe_format(self.invert_merged_output, bool))
@@ -9464,16 +9782,17 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("stepped-input-id", str(self.stepped_input_id))
                 node.set("stepped-input-type", InputType.to_string(self.stepped_input_type))
                 node.set("latched", safe_format(self._stepped_latched, bool))
+                if self.step_mode in (StepMode.PID, StepMode.SteppedPID):
+                    self._write_pid_settings(node)
                 match self.step_mode:
                     case StepMode.PID:
-                        self._write_pid_settings(node)
+                        node.set("step-dir", safe_format(self.target_step_direction, int))
                     case StepMode.Stepped | StepMode.SteppedPID:
                         node.set("step-mode", safe_format(StepMode.to_string(self.step_mode), str))
                         node.set("step-dir", safe_format(self.target_step_direction, int))
                         node.set("steps", gremlin.util.floatlist_to_csv(self.target_step_list))
                         node.set("step-start-index", safe_format(self.target_step_start_index, int))
                         node.set("latched", safe_format(self._stepped_latched, bool))
-
 
                     case StepMode.Velocity:
                         node.set("linear", safe_format(self._target_step_linear_mode, bool))
@@ -9574,7 +9893,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         return True
 
     def _get_output_name(self) -> str:
-        if self.action_mode == VjoyAction.VJoyAxis:
+        if self.action_mode in (VjoyAction.VJoyAxis, VjoyAction.VJoyBumpAxis):
             return "Axis"
         elif self.action_mode in (
             VjoyAction.VJoyHat,
@@ -9640,11 +9959,18 @@ Supports axis merging, curved output, command, hat and button mappings.
             case VjoyAction.VJoyInvertAxis:
                 table.addField("Invert Axis", "yes")
 
+            case VjoyAction.VJoyBumpAxis:
+                table.addField("Bump Offset", f"{self.bump_offset:g}")
+                table.addField("Bump Delay", f"{self.bump_delay_ms} ms")
+
             case VjoyAction.VJoySetAxis:
                 if self.use_relative_value:
                     table.addField("Relative Axis", f"{self.target_value:0.3f}")
                 else:
                     table.addField("Set Axis", f"{self.target_value:0.3f}")
+                if self.fixed_pid_enabled and not self.target_use_last:
+                    duration = f"{self.fixed_pid_duration:g} s" if self.fixed_pid_duration else "auto"
+                    table.addField("PID Transition", duration)
 
             case VjoyAction.VJoyDisableLocal:
                 table.addField("Control", "Disable local control")
@@ -9716,6 +10042,7 @@ Supports axis merging, curved output, command, hat and button mappings.
     def __str__(self):
         if self.action_mode in (
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyBumpAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyAxis,
         ):

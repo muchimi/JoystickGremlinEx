@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
 #
 # Written for Gremlin Ex by Muchimi
 # Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
@@ -455,7 +455,7 @@ import struct
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import psutil
@@ -467,6 +467,7 @@ from shiboken6 import Shiboken
 import dinput
 import gremlin.config
 import gremlin.joystick_handling
+from gremlin.axis_bump import output_lock
 from dinput import GEX_MAX_DEVICES, GEX_PID_BASE, DeviceSummary
 from gremlin.input_types import InputType
 from gremlin.singleton_decorator import SingletonDecorator
@@ -886,6 +887,7 @@ class MaestroController:
     windows_order: int | None = None  # one-based position among active GEX joysticks
     hid_order_valid: bool | None = None
     native_guids: tuple = ()  # HID/XUSB aliases verified against this instance
+    last_axis_outputs: dict = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def service_device_id(self) -> str:
@@ -2787,7 +2789,7 @@ class Maestro:
 
     def setAxis(self, device_index: int, axis_index: int, value: float):
         """Write a one-based axis, converting GEX -1..1 to service 0..1."""
-        with self._lock:
+        with output_lock, self._lock:
             if not self.enabled or self._stopping.is_set():
                 return
             controller = self._control(device_index, axis_index, "axis")
@@ -2798,6 +2800,7 @@ class Maestro:
             value = max(-1.0, min(1.0, value))
             self.client.write(f"/maestro_axis/{controller.id}/{controller.axis_names[axis_index - 1]}", (value + 1) / 2)
             self._set_axis(device_index, axis_index, value)
+            controller.last_axis_outputs[axis_index] = (value,)
         self._notify_output(device_index, InputType.JoystickAxis, axis_index, value)
 
     def _set_button(self, device_index, button_index, is_pressed):
@@ -2876,6 +2879,10 @@ class MaestroAxis:
     @property
     def value(self):
         return self.device.maestro._read_axis_raw(self.device.id, self.axis_id) / 32767
+
+    @property
+    def last_output(self):
+        return self.device.controller.last_axis_outputs.get(self.axis_id)
 
     @value.setter
     def value(self, value):

@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
 #
 # Written for Gremlin Ex by Muchimi
 # Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import sys
+from html import escape
 from typing import Callable
 
 from lxml import etree
@@ -4712,10 +4713,15 @@ The setting can be overriden by the global mode reload option set in Options for
             self._populate_mode_layout()
 
     def _delete_mode(self, mode_name):
-        if ConfirmBox(
-            prompt=f"Delete mode {mode_name}?<br>This will delete this mode and all associated mappings.<br>Are you sure?",
-            parent=self,
-        ):
+        usage = self._profile.get_mode_removal_usage(mode_name)
+        used = [f"{label}: {count}" for label, count in usage.items() if count]
+        prompt = f"Delete mode <b>{escape(mode_name)}</b>?"
+        details = None
+        if used:
+            prompt += "<br>This mode is used in the profile."
+            details = "<br>".join(used)
+            details += "<br><br>Confirm to remove the affected mappings and update dependent settings."
+        if ConfirmBox(prompt=prompt, informative_text=details, parent=self):
             self._delete_mode_confirm(mode_name)
 
     def _delete_mode_confirm(self, mode_name):
@@ -4729,12 +4735,14 @@ The setting can be overriden by the global mode reload option set in Options for
         # Obtain mode from which the mode we want to delete inherits
 
         if self._profile.remove_mode(mode_name, emit=False):
-            default_mode = self._profile.get_root_mode()
+            default_mode = self._profile.get_start_mode()
             edit_mode_changed = gremlin.shared_state.edit_mode == mode_name
             if edit_mode_changed:
                 gremlin.shared_state.edit_mode = default_mode
             if gremlin.shared_state.runtime_mode == mode_name:
                 gremlin.shared_state.runtime_mode = default_mode
+            if gremlin.shared_state.previous_runtime_mode == mode_name:
+                gremlin.shared_state.previous_runtime_mode = default_mode
             if self.selected_mode == mode_name:
                 self.selected_mode = default_mode
 

@@ -440,17 +440,20 @@ class DialogChecks(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PySide6 import QtCore, QtGui, QtWidgets
         cls.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-        # Load the actual combo boxes without importing the joystick drivers.
+        # Load the actual UI controls without importing the joystick drivers.
         tree = ast.parse((ROOT / "gremlin/ui/ui_common.py").read_bytes())
-        names = {"QDataComboBox", "HtmlItemDelegate", "QHtmlDataComboBox"}
+        names = {"QDataComboBox", "HtmlItemDelegate", "QHtmlDataComboBox", "QRoundedGroupBox"}
         widgets = ast.Module(body=[node for node in tree.body if getattr(node, "name", None) in names],
                              type_ignores=[])
         combo_namespace = dict(
             QtCore=QtCore, QtGui=QtGui, QtWidgets=QtWidgets, Qt=QtCore.Qt, QSize=QtCore.QSize, Callable=Callable,
             QTextDocument=QtGui.QTextDocument, QComboBox=QtWidgets.QComboBox,
             QStyledItemDelegate=QtWidgets.QStyledItemDelegate, Buttons=NS(_default_parent=None),
-            gremlin=NS(config=NS(Configuration=lambda: NS(dropdown_use_mouse_wheel=True))),
+            gremlin=NS(config=NS(Configuration=lambda: NS(dropdown_use_mouse_wheel=True)),
+                       shared_state=NS(is_dark_theme=True)),
         )
+        colors = NS(groupBoxGreenColor=lambda: "#0f8633", groupBoxBlueColor=lambda: "#78c5ff")
+        combo_namespace["Color"] = lambda: colors
         exec(compile(widgets, "gremlin/ui/ui_common.py", "exec"), combo_namespace)
         common = ModuleType("gremlin.ui.ui_common")
         class RememberDialog(QtWidgets.QDialog):
@@ -463,9 +466,11 @@ class DialogChecks(unittest.TestCase):
                 layout.addWidget(widget)
             return result
         common.QInfoBox = QtWidgets.QLabel
-        common.Color = Mock()
+        common.Color = combo_namespace["Color"]
         common.MessageBoxYesNo = Mock()
         common.QRememberDialog = RememberDialog
+        common.QRoundedGroupBox = combo_namespace["QRoundedGroupBox"]
+        common.QWarningWidget = QtWidgets.QLabel
         common.QDataCheckbox = QtWidgets.QCheckBox
         common.QDataComboBox = combo_namespace["QDataComboBox"]
         common.QHtmlDataComboBox = combo_namespace["QHtmlDataComboBox"]

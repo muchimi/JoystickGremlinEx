@@ -42,6 +42,7 @@ from gremlin.types import KeyboardOutputMode, SyncMode, SendType
 import gremlin.remote
 import vjoy.vjoy
 import gremlin.process
+from gremlin.remote import RemoteClientWidget
 from gremlin.ui.ui_common import (
     Buttons,
     Color,
@@ -55,7 +56,6 @@ from gremlin.ui.ui_common import (
     QIntLineEdit,
     QSyncModeWidget,
     QWarningWidget,
-    RemoteClientWidget,
     TargetProcessWidget,
     getGridContainer,
     getHContainer,

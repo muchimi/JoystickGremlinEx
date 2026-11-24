@@ -52,6 +52,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T110)
+- New: Virtual Remap action: **set axis value mode** gains the stepped PID feature that allows you to use a PID controller to progressively change the value of the axis over time for a smooth transition.
+- New: Virtual Remap action: **bump axis mode**.  This new mode is a convenience mode to resend (bump) an axis value so the game picks it up as a change.  This internally is a pulse operation that sets two different axis values, offset sufficiently for the game to detected an axis change, but sets the final value to the last sent value by GEX.  This is helpful for games that don't expose an API to read the current value, yet you want the game to sync up to your current controls regardless of how the game defaults were.  While this could be done with separate actions in GEX before, this new mode makes it a single step and clear as to what the action does. The action supports a pulse duration, and the offset value to send to the game which defaults to 0.1.
+- Change: UI (PID): PID settings widget updated to set PID parameters more easily using presets for duration and for the PID acceleration behaviors.  The transition time is how long the PID is given to make the transition from the current axis value to the target value.  The gain presets determine the acceleration behavior, such as a gentle start and fast arrival, a fast start and slow arrival, or a smooth transition.  Note that if an axis is set with a fixed value while a PID is active, that PID will be stopped and the axis will immediately jump to the specified target value.
+- New: Input Viewer: the state visualizer has a new rolling mode to display the last changed state.  This will only display up to the maximum number of states currently visible.  The limit of the state count is to ensure that the operating system does not run out of resources causing a crash due to too many active visual elements on screen at once.
+- Change: API: Profile loading optimized to reduce parsing passes.
+- Change: API: configuration data saves are batched to reduce frequent I/O.
+- Fix: UI: some copy buttons would not result in enabling the paste button immediately.
+- Fix: API (execution engine): added a guardrail in the profile build process when stale mode data is found: the stale mode data would result in an exception due to the bad data as bad mode data is not expected by the build engine. Downstream fixes include a new workflow for mode rename and mode delete that will check the profile (as best as it can because some modes may be referenced in TTS for example) for any mappings that use the mode.  For renames, the references will be automatically updated.  For deletes, the delete will fail if references to that mode are present, and the list of the mappings impacted will be presented and the build/profile start will abort.
+
+
 ### (m77T109)
 
 - New: HID Hide integration: GEX can now manage HID Hide directly within GEX. Added support for the low level IOCTL API for HID Hide. GEX will also prompt on load if it is not white listed, and has a new dialog to HID Hide device visibility.  This requires HID Hide to be installed.  
