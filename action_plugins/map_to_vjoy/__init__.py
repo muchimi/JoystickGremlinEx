@@ -5535,11 +5535,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 syslog.warning(
                     f"VJOY: [{self.action_data.id}] failed to get device for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
                 )
-            return
-
-        # For hat actions the output hat is stored in vjoy_hat_id.
-        # check the hat is found
-        if VjoyAction.is_hat_action(action_data.action_mode):
+        elif VjoyAction.is_hat_action(action_data.action_mode):
+            # For hat actions the output hat is stored in vjoy_hat_id.
             self.vjoy_input_id = action_data.vjoy_hat_id
             if self.vjoy_input_id < 1 or self.vjoy_input_id > dev.hat_count:
                 self._valid = False
@@ -5560,13 +5557,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
 
         # check the button is found
-        elif VjoyAction.is_button_action(action_data.action_mode) and \
-             self.vjoy_input_id < 1 or self.vjoy_input_id > dev.button_count:
-                self._valid = False
-                if self.verbose:
-                    syslog.warning(
-                        f"VJOY: [{self.action_data.id}] invalid button id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
-                    )
+        elif VjoyAction.is_button_action(action_data.action_mode) and not 1 <= self.vjoy_input_id <= dev.button_count:
+            self._valid = False
+            if self.verbose:
+                syslog.warning(
+                    f"VJOY: [{self.action_data.id}] invalid button id [{self.vjoy_input_id}] for vjoy [{self.vjoy_id}] - input: [{input_item.display_name if input_item else 'None'}]"
+                )
 
         if self.verbose:
             syslog.info(f"Initializing VJoyRemapFunctor for action_data id: [{action_data.id}]")
@@ -5853,6 +5849,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         """occurs on profile start"""
+        if not self._valid:
+            return
+
         # Rebuild topology-derived curve metadata for every profile run.
         self.curve_actions = None
 
@@ -5863,7 +5862,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if VjoyAction.is_command(self.action_mode):
             # CodeRunner selects the actual startup mode after the start hooks.
-            self._startup_command_pending = self._valid and self.action_data.sync_mode != SyncMode.Ignore
+            self._startup_command_pending = self.action_data.sync_mode != SyncMode.Ignore
             return
 
         # setup initial state
@@ -6220,6 +6219,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """called when profile stops"""
 
         self._startup_command_pending = False
+        if not self._valid:
+            return
+
         if self.action_mode == VjoyAction.VJoyBumpAxis:
             with output_lock:
                 bumps = self._axis_bumps or {}

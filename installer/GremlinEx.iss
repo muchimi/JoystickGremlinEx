@@ -52,10 +52,10 @@ Name: "maestrobridge"; Description: "{code:MaestroBridgeDescription}"; GroupDesc
 ; Package the matching DLL for a live driver query before files are installed.
 Source: "..\vjoy\x86\vJoyInterface.dll"; Flags: dontcopy noencryption
 Source: "dependencies.ps1"; Flags: dontcopy
+Source: "release.ps1"; Flags: dontcopy
 #ifdef BundledBuild
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
-Source: "release.ps1"; Flags: dontcopy
 Source: "ffmpeg.ps1"; Flags: dontcopy
 #endif
 [Run]
@@ -75,6 +75,7 @@ Name: "{autoprograms}\GremlinEx Documentation"; Filename: "{#DocumentationUrl}"
 Type: files; Name: "{app}\.gremlinex-installed-version"
 [Code]
 #include "dependencies.iss"
+#include "update.iss"
 
 procedure InitializeWizard;
 begin
@@ -111,6 +112,7 @@ var
   PortableTarget: String;
 
 #include "dependencies.iss"
+#include "update.iss"
 
 function IsManaged: Boolean;
 begin
@@ -124,12 +126,13 @@ end;
 
 function RunHelper(Action, Asset, Destination: String): Boolean;
 var
-  Params: String;
+  HelperPath, Params: String;
   ExitCode: Integer;
 begin
-  ExtractTemporaryFile('release.ps1');
+  HelperPath := ExpandConstant('{tmp}\release.ps1');
+  if not FileExists(HelperPath) then ExtractTemporaryFile('release.ps1');
   Params := '-NoProfile -ExecutionPolicy Bypass -File ' +
-    Q(ExpandConstant('{tmp}\release.ps1')) +
+    Q(HelperPath) +
     ' -Action ' + Action +
     ' -Asset ' + Q(Asset) +
     ' -Destination ' + Q(Destination);

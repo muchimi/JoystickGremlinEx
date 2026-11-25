@@ -52,6 +52,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T110A)
+- Change: Setup: added check for a new version of GEX. 
+- Fix: API: profile start behavior when not able to resolve device references.  
+
+
 ### (m77T110)
 - New: Virtual Remap action: **set axis value mode** gains the stepped PID feature that allows you to use a PID controller to progressively change the value of the axis over time for a smooth transition.
 - New: Virtual Remap action: **bump axis mode**.  This new mode is a convenience mode to resend (bump) an axis value so the game picks it up as a change.  This internally is a pulse operation that sets two different axis values, offset sufficiently for the game to detected an axis change, but sets the final value to the last sent value by GEX.  This is helpful for games that don't expose an API to read the current value, yet you want the game to sync up to your current controls regardless of how the game defaults were.  While this could be done with separate actions in GEX before, this new mode makes it a single step and clear as to what the action does. The action supports a pulse duration, and the offset value to send to the game which defaults to 0.1.
