@@ -116,13 +116,12 @@ class GlobalSequence:
     def __init__(self):
         self._lock = threading.Lock()
         self._sequence_count = 0  # number of active sequences
+        self._generation = object()
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
 
     def profile_start(self):
-        # reset count on profile start
-        with self._lock:
-            self._sequence_count = 0
+        self.resetSequenceCount()
 
     @property
     def sequence_count(self):
@@ -132,6 +131,7 @@ class GlobalSequence:
     def resetSequenceCount(self):
         with self._lock:
             self._sequence_count = 0
+            self._generation = object()
 
     def canExecute(self):
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
@@ -143,21 +143,24 @@ class GlobalSequence:
         return True
 
     def tryPushSequence(self):
+        return self.reserveSequence() is not None
+
+    def reserveSequence(self):
         """Atomically checks the concurrency limit and reserves a sequence slot."""
         max_concurrent = gremlin.config.Configuration().max_concurrent_sequence
         with self._lock:
             if max_concurrent and self._sequence_count >= max_concurrent:
-                return False
+                return None
             self._sequence_count += 1
-            return True
+            return self._generation
 
     def pushSequence(self):
         with self._lock:
             self._sequence_count += 1
 
-    def popSequence(self):
+    def popSequence(self, generation=None):
         with self._lock:
-            if self._sequence_count:
+            if self._sequence_count and (generation is None or generation is self._generation):
                 self._sequence_count -= 1
 
 
@@ -1112,60 +1115,69 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # self._verbose = True
 
         self._hook_mode_change = False
-        self.action_data._thread = None
-        self.action_data._is_running = False
+        if not hasattr(self.action_data, "_thread"):
+            self.action_data._thread = None
+            self.action_data._is_running = False
         self._started = False
+        self._profile_stopped = False
+        self._activation = object()
         if self._verbose:
             syslog.info("SEQUENCE: initialized")
 
         self._current_step = None  # tracks the next step to execute
         self._runner_lock = threading.RLock()
         self._stop_event = threading.Event()
+        self._runner_activation = self._activation
+
+    def _can_dispatch_step(self):
+        return not self._profile_stopped and self._runner_activation is self._activation
 
     def _start_runner(self, runner, thread_name: str):
         gs = _global_sequence
         with self._runner_lock:
             thread = self.action_data._thread
-            if self.action_data._is_running or (thread is not None and thread.is_alive()):
+            if self._profile_stopped or self.action_data._is_running or (thread is not None and thread.is_alive()):
                 return
-            if not gs.tryPushSequence():
+            generation = gs.reserveSequence()
+            if generation is None:
                 syslog.error("SEQUENCE: exceeded concurrent sequence limit")
                 return
 
             self._stop_event.clear()
+            self._runner_activation = self._activation
             self.action_data._is_running = True
             try:
-                thread = threading.Thread(target=self._run_runner, args=(runner,), name=thread_name)
+                thread = threading.Thread(target=self._run_runner, args=(runner, generation), name=thread_name)
                 self.action_data._thread = thread
                 thread.start()
             except BaseException:
                 self.action_data._thread = None
                 self.action_data._is_running = False
                 self._stop_event.set()
-                gs.popSequence()
+                gs.popSequence(generation)
                 raise
 
             if self._verbose:
                 syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
 
-    def _run_runner(self, runner):
+    def _run_runner(self, runner, generation=None):
         try:
             runner()
         finally:
             with self._runner_lock:
-                _global_sequence.popSequence()
+                _global_sequence.popSequence(generation)
                 if self.action_data._thread is threading.current_thread():
                     self.action_data._thread = None
-                self.action_data._is_running = False
+                    self.action_data._is_running = False
                 self._stop_event.set()
 
-    def _stop_runner(self):
+    def _stop_runner(self, *, wait=True):
         with self._runner_lock:
             thread = self.action_data._thread
             self.action_data._is_running = False
             self._stop_event.set()
 
-        if thread is None or thread is threading.current_thread():
+        if not wait or thread is None or thread is threading.current_thread():
             return
 
         gremlin.util.safeJoin(thread)
@@ -1176,7 +1188,9 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def profile_start(self):
         if self._verbose:
             syslog.info("SEQUENCE: profile start")
-        self._stop_runner()
+        self._stop_runner(wait=False)
+        self._activation = object()
+        self._profile_stopped = False
 
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
@@ -1233,8 +1247,14 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             return result  # false if sequence is running
         return True  # allowed
 
+    def profile_stopping(self):
+        with self._runner_lock:
+            self._profile_stopped = True
+            self._valid = False
+            self._stop_runner(wait=False)
+
     def profile_stop(self):
-        self._stop_runner()
+        self.profile_stopping()
 
         if self._hook_mode_change:
             eh = gremlin.event_handler.EventHandler()
@@ -1430,7 +1450,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     break
                 if verbose:
                     syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-                execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
+                if self._can_dispatch_step():
+                    execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
                 # autorelease delay computation
                 delay = options.getAutoreleaseDelay(autorelease_delay_ms)
                 if delay > 0:
@@ -1440,7 +1461,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
                 if verbose:
                     syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-                execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
+                if self._can_dispatch_step():
+                    execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
                 if not self.action_data._is_running:
                     break
@@ -1484,7 +1506,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # send special end of sequence event to steps so they can stop whatever they are doing
         extra_data = {"sequence_end": True}
         for node in nodes:
-            execute_node(node, event_release, gremlin.actions.Value(False), extra_data)  # issue release for end of sequence
+            if self._can_dispatch_step():
+                execute_node(node, event_release, gremlin.actions.Value(False), extra_data)  # issue release for end of sequence
 
         if verbose:
             syslog.info(f"SEQUENCE: normal runner: exiting runner {self.id}")
@@ -1542,7 +1565,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 break
             if verbose:
                 syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
-            execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
+            if self._can_dispatch_step():
+                execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
             # autorelease delay computation
             delay = options.getAutoreleaseDelay(autorelease_delay_ms)
             if delay > 0:
@@ -1552,7 +1576,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
             if verbose:
                 syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
-            execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
+            if self._can_dispatch_step():
+                execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
             if not self.action_data._is_running:
                 break
@@ -1655,12 +1680,14 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     break
                 if verbose:
                     syslog.info(f"SEQUENCE RUNNER: (wiggle) Trigger Functor: loop [{repeat_index}] executes step [{index}] node: [{node.id}]")
-                execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
+                if self._can_dispatch_step():
+                    execute_node(node, event_press, gremlin.actions.Value(True), None)  # issue press
                 # autorelease delay
                 delay = options.getAutoreleaseDelay(exec_delay_ms)
                 if delay > 0:
                     self._wait(delay)
-                execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
+                if self._can_dispatch_step():
+                    execute_node(node, event_release, gremlin.actions.Value(False), None)  # issue release
 
                 # delay between steps
                 if not self.action_data._is_running:

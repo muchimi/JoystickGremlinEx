@@ -17,6 +17,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+
 import enum
 
 
@@ -37,9 +38,9 @@ class InputType(enum.IntEnum):
     State = 11  # state input
     OctaviIfr1 = 12  # octavi IFR1
     StreamDeck = 13  # Elgato Stream Deck via plugin bridge
-    Voice = 14 # Voice input
+    Voice = 14  # Voice input
     OverlayButton = 15  # Overlay HUD button (profile XML / events; UI uses JoystickButton)
-
+    StarCitizen = 16  # Star Citizen specific input
 
     @staticmethod
     def to_string(value) -> str:
@@ -54,11 +55,11 @@ class InputType(enum.IntEnum):
         return int(self)
 
     @staticmethod
-    def from_string(value) -> "InputType":
+    def from_string(value) -> InputType:
         return InputType.to_enum(value)
 
     @staticmethod
-    def to_enum(value) -> "InputType":
+    def to_enum(value) -> InputType:
         try:
             if value is None:
                 return InputType.NotSet
@@ -102,6 +103,8 @@ class InputType(enum.IntEnum):
                 return "Voice"
             case InputType.OverlayButton:
                 return "Overlay"
+            case InputType.StarCitizen:
+                return "StarCitizen"
             case _:
                 return f"Don't know how to handle {value}"
 
@@ -118,7 +121,9 @@ class InputType(enum.IntEnum):
 
     @staticmethod
     def to_display_name(value) -> str:
-        if value in _InputType_to_display_lookup.keys():
+        if value == InputType.StarCitizen:
+            return _InputType_to_display_lookup[value]
+        if value in _InputType_to_display_lookup:
             return _InputType_to_string_lookup[value]
         return f"Unknown type: {value}"
 
@@ -132,7 +137,7 @@ class InputType(enum.IntEnum):
                 input_type = _InputType_to_enum_lookup[value]
                 return input_type
 
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         return None
 
@@ -155,6 +160,7 @@ _InputType_to_string_lookup = {
     InputType.Mouse: "mouse",
     InputType.Voice: "voice",
     InputType.OverlayButton: "overlay",
+    InputType.StarCitizen: "star-citizen",
 }
 
 _InputType_to_display_lookup = {
@@ -173,6 +179,7 @@ _InputType_to_display_lookup = {
     InputType.Mouse: "Mouse",
     InputType.Voice: "Voice",
     InputType.OverlayButton: "Overlay Button",
+    InputType.StarCitizen: "Star Citizen",
 }
 
 
@@ -211,4 +218,6 @@ _InputType_to_enum_lookup = {
     "overlay": InputType.OverlayButton,
     "overlay-button": InputType.OverlayButton,
     "OverlayButton": InputType.OverlayButton,
+    "star-citizen": InputType.StarCitizen,
+    "StarCitizen": InputType.StarCitizen,
 }

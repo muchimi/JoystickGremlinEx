@@ -367,6 +367,11 @@ class CodeRunner:
                         syslog.info(f"\t{device_node!s}")
                     continue
 
+                if device.device_type == DeviceType.StarCitizen and device.connected:
+                    from gremlin.ui.star_citizen import get_device
+
+                    get_device()
+
                 device_name = device.name
                 if verbose:
                     syslog.info(f"CALLBACK: device: {device_node!s}")
@@ -874,6 +879,9 @@ class CodeRunner:
         el = gremlin.event_handler.EventListener()
         eh = gremlin.event_handler.EventHandler()
 
+        eh.stop_mode_queue()
+        gremlin.macro.MacroManager().stop()
+
         # tell components we're stopping
         el.profile_stopping.emit()  # about to stop
         el.profile_stop.emit()  # stop
@@ -934,7 +942,6 @@ class CodeRunner:
         gremlin.input_devices.start_registry.stop()
         gremlin.input_devices.start_registry.clear()
 
-        gremlin.macro.MacroManager().stop()
         sendinput.MouseController().stop()
 
         # Remove all claims on VJoy devices

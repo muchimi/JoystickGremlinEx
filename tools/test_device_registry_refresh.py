@@ -99,7 +99,7 @@ class RegistryRefreshChecks(unittest.TestCase):
                               _update_virtual_map=Mock(), _log_output_map=Mock())
         self.namespace["_create_vjoy_device"] = lambda vid: NS(
             device_guid=f"vjoy-{vid}", button_count=128, axis_count=8, hat_count=4,
-            axismap_list=[], axis_names={}, device_type=DeviceType.VJoy)
+            axismap_list=[], axis_names={}, device_type=DeviceType.VJoy, is_special=False)
 
         def register_special():
             self.namespace["_all_devices_map"][self.keyboard_guid] = self.keyboard
@@ -222,6 +222,17 @@ class RegistryRefreshChecks(unittest.TestCase):
         self.assertIs(self.namespace["getDevice"](self.keyboard_guid), self.keyboard)
         self.assertIs(self.namespace["getDevice"](service.device_guid), service)
         self.assertNotIn(old.device_guid, self.namespace["_all_devices_map"])
+
+    def test_publication_keeps_special_devices_with_joystick_inputs(self):
+        self.enumeration_fixture()
+        telemetry = NS(device_guid="star-citizen-guid", device_type=DeviceType.Joystick, is_special=True)
+        stale = NS(device_guid="unplugged-guid", device_type=DeviceType.Joystick, is_special=False)
+        self.namespace["_all_devices_map"].update({telemetry.device_guid: telemetry, stale.device_guid: stale})
+
+        self.namespace["_publish_joystick_devices"]({}, {}, {}, ())
+
+        self.assertIs(self.namespace["getDevice"](telemetry.device_guid), telemetry)
+        self.assertNotIn(stale.device_guid, self.namespace["_all_devices_map"])
 
     def test_existing_registry_views_keep_the_previous_complete_generation(self):
         previous = UserDict({self.keyboard_guid: self.keyboard})

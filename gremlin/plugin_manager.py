@@ -439,6 +439,8 @@ class ActionPlugins:
             return False
         if "afcs" in key and not config.afcs_enabled:
             return False
+        if tag == "map-to-star-citizen" and not config.startup_star_citizen_enabled:
+            return False
         return True
 
     def _discover_plugins(self):

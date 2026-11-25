@@ -16,39 +16,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Copyright (C) 2015 - 2020 Lionel Ott
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 
 from __future__ import annotations  # deprecated with python 3.14+
 
-from enum import Enum, auto, IntFlag, IntEnum, unique
-
-from typing import Tuple, Union
+import enum
+import logging
+from enum import Enum, IntEnum, IntFlag, auto, unique
 
 import gremlin.error
-
-import logging
-import enum
-
 
 syslog = logging.getLogger("system")
 
 
 class VisualizationType(IntEnum):
     """Enumeration of possible visualization types."""
+
     NotSet = 0
     AxisTemporal = 1
     AxisCurrent = 2
@@ -61,6 +43,7 @@ class VisualizationType(IntEnum):
     @classmethod
     def toString(cls, value: VisualizationType) -> str:
         return value.name.casefold()
+
     @classmethod
     def fromString(cls, value: str) -> VisualizationType:
         match value.casefold():
@@ -84,7 +67,6 @@ class VisualizationType(IntEnum):
                 raise ValueError(f"Unknown VisualizationType string: {value}")
 
 
-
 class KeyboardOutputMode(Enum):  # order is that of the display order for keyboard mapper options
     Pulse = 0  # keyboard make and break (press/release) (pulse mode)
     AutoRepeat = 1  # pulse mode - key pulses while the input is held
@@ -94,7 +76,7 @@ class KeyboardOutputMode(Enum):  # order is that of the display order for keyboa
     Toggle = 5  # toggles make / break
 
     @staticmethod
-    def to_displayname(value: KeyboardOutputMode):  # noqa: F821
+    def to_displayname(value: KeyboardOutputMode) -> str:
         match value:
             case KeyboardOutputMode.Pulse:
                 return "Pulse Single"
@@ -116,7 +98,7 @@ class AxisNames(Enum):
     DIAL = 8
 
     @staticmethod
-    def to_string(value: AxisNames) -> str:  # noqa: F821
+    def to_string(value: AxisNames) -> str:
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
@@ -124,7 +106,7 @@ class AxisNames(Enum):
             return "X"
 
     @staticmethod
-    def to_enum(value: str) -> AxisNames:  # noqa: F821
+    def to_enum(value: str) -> AxisNames:
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
@@ -132,7 +114,7 @@ class AxisNames(Enum):
             return AxisNames.X
 
     @staticmethod
-    def to_list():
+    def to_list() -> list[AxisNames]:
         return [axis for axis in AxisNames]
 
 
@@ -271,7 +253,7 @@ class DeviceCategory(IntEnum):
     Virtual = 2  # VIrtual device
     Special = 3  # special devices that are not joysticks (like keyboard)
     Config = 4  # configuration device like settings
-    Disconnected = 5 # disconnected device (not currently connected, but was previously connected or referenced in a profile)
+    Disconnected = 5  # disconnected device (not currently connected, but was previously connected or referenced in a profile)
 
     @staticmethod
     def to_string(value):
@@ -320,12 +302,13 @@ class DeviceType(IntEnum):
     Voice = 13  # voice special device
     Overlay = 14  # OBS / on-screen overlay designer tab
     Afcs = 15  # AFCS visual axis-flow designer tab
+    StarCitizen = 16  # Star Citizen telemetry device
 
     @staticmethod
-    def tab_order_group(value: DeviceType) -> int:
+    def tab_order_group(value: DeviceType, category: DeviceCategory | None = None) -> int:
         """Default display group for hardware, virtual inputs, and system tabs."""
         if value == DeviceType.Joystick:
-            return 0
+            return 2 if category == DeviceCategory.Special else 0
         if value in (DeviceType.VJoy, DeviceType.Maestro):
             return 1
         if value == DeviceType.Settings:
@@ -341,6 +324,7 @@ class DeviceType(IntEnum):
             DeviceType.NotSet,
             DeviceType.Joystick,
             DeviceType.ModeControl,
+            DeviceType.StarCitizen,
         )
 
     @staticmethod
@@ -410,6 +394,7 @@ _DeviceType_to_display_name = {
     DeviceType.Voice: "Voice",
     DeviceType.Overlay: "Overlay",
     DeviceType.Afcs: "AFCS",
+    DeviceType.StarCitizen: "Star Citizen",
 }
 
 _DeviceType_to_string_lookup = {
@@ -429,6 +414,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.Voice: "voice",
     DeviceType.Overlay: "overlay",
     DeviceType.Afcs: "afcs",
+    DeviceType.StarCitizen: "star-citizen",
 }
 
 
@@ -449,6 +435,7 @@ _DeviceType_to_enum_lookup = {
     "voice": DeviceType.Voice,
     "overlay": DeviceType.Overlay,
     "afcs": DeviceType.Afcs,
+    "star-citizen": DeviceType.StarCitizen,
 }
 
 
@@ -466,7 +453,7 @@ class PluginVariableType(xIntEnum):
     Action = 9
 
     @staticmethod
-    def to_string(value: PluginVariableType) -> str:  # noqa: F821
+    def to_string(value: PluginVariableType) -> str:
         try:
             v = value.value
             data = next((item for item in PluginVariableType if item.value == v), None)
@@ -475,7 +462,7 @@ class PluginVariableType(xIntEnum):
             raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> PluginVariableType:  # noqa: F821
+    def to_enum(value: str) -> PluginVariableType:
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
@@ -515,14 +502,14 @@ class MergeAxisOperation(Enum):
     Sum = 4
 
     @staticmethod
-    def to_string(value: MergeAxisOperation) -> str:  # noqa: F821
+    def to_string(value: MergeAxisOperation) -> str:
         try:
             return _MergeAxisOperation_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid MergeAxisOperation in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> MergeAxisOperation:  # noqa: F821
+    def to_enum(value: str) -> MergeAxisOperation:
         try:
             return _MergeAxisOperation_to_enum_lookup[value.lower()]
         except KeyError:
@@ -564,14 +551,14 @@ class PropertyType(Enum):
     List = 16
 
     @staticmethod
-    def to_string(value: PropertyType) -> str:  # noqa: F821
+    def to_string(value: PropertyType) -> str:
         try:
             return _PropertyType_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid PropertyType in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> PropertyType:  # noqa: F821
+    def to_enum(value: str) -> PropertyType:
         try:
             return _PropertyType_to_enum_lookup[value.lower()]
         except KeyError:
@@ -621,14 +608,14 @@ class AxisMode(Enum):
     Relative = 2
 
     @staticmethod
-    def to_string(value: AxisMode) -> str:  # noqa: F821
+    def to_string(value: AxisMode) -> str:
         try:
             return _AxisMode_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid AxisMode in lookup")
 
     @staticmethod
-    def to_enum(value: str) -> AxisMode:  # noqa: F821
+    def to_enum(value: str) -> AxisMode:
         try:
             return _AxisMode_to_enum_lookup[value.lower()]
         except KeyError:
@@ -653,14 +640,14 @@ class HatDirection(Enum):
     NorthWest = (-1, 1)
 
     @staticmethod
-    def to_string(value: HatDirection) -> str:  # noqa: F821
+    def to_string(value: HatDirection) -> str:
         try:
             return _HatDirection_to_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
 
     @staticmethod
-    def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:  # noqa: F821
+    def to_enum(value: str | tuple[int, int]) -> HatDirection:
         try:
             if isinstance(value, HatDirection):
                 return value
@@ -672,11 +659,11 @@ class HatDirection(Enum):
             raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
 
     @staticmethod
-    def to_position(value: HatDirection) -> tuple:  # noqa: F821
+    def to_position(value: HatDirection) -> tuple:
         return value.value
 
     @staticmethod
-    def to_display_name(value: HatDirection) -> str:  # noqa: F821
+    def to_display_name(value: HatDirection) -> str:
         return value.name
 
 
@@ -723,7 +710,7 @@ class LogicalOperator(Enum):
     All = 2
 
     @staticmethod
-    def to_display(instance: LogicalOperator) -> str:  # noqa: F821
+    def to_display(instance: LogicalOperator) -> str:
         lookup = {LogicalOperator.Any: "Any", LogicalOperator.All: "All"}
         value = lookup.get(instance, None)
         if value is None:
@@ -731,7 +718,7 @@ class LogicalOperator(Enum):
         return value
 
     @staticmethod
-    def to_string(instance: LogicalOperator) -> str:  # noqa: F821
+    def to_string(instance: LogicalOperator) -> str:
         lookup = {LogicalOperator.Any: "any", LogicalOperator.All: "all"}
         value = lookup.get(instance, None)
         if value is None:
@@ -739,7 +726,7 @@ class LogicalOperator(Enum):
         return value
 
     @staticmethod
-    def to_enum(string: str) -> LogicalOperator:  # noqa: F821
+    def to_enum(string: str) -> LogicalOperator:
         lookup = {"any": LogicalOperator.Any, "all": LogicalOperator.All}
         value = lookup.get(string, None)
         if value is None:
@@ -755,7 +742,7 @@ class ConditionType(Enum):
     CurrentInput = 3
 
     @staticmethod
-    def to_display(instance: ConditionType) -> str:  # noqa: F821
+    def to_display(instance: ConditionType) -> str:
         lookup = {
             ConditionType.Joystick: "Joystick",
             ConditionType.Keyboard: "Keyboard",
@@ -767,7 +754,7 @@ class ConditionType(Enum):
         return value
 
     @staticmethod
-    def to_string(instance: ConditionType) -> str:  # noqa: F821
+    def to_string(instance: ConditionType) -> str:
         lookup = {
             ConditionType.Joystick: "joystick",
             ConditionType.Keyboard: "keyboard",
@@ -779,7 +766,7 @@ class ConditionType(Enum):
         return value
 
     @staticmethod
-    def to_enum(string: str) -> ConditionType:  # noqa: F821
+    def to_enum(string: str) -> ConditionType:
         lookup = {
             "joystick": ConditionType.Joystick,
             "keyboard": ConditionType.Keyboard,
@@ -1114,7 +1101,7 @@ class VerboseMode(IntFlag):
     Plugin = auto()
     Voice = auto()
     Maestro = auto()  # maestro mode
-
+    StarCitizen = auto() #
     All = (
         Keyboard
         | Joystick
@@ -1161,6 +1148,7 @@ class VerboseMode(IntFlag):
         | Plugin
         | Voice
         | Maestro
+        | StarCitizen
     )
 
     def __contains__(self, item):
@@ -1189,6 +1177,7 @@ class TabDeviceType(int, Enum):
     Voice = 15
     Overlay = 16
     Afcs = 17
+    StarCitizen = 18
 
 
 class GamePadOutput(Enum):
@@ -1690,7 +1679,6 @@ class EventSourceType(enum.Enum):
     Overlay = 7
 
 
-
 class PlayMode(enum.Enum):
     Blank = 0  # blank
     AudioFile = 1  # use standard sound files
@@ -1747,10 +1735,10 @@ class PlayMode(enum.Enum):
             case _:
                 return f"Unknown play mode: [{value}]"
 
+
 class PlaybackMode(enum.Enum):
-    """ playback mode for multi sounds """
+    """playback mode for multi sounds"""
+
     RoundRobin = 1  # play sounds in a round-robin fashion
     Random = 2  # play sounds randomly
     TimedRandom = 3  # play sounds randomly with a cooldown period
-
-

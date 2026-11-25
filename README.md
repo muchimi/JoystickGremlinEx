@@ -52,6 +52,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T111)
+- New: Star Citizen device: (experimental) CIG has included in the latest releases of Star Citizen an undocumented gPRC server that sends (and for 5.0, receives) state data.  The data is incomplete, subject to change so not only is this experimental in GEX but it is also experimental in Star Citizen.  The module uses Google Protobuf for the decoding/encoding and defines a number of game related state changes.  For convenience, inputs may be duplicated to simplify mapping because some states are transition states (such as the landing gear and the wing deployment).  The server self-reports as to what data it provides, and the current implementation is based on what is in 4.10.3 live. More work on this will follow I'm sure as this is all fairly new, but usable right now. To enable this module, you must define an environment variable **GRPC_CLIENT_SERVER_ENABLED=true** before running the SC Launcher and GEX.  The GEX module supports 96 triggers, some of which are derived by GEX, based on the set available via the gPRC interface.
+
+- Change: API: optimization pass using profiler data on a very complex profile. The data yielded a pair of optimizations: the execution engine forward-lookup scan was simplified and cached, and the map to state action cleanup is cleaning up some references it should not keep.
+
+- Fix: API (timers): containers or actions that use wait (timer) threads were not consistently canceled on profile which could not only cause dangling references/threads after stop that take a while to clear, and could potentially trigger after profile deactivation.  This impacts several containers and actions.
+- Fix: Map to State Action: the action could be loaded and initialized before the profile states are completely loaded depending on where it appears in the profile.  This forces GEX to create a temporary state and temporary container ID subsequently replaced with a warning message to this effect. The action is modified to delay load after the rest of the profile states are loaded so the state engine is initialized before actions that use it are initialized.  This happens at profile load time.
+- Fix: Mode queue may not stop on profile deactivation, resulting in possible duplication of the mode queue if a profile starts/stops multiple times.
+
 ### (m77T110A)
 - Change: Setup: added check for a new version of GEX. 
 - Fix: API: profile start behavior when not able to resolve device references.  

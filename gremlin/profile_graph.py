@@ -805,6 +805,8 @@ class GraphInputItemNode(GraphBaseNode):
                     data["Axis"] = device.get_axis_name(input_item.input_id)
                 case InputType.JoystickButton:
                     data["Button"] =   input_item.input_id
+                case InputType.StarCitizen:
+                    data["Telemetry"] = input_item.short_display_name
                 case InputType.JoystickHat:
                     data["Hat"] = input_item.input_id
                 case InputType.Keyboard | InputType.KeyboardLatched:
@@ -2331,7 +2333,7 @@ class ProfileInputItemNode(ProfileBaseNode):
                     self.input_id = safe_read(node, "id", int, 0)
             self.is_axis = True
 
-        elif self.input_type in (InputType.JoystickButton, InputType.JoystickHat):
+        elif self.input_type in (InputType.JoystickButton, InputType.JoystickHat, InputType.StarCitizen):
             if "id" in node.attrib:
                 str_id = node.get("id")
                 if not str_id.isnumeric():

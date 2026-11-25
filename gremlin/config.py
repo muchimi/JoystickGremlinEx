@@ -57,61 +57,36 @@ DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNO
 # works from a frozen exe without requiring launch_gex.cmd env vars.
 
 VOICE_ENABLED = (
-    "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_VOICE_ENABLED" in os.environ
-    else True
+    "GEX_VOICE_ENABLED" in os.environ and os.environ["GEX_VOICE_ENABLED"].lower() in ("1", "true", "yes") if "GEX_VOICE_ENABLED" in os.environ else True
 )
-MIDI_ENABLED = (
-    "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_MIDI_ENABLED" in os.environ
-    else True
-)
-OSC_ENABLED = (
-    "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_OSC_ENABLED" in os.environ
-    else True
-)
+MIDI_ENABLED = "GEX_MIDI_ENABLED" in os.environ and os.environ["GEX_MIDI_ENABLED"].lower() in ("1", "true", "yes") if "GEX_MIDI_ENABLED" in os.environ else True
+OSC_ENABLED = "GEX_OSC_ENABLED" in os.environ and os.environ["GEX_OSC_ENABLED"].lower() in ("1", "true", "yes") if "GEX_OSC_ENABLED" in os.environ else True
 SIMCONNECT_ENABLED = "GEX_SIMCONNECT_ENABLED" in os.environ and os.environ["GEX_SIMCONNECT_ENABLED"].lower() in (
     "1",
     "true",
     "yes",
 )
 OVERLAY_ENABLED = (
-    "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_OVERLAY_ENABLED" in os.environ
-    else True
+    "GEX_OVERLAY_ENABLED" in os.environ and os.environ["GEX_OVERLAY_ENABLED"].lower() in ("1", "true", "yes") if "GEX_OVERLAY_ENABLED" in os.environ else True
 )
-AFCS_ENABLED = (
-    "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_AFCS_ENABLED" in os.environ
-    else True
-)
+AFCS_ENABLED = "GEX_AFCS_ENABLED" in os.environ and os.environ["GEX_AFCS_ENABLED"].lower() in ("1", "true", "yes") if "GEX_AFCS_ENABLED" in os.environ else True
 STREAMDECK_ENABLED = (
     "GEX_STREAMDECK_ENABLED" in os.environ and os.environ["GEX_STREAMDECK_ENABLED"].lower() in ("1", "true", "yes")
     if "GEX_STREAMDECK_ENABLED" in os.environ
     else True
 )
 OCTAVI_ENABLED = (
-    "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_OCTAVI_ENABLED" in os.environ
-    else True
+    "GEX_OCTAVI_ENABLED" in os.environ and os.environ["GEX_OCTAVI_ENABLED"].lower() in ("1", "true", "yes") if "GEX_OCTAVI_ENABLED" in os.environ else True
 )
 PROFILE_GRAPH_ENABLED = (
-    "GEX_PROFILE_GRAPH_ENABLED" in os.environ
-    and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
+    "GEX_PROFILE_GRAPH_ENABLED" in os.environ and os.environ["GEX_PROFILE_GRAPH_ENABLED"].lower() in ("1", "true", "yes")
     if "GEX_PROFILE_GRAPH_ENABLED" in os.environ
     else True
 )
 GEX_MAESTRO_ENABLED = (
-    "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_MAESTRO_ENABLED" in os.environ
-    else True
+    "GEX_MAESTRO_ENABLED" in os.environ and os.environ["GEX_MAESTRO_ENABLED"].lower() in ("1", "true", "yes") if "GEX_MAESTRO_ENABLED" in os.environ else True
 )
-VJOY_ENABLED = (
-    "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes")
-    if "GEX_VJOY_ENABLED" in os.environ
-    else True
-)
+VJOY_ENABLED = "GEX_VJOY_ENABLED" in os.environ and os.environ["GEX_VJOY_ENABLED"].lower() in ("1", "true", "yes") if "GEX_VJOY_ENABLED" in os.environ else True
 
 SEQUENCE_TEXT_ENABLED = (
     "GEX_SEQUENCE_TEXT_ENABLED" in os.environ and os.environ["GEX_SEQUENCE_TEXT_ENABLED"].lower() in ("1", "true", "yes")
@@ -119,14 +94,18 @@ SEQUENCE_TEXT_ENABLED = (
     else False
 )
 
+STAR_CITIZEN_ENABLED = (
+    "GEX_STAR_CITIZEN_ENABLED" in os.environ and os.environ["GEX_STAR_CITIZEN_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_STAR_CITIZEN_ENABLED" in os.environ
+    else True
+)
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
-    changed = Signal(
-        str, object
-    )  # fires on some configuration value changes, passes the method to get the value that has changed
+    changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
 
     _save_requested = QtCore.Signal()
     _SAVE_DELAY_MS = 200
@@ -208,6 +187,7 @@ class Configuration(QtCore.QObject):
         gremlin.shared_state.data_path = self.data_path()
 
         self.reload()
+        self._startup_star_citizen_enabled = self.star_citizen_enabled
 
     def logModuleOptions(self):
         """Logs the status of various module options."""
@@ -824,20 +804,12 @@ class Configuration(QtCore.QObject):
                     syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
 
             disk_pages = merged.get("streamdeck_pages") if isinstance(merged, dict) else None
-            disk_foreign = {
-                key: merged[key]
-                for key in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                if isinstance(merged, dict) and key in merged
-            }
+            disk_foreign = {key: merged[key] for key in self._PROFILE_SIDECAR_FOREIGN_KEYS if isinstance(merged, dict) and key in merged}
 
             # Apply pending in-memory profile changes (e.g. last_input/selection_map)
             # on top of on-disk data before writing — never foreign module payloads.
             if pending_profile_data:
-                pending = {
-                    key: value
-                    for key, value in pending_profile_data.items()
-                    if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS
-                }
+                pending = {key: value for key, value in pending_profile_data.items() if key not in self._PROFILE_SIDECAR_FOREIGN_KEYS}
                 merged.update(pending)
 
             # Restore foreign keys captured from disk before update(). Without this,
@@ -854,9 +826,7 @@ class Configuration(QtCore.QObject):
             mem_custom = self._streamdeck_pages_custom_count(mem_pages)
             if disk_custom > 0 and mem_custom < disk_custom:
                 merged["streamdeck_pages"] = disk_pages
-                syslog.info(
-                    f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})"
-                )
+                syslog.info(f"CONFIG: preserved on-disk streamdeck_pages (disk_custom={disk_custom}, memory_custom={mem_custom})")
 
             # Re-read foreign keys immediately before write so an overlay/Stream Deck
             # save that landed during this merge is not rolled back.
@@ -924,9 +894,7 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
-            syslog.info(
-                f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]"
-            )
+            syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -1055,9 +1023,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data(
-            "tts_mode_switch_enabled", False
-        )  # change in m77 default is to not speak mode changes by default
+        return self._get_data("tts_mode_switch_enabled", False)  # change in m77 default is to not speak mode changes by default
 
     @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value: bool):
@@ -1533,11 +1499,7 @@ class Configuration(QtCore.QObject):
     def apply_remote_control_firewall_settings(self, port: int, host: str | None):
         """Save the rule scope and remote endpoint together."""
         all_hosts = host is None
-        if (
-            self.remote_control_firewall_all_hosts == all_hosts
-            and self.server_port == port
-            and (all_hosts or self.broadcast_host_ip == host)
-        ):
+        if self.remote_control_firewall_all_hosts == all_hosts and self.server_port == port and (all_hosts or self.broadcast_host_ip == host):
             return
         self._data.update(server_port=port, remote_control_firewall_all_hosts=all_hosts)
         if host is not None:
@@ -2027,8 +1989,9 @@ class Configuration(QtCore.QObject):
 
     @verbose.setter
     def verbose(self, value):
-        self._data["verbose"] = value
-        self.save()
+        if self._data.get("verbose") != value:
+            self._set_data("verbose", value)
+            self.changed.emit("verbose", value)
 
     @property
     def verbose_mode(self):
@@ -2040,8 +2003,7 @@ class Configuration(QtCore.QObject):
 
     def setVerboseMode(self, value):
         """sets the verbose mode to a value"""
-        self._data["verbose_mode"] = value
-        self.save()
+        self.verbose_mode = value
 
     def is_verbose_mode(self, mode):
         value = self.verbose_mode
@@ -2050,8 +2012,9 @@ class Configuration(QtCore.QObject):
 
     @verbose_mode.setter
     def verbose_mode(self, value):
-        self._data["verbose_mode"] = value
-        self.save()
+        if self._data.get("verbose_mode") != value:
+            self._set_data("verbose_mode", value)
+            self.changed.emit("verbose_mode", value)
 
     def verbose_set_mode(self, mode, enabled):
         """enables the specified verbose mode"""
@@ -2375,6 +2338,11 @@ class Configuration(QtCore.QObject):
         """true if verbose mode for maestro"""
         # return True
         return self.verbose and VerboseMode.Maestro in self.verbose_mode
+
+    @property
+    def verbose_mode_star_citizen(self):
+        """true if verbose mode for Star Citizen"""
+        return self.verbose and VerboseMode.StarCitizen in self.verbose_mode
 
     @property
     def osc_input_port(self):
@@ -2735,9 +2703,7 @@ class Configuration(QtCore.QObject):
         elif isinstance(input_id, (list, set, tuple)):
             pass
         else:
-            syslog.warning(
-                f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
-            )
+            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             return
 
         input_type = InputType.convert(input_type)
@@ -2747,9 +2713,7 @@ class Configuration(QtCore.QObject):
         input_type_string = InputType.to_string(input_type)
         self._profile_data["last_input"] = data
         self._profile_data["last_input_device_guid"] = normalized_device_guid
-        self._profile_data["last_device_guid"] = (
-            normalized_device_guid  # read first by last_device_guid; must not go stale
-        )
+        self._profile_data["last_device_guid"] = normalized_device_guid  # read first by last_device_guid; must not go stale
         self._profile_data["last_input_id"] = input_id
         self._profile_data["last_input_type"] = input_type_string
         self._profile_data["last_input_mode"] = mode
@@ -2764,9 +2728,7 @@ class Configuration(QtCore.QObject):
             syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
 
         if __debug__:
-            syslog.info(
-                f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]"
-            )
+            syslog.info(f"CONFIG: SetLastInput(): device: [{device.name}], device_guid=[{device_guid}], input_type=[{input_type}], input_id=[{input_id}]")
 
         # save the config
         self.save_profile_settings()
@@ -2863,6 +2825,16 @@ class Configuration(QtCore.QObject):
                 input_type = InputType.NotSet
                 save_input_id = None
                 input_id = None
+
+            case DeviceType.StarCitizen:
+                device = gremlin.joystick_handling.getDevice(dinput_device_guid)
+                if device and device.button_count:
+                    if isinstance(input_id, str) and input_id.isdecimal():
+                        input_id = int(input_id)
+                    if not isinstance(input_id, int) or not 1 <= input_id <= device.button_count:
+                        input_id = 1
+                    input_type = InputType.StarCitizen
+                    save_input_id = input_id
             case _:
                 assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
 
@@ -2889,6 +2861,7 @@ class Configuration(QtCore.QObject):
             return (device.device_guid, None, None)
 
         requested_device_guid = device_guid
+        input_type = None
 
         # get the profile data
         if self._profile_data:
@@ -2955,9 +2928,7 @@ class Configuration(QtCore.QObject):
         dinput_device_guid = device.device_guid
         device_guid = device.device_id
         normalized_dinput_device_guid = gremlin.util.normalize_guid(dinput_device_guid)
-        normalized_requested_guid = (
-            gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
-        )
+        normalized_requested_guid = gremlin.util.normalize_guid(requested_device_guid) if requested_device_guid is not None else None
 
         data: dict = self._profile_data.get("last_input", {})
         lookup_keys = [device_guid, normalized_dinput_device_guid]
@@ -2977,7 +2948,7 @@ class Configuration(QtCore.QObject):
             if (
                 isinstance(input_id, str)
                 and input_id.isnumeric()
-                and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+                and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat, InputType.StarCitizen)
             ):
                 input_id = int(input_id)
 
@@ -3096,9 +3067,7 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        return MIDI_ENABLED and self._data.get(
-            "midi_enabled", False
-        )  # defaults to OFF and must be explicitly enabled by the user
+        return MIDI_ENABLED and self._data.get("midi_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
@@ -3118,9 +3087,7 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self) -> bool:
         """True if OSC support is enabled"""
         if self._osc_enabled is None:
-            self._osc_enabled = self._get_data(
-                "osc_enabled", True
-            )  # defaults to OFF and must be explicitly enabled by the user
+            self._osc_enabled = self._get_data("osc_enabled", True)  # defaults to OFF and must be explicitly enabled by the user
         return OSC_ENABLED and self._osc_enabled
 
     @osc_enabled.setter
@@ -3173,9 +3140,7 @@ class Configuration(QtCore.QObject):
     @property
     def streamdeck_enabled(self) -> bool:
         """True if Stream Deck plugin bridge support is enabled"""
-        return STREAMDECK_ENABLED and self._get_data(
-            "streamdeck_enabled", False
-        )  # defaults to OFF and must be explicitly enabled by the user
+        return STREAMDECK_ENABLED and self._get_data("streamdeck_enabled", False)  # defaults to OFF and must be explicitly enabled by the user
 
     @streamdeck_enabled.setter
     def streamdeck_enabled(self, value: bool):
@@ -4401,9 +4366,7 @@ class Configuration(QtCore.QObject):
     @property
     def virpil_led_executable(self) -> str:
         """returns the path to the virpil LED executable"""
-        return self._get_data(
-            "virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe"
-        )
+        return self._get_data("virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe")
 
     @virpil_led_executable.setter
     def virpil_led_executable(self, value: str):
@@ -4643,3 +4606,17 @@ class Configuration(QtCore.QObject):
             self._startup_options.pop(name, None)
         else:
             self._startup_options[name] = value
+
+    @property
+    def star_citizen_enabled(self) -> bool:
+        """Return the configured Star Citizen module setting."""
+        return STAR_CITIZEN_ENABLED and self._get_data("star_citizen_enabled", True)
+
+    @star_citizen_enabled.setter
+    def star_citizen_enabled(self, value: bool):
+        self._set_data("star_citizen_enabled", value)
+
+    @property
+    def startup_star_citizen_enabled(self) -> bool:
+        """Return the Star Citizen module setting for this session."""
+        return self._startup_star_citizen_enabled

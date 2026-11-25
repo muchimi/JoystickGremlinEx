@@ -44,6 +44,7 @@ import gremlin.ui
 import gremlin.util
 from dinput import DeviceSummary
 from gremlin import execution_guard
+from gremlin.runtime_timers import RuntimeTimers
 from gremlin.fastqueue import FastQueue
 from gremlin.filter import EMAFilter
 from gremlin.input_types import InputType
@@ -387,7 +388,7 @@ class Event:
             stub = f"Keyboard - scan code, extended :  [{key.name}]  vk: {key.virtual_code} (0x{key.virtual_code:X}) pressed: {self.is_pressed}"
         elif self.event_type == InputType.JoystickAxis or self.is_axis:
             stub = f"Axis : {self.identifier} raw value: {self.raw_value} value: {self.value}"
-        elif self.event_type == InputType.JoystickButton:
+        elif self.event_type in (InputType.JoystickButton, InputType.StarCitizen):
             stub = f"Button : {self.identifier} pressed: {self.is_pressed} value: {self.value}"
         elif self.event_type == InputType.ModeControl:
             stub = f"Mode Control : {self.identifier} pressed: {self.is_pressed} value: {self.value} mode: {self.mode}"
@@ -1445,7 +1446,6 @@ class EventListener(QtCore.QObject):
 
         self._profile_started = False
         device_guid = gremlin.shared_state.mode_tab_guid
-        delay = 0.250  # delay in seconds between press/release events for mode control change
         master_mode = gremlin.shared_state.master_mode
         extra_data = {"mode": master_mode}  # override execution mode
 
@@ -1471,8 +1471,8 @@ class EventListener(QtCore.QObject):
 
         eh = EventHandler()
         m2_list, f2_list = eh.execute_event(event_stop_pressed)
-        start_release = Timer(delay, lambda: eh._execute_callbacks(event_stop_released, m2_list, f2_list))
-        start_release.start()
+        # Complete the explicit Profile Stop mapping before retiring its execution graph.
+        eh._execute_callbacks(event_stop_released, m2_list, f2_list)
 
         if not self.enable_mouse_hook:
             self.disableMouse()
@@ -1538,12 +1538,10 @@ class EventListener(QtCore.QObject):
         eh = EventHandler()
 
         m2_list, f2_list = eh.execute_event(event_start_pressed)
-        start_release = Timer(delay, lambda: eh._execute_callbacks(event_start_released, m2_list, f2_list))
-        start_release.start()
+        eh._mode_timers.schedule(delay, lambda: eh._execute_callbacks(event_start_released, m2_list, f2_list))
 
         m2_list, f2_list = eh.execute_event(event_enter_pressed)
-        enter_release = Timer(delay, lambda: eh._execute_callbacks(event_enter_released, m2_list, f2_list))
-        enter_release.start()
+        eh._mode_timers.schedule(delay, lambda: eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 
     def _device_changed_cb(self):
         self._init_joysticks()
@@ -2608,6 +2606,7 @@ class LatchedCallbackData:
 class EventHandler(QtCore.QObject):
     """Listens to the inputs from multiple different input devices."""
 
+    _mode_change_queued = QtCore.Signal()
     mode_status_update = Signal()  # tell the UI to update the mode status bar
 
     # signal emitted when the profile is changed
@@ -2629,6 +2628,7 @@ class EventHandler(QtCore.QObject):
         el = EventListener()
         el.runtime_mode_changed.connect(self._update_mode_change)
         el.profile_start.connect(self._profile_start)
+        el.profile_stopping.connect(self.stop_mode_queue)
         el.profile_stop.connect(self._profile_stop)
         el.profile_started.connect(self._profile_started)
 
@@ -2636,9 +2636,12 @@ class EventHandler(QtCore.QObject):
 
         self._lock = threading.RLock()
         self._started = False
-        self._execute_queue = []  # list of items to execute
-        self._execute_thread = None
-        self._execute_running = False
+        self._mode_timers = RuntimeTimers()
+        self._mode_queue_timer = QtCore.QTimer(self)
+        self._mode_queue_timer.setSingleShot(True)
+        self._mode_queue_timer.timeout.connect(self._drain_mode_queue)
+        self._mode_change_queued.connect(self._drain_mode_queue, QtCore.Qt.ConnectionType.QueuedConnection)
+        self._mode_queue_dispatching = False
         self._mode_lookup_cache = {}
         self._mode_lookup_cache_lock = threading.RLock()
 
@@ -2664,11 +2667,7 @@ class EventHandler(QtCore.QObject):
             # self._queue_start()
             self._update_mode_change(gremlin.shared_state.runtime_mode)
             self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
-            self._execute_thread_event = threading.Event()
-            self._execute_thread = threading.Thread(target=self._execute_runner, args=(self._execute_thread_event,))
-
-            self._execute_thread.name = "execute runner"
-            self._execute_thread.start()
+            self._mode_timers.start()
             syslog.info("EXEC: start")
 
     def _profile_started(self):
@@ -2676,6 +2675,7 @@ class EventHandler(QtCore.QObject):
         pass
 
     def _profile_stop(self):
+        self.stop_mode_queue()
         if self._started:
             # self._queue_stop() # finish up and stop the current execution queue
             self._started = False
@@ -2686,12 +2686,12 @@ class EventHandler(QtCore.QObject):
             current_profile = gremlin.shared_state.current_profile
             last_mode = gremlin.shared_state.runtime_mode
             current_profile.set_last_runtime_mode(last_mode)
-            if self._execute_thread and self._execute_thread.is_alive():
-                syslog.info("EXEC: stopping execute runner thread")
-                self._execute_thread_event.set()
-                gremlin.util.safeJoin(self._execute_thread)
-                syslog.info("EXEC: execute runner thread stopped")
-                self._execute_thread = None
+
+    def stop_mode_queue(self):
+        with self._lock:
+            self._mode_timers.stop()
+            self._change_mode_queue.clear()
+        self._mode_queue_timer.stop()
 
     def registerModeValidator(self, callback: Callable):
         assert callback is not None and callable(callback), "Callback must provided and be a callable "
@@ -3284,9 +3284,15 @@ class EventHandler(QtCore.QObject):
                 verbose = gremlin.config.Configuration().verbose
                 if event.event_type != InputType.ModeControl and device_guid not in valid_devices_map:
                     device = gremlin.joystick_handling.getDevice(device_guid)
-                    if verbose:
-                        syslog.info(f"CALLBACK: device [{device.name}] [{device.device_id}] is disabled in callbacks ")
-                    return
+                    telemetry_button = (
+                        event.event_type == InputType.StarCitizen
+                        and device is not None and device.device_type == DeviceType.StarCitizen
+                        and device.connected and not device.disabled
+                    )
+                    if not telemetry_button:
+                        if verbose:
+                            syslog.info(f"CALLBACK: device [{device_guid}] is unavailable for callbacks")
+                        return
 
                 if device_guid not in self.callbacks:
                     self.callbacks[device_guid] = {}
@@ -3484,7 +3490,7 @@ class EventHandler(QtCore.QObject):
     def _mode_change_allowed(self) -> bool:
         """checks if a mode change is allowed right now"""
         if self._mode_change_hooks:
-            for id, callback in self._mode_change_hooks.items():
+            for id, callback in self._mode_change_hooks.copy().items():
                 result = callback(id)
                 if not result:
                     return False
@@ -3492,38 +3498,39 @@ class EventHandler(QtCore.QObject):
         return True
 
     def queueModeChange(self, new_mode: str, args: tuple):
-        """request a mode change using the mode stack"""
+        """Queue a mode change while the current profile accepts requests."""
         with self._lock:
+            if not self._mode_timers.active:
+                return
+            wake = not self._change_mode_queue
             self._change_mode_queue.append((new_mode, args))
-            config = gremlin.config.Configuration()
-            if config.verbose_mode_macro or config.verbose_mode_sequence:
-                syslog.info(f"MODE QUEUE: queue mode [{new_mode}] queue depth: [{len(self._change_mode_queue)}]")
+        if wake:
+            self._mode_change_queued.emit()
 
-    def _execute_runner(self, abort_event: threading.Event):
-        """mode change runner - watches for mode change requests and changes mode if a mode change is allowed"""
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_macro or config.verbose_mode_sequence
-        while not abort_event.is_set():
-            if len(self._change_mode_queue):
-                if self.ModeChangeAllowed():
-                    with self._lock:
-                        # get the most recent mode pushed on the queue
-                        new_mode, args = self._change_mode_queue.popleft()
-                        self._change_mode_queue.clear()  # remove all items
-
-                    if verbose:
-                        syslog.info(f"MODE QUEUE RUNNER: deqeue mode [{new_mode}]")
-                    # clear the queue of all other mode changes that accumulated
-
-                    # run the mode change
-                    if new_mode != self.current_mode:
-                        self._change_mode(new_mode, args)
-                else:
-                    # Validators can stay false for an entire macro/sequence.
-                    # Wait rather than consuming a core while the queue is full.
-                    abort_event.wait(0.01)
-            else:
-                abort_event.wait(0.05)
+    @QtCore.Slot()
+    def _drain_mode_queue(self):
+        """Dispatch deferred mode changes on the same event loop as Stop."""
+        with self._lock:
+            activation = self._mode_timers.activation
+            if self._mode_queue_dispatching or activation is None or not self._change_mode_queue:
+                return
+        self._mode_queue_dispatching = True
+        try:
+            if not self.ModeChangeAllowed():
+                return
+            with self._lock:
+                if self._mode_timers.activation is not activation or not self._change_mode_queue:
+                    return
+                new_mode, args = self._change_mode_queue.popleft()
+                self._change_mode_queue.clear()
+            if new_mode != self.current_mode:
+                self._change_mode(new_mode, args)
+        finally:
+            self._mode_queue_dispatching = False
+            with self._lock:
+                pending = self._mode_timers.active and bool(self._change_mode_queue)
+            if pending:
+                self._mode_queue_timer.start(10)
 
     def change_mode(self, new_mode, emit=True, force_update=False, tts=True, validate=True, *, startup=False):
         args = (emit, force_update, tts, validate)
@@ -3576,6 +3583,9 @@ class EventHandler(QtCore.QObject):
         emit, force_update, tts, validate = args
 
         is_running = gremlin.shared_state.is_running
+        activation = self._mode_timers.activation if is_running else None
+        if is_running and activation is None:
+            return
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui or config.verbose_mode_mode
@@ -3703,14 +3713,15 @@ class EventHandler(QtCore.QObject):
 
                         # fire mode change control for mode exit (press + release)
                         m1_list, f1_list = self.execute_event(event_old_mode_exit_pressed)
+                        if self._mode_timers.activation is not activation:
+                            return
                         if m1_list or f1_list:
                             # callback = self._create_change_mode_callback(event_old_mode_exit_pressed, m1_list, f1_list)
                             # mode_exit_press = Timer(delay, callback)
                             # mode_exit_press.start()
 
                             callback = self._create_change_mode_callback(event_old_mode_exit_released, m1_list, f1_list)
-                            mode_exit_release = Timer(delay, callback)
-                            mode_exit_release.start()
+                            self._mode_timers.schedule(delay, callback)
 
                         # CHANGE THE MODE
 
@@ -3722,6 +3733,8 @@ class EventHandler(QtCore.QObject):
                                 )
                                 return
 
+                        if self._mode_timers.activation is not activation:
+                            return
                         self.previous_runtime_mode = self.runtime_mode
                         gremlin.shared_state.runtime_mode = new_mode
                         # remember the last mode for this profile
@@ -3740,16 +3753,18 @@ class EventHandler(QtCore.QObject):
                                 el.runtime_mode_changed.emit(new_mode)
                             el.update_mode_status_bar.emit(new_mode)
 
+                        if self._mode_timers.activation is not activation:
+                            return
+
                         # fire mode change for mode enter (press + release)
                         m2_list, f2_list = self.execute_event(event_new_mode_enter_pressed)
-                        if m2_list or f2_list:
+                        if self._mode_timers.activation is activation and (m2_list or f2_list):
                             # callback = self._create_change_mode_callback(event_new_mode_enter_pressed, m2_list, f2_list)
                             # mode_enter_press = Timer(delay, callback)
                             # mode_enter_press.start()
 
                             callback = self._create_change_mode_callback(event_new_mode_enter_released, m2_list, f2_list)
-                            mode_enter_release = Timer(delay, callback)
-                            mode_enter_release.start()
+                            self._mode_timers.schedule(delay, callback)
 
                 else:
                     # non-runtime
@@ -3782,7 +3797,11 @@ class EventHandler(QtCore.QObject):
 
     def _create_change_mode_callback(self, event, m_list, f_list):
         """gets a return callback for mode changes"""
-        return lambda: self._execute_callbacks(event, m_list, f_list)
+        def execute():
+            if self._mode_timers.active:
+                self._execute_callbacks(event, m_list, f_list)
+
+        return execute
 
     def resume(self):
         """Resumes the processing of callbacks."""
@@ -3924,6 +3943,7 @@ class EventHandler(QtCore.QObject):
                     InputType.JoystickAxis,
                     InputType.JoystickButton,
                     InputType.JoystickHat,
+                    InputType.StarCitizen,
                 ):
                     f_list = self._matching_functors(event)
                     if f_list:
@@ -4171,6 +4191,7 @@ class EventHandler(QtCore.QObject):
                 InputType.JoystickHat,
                 InputType.OctaviIfr1,
                 InputType.ModeControl,
+                InputType.StarCitizen,
             ):
                 if verbose:
                     syslog.info(f"EVENT: [Joystick] processing input item: {input_item.display_name}")
@@ -5732,16 +5753,20 @@ class JoystickEventProcessor:
         """Dispatch matching sources and wildcard listeners once on the UI thread."""
         gremlin.util.assert_ui_thread()
         device_guid = event.device_guid
-        input_type = event.getInputType()
+        input_types = (event.getInputType(),)
+        if event.event_type == InputType.StarCitizen and event.event_type != input_types[0]:
+            input_types += (event.event_type,)
         input_id_key = gremlin.input_item.getInputIdKey(event.identifier)
         mode = CallbackMode.Run if gremlin.shared_state.is_running else CallbackMode.Edit
         sources = (event.source,) if event.source == EventSourceType.Any else (event.source, EventSourceType.Any)
         callbacks = {}
         for source in sources:
-            registered = self._listener_callbacks.get(source, {}).get(mode, {}).get(device_guid, {}).get(input_type, {})
-            for identifier in (-1, input_id_key):
-                for callback in tuple(registered.get(identifier, ())):
-                    callbacks[callback] = None
+            device_callbacks = self._listener_callbacks.get(source, {}).get(mode, {}).get(device_guid, {})
+            for input_type in input_types:
+                registered = device_callbacks.get(input_type, {})
+                for identifier in (-1, input_id_key):
+                    for callback in tuple(registered.get(identifier, ())):
+                        callbacks[callback] = None
         for callback in callbacks:
             if callback in self._callback_map:
                 owner = getattr(callback, "__self__", None)

@@ -1448,6 +1448,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """gets the override input type - which defaults to the regular input type if no override is set"""
         if self._override_input_type:
             return self._override_input_type
+        if self._input_type == InputType.StarCitizen:
+            return InputType.JoystickButton
         return self._input_type
 
     @property
@@ -1581,6 +1583,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     self.is_axis = False
                     self._input_name = f"Button {input_id}"
                     self._is_button = True
+                case InputType.StarCitizen:
+                    self.is_axis = False
+                    device = gremlin.joystick_handling.getDevice(self._device_guid)
+                    self._input_name = device.get_button_name(input_id) if device else f"Star Citizen {input_id}"
+                    self._is_button = True
                 case InputType.JoystickHat:
                     self.is_axis = False
                     self._input_name = f"Hat {input_id}"
@@ -1611,13 +1618,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         else:
             self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
 
-    def from_xml(self, node: etree._Element, data, extra_data: dict = None, skip_root=False):
+    def from_xml(self, node: etree._Element, data, extra_data: dict = None, skip_root=False, *, defer_containers=False):
         """Parses an InputItem node.
 
         :param node: xml element node to parse
         :param data: data object (context sensitive)
         :param extra_data: map object (context sensitive)
         :param skip_root: true if the child node should be processed only for containers (subclass dependent)
+        :param defer_containers: load input metadata now and read the containers later
         """
 
         # assert data is not None, "InputItem must be provided"
@@ -1626,8 +1634,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.ui.state_device
 
         extra_data = dict(extra_data or {})
-        container_plugins = ContainerPlugins()
-        container_tag_map = container_plugins.tag_map
         if extra_data and "input_type" in extra_data:
             self.setInputType(extra_data["input_type"])
         else:
@@ -1688,7 +1694,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                             break
                     self.is_axis = True
 
-                case InputType.JoystickButton | InputType.JoystickHat:
+                case InputType.JoystickButton | InputType.JoystickHat | InputType.StarCitizen:
                     if "id" in node.attrib:
                         str_id = node.get("id")
                         if not str_id.isnumeric():
@@ -1700,12 +1706,17 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                         button = safe_read(node, "id", int, 0)
                         self.input_id = gremlin.ui.octavi_device.OctaviButton(button)
 
-        # read containers for this input item
+        if not defer_containers:
+            self._load_containers_from_xml(node, extra_data)
+
+    def _load_containers_from_xml(self, node, extra_data=None):
+        """Load container mappings after their referenced inputs are available."""
+        extra_data = dict(extra_data or {})
+        container_plugins = ContainerPlugins()
+        container_tag_map = container_plugins.tag_map
         self._containers.pushSuspend()  # stop updates
         self._containers.clear()  # remove any prior data
         container_nodes = node.xpath("./container")
-        if extra_data is None:
-            extra_data = {}
         extra_data["input_item"] = self
         for child in container_nodes:
             if child.tag in ("latched", "input", "keylatched") or _is_curve_tag(child.tag):
@@ -1847,8 +1858,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     )
                 else:
                     stub = f"{device.get_axis_name(self._input_id)}"
-            case InputType.JoystickButton:
-                stub = f"Button {self._input_id}"
+            case InputType.JoystickButton | InputType.StarCitizen:
+                stub = device.get_button_name(self._input_id) if device else f"Button {self._input_id}"
             case InputType.JoystickHat:
                 stub = f"Hat {self._input_id}"
             case InputType.Keyboard | InputType.KeyboardLatched:
@@ -5767,10 +5778,10 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         :param node the XML node to populate fields with
         """
 
+        saved_id = node.get("container_id")
+        if saved_id and saved_id.strip():
+            self._id = saved_id
         super().from_xml(node, data, extra_data)
-
-        if "container_id" in node.attrib:
-            self._id = node.get("container_id")
 
         assert node.tag == "container", "Invalid container node"
         assert "type" in node.attrib, "Invalid container node"

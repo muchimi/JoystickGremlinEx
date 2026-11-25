@@ -803,6 +803,8 @@ class GremlinUi(QRememberMainWindow):
                     return TabDeviceType.NotSet
                 case DeviceType.Keyboard:  # keyboard special device
                     return TabDeviceType.Keyboard
+                case DeviceType.StarCitizen:
+                    return TabDeviceType.StarCitizen
                 case DeviceType.Joystick:  # joystick or game controller
                     return TabDeviceType.Joystick
                 case DeviceType.VJoy:  # vjoy (virtual)
@@ -923,6 +925,8 @@ class GremlinUi(QRememberMainWindow):
         tab_switch_needed = self._tabswitch_needed(device_guid)
         if tab_switch_needed and not is_tabswitch_enabled:
             # tab switch is disabled
+            return
+        if input_type == InputType.StarCitizen and self._find_tab_index(device_guid) == -1:
             return
 
         input_switch_needed = True  # tab_switch_needed or self._inputswitch_needed(device_guid, input_id)
@@ -3173,7 +3177,14 @@ class GremlinUi(QRememberMainWindow):
         # a profile. Use the same profile-aware inventory as Device List, which
         # also reconciles stale cached connection flags against live devices.
         all_devices = gremlin.joystick_handling.display_devices(self.profile)
+        if not self.config.startup_star_citizen_enabled:
+            # A saved profile can still supply a disconnected device with this GUID.
+            star_citizen_guid = gremlin.shared_state.star_citizen_tab_guid
+            all_devices = [dev for dev in all_devices if dev.device_guid != star_citizen_guid]
         display_device_map = {gremlin.util.normalize_guid(dev.device_id): dev for dev in all_devices}
+
+        def tab_group(device):
+            return DeviceType.tab_order_group(device.device_type, device.device_category)
 
         # physical connected
         physical_devices = [dev for dev in all_devices if not dev.is_virtual and dev.device_category == DeviceCategory.Physical and dev.connected]
@@ -3282,7 +3293,7 @@ class GremlinUi(QRememberMainWindow):
 
             # New devices join their default group without disturbing a user's
             # existing order. In particular, new joysticks precede special tabs.
-            missing_devices.sort(key=lambda device: (DeviceType.tab_order_group(device.device_type), device.name.casefold()))
+            missing_devices.sort(key=lambda device: (tab_group(device), device.name.casefold()))
             for device in missing_devices:
                 fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
                 if fixed_tab:
@@ -3293,13 +3304,13 @@ class GremlinUi(QRememberMainWindow):
                     device.visible = self.config.isDeviceVisible(device.device_guid)
                     if device.disabled or not device.visible:
                         continue
-                group = DeviceType.tab_order_group(device.device_type)
-                same_group = [index for index, existing in enumerate(sorted_devices) if DeviceType.tab_order_group(existing.device_type) == group]
+                group = tab_group(device)
+                same_group = [index for index, existing in enumerate(sorted_devices) if tab_group(existing) == group]
                 index = (
                     same_group[-1] + 1
                     if same_group
                     else next(
-                        (index for index, existing in enumerate(sorted_devices) if DeviceType.tab_order_group(existing.device_type) > group),
+                        (index for index, existing in enumerate(sorted_devices) if tab_group(existing) > group),
                         len(sorted_devices),
                     )
                 )
@@ -3333,7 +3344,7 @@ class GremlinUi(QRememberMainWindow):
             sorted_devices = all_sorted_devices
 
         if reset or not tab_map:
-            sorted_devices.sort(key=lambda device: (DeviceType.tab_order_group(device.device_type), device.name.casefold()))
+            sorted_devices.sort(key=lambda device: (tab_group(device), device.name.casefold()))
 
         # Visibility layouts override old flags stored alongside manual tab order.
         visible_map = getattr(self.config, "device_visible_map", {})
@@ -3497,6 +3508,8 @@ class GremlinUi(QRememberMainWindow):
             # the profile always records the last tab (config skips tabs without inputs)
             active_device_guid = last_input[0] or config.last_device_guid
             active_device = gremlin.joystick_handling.getDevice(active_device_guid) if active_device_guid else None
+            if active_device and not config.startup_star_citizen_enabled and active_device.device_guid == gremlin.shared_state.star_citizen_tab_guid:
+                active_device = None
             if not active_device:
                 # not found - pick the first one by tab order
                 active_device = next(iter(sorted_devices), None)
@@ -3646,6 +3659,23 @@ class GremlinUi(QRememberMainWindow):
                     # special devices
 
                     match device.device_type:
+                        case DeviceType.StarCitizen:
+                            from gremlin.ui.star_citizen import create_tab
+
+                            guid = device.device_guid
+                            device_profile = self.profile.get_device_modes(guid, device.device_type, device.name)
+                            gremlin.shared_state.device_profile_map[guid] = device_profile
+                            gremlin.shared_state.device_type_map[guid] = device.device_type
+
+                            widget = self.getRegisteredWidget(device_id)
+                            if widget is None or not Shiboken.isValid(widget):
+                                widget = create_tab(device, self.profile, self.current_mode)
+                                self.registerWidget(device_id, widget)
+                                widget.tabData = ts.getData(device_id)
+                            widget.data = (TabDeviceType.StarCitizen, device_id, index)
+                            if add_tab_if_missing(device, TabDeviceType.StarCitizen):
+                                index += 1
+
                         case DeviceType.Keyboard:
                             # =======================================================
                             # Create keyboard tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)
@@ -5052,7 +5082,10 @@ class GremlinUi(QRememberMainWindow):
             self._dump_tab_map(tab_map)
 
         # Sort every currently displayed tab, including all special modules.
-        guid_list = sorted(tab_map.values(), key=lambda data: (DeviceType.tab_order_group(data.device.device_type), data.device.name.casefold()))
+        guid_list = sorted(
+            tab_map.values(),
+            key=lambda data: (DeviceType.tab_order_group(data.device.device_type, data.device.device_category), data.device.name.casefold()),
+        )
 
         # move the tabs to the correct location
         self._reset_tab_data()

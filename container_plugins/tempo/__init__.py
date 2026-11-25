@@ -19,7 +19,6 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import copy
 import logging
-import threading
 import time
 
 from lxml import etree as ElementTree
@@ -30,6 +29,7 @@ import gremlin
 import gremlin.ui.ui_common
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, ActionSet, InputItem
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 from gremlin.util import safe_format, write_guid
 import gremlin.execution_graph
 import gremlin.base_profile
@@ -248,6 +248,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def __init__(self, container: TempoContainer, parent=None):  # noqa: F821
         self.container: TempoContainer = container
         super().__init__(container, parent)
+        self._timers = RuntimeTimers()
 
         self.delay = container.delay
         self.activate_on = container.activate_on
@@ -264,7 +265,14 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self._thread = None
         self.verbose = gremlin.config.Configuration().verbose_mode_container
 
+    def profile_stop(self):
+        self._timers.stop()
+
+    profile_stopping = profile_stop
+
     def profile_started(self):
+        self._timers.start()
+
         # reset any prior values before start
         self.start_time = 0
         self.timer = None
@@ -326,13 +334,13 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         # kill any executing timers on mode change
         if self.timer:
-            self.timer.cancel()
+            self._timers.cancel(self.timer)
             self.timer = None
 
     def _trigger_short_press(self, event, value, extra_data: dict = None):
         """triggers a short press"""
 
-        if event is None:
+        if not self._timers.active or event is None:
             # can happen if a queued timer/thread callback fires after a mode
             # change already cleared the pending event reference
             return
@@ -341,6 +349,8 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         ec = gremlin.execution_graph.ExecutionContext()
         if self.short_enabled:
             for node in self.short_nodes:
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
         else:
             syslog.warning("TEMPO: no short action to trigger")
@@ -348,7 +358,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def _trigger_long_press(self, event, value, extra_data: dict = None):
         """triggers a long press"""
 
-        if event is None:
+        if not self._timers.active or event is None:
             # can happen if a queued timer/thread callback fires after a mode
             # change already cleared the pending event reference
             return
@@ -357,11 +367,15 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         ec = gremlin.execution_graph.ExecutionContext()
         if self.long_enabled:
             for node in self.long_nodes:
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
         else:
             syslog.warning("TEMPO: no long action to trigger")
 
     def process_event(self, event, value, extra_data=None):
+        if not self._timers.active:
+            return False
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0, 0)
         else:
@@ -376,8 +390,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         if is_pressed:
             # input press event
             self.start_time = time.time()
-            self.timer = threading.Timer(self.delay, self._long_press)
-            self.timer.start()
+            self.timer = self._timers.schedule(self.delay, self._long_press)
 
         else:
             # input release event
@@ -387,7 +400,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 self._trigger_long_press(event, value, extra_data)
             else:
                 if self.timer:
-                    self.timer.cancel()
+                    self._timers.cancel(self.timer)
                     self.timer = None
                 # Only fire the short press if we actually recorded the matching
                 # press on this functor instance. After a mode switch a new tempo
@@ -396,17 +409,8 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 # then sends None events downstream (crashes in execute_node /
                 # play_sound with 'NoneType' has no attribute ...).
                 if self.event_press is not None:
-                    thread = threading.Thread(
-                        target=lambda: self._short_press(
-                            self.event_press,  # send a press event to the functors
-                            self.value_press,
-                            event,
-                            value,
-                        ),
-                        daemon=False,
-                    )
-                    thread.name = "TEMPO short"
-                    thread.start()
+                    event_press, value_press = self.event_press, self.value_press
+                    self._timers.schedule(0, lambda: self._short_press(event_press, value_press, event, value))
 
             self.trigger_mode = None
 
@@ -421,8 +425,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         :param value_r value to release the action
         """
         self._trigger_short_press(event_p, value_p)
-        time.sleep(self.autorelease_delay)
-        self._trigger_short_press(event_r, value_r)
+        self._timers.schedule(self.autorelease_delay, lambda: self._trigger_short_press(event_r, value_r))
 
     def _long_press(self):
         self.trigger_mode = "long"  # indicate long press triggered

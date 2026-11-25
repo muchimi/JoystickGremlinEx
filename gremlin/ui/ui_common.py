@@ -8025,8 +8025,11 @@ class QButtonStateWidget(QJoystickListener, QWidget):
             self._update_hat_ui(position)
 
     def process_event_ui(self, event: gremlin.event_handler.Event):
-        assert gremlin.util.is_ui_thread()
-        self._update_value_ui(event.is_pressed)
+        self.setState(event.is_pressed)
+
+    def setState(self, is_pressed: bool):
+        """Display a button state supplied directly on the UI thread."""
+        self._update_value_ui(is_pressed)
 
     def desiredHeight(self):
         return self.sizeHint().height()
@@ -15150,7 +15153,7 @@ class QWarningWidget(QWidget):
         self,
         text=None,
         split: bool = False,
-        tooltip: str = None,
+        tooltip: str | None = None,
         icon: QIcon = None,
         autohide: bool = False,
         parent=None,

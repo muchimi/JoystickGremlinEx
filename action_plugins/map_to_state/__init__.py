@@ -26,6 +26,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 import gremlin.base_profile
 import gremlin.config
+import gremlin.execution_graph
 from gremlin.input_types import InputType
 from gremlin.types import SyncMode
 from gremlin.util import safe_read, safe_format
@@ -981,6 +982,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         self._started = False
         self.action_data: MapToState = action
+        self._listener_key = None
+        self.state_targets = []
 
         self.verbose = gremlin.config.Configuration().verbose_mode_state
 
@@ -1006,7 +1009,22 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         # self.last_event = None
         self.pulse_worker_map = {}
 
-        self.sd.registerStateChangeCallback(key, self._handle_state_changed)
+    def hook(self):
+        if self.node is not None:
+            node = gremlin.execution_graph.ExecutionContext().node_map.get(self.action_data.id)
+            if node is not self.node:
+                return
+        super().hook()
+
+    def unhook(self):
+        self._unregister_state_listener()
+        super().unhook()
+
+    def _unregister_state_listener(self):
+        key = self._listener_key
+        if key is not None:
+            self._listener_key = None
+            self.sd.unregisterStateChangeCallback(key, self._handle_state_changed)
 
     def _target_states(self) -> list[gremlin.ui.state_device.StateInputItem]:
         """states the action applies to"""
@@ -1016,8 +1034,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         """callback for when the state changes"""
         if self.verbose:
             syslog.info(f"STATE FUNCTOR: state changed: [{state.key}] = {state.value}")
-        if not state.value:
-            pass
 
     def profile_start(self):
         import gremlin.event_handler
@@ -1025,6 +1041,12 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.verbose = gremlin.config.Configuration().verbose_mode_state
         # self.verbose = True
+        key = self.action_data.key
+        if key != self._listener_key:
+            self._unregister_state_listener()
+            if key:
+                self.sd.registerStateChangeCallback(key, self._handle_state_changed)
+                self._listener_key = key
 
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
@@ -1050,7 +1072,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         self.pulse_worker_map = {}  # map of (state_name) to pulse worker object
         if self.verbose:
             input_item: gremlin.input_item.InputItem = self.action_data.input_item
-            syslog.info(f"STATE FUNCTOR PROFILE START SYNC: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.display_name}")
+            syslog.info(f"STATE FUNCTOR PROFILE START SYNC: (map to state) [{key}] : mapped to input: {input_item.display_name}")
             syslog.info(f"\tsync mode: [{self.action_data.sync_mode.name}]")
 
         # input inversion
@@ -1129,6 +1151,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_stop(self):
         # occurs on profile stop
         self._started = False
+        self._unregister_state_listener()
 
         if self.action_data.reset_default_on_stop:
             if self.verbose:
@@ -1571,8 +1594,7 @@ class MapToState(gremlin.input_item.AbstractAction):
         if "key" in node.attrib:
             key = node.get("key")
         if "state-id" in node.attrib:
-            state_id = gremlin.util.to_uuid(node.get("state-id"))
-            state = sd.getStateById(state_id)
+            state = sd.getStateById(node.get("state-id"))
 
         if not state and key:
             # grab state ID for legacy profiles

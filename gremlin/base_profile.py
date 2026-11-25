@@ -303,6 +303,15 @@ class ProfileDeviceNode:
 
                         # not a matching device, treat as a regular
 
+                if not device and device_guid == gremlin.shared_state.star_citizen_tab_guid:
+                    # Keep saved telemetry mappings readable while the module is disabled.
+                    device = dinput.DeviceSummary()
+                    device.device_guid = device_guid
+                    device.name = self.name
+                    device.device_type = DeviceType.StarCitizen
+                    device.device_category = DeviceCategory.Special
+                    device.setConnected(False)
+
                 if not device:
                     # create a disconnected device for this entry
 
@@ -449,6 +458,13 @@ class AbstractFunctor(QtCore.QObject):
     def hook(self):
         """called by the execution context before profile_start, profile_started gets called"""
         if not self._hooked:
+            if isinstance(self.action_data, gremlin.input_item.AbstractContainer):
+                input_item = self.action_data.input_item
+                if input_item is not None and input_item.input_type == InputType.State:
+                    # Only the current execution graph owns the State container's startup hooks.
+                    node = gremlin.execution_graph.ExecutionContext().node_map.get(self.action_data.id)
+                    if node is None or node.functors is not self:
+                        return
             self._hooked = True
             el = gremlin.event_handler.EventListener()
             el.profile_start.connect(self.profile_start)
@@ -861,9 +877,10 @@ class JoystickInputStats:
         self.device_counts = {}  # device count [input_type] -> int
         self.filtered_counts = {}  # filtered input count [input_type] -> int
         self.mapped_counts = {}  # mapped input count [input_type] -> int
+        self.button_input_type = device.button_input_type if device else InputType.JoystickButton
         self.input_types = [
             InputType.JoystickAxis,
-            InputType.JoystickButton,
+            self.button_input_type,
             InputType.JoystickHat,
         ]
         self.mapped_mode = None  # mode used to filter the mappings, if None, uses all profile modes
@@ -875,7 +892,7 @@ class JoystickInputStats:
 
         if device:
             self.device_counts[InputType.JoystickAxis] = device.axis_count
-            self.device_counts[InputType.JoystickButton] = device.button_count
+            self.device_counts[self.button_input_type] = device.button_count
             self.device_counts[InputType.JoystickHat] = device.hat_count
             self.updateFilters(input_filter)
             self.updateMappings()
@@ -912,7 +929,7 @@ class JoystickInputStats:
 
     @property
     def visible_button_count(self) -> int:
-        return self.getVisibleCount(InputType.JoystickButton)
+        return self.getVisibleCount(self.button_input_type)
 
     @property
     def visible_hat_count(self) -> int:
@@ -946,7 +963,7 @@ class JoystickInputStats:
                         self.mapped_counts[input_type] = sum(
                             [
                                 1
-                                for input_item in mode_object.config[input_type]
+                                for input_item in mode_object.config[input_type].values()
                                 if isinstance(input_item, InputItem) and input_item.containers
                             ]
                         )
@@ -964,7 +981,7 @@ class JoystickInputStats:
                 match input_type:
                     case InputType.JoystickAxis:
                         max_count = device.axis_count
-                    case InputType.JoystickButton:
+                    case InputType.JoystickButton | InputType.StarCitizen:
                         max_count = device.button_count
                     case InputType.JoystickHat:
                         max_count = device.hat_count
@@ -1353,6 +1370,7 @@ class Settings:
             return device.device_type in (
                 DeviceType.Joystick,
                 DeviceType.VJoy,
+                DeviceType.StarCitizen,
             )  # filter by default if a joystick device
         return False
 
@@ -1393,7 +1411,7 @@ class Settings:
 
         if self.getDeviceFiltered(device_guid):
             device = gremlin.joystick_handling.getDevice(device_guid)
-            device_guid = gremlin.util.normalize_guid(self.device_guid)  # key must be a string
+            device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
             if device:
                 input_type = InputType.JoystickAxis
                 for index in range(device.axis_count):
@@ -1402,7 +1420,7 @@ class Settings:
                     if included:
                         setFilter(device_guid, input_type, input_id, included)
 
-                input_type = InputType.JoystickButton
+                input_type = device.button_input_type
                 for input_id in range(1, device.button_count + 1):
                     included = self.getInputVisible(device_guid, input_type, input_id)
                     if included:
@@ -1480,8 +1498,8 @@ class Settings:
             self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, is_used)
         for index in range(device.button_count):
             input_id = index + 1
-            is_used = self.profile.isInputMapped(device_guid, InputType.JoystickButton, input_id, current_mode)
-            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, is_used)
+            is_used = self.profile.isInputMapped(device_guid, device.button_input_type, input_id, current_mode)
+            self.setInputVisible(device_guid, device.button_input_type, input_id, is_used)
         for index in range(device.hat_count):
             input_id = index + 1
             is_used = self.profile.isInputMapped(device_guid, InputType.JoystickHat, input_id, current_mode)
@@ -1498,7 +1516,7 @@ class Settings:
             self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, True)
         for index in range(device.button_count):
             input_id = index + 1
-            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, True)
+            self.setInputVisible(device_guid, device.button_input_type, input_id, True)
         for index in range(device.hat_count):
             input_id = index + 1
             self.setInputVisible(device_guid, InputType.JoystickHat, input_id, True)
@@ -1517,7 +1535,7 @@ class Settings:
             self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, False)
         for index in range(device.button_count):
             input_id = index + 1
-            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, False)
+            self.setInputVisible(device_guid, device.button_input_type, input_id, False)
         for index in range(device.hat_count):
             input_id = index + 1
             self.setInputVisible(device_guid, InputType.JoystickHat, input_id, False)
@@ -1539,6 +1557,8 @@ class Settings:
         if not additive:
             self.clearDeviceFilters(device)  # clear any filters
         self.setFilterDefaults(device.device_guid)
+        if device.device_type == DeviceType.StarCitizen:
+            self.syncFilterDefaults(device.device_guid)
 
     def setInputTypeVisibleDevice(
         self, device: dinput.DeviceSummary, input_type: InputType, visible: bool, additive=False
@@ -1553,10 +1573,9 @@ class Settings:
                 for index in range(device.axis_count):
                     input_id = device.axis_sequence_to_input_id(index)
                     self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, visible)
-            case InputType.JoystickButton:
-                for index in range(device.button_count):
-                    input_id = index + 1
-                    self.setInputVisible(device_guid, InputType.JoystickButton, input_id, visible)
+            case InputType.JoystickButton | InputType.StarCitizen:
+                for input_id in range(1, device.button_count + 1):
+                    self.setInputVisible(device_guid, input_type, input_id, visible)
             case InputType.JoystickHat:
                 for index in range(device.hat_count):
                     input_id = index + 1
@@ -1936,14 +1955,13 @@ class Settings:
             self.setFilterDefaults(device.device_guid)
 
     def setFilterDefaults(self, device_guid: dinput.GUID, force=False):
-        """sets the default visible inputs for a given joystick"""
+        """Sets default visibility for a device with fixed inputs."""
         assert isinstance(device_guid, dinput.GUID), "invalid device"
         device = gremlin.joystick_handling.getDevice(device_guid)
         if not device:
             return
 
-        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-            # not a joystick axis
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy, DeviceType.StarCitizen):
             return
         if device.disabled:
             # disabled device
@@ -1958,11 +1976,11 @@ class Settings:
             cfg_max_hat = config.device_filter_max_hat
 
             max_axis = min(cfg_max_axis, device.axis_count)
-            max_button = min(cfg_max_button, device.button_count)
+            max_button = device.button_count if device.device_type == DeviceType.StarCitizen else min(cfg_max_button, device.button_count)
             max_hat = min(cfg_max_hat, device.hat_count)
             data = [
                 (InputType.JoystickAxis, max_axis),
-                (InputType.JoystickButton, max_button),
+                (device.button_input_type, max_button),
                 (InputType.JoystickHat, max_hat),
             ]
             # force an entry so settings knows we looked at this device already
@@ -1980,8 +1998,7 @@ class Settings:
         assert isinstance(device_guid, dinput.GUID), "invalid device"
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "device not found"
-        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-            # not a joystick axis
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy, DeviceType.StarCitizen):
             return
 
         device_id = device.device_id
@@ -2003,6 +2020,9 @@ class Settings:
 
         # start with default data for all devices, then override with saved data if it exists
         self.setAllDevicesDefault()
+        star_citizen = gremlin.joystick_handling.getDevice(gremlin.shared_state.star_citizen_tab_guid)
+        if star_citizen is not None and star_citizen.connected:
+            self.setFilterDefaults(star_citizen.device_guid)
 
         # load specific defaults for the device if found
         if os.path.isfile(fname):
@@ -2753,7 +2773,7 @@ class Profile:
         self.settings.setFilterDefaults(device_guid, force)
 
     def ensureInputItems(self, device_guid: dinput.GUID, force=False):
-        """ensures input items are setup for joysticks"""
+        """Ensures input items are set up for devices with fixed inputs."""
         assert isinstance(device_guid, dinput.GUID), "invalid device id format"
 
         device = gremlin.joystick_handling.getDevice(device_guid)
@@ -4343,7 +4363,7 @@ class Profile:
         if (
             isinstance(input_id, str)
             and input_id.isnumeric()
-            and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+            and input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat, InputType.StarCitizen)
         ):
             input_id = int(input_id)
 
@@ -4977,6 +4997,7 @@ class Profile:
                 DeviceType.VJoy,
                 DeviceType.State,
                 DeviceType.ModeControl,
+                DeviceType.StarCitizen,
             ):
                 # remove empty nodes
                 if depth > 0:
@@ -5177,6 +5198,7 @@ class Profile:
             InputType.OpenSoundControl,
             InputType.StreamDeck,
             InputType.State,
+            InputType.StarCitizen,
         ]
 
         # Process all devices
@@ -5544,6 +5566,8 @@ class Profile:
                         assert device.device_guid == gremlin.shared_state.osc_tab_guid
                     case InputType.OverlayButton:
                         assert device.device_guid == gremlin.shared_state.overlay_tab_guid
+                    case InputType.StarCitizen:
+                        assert device.device_guid == gremlin.shared_state.star_citizen_tab_guid
                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
                         assert device.device_type in (DeviceType.Joystick, DeviceType.VJoy)
                     case _:
@@ -5671,6 +5695,8 @@ class Profile:
                         if state is None:
                             # does not exist
                             current_input_id = None
+                    case InputType.StarCitizen:
+                        current_device_guid = gremlin.shared_state.star_citizen_tab_guid
                     case InputType.OctaviIfr1:
                         current_device_guid = gremlin.shared_state.octaviifr1_tab_guid
                     case InputType.ModeControl:
@@ -6315,6 +6341,7 @@ class ProfileModeNode:
         InputType.ModeControl,
         InputType.OctaviIfr1,
         InputType.StreamDeck,
+        InputType.StarCitizen,
     ]
 
     def __init__(self, name: str = None, system: bool = None, parent: ProfileDeviceNode = None):
@@ -6528,7 +6555,7 @@ class ProfileModeNode:
                     case InputType.StreamDeck:
                         item = StreamDeckInputItem(self)
                         item.setOverrideInputType(InputType.JoystickButton)
-                    case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
+                    case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat | InputType.StarCitizen:
                         item = InputItem(mode_node=self, input_type=input_type, device_guid=device_guid)
                     case InputType.ModeControl:
                         item = gremlin.ui.mode_device.ModeInputItem(self)
@@ -6633,7 +6660,7 @@ class ProfileModeNode:
                     do_include = True
                 depth = gremlin.util.xmlNodeDepth(item_node)
                 match input_item.device_type:
-                    case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
+                    case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy | DeviceType.StarCitizen:
                         if input_item.description or depth > 1:
                             do_include = True
                     case DeviceType.OctaviIFR1:

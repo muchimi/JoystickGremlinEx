@@ -17,6 +17,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+from copy import deepcopy
 from typing import Callable
 import logging
 
@@ -1463,8 +1464,8 @@ class JoystickFilterDialog(QRememberDialog):
             # grab a copy of the inputs
 
             # save a copy of the current input map
-            self._current_filters = self.settings.getFilterMap()
-            self._default_filters = self.settings.getDefaultFilterMap()
+            self._current_filters = deepcopy(self.settings.getFilterMap())
+            self._default_filters = deepcopy(self.settings.getDefaultFilterMap())
 
             self.stats = gremlin.base_profile.JoystickInputStats(self.device_guid, self._current_filters)
 
@@ -1498,7 +1499,7 @@ class JoystickFilterDialog(QRememberDialog):
                     name = device.getAxisName(input_id)
                     data.append((device_guid, input_type, input_id, name, linear_id))
             if device.button_count:
-                input_type = InputType.JoystickButton
+                input_type = device.button_input_type
                 for index in range(device.button_count):
                     input_id = index + 1
                     name = device.get_button_name(input_id)
@@ -1521,7 +1522,7 @@ class JoystickFilterDialog(QRememberDialog):
                 flow_layouts[input_type] = QFlowLayout(self.group_widgets[input_type])
 
             if device.button_count:
-                input_type = InputType.JoystickButton
+                input_type = device.button_input_type
                 self.group_widgets[input_type] = QtWidgets.QGroupBox(f"Buttons ({device.button_count} inputs, {self.stats.visible_button_count} visible)")
                 flow_layouts[input_type] = QFlowLayout(self.group_widgets[input_type])
 
@@ -1547,14 +1548,21 @@ class JoystickFilterDialog(QRememberDialog):
                         f"{InputType.to_name(input_type)} {input_id}/L{linear_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
                     )
 
+                label = str(input_id) if input_type != InputType.JoystickAxis else device.get_axis_name(input_id, short_name=True)
+                size = 32
+                if input_type == device.button_input_type and input_id in device.data.get("button_names", {}):
+                    label = name
+                    tooltip = f"{name} ({tooltip})"
+                    size = QtCore.QSize(get_text_width(label) + 24, 32)
                 widget = QUsedPushButton(
-                    str(input_id) if input_type != InputType.JoystickAxis else device.get_axis_name(input_id, short_name=True),
+                    label,
                     used=is_used,
                     callback=self._handle_toggle,  # single input toggle
                     data=(input_type, input_id),
                     checkable=True,
                     checked=visible,
                     tooltip=tooltip,
+                    size=size,
                 )
 
                 widget.setStyleSheet(css)
@@ -1787,7 +1795,7 @@ class JoystickFilterDialog(QRememberDialog):
             match input_type:
                 case InputType.JoystickAxis:
                     btn.pulseHighlight()
-                case InputType.JoystickButton:
+                case InputType.JoystickButton | InputType.StarCitizen:
                     btn.setHighlight(event.is_pressed)
                 case InputType.JoystickHat:
                     value = event.value
@@ -1834,8 +1842,8 @@ class JoystickFilterDialog(QRememberDialog):
 
     def _revert(self):
         """reverts to the existing setup"""
-        self.settings.setFilterMap(self._current_filters)
-        self.settings.setDefaultFilterMap(self._default_filters)
+        self.settings.setFilterMap(deepcopy(self._current_filters))
+        self.settings.setDefaultFilterMap(deepcopy(self._default_filters))
 
     def _handle_dump(self, widget, is_control: bool, is_shift: bool, is_alt: bool, is_right: bool):
         self.settings.dump_visible_map(self.device_guid)
@@ -1893,14 +1901,14 @@ class JoystickFilterDialog(QRememberDialog):
                 if is_control:
                     self.settings.setInputTypeVisible(InputType.JoystickButton, False)
                 else:
-                    self.settings.setInputTypeVisibleDevice(device, InputType.JoystickButton, False)
+                    self.settings.setInputTypeVisibleDevice(device, device.button_input_type, False)
 
             case "show_buttons":
                 # show buttons
                 if is_control:
                     self.settings.setInputTypeVisible(InputType.JoystickButton, True, is_shift)
                 else:
-                    self.settings.setInputTypeVisibleDevice(device, InputType.JoystickButton, True, is_shift)
+                    self.settings.setInputTypeVisibleDevice(device, device.button_input_type, True, is_shift)
 
             case "mapped":
                 # filter to mapped devices only
@@ -1940,7 +1948,7 @@ class JoystickFilterDialog(QRememberDialog):
         if device.axis_count:
             self.group_widgets[InputType.JoystickAxis].setTitle(f"Axis ({device.axis_count} inputs, {self.stats.visible_axis_count} visible)")
         if device.button_count:
-            self.group_widgets[InputType.JoystickButton].setTitle(f"Button ({device.button_count} inputs, {self.stats.visible_button_count} visible)")
+            self.group_widgets[device.button_input_type].setTitle(f"Button ({device.button_count} inputs, {self.stats.visible_button_count} visible)")
         if device.hat_count:
             self.group_widgets[InputType.JoystickHat].setTitle(f"Hat ({device.hat_count} inputs, {self.stats.visible_hat_count} visible)")
 

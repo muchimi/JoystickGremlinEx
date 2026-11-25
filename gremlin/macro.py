@@ -398,8 +398,6 @@ class MacroManager(QtCore.QObject):
         if self._is_running:
             return
 
-        self._active = {}
-        self._flags = {}
         config = gremlin.config.Configuration()
         self._max_concurrent = config.max_concurrent_macro
         self._mode_affinity = config.macro_mode_affinity
@@ -416,7 +414,7 @@ class MacroManager(QtCore.QObject):
         if thread is None or not thread.is_alive():
             # reset the wake-up event so the fresh thread starts from a clean
             # state (avoids waiting on a half-torn-down primitive)
-            self._abort_event.clear()
+            self._abort_event = threading.Event()
             self._schedule_event.clear()
             self._run_scheduler_thread = Thread(target=self._run_scheduler, args=(self._abort_event,), daemon=True)
             self._run_scheduler_thread.name = "Macro scheduler"
@@ -427,10 +425,13 @@ class MacroManager(QtCore.QObject):
 
     def stop(self):
         """Wake and stop the scheduler, and signal all running macro workers."""
-        self._is_running = False
         self._abort_event.set()
+        self._is_running = False
         self._schedule_event.set()
         with self._queue_lock:
+            for entry in self._queue:
+                if entry.macro.id not in self._active:
+                    entry.macro.state = MacroState.Idle
             self._queue.clear()
             for flag in self._legacy_abort_flags.values():
                 flag.set()
@@ -442,7 +443,7 @@ class MacroManager(QtCore.QObject):
                 flag.set()
         thread = self._run_scheduler_thread
         if thread is not None and thread is not threading.current_thread():
-            gremlin.util.safeJoin(thread)
+            thread.join()
         self._run_scheduler_thread = None
         if self._hook_mode_change:
             eh = gremlin.event_handler.EventHandler()
@@ -487,6 +488,10 @@ class MacroManager(QtCore.QObject):
         :returns id: a unique ID for the macro step
         """
 
+        activation = self._abort_event
+        if not self._is_running or activation.is_set():
+            return None
+
         mode = gremlin.shared_state.current_mode  # current profile mode
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
@@ -497,10 +502,6 @@ class MacroManager(QtCore.QObject):
             if self.verbose:
                 syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
             return
-
-        macro.state = MacroState.Scheduled
-
-
 
         if self.verbose:
             syslog.info(f"MACRO: queue macro ID [{macro.id}]")
@@ -528,6 +529,11 @@ class MacroManager(QtCore.QObject):
 
             self._preprocess_macro(macro)
             with self._queue_lock:
+                if not self._is_running or self._abort_event is not activation or activation.is_set():
+                    return None
+                if macro.id in self._active or macro.state != MacroState.Idle:
+                    return None
+                macro.state = MacroState.Scheduled
                 entry = MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list)
                 if self.verbose:
                     syslog.info(f"MACRO: created macro entry [{entry.macro.id}]")
@@ -681,12 +687,13 @@ class MacroManager(QtCore.QObject):
 
             # add the macro to the active queue
             self._active[macro.id] = macro
-            self._legacy_abort_flags[macro.id] = threading.Event()
+            abort_flag = threading.Event()
+            self._legacy_abort_flags[macro.id] = abort_flag
             macro.state = MacroState.Running
             try:
                 Thread(
                     target=self._execute_macro,
-                    args=(macro, is_local, is_remote, client_list),
+                    args=(macro, is_local, is_remote, client_list, abort_flag, self._abort_event),
                     daemon=True,
                 ).start()
             except Exception:
@@ -709,6 +716,8 @@ class MacroManager(QtCore.QObject):
         is_local: bool = None,
         is_remote: bool = None,
         client_list: list = None,
+        abort_flag: threading.Event = None,
+        activation: threading.Event = None,
     ):
         """Executes a given macro in a separate thread.
 
@@ -721,9 +730,8 @@ class MacroManager(QtCore.QObject):
         :param macro the macro object to be executed
         """
         verbose = gremlin.config.Configuration().verbose_mode_macro
-        abort_flag = self._legacy_abort_flags.get(macro.id)
         if abort_flag is None:
-            abort_flag = threading.Event()
+            abort_flag = self._legacy_abort_flags.get(macro.id) or threading.Event()
         try:
             if verbose:
                 syslog.info(f"MACRO: execute [{macro.id}]")
@@ -755,7 +763,7 @@ class MacroManager(QtCore.QObject):
                                 break
                             if verbose:
                                 syslog.info(f"\tAction: {action!s}")
-                            action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                            self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
                         count += 1
                         abort_flag.wait(delay)
 
@@ -765,7 +773,7 @@ class MacroManager(QtCore.QObject):
                         for action in macro.sequence:
                             if macro.aborted or abort_flag.is_set():
                                 break
-                            action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                            self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
                         abort_flag.wait(delay)
 
             # Handle simple one shot macros
@@ -776,18 +784,19 @@ class MacroManager(QtCore.QObject):
                 for action in macro.sequence:
                     if macro.aborted or abort_flag.is_set():
                         break
-                    action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                    self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
 
         finally:
             macro.state = MacroState.Idle
             # Preserve callback order and exclusive ownership until callbacks
             # finish, while guaranteeing cleanup even if one raises.
             try:
-                if macro.completed_callback:
+                if macro.completed_callback and (activation is None or not activation.is_set()):
                     macro.completed_callback()
             finally:
                 try:
-                    self.el.macro_step_completed.emit(macro.id)
+                    if activation is None or not activation.is_set():
+                        self.el.macro_step_completed.emit(macro.id)
                 finally:
                     with self._active_condition:
                         self._active.pop(macro.id, None)
@@ -816,6 +825,10 @@ class MacroManager(QtCore.QObject):
             :returns id: a unique ID for the macro step
             """
 
+            activation = self._abort_event
+            if not self._is_running or activation.is_set():
+                return None
+
             mode = gremlin.shared_state.current_mode  # current profile mode
 
             if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
@@ -826,10 +839,6 @@ class MacroManager(QtCore.QObject):
                 if self.verbose:
                     syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
                 return
-
-            macro.state = MacroState.Scheduled
-
-
 
             if self.verbose:
                 syslog.info(f"MACRO: queue macro ID [{macro.id}]")
@@ -859,6 +868,11 @@ class MacroManager(QtCore.QObject):
                 entry = MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list)
                 abort_flag = threading.Event() # event unique to the worker
                 with self._tasks_lock:
+                    if not self._is_running or self._abort_event is not activation or activation.is_set():
+                        return None
+                    if macro.id in self._macro_flags or macro.state != MacroState.Idle:
+                        return None
+                    macro.state = MacroState.Scheduled
                     self._macro_flags[macro.id] = abort_flag
                     self._macro_map[macro.id] = macro
                     # submit a work task
@@ -869,7 +883,8 @@ class MacroManager(QtCore.QObject):
                                                 entry.is_remote,
                                                 client_list,
                                                 abort_flag,
-                                                self._handle_macro_completed)
+                                                self._handle_macro_completed,
+                                                activation)
                     except Exception:
                         macro.state = MacroState.Idle
                         self._handle_macro_completed(macro)
@@ -925,6 +940,7 @@ class MacroManager(QtCore.QObject):
         client_list: list = None,
         abort_flag: threading.Event = None,
         completion_callback : Callable = None,
+        activation: threading.Event = None,
     ):
         """Executes a given macro in a separate thread.
 
@@ -972,7 +988,7 @@ class MacroManager(QtCore.QObject):
                                 break
                             if verbose:
                                 syslog.info(f"\tAction: {action!s}")
-                            action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                            self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
                         count += 1
                         abort_flag.wait(delay)
 
@@ -982,7 +998,7 @@ class MacroManager(QtCore.QObject):
                         for action in macro.sequence:
                             if macro.aborted or abort_flag.is_set():
                                 break
-                            action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                            self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
                         abort_flag.wait(delay)
 
             # Handle simple one shot macros
@@ -994,7 +1010,7 @@ class MacroManager(QtCore.QObject):
                     if macro.aborted or abort_flag.is_set():
                         # ask to terminate received
                         break
-                    action(is_local, is_remote, macro.force_remote, client_list=client_list)
+                    self._run_macro_action(action, macro, abort_flag, activation, is_local, is_remote, client_list)
 
 
 
@@ -1004,14 +1020,23 @@ class MacroManager(QtCore.QObject):
                 self._flags.pop(macro.id, None)
             # Completion bookkeeping must still happen if a user callback fails.
             try:
-                if macro.completed_callback:
+                if macro.completed_callback and (activation is None or not activation.is_set()):
                     macro.completed_callback()
             finally:
                 try:
                     if completion_callback:
                         completion_callback(macro)
                 finally:
-                    self.el.macro_step_completed.emit(macro.id)
+                    if activation is None or not activation.is_set():
+                        self.el.macro_step_completed.emit(macro.id)
+
+    def _run_macro_action(self, action, macro, abort_flag, activation, is_local, is_remote, client_list):
+        if abort_flag.is_set() or (activation is not None and activation.is_set()):
+            return
+        if isinstance(action, (PauseAction, GraphAction)):
+            action(is_local, is_remote, macro.force_remote, client_list=client_list, abort_event=abort_flag)
+        else:
+            action(is_local, is_remote, macro.force_remote, client_list=client_list)
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""
@@ -1591,7 +1616,7 @@ class PauseAction(MacroAbstractAction):
         self.duration_max = state["duration_max"]
         self.is_random = state["is_random"]
 
-    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None, *, abort_event=None):
         import random
 
         # syslog = logging.getLogger("system")
@@ -1612,8 +1637,11 @@ class PauseAction(MacroAbstractAction):
         if verbose:
             syslog.info(f"MACRO: Pause action for {duration}")
         if is_local:
-            time.sleep(duration)
-        if is_remote:
+            if abort_event is None:
+                time.sleep(duration)
+            elif abort_event.wait(duration):
+                return
+        if is_remote and (abort_event is None or not abort_event.is_set()):
             gremlin.remote.remote_client.send_pause(duration, client_list)
 
 
@@ -1647,9 +1675,8 @@ class GraphAction(MacroAbstractAction):
             if verbose:
                 syslog.info("GraphAction: profile stop received - stopping execution")
             self._complete_event.set()
-            time.sleep(0.01)
 
-    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None, *, abort_event=None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_condition
         if verbose:
@@ -1658,8 +1685,14 @@ class GraphAction(MacroAbstractAction):
             self._complete_event.clear()
             if verbose:
                 syslog.info(f"GraphAction: execute {self.data}")
+            if abort_event is not None and abort_event.is_set():
+                return
             self._graph.process_event(self._event, self._value)
-            self._complete_event.wait()
+            if abort_event is None:
+                self._complete_event.wait()
+            else:
+                while not abort_event.is_set() and not self._complete_event.wait(0.05):
+                    pass
             if verbose:
                 syslog.info(f"GraphAction: completed {self.data}")
 

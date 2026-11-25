@@ -32,12 +32,12 @@ import gremlin.input_item
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 import enum
 import gremlin.util
 from gremlin.util import safe_format, safe_read
 from psygnal import Signal
 from shiboken6 import Shiboken
-import threading
 import gremlin.config
 from gremlin.types import SyncMode
 from gremlin.types import ContainerViewTypes, Interactions
@@ -464,6 +464,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
 class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def __init__(self, container: SwitchContainer, parent=None):  # noqa: F821
         super().__init__(container, parent)
+        self._timers = RuntimeTimers()
         self.action_data: SwitchContainer = container
 
         self.index = 0
@@ -492,6 +493,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             return
 
         self._started = True
+        self._timers.start()
         self.verbose = gremlin.config.Configuration().verbose_mode_switch
 
         data: SwitchData
@@ -502,6 +504,13 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             data.releaseEvent = None
             data.releaseValue = None
             data.releaseExtraData = None
+
+    def profile_stop(self):
+        self._timers.stop()
+        self._valid = False
+        self._started = False
+
+    profile_stopping = profile_stop
 
     def profile_after_start(self):
         """occurs after the start is completed"""
@@ -592,7 +601,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def profile_stop(self):
         """called on profile stop"""
         if self.timer:
-            self.timer.cancel()
+            self._timers.cancel(self.timer)
             self.timer = None
 
         self._started = False
@@ -606,6 +615,8 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         return latch_list
 
     def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):
+        if not self._timers.active:
+            return False
         if event.is_axis:
             # not a switch
             return True
@@ -665,10 +676,9 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                         if self.verbose:
                             syslog.info("\tschedule autorelease")
                         if self.timer:
-                            self.timer.cancel()
-                        self.timer = threading.Timer(interval=data.releaseDelay / 1000, function=lambda: self._trigger_autorelease(data))
+                            self._timers.cancel(self.timer)
+                        self.timer = self._timers.schedule(data.releaseDelay / 1000, lambda: self._trigger_autorelease(data))
                         # trigger the release
-                        self.timer.start()
 
         return False  # stop execution past this container
 
@@ -690,6 +700,8 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 d.state = False
 
     def _trigger_autorelease(self, data):
+        if not self._timers.active:
+            return
         if self.verbose:
             syslog.info("\tskip: trigger input release [autorelease event]")
         data.state = False  # indicate released

@@ -338,6 +338,18 @@ class SequenceChecks(unittest.TestCase):
         self.assertFalse(functor.action_data._is_running)
         self.ns["syslog"].info.assert_not_called()
 
+    def test_profile_stop_drops_pending_release_and_end_actions(self):
+        functor = self.make_functor()
+        functor.container.normal_autorelease_delay = 50
+        functor._wait = Mock(side_effect=lambda _: functor.profile_stopping())
+
+        self.run_direct(functor, "_normal_runner")
+
+        self.assertEqual(self.calls, [(0, True, False)])
+        runner = Mock()
+        functor._start_runner(runner, "stopped sequence")
+        runner.assert_not_called()
+
     def test_normal_mode_always_starts_at_the_first_step(self):
         functor = self.make_functor()
         functor.action_data.resume_mode = True

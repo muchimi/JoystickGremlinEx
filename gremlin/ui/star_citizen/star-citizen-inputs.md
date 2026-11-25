@@ -1,0 +1,94 @@
+# Current list of Star Citizen inputs supported by GEX m77 (Star Citizen 4.10.3 live)
+
+- Landing gear (held while deployed)
+- Lights (held while on)
+- Shield generators (held while on)
+- Shield emitters (held while on)
+- Quantum spool (held while on)
+- Flight ready (held while on)
+- Engines (held while on)
+- Wing transformation (held while deployed)
+- VTOL (held while deployed)
+- Main power (held while on)
+- Weapons power (held while on)
+- Landed (held while on)
+- Shields (held while on)
+- Coolers (held while on)
+- Life support (held while on)
+- Gravity generators (held while on)
+- Sensors (held while on)
+- Landing gear — changed
+- Landing gear — retracted
+- Landing gear — deploying
+- Landing gear — deployed
+- Landing gear — retracting
+- Lights — changed
+- Lights — on
+- Lights — off
+- Shield generators — changed
+- Shield generators — on
+- Shield generators — off
+- Shield emitters — changed
+- Shield emitters — on
+- Shield emitters — off
+- Shield status — changed
+- Shield status — nominal
+- Shield status — off
+- Shield status — minor flashing
+- Shield status — minor
+- Shield status — major flashing
+- Shield status — major
+- Quantum drive status — changed
+- Quantum drive status — nominal
+- Quantum drive status — off
+- Quantum drive status — minor flashing
+- Quantum drive status — minor
+- Quantum drive status — major flashing
+- Quantum drive status — major
+- Quantum spool — changed
+- Quantum spool — on
+- Quantum spool — off
+- Flight ready — changed
+- Flight ready — on
+- Flight ready — off
+- Engines — changed
+- Engines — on
+- Engines — off
+- Wing transformation — changed
+- Wing transformation — retracted
+- Wing transformation — deploying
+- Wing transformation — deployed
+- Wing transformation — retracting
+- VTOL — changed
+- VTOL — retracted
+- VTOL — deploying
+- VTOL — deployed
+- VTOL — retracting
+- Main power — changed
+- Main power — on
+- Main power — off
+- Weapons power — changed
+- Weapons power — on
+- Weapons power — off
+- Landed — changed
+- Landed — on
+- Landed — off
+- Master mode — changed
+- Master mode — navigation
+- Master mode — scm
+- Master mode — stealth
+- Shields — changed
+- Shields — on
+- Shields — off
+- Coolers — changed
+- Coolers — on
+- Coolers — off
+- Life support — changed
+- Life support — on
+- Life support — off
+- Gravity generators — changed
+- Gravity generators — on
+- Gravity generators — off
+- Sensors — changed
+- Sensors — on
+- Sensors — off

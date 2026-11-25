@@ -955,8 +955,14 @@ class ExecutionContext:
         :param node_type: optional, the node type to look for because a match on actions or containers may yield an action node instead of the container or action
 
         """
-        for node in anytree.PreOrderIter(self.graph):
-            if node.id == item.id:
+        item_id = item.id
+        node = self._node_map.get(item_id)
+        if node is not None and node.nodeType == node_type:
+            if node.id == item_id or getattr(node, "container", None) is item or getattr(node, "action", None) is item:
+                return node
+
+        for node in self._safe_preorder_iter(self.graph):
+            if node.id == item_id:
                 # find by ID
                 if node.nodeType != node_type:
                     syslog.warning(
@@ -1927,37 +1933,20 @@ class ExecutionContext:
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             syslog.info("Register callbacks in execution tree")
-        for device_guid in callbacks:
-            for mode in callbacks[device_guid]:
-                for key in callbacks[device_guid][mode]:
-                    callback: ContainerCallback
-                    for callback, _ in callbacks[device_guid][mode][key]:
-                        # script based
-                        if hasattr(callback, "id"):
-                            id = callback.id
-                        else:
-                            syslog.warning(f"EXEC: cannot find execution node for callback: {callback}")
-                            continue
-
-                        if self._verbose_exec:
-                            syslog.info(f"Looking for id: {id}")
-                        node = next(
-                            (
-                                n
-                                for n in self._safe_preorder_iter(self.graph)
-                                if n is not None and n.nodeType == ExecutionGraphNodeType.Container and n.id == id
-                            ),
-                            None,
-                        )
-                        if node:
-                            self.registerNode(node)
-
+        # Registration covers every executable node, including nested containers
+        # without an event-handler callback. Index the graph in a single pass.
         for node in self._safe_preorder_iter(self.graph):
-            if node:
-                if node.id in self._functor_map:
-                    continue  # already processed
-                if node.nodeType in (ExecutionGraphNodeType.Container, ExecutionGraphNodeType.Action):
-                    self.registerNode(node)
+            if node.id in self._functor_map:
+                continue  # already processed
+            if node.nodeType in (ExecutionGraphNodeType.Container, ExecutionGraphNodeType.Action):
+                self.registerNode(node)
+
+        for modes in callbacks.values():
+            for events in modes.values():
+                for entries in events.values():
+                    for callback, _ in entries:
+                        if not hasattr(callback, "id"):
+                            syslog.warning(f"EXEC: cannot find execution node for callback: {callback}")
 
     def registerNode(self, node):
         """registers functors for a given node"""

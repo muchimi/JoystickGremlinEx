@@ -26,6 +26,7 @@ import uuid
 import logging
 import traceback
 import threading
+from gremlin.input_types import InputType as GremlinInputType
 from gremlin.types import DeviceType, DeviceCategory
 
 MAESTRO_VID = 0x1209  # vendor ID for GEX managed devices
@@ -768,7 +769,7 @@ class DeviceSummary:
     @property
     def connected(self) -> bool:
         """true if the device is connected"""
-        if self.is_special:
+        if self.is_special and self.device_type != DeviceType.StarCitizen:
             # special devices are always connected
             return True
         return self._connected
@@ -852,8 +853,15 @@ class DeviceSummary:
 
         return axis_name
 
+    @property
+    def button_input_type(self) -> GremlinInputType:
+        """Return the Gremlin input type for this device's numbered buttons."""
+        if self.device_type == DeviceType.StarCitizen:
+            return GremlinInputType.StarCitizen
+        return GremlinInputType.JoystickButton
+
     def get_button_name(self, input_id):
-        return f"Button {input_id}"
+        return self.data.get("button_names", {}).get(input_id, f"Button {input_id}")
 
     def get_hat_name(self, input_id):
         import gremlin.util

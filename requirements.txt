@@ -58,6 +58,8 @@ rapidfuzz >= 3.14.6
 sympy >= 1.14.0
 pycaw >= 20260927
 OdenGraphQt >= 0.7.4
+grpcio >= 1.76
+protobuf >= 6.31
 
 
 # documentation related

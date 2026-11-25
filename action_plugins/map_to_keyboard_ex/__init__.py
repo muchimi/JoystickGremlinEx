@@ -642,27 +642,11 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 self.process_event(event, is_pressed, extra_data={"virtual": True})
 
     def profile_stop(self):
-        # release all keys
-        if self.mode == KeyboardOutputMode.Hold:
-            # release any pressed keys on profile stop to avoid stuck keys
-            if self._hold_keys:
-                verbose = gremlin.config.Configuration().verbose_mode_keyboard
-                if self.use_macros:
-                    gremlin.macro.MacroManager().queue_macro(self.release)
-                else:
-                    is_local, is_remote = self.action_data.sendFlags()
-                    for key in self._hold_keys:
-                        if verbose:
-                            syslog.info(f"send key release: {key}")
-                        gremlin.keyboard.send_key_up(
-                            key, is_local, is_remote, client_list=self.client_list, target_hwnd=self.target_hwnd, extra_data=self.extra_data
-                        )
-                self._hold_keys.clear()
+        if self.mode == KeyboardOutputMode.Hold and self._hold_keys:
+            self._manual_release()
+            self._hold_keys.clear()
 
-        # terminate any autorepeat
-        self._autorepeat_clear()
-
-        # terminate any pulse
+        self._autorepeat_clear(release_directly=True)
         self.pulse_stop()
 
     def profile_mode_changed(self, mode: str):
@@ -675,14 +659,17 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self.pulse_stop()
 
     @QtCore.Slot()
-    def _autorepeat_clear(self):
+    def _autorepeat_clear(self, *, release_directly=False):
         if self._ar_thread is not None:
             self._ar_event.set()
             self._ar_running = False
             gremlin.util.safeJoin(self._ar_thread)
             self._ar_thread = None
             # ensure the keys are released
-            gremlin.macro.MacroManager().queue_macro(self.release)
+            if release_directly:
+                self._manual_release()
+            else:
+                gremlin.macro.MacroManager().queue_macro(self.release)
 
     def _manual_release(self):
         """callback for manual releases"""

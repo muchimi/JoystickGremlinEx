@@ -1049,6 +1049,8 @@ def get_button(device_guid: str | dinput.GUID | int | DeviceSummary, input_id: i
                         return False
                 # physical / disconnected / maestro without a vJoy id
                 return device.get_button(input_id)
+            case DeviceType.StarCitizen:
+                return device.get_button(input_id)
             case DeviceType.Osc:
                 if hasattr(input_id, "message"):
                     # OSC device
@@ -1092,6 +1094,8 @@ def get_button(device_guid: str | dinput.GUID | int | DeviceSummary, input_id: i
                 if value is None:
                     return False
                 return value
+            case _ if device.is_special:
+                return device.connected and device.get_button(input_id)
 
     else:
         syslog.warning(f"JOYSTICK: unable to get button state for device for id [{device_guid}] index [{input_id}]")
@@ -1927,6 +1931,11 @@ def registerSpecialDevices():
 
     config = gremlin.config.Configuration()
 
+    if config.startup_star_citizen_enabled:
+        from gremlin.ui.star_citizen import make_summary
+
+        special_devices.append(make_summary())
+
     # keyboard
 
     device = DeviceSummary()
@@ -2217,7 +2226,10 @@ def _publish_joystick_devices(devices, vjoy_devices, native_vjoy_devices, signat
         published = {device.device_guid: device for device in _disconnected_devices}
         published.update(devices)
         joystick_types = (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro)
-        published.update((guid, device) for guid, device in _all_devices_map.items() if device.device_type not in joystick_types)
+        published.update(
+            (guid, device) for guid, device in _all_devices_map.items()
+            if device.device_type not in joystick_types or device.is_special
+        )
         _replace_device_registry(published)
         _all_vjoy_devices_map = vjoy_devices
         _native_vjoy_devices = native_vjoy_devices
@@ -2604,7 +2616,10 @@ def _update_joystick_device_maps():
 
     with _device_registry_lock:
         _apply_maestro_service_devices()
-        _all_joystick_devices = [dev for dev in _all_devices_map.values() if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)]
+        _all_joystick_devices = [
+            dev for dev in _all_devices_map.values()
+            if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy) and not dev.is_special
+        ]
         _all_joystick_devices.sort(key=lambda x: x.name.casefold())
         _joystick_device_guid_map.clear()
         _joystick_device_guid_map.update({dev.device_guid: dev for dev in _all_joystick_devices})

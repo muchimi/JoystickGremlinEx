@@ -253,6 +253,11 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.last_execution = 0.0
         self.last_value = None
 
+    def profile_stop(self):
+        self._valid = False
+
+    profile_stopping = profile_stop
+
     def process_event(self, event, value, extra_data=None):
         step_count = len(self.action_set_nodes) if self.valid else 0
         if not step_count:

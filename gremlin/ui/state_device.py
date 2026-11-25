@@ -1029,10 +1029,10 @@ class StateInputItem(InputItem):
 
         return node
 
-    def from_xml(self, node, data=None, extra_data=None):
+    def from_xml(self, node, data=None, extra_data=None, *, defer_containers=False):
         """read XML state node"""
 
-        self._key = node.get("key")
+        self._key = node.get("key", "").casefold().strip()
         if "id" in node.attrib:
             self.setId(read_guid(node, "id"))
         node_type = node.get("type")
@@ -1102,7 +1102,7 @@ class StateInputItem(InputItem):
             else:
                 self._attributes[attr_key] = None
 
-        super().from_xml(node, data, extra_data)
+        super().from_xml(node, data, extra_data, defer_containers=defer_containers)
 
         self._default_value = bool(value)
         self._value = bool(value)
@@ -1815,27 +1815,23 @@ class StateData:
     def unregisterStateChangeCallback(self, key: str, callback):
         """unregisters a previously registered state change callback"""
         key = key.casefold().strip()
-        if key in self._state_change_callbacks:
-            if callback in self._state_change_callbacks[key]:
-                self._state_change_callbacks[key].remove(callback)
+        callbacks = self._state_change_callbacks.get(key)
+        if callbacks and callback in callbacks:
+            callbacks.remove(callback)
+            if not callbacks:
+                self._state_change_callbacks.pop(key, None)
 
     def _fire_callbacks(self, state: StateInputItem):
         """invokes all registered state change callbacks for the given state"""
         key = state.key
         # syslog.info(f"State Fire change callbacks: [{key}] -> {gremlin.util.ansiBool(state.value)}")
-        if key in self._state_change_callbacks:
-            for callback in self._state_change_callbacks[key]:
-                callback(state)
+        for callback in tuple(self._state_change_callbacks.get(key, ())):
+            callback(state)
 
     def _handle_profile_unload(self):
         """occurs on profile unload before a new profile is loaded"""
 
-        for state in self._data.values():
-            # disconnect hooks
-            state.changed.disconnect(self._handle_state_changed)
-
-        self._data = {}
-        self._id_map = {}
+        self.clear(emit=False)
         verbose = gremlin.config.Configuration().verbose_mode_state
         if verbose:
             syslog.info("STATE: clear data")
@@ -1888,13 +1884,13 @@ class StateData:
         self._add_state(state)
         return state
 
-    def _add_state(self, state: StateInputItem):
+    def _add_state(self, state: StateInputItem, *, emit=True):
         if state not in self._hooked_states:
             self._hooked_states.add(state)
             state.changed.connect(self._handle_state_changed)
         self._data[state.key] = state
         self._id_map[state.id] = state
-        if not gremlin.shared_state.profile_loading:
+        if emit and not gremlin.shared_state.profile_loading:
             self.crud.emit()
 
     def _handle_state_changed(self, state: StateInputItem):
@@ -2265,13 +2261,17 @@ class StateData:
             return True
         return fnmatch.fnmatch(key, filter)
 
-    def clear(self):
+    def clear(self, *, emit=True):
         """clears all data"""
-        if self._data:
-            self._data.clear()
-            self._id_map.clear()
-            if not gremlin.shared_state.profile_loading:
-                self.crud.emit()
+        had_states = bool(self._data)
+        for state in self._hooked_states:
+            state.changed.disconnect(self._handle_state_changed)
+            state.unhook()
+        self._hooked_states.clear()
+        self._data.clear()
+        self._id_map.clear()
+        if had_states and emit and not gremlin.shared_state.profile_loading:
+            self.crud.emit()
 
     def remove(self, state: StateInputItem | str):
 
@@ -2282,6 +2282,9 @@ class StateData:
         if key in self._data:
             data = self._data[key]
             self.clear_exclusive_group(data)
+            if data in self._hooked_states:
+                data.changed.disconnect(self._handle_state_changed)
+                self._hooked_states.remove(data)
             data.unhook()
             del self._data[key]
             del self._id_map[data.id]
@@ -2351,19 +2354,24 @@ class StateData:
     def from_xml(self, root, data=None, extra_data=None):
         """reads saved data"""
 
-        # read categories first
-        nodes = root.xpath("//categories")
-        if nodes:
-            node = nodes[0]
-            sc = StateCategories()
-            sc.from_xml(node)
+        self.clear(emit=False)
 
-        for node in root:
-            if node.tag == "state":
-                item = StateInputItem()
-                item.from_xml(node)
-                self._data[item.key] = item
-                self._id_map[item.id] = item
+        # read categories first
+        categories = root.find("categories")
+        if categories is not None:
+            sc = StateCategories()
+            sc.from_xml(categories)
+
+        # State actions can reference themselves or any State declared later in the XML.
+        mappings = []
+        for node in root.findall("state"):
+            item = StateInputItem()
+            item.from_xml(node, data, extra_data, defer_containers=True)
+            self._add_state(item, emit=False)
+            mappings.append((item, node))
+
+        for item, node in mappings:
+            item._load_containers_from_xml(node, extra_data)
 
     @QtCore.Slot(object)
     def _state_changed(self, input_item: StateInputItem):

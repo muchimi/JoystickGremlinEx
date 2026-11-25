@@ -17,7 +17,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import threading
 
 
 from lxml import etree as ElementTree
@@ -30,6 +29,7 @@ import gremlin.ui.ui_common
 import gremlin.input_item
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, InputItem
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
 import copy
@@ -404,6 +404,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
 
     def __init__(self, container: "DoubleTapContainer", parent=None):
         super().__init__(container, parent)
+        self._timers = RuntimeTimers()
 
         self.container = container
         self.delay = container.doubletap_delay  # in seconds
@@ -454,7 +455,14 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
         self.last_trigger = None
         self._valid = False
 
+    def profile_stop(self):
+        self._timers.stop()
+
+    profile_stopping = profile_stop
+
     def profile_started(self):
+        self._timers.start()
+
         super().profile_started()
         # reset any prior values before start
         self.start_time = time.time()
@@ -595,7 +603,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
     def _trigger_double_press(self, event, value, extra_data: dict = None):
         """called on double tap trigger"""
 
-        if event is None:
+        if not self._timers.active or event is None:
             # can happen if a queued timer/thread callback fires after a mode
             # change already cleared the pending event reference
             return
@@ -617,6 +625,8 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
                     syslog.info(f"(chaining) execute double tap action index [{self.dtap_index}] is pressed: [{is_pressed}]")
                 ec = gremlin.execution_graph.ExecutionContext()
                 node = self.dtap_nodes[self.dtap_index]
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
 
 
@@ -642,6 +652,8 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
             # not chaining
             for node in self.dtap_nodes:
                 ec = gremlin.execution_graph.ExecutionContext()
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
 
     def _debug_stub(self) -> str:
@@ -651,7 +663,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
     def _trigger_short_press(self, event, value, extra_data: dict = None):
         """triggers a short press"""
 
-        if event is None:
+        if not self._timers.active or event is None:
             # can happen if a queued timer/thread callback fires after a mode
             # change already cleared the pending event reference
             return
@@ -680,6 +692,8 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
                     syslog.info(f"(chaining) execute short press, index [{self.short_index}] is pressed: [{is_pressed}]")
                 ec = gremlin.execution_graph.ExecutionContext()
                 node = self.short_nodes[self.short_index]
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
 
                 if not is_pressed and node_count > 1:
@@ -714,6 +728,8 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
             # not chaining
             for node in self.short_nodes:
                 ec = gremlin.execution_graph.ExecutionContext()
+                if not self._timers.active:
+                    return
                 ec.execute_node(node, event, value, extra_data)
 
 
@@ -722,7 +738,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
         if self._first_tap_timer:
             if self.verbose:
                 syslog.info("\tstop first tap timer")
-            self._first_tap_timer.cancel()
+            self._timers.cancel(self._first_tap_timer)
             self._first_tap_timer = None
 
     def _reset_timers(self):
@@ -741,7 +757,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
 
         """
 
-        if not self._valid:
+        if not self._timers.active or not self._valid:
             return False
 
         input_type = event.getInputType()
@@ -826,8 +842,7 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
                         syslog.info("first tap processing")
                     self.waiting_second_tap = True # wait for the second tap
                     # triger the short press timer
-                    self._first_tap_timer = threading.Timer(self.container.doubletap_delay, self._handle_tap_timeout)
-                    self._first_tap_timer.start()
+                    self._first_tap_timer = self._timers.schedule(self.container.doubletap_delay, self._handle_tap_timeout)
 
             else:
                 # single tap only mode (no double tap actions or not enabled) - trigger single tap only
@@ -911,10 +926,10 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
                 # queue autorelease callback
                 callback = self._create_callback(self._trigger_short_press, event_r, value_r, extra_data)
                 if self.autorelease_delay > 0:
-                    timer = threading.Timer(self.autorelease_delay, callback)
+                    self._timers.schedule(self.autorelease_delay, callback)
                     if self.verbose:
                         syslog.info("\tstart short press release timer")
-                    timer.start()
+
                 else:
                     # trigger immediately
                     callback()
@@ -947,10 +962,10 @@ class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor)
             if self.autorelease_enabled:
                 if self.autorelease_delay > 0:
                     callback = self._create_callback(self._handle_double_tap_release, event_r, value_r, extra_data)
-                    timer = threading.Timer(self.autorelease_delay, callback)
+                    self._timers.schedule(self.autorelease_delay, callback)
                     if self.verbose:
                         syslog.info("\tstart double tap release timer")
-                    timer.start()
+
                 else:
                     # trigger immediately
                     callback()

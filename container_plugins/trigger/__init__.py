@@ -21,6 +21,7 @@ from lxml import etree as ElementTree
 import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 import gremlin.ui.ui_common
 
 import gremlin.types
@@ -33,7 +34,6 @@ from shiboken6 import Shiboken
 import logging
 from PySide6 import QtWidgets, QtCore
 from gremlin.util import safe_format, safe_read
-import threading
 from gremlin.ui.ui_common import (
     QExecuteWidget,
     QFloatLineEdit,
@@ -237,9 +237,11 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent=None):
         super().__init__(container, parent)
+        self._timers = RuntimeTimers()
 
     def profile_started(self):
         super().profile_started()
+        self._timers.start()
 
         self._timer = None  # trigger timer
 
@@ -255,6 +257,12 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.verbose_condition = config.verbose_mode_condition
         self.verbose = config.verbose_mode_container
 
+    def profile_stop(self):
+        self._timers.stop()
+        self._valid = False
+
+    profile_stopping = profile_stop
+
     def process_event(self, event, value, extra_data=None):
         """Executes the content with the provided data.
 
@@ -263,24 +271,29 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         :return True if execution was successful, False otherwise
         """
 
+        if not self._timers.active:
+            return False
+
         is_pressed = event.is_pressed
         trigger = (is_pressed and self.container.exec_on_press) or (not is_pressed and self.container.exec_on_release)
 
         if trigger:
             if self._timer:
                 # abort curent timer
-                self._timer.cancel()
+                self._timers.cancel(self._timer)
 
             if self.verbose:
                 syslog.info("TRIGGER CONTAINER: scheduling trigger")
-            self._timer = threading.Timer(self.container.trigger_delay, self._handle_trigger)
-            self._timer.start()
+            self._timer = self._timers.schedule(self.container.trigger_delay, self._handle_trigger)
         return False  # do not do further processing
 
     def _handle_trigger(self):
         """triggers when the timer runs out"""
         import gremlin.event_handler
         import gremlin.shared_state
+
+        if not self._timers.active:
+            return
 
         # come up with our own trigger event
         event = gremlin.event_handler.Event(InputType.JoystickButton, identifier=1, device_guid=gremlin.shared_state.fake_tab_guid, is_pressed=True, value=True)

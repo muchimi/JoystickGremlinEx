@@ -2683,6 +2683,12 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "GEX_OCTAVI_ENABLED",
             ),
             (
+                "star_citizen",
+                "Star Citizen",
+                "Enable the Star Citizen telemetry device tab and Map to Star Citizen action after restarting GremlinEx.",
+                "GEX_STAR_CITIZEN_ENABLED",
+            ),
+            (
                 "maestro",
                 "Maestro",
                 "When set, GremlinEx enables the Maestro bridge module for interacting with HID Maestro virtual controllers.",
@@ -2698,6 +2704,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             "osc": self.config.isDeviceVisible(gremlin.shared_state.osc_tab_guid),
             "voice": self.config.isDeviceVisible(gremlin.shared_state.voice_tab_guid),
             "octavi": self.config.isDeviceVisible(gremlin.shared_state.octavi_tab_guid),
+            "star_citizen": self.config.isDeviceVisible(gremlin.shared_state.star_citizen_tab_guid),
             "maestro": self.config.maestro_enabled,
         }
 
@@ -2719,6 +2726,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     value = self.config.voice_enabled
                 case "octavi":
                     value = self.config.octavi_enabled
+                case "star_citizen":
+                    value = self.config.star_citizen_enabled
+                    enabled = gremlin.config.STAR_CITIZEN_ENABLED
+                    if not enabled:
+                        description = f"Disabled by {env_var}."
                 case "maestro":
                     value = self.config.maestro_enabled
                     enabled = False
@@ -2786,6 +2798,10 @@ Enabled modules may not show until the device filter is updated.
                 self.config.octavi_enabled = checked
                 if checked and not self._module_visible_map[data]:
                     self.config.setDeviceVisible(gremlin.shared_state.octavi_tab_guid, True)
+            case "star_citizen":
+                self.config.star_citizen_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.star_citizen_tab_guid, True)
             case "maestro":
                 self.config.maestro_enabled = checked
                 # update visibility of tool
@@ -5589,7 +5605,7 @@ class DeviceDisplayDialog(QRememberDialog):
 
         all_devices = sorted(
             gremlin.joystick_handling.display_devices(refresh=True),
-            key=lambda device: (DeviceType.tab_order_group(device.device_type), (device.name or "").casefold()),
+            key=lambda device: (DeviceType.tab_order_group(device.device_type, device.device_category), (device.name or "").casefold()),
         )
 
         device: TabData
@@ -5604,6 +5620,8 @@ class DeviceDisplayDialog(QRememberDialog):
 
         tab_map = {}
         for index, device in enumerate(all_devices):
+            if device.device_guid == gremlin.shared_state.star_citizen_tab_guid and not self.config.startup_star_citizen_enabled:
+                continue
             if device.disabled and device.device_type not in (DeviceType.Settings, DeviceType.Plugins):
                 # skip disabled devices
                 continue

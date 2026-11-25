@@ -23,6 +23,7 @@ import threading
 import time
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 from PySide6 import QtWidgets
 
 
@@ -241,6 +242,7 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, action_data: RepeatContainer, parent=None):  # noqa: F821
         super().__init__(action_data, parent)
+        self._timers = RuntimeTimers()
         self.pulse_worker_map = {}  # map of (device_id, input_id) to pulse worker object
         self.action_data: RepeatContainer = action_data
         self.verbose = gremlin.config.Configuration().verbose_mode_container
@@ -251,17 +253,26 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._repeat_count = None  # number of times to repeat, None = disabled
 
     def profile_start(self):
+        self._timers.start()
         self.verbose = gremlin.config.Configuration().verbose_mode_container
 
     def profile_stop(self):
-        self._stop()
+        self._timers.stop()
+        self._valid = False
+        self._stop(wait=False)
+
+    profile_stopping = profile_stop
 
     def _pulse_on(self):
         """called when pulse is on"""
+        if not self._timers.active:
+            return
         self._execute(self._press_event, self._value, self._extra_data)
 
     def _pulse_off(self):
         """called when pulse is off"""
+        if not self._timers.active:
+            return
         self._execute(self._release_event, self._value, self._extra_data)
 
     def pulse_start(self, args, duration: float, interval: float):
@@ -279,7 +290,13 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 return
         else:
             count = self._repeat_count
-            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data=args, count=count)
+            activation = self._timers.activation
+            worker = gremlin.repeater.PulseWorker(
+                duration, interval,
+                lambda: self._pulse_on() if self._timers.activation is activation else None,
+                lambda: self._pulse_off() if self._timers.activation is activation else None,
+                data=args, count=count,
+            )
             self.pulse_worker_map[key] = worker
 
         if self.verbose:
@@ -296,54 +313,58 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             worker.stop()
             del self.pulse_worker_map[key]
 
-    def _stop(self):
+    def _stop(self, *, wait=True):
         """stops timer and pulsing"""
         if self._timer:
             # stop the timer
-            self._timer.cancel()
+            self._timers.cancel(self._timer)
             self._timer = None
 
         # stop pulsing if we were pulsing
         self.pulse_stop()
 
         # stop the repeat if in the middle of a pulse cycle
-        if self._thread and self._thread.is_alive():
-            with self._lock:
-                self._is_running = False
-            gremlin.util.safeJoin(self._thread)
-            self._thread = None
+        with self._lock:
+            self._is_running = False
+            thread = self._thread
+        if wait and thread is not threading.current_thread():
+            gremlin.util.safeJoin(thread)
 
     def _initial_pulse(self):
         """pulses a single time"""
-        if self._is_running:
-            return  # already running
-
         with self._lock:
+            activation = self._timers.activation
+            if activation is None or (self._thread and self._thread.is_alive()):
+                return
             self._is_running = True
+            self._thread = threading.Thread(target=self._pulse_runner, args=(activation,), name="repeater container runner")
+            self._thread.start()
 
-        self._thread = threading.Thread(target=self._pulse_runner)
-        self._thread.name = "repeater container runner"
-        self._thread.start()
-
-    def _pulse_runner(self):
+    def _pulse_runner(self, activation):
         """runs a single abortable press/release pulse that is abortable if the input is released"""
-        pulse_end = time.time() + self.action_data.hold_delay
-        self._execute(self._press_event, self._value, self._extra_data)
-        while self._is_running and time.time() < pulse_end:
-            time.sleep(0.001)
-        self._execute(self._release_event, self._value, self._extra_data)  # execute the first actions
-
-        if self._is_running:
-            # initial pulse completed ok, chain the rest
-            wait_time = self.action_data.initial_pulse_delay  # wait interval before pulsing the next one
-            self._timer = threading.Timer(wait_time, self._handle_repeat_start)
-            self._timer.start()
-
-        with self._lock:
-            self._is_running = False
+        try:
+            if self._timers.activation is not activation:
+                return
+            pulse_end = time.monotonic() + self.action_data.hold_delay
+            self._execute(self._press_event, self._value, self._extra_data)
+            while self._is_running and time.monotonic() < pulse_end:
+                time.sleep(0.001)
+            if self._timers.activation is not activation:
+                return
+            self._execute(self._release_event, self._value, self._extra_data)
+            with self._lock:
+                if self._is_running and self._timers.activation is activation:
+                    self._timer = self._timers.schedule(self.action_data.initial_pulse_delay, self._handle_repeat_start)
+        finally:
+            with self._lock:
+                self._is_running = False
+                self._thread = None
 
     def process_event(self, event, value, extra_data=None):
         """handles functor event"""
+
+        if not self._timers.active:
+            return False
 
         verbose = gremlin.config.Configuration().verbose_mode_outputs
         # verbose = True
@@ -377,9 +398,7 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 else:
                     # start after the timer has lapsed
                     wait_time = self.action_data.initial_pulse_delay  # wait interval before pulsing the next one
-                    self._timer = threading.Timer(wait_time, self._handle_repeat_start)
-                    self._timer.start()
-
+                    self._timer = self._timers.schedule(wait_time, self._handle_repeat_start)
         else:
             # input is released
             self._stop()
@@ -388,6 +407,8 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def _handle_repeat_start(self):
         """timer lapsed - stat the repeat pulse"""
+        if not self._timers.active:
+            return
         self.pulse_start(None, duration=self.action_data.hold_delay, interval=self.action_data.pulse_interval_delay)
         self._timer = None
 

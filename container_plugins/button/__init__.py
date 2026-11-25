@@ -17,7 +17,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import threading
 
 from lxml import etree as ElementTree
 
@@ -32,6 +31,7 @@ from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.util import safe_format, safe_read
 from gremlin.input_types import InputType
+from gremlin.runtime_timers import RuntimeTimers
 from shiboken6 import Shiboken
 import gremlin.base_profile
 from gremlin.ui.ui_common import (
@@ -235,17 +235,32 @@ class ButtonContainerWidget(AbstractContainerWidget):
 class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def __init__(self, container, parent=None):
         super().__init__(container, parent)
+        self._timers = RuntimeTimers()
         self.container = container
         self.last_trigger = None
         self.autorelease = container.autorelease
         self.verbose = gremlin.config.Configuration().verbose_mode_container
         self.release_timer = None
 
+    def profile_started(self):
+        self._timers.start()
+        super().profile_started()
+
+
     def profile_stop(self):
-        if self.release_timer:
-            self.release_timer.cancel()
+        self._timers.stop()
+        self.release_timer = None
+        self._valid = False
+
+    profile_stopping = profile_stop
+
+    def _trigger_release(self, index, event, value, extra_data):
+        if self._timers.active:
+            self._trigger(index, event, value, extra_data)
 
     def process_event(self, event, value, extra_data=None):
+        if not self._timers.active:
+            return False
 
         event = event.clone()
         if event.event_type == InputType.JoystickHat:
@@ -263,9 +278,9 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 event_r = event.clone()
                 event_r.is_pressed = False
                 if self.release_timer:
-                    self.release_timer.cancel()
-                self.release_timer = threading.Timer(self.container.autorelease_delay / 1000, lambda: self._trigger(0, event_r, value, extra_data))
-                self.release_timer.start()
+                    self._timers.cancel(self.release_timer)
+                self.release_timer = self._timers.schedule(self.container.autorelease_delay / 1000, lambda: self._trigger_release(0, event_r, value, extra_data))
+
                 self.last_trigger = 0
 
             # self.press_set.process_event(event, value)
@@ -280,9 +295,9 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 event_r = event.clone()
                 event_r.is_pressed = False
                 if self.release_timer:
-                    self.release_timer.cancel()
-                self.release_timer = threading.Timer(self.container.autorelease_delay / 1000, lambda: self._trigger(1, event_r, value, extra_data))
-                self.release_timer.start()
+                    self._timers.cancel(self.release_timer)
+                self.release_timer = self._timers.schedule(self.container.autorelease_delay / 1000, lambda: self._trigger_release(1, event_r, value, extra_data))
+
             self.last_trigger = 1
 
             # self.release_set.process_event(event, value)
