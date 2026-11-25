@@ -2786,8 +2786,8 @@
 <td>Supports streamers and instructional videos via its graphical overlay module compatible with OBS.  The overlay can be customized with graphical widgets that show inputs or outputs, states and other features.</td>
 </tr>
 <tr>
-<td>Linear data input processing</td>
-<td>GEX supports input calibration and deadzone mapping on a per input basis. Inputs are also processed through a signal processing EMA (Exponential Moving Average) filter to handle very high refresh rate devices (such as Azeron), as well as inputs that come from potentiometer based inputs that tend to be noisy.</td>
+<td>Linear data input processing and signal filters</td>
+<td>GEX supports input calibration and deadzone mapping on a per input basis. Inputs are also processed through a signal processing EMA (Exponential Moving Average) filter to handle very high refresh rate devices (such as Azeron), as well as inputs that come from potentiometer based inputs that tend to be noisy.  The filter is automatic.</td>
 </tr>
 <tr>
 <td>OCR (character recognition)</td>
@@ -2834,8 +2834,16 @@
 <td>GEX includes advanced mapping options for linear input including directional and range based triggers, axis merging with other axes with each merge having its own computational operation such as add, substact, trim, scale, average.</td>
 </tr>
 <tr>
+<td>Advanced axis curve and editor</td>
+<td>GEX supports s-curves, logarithmic, and cubic curve models.  GEX also includes a custom curve fit algorithm that will fit a response curve through input coordinates for custom curve handling.  The curve editor supports curve segments, including movement, smoothing, straigthen and edit of handles, as well as the ability to save or recall custom presets.</td>
+</tr>
+<tr>
 <td>Advanced momentary input (button) processing</td>
 <td>GEX's mapping engine supports encoder input with acceleration and latching of companion inputs for reversed inputs (such as an input for down, and a latched input for up on the same mappping).</td>
+</tr>
+<tr>
+<td>Advanced button to axis processing</td>
+<td>GEX supports PID controllers with behavior presets, stepped output, curved steps and encoders, and has built in support for directional latched input.</td>
 </tr>
 <tr>
 <td>Encoder support</td>
@@ -2874,8 +2882,12 @@
 <td>GEX can filter input devices that are not used, and also reduce the displayed inputs (axis, buttons or hats) to manage profile editing without having thousands of inputs displayed concurrently in the UI.</td>
 </tr>
 <tr>
+<td>Templates and copy/paste of mappings</td>
+<td>GEX can create templates from mappings and create a mapping from a saved, or received template.  GEX also has copy/paste support for mappings to make it easy to copy a container or action and re-use it somewhere else in the same, or different profile.</td>
+</tr>
+<tr>
 <td>Theme aware modern UI</td>
-<td>The UI supports the default Windows theme, custom colors, or dark/light modes</td>
+<td>The UI supports the default Windows theme, custom colors, or dark/light modes and a current generation user interface.</td>
 </tr>
 <tr>
 <td>Custom modules</td>
