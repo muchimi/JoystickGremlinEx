@@ -2727,11 +2727,11 @@
 <tbody>
 <tr>
 <td>Virtual joystick/gamepad support</td>
-<td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.</td>
+<td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.  GEX also supports up to four (4) gamepad devices with 6 axes, 32 buttons and one hat (limits are due to the XINPUT specification).  GEX can read from gamepads or joysticks, virtual or not, and when using the integrated bridge service, can write to gamepads using normal joystick mapping actions.</td>
 </tr>
 <tr>
 <td>XINPUT and DINPUT suport</td>
-<td>GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT.</td>
+<td>GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT.  Gamepad output is via the normal joystick interfaces so gamepads look to a profile exaclty like a joystick, but looks like a gamepad to the game.</td>
 </tr>
 <tr>
 <td>Network output support</td>
@@ -2742,8 +2742,8 @@
 <td>GEX does not require any software from a hardware vendor provided the device is recognized by Windows. It thus replaces vendor specific programming/mapping software and works with any supported Windows controller.</td>
 </tr>
 <tr>
-<td>Full support for HID Hide</td>
-<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.</td>
+<td>Full internal support for HID Hide including configuratione</td>
+<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.  GEX lets you manage all HID Hide device whitelisting from within GEX.</td>
 </tr>
 <tr>
 <td>Full support for DINPUT devices</td>
