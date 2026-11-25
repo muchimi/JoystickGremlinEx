@@ -2,13 +2,18 @@
 # GremlinEx
 
 
-GremlinEx (GEX) is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Sound Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, convert text to speech and play sounds.  It can send output to a game or another process.
+GremlinEx (GEX) is a universal controller integrator: it allows you to take input from multiple hardware devices from different manufacturers connected to a local machine, or a remote machine, such as joysticks and HID controllers, OSC (Open Sound Control), MIDI, Keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, convert text to speech and play sounds.  It can send output to a game or another process, and even translate gamepad input to joystick output and vice versa, all in real time.
+
+The feature set is available [in the documentation here](https://muchimi.github.io/JoystickGremlinEx/overview/#key-features-what-is-gremlinex).
 
 As of m77T90, for virtual programmable joysticks and gamepads, GEX supports both vJoy/VIGEM and the newer HID Maestro virtual devices.  The support for HID Maestro is built-in the GEX Maestro Bridge service.  Note that you cannot have both vJoy/VIGEM and the bridge service running concurrently due to driver level conflicts external to GEX.
 
 With OSC support, GremlinEx can receive input from custom designed glass (touch screen) surfaces, and supports two way communication to any device supported by BitFocus Companion such as the Elgato Streamdeck.  This communication is two-way so GremlinEx can also send data to a glass surface or an external hardware panel.
 
 GremlinEx can be expanded using custom plugins written in Python.
+
+GEX handles support simple profiles with one or two input controllers all the way up to custom simpits with multiple input controllers and types, complex logic and conditions and even a state machine.  
+
 
 ![gremlinex](gremlinex.png)
 ![gremlinex viewer](gremlinex_viewer.png)

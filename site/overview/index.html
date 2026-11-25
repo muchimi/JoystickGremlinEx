@@ -2727,11 +2727,11 @@
 <tbody>
 <tr>
 <td>Virtual joystick/gamepad support</td>
-<td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.</td>
+<td>GEX supports legacy vJoy/VIGEM and HID Maestro via the GEX Bridge Service for virtual controllers.  The bridge service replaces vJoy and VIGEM and provides up to 256 virtual devices all with 128 buttons, 8 axes and 4 hats.  GEX also supports up to four (4) gamepad devices with 6 axes, 32 buttons and one hat (limits are due to the XINPUT specification).  GEX can read from gamepads or joysticks, virtual or not, and when using the integrated bridge service, can write to gamepads using normal joystick mapping actions.</td>
 </tr>
 <tr>
 <td>XINPUT and DINPUT suport</td>
-<td>GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT.</td>
+<td>GEX uses XINPUT to read gamepad data and DINPUT for joystick controllers.  With the GEX Bridge, GEX supports output to virtual joysticks via DINPUT, and to virtual gamepads via XINPUT.  Gamepad output is via the normal joystick interfaces so gamepads look to a profile exaclty like a joystick, but looks like a gamepad to the game.</td>
 </tr>
 <tr>
 <td>Network output support</td>
@@ -2742,8 +2742,8 @@
 <td>GEX does not require any software from a hardware vendor provided the device is recognized by Windows. It thus replaces vendor specific programming/mapping software and works with any supported Windows controller.</td>
 </tr>
 <tr>
-<td>Full support for HID Hide</td>
-<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.</td>
+<td>Full internal support for HID Hide including configuration</td>
+<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.  GEX lets you manage all HID Hide device whitelisting from within GEX. GEX uses the low level API from HIDHide exposed via IOCTL.</td>
 </tr>
 <tr>
 <td>Full support for DINPUT devices</td>
@@ -2767,11 +2767,11 @@
 </tr>
 <tr>
 <td>Full support for the OSC protocol</td>
-<td>GEX supports the OSC (Open Sound Control) network protocol used, among other things, to collect input from stage control hardware such as lighting consoles, sound and stage control.  These devices are compatible with GEX because they have buttons, encoders and faders that can be used for game input.  GEX works with any BitFocus Companion supported devices, and MIDI devices as well. OSC itself is a binary protocol with low latency and is ideal to communicate controller data real time to devices on the local network.</td>
+<td>GEX supports the OSC (Open Sound Control) network protocol used, among other things, to collect input from stage control hardware such as lighting consoles, sound and stage control.  These devices are compatible with GEX as they support buttons, encoders and faders that can be used for game input.  GEX works with any BitFocus Companion supported devices, and MIDI devices as well. OSC itself is a binary protocol with low latency and is ideal to communicate controller data real time to devices on the local network.</td>
 </tr>
 <tr>
-<td>Full support for touch (glass) surfaces.</td>
-<td>GEX supports glass surfaces either via it's touch aware web input overlay, or via graphical applications that output OSC, such as the Open Stage Control application.  This provides GEX with the ability to accept touch screen input for encoders, faders and buttons, with two way communication over the OSC protocol, or via the Overlay feature.  The web client lets smartphones and tablets like iPads send input to GEX.  Note: a current Windows limitation is touch screens have to be networked.</td>
+<td>Full support for touch screen (glass) surfaces and custom designed touch-screen based panels</td>
+<td>GEX supports glass surfaces either via its intergrated touch aware web input overlay (game overlay), or via graphical applications compatible with the OSC protocol, common in touch surfaces that manage stages and lighting, and DJ equipment.  These tools provide complete authoring and creation of graphical panels including tablets and phones.  External open source tools like <a href="https://openstagecontrol.ammd.net/docs/getting-started/introduction/">the Open Stage Control application</a>.  This provides GEX with the ability to accept touch screen input for encoders, faders and buttons, with two way communication over the OSC protocol, or via the Overlay feature.  The web client lets smartphones and tablets like iPads send input to GEX.  Note: a current Windows limitation is touch screens have to be networked.</td>
 </tr>
 <tr>
 <td>Automatic XINPUT/XUSB output conversion</td>
@@ -2783,23 +2783,27 @@
 </tr>
 <tr>
 <td>Game overlay</td>
-<td>Supports streamers and instructional videos via its graphical overlay module compatible with OBS.  The overlay can be customized with graphical widgets that show inputs or outputs, states and other features.</td>
+<td>GEX lets you author graphical game overlays with advanced scaling, positioning and multi-monitor support, and green screen applications for OBS.  This supports streamers and instructional videos as well as custom graphical overlays for a game that respond to inputs and outputs and GEX actions and states.</td>
 </tr>
 <tr>
-<td>Linear data input processing</td>
-<td>GEX supports input calibration and deadzone mapping on a per input basis. Inputs are also processed through a signal processing EMA (Exponential Moving Average) filter to handle very high refresh rate devices (such as Azeron), as well as inputs that come from potentiometer based inputs that tend to be noisy.</td>
+<td>Linear data input processing and signal filters</td>
+<td>GEX supports input calibration and deadzone mapping on a per input basis. Inputs are also processed through a signal processing EMA (Exponential Moving Average) filter to handle very high refresh rate devices (such as Azeron), as well as inputs that come from potentiometer based inputs that tend to be noisy.  The filter is automatic.</td>
 </tr>
 <tr>
 <td>OCR (character recognition)</td>
-<td>The overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
+<td>The game overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
 </tr>
 <tr>
-<td>Web input/output</td>
-<td>Supports web input interfaces that can be designed in GEX to support web based touch screens like phones and tablets (non-Windows).  This is part of the overlay system.</td>
+<td>Advanced AFCS mapping</td>
+<td>For advanced users and very specialized simpit environments, the AFCS mapper allows a graphical design of signal modification using nodes and operations to produce exceedingly specialized mappings that cannot be done via other methods</td>
+</tr>
+<tr>
+<td>Web interface to present glass surfaces on non-Windows devices (phones and tablets)</td>
+<td>The GEX editor supports editing of graphical web interfaces for phones and tablets - or for any modern web browser for interacting with a game.</td>
 </tr>
 <tr>
 <td>Network remote control</td>
-<td>Supports remote control and remote input from multiple local GEX clients for joystick, keyboard and mouse.  This behavior can be triggered on/off via control inputs.</td>
+<td>Supports remote control and remote input/output from multiple local GEX clients for joystick, gamepad, keyboard and mouse data.  This behavior can be triggered on/off via control inputs.</td>
 </tr>
 <tr>
 <td>State machine</td>
@@ -2830,8 +2834,16 @@
 <td>GEX includes advanced mapping options for linear input including directional and range based triggers, axis merging with other axes with each merge having its own computational operation such as add, substact, trim, scale, average.</td>
 </tr>
 <tr>
+<td>Advanced axis curve and editor</td>
+<td>GEX supports s-curves, logarithmic, and cubic curve models.  GEX also includes a custom curve fit algorithm that will fit a response curve through input coordinates for custom curve handling.  The curve editor supports curve segments, including movement, smoothing, straigthen and edit of handles, as well as the ability to save or recall custom presets.</td>
+</tr>
+<tr>
 <td>Advanced momentary input (button) processing</td>
 <td>GEX's mapping engine supports encoder input with acceleration and latching of companion inputs for reversed inputs (such as an input for down, and a latched input for up on the same mappping).</td>
+</tr>
+<tr>
+<td>Advanced button to axis processing</td>
+<td>GEX supports PID controllers with behavior presets, stepped output, curved steps and encoders, and has built in support for directional latched input.</td>
 </tr>
 <tr>
 <td>Encoder support</td>
@@ -2854,6 +2866,10 @@
 <td>Supports direct control of Microsoft FLight Simulator 2024 via the Simconnect SDK including calculated expressions to bypass any mapping done in MSFS</td>
 </tr>
 <tr>
+<td>Cloud Imperium Games Star Citizen Telemetry Service Support</td>
+<td>Supports read/write to the Star Citizen local telemetry (if writing is enabled by CIG). GEX can trigger on 96 inputs as of 4.10.3.  This is being updated as the telemetry service adds features.</td>
+</tr>
+<tr>
 <td>Visual repeaters</td>
 <td>Provides visual real time input repeaters as well as an output viewer as part of the GEX user interface.</td>
 </tr>
@@ -2866,8 +2882,12 @@
 <td>GEX can filter input devices that are not used, and also reduce the displayed inputs (axis, buttons or hats) to manage profile editing without having thousands of inputs displayed concurrently in the UI.</td>
 </tr>
 <tr>
+<td>Templates and copy/paste of mappings</td>
+<td>GEX can create templates from mappings and create a mapping from a saved, or received template.  GEX also has copy/paste support for mappings to make it easy to copy a container or action and re-use it somewhere else in the same, or different profile.</td>
+</tr>
+<tr>
 <td>Theme aware modern UI</td>
-<td>The UI supports the default Windows theme, custom colors, or dark/light modes</td>
+<td>The UI supports the default Windows theme, custom colors, or dark/light modes and a current generation user interface.</td>
 </tr>
 <tr>
 <td>Custom modules</td>
@@ -2882,8 +2902,8 @@
 <p>GEX is offered as a GPL 3 license.  Other open source dependencies have their own license, as do any publicly reditributable components.  By using GEX, you agree to the terms and conditions of the GPL 3 license, as well as the terms of any dependencies.  The distribution media includes a licensing folder that references all licenses.</p>
 <p>GEX is not commercial software.  Donations are however highly appreciated to support the on-going development.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¶</a></h2>
-<p>As of m77, GEX is installed via standard Windows installers for convenience, although portable .ZIP archives are also supported.  The GEX installer will optionally install the bridge component (recommended).</p>
-<p>The default installation of the bridge component is to run locally (advanced networking is supported and is not meant for typical deployments).</p>
+<p>As of m77, GEX is installed via standard Windows installers for convenience, although portable .ZIP archives are also supported.  The GEX installer will optionally install the bridge component (recommended) and supports updates.</p>
+<p>The default installation of the bridge component is to run locally (advanced networking is supported and is not meant for typical deployments).  It is recommended to use the bridge module instead of vJoy or VIGEM due to the enhanced capabilities provided, and ease of use/installation.</p>
 <p>The installer for GEX will by default install GEX to a versioned folder, allowing multiple releases to co-exist.  The bridge installer is also versioned, but as only one bridge can be installed at a time, the same folder is used, and the installer will do an upgrade in place if a new version is available.</p>
 <p>Versions are usually backards compatible unless otherwise noted in the patch notes.  Note that any profile conversions make the profile incompatible with a prior release, so make backups of any current profiles.</p>
 <p>Profile compatibility with original Joystick Gremlin profiles (v13) is not a guarantee but in general has been tested to convert correctly.  It is however not recommended to use old profiles without some editing to take advantage of the features available in GEX.</p>
