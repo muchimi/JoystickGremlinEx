@@ -2742,8 +2742,8 @@
 <td>GEX does not require any software from a hardware vendor provided the device is recognized by Windows. It thus replaces vendor specific programming/mapping software and works with any supported Windows controller.</td>
 </tr>
 <tr>
-<td>Full internal support for HID Hide including configuration.</td>
-<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.  GEX lets you manage all HID Hide device whitelisting from within GEX.</td>
+<td>Full internal support for HID Hide including configuration</td>
+<td>GEX supports HID Hide to hide physical hardware from games so only the virtual outputs are visible to a game.  GEX lets you manage all HID Hide device whitelisting from within GEX. GEX uses the low level API from HIDHide exposed via IOCTL.</td>
 </tr>
 <tr>
 <td>Full support for DINPUT devices</td>
@@ -2767,11 +2767,11 @@
 </tr>
 <tr>
 <td>Full support for the OSC protocol</td>
-<td>GEX supports the OSC (Open Sound Control) network protocol used, among other things, to collect input from stage control hardware such as lighting consoles, sound and stage control.  These devices are compatible with GEX because they have buttons, encoders and faders that can be used for game input.  GEX works with any BitFocus Companion supported devices, and MIDI devices as well. OSC itself is a binary protocol with low latency and is ideal to communicate controller data real time to devices on the local network.</td>
+<td>GEX supports the OSC (Open Sound Control) network protocol used, among other things, to collect input from stage control hardware such as lighting consoles, sound and stage control.  These devices are compatible with GEX as they support buttons, encoders and faders that can be used for game input.  GEX works with any BitFocus Companion supported devices, and MIDI devices as well. OSC itself is a binary protocol with low latency and is ideal to communicate controller data real time to devices on the local network.</td>
 </tr>
 <tr>
-<td>Full support for touch (glass) surfaces.</td>
-<td>GEX supports glass surfaces either via it's touch aware web input overlay, or via graphical applications that output OSC, such as the Open Stage Control application.  This provides GEX with the ability to accept touch screen input for encoders, faders and buttons, with two way communication over the OSC protocol, or via the Overlay feature.  The web client lets smartphones and tablets like iPads send input to GEX.  Note: a current Windows limitation is touch screens have to be networked.</td>
+<td>Full support for touch screen (glass) surfaces and custom designed touch-screen based panels</td>
+<td>GEX supports glass surfaces either via its intergrated touch aware web input overlay (game overlay), or via graphical applications compatible with the OSC protocol, common in touch surfaces that manage stages and lighting, and DJ equipment.  These tools provide complete authoring and creation of graphical panels including tablets and phones.  External open source tools like <a href="https://openstagecontrol.ammd.net/docs/getting-started/introduction/">the Open Stage Control application</a>.  This provides GEX with the ability to accept touch screen input for encoders, faders and buttons, with two way communication over the OSC protocol, or via the Overlay feature.  The web client lets smartphones and tablets like iPads send input to GEX.  Note: a current Windows limitation is touch screens have to be networked.</td>
 </tr>
 <tr>
 <td>Automatic XINPUT/XUSB output conversion</td>
@@ -2791,7 +2791,11 @@
 </tr>
 <tr>
 <td>OCR (character recognition)</td>
-<td>The overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
+<td>The game overlay supports an OCR (optical character recognition or translating graphics to text) function to trigger actions based on recognized text.  This is used as part of the overlay system.</td>
+</tr>
+<tr>
+<td>Advanced AFCS mapping</td>
+<td>For advanced users and very specialized simpit environments, the AFCS mapper allows a graphical design of signal modification using nodes and operations to produce exceedingly specialized mappings that cannot be done via other methods</td>
 </tr>
 <tr>
 <td>Web input/output</td>
