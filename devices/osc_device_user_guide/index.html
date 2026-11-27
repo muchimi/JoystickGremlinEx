@@ -1,0 +1,1531 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/devices/osc_device_user_guide/">
+      
+      
+        <link rel="prev" href="../loopback_device_user_guide/">
+      
+      
+        <link rel="next" href="../star_citizen_user_guide/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>OSC Device User Guide - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#osc-device-user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              OSC Device User Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../bitfocus_companion_setup_guide/" class="md-tabs__link">
+          
+  
+  
+  Devices
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../actions/" class="md-tabs__link">
+          
+  
+  
+  Actions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked="">
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Devices
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Devices
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bitfocus_companion_setup_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bitfocus Companion Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../loopback_device_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loopback Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OSC Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OSC Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#connect-the-sender-to-gex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect the sender to GEX
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-an-osc-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add an OSC input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitfocus-companion-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitfocus Companion example
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bitfocus Companion example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toggle-the-landing-gear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle the landing gear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#more-sc-ex-button-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        More SC Ex button mappings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-a-profile-start-message-back-to-companion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send a profile-start message back to Companion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-a-button-from-the-same-pc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test a button from the same PC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-several-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import several inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#send-feedback-to-a-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send feedback to a panel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../star_citizen_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Star Citizen Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state_device_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6">
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Actions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Action Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../actions/keyboard_ex_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Map to Keyboard/Mouse Ex User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mapping Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#connect-the-sender-to-gex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect the sender to GEX
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-an-osc-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add an OSC input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitfocus-companion-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitfocus Companion example
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bitfocus Companion example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toggle-the-landing-gear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle the landing gear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#more-sc-ex-button-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        More SC Ex button mappings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#send-a-profile-start-message-back-to-companion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send a profile-start message back to Companion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-a-button-from-the-same-pc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test a button from the same PC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#import-several-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import several inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#send-feedback-to-a-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send feedback to a panel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="osc-device-user-guide">OSC Device User Guide<a class="headerlink" href="#osc-device-user-guide" title="Permanent link">¶</a></h1>
+<p>Use the <strong>OSC</strong> device tab to map controls from a touch panel, another app, or a script. GremlinEx (GEX) receives Open Sound Control messages over UDP. A message has an address such as <code>/gex/test/button</code> and can carry arguments such as a button state or a fader position. <a href="https://opensoundcontrol.stanford.edu/spec-1_0.html">OSC 1.0 specification</a></p>
+<h2 id="connect-the-sender-to-gex">Connect the sender to GEX<a class="headerlink" href="#connect-the-sender-to-gex" title="Permanent link">¶</a></h2>
+<ol>
+<li>Open <strong>Options → Modules</strong> and enable <strong>OSC</strong>. Restart GEX if you changed the setting.</li>
+<li>Open <strong>Options → OSC/MIDI</strong> and check <strong>Enable OSC</strong>. Note the <strong>GremlinEx IP</strong> and <strong>Input port</strong>. The default UDP input port is <code>8000</code>.</li>
+<li>Set your panel or app’s OSC destination to that IP and input port. For a panel on another device, use <strong>Select</strong> next to <strong>GremlinEx IP</strong> to choose the GEX computer’s LAN address. A sender on the same PC can send to the displayed address too. Use <code>127.0.0.1</code> if GEX is listening on loopback.</li>
+<li>If Windows Firewall blocks a sender on your LAN, allow inbound UDP to the selected input port on the private network.</li>
+</ol>
+<p><strong>Output IP</strong> and <strong>Output port</strong> are defaults for messages sent from GEX. The default output port is <code>8001</code>. Use the receiving app’s listen port when sending feedback.</p>
+<h2 id="add-an-osc-input">Add an OSC input<a class="headerlink" href="#add-an-osc-input" title="Permanent link">¶</a></h2>
+<ol>
+<li>Open your profile, select the edit mode, and open the <strong>OSC</strong> tab.</li>
+<li>Click <strong>Add</strong>. In <strong>OSC Input Mapper</strong>, enter the address in <strong>Cmd</strong>, including the leading slash. To learn an address and its arguments, click <strong>Listen for input</strong>, then operate the panel control once. The listener shows the IP and port it is using.</li>
+<li>Select <strong>Message only</strong> so messages with the same address can carry different values. Select the <strong>Action mode</strong> for the control. For a captured message with several arguments, choose the one to use under <strong>Source</strong>. For example, you can add two axis inputs for an XY pad with the same address and select a different argument on each row.</li>
+<li>Click <strong>OK</strong>. Select the input row, add a <strong>Basic</strong> container and an action, then save and activate the profile to test it.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Sender</th>
+<th>Input setup</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Momentary button or switch that sends <code>1</code> and <code>0</code></td>
+<td>Select <strong>Button</strong> and leave <strong>Trigger on message</strong> off.</td>
+<td>A nonzero value presses the button. Zero releases it.</td>
+</tr>
+<tr>
+<td>Command with no arguments</td>
+<td>Select <strong>Button</strong> and enable <strong>Trigger on message</strong>. Set the release delay.</td>
+<td>GEX presses the button when the message arrives and releases it after the delay. <strong>Autorelease on no arg messages</strong> in <strong>Options → OSC/MIDI</strong> also enables this behavior for argument-free button messages.</td>
+</tr>
+<tr>
+<td>Fader or slider that sends a value from <code>0.0</code> to <code>1.0</code></td>
+<td>Select <strong>Axis</strong> and choose the numeric argument under <strong>Source</strong> if the message has more than one.</td>
+<td>GEX maps <code>0.0</code> to <code>−1.0</code>, <code>0.5</code> to center, and <code>1.0</code> to <code>+1.0</code>. Attach <strong>Virtual Remap</strong> to drive an output axis.</td>
+</tr>
+<tr>
+<td>Numeric update you want to handle as a press</td>
+<td>Select <strong>Change</strong>.</td>
+<td>GEX emits a press for each matching numeric message, including zero. Use a press-triggered action.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="bitfocus-companion-example">Bitfocus Companion example<a class="headerlink" href="#bitfocus-companion-example" title="Permanent link">¶</a></h2>
+<p>For Stream Deck setup and the full button walkthrough, see the <a href="../bitfocus_companion_setup_guide/">Bitfocus Companion Setup Guide</a>.</p>
+<p>In this setup, Companion and GEX run on the same Windows PC. Companion sends button events to GEX, and GEX uses the profile’s keyboard ex bindings to control Star Citizen.</p>
+<table>
+<thead>
+<tr>
+<th>Connection</th>
+<th>Settings from this setup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Companion <strong>Generic → OSC</strong> connection, named <code>osc</code></td>
+<td><strong>UDP</strong>, target <code>192.168.1.95:8000</code>, feedback listener enabled on UDP <code>8001</code>.</td>
+</tr>
+<tr>
+<td>GEX <strong>Options → OSC/MIDI</strong></td>
+<td><strong>GremlinEx IP</strong> <code>192.168.1.95</code>, <strong>Input port</strong> <code>8000</code>.</td>
+</tr>
+<tr>
+<td>Companion web admin</td>
+<td><code>http://127.0.0.1:8010</code> on this PC. Open it to edit the connection and buttons.</td>
+</tr>
+</tbody>
+</table>
+<p>Use your GEX computer’s selected listener address in Companion’s target settings. <code>192.168.1.95</code> is the address used in this example. <a href="https://bitfocus.io/connections/generic-osc">Bitfocus Generic OSC documentation</a></p>
+<h3 id="toggle-the-landing-gear">Toggle the landing gear<a class="headerlink" href="#toggle-the-landing-gear" title="Permanent link">¶</a></h3>
+<ol>
+<li>In Companion, edit the gear button. Under <strong>Press actions</strong>, add the <code>osc</code> connection’s <strong>Send float</strong> action with path <code>/gear_toggle</code> and value <code>1.0</code>. Under <strong>Release actions</strong>, use <strong>Send float</strong> with the same path and value <code>0.0</code>.</li>
+<li>In GEX, open the SC Ex profile’s <strong>Default</strong> mode and select <code>/gear_toggle</code> in the <strong>OSC</strong> tab. To recreate the input in another profile, use <strong>Message only</strong>, <strong>Button</strong>, and the first argument. Leave <strong>Trigger on message</strong> off because Companion sends the release.</li>
+<li>Add <strong>Map to Keyboard/Mouse Ex</strong> in a <strong>Basic</strong> container. Select <strong>N</strong>, choose <strong>Pulse</strong>, set the duration to <strong>125 ms</strong>, and configure the action to execute on press only. The saved SC Ex mapping also plays a sound on press to acknowledge the command. <a href="../../actions/keyboard_ex_user_guide/">Map to Keyboard/Mouse Ex User Guide</a></li>
+<li>Verify that <code>N</code> is bound to the landing gear in Star Citizen, activate the profile, and press the Companion button in the game. GEX sends one key pulse even if you hold the Companion button. Releasing the Companion button resets the OSC input for the next press.</li>
+</ol>
+<h3 id="more-sc-ex-button-mappings">More SC Ex button mappings<a class="headerlink" href="#more-sc-ex-button-mappings" title="Permanent link">¶</a></h3>
+<p>These Companion buttons also send a float <code>1.0</code> on press and <code>0.0</code> on release. In GEX they use <strong>Message only</strong>, <strong>Button</strong>, and <strong>Map to Keyboard/Mouse Ex</strong>. Use the keys assigned in your Star Citizen controls if they differ from the saved profile.</p>
+<table>
+<thead>
+<tr>
+<th>Star Citizen control</th>
+<th>OSC path</th>
+<th>SC Ex keyboard output</th>
+<th><strong>Trigger on message</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Toggle ship lights</td>
+<td><code>/lights_toggle</code></td>
+<td><strong>L</strong>, Hold</td>
+<td>Off</td>
+</tr>
+<tr>
+<td>Toggle VTOL</td>
+<td><code>/vtol_toggle</code></td>
+<td><strong>K</strong>, Hold</td>
+<td>On, with a 250 ms autorelease delay</td>
+</tr>
+<tr>
+<td>Flight ready</td>
+<td><code>/flight_ready</code></td>
+<td><strong>Right Alt + R</strong>, Hold</td>
+<td>Off</td>
+</tr>
+</tbody>
+</table>
+<p>These mappings send keyboard input. For commands advertised by the game’s local server or for feedback driven by actual ship state, see the <a href="../star_citizen_user_guide/">Star Citizen Device User Guide</a>.</p>
+<h3 id="send-a-profile-start-message-back-to-companion">Send a profile-start message back to Companion<a class="headerlink" href="#send-a-profile-start-message-back-to-companion" title="Permanent link">¶</a></h3>
+<p>SC Ex includes a <strong>Map to OSC Ex</strong> action on <strong>Profile Start</strong>. It sends <code>/switch_sc</code> with no arguments to <code>192.168.1.95:8001</code>. The Companion <code>osc</code> connection listens for that path with <strong>Listen for OSC messages (No Arguments)</strong> feedback. To recreate the route, set the action target to your Companion computer’s address and its <strong>Feedback Port</strong>, then match the path in the Companion feedback. <a href="#send-feedback-to-a-panel">Send feedback to a panel</a></p>
+<h2 id="test-a-button-from-the-same-pc">Test a button from the same PC<a class="headerlink" href="#test-a-button-from-the-same-pc" title="Permanent link">¶</a></h2>
+<p>Create a <strong>Button</strong> input with address <code>/gex/test/button</code>. Add <strong>Play Sound/TTS</strong> with a short sound and enable <strong>Execute on press</strong> only. Save and activate the profile. Send an OSC integer <code>1</code> and then <code>0</code> from your panel, or run this Python 3 example. Replace the IP and port with the values in <strong>Options → OSC/MIDI</strong>.</p>
+<pre><code class="language-python">import socket
+import struct
+import time
+
+
+def osc_string(value):
+    data = value.encode("ascii") + b"\0"
+    return data + b"\0" * (-len(data) % 4)
+
+
+destination = ("127.0.0.1", 8000)
+header = osc_string("/gex/test/button") + osc_string(",i")
+with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+    sender.sendto(header + struct.pack("&gt;i", 1), destination)
+    time.sleep(0.2)
+    sender.sendto(header + struct.pack("&gt;i", 0), destination)
+</code></pre>
+<p>You should hear the sound once. The input should return to released when the second message arrives. <a href="../../actions/play_sound_user_guide/">Play Sound/TTS User Guide</a></p>
+<h2 id="import-several-inputs">Import several inputs<a class="headerlink" href="#import-several-inputs" title="Permanent link">¶</a></h2>
+<p>Click <strong>Import</strong> on the <strong>OSC</strong> tab and paste one address per line. Use <code>B</code> for a button, <code>BNP</code> for an autorelease button, <code>A</code> for an axis, or <code>C</code> for Change. An address without a suffix defaults to a button.</p>
+<pre><code class="language-text">/panel/lights B
+/panel/gear/pulse BNP
+/panel/throttle A
+/panel/selector C
+</code></pre>
+<p>Import adds input definitions to the selected mode. Add actions to the resulting rows and save the profile.</p>
+<h2 id="send-feedback-to-a-panel">Send feedback to a panel<a class="headerlink" href="#send-feedback-to-a-panel" title="Permanent link">¶</a></h2>
+<p>To drive a panel indicator from a GEX mapping, add <strong>Map to OSC Ex</strong> to the source control. Set <strong>Target IP</strong> and <strong>Target Port</strong> to the panel’s OSC listener. Enter its address in <strong>Command</strong>, use <strong>Add Argument</strong> for the value it expects, then click <strong>Test</strong> and check the panel. Use a separate feedback address if the panel echoes updates back to GEX. <a href="../../actions/#map-to-osc">OSC actions</a></p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The OSC tab is missing</td>
+<td>Check <strong>Options → Modules → OSC</strong> and restart GEX. Also check the device visibility filter.</td>
+</tr>
+<tr>
+<td>The listener captures nothing</td>
+<td>Check the sender’s destination against the IP and port shown by the listener. Use UDP, check the firewall for a LAN sender, and make sure another program has not taken that IP and port.</td>
+</tr>
+<tr>
+<td>Capture works but the action does nothing</td>
+<td>Activate the profile in the mode containing the mapping. Check the address, selected argument, action mode, and press/release settings.</td>
+</tr>
+<tr>
+<td>A button stays pressed</td>
+<td>Send a zero value to release it, or use autorelease for a sender that only sends pulses.</td>
+</tr>
+<tr>
+<td>The fader never reaches center or the endpoints</td>
+<td>Check the selected argument and configure the sender to output <code>0.0</code> through <code>1.0</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>To log incoming addresses and arguments, turn on <strong>Enable Verbose Log Mode</strong> and <strong>OSC</strong> under <strong>Options → Verbosity</strong>, then restart GEX and check <code>system.log</code>. <a href="../../usage/#log-file">Log file location</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

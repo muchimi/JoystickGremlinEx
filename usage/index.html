@@ -11,7 +11,7 @@
         <link rel="prev" href="../overview/">
       
       
-        <link rel="next" href="../devices/loopback_device_user_guide/">
+        <link rel="next" href="../devices/bitfocus_companion_setup_guide/">
       
       
         
@@ -273,7 +273,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../devices/loopback_device_user_guide/" class="md-tabs__link">
+        <a href="../devices/bitfocus_companion_setup_guide/" class="md-tabs__link">
           
   
   
@@ -3164,6 +3164,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../devices/bitfocus_companion_setup_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bitfocus Companion Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../devices/loopback_device_user_guide/" class="md-nav__link">
         
   
@@ -3172,6 +3200,34 @@
     
   
     Loopback Device User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devices/osc_device_user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OSC Device User Guide
   
 
     
@@ -6312,8 +6368,8 @@ GremlinEx names the VJOY devices using their axis/button/hat count and the VJOY 
 <td>Map profile start/stop and mode enter/exit events.</td>
 </tr>
 <tr>
-<td><a href="#osc-device-open-sound-control">OSC</a></td>
-<td>Map incoming OSC messages; OSC actions provide outgoing messages.</td>
+<td><a href="../devices/osc_device_user_guide/">OSC</a></td>
+<td>Map incoming OSC messages and send feedback to panels.</td>
 </tr>
 <tr>
 <td><a href="#midi-device">MIDI</a></td>
@@ -7280,6 +7336,7 @@ GremlinEx can send to the local and remote clients at the same time by selecting
 <p>The majority of issues will come from messages not being recognized by GremlinEx because the input configuration is causing it to filter (skip) that message.  To this end, Gremlin will tell you what it's listening to.</p>
 <p>There are some tools that let you visualize what MIDI messages the computer is receiving such as <a href="http://www.midiox.com/">MidiOx</a>, and older but tried and true MIDI diagnostics tool, or something like <a href="https://hexler.net/protokol">Hexler Protokol</a>.  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.</p>
 <h2 id="osc-device-open-sound-control">OSC device (Open Sound Control)<a class="headerlink" href="#osc-device-open-sound-control" title="Permanent link">¶</a></h2>
+<p>See the <a href="../devices/osc_device_user_guide/">OSC Device User Guide</a> for connection setup, input capture, a button test, and panel feedback.</p>
 <p>GremlinEx, as of 13.40.14ex, can map OSC (Open Sound control) protocol messages as input and use those to trigger actions.  OSC is a network protocol over UDP used to exchange information between AV (audio visual) control panels, studio equipment and related software.  In GremlinEx's context, OSC is used to get input from control panels and touch surfaces that support the OSC protocol, including faders/knobs, buttons/switches, rotary encoders and sliders, all of which are very useful to use as  game input.  GremlinEx can receive and send OSC messages.  OSC is generally much easier to setup and program than MIDI as it supports text commands and multiple parameters, including floating point and integer values.  For more information on the open sound control protocol, visit <a href="https://OpenSoundControl.org">OpenSoundControl.org</a>.</p>
 <p>Examples of what can be achieved using OSC:</p>
 <ul>
