@@ -720,6 +720,12 @@ class StartupWindowChecks(unittest.TestCase):
 
 class EnumerationChecks(unittest.TestCase):
     def test_no_vjoy_or_physical_devices_does_not_exit_or_query_vjoy(self):
+        self.check_no_vjoy_devices(driver_installed=False)
+
+    def test_busy_vjoy_device_does_not_start_keep_alive(self):
+        self.check_no_vjoy_devices(driver_installed=True)
+
+    def check_no_vjoy_devices(self, driver_installed):
         tree = ast.parse((ROOT / 'gremlin/joystick_handling.py').read_bytes())
         nodes = [node for node in tree.body if getattr(node, 'name', None) in {
             'joystick_devices_initialization', '_publish_joystick_devices', '_replace_device_registry'}]
@@ -731,8 +737,11 @@ class EnumerationChecks(unittest.TestCase):
         services.util.normalize_guid = lambda value: value
         services.config = NS(Configuration=lambda: config)
         monitor = NS(start=Mock(), stop=Mock())
-        driver = NS(valid=False, vJoyEnabled=Mock())
-        vjoy = NS(VJoyMonitor=lambda: monitor, device_available=Mock())
+        driver = NS(
+            valid=driver_installed, vJoyEnabled=Mock(return_value=driver_installed),
+            GetVJDStatus=Mock(return_value=STARTUP.VJoyState.Bust.value),
+        )
+        vjoy = NS(VJoyMonitor=lambda: monitor, device_available=Mock(return_value=False))
         listener = NS(device_initialized=Mock(), deferDeviceChanges=Mock(return_value=False))
         services.event_handler = NS(EventListener=lambda: listener)
         services.ui = NS(axis_calibration=NS(CalibrationManager=lambda: NS(reload=Mock())))
@@ -754,12 +763,12 @@ class EnumerationChecks(unittest.TestCase):
         exec(compile(ast.Module(body=nodes, type_ignores=[]), 'joystick_handling.py', 'exec'), namespace)
         with (patch.dict(sys.modules, {'gremlin': services, 'gremlin.util': services.util}),
               patch.object(STARTUP, 'VJoyInterface', driver),
-              patch.object(STARTUP, '_machine_key_exists', return_value=False)):
+              patch.object(STARTUP, '_machine_key_exists', return_value=driver_installed)):
             self.assertTrue(namespace['joystick_devices_initialization']())
-        self.assertFalse(config.vjoy_installed)
+        self.assertEqual(config.vjoy_installed, driver_installed)
         self.assertTrue(namespace['_joystick_initialized'])
         self.assertEqual(len(namespace['_all_vjoy_devices_map']), 16)
-        vjoy.device_available.assert_not_called()
+        self.assertEqual(vjoy.device_available.call_count, 16 if driver_installed else 0)
         monitor.start.assert_not_called()
         listener.device_initialized.emit.assert_called_once()
 

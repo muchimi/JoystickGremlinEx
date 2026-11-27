@@ -382,6 +382,7 @@ class GremlinUi(QRememberMainWindow):
         el.profile_changed.connect(self._profile_changed_cb)
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
+        el.osc_event.connect(self._highlight_osc_input)
         el.input_selection_changed.connect(self._input_changed_handler)
 
         # hook input selection
@@ -946,6 +947,39 @@ class GremlinUi(QRememberMainWindow):
             syslog.info(f"Button input switch to {device_guid} button {input_id}")
 
         self._select_input_handler(device_guid, input_type, input_id, force_switch=True)
+
+    @QtCore.Slot(gremlin.event_handler.Event)
+    def _highlight_osc_input(self, event):
+        """Select a matched OSC input even when its row has not been rendered."""
+        if gremlin.shared_state.is_running or gremlin.shared_state.is_highlighting_suspended():
+            return
+        if not self.config.highlight_enabled:
+            return
+        if event.is_axis:
+            if not self.config.highlight_input_axis:
+                return
+        elif not event.is_pressed or not self.config.highlight_input_buttons:
+            return
+
+        device_guid = event.device_guid
+        switch_tabs = self._tabswitch_needed(device_guid)
+        if switch_tabs and not self.config.highlight_autoswitch:
+            return
+        if self._find_tab_index(device_guid) == -1:
+            return
+
+        message_key = event.identifier.message_key
+        if not switch_tabs:
+            widget = self.getRegisteredWidget(device_guid)
+            list_view = widget.inputItemListView if widget is not None else None
+            row = list_view.getSelectedWidget() if list_view is not None else None
+            if row is not None and row.selected and row.input_item.message_key == message_key:
+                return
+
+        self._select_input_handler(
+            device_guid, InputType.OpenSoundControl, message_key,
+            force_switch=True, extra_data={"source": "osc_highlight"},
+        )
 
     def _axis_state_change(self, event):
         """axis changed - triggered only at design time - HIGHLIGHT SYSTEM"""
@@ -4719,6 +4753,10 @@ class GremlinUi(QRememberMainWindow):
                         input_id = input_item.input_id
                         has_containers = bool(input_item.containers)
                         switch_input = not input_item.selected or not has_containers
+                        if input_type == InputType.OpenSoundControl and not switch_input:
+                            list_view = widget.inputItemListView
+                            row = list_view.getWidgetForInputItem(input_item) if list_view is not None else None
+                            switch_input = switch_tabs or row is None or not row.selected
 
                     if verbose:
                         syslog.info(
@@ -4765,8 +4803,13 @@ class GremlinUi(QRememberMainWindow):
 
                             # A tab refresh can rebuild list/model objects. Re-resolve the
                             # input item from ids to avoid selecting a stale object reference.
+                            lookup_id = (
+                                restore_input_id
+                                if input_type == InputType.OpenSoundControl and isinstance(restore_input_id, str)
+                                else input_id
+                            )
                             if input_type is not None and input_id is not None:
-                                resolved_item = self._find_input_item(device_guid, input_type, input_id)
+                                resolved_item = self._find_input_item(device_guid, input_type, lookup_id)
                                 if resolved_item is not None:
                                     input_item = resolved_item
 
@@ -4780,18 +4823,25 @@ class GremlinUi(QRememberMainWindow):
                             index = widget.indexOf(input_item) if input_item is not None else -1
                             if index == -1 and input_type is not None and input_id is not None and hasattr(widget, "inputItemListModel"):
                                 for candidate in widget.inputItemListModel:
-                                    if candidate is not None and candidate.input_type == input_type and candidate.input_id == input_id:
+                                    if candidate is not None and candidate.input_type == input_type and self._input_id_matches(candidate, lookup_id):
                                         input_item = candidate
                                         index = widget.indexOf(candidate)
                                         break
 
-                            if index == -1 and requested_specific_input and input_item is not None:
-                                device = gremlin.joystick_handling.getDevice(device_guid)
-                                if device and device.device_type == DeviceType.Joystick and self.is_highligthing_enabled and self.config.filter_auto_unhide:
-                                    widget.setInputVisible(input_item, True, emit=True)
-                                    index = widget.indexOf(input_item)
-                                    if verbose:
-                                        syslog.info(f"SELECT INPUT: restore target {input_item.display_name} unhidden at index {index}")
+                            if (
+                                index == -1 and requested_specific_input and input_item is not None
+                                and self.config.filter_auto_unhide and self.is_highligthing_enabled
+                            ):
+                                if input_type == InputType.OpenSoundControl:
+                                    if extra_data and extra_data.get("source") == "osc_highlight":
+                                        index = widget.revealFilteredInput(input_item)
+                                else:
+                                    device = gremlin.joystick_handling.getDevice(device_guid)
+                                    if device and device.device_type == DeviceType.Joystick:
+                                        widget.setInputVisible(input_item, True, emit=True)
+                                        index = widget.indexOf(input_item)
+                                if index >= 0 and verbose:
+                                    syslog.info(f"SELECT INPUT: input {input_item.display_name} unhidden at index {index}")
 
                             if index == -1:
                                 if requested_specific_input:
@@ -7032,6 +7082,7 @@ if __name__ == "__main__":
         gremlin.remote.remote_client.requestIdentify()
 
         syslog.info("GremlinEx UI launching...")
+        gremlin.diagnostics.start_ui_watchdog(app, app_path)
 
         try:
             # integrate twisted with QT framework

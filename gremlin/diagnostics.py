@@ -31,12 +31,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Crash trail for Python, Qt, and native failures.
+"""Crash and UI hang diagnostics.
 
 Python exceptions and Qt warnings go to fault.log. Breadcrumbs are appended to
 trace.log immediately and snapshotted to breadcrumbs.log. A native filter
 writes native-crash.txt (registers and return addresses) and native-crash.dmp
-when the process dies in native code.
+when the process dies in native code. The UI watchdog writes Python thread
+stacks to hang.log when Qt stops servicing its timer.
 """
 
 from __future__ import annotations
@@ -58,6 +59,8 @@ syslog = logging.getLogger("system")
 
 _RING_LIMIT = 200
 _FLUSH_SEC = 0.25
+_UI_HEARTBEAT_MS = 5000
+_UI_HANG_TIMEOUT_SEC = 30
 _lock = threading.Lock()
 _ring: deque[str] = deque(maxlen=_RING_LIMIT)
 _fault_handle = None
@@ -81,6 +84,43 @@ def prepare() -> None:
 GEX_DEV_ENABLED = "GEX_DEV_ENABLED" in os.environ and os.environ["GEX_DEV_ENABLED"].lower() in ("1", "true", "yes")
 PACKAGED = hasattr(sys, '_MEIPASS') and not GEX_DEV_ENABLED
 DIAGNOSTIC_MODE = "GEX_DIAGNOSTIC_MODE" in os.environ and os.environ["GEX_DIAGNOSTIC_MODE"].lower() in ("1", "true", "yes")
+
+
+def start_ui_watchdog(app, data_path: str) -> None:
+    """Arm a native traceback timer and refresh it from the Qt event loop."""
+    if not DIAGNOSTIC_MODE:
+        return
+
+    from PySide6.QtCore import QTimer
+
+    hang_path = os.path.join(data_path, "hang.log")
+    try:
+        handle = open(hang_path, "a", encoding="utf-8")
+    except OSError as err:
+        syslog.warning("DIAG: could not open UI hang log: %s", err)
+        return
+
+    timer = QTimer(app)
+    timer.setInterval(_UI_HEARTBEAT_MS)
+
+    def refresh():
+        faulthandler.dump_traceback_later(_UI_HANG_TIMEOUT_SEC, file=handle)
+
+    def stop():
+        timer.stop()
+        faulthandler.cancel_dump_traceback_later()
+        handle.close()
+
+    timer.timeout.connect(refresh)
+    app.aboutToQuit.connect(stop)
+    refresh()
+    timer.start()
+    syslog.info(
+        "DIAG: UI watchdog armed. Stalls of %s seconds write thread stacks to %s",
+        _UI_HANG_TIMEOUT_SEC,
+        hang_path,
+    )
+
 
 def diagnostics_only(func):
     if PACKAGED or not DIAGNOSTIC_MODE:

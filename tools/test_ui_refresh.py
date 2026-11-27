@@ -964,6 +964,92 @@ FilteredInputTab = load_methods("gremlin/input_item.py", "BaseDeviceTabWidget", 
 })
 
 
+InputScrollView = load_methods("gremlin/input_item.py", "InputItemListView", {
+    "widget", "_scroll_to_item_ui", "_prepare_scroll_to_item_ui", "_flush_scroll_to_item_ui",
+})
+
+
+class InputScrollTests(unittest.TestCase):
+    def setUp(self):
+        self.view = InputScrollView()
+        self.view._widget_map = {}
+        self.view._pending_scroll_widget = None
+        self.area = QtWidgets.QScrollArea(self.view)
+        self.area.setWidgetResizable(True)
+        content = QtWidgets.QWidget()
+        self.view._scroll_layout = QtWidgets.QVBoxLayout(content)
+        self.view._scroll_area = self.area
+        self.area.setWidget(content)
+        self.stack = QtWidgets.QStackedWidget(self.view)
+        self.stack.addWidget(QtWidgets.QLabel("No matching inputs"))
+        self.stack.addWidget(self.area)
+        self.stack.setCurrentWidget(self.area)
+        QtWidgets.QVBoxLayout(self.view).addWidget(self.stack)
+        self.view.resize(240, 180)
+        self.add_row()
+        self.view.show()
+        APP.processEvents()
+
+    def tearDown(self):
+        self.view.deleteLater()
+        flush_deletes()
+
+    def add_row(self):
+        row = QtWidgets.QLabel("Input")
+        row.setFixedHeight(36)
+        row.index = len(self.view._widget_map)
+        self.view._widget_map[row.index] = row
+        self.view._scroll_layout.addWidget(row)
+        return row
+
+    def assert_row_in_viewport(self, row):
+        viewport = self.area.viewport()
+        top = row.mapTo(viewport, QtCore.QPoint()).y()
+        self.assertGreaterEqual(top, 0)
+        self.assertLessEqual(top + row.height(), viewport.height())
+
+    def test_scroll_after_rebuild_waits_for_qt_geometry(self):
+        self.assertEqual(self.area.verticalScrollBar().maximum(), 0)
+        rows = [self.add_row() for _ in range(20)]
+        target = rows[-1]
+        self.view._scroll_to_item_ui(target)
+        self.assertIs(self.view._pending_scroll_widget, target)
+
+        pump_until(lambda: self.view._pending_scroll_widget is None)
+        self.assertGreater(self.area.verticalScrollBar().value(), 0)
+        self.assert_row_in_viewport(target)
+
+    def test_scroll_after_view_switches_from_blank_to_filtered_rows(self):
+        self.stack.setCurrentIndex(0)
+        target = [self.add_row() for _ in range(20)][-1]
+        self.view._scroll_to_item_ui(target)
+        self.stack.setCurrentWidget(self.area)
+
+        pump_until(lambda: self.view._pending_scroll_widget is None)
+        self.assert_row_in_viewport(target)
+
+    def test_latest_scroll_request_uses_viewport_coordinates(self):
+        rows = [self.add_row() for _ in range(20)]
+        APP.processEvents()
+        bar = self.area.verticalScrollBar()
+        bar.setValue(bar.maximum())
+        self.view._scroll_to_item_ui(rows[0])
+        self.view._scroll_to_item_ui(rows[8])
+
+        pump_until(lambda: self.view._pending_scroll_widget is None)
+        self.assert_row_in_viewport(rows[8])
+
+    def test_pending_scroll_ignores_a_row_removed_during_refresh(self):
+        rows = [self.add_row() for _ in range(20)]
+        APP.processEvents()
+        target = rows[-1]
+        self.view._scroll_to_item_ui(target)
+        del self.view._widget_map[target.index]
+
+        pump_until(lambda: self.view._pending_scroll_widget is None)
+        self.assertEqual(self.area.verticalScrollBar().value(), 0)
+
+
 class FilteredStateSelectionTests(unittest.TestCase):
     def setUp(self):
         CONFIG.verbose_mode_inputs = CONFIG.debug_ui = False

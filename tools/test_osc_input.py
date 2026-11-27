@@ -18,7 +18,7 @@
 """OSC receive-to-design-selection checks with real Qt and no sockets/devices.
 
 Run: python tools/test_osc_input.py
-Production receive, dispatch, repeater and row-selection methods are executed.
+Exercises the production receiver and editor highlight handler without rendering input rows.
 """
 
 import ast
@@ -31,9 +31,9 @@ from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore
 
-from test_qt_marshalling import APP, flush_deletes, pump_until
+from test_qt_marshalling import APP, flush_deletes
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,25 +69,22 @@ import sys
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from gremlin.input_types import InputType
-from gremlin.types import CallbackMode, EventSourceType
+from gremlin.types import EventSourceType
 
 
-CONFIG = NS(verbose_mode_osc=False, verbose_mode_events=False, verbose_mode_ui_level=lambda level: False,
-            highlight_enabled=True, highlight_input_buttons=True, highlight_input_axis=True,
+CONFIG = NS(verbose_mode_osc=False, highlight_enabled=True, highlight_input_buttons=True,
+            highlight_input_axis=True, highlight_autoswitch=False,
             osc_no_arg_autorelease=False)
-STATE = NS(is_running=False, current_mode="Default", runtime_mode="Default", osc_tab_guid="osc",
+STATE = NS(is_running=False, runtime_mode="Default", osc_tab_guid="osc",
            is_highlighting_suspended=Mock(return_value=False))
 SERVICES = NS(config=NS(Configuration=lambda: CONFIG), shared_state=STATE,
               base_classes=NS(PickleTarget=type("PickleTarget", (), {})),
-              util=NS(get_guid=lambda: "event", assert_ui_thread=lambda: None,
-                      is_ui_thread=lambda: QtCore.QThread.isMainThread()),
-              ui=NS(ui_common=NS(DeviceWidgetTracker=lambda: NS(getCache=lambda *args: {}))))
+              util=NS(get_guid=lambda: "event"))
 SERVICES.input_devices = NS(callback_registry=NS(registry={}))
 NSPACE = dict(QtCore=QtCore, enum=enum, InputType=InputType, EventSourceType=EventSourceType,
-              CallbackMode=CallbackMode, gremlin=SERVICES, time=time,
+              gremlin=SERVICES, time=time,
               syslog=logging.getLogger("osc-input-checks"))
 SERVICES.util.scale_to_range = load_function("gremlin/util.py", "scale_to_range", NSPACE)
-SERVICES.input_item = NS(getInputIdKey=load_function("gremlin/input_item.py", "getInputIdKey", NSPACE))
 Identifier = load_class("gremlin/ui/osc_device.py", "OscInputItem", {
     "InputMode", "CommandMode", "toMessageKey",
 }, NSPACE)
@@ -96,12 +93,7 @@ AxisValues = load_class("gremlin/event_handler.py", "AxisValues", {"__init__"}, 
 SERVICES.event_handler = NS(Event=Event, AxisValues=AxisValues)
 NSPACE["OscDeviceTabWidget"] = NS(device_guid="osc")
 Client = load_class("gremlin/ui/osc_device.py", "InputOscClient", {"_handle_osc_message_received"}, NSPACE)
-Dispatcher = load_class("gremlin/event_handler.py", "JoystickEventProcessor", {"_fireCallbacks_ui"}, NSPACE)
-RowMethods = load_class("gremlin/input_item.py", "InputItemWidget", {
-    "_handle_button_state_change_callback", "_handle_axis_state_change_callback",
-}, NSPACE)
-ButtonRepeater = load_class("gremlin/ui/ui_common.py", "QButtonStateWidget", {"_handle_update_ui"}, NSPACE)
-AxisRepeater = load_class("gremlin/ui/ui_common.py", "QAxisRepeaterProgressbar", {"_handle_update_ui"}, NSPACE)
+Editor = load_class("gremlinEx.py", "GremlinUi", {"_highlight_osc_input", "_input_id_matches"}, NSPACE)
 
 
 class Bus(QtCore.QObject):
@@ -126,29 +118,6 @@ class Input(Identifier):
         self.button_value = value
 
 
-class Row(QtWidgets.QLabel):
-    button_detected = RowMethods._handle_button_state_change_callback
-    axis_detected = RowMethods._handle_axis_state_change_callback
-
-    def __init__(self):
-        super().__init__("Unselected")
-        self._selected = False
-        self.trigger_count = 0
-
-    @property
-    def selected(self):
-        return self._selected
-
-    @selected.setter
-    def selected(self, value):
-        assert QtCore.QThread.isMainThread(), "Selection must reach the GUI thread"
-        self._selected = value
-        self.setText("Selected" if value else "Unselected")
-
-    def trigger(self):
-        self.trigger_count += 1
-
-
 class OscInputTests(unittest.TestCase):
     def setUp(self):
         self.qt_errors = []
@@ -157,11 +126,16 @@ class OscInputTests(unittest.TestCase):
         STATE.is_running = False
         STATE.is_highlighting_suspended.return_value = False
         CONFIG.highlight_enabled = CONFIG.highlight_input_buttons = CONFIG.highlight_input_axis = True
+        CONFIG.highlight_autoswitch = False
         self.bus = Bus()
-        self.dispatcher = Dispatcher()
-        self.dispatcher._listener_callbacks = {}
-        for signal in (self.bus.joystick_event_ui, self.bus.vjoy_output_event_ui):
-            signal.connect(self.dispatcher._fireCallbacks_ui, QtCore.Qt.ConnectionType.QueuedConnection)
+        self.editor = Editor()
+        self.editor.config = CONFIG
+        self.editor._tabswitch_needed = Mock(return_value=False)
+        self.editor._find_tab_index = Mock(return_value=0)
+        self.view = NS(getSelectedWidget=Mock(return_value=None))
+        self.editor.getRegisteredWidget = Mock(return_value=NS(inputItemListView=self.view))
+        self.editor._select_input_handler = Mock(side_effect=self.assert_gui_thread)
+        self.bus.osc_event.connect(self.editor._highlight_osc_input)
         self.events = []
         self.bus.osc_event.connect(self.events.append, QtCore.Qt.ConnectionType.QueuedConnection)
         self.client = Client()
@@ -169,47 +143,27 @@ class OscInputTests(unittest.TestCase):
         self.client._osc_map = {}
         self.client._state_data = {}
         self.client._verbose = False
-        self.rows = []
-        self.repeaters = []
 
     def tearDown(self):
-        for obj in [self.client, self.dispatcher, self.bus, *self.rows, *self.repeaters]:
+        for obj in (self.client, self.editor, self.bus):
             obj.deleteLater()
         flush_deletes()
         self.exception_hook.stop()
         self.assertEqual(self.qt_errors, [])
 
-    def add_button(self, message, source_index=0, mode=None):
+    def assert_gui_thread(self, *args, **kwargs):
+        self.assertTrue(QtCore.QThread.isMainThread())
+
+    def add_input(self, message, source_index=0, mode=None):
         identifier = Input(message, source_index=source_index, mode=mode)
         self.client._osc_map.setdefault(identifier.message_key, []).append(identifier)
-        row = Row()
-        repeater = ButtonRepeater()
-        repeater._state_change_callback = row.button_detected
-        repeater._update_value_ui = Mock()
-        self.dispatcher._listener_callbacks.setdefault(EventSourceType.OSC, {}).setdefault(
-            CallbackMode.Edit, {},
-        ).setdefault("osc", {}).setdefault(InputType.JoystickButton, {})[identifier.message_key] = [repeater._handle_update_ui]
-        self.rows.append(row)
-        self.repeaters.append(repeater)
-        return identifier, row
+        return identifier
 
-    def add_axis(self, message, source_index=0):
-        identifier = Input(message, mode=Identifier.InputMode.Axis, source_index=source_index)
-        self.client._osc_map.setdefault(identifier.message_key, []).append(identifier)
-        row = Row()
-        repeater = AxisRepeater()
-        repeater._device_guid = "osc"
-        repeater._input_id = identifier
-        repeater._get_values_callback = None
-        repeater._value = None
-        repeater._state_change_callback = row.axis_detected
-        repeater._set_value_ui = Mock()
-        self.dispatcher._listener_callbacks.setdefault(EventSourceType.OSC, {}).setdefault(
-            CallbackMode.Edit, {},
-        ).setdefault("osc", {}).setdefault(InputType.JoystickAxis, {})[identifier.message_key] = [repeater._handle_update_ui]
-        self.rows.append(row)
-        self.repeaters.append(repeater)
-        return identifier, row
+    def assert_selection(self, message_key):
+        self.editor._select_input_handler.assert_called_once_with(
+            "osc", InputType.OpenSoundControl, message_key,
+            force_switch=True, extra_data={"source": "osc_highlight"},
+        )
 
     def receive(self, message, values):
         errors = []
@@ -226,72 +180,89 @@ class OscInputTests(unittest.TestCase):
         self.assertEqual(errors, [])
         APP.processEvents()
 
-    def test_detected_osc_press_selects_input_on_gui_thread(self):
-        identifier, row = self.add_button("/select")
-        self.receive("/select", [1.0])
-        self.assertTrue(row.selected)
-        self.assertEqual(row.text(), "Selected")
-        self.assertEqual(row.trigger_count, 1)
+    def test_press_requests_off_page_input_on_gui_thread(self):
+        identifier = self.add_input("/vtol_toggle")
+        self.receive("/vtol_toggle", [1.0])
+        self.assert_selection("/vtol_toggle")
         self.assertIs(self.events[0].identifier, identifier)
 
     def test_second_parameter_input_is_matched_and_selected(self):
-        identifier, row = self.add_button("/select", source_index=1)
+        other = self.add_input("/select")
+        identifier = self.add_input("/select", source_index=1)
         self.receive("/select", [0.0, 1.0])
-        self.assertTrue(row.selected)
-        self.assertIs(self.events[0].identifier, identifier)
-        self.assertEqual(self.events[0].raw_value, 1.0)
+        self.assert_selection("/select 1")
+        self.assertFalse(self.editor._input_id_matches(NS(input_id=other, message_key=other.message_key), "/select 1"))
+        self.assertTrue(self.editor._input_id_matches(NS(input_id=identifier, message_key=identifier.message_key), "/select 1"))
+        self.assertIs(self.events[-1].identifier, identifier)
+        self.assertEqual(self.events[-1].raw_value, 1.0)
 
     def test_suspended_design_highlighting_does_not_select(self):
-        self.add_button("/select")
+        self.add_input("/select")
         STATE.is_highlighting_suspended.return_value = True
         self.receive("/select", [1.0])
-        self.assertFalse(self.rows[0].selected)
+        self.editor._select_input_handler.assert_not_called()
 
     def test_disabled_button_highlighting_does_not_select(self):
-        self.add_button("/select")
+        self.add_input("/select")
         CONFIG.highlight_input_buttons = False
         self.receive("/select", [1.0])
-        self.assertFalse(self.rows[0].selected)
+        self.editor._select_input_handler.assert_not_called()
 
     def test_button_release_does_not_select(self):
-        self.add_button("/select")
+        self.add_input("/select")
         self.receive("/select", [0.0])
-        self.assertFalse(self.rows[0].selected)
+        self.editor._select_input_handler.assert_not_called()
 
     def test_unrelated_address_does_not_select(self):
-        self.add_button("/select", source_index=1)
+        self.add_input("/select", source_index=1)
         self.receive("/select/other", [0.0, 1.0])
-        self.assertFalse(self.rows[0].selected)
+        self.editor._select_input_handler.assert_not_called()
         self.assertEqual(self.events, [])
 
     def test_detected_axis_selects_input_and_keeps_parameter_value(self):
-        identifier, row = self.add_axis("/axis", source_index=1)
+        identifier = self.add_input("/axis", source_index=1, mode=Identifier.InputMode.Axis)
         self.receive("/axis", [0.0, 0.75])
-        self.assertTrue(row.selected)
+        self.assert_selection("/axis 1")
         self.assertIs(self.events[0].identifier, identifier)
         self.assertEqual(self.events[0].raw_value, 0.75)
         self.assertEqual(self.events[0].value, 0.5)
 
     def test_suspended_axis_highlighting_does_not_select(self):
-        self.add_axis("/axis")
+        self.add_input("/axis", mode=Identifier.InputMode.Axis)
         STATE.is_highlighting_suspended.return_value = True
         self.receive("/axis", [0.75])
-        self.assertFalse(self.rows[0].selected)
+        self.editor._select_input_handler.assert_not_called()
 
     def test_runtime_message_still_emits_event_without_selecting_design_row(self):
-        identifier, row = self.add_button("/select", source_index=1)
+        identifier = self.add_input("/select", source_index=1)
         STATE.is_running = True
         self.receive("/select", [0.0, 1.0])
-        self.assertFalse(row.selected)
+        self.editor._select_input_handler.assert_not_called()
         self.assertIs(self.events[0].identifier, identifier)
         self.assertTrue(self.events[0].is_pressed)
 
     def test_change_mode_input_selects_on_zero_value(self):
-        identifier, row = self.add_button("/change", mode=Identifier.InputMode.OnChange)
+        identifier = self.add_input("/change", mode=Identifier.InputMode.OnChange)
         self.receive("/change", [0.0])
-        self.assertTrue(row.selected)
+        self.assert_selection("/change")
         self.assertIs(self.events[0].identifier, identifier)
         self.assertEqual(self.events[0].value, 0.0)
+
+    def test_other_device_tab_respects_auto_switch(self):
+        self.add_input("/vtol_toggle")
+        self.editor._tabswitch_needed.return_value = True
+        self.receive("/vtol_toggle", [1.0])
+        self.editor._select_input_handler.assert_not_called()
+
+        CONFIG.highlight_autoswitch = True
+        self.receive("/vtol_toggle", [1.0])
+        self.assert_selection("/vtol_toggle")
+
+    def test_already_selected_visible_row_does_not_refresh(self):
+        identifier = self.add_input("/vtol_toggle")
+        self.view.getSelectedWidget.return_value = NS(selected=True, input_item=identifier)
+        self.receive("/vtol_toggle", [1.0])
+        self.editor._select_input_handler.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -30,7 +30,8 @@ import gremlin.shared_state
 from dinput import DeviceSummary
 from gremlin.types import DeviceCategory, DeviceType
 
-from .telemetry import BUTTONS, StarCitizenClient, get_client as get_device, is_button_pressed, telemetry_enabled
+from .telemetry import BUTTONS, StarCitizenClient, is_button_pressed, telemetry_enabled
+from .telemetry import get_client as get_device
 
 DEVICE_NAME = "Star Citizen"
 

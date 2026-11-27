@@ -2950,6 +2950,7 @@ class InputItemWidget(QBoxFrame):
             case InputType.Midi:
                 source = EventSourceType.Midi
             case InputType.OpenSoundControl:
+                # The editor handles OSC selection even when its row is off-page.
                 source = EventSourceType.OSC
             case _:
                 source = EventSourceType.Any
@@ -2999,7 +3000,7 @@ class InputItemWidget(QBoxFrame):
                             input_item=self._input_item,
                             values=values,
                             callback=self._get_state_callback,
-                            state_change_callback=self._handle_axis_state_change_callback,
+                            state_change_callback=None if source == EventSourceType.OSC else self._handle_axis_state_change_callback,
                             description=f"axis repeater for input item: {self.input_item.display_name}",
                             source=source,
                         )
@@ -3020,7 +3021,7 @@ class InputItemWidget(QBoxFrame):
                         widget = QButtonStateWidget(
                             input_item=self._input_item,
                             callback=self._get_state_callback,
-                            state_change_callback=self._handle_button_state_change_callback,
+                            state_change_callback=None if source == EventSourceType.OSC else self._handle_button_state_change_callback,
                             description=f"ButtonRepeater for: [{self._input_item.display_name}]",
                             source=source,
                         )
@@ -4183,6 +4184,7 @@ class InputItemListView(AbstractPaginatedView):
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setWidget(self._scroll_widget)
         self._scroll_spacer_widget = None  # spacer widget to move items up if too few
+        self._pending_scroll_widget = None
 
         # Add the scroll area to the main layout
         self.main_layout.addWidget(self._scroll_area)
@@ -4318,37 +4320,16 @@ class InputItemListView(AbstractPaginatedView):
             return
 
         if self.model.hasInputItem(input_item):
-            index = self.model.indexOfInputItem(input_item)
+            index = self.model.indexOf(input_item, filter=self.filter)
+            if index == -1:
+                return
 
             if self.paginated:
                 page_start, page_end = self.pageRange()
                 if not page_start <= index < page_end:
                     self.showIndex(index)
-            page_start = self.pageRange()[0]
 
             self.scrollToIndex(index)
-
-            # shenanigans to have the selected input visible in the scroll area of inputs
-            # the size() on the widget returns the wrong size so each widget has an "actual size" function trapping the event
-            # so we get the correct height as rendered
-            # then we compute the pixel offset and tell the scroll area to scroll to that pixel height
-            if self._widget_map:
-                key = next(iter(self._widget_map))  # first widget
-                widget = self._widget_map[key]  # gremlin.util.get_layout_widgets(self._scroll_layout)
-                target_widget = None
-                if hasattr(widget, "widget_height"):
-                    # not in label mode
-                    if widget.widget_height is not None:
-                        h = 0
-                        for i, widget in enumerate(self._widget_map.values()):
-                            h += widget.widget_height
-                            if i == index - page_start:
-                                target_widget = widget
-                                break
-                    if self._scroll_area:
-                        self._scroll_area.ensureVisible(0, h)
-                        if target_widget is not None:
-                            self._scroll_area.ensureWidgetVisible(target_widget)
 
     def scrollToInput(self, input_item):
         self._sync_input(input_item)
@@ -5172,20 +5153,25 @@ class InputItemListView(AbstractPaginatedView):
         gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
 
     def _scroll_to_item_ui(self, widget):
-        # runs on UI thread
-        if self._scroll_widget is None:
+        # Qt updates row geometry and the scrollbar range after a list rebuild.
+        if self._pending_scroll_widget is None:
+            QtCore.QTimer.singleShot(0, self, self._prepare_scroll_to_item_ui)
+        self._pending_scroll_widget = widget
+
+    def _prepare_scroll_to_item_ui(self):
+        if self._pending_scroll_widget is None:
             return
-        if Shiboken.isValid(self) and Shiboken.isValid(self._scroll_widget):
-            # update layout just in case the widgets have changed size
-            self._scroll_widget.layout().activate()
-            bar = self._scroll_area.verticalScrollBar()
-            if bar:
-                pos_map = gremlin.util.getWidgetPositionInHierarchy(widget, self._scroll_area)
-                pos = pos_map[-1][1] if pos_map else QtCore.QPoint(0, 0)
-                y = pos.y()
-                bar = self._scroll_area.verticalScrollBar()
-                bar.setValue(y)
-                # syslog.info(f"Scrolled to widget at y-position: [{y}]")
+        self._scroll_layout.activate()
+        # Give QScrollArea a turn to resize its content and update the scrollbar range.
+        QtCore.QTimer.singleShot(0, self, self._flush_scroll_to_item_ui)
+
+    def _flush_scroll_to_item_ui(self):
+        widget = self._pending_scroll_widget
+        self._pending_scroll_widget = None
+        if widget is None or not Shiboken.isValid(widget) or self.widget(widget.index) is not widget:
+            return
+
+        self._scroll_area.ensureWidgetVisible(widget, 0, 0)
 
     def __len__(self):
         return self.count()

@@ -2274,7 +2274,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
     verbose = config.verbose_mode_inputs or config.verbose_mode_vjoy
     verbose_detailed = verbose and config.verbose_mode_extra
 
-    # vjoy monitor handls keep alive pings to vjoy so the process maintains a hook into the interface when there is no activity
     vjm = vjoy.VJoyMonitor()
 
     try:
@@ -2561,6 +2560,8 @@ def joystick_devices_initialization(force: bool = True) -> bool:
             except Exception:  # noqa: BLE001
                 signature = None
             published = _publish_joystick_devices(discovered_devices, configured_vjoy_devices, native_vjoy_devices, signature)
+            if _vjoy_devices_map:
+                vjm.start()
             _log_output_map()
             syslog.info("Input device summary:")
             for device in published:
@@ -2572,9 +2573,6 @@ def joystick_devices_initialization(force: bool = True) -> bool:
             gremlin.util.InvokeUiMethod(mgr.reload)
 
     finally:
-        # turn on vjoy monitoring
-        if config.vjoy_installed:
-            vjm.start()
         # notify listeners that joystick initialization is complete
         el = gremlin.event_handler.EventListener()
         el.device_initialized.emit()

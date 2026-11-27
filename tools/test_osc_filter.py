@@ -112,13 +112,14 @@ load("gremlin/input_item.py", {"InputItemListView"}, {
     "_apply_pending_selection_page", "getInputItemWidgetCount",
 })
 load("gremlin/ui/osc_device.py", {"OscDeviceTabWidget"}, {
-    "_filter_data", "_filter_changed",
+    "_filter_data", "_filter_changed", "revealFilteredInput",
 }, base="object")
 load("gremlin/ui/osc_device.py", {"OscFilterWidget"})
 
 
 class Input:
     def __init__(self, message):
+        self.guid = uuid.uuid4()
         self.input_id = NS(message=message)
 
 
@@ -158,6 +159,7 @@ class OscFilterTests(unittest.TestCase):
         CONFIG.osc_filter = ""
         self.tab = NAMESPACE["OscDeviceTabWidget"]()
         self.tab._filter = ""
+        self.tab._revealed_input_guids = set()
         self.model = Model(model_description="OSC filter test", filter_callback=self.tab._filter_data)
         inputs = [Input(f"/match/{index}") for index in range(19)]
         inputs.extend(Input(f"/other/{index}") for index in range(51))
@@ -219,6 +221,31 @@ class OscFilterTests(unittest.TestCase):
         self.assertFalse(self.view.blank)
         self.assertIn("70 OSC inputs", self.controls._count_widget.text())
         self.assertIn("Total items 70", self.pages._label.toolTip())
+
+    def test_revealing_one_input_keeps_the_filter_and_other_rows_hidden(self):
+        self.apply_filter("match")
+        target, other = list(self.model.getUnfilteredItems())[-2:]
+        self.assertEqual(self.model.indexOf(target), -1)
+
+        index = self.tab.revealFilteredInput(target)
+        self.assertEqual(index, 19)
+        self.assertIs(self.model.filteredItemAt(index), target)
+        self.assertEqual(self.model.indexOf(other), -1)
+        self.assertEqual(self.controls.filter, "match")
+        self.assertIn("20 of 70 OSC inputs", self.controls._count_widget.text())
+
+        self.model.applyFilter()
+        self.assertEqual(self.model.indexOf(target), index)
+        self.apply_filter("match")
+        self.assertEqual(self.model.indexOf(target), -1)
+
+    def test_revealing_an_input_when_the_filter_matches_nothing(self):
+        self.apply_filter("missing")
+        target = list(self.model.getUnfilteredItems())[-1]
+
+        self.assertEqual(self.tab.revealFilteredInput(target), 0)
+        self.assertIs(self.view._widget_map[0], target)
+        self.assertFalse(self.view.blank)
 
     def test_disabled_pagination_renders_every_match(self):
         self.view.setPageSize(0)

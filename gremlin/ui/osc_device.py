@@ -3831,6 +3831,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         config = gremlin.config.Configuration()
 
         self._filter = gremlin.util.decorate_filter(config.osc_filter)
+        self._revealed_input_guids = set()
         self._in_input_dialog = False  # flag to deal with focus issue
 
         self._last_selected_index = -1  # index of last input, -1 if none
@@ -4005,8 +4006,8 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 
-        if not self._filter:
-            return True  # ok
+        if not self._filter or input_item.guid in self._revealed_input_guids:
+            return True
         item: OscInputItem = input_item.input_id
         key = item.message
         if not key:
@@ -4079,9 +4080,17 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     def _filter_changed(self, filter):
         """called when the filter changes"""
         self._filter = gremlin.util.decorate_filter(filter)
+        self._revealed_input_guids.clear()
 
         self.inputItemListModel.applyFilter()
         self._filter_widget.updateCounts()
+
+    def revealFilteredInput(self, input_item: InputItem) -> int:
+        """Keep this input visible until the user reapplies the OSC filter."""
+        self._revealed_input_guids.add(input_item.guid)
+        model = self.inputItemListModel
+        model.applyFilter()
+        return model.indexOf(input_item)
 
     def find_item(self, device_guid, input_type, input_id) -> OscInputItem:
         """locates the input item, returns none if not found"""
@@ -4713,9 +4722,6 @@ class InputOscClient(QtCore.QObject):
 
         # get the input items behind this message
         config = gremlin.config.Configuration()
-        tracker = DeviceWidgetTracker()
-        current_mode = gremlin.shared_state.current_mode
-        _cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
