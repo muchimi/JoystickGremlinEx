@@ -150,6 +150,7 @@ from gremlin.ui.ui_common import (
     getHContainer,
 )
 from gremlin.ui.ui_gremlin import Ui_Gremlin
+from gremlin.ui.update import UpdateController
 from gremlin.util import PACKAGED, compare_path, find_file, load_icon, log_sys_error
 
 # import gremlin.ktts
@@ -806,7 +807,9 @@ class GremlinUi(QRememberMainWindow):
                     return TabDeviceType.Keyboard
                 case DeviceType.StarCitizen:
                     return TabDeviceType.StarCitizen
-                case DeviceType.Joystick:  # joystick or game controller
+                case DeviceType.Loopback:
+                    return TabDeviceType.Loopback
+                case DeviceType.Joystick | DeviceType.SpaceMouse | DeviceType.Tobii:
                     return TabDeviceType.Joystick
                 case DeviceType.VJoy:  # vjoy (virtual)
                     return TabDeviceType.VjoyInput
@@ -2302,6 +2305,7 @@ class GremlinUi(QRememberMainWindow):
         self.ui.actionLogEdit.triggered.connect(self.log_edit)
         # About
         self.ui.actionAbout.triggered.connect(self.about)
+        self.update_checker = UpdateController(self, self.ui.actionCheckForUpdates, self._save_changes_request, self._force_close)
 
         # Toolbar actions
         self.ui.actionActivate.triggered.connect(self.menu_activate)
@@ -3211,6 +3215,8 @@ class GremlinUi(QRememberMainWindow):
         # a profile. Use the same profile-aware inventory as Device List, which
         # also reconciles stale cached connection flags against live devices.
         all_devices = gremlin.joystick_handling.display_devices(self.profile)
+        if not self.config.startup_loopback_enabled:
+            all_devices = [dev for dev in all_devices if dev.device_type != DeviceType.Loopback]
         if not self.config.startup_star_citizen_enabled:
             # A saved profile can still supply a disconnected device with this GUID.
             star_citizen_guid = gremlin.shared_state.star_citizen_tab_guid
@@ -3285,7 +3291,7 @@ class GremlinUi(QRememberMainWindow):
                 if fixed_tab:
                     visible = True
                     device.visible = True
-                elif device.is_virtual:
+                elif device.is_virtual and device.device_type != DeviceType.Loopback:
                     if device.device_id not in virtual_input_ids:
                         continue
                     visible = True
@@ -3332,7 +3338,7 @@ class GremlinUi(QRememberMainWindow):
                 fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
                 if fixed_tab:
                     device.visible = True
-                if device.is_virtual and device.device_id not in virtual_input_ids:
+                if device.is_virtual and device.device_type != DeviceType.Loopback and device.device_id not in virtual_input_ids:
                     continue
                 if not fixed_tab and gremlin.util.normalize_guid(device.device_id) not in tab_map_device_ids:
                     device.visible = self.config.isDeviceVisible(device.device_guid)
@@ -3555,6 +3561,7 @@ class GremlinUi(QRememberMainWindow):
                 syslog.info(f"TABS: last active device: [{active_device.name}] id: [{active_device.device_id}]")
 
             visible_map = self.config.device_visible_map
+            space_mouse_visible = config.startup_space_mouse_enabled and visible_map.get(gremlin.shared_state.space_mouse_filter_id, True)
 
             # add disconnected devices to the visible list so they show up in the tabs
 
@@ -3585,6 +3592,8 @@ class GremlinUi(QRememberMainWindow):
                 device_id = device.device_id
                 device_name = device.name
                 fixed_tab = device.device_type in (DeviceType.Settings, DeviceType.Plugins)
+                if device.device_type == DeviceType.SpaceMouse and not space_mouse_visible:
+                    continue
 
                 if device.device_type == DeviceType.VJoy:
                     pass
@@ -3617,11 +3626,12 @@ class GremlinUi(QRememberMainWindow):
                     syslog.info(f"TAB: [{index}] processing device [{device_name}]  [{device_id}]")
 
                 if device in physical_set or device in disconnected_set:
-                    device_profile = self.profile.get_device_modes(device.device_guid, DeviceType.Joystick, device.name)
+                    device_type = device.device_type if device.device_type in (DeviceType.SpaceMouse, DeviceType.Tobii) else DeviceType.Joystick
+                    device_profile = self.profile.get_device_modes(device.device_guid, device_type, device.name)
 
                     # this needs to be registered before widgets are created because widgets may need this data
                     gremlin.shared_state.device_profile_map[device.device_guid] = device_profile
-                    gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Joystick
+                    gremlin.shared_state.device_type_map[device.device_guid] = device_type
 
                     if verbose:
                         syslog.info(f"Device tab widget: for [{device.name}]")
@@ -3693,6 +3703,21 @@ class GremlinUi(QRememberMainWindow):
                     # special devices
 
                     match device.device_type:
+                        case DeviceType.Loopback:
+                            from gremlin.ui.loopback.tab import LoopbackTab
+
+                            device = self.profile.loopback.device
+                            widget = self.getRegisteredWidget(device_id)
+                            if widget is None or not Shiboken.isValid(widget):
+                                widget = LoopbackTab(device, self.profile, self.current_mode)
+                                self.registerWidget(device_id, widget)
+                                widget.tabData = ts.getData(device_id)
+                            gremlin.shared_state.device_profile_map[device.device_guid] = self.profile.getDeviceNode(device.device_guid)
+                            gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Loopback
+                            widget.data = (TabDeviceType.Loopback, device_id, index)
+                            if add_tab_if_missing(device, TabDeviceType.Loopback):
+                                index += 1
+
                         case DeviceType.StarCitizen:
                             from gremlin.ui.star_citizen import create_tab
 
@@ -4287,7 +4312,7 @@ class GremlinUi(QRememberMainWindow):
             default_input_id = None
             default_input_type = None
             if info:
-                if info.device_type == DeviceType.Joystick:
+                if info.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii):
                     if info.axis_count:
                         default_input_id = 1
                         default_input_type = InputType.JoystickAxis
@@ -4837,7 +4862,7 @@ class GremlinUi(QRememberMainWindow):
                                         index = widget.revealFilteredInput(input_item)
                                 else:
                                     device = gremlin.joystick_handling.getDevice(device_guid)
-                                    if device and device.device_type == DeviceType.Joystick:
+                                    if device and device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii):
                                         widget.setInputVisible(input_item, True, emit=True)
                                         index = widget.indexOf(input_item)
                                 if index >= 0 and verbose:
@@ -4861,7 +4886,10 @@ class GremlinUi(QRememberMainWindow):
 
                             if index == -1:
                                 device = gremlin.joystick_handling.getDevice(device_guid)
-                                if device and device.device_type == DeviceType.Joystick and self.is_highligthing_enabled and self.config.filter_auto_unhide:
+                                if (
+                                    device and device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii)
+                                    and self.is_highligthing_enabled and self.config.filter_auto_unhide
+                                ):
                                     widget.setInputVisible(input_item, True, emit=True)
                                     index = widget.indexOf(input_item)
                                     if verbose:
@@ -6223,7 +6251,8 @@ class GremlinUi(QRememberMainWindow):
     def _force_close(self):
         """Forces the closure of the program."""
         self._really_quitting = True
-        self.ui.tray_icon.hide()
+        if self.ui.tray_icon is not None:
+            self.ui.tray_icon.hide()
         self.close()
         # safety net: some background threads may not release the process
         # promptly after quit(), leaving it alive in Task Manager with no
@@ -6306,6 +6335,7 @@ class GremlinUi(QRememberMainWindow):
 
             if response == QtWidgets.QMessageBox.StandardButton.Save:
                 self.save_profile()
+                continue_process = not self._has_profile_changed()
             elif response == QtWidgets.QMessageBox.StandardButton.Cancel:
                 continue_process = False
         if callback:
@@ -6996,6 +7026,14 @@ if __name__ == "__main__":
         # update device list
         gremlin.joystick_handling.joystick_devices_initialization()
 
+        from gremlin.ui.space_mouse import start_space_mouse
+
+        start_space_mouse()
+
+        from gremlin.ui.tobii import start_tobii
+
+        start_tobii()
+
         # Either virtual output provider can be used; absent drivers do not
         # prevent profile editing or the use of non-joystick outputs.
         vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_type == DeviceType.VJoy and dev.connected])
@@ -7083,6 +7121,8 @@ if __name__ == "__main__":
 
         syslog.info("GremlinEx UI launching...")
         gremlin.diagnostics.start_ui_watchdog(app, app_path)
+        if config.check_for_updates_enabled:
+            QTimer.singleShot(0, ui.update_checker.check)
 
         try:
             # integrate twisted with QT framework

@@ -1696,7 +1696,7 @@ class ImportProfileDialog(QRememberDialog):
 
                 detail_widget = None
                 width = gremlin.shared_state.char_width * 3
-                if import_item.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+                if import_item.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy):
                     detail_widget = QDataPushButton("...")
                     detail_widget.setToolTip("Details")
                     detail_widget.clicked.connect(self._view_details)
@@ -2619,7 +2619,7 @@ class Mapper:
                 device_guid = device.device_guid
 
                 # Don't create mappings for non joystick devices
-                if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+                if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy):
                     return
                 mode = gremlin.shared_state.current_mode
                 profile : gremlin.base_profile.Profile= gremlin.shared_state.current_profile

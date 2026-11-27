@@ -351,6 +351,10 @@ class ProfileDeviceNode:
 
                     device.button_count = 128
                     device.hat_count = 4
+                    if device_type == DeviceType.SpaceMouse:
+                        device.set_space_mouse_layout(safe_read(node, "button-count", int, 128))
+                    elif device_type == DeviceType.Tobii:
+                        device.set_tobii_layout()
                     device.name = safe_read(node, "name", str, "unknown")
                     device.setConnected(False)
 
@@ -411,6 +415,8 @@ class ProfileDeviceNode:
             node.set("virtual", safe_format(self.device.is_virtual, bool))
             if self.device_type == DeviceType.Maestro:
                 node.set("virtual-id", safe_format(self.device.virtual_id, int))
+            elif self.device_type == DeviceType.SpaceMouse:
+                node.set("button-count", safe_format(self.device.button_count, int))
 
             mode_list = sorted(self.modes.values(), key=lambda x: x.name)
             for mode in mode_list:
@@ -1369,6 +1375,8 @@ class Settings:
         if device is not None:
             return device.device_type in (
                 DeviceType.Joystick,
+                DeviceType.SpaceMouse,
+                DeviceType.Tobii,
                 DeviceType.VJoy,
                 DeviceType.StarCitizen,
             )  # filter by default if a joystick device
@@ -1946,7 +1954,7 @@ class Settings:
         for device in device_list:
             # come up with a suitable default
             assert device is not None, "invalid device"
-            assert device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy), (
+            assert device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy), (
                 "not a joystick axis"
             )
             if device.disabled:
@@ -1961,7 +1969,7 @@ class Settings:
         if not device:
             return
 
-        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy, DeviceType.StarCitizen):
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.StarCitizen):
             return
         if device.disabled:
             # disabled device
@@ -1998,7 +2006,7 @@ class Settings:
         assert isinstance(device_guid, dinput.GUID), "invalid device"
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "device not found"
-        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy, DeviceType.StarCitizen):
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.StarCitizen):
             return
 
         device_id = device.device_id
@@ -2655,6 +2663,9 @@ class Profile:
         self.state.clear()
         self.voice = gremlin.ui.voice_device.VoiceData()
         self.voice.clear()
+        from gremlin.ui.loopback import Loopback
+
+        self.loopback = Loopback()
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
         self._removed_devices = []  # list of removed devices from the profile, list of device_id (str)
         self._save_config_enabled = False  # true if profile config saving is enabled
@@ -2781,7 +2792,7 @@ class Profile:
             # ignore joysticks that are disabled
             return
 
-        if device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+        if device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy):
             # ensure all inputs are defined for joysticks
             loaded = device_guid in self._joystick_inputs_loaded and self._joystick_inputs_loaded[device_guid]
             if force or not loaded:
@@ -3641,7 +3652,7 @@ class Profile:
     def remove_device(self, device: dinput.DeviceSummary):
         """removes the specified device from the profile"""
 
-        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy):
             syslog.error(f"PROFILE: cannot remove non-joystick/maestro device: {device.name}")
             return
 
@@ -4673,6 +4684,8 @@ class Profile:
         self._configure_vjoy_failover(root)
 
         # Parse each device into separate DeviceConfiguration objects
+        self.loopback.from_xml(root.find("loopback"))
+        self.loopback.resolve_references(root)
         device_nodes = root.xpath("/profile/devices//device")
         # verbose = True
         for child in device_nodes:
@@ -4699,7 +4712,10 @@ class Profile:
                 continue
 
             # special case - mode control device
-            if device_guid == gremlin.ui.mode_device.ModeDeviceTabWidget.device_guid:
+            if device_guid == self.loopback.device.device_guid:
+                device_node = self.get_device_modes(device_guid, DeviceType.Loopback, "loopback")
+                device_node.device = self.loopback.device
+            elif device_guid == gremlin.ui.mode_device.ModeDeviceTabWidget.device_guid:
                 device_node = self.getDeviceNode(device_guid)
                 assert device_node is not None, "mode control device should already exist in profile"
             else:
@@ -4907,6 +4923,9 @@ class Profile:
 
         # load the mode tree
         self.reload_modes(update_devices=True)
+        if any(self.loopback.controls.values()):
+            for mode in self.get_modes():
+                self.loopback.prepare_mode(self, mode)
 
         if verbose:
             self.dumpModeTree()
@@ -4994,10 +5013,13 @@ class Profile:
             depth = gremlin.util.xmlNodeDepth(node)
             if device.device_type in (
                 DeviceType.Joystick,
+                DeviceType.SpaceMouse,
+                DeviceType.Tobii,
                 DeviceType.VJoy,
                 DeviceType.State,
                 DeviceType.ModeControl,
                 DeviceType.StarCitizen,
+                DeviceType.Loopback,
             ):
                 # remove empty nodes
                 if depth > 0:
@@ -5017,6 +5039,8 @@ class Profile:
                     devices.append(node)
 
         root.append(devices)
+        if (loopback_node := self.loopback.to_xml()) is not None:
+            root.append(loopback_node)
 
         # simconnect settings
         for key, mode in self._simconnect_modes.items():
@@ -5128,6 +5152,7 @@ class Profile:
         root.append(node)
 
         # Serialize XML document
+        self.loopback.annotate_references(root)
         tree = etree.ElementTree(root)
         if fname:
             tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
@@ -5185,7 +5210,7 @@ class Profile:
 
         :return True if the profile is empty, False otherwise
         """
-        is_empty = True
+        is_empty = not any(self.loopback.controls.values())
         is_empty &= len(self.merge_axes) == 0
 
         # Enumerate all input devices
@@ -5569,10 +5594,10 @@ class Profile:
                     case InputType.StarCitizen:
                         assert device.device_guid == gremlin.shared_state.star_citizen_tab_guid
                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
-                        assert device.device_type in (DeviceType.Joystick, DeviceType.VJoy)
+                        assert device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.Loopback)
                     case _:
                         syslog.warning(f"Unhandled input type: {input_type} {input_type.name}")
-                        pass
+                        
 
         device_id = gremlin.util.normalize_guid(device_guid)  # to string
         data = self._configuration_data
@@ -6047,10 +6072,11 @@ class Profile:
         if not fname or not os.path.isfile(fname):
             return False
 
-        from gremlin.types import PlayMode
+        from PySide6 import QtWidgets
+
         import gremlin.tts
         import gremlin.ui.ui_common
-        from PySide6 import QtWidgets
+        from gremlin.types import PlayMode
 
         tree = gremlin.profile.parse_profile_xml(fname)
         root = tree.getroot()
@@ -6660,7 +6686,7 @@ class ProfileModeNode:
                     do_include = True
                 depth = gremlin.util.xmlNodeDepth(item_node)
                 match input_item.device_type:
-                    case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy | DeviceType.StarCitizen:
+                    case DeviceType.Maestro | DeviceType.Joystick | DeviceType.SpaceMouse | DeviceType.Tobii | DeviceType.VJoy | DeviceType.StarCitizen | DeviceType.Loopback:
                         if input_item.description or depth > 1:
                             do_include = True
                     case DeviceType.OctaviIFR1:

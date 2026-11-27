@@ -25,14 +25,15 @@ function Test-RegistryKey {
 }
 
 function Test-DependencyNeeded {
-    param([string]$Name, [version]$AvailableVersion)
+    param([string]$Name, [version]$AvailableVersion, $Installation)
     if ($Name -eq 'hidhide') {
         return -not ((Test-RegistryKey LocalMachine 'SYSTEM\CurrentControlSet\Services\HidHide') -or
             (Test-RegistryKey ClassesRoot 'Installer\Dependencies\NSS.Drivers.HidHide.x64'))
     }
-    $installed = Get-BridgeInstallation
-    if ($installed.Installed) {
-        return ($null -ne $installed.Version -and $null -ne $AvailableVersion -and $AvailableVersion -gt $installed.Version)
+    if ($null -eq $Installation) { $Installation = Get-BridgeInstallation }
+    if ($Installation.Installed) {
+        return ($Installation.Path -and $null -ne $Installation.Version -and
+            $null -ne $AvailableVersion -and $AvailableVersion -gt $Installation.Version)
     }
     return $true
 }
@@ -330,7 +331,7 @@ function Get-BridgeUpdateStatus {
     param([switch]$CheckConnection, [switch]$SkipReleaseCheck)
     $installed = Get-BridgeInstallation
     $status = [pscustomobject]@{
-        Installed = $installed.Installed; InstalledVersion = $installed.Version
+        Installed = $installed.Installed; InstalledVersion = $installed.Version; Installation = $installed
         LatestVersion = $null; Action = 'none'; Release = $null; Error = ''
         ConnectionState = 'not_tested'; ConnectionMessage = 'The bridge connection was not tested.'
     }
@@ -347,7 +348,7 @@ function Get-BridgeUpdateStatus {
         $status.Release = Get-DependencyRelease 'bridge'
         $status.LatestVersion = $status.Release.Version
         if ($installed.Installed -and $null -ne $installed.Version -and $status.LatestVersion -gt $installed.Version) {
-            $status.Action = 'upgrade'
+            $status.Action = if ($installed.Path) { 'upgrade' } else { 'path_unavailable' }
         }
     } catch { $status.Error = [string]$_ }
     return $status
@@ -386,12 +387,17 @@ function Get-DependencyInstaller {
 }
 
 function Invoke-DependencySetup {
-    param([string]$Name, [string]$SetupPath, [bool]$Quiet)
+    param([string]$Name, [string]$SetupPath, [bool]$Quiet, [string]$InstallDirectory)
     if ($Name -eq 'hidhide') {
         $arguments = @('/norestart')
         if ($Quiet) { $arguments += '/quiet' }
     } else {
         $arguments = @('/NORESTART', '/RESTARTEXITCODE=3010')
+        if ($InstallDirectory) {
+            # Keep a drive-root path valid inside a quoted Windows command-line argument.
+            if ($InstallDirectory.EndsWith('\')) { $InstallDirectory += '.' }
+            $arguments += '/DIR="' + $InstallDirectory + '"'
+        }
         if ($Quiet) { $arguments += @('/VERYSILENT', '/SUPPRESSMSGBOXES') }
     }
     $processOptions = @{FilePath = $SetupPath; ArgumentList = $arguments; Wait = $true; PassThru = $true}
@@ -407,17 +413,20 @@ function Invoke-DependencyInstall {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $release = $null
+        $installDirectory = ''
         if ($Name -eq 'bridge') {
             $status = Get-BridgeUpdateStatus
-            if ($status.Action -eq 'none') {
-                Write-Host "Bridge installation or upgrade is not needed or could not be confirmed; skipping. $($status.Error)"
+            if ($status.Error) { throw $status.Error }
+            if ($status.Action -notin @('install', 'upgrade')) {
+                Write-Host 'Bridge installation or upgrade is not needed or could not be confirmed; skipping.'
                 return 0
             }
-            if ($null -eq $status.Release) { throw $status.Error }
             $release = $status.Release
+            if ($status.Action -eq 'upgrade') {
+                $installDirectory = Split-Path -LiteralPath $status.Installation.Path
+            }
         }
-        # Recheck immediately before installing in case the machine changed since task selection.
-        if (-not (Test-DependencyNeeded $Name $release.Version)) {
+        if ($Name -eq 'hidhide' -and -not (Test-DependencyNeeded $Name)) {
             Write-Host "$Name is already installed or no longer needed; skipping."
             return 0
         }
@@ -425,11 +434,14 @@ function Invoke-DependencyInstall {
         $stage = Join-Path $tempRoot ('gremlinex-dependency-' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $stage | Out-Null
         $InstallerPath = Get-DependencyInstaller $Name $stage $release
-        if (-not (Test-DependencyNeeded $Name $release.Version)) {
+        # Confirm the version and original installation are still the intended target.
+        $current = if ($Name -eq 'bridge') { Get-BridgeInstallation }
+        if (($Name -eq 'bridge' -and ($current.Installed -ne $status.Installed -or
+            $current.Path -ne $status.Installation.Path)) -or -not (Test-DependencyNeeded $Name $release.Version $current)) {
             Write-Host "$Name was installed or upgraded while downloading; skipping."
             return 0
         }
-        $exitCode = Invoke-DependencySetup $Name $InstallerPath $Quiet
+        $exitCode = Invoke-DependencySetup $Name $InstallerPath $Quiet $installDirectory
     } catch {
         Write-Warning "Optional $Name installation failed: $_"
         $exitCode = 1

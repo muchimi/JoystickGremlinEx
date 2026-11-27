@@ -1,5 +1,7 @@
 # Stream Deck (Elgato plugin bridge)
 
+For a Stream Deck managed by Companion, follow the [Bitfocus Companion Setup Guide](devices/bitfocus_companion_setup_guide.md) to send button input to GEX over OSC.
+
 GremlinEx drives Stream Deck hardware through a **Stream Deck plugin** and a localhost WebSocket bridge. Stream Deck software remains running and owns USB (Wave Link / multi-deck safe).
 
 This path does **not** require Bitfocus Companion or OSC for those keys. The model is **Companion-style (Scope B)**: GEX owns unlimited virtual pages (banks), surface variables, multi-step keys, and live feedback — while existing GEX actions (vJoy, Macro, SimConnect, OSC, State, …) remain the connection layer.

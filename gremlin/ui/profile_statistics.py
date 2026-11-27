@@ -85,10 +85,11 @@ def _write_report_pdf(path, markdown, title):
             style.setHeaderRowCount(1)
             style.setCellPadding(4)
             last_header = table.cellAt(0, table.columns() - 1).firstCursorPosition().block().text()
-            if last_header in ("Mapping chain", "Maps to"):
+            column_width = {"Mapping chain": 50, "Maps to": 65, "Condition details": 36}.get(last_header)
+            if column_width is not None:
                 kind = QtGui.QTextLength.Type
                 widths = [QtGui.QTextLength(kind.VariableLength, 0)] * (table.columns() - 1)
-                widths.append(QtGui.QTextLength(kind.PercentageLength, 50 if last_header == "Mapping chain" else 65))
+                widths.append(QtGui.QTextLength(kind.PercentageLength, column_width))
                 style.setWidth(QtGui.QTextLength(kind.PercentageLength, 100))
                 style.setColumnWidthConstraints(widths)
             table.setFormat(style)
@@ -142,17 +143,23 @@ class ProfileStatisticsDialog(BaseDialogUi):
                         item.setData(QtCore.Qt.ItemDataRole.DisplayRole, value)
                     if isinstance(value, int) or is_percentage:
                         item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-                    if title == "Output Bindings":
+                    if title in ("Conditions", "Output Bindings", "State and Loopback Mappings"):
                         item.setToolTip(value)
                     table.setItem(row_index, column, item)
             header = table.horizontalHeader()
-            if title == "Output Bindings":
+            initial_widths = {
+                "Conditions": (85, 115, 85, 210),
+                "Output Bindings": (160, 125, 90, 80),
+            }.get(title)
+            if initial_widths:
                 header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Interactive)
-                for column, width in enumerate((160, 125, 90, 80)):
+                for column, width in enumerate(initial_widths):
                     table.setColumnWidth(column, width)
             else:
                 header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-            stretch_column = {"Devices": 2, "Mapping Usage": 1, "Output Bindings": 4}.get(title, 0)
+            stretch_column = {
+                "Conditions": 4, "Devices": 2, "Mapping Usage": 1, "Output Bindings": 4, "State and Loopback Mappings": 3,
+            }.get(title, 0)
             header.setSectionResizeMode(stretch_column, QtWidgets.QHeaderView.ResizeMode.Stretch)
             if title == "Mapping Usage":
                 header.setSortIndicator(headers.index("% of all mappings"), QtCore.Qt.SortOrder.DescendingOrder)

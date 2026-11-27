@@ -5313,15 +5313,15 @@ def ConfirmBox(prompt="Are you sure", informative_text=None, parent=None) -> boo
 
 
 def MessageBoxWarning(title="Warning", prompt="Operation", informative_text=None, parent=None, width=200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "warning", None, parent)
+    _show_message_box(title, prompt, informative_text, "warning", parent=parent, width=width)
 
 
 def MessageBoxInfo(title="Notice", prompt="Operation", informative_text=None, parent=None, width=200):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "info", None, parent)
+    _show_message_box(title, prompt, informative_text, "info", parent=parent, width=width)
 
 
-def MessageBoxYesNo(title="Notice", prompt="Operation", informative_text=None, callback=None, parent=None, width=300, data=None):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "yesno", callback, parent, width, data)
+def MessageBoxYesNo(title="Notice", prompt="Operation", informative_text=None, callback=None, parent=None, width=300, data=None, *, default_button=None):
+    _show_message_box(title, prompt, informative_text, "yesno", callback, parent, width, data, default_button)
 
 
 def MessageBoxOkCancel(
@@ -5332,7 +5332,7 @@ def MessageBoxOkCancel(
     parent=None,
     width=300,
 ):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "okcancel", callback, parent, width)
+    _show_message_box(title, prompt, informative_text, "okcancel", callback, parent, width)
 
 
 def MessageBox(
@@ -5345,7 +5345,12 @@ def MessageBox(
     width=300,
 ):
     mode = "warning" if is_warning else "info"
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, mode, callback, parent, width)
+    _show_message_box(title, prompt, informative_text, mode, callback, parent, width)
+
+
+def _show_message_box(*args, **kwargs):
+    # Bind the dialog options before dispatching. InvokeUiMethod accepts up to eight arguments.
+    gremlin.util.InvokeUiMethod(lambda: _message_box_ui(*args, **kwargs))
 
 
 def _message_box_ui(
@@ -5357,6 +5362,7 @@ def _message_box_ui(
     parent=None,
     width=300,
     data=None,
+    default_button=None,
 ):
     buttons = QtWidgets.QMessageBox.StandardButton.Ok
     if parent is None:
@@ -5382,6 +5388,8 @@ def _message_box_ui(
     if informative_text:
         msgbox.setInformativeText(informative_text)
     msgbox.setStandardButtons(buttons)
+    if default_button is not None:
+        msgbox.setDefaultButton(default_button)
     # bracket min size
     if not width or not isinstance(width, int) or width < 300:
         width = 300
@@ -8718,14 +8726,13 @@ class AxesTimeline(QtWidgets.QGroupBox):
         self.plot_widget = TimeLinePlotWidget()
         self.legend_layout = QtWidgets.QHBoxLayout()
 
-        colors = Color().PenColors()
-        for i in range(device.axis_count):
-            # convert linear to axis input id
-            input_id = device.axis_sequence_to_input_id(i)
+        self.input_id_list = device.getAxisInputIdList()
+        for input_id in self.input_id_list:
             axis_name = device.get_axis_name(input_id)
-            label = QtWidgets.QLabel(f"Axis {axis_name}")
-            # color index is 1 to 8 with 0 as black/clear
-            css = f"QLabel {{ color: {colors.get(input_id, '#000000')}; font-weight: bold }}"
+            label = QtWidgets.QLabel(axis_name)
+            label.setTextFormat(QtCore.Qt.TextFormat.PlainText)
+            color = self.plot_widget.series_pen(input_id).color().name()
+            css = f"QLabel {{ color: {color}; font-weight: bold }}"
             label.setStyleSheet(css)
             self.legend_layout.addWidget(label)
 
@@ -8737,7 +8744,6 @@ class AxesTimeline(QtWidgets.QGroupBox):
         layout.addLayout(self.legend_layout)
 
         self.device_guid = device.device_guid
-        self.input_id_list = device.getAxisInputIdList()
         self.interval = 1 / 60
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(round(self.interval * 1000))
@@ -8790,6 +8796,7 @@ class TimeLinePlotWidget(QWidget):
 
         # Plotting canvas
         self._pens = Color().Pens()
+        self._series_pens = [pen for index, pen in self._pens.items() if index != 0]
         self._pixmap = QtGui.QPixmap(1000, 200)
         self._pixmap.fill()
         self._rect = QtCore.QRect(0, 0, 1000, 200)
@@ -8866,6 +8873,11 @@ class TimeLinePlotWidget(QWidget):
             self._series[series_id] = [value, value]
         self._series[series_id][1] = value
 
+    def series_pen(self, series_id):
+        if series_id in self._pens:
+            return self._pens[series_id]
+        return self._series_pens[(series_id - 1) % len(self._series_pens)]
+
     def _update_pixmap(self):
         """Updates the pixmap that contains the moving timeline."""
         p = QtGui.QPainter(self._pixmap)
@@ -8902,7 +8914,7 @@ class TimeLinePlotWidget(QWidget):
 
         # Draw onto the pixmap all series data that has been accumulated
         for key, value in self._series.items():
-            p.setPen(self._pens[key])
+            p.setPen(self.series_pen(key))
             p.drawLine(
                 self._pixmap.width() - self._step_size - 1,
                 int(2 + (self._pixmap.height() - 4) * (value[0] + 1) / 2.0),
@@ -9674,8 +9686,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         jep = gremlin.event_handler.JoystickEventProcessor()
         self._row_height = 0
 
-        for i in range(device.button_count):
-            input_id = i + 1
+        for input_id in device.get_button_input_ids():
             is_used = profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id) if profile else False
             is_marked = input_id in used_buttons
             used_device_guid = device.device_guid
@@ -9683,6 +9694,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             widget = QUsedPushButton(
                 str(input_id),
                 input_id,
+                tooltip=device.get_button_name(input_id) if device.device_type == gremlin.types.DeviceType.Loopback else None,
                 used=is_used,
                 marker=is_marked,
                 used_device_guid=used_device_guid,
@@ -12293,6 +12305,7 @@ class QRememberDialog(QtWidgets.QDialog):
 
     def _apply_window_settings_ui(self):
         """Restores the stored window geometry settings."""
+        restored_location = False
         try:
             config = gremlin.config.Configuration()
             window_size = config.getWindowSize(self._window_key)
@@ -12301,16 +12314,35 @@ class QRememberDialog(QtWidgets.QDialog):
                 self.resize(window_size[0], window_size[1])
             else:
                 self.resize(self._default_width or 300, self._default_height or 200)
-            if window_location:
-                x, y = window_location
-                if x is None or y is None:
-                    x, y = self.x(), self.y()
-                pos = QtCore.QPoint(x, y)
-                # syslog.info(f"recall move window {self.window_key} to {x},{y}")
-                self.move(pos)
+            if window_location and window_location[0] is not None and window_location[1] is not None:
+                self.move(*window_location)
+                restored_location = True
         except Exception:  # noqa: BLE001, S110
             pass
 
+        if restored_location:
+            self._ensure_visible_on_screen()
+        else:
+            self._center_on_main_window()
+        return restored_location
+
+    def _center_on_main_window(self):
+        """Place a new dialog over GEX, or over its parent before GEX is available."""
+        anchor = getattr(getattr(gremlin, "shared_state", None), "ui", None)
+        if not isinstance(anchor, QtWidgets.QWidget) or anchor is self:
+            parent = self.parentWidget()
+            anchor = parent.window() if parent else None
+        if anchor is not None and not anchor.isMinimized():
+            center = anchor.frameGeometry().center()
+        else:
+            screen = (anchor.screen() if anchor is not None else self.screen()) or QtWidgets.QApplication.primaryScreen()
+            if screen is None:
+                return
+            center = screen.availableGeometry().center()
+
+        frame = self.frameGeometry()
+        frame.moveCenter(center)
+        self.move(frame.topLeft())
         self._ensure_visible_on_screen()
 
     def _ensure_visible_on_screen(self):
@@ -12368,9 +12400,17 @@ class QRememberDialog(QtWidgets.QDialog):
     def showEvent(self, event):
         """occurs when window is displayed (made visible)"""
         super().showEvent(event)
-        self._apply_window_settings_ui()
+        restored_location = self._apply_window_settings_ui()
+        initial_position = self.pos()
+
         # Native decorations and layout constraints can settle after showEvent.
-        QtCore.QTimer.singleShot(0, self._ensure_visible_on_screen)
+        def settle_position():
+            if not restored_location and self.pos() == initial_position:
+                self._center_on_main_window()
+            else:
+                self._ensure_visible_on_screen()
+
+        QtCore.QTimer.singleShot(0, self, settle_position)
 
     def closeEvent(self, event):
         """occurs when window is closed"""
@@ -15112,8 +15152,8 @@ class QModeSelector(QWidget):
 class QInputDialog(QRememberDialog):
     """grabs user input, adds enter key accept - we use our own here to avoid focus issues and have control over the enter key to accept on enter"""
 
-    def __init__(self, title="Input Dialog", label=None, text=None, parent=None):
-        super().__init__(self.__class__.__name__, parent=parent)
+    def __init__(self, title="Input Dialog", label=None, text=None, parent=None, *, key=None):
+        super().__init__(key or self.__class__.__name__, parent=parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setWindowTitle(title)
@@ -15129,7 +15169,7 @@ class QInputDialog(QRememberDialog):
 
         self.cancel_widget = Buttons.getCancelWidget(callback=self._cancel)
         self.ok_widget = Buttons.getOkWidget(callback=self._accept)
-        widget = getHContainer([self.ok_widget, self.cancel_widget], widget_only=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], widget_only=True, auto_size=True)
         self.main_layout.addWidget(widget, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
 
     def text(self) -> str:

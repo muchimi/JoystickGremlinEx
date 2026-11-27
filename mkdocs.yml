@@ -29,8 +29,16 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - Usage: usage.md
+  - Devices:
+      - Bitfocus Companion Setup Guide: devices/bitfocus_companion_setup_guide.md
+      - Loopback Device User Guide: devices/loopback_device_user_guide.md
+      - OSC Device User Guide: devices/osc_device_user_guide.md
+      - Star Citizen Device User Guide: devices/star_citizen_user_guide.md
+      - State Device User Guide: devices/state_device_user_guide.md
   - Containers : containers.md
-  - Actions : actions.md
+  - Actions:
+      - Action Reference: actions.md
+      - Map to Keyboard/Mouse Ex User Guide: actions/keyboard_ex_user_guide.md
   - Mapping Guide: mapping.md
   - Resources: resources.md
   - Scripting: scripting.md

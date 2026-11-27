@@ -102,7 +102,7 @@ def overlay_physical_devices(input_kind: str | None = None):
     ):
         if getattr(dev, "is_virtual", False):
             continue
-        if getattr(dev, "device_type", None) != DeviceType.Joystick:
+        if getattr(dev, "device_type", None) not in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii):
             continue
         if getattr(dev, "disabled", False):
             continue

@@ -17,85 +17,72 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
-import logging
+
 import fnmatch
+import html
+import logging
 import random
-from itertools import islice
-from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtCore import QModelIndex
-
-from PySide6.QtWidgets import QLayout, QGroupBox, QWidget
-import threading
-
-
-import gremlin.config
-from gremlin import execution_guard
-import gremlin.event_handler
-from gremlin.types import DeviceType
-from gremlin.input_types import InputType
-import gremlin.shared_state
-
-from gremlin.singleton_decorator import SingletonDecorator
 import re
-from gremlin.ui.osc_device import OscInputItem
-import gremlin.ui.ui_common
+import threading
+from itertools import islice
+from typing import Any, Callable  # noqa: UP035
+
 from lxml import etree as ElementTree
-import gremlin.util
-from gremlin.util import safe_format, safe_read, write_guid, read_guid
+from psygnal import Signal
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QWidget
+from shiboken6 import Shiboken
 
 import gremlin.base_profile
-from gremlin.base_classes import AbstractCallbackModel
-from psygnal import Signal
+import gremlin.config
+import gremlin.event_handler
 import gremlin.input_item
+import gremlin.shared_state
+import gremlin.ui.ui_common
+import gremlin.util
+from gremlin import execution_guard
+from gremlin.base_classes import AbstractCallbackModel
 from gremlin.input_item import (
-    AbstractCondition,
-    AbstractPaginatedView,
-    InputItemWidget,
-    BaseAbstractCondition,
-    AbstractConditionWidget,
-    InputItem,
-    AbstractContainer,
     AbstractAction,
-    AdvancedInputItemListModel,
-    FilterChip,
+    AbstractCondition,
+    AbstractConditionWidget,
+    AbstractContainer,
+    AbstractPaginatedView,
+    BaseAbstractCondition,
     FilterControlWidget,
+    InputItem,
     PaginationWidget,
 )
-from shiboken6 import Shiboken
-import html
-from typing import Callable, Any
+from gremlin.input_types import InputType
+from gremlin.singleton_decorator import SingletonDecorator
+from gremlin.types import DeviceType
 from gremlin.ui.ui_common import (
-    getHContainer,
-    getVContainer,
-    QDataPushButton,
-    QHorizontalSeparator,
-    QHorizontalLine,
-    QCollapsible,
     Buttons,
-    Icons,
-    ConfirmBox,
     Color,
-    QFlowLayout,
-    QDataRadioButton,
-    QVBoxLayout,
-    QHBoxLayout,
-    QWarningWidget,
-)
-from gremlin.ui.ui_common import (
+    ConfirmBox,
     ConfirmPushButton,
+    Icons,
     MessageBox,
     QDataCheckbox,
     QDataComboBox,
     QDataLineEdit,
+    QDataPushButton,
+    QDataRadioButton,
     QFloatLineEdit,
+    QFlowLayout,
+    QHorizontalLine,
     QIconLabel,
     QInputLockWidget,
     QShowAtCursorDialog,
-    getGridContainer,
+    QVBoxLayout,
+    QWarningWidget,
     get_text_width,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
     synchronize_grids,
 )
-
+from gremlin.util import read_guid, safe_format, safe_read, write_guid
 
 syslog = logging.getLogger("system")
 
@@ -106,7 +93,7 @@ _state_change_context = threading.local()
 class StateCategory:
     """holds a state category"""
 
-    def __init__(self, name: str, id: str = None):
+    def __init__(self, name: str, id: str | None = None):
         assert id is None or isinstance(id, str)
         self._id = gremlin.util.get_guid() if id is None else id
         self._name = name.casefold().strip() if name else "Default"
@@ -189,7 +176,7 @@ class CategoryValidator(QtGui.QValidator):
             r = re.compile(clean_value + "*")
             for _ in filter(r.match, self._category_names):
                 return QtGui.QValidator.State.Intermediate
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             # invalid regex - probably a special char
             pass
         return QtGui.QValidator.State.Invalid
@@ -232,13 +219,11 @@ class StateCategories(QtCore.QObject):
 
     def removeCategory(self, category):
         """removes a category if it exists"""
-        if category:
-            if category != self._default_category:
-                # only delete if not the default category
-                if category.key in self._categories:
-                    del self._categories[category.key]
-                    el = gremlin.event_handler.EventListener()
-                    el.state_category_delete.emit(category)
+        # only delete if not the default category
+        if category and category != self._default_category and category.key in self._categories:
+            del self._categories[category.key]
+            el = gremlin.event_handler.EventListener()
+            el.state_category_delete.emit(category)
 
     def removeCategoryName(self, name: str):
         """removes a category by name if it exists"""
@@ -317,7 +302,7 @@ class StateCategories(QtCore.QObject):
     def _sort(self):
         """sorts the category list"""
         if self._categories:
-            keys = list((key for key in self._categories))
+            keys = list(self._categories)
             keys.sort()
             new_map = {}
             for key in keys:
@@ -363,19 +348,18 @@ class StateCategories(QtCore.QObject):
         widget.setEditable(editable)
         widget.setValidator(CategoryValidator())
 
-        index = 0
         select_index = None
         default_id = default_category.id if default_category else None
         categories = []
 
         categories = [c for c in self._categories.values()]
         categories.sort(key=lambda x: x.name)
-        for category in categories:
+        for index, category in enumerate(categories):
             _key = category.key
             widget.addItem(category.name, category)
             if select_index is None and default_id and default_id == category.id:
                 select_index = index
-            index += 1
+
 
         widget.setMinimumWidth(200)
         if select_index is not None:
@@ -392,14 +376,12 @@ class StateCategories(QtCore.QObject):
                 current = widget.currentData()
                 widget.clear()
                 widget.addItem(self._default_category.name, self._default_category)
-                index = 0
                 selected_index = None
                 # add default category
-                for category in self._categories.values():
+                for index, category in enumerate(self._categories.values()):
                     widget.addItem(category.name, category)
                     if selected_index is None and current == category:
                         selected_index = index
-                    index += 1
 
                 if selected_index is not None:
                     widget.setCurrentIndex(selected_index)
@@ -430,9 +412,9 @@ class StateInputItem(InputItem):
 
     def __init__(
         self,
-        key: str = None,
+        key: str | None = None,
         default_value: bool = False,
-        description: str = None,
+        description: str | None = None,
         is_expression=False,
         expression=None,
         category: StateCategory = None,
@@ -442,7 +424,7 @@ class StateInputItem(InputItem):
         autorelease_trigger_mode: str = "on",
         data=None,
         exclusive_keys=None,
-        attributes: list[str] = None,
+        attributes: list[str] | None = None,
     ):
         master_mode = gremlin.shared_state.master_mode
 
@@ -512,7 +494,7 @@ class StateInputItem(InputItem):
             return  # nothing to do
         if isinstance(key, str):
             self._attributes[key] = None
-        elif isinstance(key, list) or isinstance(key, tuple):
+        elif isinstance(key, (list, tuple)):
             for k in key:
                 self._attributes[k] = None
 
@@ -921,9 +903,8 @@ class StateInputItem(InputItem):
 
     def stateInExpression(self, state) -> bool:
         """true if the key is found in the expression"""
-        if self._is_expression:
-            if not self._expression_stack:
-                self.evaluate()
+        if self._is_expression and not self._expression_stack:
+            self.evaluate()
         return False
 
     def _state_name_change(self, old_name, new_name, state):
@@ -966,9 +947,8 @@ class StateInputItem(InputItem):
 
     def _state_category_name_change(self, category: StateCategory):
         """called when a category is changed"""
-        if self._category == category:
-            if self._emit:
-                self.category_changed.emit(self)
+        if self._category == category and self._emit:
+            self.category_changed.emit(self)
 
     def to_xml(self) -> ElementTree.Element:
         """write XML state node"""
@@ -1386,7 +1366,7 @@ class StateInputItem(InputItem):
 
         stack = []
 
-        operators = set(["and", "or", "not", "xor"])
+        operators = {"and", "or", "not", "xor"}
 
         tokens = postfix_stack.copy()
         states = self._valid_states()
@@ -1584,7 +1564,7 @@ class StateInputItemWidget(gremlin.input_item.InputItemWidget):
 class BaseStateCondition(BaseAbstractCondition):
     """state condition"""
 
-    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
+    def __init__(self, extra_data: dict | None = None, target: AbstractContainer | AbstractAction = None):
         super().__init__(extra_data, target=target)
 
         self.key = None
@@ -1593,7 +1573,6 @@ class BaseStateCondition(BaseAbstractCondition):
         self.ignore_release = False
 
     def from_xml(self, node, data=None, extra_data=None):
-        import gremlin.ui.state_device
 
         super().from_xml(node, data, extra_data)
 
@@ -1647,13 +1626,15 @@ class BaseStateCondition(BaseAbstractCondition):
 class StateConditionWidget(AbstractConditionWidget):
     """state condition UI"""
 
-    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
+    def __init__(
+        self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable | None = None, extra_data: dict | None = None, parent=None
+    ):
 
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.input_event = None
         self.setTitle("State Condition")
 
-    def _create_ui(self, extra_data: dict = None):
+    def _create_ui(self, extra_data: dict | None = None):
         if not Shiboken.isValid(self):
             return
         self.delete_button_widget = Buttons.getDeleteWidget(
@@ -1731,7 +1712,6 @@ class StateConditionWidget(AbstractConditionWidget):
 
     def populate_selector(self):
         """updates the available states"""
-        import gremlin.ui.state_device
 
         with QtCore.QSignalBlocker(self.state_selector):
             self.state_selector.clear()
@@ -1763,10 +1743,10 @@ class StateInputItemModel(gremlin.input_item.AdvancedInputItemListModel):
     def __init__(
         self,
         profile: gremlin.base_profile.Profile,
-        custom_load_handler: Callable = None,
-        custom_filter_handler: Callable = None,
-        custom_change_handler: Callable = None,
-        item_changed_handler: Callable = None,
+        custom_load_handler: Callable | None = None,
+        custom_filter_handler: Callable | None = None,
+        custom_change_handler: Callable | None = None,
+        item_changed_handler: Callable | None = None,
     ):
 
         super().__init__(
@@ -2161,11 +2141,10 @@ class StateData:
     def setDescription(self, key: str, description: str, emit=True):
         """sets the description on a state"""
         key = key.casefold().strip()
-        if key in self._data:
-            if self._data[key].description != description:
-                self._data[key].SetDescription(description)
-                if self.emit:
-                    self.changed.emit(self._data[key])
+        if key in self._data and self._data[key].description != description:
+            self._data[key].SetDescription(description)
+            if self.emit:
+                self.changed.emit(self._data[key])
 
     def exists(self, key: str | StateInputItem):
         """true if the key exists in the state data"""
@@ -2176,9 +2155,7 @@ class StateData:
         data: StateInputItem = key
         if data.id in self._data.items():
             return True
-        if data.key in self._data:
-            return True
-        return False
+        return data.key in self._data
 
     def isUsed(self, key: str | StateInputItem, return_usage: bool = False):
         """examines the profile to see if the state is referenced in a mapping or an expression
@@ -2213,7 +2190,7 @@ class StateData:
                 else:
                     return True  # used as a state in another's expression
 
-        def _action_callback(action, extra_data: dict = None):
+        def _action_callback(action, extra_data: dict | None = None):
             nonlocal used, key, used_list
             if action.key == key:
                 used = True  # state is used
@@ -2224,18 +2201,17 @@ class StateData:
                     return False  # stop further processing
             return True
 
-        def _condition_callback(input_item, owner, condition, extra_data: dict = None):
+        def _condition_callback(input_item, owner, condition, extra_data: dict | None = None):
             nonlocal used, key, used_list
             import gremlin.input_item
 
-            if isinstance(condition, BaseStateCondition):
-                if condition.key == key:
-                    used = True  # state is used
-                    if return_usage:
-                        stub = "Container" if isinstance(owner, gremlin.input_item.AbstractContainer) else "Action"
-                        used_list.append(f"{stub} Condition: Device [{input_item.device_name}] Input [{input_item.display_name}] in [{owner.name}]")
-                    else:
-                        return False  # stop further processing
+            if isinstance(condition, BaseStateCondition) and condition.key == key:
+                used = True  # state is used
+                if return_usage:
+                    stub = "Container" if isinstance(owner, gremlin.input_item.AbstractContainer) else "Action"
+                    used_list.append(f"{stub} Condition: Device [{input_item.device_name}] Input [{input_item.display_name}] in [{owner.name}]")
+                else:
+                    return False  # stop further processing
             return True
 
         # look for map to state actions using this state in the profile
@@ -2423,7 +2399,7 @@ class CategoryModel(QtCore.QAbstractListModel):
         for item in self._data.values():
             self._category_names.append(item.name)
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
         """Returns the number of rows in the model."""
         return len(self._data)
 
@@ -2530,7 +2506,7 @@ class StateCategoryEditor(QtWidgets.QDialog):
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
 
-        widget, layout = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
 
         self.ok_widget.clicked.connect(self.accept)
         self.cancel_widget.clicked.connect(self.reject)
@@ -2627,7 +2603,7 @@ class StateCategoryConfigDialog(QShowAtCursorDialog):
 
         self._edit_widget.valueChanged.connect(self._new_category_changed_cb)
 
-        widget, layout = getHContainer([self._edit_widget, self._add_button, self._delete_button], "New Category:")
+        widget = getHContainer([self._edit_widget, self._add_button, self._delete_button], "New Category:", widget_only=True)
         main_layout.addWidget(widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
@@ -2636,7 +2612,7 @@ class StateCategoryConfigDialog(QShowAtCursorDialog):
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
-        widget, layout = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
 
         main_layout.addWidget(widget)
 
@@ -2645,11 +2621,9 @@ class StateCategoryConfigDialog(QShowAtCursorDialog):
 
     def _handle_edited(self):
         """called when the list view has been edited"""
-        pass
 
     def _list_lost_focus(self):
         """on focus loss, clear selection"""
-        pass
 
     def category(self) -> StateCategory:
         """gets the selected category"""
@@ -2777,7 +2751,7 @@ class StateCategoryConfigDialog(QShowAtCursorDialog):
 
     def getCategories(self) -> list:
         """gets a list of edited categories"""
-        categories = list([item for item in self._model.items])
+        categories = [item for item in self._model.items]
         return categories
 
     def populate_ui(self):
@@ -3025,7 +2999,7 @@ class StateExclusivePickerDialog(QShowAtCursorDialog):
             sd = StateData()
             decorated = gremlin.util.decorate_filter(self._search) if self._search else None
             shown = 0
-            for _key, state in sd.getStates().items():
+            for state in sd.getStates().values():
                 if not state or state.isExpression:
                     continue
                 state_key = (state.key or "").casefold().strip()
@@ -3033,9 +3007,8 @@ class StateExclusivePickerDialog(QShowAtCursorDialog):
                     continue
                 if self._category is not None and state.category != self._category:
                     continue
-                if decorated:
-                    if not (fnmatch.fnmatch(state_key, decorated) or self._search.casefold() in state_key):
-                        continue
+                if decorated and not (fnmatch.fnmatch(state_key, decorated) or self._search.casefold() in state_key):
+                    continue
                 item = QtWidgets.QListWidgetItem(state.key)
                 item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
                 item.setCheckState(QtCore.Qt.Checked if state_key in self._selected else QtCore.Qt.Unchecked)
@@ -3429,12 +3402,10 @@ class StateInputConfigDialog(QShowAtCursorDialog):
             if state and self.ref_data and state != self.ref_data:
                 enabled = False
                 msg = "Name is not case sensitive and must be unique."
-
-        if enabled:
-            # check against reserved keywords
-            if key in ("and", "or", "not", "xor"):
-                enabled = False
-                msg = "Name cannot be a reserved keyword."
+        # check against reserved keywords
+        if enabled and key in ("and", "or", "not", "xor"):
+            enabled = False
+            msg = "Name cannot be a reserved keyword."
 
         self.ok_widget.setEnabled(enabled)
         self._set_status(msg)
@@ -3476,7 +3447,7 @@ class StateInputConfigDialog(QShowAtCursorDialog):
         # ensure the item is unique and not already used
         is_expression = False
         if self.data.expression:
-            value, is_error, error_msg = self.data.evaluate(as_tuple=True, force=True)
+            _, is_error, error_msg = self.data.evaluate(as_tuple=True, force=True)
             if is_error:
                 MessageBox(
                     title="Expression Evaluation Error",
@@ -3495,19 +3466,18 @@ class StateInputConfigDialog(QShowAtCursorDialog):
         if key:
             key_low = self.data.key.casefold().strip()
             if key_low:
-                if not self._is_edit:
-                    # validate if not editing
-                    if not is_expression:
-                        id = self.data.id
-                        sc = StateData()
-                        data = sc.getStates()
-                        states = [item.key for item in data.values() if item.id != id and key_low == item.key]
-                        if states:
-                            MessageBox(
-                                title="State Error",
-                                prompt=f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.",
-                            )
-                            return
+                # validate if not editing
+                if not self._is_edit and not is_expression:
+                    id = self.data.id
+                    sc = StateData()
+                    data = sc.getStates()
+                    states = [item.key for item in data.values() if item.id != id and key_low == item.key]
+                    if states:
+                        MessageBox(
+                            title="State Error",
+                            prompt=f"[{key}] is already defined as a state.\nState names must be unique and are not case sensitive.",
+                        )
+                        return
 
                 if self.data.isExpression or not self._exclusive_enabled:
                     self.data.exclusive_keys = []
@@ -3547,7 +3517,7 @@ class StateInputConfigDialog(QShowAtCursorDialog):
 class StateFilterCountWidget(QtWidgets.QLabel):
     """shows filtered vs total state counts for a model"""
 
-    def __init__(self, model=None, filter=StateInputItemModel.DEFAULT_FILTER, prefix: str = None, suffix: str = None, parent=None):
+    def __init__(self, model=None, filter=StateInputItemModel.DEFAULT_FILTER, prefix: str | None = None, suffix: str | None = None, parent=None):
         super().__init__(parent)
         self._model = None
         self._filter = filter
@@ -4274,7 +4244,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         ):
             try:
                 signal.disconnect(slot)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
     def _handle_state_added(self, state):
@@ -4780,9 +4750,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         gremlin.util.InvokeUiMethod(self._change_expression_callback_ui, state, widget)
 
     def _change_expression_callback_ui(self, state, widget):
-        if Shiboken.isValid(widget):
-            if widget.data.input_id == state:
-                widget.setText(state.expression)
+        if Shiboken.isValid(widget) and widget.data.input_id == state:
+            widget.setText(state.expression)
 
     def _set_status(self, widget, icon=None, status=None, use_qta=True, color=None):
         """sets the status of an input widget"""
@@ -4797,7 +4766,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         """called when the widget has to update itself on a data change"""
-        pass
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""

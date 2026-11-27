@@ -25,6 +25,7 @@ Actions are contained in [containers](containers.md#containers).
 | Map to OSC | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is the original GremlinEx OSC mapper |
 | Map to OSC Ex | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is a more advanced version of the GremlinEx OSC mapper.  This is often used to change states on Bitfocus controlled devices such as the ELgato Streamdeck, LoupeDeck or OSC glass surfaces like Open Stage Control or TouchOSC - this enables two way communication between GremlinEx and these hardware panels or control surfaces via the OSC protocol over the network. |
 | Map to Simconnect | Sends commands and inputs to Microsoft Flight Simulator using the Simconnect SDK.  Works with the GremlinEx WASM module for MSFS to process internal calculator code, which mostly lets you control add-on software for MSFS not exposed via the usual SDK.  This lets you use GremlinEx to completely bypass the MSFS internal mapper. |
+| [Map to Star Citizen](devices/star_citizen_user_guide.md#send-a-command-to-the-game) | Sends a command advertised by the local Star Citizen server. | Bind a joystick button or other input to a supported game action. |
 | [Map to State](actions/map_to_state_user_guide.md) | Changes ordinary states selected by name, list, category, or attribute. | Track switches, select command layers, pulse flags, or update related states used by expressions and conditions. |
 | Map to trigger | This action sends a virtual trigger to the profile as if the input hardware was triggered.  This can send any joystick event such as a button, hat or axis change, and looks to the profile as if the actual hardware was touched. | Use this to trigger other parts of the profile that are already mapped. This enables one input to trigger other inputs. |
 | [Map to Vjoy (Vjoy Remap)](actions/map_to_vjoy_user_guide.md) | This action lets you do advanced mapping to VJOY devices, including applying curves or merging axes. | Use this when you need to map to a vjoy device. |
@@ -404,6 +405,8 @@ Examples of how this action can be used:
 ![trigger map button](assets/trigger_map_button.png)
 
 ## Map to keyboard/Mouse EX action
+
+For step-by-step setup and screenshots of the editor and key picker, see the [Map to Keyboard/Mouse Ex User Guide](actions/keyboard_ex_user_guide.md).
 
 This is identical to the base keyboard mapper but adds a few functions I thought would be handy.
 

@@ -119,13 +119,16 @@ class PublishedHidOrderChecks(unittest.TestCase):
     published = cache.MaestroCacheChecks.published
 
     def controller_rows(self):
-        self.definitions = {f"gex-{n}": cache.identity.definition(f"gex-{n}") | service_row(n) for n in (1, 2)}
+        self.definitions = {
+            f"gex-{n}": cache.identity.definition(f"gex-{n}") | service_row(n) | {"vendorId": MAESTRO.GEX_VENDOR_ID}
+            for n in (1, 2)
+        }
         self.active_ids = ["gex-2", "gex-1"]
         CONFIG.maestro_device_map = {"gex-1": 7, "gex-2": 3}
         self.maestro._local_service = True
         hid = ModuleType("gremlin.hid")
         self.rows = [hid_row(self.definitions[f"gex-{n}"]) for n in (1, 2)]
-        hid.enumerate_devices = lambda: self.rows
+        self.enumerate_hid = hid.enumerate_devices = Mock(side_effect=lambda vendor_id=0: self.rows)
         modules = patch.dict("sys.modules", {"gremlin.hid": hid})
         modules.start()
         self.addCleanup(modules.stop)
@@ -139,6 +142,25 @@ class PublishedHidOrderChecks(unittest.TestCase):
             index: NS(input_enabled=True, data={"maestro_key": controller.key})
             for index, controller in self.maestro._controller_map.items()
         }
+
+    def test_canonical_joysticks_use_one_vendor_scan(self):
+        self.controller_rows()
+        self.maestro._scan_hid_order()
+        self.enumerate_hid.assert_called_once_with(MAESTRO.GEX_VENDOR_ID)
+        self.assertTrue(all(c.hid_order_valid for c in self.maestro._controller_map.values()))
+
+    def test_a_joystick_without_confirmed_vendor_keeps_full_order_scan(self):
+        self.controller_rows()
+        definition = next(iter(self.maestro._known_service_devices.values()))
+        definition.pop("vendorId")
+        self.maestro._scan_hid_order()
+        self.enumerate_hid.assert_called_once_with()
+
+    def test_reset_reuses_the_input_scan_from_publishing(self):
+        self.controller_rows()
+        with patch.object(self.maestro, "_compare_list", return_value=False):
+            self.maestro.reset()
+        self.enumerate_hid.assert_called_once_with(MAESTRO.GEX_VENDOR_ID)
 
     def test_hid_order_failure_does_not_keep_native_discovery_pending(self):
         self.controller_rows()
@@ -176,14 +198,17 @@ class PublishedHidOrderChecks(unittest.TestCase):
         index = next(iter(self.maestro._device_map))
         missing = self.maestro._controller_map[index]
         del self.maestro._device_map[index]
-        with patch.object(self.maestro, "syncDinput"), patch.object(MAESTRO.time, "monotonic", side_effect=[0, 21]), patch.object(
-            MAESTRO, "syslog"
-        ) as log:
+        with (
+            patch.object(CONFIG, "verbose_mode_maestro", True),
+            patch.object(self.maestro, "syncDinput"),
+            patch.object(MAESTRO.time, "monotonic", side_effect=[0, 21]),
+            patch.object(MAESTRO, "syslog") as log,
+        ):
             self.maestro._sync_worker_runner()
         log.warning.assert_called_once()
-        warning, unmatched = log.warning.call_args.args
+        warning = log.warning.call_args.args[0]
         self.assertIn("no native input match", warning)
-        self.assertEqual(unmatched, f"{missing.id} ({missing.name})")
+        self.assertTrue(warning.endswith(f"{missing.id} ({missing.name})."))
         self.assertIsNone(self.maestro._sync_worker)
 
     def test_worker_finishes_for_matched_inputs_even_when_hid_order_is_invalid(self):
@@ -196,7 +221,7 @@ class PublishedHidOrderChecks(unittest.TestCase):
             GREMLIN.joystick_handling, "joystick_devices_initialization", create=True
         ) as initialize, patch.object(self.maestro._stopping, "wait") as wait, patch.object(MAESTRO, "syslog") as log:
             self.maestro._sync_worker_runner()
-        publish.assert_called_once_with()
+        publish.assert_called_once_with(inputs_scanned=True)
         initialize.assert_called_once_with()
         wait.assert_not_called()
         log.warning.assert_not_called()

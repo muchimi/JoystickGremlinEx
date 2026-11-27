@@ -165,7 +165,7 @@ GremlinEx started as a fork of the excellent Joystick Gremlin by Lionel Ott year
 
 Fast forward to today: GremlinEx (GEX) at this point is not Joystick Gremlin **nor a new version of Joystick Gremlin**.  Very little remains from the original fork except for the concept.  GEX has been re-architected, redesigned, and is well over 90% new / replacement code.  The code that remains is mostly for compatibility with older profiles.  GEX offers a new UI experience, while keeping with the spirit of the original.
 
-Efforts were made to retain the ability to load older profiles, provided the containers and actions still exist and can be converted.  However in many cases, the new features suplant these older constructs and remapping needs to occur to leverage GEX's features.  For example, you would not use merge axis or separate curve actions anymore, you'd find all of this directly baked in the [map to vjoy action](actions/map_to_vjoy_user_guide.md).  You would not use axis to buttons, you'd use the new [gated axis action](action/gated_axis_user_guide.md).
+Efforts were made to retain the ability to load older profiles, provided the containers and actions still exist and can be converted.  However in many cases, the new features suplant these older constructs and remapping needs to occur to leverage GEX's features.  For example, you would not use merge axis or separate curve actions anymore, you'd find all of this directly baked in the [map to vjoy action](actions/map_to_vjoy_user_guide.md).  You would not use axis to buttons, you'd use the new [gated axis action](actions/gated_axis_user_guide.md).
 
 Available reworked and new [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
 

@@ -501,7 +501,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             from gremlin.types import DeviceType
 
             device = gremlin.joystick_handling.getDevice(self._device_guid)
-            if device.device_type == DeviceType.Joystick and self._input_type == InputType.JoystickAxis:
+            if device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii) and self._input_type == InputType.JoystickAxis:
                 assert value in device.axis_id_map, "invalid axis for device"
 
         if value != self._input_id:

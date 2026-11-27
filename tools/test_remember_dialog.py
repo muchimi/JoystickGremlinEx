@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = QtWidgets.QApplication.instance() or QtWidgets.QApplication([
     "remember-dialog-checks", "-platform", "offscreen",
 ])
-SERVICES = NS(config=NS(Configuration=Mock()), util=NS(InvokeUiMethod=lambda callback: callback()))
+SERVICES = NS(config=NS(Configuration=Mock()), util=NS(InvokeUiMethod=lambda callback: callback()), shared_state=NS(ui=None))
 UI = dict(QtCore=QtCore, QtWidgets=QtWidgets, gremlin=SERVICES)
 tree = ast.parse((ROOT / "gremlin/ui/ui_common.py").read_bytes())
 nodes = [node for node in tree.body if getattr(node, "name", None) == "QRememberDialog"]
@@ -73,6 +73,37 @@ class RememberDialogChecks(unittest.TestCase):
     def assert_inside(self, area):
         frame = self.dialog.frameGeometry()
         self.assertTrue(QtCore.QRect(*area).contains(frame), (area, frame.getRect()))
+
+    def test_first_open_centers_on_gex_even_with_a_different_parent(self):
+        main_window = QtWidgets.QMainWindow()
+        parent = QtWidgets.QDialog(main_window)
+        dialog = QRememberDialog("first-open-test", width=250, height=180, parent=parent)
+        self.widgets.extend((main_window, parent, dialog))
+        main_window.setGeometry(110, 90, 600, 420)
+        parent.setGeometry(12, 15, 200, 130)
+        main_window.show()
+        parent.show()
+        with patch.object(SERVICES.shared_state, "ui", main_window):
+            dialog.show()
+            APP.processEvents()
+        self.assertEqual(dialog.frameGeometry().center(), main_window.frameGeometry().center())
+
+    def test_first_open_centers_after_the_dialog_size_settles(self):
+        class LateResizeDialog(QRememberDialog):
+            def showEvent(self, event):
+                super().showEvent(event)
+                self.resize(410, 240)
+
+        main_window = QtWidgets.QMainWindow()
+        dialog = LateResizeDialog("first-open-resize-test")
+        self.widgets.extend((main_window, dialog))
+        main_window.setGeometry(80, 75, 630, 430)
+        main_window.show()
+        with patch.object(SERVICES.shared_state, "ui", main_window):
+            dialog.show()
+            APP.processEvents()
+        self.assertEqual(dialog.size(), QtCore.QSize(410, 240))
+        self.assertEqual(dialog.frameGeometry().center(), main_window.frameGeometry().center())
 
     def test_visible_saved_geometry_is_preserved(self):
         with self.screens((0, 0, 1920, 1040)):

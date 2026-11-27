@@ -68,7 +68,7 @@ class FFmpegTests(unittest.TestCase):
                       if getattr(node, "name", None) == "Sound")
         source.decorator_list = []
         source.body = [node for node in source.body if getattr(node, "name", None) in {
-            "ensureFFmpeg", "convertMp3ToWav_pydub",
+            "ensureFFmpeg", "convertMp3ToWav", "convertMp3ToWav_pydub",
         }]
         namespace = dict(configure_ffmpeg=ffmpeg.configure_ffmpeg, os=os, syslog=Mock(),
                          AudioSegment=Mock())
@@ -151,6 +151,20 @@ class FFmpegTests(unittest.TestCase):
         namespace["AudioSegment"].from_mp3.side_effect = load_audio
         self.assertTrue(sound.convertMp3ToWav_pydub("input.mp3", "output.wav"))
         namespace["AudioSegment"].from_mp3.assert_called_once_with("input.mp3")
+
+    @unittest.skipUnless(os.name == "nt", "Windows console flag")
+    def test_edge_tts_conversion_starts_ffmpeg_without_a_console(self):
+        sound, _ = self.sound()
+        sound.verbose = False
+        expected = self.tools(self.root / "ffmpeg")
+        with patch.object(subprocess, "run", return_value=NS(returncode=0)) as run:
+            self.assertTrue(sound.convertMp3ToWav("input.mp3", "output.wav"))
+
+        run.assert_called_once_with(
+            [expected, "-i", "input.mp3", "output.wav"],
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
 
     def test_missing_tools_report_failure_without_calling_pydub(self):
         sound, namespace = self.sound()

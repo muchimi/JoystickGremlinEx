@@ -403,6 +403,7 @@ class VirtualOutputSelectorTests(unittest.TestCase):
         self.assertEqual(self.backends[self.maestro.device_guid].hat(1).direction, (0, 1))
 
     def test_autorelease_uses_selected_maestro_without_native_vjoy(self):
+        self.maestro.get_button_input_ids = lambda: range(1, self.maestro.button_count + 1)
         self.backends[self.maestro.device_guid].button(1).is_pressed = True
         Release()._release_callback_prototype((self.key, 1), is_local=True)
         self.assertFalse(self.backends[self.maestro.device_guid].button(1).is_pressed)

@@ -1,0 +1,133 @@
+# Copyright (C) 2026 EMCS (Gremlin Ex (GEX) contributions)
+#
+# Written for Gremlin Ex by Muchimi
+# Some portions are derived from the original 2019 Joystick Gremlin by Lionel Ott and other contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+
+"""Translate saved Loopback GUIDs to the numeric slots used by joystick mappings."""
+
+import sys
+from uuid import UUID
+
+from lxml import etree
+
+from gremlin.input_types import InputType
+from gremlin.types import VjoyAction
+
+from . import AXIS, BUTTON
+
+COMMENT_PREFIX = " Loopback input ("
+
+
+def _references(loopback, root):
+    device_guid = UUID(str(loopback.device.device_guid))
+    loopback_ids = {str(device_guid), device_guid.hex}
+
+    def is_loopback(value):
+        # Optional device IDs may be absent or contain a legacy placeholder.
+        if not value:
+            return False
+        value = value.casefold().removeprefix("urn:uuid:")
+        if value.startswith("{") and value.endswith("}"):
+            value = value[1:-1]
+        return value in loopback_ids
+
+    for device in root.findall("./devices//device"):
+        if is_loopback(device.get("device-guid")):
+            for tag, kind in (("axis", AXIS), ("button", BUTTON)):
+                for item in device.findall(f"./mode/{tag}"):
+                    yield item, kind, ("id", "input_id"), "input-guid", "mapping"
+
+    for condition in root.iter("condition"):
+        if condition.get("condition-type") == "joystick" and is_loopback(condition.get("device-guid")) and condition.get("input") in ("axis", "button"):
+            kind = InputType.to_enum(condition.get("input"))
+            yield condition, kind, ("id",), "input-guid", "condition"
+
+    for action in root.iter("vjoyremap"):
+        if action.get("device-type", "").casefold() == "loopback":
+            mode = VjoyAction.from_string(action.get("mode", ""))
+            if mode == VjoyAction.VJoyHatToButton:
+                for target in action.findall("hat_to_button"):
+                    yield target, BUTTON, ("input",), "output-guid", "hat direction"
+            elif mode == VjoyAction.VJoySetAxisStepped or VjoyAction.is_axis_action(mode):
+                yield action, AXIS, ("axis", "input", "button"), "output-guid", "output"
+            elif VjoyAction.is_button_action(mode):
+                yield action, BUTTON, ("button", "input", "axis"), "output-guid", "output"
+        stepped_input_type = action.get("stepped-input-type")
+        if stepped_input_type in ("axis", "button") and is_loopback(action.get("stepped-device-id")):
+            kind = InputType.to_enum(stepped_input_type)
+            yield action, kind, ("stepped-input-id",), "stepped-input-guid", "secondary input"
+        for source in action.findall("./merge-axis/merge-data"):
+            if is_loopback(source.get("device-id")):
+                yield source, AXIS, ("input-id",), "input-guid", "merged axis"
+
+
+def _slot(node, attrs):
+    digit_limit = sys.get_int_max_str_digits()
+    for attr in attrs:
+        value = node.get(attr, "").strip()
+        digits = value[1:] if value.startswith(("+", "-")) else value
+        parts = digits.split("_")
+        if not all(part.isdecimal() for part in parts):
+            continue
+        if digit_limit and sum(len(part) for part in parts) > digit_limit:
+            continue
+        return int(value)
+    return 0
+
+
+def resolve_references(loopback, root):
+    _remove_notes(root)
+    slots = {
+        (kind, control.guid): index
+        for kind, controls in loopback.controls.items() for index, control in controls.items()
+    }
+    for node, kind, attrs, guid_attr, _ in _references(loopback, root):
+        guid = node.get(guid_attr)
+        if not guid:
+            continue
+        try:
+            guid = str(UUID(guid)) # @IgnoreException
+        except ValueError:
+            # Keep malformed references unassigned rather than using a stale slot.
+            pass
+        index = slots.get((kind, guid))
+        if index is None:
+            index = loopback.missing_reference_slot(kind, guid, _slot(node, attrs))
+            slots[kind, guid] = index
+        node.set(attrs[0], str(index))
+        for attr in attrs[1:]:
+            if attr in node.attrib:
+                node.set(attr, str(index))
+
+
+def _remove_notes(root):
+    """Remove only the comments generated by the Loopback serializer."""
+    for comment in root.xpath("//comment()[starts-with(., $prefix)]", prefix=COMMENT_PREFIX):
+        comment.getparent().remove(comment)
+
+
+def annotate_references(loopback, root):
+    _remove_notes(root)
+    for node, kind, attrs, guid_attr, label in _references(loopback, root):
+        index = _slot(node, attrs)
+        guid = loopback.reference_guid(kind, index)
+        if guid is None:
+            continue
+        node.set(guid_attr, guid)
+        control = loopback.controls[kind].get(index)
+        name = control.name.replace("--", "—") if control is not None else "Missing control"
+        node.insert(0, etree.Comment(f"{COMMENT_PREFIX}{label}): {name} "))

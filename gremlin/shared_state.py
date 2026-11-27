@@ -140,6 +140,9 @@ midi_tab_id = gremlin.util.normalize_guid(midi_tab_guid)
 # UUID of the OSC tab (osc device)
 osc_tab_guid = gremlin.util.parse_guid('ccb486e8-808e-4b3f-abe7-bcb380f39aa4')
 star_citizen_tab_guid = gremlin.util.parse_guid('2d3a5904-4c1a-49aa-a6fd-d7a1007c3b85')
+loopback_tab_guid = gremlin.util.parse_guid("d137a6a7-70cb-4c22-9e2c-b45083d2b013")
+# Visibility for all Space Mouse tabs, independent of each hardware GUID.
+space_mouse_filter_id = "f04a754133d65bf882ba7e718d677a7b"
 osc_tab_id = gremlin.util.normalize_guid(osc_tab_guid)
 
 # UUID of the keyboard tab (keyboard device)

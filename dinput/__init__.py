@@ -402,6 +402,16 @@ class InputEvent:
             self.input_index = 0
             self.value = 0
 
+    @classmethod
+    def from_values(cls, device_guid, input_type, input_index, value):
+        """Build an input sample from a joystick backend outside DirectInput."""
+        event = cls.__new__(cls)
+        event.device_guid = device_guid
+        event.input_type = input_type
+        event.input_index = input_index
+        event.value = value
+        return event
+
     def __str__(self) -> str:
         return f"InputEvent: GUID [{self.device_guid}] type: [{self.input_type}] index: [{self.input_index}] value: [{self.value}]"
 
@@ -452,6 +462,9 @@ class AxisMap:
                 return "(8) S2"
 
         return f"Invalid: {self.axis_index}"
+
+
+TOBII_GAZE_GUID = GUID(uuid.uuid5(uuid.NAMESPACE_URL, "gex:tobii-eye-gaze"))
 
 
 class DeviceSummary:
@@ -660,11 +673,35 @@ class DeviceSummary:
         """sets a custom hat callback to get a hat value (parameter is the hat number)"""
         self._get_hat_callback = callback
 
+    def set_space_mouse_layout(self, button_count):
+        """Define the six SpaceMouse axes for live and offline summaries."""
+        self._set_streamed_joystick_layout(DeviceType.SpaceMouse, ("X", "Y", "Z", "Roll", "Pitch", "Yaw"), button_count)
+
+    def set_tobii_layout(self):
+        """Restore the fixed layout for either Tobii input device."""
+        names = ("Gaze X", "Gaze Y") if self.device_guid == TOBII_GAZE_GUID else ("X", "Y", "Z", "Yaw", "Pitch", "Roll")
+        self._set_streamed_joystick_layout(DeviceType.Tobii, names, 0)
+
+    def _set_streamed_joystick_layout(self, device_type, axis_names, button_count):
+        self.device_type = device_type
+        self.device_category = DeviceCategory.Physical
+        self.axis_names = dict(enumerate(axis_names, 1))
+        self.axis_count = len(self.axis_names)
+        self.button_count = button_count
+        self.hat_count = 0
+        self.axis_id_map = {index: index for index in self.axis_names}
+        self.linear_id_map = dict(self.axis_id_map)
+        self.axismap_list = []
+        for index in self.axis_names:
+            axis_map = AxisMap()
+            axis_map.axis_index = axis_map.linear_index = index
+            self.axismap_list.append(axis_map)
+
     def get_button(self, button):
         """gets a button for this device"""
         if self._get_button_callback:
             return self._get_button_callback(button)
-        if self.is_special:
+        if self.is_special or self.device_type in (DeviceType.SpaceMouse, DeviceType.Tobii):
             return False
         return DILL.get_button(self.device_guid, button)
 
@@ -672,6 +709,8 @@ class DeviceSummary:
         """gets an axis for this device"""
         if self._get_axis_callback:
             return self._get_axis_callback(axis)
+        if self.device_type in (DeviceType.SpaceMouse, DeviceType.Tobii):
+            return 0
         return DILL.get_axis(self.device_guid, axis)
 
     def get_axis_list(self) -> list:
@@ -784,7 +823,7 @@ class DeviceSummary:
 
     def _supports_virtual(self):
         """Require GEX native recognition or bridge ownership for Maestro."""
-        return self.device_type == DeviceType.VJoy or (
+        return self.device_type in (DeviceType.VJoy, DeviceType.Loopback) or (
             self.device_type == DeviceType.Maestro
             and bool(self.data.get("maestro_native_input") or self.data.get("maestro_key"))
         )
@@ -863,6 +902,12 @@ class DeviceSummary:
     def get_button_name(self, input_id):
         return self.data.get("button_names", {}).get(input_id, f"Button {input_id}")
 
+    def get_button_input_ids(self):
+        """Return defined button IDs, including sparse internal controls."""
+        if self.device_type == DeviceType.Loopback:
+            return self.data["button_names"].keys()
+        return range(1, self.button_count + 1)
+
     def get_hat_name(self, input_id):
         import gremlin.util
 
@@ -874,6 +919,8 @@ class DeviceSummary:
 
     def axis_index_list(self) -> list:
         """returns the list of valid axis indices"""
+        if self.device_type == DeviceType.Loopback:
+            return list(self.axis_id_map)
         index_list = [data.axis_index for data in self.axismap_list if data.axis_index > 0]
         return index_list
 
@@ -908,7 +955,7 @@ class DeviceSummary:
 
     def update(self):
         """updates device connectivity"""
-        if self.is_special:
+        if self.is_special or self.device_type == DeviceType.Tobii:
             # nothing to update on special devices
             return
 
@@ -926,6 +973,8 @@ class DeviceSummary:
 
         """
         assert isinstance(index, int) and index > 0, f"invalid index: {index} - should be a 1 based integer"
+        if self.device_type in (DeviceType.SpaceMouse, DeviceType.Loopback, DeviceType.Tobii) and index in self.axis_names:
+            return self.axis_names[index]
         try:
             am: AxisMap
             stub = ""

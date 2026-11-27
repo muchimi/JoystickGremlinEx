@@ -131,7 +131,7 @@ SERVICES = NS(
     util=NS(get_guid=uuid.uuid4, InvokeUiMethod=invoke, is_ui_thread=lambda: True),
     config=NS(Configuration=lambda: CONFIG),
     ui=NS(ui_common=COMMON),
-    joystick_handling=NS(all_joystick_devices=lambda: DEVICES,
+    joystick_handling=NS(all_joystick_devices=lambda: DEVICES, active_loopback=lambda: None,
                         getDeviceName=lambda guid: guid),
     event_handler=NS(EventListener=lambda: BUS, JoystickEventProcessor=lambda: NS(),
                      AxisState=lambda: NS(getAxisValues=lambda *args: NS(actual=0.5))),
@@ -167,11 +167,11 @@ load("gremlin/ui/ui_common.py", {"JoystickDeviceWidget"}, {
     "__init__", "_handle_shutdown", "device_guid", "hook", "unhook", "_cleanup_ui", "_create_temporal_axis", "_create_current_axis",
 })
 COMMON.JoystickDeviceWidget = NAMESPACE["JoystickDeviceWidget"]
-load("gremlin/ui/input_viewer.py", {"VisualizerWidget", "VisualizationSelector"})
+load("gremlin/ui/input_viewer.py", {"VisualizerWidget", "VisualizationSelector", "_viewer_loopback_device", "_viewer_input_devices"})
 load("gremlin/ui/input_viewer.py", {"InputViewerDialog"}, {
     "closeSystemWidget", "_add_widget", "_add_remove_visualization_widget", "_visualizer_count", "_update_ui",
     "_clear_all", "_clear", "_clear_joystick_visualizers", "_delete_widget", "_cleanup_joystick_widgets",
-    "load_viewer_widgets", "_update_virtual_selector", "showKeyboard", "hideKeyboard", "showState", "hideState",
+    "load_viewer_widgets", "_update_virtual_selector", "_observe_loopback", "showKeyboard", "hideKeyboard", "showState", "hideState",
     "saveKeyboardState", "saveStateState", "_select_used",
 }, base="QWidget")
 load("gremlinEx.py", {"GremlinUi"}, {"_get_tab_map", "getMappedDeviceList"}, base="object")
@@ -454,6 +454,8 @@ class SelectUsedTests(unittest.TestCase):
 
         self.viewer = NAMESPACE["InputViewerDialog"]()
         self.viewer.virtual_device_selector = QtWidgets.QComboBox(self.viewer)
+        self.viewer._loopback = None
+        self.viewer.refresh = self.viewer.load_viewer_widgets
         self.viewer.virtual_device_selector.autoSize = self.viewer.virtual_device_selector.adjustSize
         self.viewer.select_virtual_widget = QtWidgets.QPushButton(self.viewer)
         self.viewer._viewer_widget_map = {}
@@ -596,6 +598,45 @@ class SelectUsedTests(unittest.TestCase):
         self.selector._select_used()
         self.assertEqual(self.selector._devices, [self.vjoy])
         self.assertEqual(set(self.viewer._visualizer_widgets), {(self.vjoy.key, VisualizationType.AxisCurrent)})
+
+    def test_loopback_is_in_both_selectors_and_can_be_selected_after_select_used(self):
+        loopback = DeviceSummary("Loopback")
+        loopback.is_virtual = True
+        loopback.button_count = 1
+
+        class Loopback(QtCore.QObject):
+            definitions_changed = QtCore.Signal()
+
+        profile_loopback = Loopback()
+        profile_loopback.device = loopback
+        handling = SERVICES.joystick_handling
+        original_name = handling.getDeviceName
+        with patch.multiple(
+            handling,
+            active_loopback=lambda: profile_loopback,
+            getDeviceName=lambda guid: loopback.name if guid == loopback.device_guid else original_name(guid),
+            get_virtual_device=lambda key: loopback if key == loopback.device_guid else None,
+        ):
+            self.viewer.load_viewer_widgets()
+            self.selector.updateSelector()
+            combo = self.viewer.virtual_device_selector
+            self.assertEqual(combo.itemText(combo.findData(loopback.device_guid)), "Loopback")
+            axis_key = (loopback.key, VisualizationType.AxisCurrent)
+            button_key = (loopback.key, VisualizationType.ButtonHat)
+            self.assertIn(axis_key, self.selector._selector_widgets)
+            self.assertIn(button_key, self.selector._selector_widgets)
+
+            self.selector._select_used()
+            self.assertNotIn(axis_key, self.selector._selector_widgets)
+            self.selector.selectVirtualDevice(loopback.device_guid)
+            self.assertEqual(set(self.viewer._visualizer_widgets), {axis_key, button_key})
+
+            loopback.axis_count = loopback.button_count = 0
+            profile_loopback.definitions_changed.emit()
+            self.selector.updateSelector()
+            self.assertEqual(combo.findData(loopback.device_guid), -1)
+            self.assertNotIn(axis_key, self.selector._selector_widgets)
+            self.viewer._observe_loopback(None)
 
     def test_select_used_clears_everything_when_no_supported_devices_are_mapped(self):
         self.mapped[:] = [self.stick.device_guid, self.keyboard.device_guid, self.state.device_guid]

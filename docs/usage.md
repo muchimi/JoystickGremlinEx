@@ -31,6 +31,14 @@ If you would like to define a new state in the profile, that state needs to be d
 
 To use vJoy or Maestro joysticks as inputs, select them under **Profile Settings > Virtual as Input > Configure...**. Each enabled device appears in its own input tab. Maestro inputs must be local joysticks available through DirectInput. These selections are saved in the profile.
 
+To use Tobii Eye Tracker 5 head tracking, calibrate the tracker in Tobii Experience and run Tobii Game Hub with an active game profile that sends head tracking over UDP. In GEX, enable **Tobii Head Tracking** under **Options → Modules**, match **Tobii UDP port** to the Game Hub port (default **4242**), and restart GEX. The **Tobii Head Tracking** tab opens with six mappable axes and shows whether GEX is waiting for packets on `127.0.0.1` or receiving tracking. GEX receives the UDP stream directly. [Tobii Game Hub setup](https://help.tobii.com/hc/en-us/articles/28217654574865-How-to-do-Opentrack-setup-for-Tobii-Game-Hub)
+
+Map **X**, **Y**, **Z**, **Yaw**, **Pitch**, and **Roll** using the same controls as other joystick axes. GEX scales translation over ±50 cm and rotation over ±180° before applying the configured input filters and curves. If the stream stops, the axes return to center after 750 ms. The Game Hub stream carries head pose. Eye-gaze coordinates are a separate stream.
+
+To monitor all six axes, choose the current-axis view or the axis timeline under **Tobii Head Tracking** in **Tools → Input Viewer**. Tobii appears in the list when Game Hub begins sending tracking data, including when the viewer is already open.
+
+For eye gaze, calibrate the tracker for your primary Windows display. Run GEX Bridge **0.1.4** or later in your signed-in desktop session with `--Osc:TobiiGazeEnabled true`. GEX Bridge reads Tobii.Interaction from the local Tobii installation. In GEX, configure the local bridge address and receive port, enable **Tobii Eye Gaze** under **Options → Modules**, then restart GEX. The **Tobii Eye Gaze** tab shows the bridge status. Its Input Viewer panels become available after the first valid gaze point. **Gaze X** increases to the right and **Gaze Y** increases upward. The axes return to center when the bridge stops reporting valid gaze.
+
 ![warning](assets/warning.png) It is generally not recommended to use the same VJOY device both as input and output concurrently in the same profile.  Outside of a performance degradation versus using, for example, states (for virtual input needs) due to the overhead involved, it becomes exceedingly easy to create loops and race conditions when using the same VJOY device both as input and output from the same process.  This is known in extreme cases to cause VJOY API issues due to the internal locking of the VJOY software, for example, making the device unavailable.  The virtual input feature for vJoy is meant to be used when the writing is done via another software that sends to VJOY is needed, to trigger something from GremlinEx as a result.  Generally speaking, only one process should write to VJOY, and another process read from VJOY.  These limitations are external to GremlinEx.  This said, with careful planning and understanding of the above limitations, it is possible to use the same VJOY device for input and output in the same profile.  This is an advanced feature and in general the preference is to use an alternative setup where possible using one of the other GrmelinEx features, such as states.
 
 ### Input Filter
@@ -281,7 +289,7 @@ Special devices in GremlinEx are non-joystick devices, or configuration devices.
 | ----------- | ----------- |
 | [Keyboard/Mouse](#keyboard-and-mouse) | Define keyboard combinations, mouse buttons, and wheel inputs. |
 | [Mode/Profile](#modeprofile-device) | Map profile start/stop and mode enter/exit events. |
-| [OSC](#osc-device-open-sound-control) | Map incoming OSC messages; OSC actions provide outgoing messages. |
+| [OSC](devices/osc_device_user_guide.md) | Map incoming OSC messages and send feedback to panels. |
 | [MIDI](#midi-device) | Map messages received from MIDI ports. |
 | [States](devices/state_device_user_guide.md) | Define ordinary states, expressions, categories, attributes, and exclusive groups. |
 | [Stream Deck](#stream-deck-device) | Map direct button and dial inputs and design virtual pages. |
@@ -481,6 +489,10 @@ GremlinEx will display a special keyboard device that groups the functionality o
 GremlinEx will display a device for processing OSC and MIDI messages sent to the local machine.  The messages can originate locally or from a remote machine.
 
 While MIDI and OSC are protocols associated with musical instruments, they are also sophisticated stage controllers with touch-screen surfaces or physical sliders, dials, button and touch pads.   GremlinEx can use signals from these devices to control a game.
+
+### Loopback device
+
+Use Loopback to share an axis or button between mappings within a profile. Define controls in the **Loopback** tab, write to them with **Virtual Remap**, and read them with joystick conditions. The **Settings** tab lets you assign startup values. [Loopback Device User Guide](devices/loopback_device_user_guide.md)
 
 ### State device
 
@@ -1434,6 +1446,8 @@ The majority of issues will come from messages not being recognized by GremlinEx
 There are some tools that let you visualize what MIDI messages the computer is receiving such as [MidiOx](http://www.midiox.com/), and older but tried and true MIDI diagnostics tool, or something like [Hexler Protokol](https://hexler.net/protokol).  Both utilities are free.  It's always a good idea to verify the MIDI signaling is functional outside of GremlinEx to verify the machine is seeing messages.  If GremlinEx cannot "listen" to a message via the listen buttons, it cannot see it.
 
 ## OSC device (Open Sound Control)
+
+See the [OSC Device User Guide](devices/osc_device_user_guide.md) for connection setup, input capture, a button test, and panel feedback.
 
 GremlinEx, as of 13.40.14ex, can map OSC (Open Sound control) protocol messages as input and use those to trigger actions.  OSC is a network protocol over UDP used to exchange information between AV (audio visual) control panels, studio equipment and related software.  In GremlinEx's context, OSC is used to get input from control panels and touch surfaces that support the OSC protocol, including faders/knobs, buttons/switches, rotary encoders and sliders, all of which are very useful to use as  game input.  GremlinEx can receive and send OSC messages.  OSC is generally much easier to setup and program than MIDI as it supports text commands and multiple parameters, including floating point and integer values.  For more information on the open sound control protocol, visit [OpenSoundControl.org](https://OpenSoundControl.org).
 

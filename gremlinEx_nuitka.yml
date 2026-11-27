@@ -7,3 +7,8 @@
       - 'SimConnect'
       - 'vJoyInterface'
       - 'hidapi'
+
+- module-name: 'pyspacemouse'
+  data-files:
+    patterns:
+      - 'devices.toml'

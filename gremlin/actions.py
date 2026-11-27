@@ -351,6 +351,12 @@ class JoystickCondition(AbstractCondition):
             # device not found - ignore
             return False
 
+        if self.device_guid == getattr(gremlin.shared_state, "loopback_tab_guid", None):
+            if self.input_type == InputType.JoystickAxis and not joy.is_axis_valid(self.input_id):
+                return False
+            if self.input_type == InputType.JoystickButton and not joy.is_button_valid(self.input_id):
+                return False
+
         if self.input_type == InputType.JoystickAxis:
             retval = False
 

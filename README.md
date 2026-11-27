@@ -58,8 +58,24 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T112)
+- New: **Loopback device**. (experimental) The loopback device is an internal virtual joystick device meant to replace the need to use an external virtual device like vJoy or a Maestro device as input to the profile.  Benefits:
+	
+	1. Not dependent on external device definitions that could be deleted nor not be present on machine.
+	2. No limit on axes or buttons.
+	3. Named inputs (case sensitive, names must be unique) so the inputs are more meaningful.
+	4. Works like any other joystick device so has all the features and mapping and conditions as a hardware or virtual joystick.
+	5. Complements the State device.
+	
+- New: **Space Mouse support.** (Experimental) This module exposes Space Mouse by 3DConnexion as a mappable device using axes and buttons.  As I do not have a device, this is based on API mockup/testing only.
+
+- New: check for updates.  This option will check the repository on start for any updates and offer to download and run the installer.  This is also available via the help menu, and can be turned on or off in options.  This is on by default.
+
 - Fix: OSC device: highlighting ignores other input pages.
 - Fix: UI: workaround for a QT layout sequence when ensuring an input is visible.
+- Fix: API: reworked startup sequence to reduce time to scan for devices.
+- Fix: Bridge: installer upgrade process and handling of running service during an upgrade.  Simplified the installer further to have a default setup, and a custom setup to change ports/IP and firewall rules if needed.  Keep defined devices when upgrading. 
+- Fix: Play Sound Action: AI voice generation could pop up a black window while generating the AI voice.
+- Fix: API: stop creating virtual internal vJoy devices if no configured vJoy devices exist.
 
 ### (m77T111)
 - New: Star Citizen device: (experimental) CIG has included in the latest releases of Star Citizen an undocumented gPRC server that sends (and for 5.0, receives) state data.  The data is incomplete, subject to change so not only is this experimental in GEX but it is also experimental in Star Citizen.  The module uses Google Protobuf for the decoding/encoding and defines a number of game related state changes.  For convenience, inputs may be duplicated to simplify mapping because some states are transition states (such as the landing gear and the wing deployment).  The server self-reports as to what data it provides, and the current implementation is based on what is in 4.10.3 live. More work on this will follow I'm sure as this is all fairly new, but usable right now. To enable this module, you must define an environment variable **GRPC_CLIENT_SERVER_ENABLED=true** before running the SC Launcher and GEX.  The GEX module supports 96 triggers, some of which are derived by GEX, based on the set available via the gPRC interface.   [List of supported input triggers](https://github.com/muchimi/JoystickGremlinEx/blob/develop/gremlin/ui/star_citizen/star-citizen-inputs.md)

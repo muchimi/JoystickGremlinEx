@@ -19,7 +19,7 @@ without contacting GitHub.
 Both installers offer unchecked tasks for optional dependencies:
 
 - HidHide is offered when its driver/service and installer dependency registration are absent.
-- GEX Maestro Bridge is offered when the bridge is not installed. vJoy detection shows a warning but does not prevent bridge installation. Bridge detection includes the Windows services, the bridge's 32/64-bit uninstall registration, and its default console installation.
+- GEX Maestro Bridge is offered when it is missing. For an installed Bridge, Setup compares its version with the latest stable release and offers an optional upgrade when a newer x64 installer is available. The task shows both version numbers and targets the detected Bridge folder, including custom service and console locations. vJoy detection shows a warning and leaves the Bridge task available.
 
 Both setup and application startup confirm vJoy availability by calling
 `vJoyEnabled()` through `vJoyInterface.dll` and finding at least one defined

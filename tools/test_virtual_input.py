@@ -126,13 +126,18 @@ class VirtualInputChecks(unittest.TestCase):
             verbose_mode_vjoy=False,
             verbose_mode_ui_level=lambda level: False,
             virtual_output_failover=False,
+            startup_loopback_enabled=True,
+            startup_star_citizen_enabled=True,
             tab_list={},
             setDeviceVisible=Mock(),
             isDeviceVisible=lambda guid: True,
         )
         self.services = NS(
             config=NS(Configuration=lambda: self.config),
-            shared_state=NS(current_profile=None, is_joystick_suspended=False, is_running=False, is_dark_theme=False),
+            shared_state=NS(
+                current_profile=None, is_joystick_suspended=False, is_running=False, is_dark_theme=False,
+                space_mouse_filter_id="space-mouse-filter",
+            ),
             event_handler=NS(EventListener=lambda: self.events),
             util=NS(normalize_guid=str, is_ui_thread=lambda: True, load_icon=lambda name: QtGui.QIcon(str(ROOT / "icons" / name))),
         )
@@ -466,6 +471,7 @@ class VirtualInputChecks(unittest.TestCase):
         self.ui.update(json=json, os=os, MessageBoxWarning=Mock())
         load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui, {"_load_order_file"}, "Widget")
         dialog = self.ui["DeviceDisplayDialog"]()
+        dialog._space_mouse_filter = None
         self.addCleanup(self.delete_widget, dialog)
         dialog.config = self.config
         dialog._order_changed = False
@@ -495,6 +501,7 @@ class VirtualInputChecks(unittest.TestCase):
         load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui,
              {"_update_tabs", "_handle_order_changed"}, "Widget")
         dialog = self.ui["DeviceDisplayDialog"]()
+        dialog._space_mouse_filter = None
         self.addCleanup(self.delete_widget, dialog)
         dialog.config = self.config
         saved = {0: ("Existing manual order", True)}
@@ -517,6 +524,7 @@ class VirtualInputChecks(unittest.TestCase):
         self.ui.update(json=json, MessageBoxWarning=Mock())
         load("gremlin/ui/dialogs.py", {"DeviceDisplayDialog"}, self.ui, {"_handle_save_order"}, "Widget")
         dialog = self.ui["DeviceDisplayDialog"]()
+        dialog._space_mouse_filter = None
         self.addCleanup(self.delete_widget, dialog)
         dialog._get_current_map = lambda: {0: ("Physical", False), 1: ("vJoy 1", True)}
         from unittest.mock import patch
@@ -546,6 +554,7 @@ class VirtualInputChecks(unittest.TestCase):
             "_get_current_map", "_load_order_file", "_update_tabs",
         }, "Widget")
         dialog = self.ui["DeviceDisplayDialog"]()
+        dialog._space_mouse_filter = None
         self.addCleanup(self.delete_widget, dialog)
         dialog.config = self.config
         dialog._order_changed = False
@@ -956,6 +965,7 @@ class VirtualInputChecks(unittest.TestCase):
             "Widget",
         )
         dialog = self.ui["DeviceDisplayDialog"]()
+        dialog._space_mouse_filter = None
         self.addCleanup(self.delete_widget, dialog)
         dialog._list_widget = self.ui["ReorderListWidget"](dialog)
         dialog.visible_map = {}
@@ -1192,7 +1202,7 @@ class VirtualInputChecks(unittest.TestCase):
             "gremlin/event_handler.py",
             {"EventListener"},
             self.ui,
-            {"_dinput_event_handler", "_queue_settled_axis_event"},
+            {"_dinput_event_handler", "process_joystick_input", "_queue_settled_axis_event"},
             "Widget",
         )
         listener = self.ui["EventListener"]()

@@ -57,12 +57,14 @@ GEX is an open source application, distributed as source code, or a packaged app
 | Advanced keyboard and mouse output processing | GEX can produce complex keyboard and mouse button/wheel outputs.  It can separate a make (press) or break (release), pulse and hold functions.  The keyboard output supports all extended keys including F13 to F24, all mouse buttons and wheels, and media control keys and any number of keys pressed at the same time. |
 | Macros, chains and sequences | GEX supports traditional macros, and adds a higher level sequence container that can be used to sequence actions in a loop, or randomly, with various stepped modes as well. |
 | Microsoft MSFS Simconnect support | Supports direct control of Microsoft FLight Simulator 2024 via the Simconnect SDK including calculated expressions to bypass any mapping done in MSFS |
-| Cloud Imperium Games Star Citizen Telemetry Service Support | Supports read/write to the Star Citizen local telemetry (if writing is enabled by CIG). GEX can trigger on 96 inputs as of 4.10.3.  This is being updated as the telemetry service adds features. |
+| [Star Citizen telemetry](devices/star_citizen_user_guide.md) | Map ship telemetry to GremlinEx actions and send commands that the local game server advertises. |
 | Visual repeaters | Provides visual real time input repeaters as well as an output viewer as part of the GEX user interface. |
 | Input highlighting | GEX can automatically detect inputs and jump to that device/input automatically to quickly jump to a particular input mapping.  GEX can make that input automatically visible if previously hidden. |
 | Device Filtering | GEX can filter input devices that are not used, and also reduce the displayed inputs (axis, buttons or hats) to manage profile editing without having thousands of inputs displayed concurrently in the UI. |
 | Templates and copy/paste of mappings | GEX can create templates from mappings and create a mapping from a saved, or received template.  GEX also has copy/paste support for mappings to make it easy to copy a container or action and re-use it somewhere else in the same, or different profile. |
 | Theme aware modern UI | The UI supports the default Windows theme, custom colors, or dark/light modes and a current generation user interface. |
+| Support for Space Mouse | GEX includes an optional module to read data from 3DConnexions' Space Mouse as axes and buttons. |
+| [Virtual Loopback device](devices/loopback_device_user_guide.md) | Define named internal axes and buttons. Use Virtual Remap to set their values, attach actions to their inputs, or read their current values with joystick conditions. |
 | Custom modules | GEX exposes an API that supports custom Python modules to access GEX mapping services and events. |
 
 ## Platform requirements

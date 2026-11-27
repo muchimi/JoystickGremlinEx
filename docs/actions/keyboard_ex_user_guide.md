@@ -1,50 +1,46 @@
-# Keyboard Ex — User Guide
+# Map to Keyboard/Mouse Ex User Guide
 
 **Map to Keyboard/Mouse Ex** converts an input into a keyboard combination, mouse-button action, or mouse-wheel event. Use it to hold a command while a joystick button is down, send a timed shortcut, repeat a command, or control when an output is pressed and released.
 
-This guide describes the Map to Keyboard/Mouse EX action. Shared dialogs and process-routing options may have different wording in another build.
-
 ## Contents
 
-- [Keyboard Ex — User Guide](#keyboard-ex--user-guide)
-  - [Contents](#contents)
-  - [Before you start](#before-you-start)
+- [Before you start](#before-you-start)
     - [A combination is not a typing sequence](#a-combination-is-not-a-typing-sequence)
-  - [Create your first mapping](#create-your-first-mapping)
-  - [Choose keys and mouse inputs](#choose-keys-and-mouse-inputs)
+- [Create your first mapping](#create-your-first-mapping)
+- [Choose keys and mouse inputs](#choose-keys-and-mouse-inputs)
     - [Record a shortcut](#record-a-shortcut)
     - [Select a shortcut visually](#select-a-shortcut-visually)
-  - [Choose an output mode](#choose-an-output-mode)
+- [Choose an output mode](#choose-an-output-mode)
     - [Hold](#hold)
     - [Press and Release](#press-and-release)
-    - [Pulse](#pulse)
-    - [AutoRepeat](#autorepeat)
+    - [Pulse Single](#pulse-single)
+    - [Pulse Repeat](#pulse-repeat)
     - [Toggle](#toggle)
-  - [Set duration and interval](#set-duration-and-interval)
-  - [Choose the triggering event](#choose-the-triggering-event)
-  - [Use mouse buttons and the wheel](#use-mouse-buttons-and-the-wheel)
+- [Set duration and interval](#set-duration-and-interval)
+- [Choose the triggering event](#choose-the-triggering-event)
+- [Use mouse buttons and the wheel](#use-mouse-buttons-and-the-wheel)
     - [Mouse buttons](#mouse-buttons)
     - [Mouse wheel](#mouse-wheel)
-  - [Set the startup state](#set-the-startup-state)
-  - [Choose local, remote, or process output](#choose-local-remote-or-process-output)
+- [Set the startup state](#set-the-startup-state)
+- [Choose local, remote, or process output](#choose-local-remote-or-process-output)
     - [Normal local output](#normal-local-output)
     - [Remote output](#remote-output)
     - [Target a process](#target-a-process)
-  - [Worked examples](#worked-examples)
+- [Worked examples](#worked-examples)
     - [Hold a push-to-talk key](#hold-a-push-to-talk-key)
     - [Send one shortcut](#send-one-shortcut)
     - [Repeat an adjustment while held](#repeat-an-adjustment-while-held)
     - [Separate “on” and “off” controls](#separate-on-and-off-controls)
     - [Send a command when a button is released](#send-a-command-when-a-button-is-released)
-  - [Test and troubleshoot](#test-and-troubleshoot)
+- [Test and troubleshoot](#test-and-troubleshoot)
 
 ## Before you start
 
 Have a profile containing the source input and know the key or mouse command expected by the target application.
 
-The action advertises support for **joystick buttons and hats**. Hat inputs require a virtual-button activation condition so the action receives an on/off state. Configure the required hat direction in the surrounding input/container controls.
+The action supports **joystick buttons and hats**. For a hat, configure a virtual-button activation condition for the direction you want to use.
 
-The implementation also requests virtual-button activation for axis inputs that reach it, but axes are not in its declared action input list. Do not assume you can add it directly to a raw axis in every build.
+To trigger a key when an axis crosses a position or enters a range, use a [Gated Axis](gated_axis_user_guide.md).
 
 For your first test:
 
@@ -59,27 +55,31 @@ The keys shown under **Current key combination** form a group of outputs. For ex
 
 The action sorts its keys for pressing and releases them in reverse order. Recording multiple inputs does not preserve typing pauses or create a timed macro. Use a sequence/macro action if you need “press A, wait, then press B.”
 
-Put together, the keys that make up a shortcut are called **latched keys**.  They can be pressed in any order, but to trigger, they must all be pressed at the same time.
+GEX sends modifiers before the other selected keys so the receiving application can recognize the shortcut.
 
 ## Create your first mapping
 
 1. Select the profile mode and source joystick button.
 2. Add **Map to Keyboard/Mouse Ex** to its action container.
-3. Select **Select...** and choose the output key, or use the single-input listen control.
+3. Click **Select...** and choose the output key, or click **Listen** to capture one input.
 4. Confirm that the key appears under **Current key combination**.
 5. Select **Hold** under **Output Mode**.
-6. Leave the trigger configured for input press rather than release-only operation.
+6. Leave **Execute on press** checked and **Execute on release** unchecked.
 7. Save and start the profile.
 8. Focus the target application, hold the source button, and then release it.
 9. Confirm that the output activates while held and stops when released.
 
-To send a brief command instead of following the source button's state, change Output Mode to **Pulse** and set **Duration (ms)**.
+For a brief command, choose **Pulse Single** under **Output Mode** and set **Duration (ms)**.
+
+![Map to Keyboard/Mouse Ex editor with Left Control, Left Shift, and A selected, Pulse Single enabled, and Duration set to 120 milliseconds.](../assets/keyboard_ex_pulse_single.png)
+
+The example sends **Left Ctrl + Left Shift + A** for **120 ms** when the source button is pressed.
 
 ## Choose keys and mouse inputs
 
 | Control | Use |
 | --- | --- |
-| Single-input listen | Capture one output input through the listener. |
+| Listen | Capture one key, mouse button, or wheel input. |
 | Listen (multi) | Capture multiple keyboard or mouse inputs; confirm with OK when finished. |
 | Select... | Choose keys through the virtual-keyboard dialog. **This is often the fastest and easiest option to select keys** |
 | Clear | Remove the current output selection. |
@@ -101,6 +101,10 @@ The listener's tooltip states that clicks on its dialog buttons are excluded fro
 3. Accept the dialog.
 4. Check the displayed combination.
 
+![Keyboard and mouse picker with Left Ctrl, Left Shift, and A selected. Extended function keys, mouse controls, and media keys are also visible.](../assets/keyboard_ex_key_picker.png)
+
+Selected keys are highlighted. Mouse buttons and wheel directions are below the keyboard, with media keys on the bottom row.
+
 This method is the easiest and preferred method to select (or deselect) keys, as it lets you also pick keys that may not exist on your keyboard/input device.  For example, the media keys, the F13 to F24 keys, or all mouse buttons and horizontal wheel triggers, may all be hard to input using the **listen** mode.  This is also difficult if your keyboard is not a **100%** sized keyboard, does not have a numeric keypad or combines multiple keys like a **60%** keyboard.  The visual keyboard includes all standard keys, including many that are not on a normal keyboard but can be output to a game.
 
 Pay attention to left/right modifiers or extended or numpad keys when the target application distinguishes them.  These keys report as different keys even if they normally produce the same output (a good example of that would be the **home** key or the **multiply** or **enter** keys).
@@ -114,15 +118,15 @@ For ordinary output mappings, select at least one key or mouse input.
 | Hold | Presses the combination while the source is on; releases it when the source turns off. | Push-to-talk, momentary controls, or dragging with a mouse button. |
 | Press | Sends key-down or mouse-button-down without an automatic matching release. | One control starts a held command. |
 | Release | Sends key-up or mouse-button-up for the selected outputs. | A second control ends a held command. |
-| Pulse | Presses the combination, holds it for Duration, then releases it. | Shortcuts and single commands. |
-| AutoRepeat | Repeatedly presses and releases the combination while the source is active. | Repeated adjustment or navigation. |
+| Pulse Single | Presses the combination, holds it for Duration, then releases it. | Shortcuts and single commands. |
+| Pulse Repeat | Repeatedly presses and releases the combination while the source is active. | Repeated adjustment or navigation. |
 | Toggle | Changes each selected output to the opposite of its observed pressed state. | Alternating a held command on and off. |
 
 ### Hold
 
 Hold follows the source input's state. Keep a normal source release path available so the output can be released.
 
-The action does not generate its own repeat pulses in Hold mode. If you need deliberate press/release repetition, use AutoRepeat. How the receiving application interprets a continuously held key is separate from this action's repeat behavior.
+Use **Pulse Repeat** when the receiving application needs separate press and release events for each repeat.
 
 ### Press and Release
 
@@ -135,15 +139,15 @@ Treat these as a pair when creating a persistent output:
 
 Releasing the source that triggered Press does not automatically send key-up. Stopping the profile does not provide the same explicit held-key cleanup for Press as it does for Hold.
 
-### Pulse
+### Pulse Single
 
-Pulse sends one timed press/release. Its duration is independent of how long you hold the source button. In this implementation, an ordinary source release does not cancel a running one-shot pulse.
+Pulse Single sends one timed press and release. The pulse runs for the configured duration even if you release the source button early.
 
-While a pulse is already running, another request for that same action is ignored. For rapid successive commands, choose a duration short enough to finish before the next trigger, or consider AutoRepeat.
+While a pulse is already running, another request for that same action is ignored. For rapid successive commands, choose a duration short enough to finish before the next trigger.
 
-### AutoRepeat
+### Pulse Repeat
 
-AutoRepeat pulses the selected combination while the source is active. Source release stops the pulse worker. Profile stop and runtime-mode changes also request that the worker stop.
+Pulse Repeat pulses the selected combination while the source is active. Releasing the source button, stopping the profile, or changing the runtime mode stops repetition.
 
 Use the normal press-triggered configuration. The editor warns against execute-on-release operation for this mode; a release-only configuration does not provide the intended start/stop cycle.
 
@@ -159,8 +163,10 @@ Timing controls use **milliseconds**.
 
 | Setting | Applies to | Meaning |
 | --- | --- | --- |
-| Duration (ms) | Pulse and AutoRepeat | How long the outputs remain pressed during a pulse. |
-| Interval (ms) | AutoRepeat | The pause between pulses. |
+| Duration (ms) | Pulse Single and Pulse Repeat | How long the outputs remain pressed during a pulse. |
+| Interval (ms) | Pulse Repeat | The pause between pulses. |
+
+![Pulse Repeat selected for the Up key, with Duration set to 80 milliseconds and Interval set to 250 milliseconds.](../assets/keyboard_ex_pulse_repeat.png)
 
 For example, a Duration of `100 ms` and Interval of `200 ms` describe a brief press followed by a longer gap. Use these as example values, not fixed product defaults.
 
@@ -177,13 +183,13 @@ For most mappings, begin with:
 - Execute on press: enabled.
 - Execute on release: disabled.
 
-For **Press**, **Release**, **Pulse**, and **Toggle**, a qualifying source release can be used as the activation event. A Release output action triggered by a source press is also valid: the output operation and the source event are separate choices.
+For **Press**, **Release**, **Pulse Single**, and **Toggle**, a qualifying source release can be used as the activation event. A **Release** output action can also run when you press the source button.
 
-For example, selecting Pulse with execute on release sends a short shortcut when you let go of the source button.
+For example, **Pulse Single** with **Execute on release** sends a short shortcut when you let go of the source button.
 
 Enabling both press and release can produce two activations per physical cycle. Avoid that for toggles or commands you want to send only once.
 
-**Hold and AutoRepeat need special care.** The editor warns against execute-on-release use for both. Hold's runtime path follows input state directly rather than acting as a release-triggered one-shot. AutoRepeat should start on press and stop on release.
+Use **Execute on press** for **Hold** and **Pulse Repeat**. Releasing the source ends the hold or stops repetition.
 
 ## Use mouse buttons and the wheel
 
@@ -196,7 +202,7 @@ Internally, GEX creates special keys for these inputs and translates them to mou
 Use the listener to select the desired mouse input, then choose its behavior:
 
 - **Hold** keeps the button down while the source is held.
-- **Pulse** produces a timed down/up pair.
+- **Pulse Single** produces a timed down/up pair.
 - **Press** and **Release** let separate sources control the down and up operations.
 - **Toggle** changes the observed button state.
 
@@ -208,7 +214,7 @@ Select the desired wheel direction and set **Mouse Wheel Factor**. The field acc
 
 The factor controls wheel movement per trigger. It does not select a repeat rate. Start at 1 and increase it only after verifying the direction and amount.
 
-In this version, the direct mouse-output paths pass the wheel factor explicitly, but the Pulse and AutoRepeat paths do not pass that action setting. Do not assume the factor scales wheel output identically in every mode. Verify timed wheel output before relying on it.
+**Pulse Single** and **Pulse Repeat** use the default wheel factor. Check the amount of wheel movement in the target application when you change modes.
 
 ## Set the startup state
 
@@ -270,7 +276,7 @@ Expected result: F10 is held while the source is held and released when the sour
 ### Send one shortcut
 
 1. Select `Ctrl + Shift + A` using **Select...** or **Listen (multi)**.
-2. Choose **Pulse**.
+2. Choose **Pulse Single**.
 3. Set Duration to `120 ms`.
 4. Enable execute on press only.
 5. Test in an application where that shortcut has the intended effect.
@@ -279,8 +285,8 @@ Expected result: one activation presses the combination, waits for the duration,
 
 ### Repeat an adjustment while held
 
-1. Select the adjustment key expected by the target application.
-2. Choose **AutoRepeat**.
+1. Select the adjustment key expected by the target application, such as **Up**.
+2. Choose **Pulse Repeat**.
 3. Begin with Duration `80 ms` and Interval `250 ms`.
 4. Use execute on press, then verify that releasing the source stops the output.
 5. Adjust the timings to suit the receiving application.
@@ -299,11 +305,11 @@ Expected result: the first source holds the output on; the second explicitly rel
 ### Send a command when a button is released
 
 1. Select the desired shortcut.
-2. Choose **Pulse**.
+2. Choose **Pulse Single**.
 3. Disable execute on press and enable execute on release.
 4. Set the duration and test a full source press/release cycle.
 
-Expected result: the shortcut is sent when the source is released. Do not substitute Hold or AutoRepeat for this release-triggered one-shot setup.
+Expected result: the shortcut is sent once when the source is released.
 
 ## Test and troubleshoot
 
@@ -317,14 +323,14 @@ You may find it helpful to not test your keyboard/mouse output to the game direc
 | Output goes to the wrong application | Focused window, configured process target, process match, and selected remote client. |
 | Action stops working after a process lookup failure | Start the target, correct the process selection, and reinitialize the action by restarting/reloading the profile. |
 | Key remains held | Press or Toggle mode, absent Release action, missing source release event, or an activation condition that never returns off. |
-| Hold does not generate repeated commands | Hold does not create repeat pulses; use AutoRepeat when repeated down/up events are required. |
-| Repeat continues after letting go | Source release reaches the action; normal press-triggered AutoRepeat configuration; no other action generating the same output. |
+| Hold does not generate repeated commands | Use **Pulse Repeat** when repeated down/up events are required. |
+| Repeat continues after letting go | Check that the action receives the release event, only **Execute on press** is selected, and another action is not generating the same output. |
 | Command fires twice | Both source press and release enabled, repeated source events, or duplicate mappings. GEX triggers keys twice, once on press (make), and once on release (break). |
-| Rapid presses are missed in Pulse mode | The previous pulse may still be running; shorten Duration or revise the desired repeat behavior. |
+| Rapid presses are missed in Pulse Single | Shorten **Duration (ms)** so each pulse can finish before the next press. |
 | Target misses brief commands | Increase Duration and test again.  Some games may not poll keyboard/mouse input rapidly enough, and conversely, some games treat everything as a trigger.  Some games may consider 100 or 125 millisecond a short tap, and anything above 150 a long tap, which may change the behavior of the game.  |
 | Target does not trigger | Ensure that a key, if pressed, is released at some point.  Keeping a key pressed may lock up of freeze the game, and even the operating system because it's waiting for a release.  You can have a press in one action, a release in another, but you should aim to release every key you have sent as a press by the time the profile stops.  You can clear a key that is stuck in pressed mode by pressing it again on the physical keyboard, which will send a release.  This may not be possible for special keys if they don't exist on your keyboard in which case you'll have to code the profile for that. |
 | Wheel movement is excessive | Reduce Mouse Wheel Factor; start at 1. Check repeat settings separately.  Some mouse drivers may accelerate the mouse differently and in some implementations, using `high DPI` resolution can impact the response of the wheel. |
-| Wheel factor appears ignored in a timed mode | Pulse/AutoRepeat do not explicitly pass the factor in this version. |
+| Wheel factor appears ignored in a timed mode | **Pulse Single** and **Pulse Repeat** use the default wheel factor. |
 | Shortcut becomes separate letters | Review the selected modifier combination, output mode, other mappings, and actual target. |
 | Toggle combination reaches a mixed state | Toggle checks individual key states; use Release to establish a definite off state. |
 | Starting the profile sends a command | State on profile start is Input and the startup event qualifies under the chosen mode. Use Ignore if that is unwanted. |

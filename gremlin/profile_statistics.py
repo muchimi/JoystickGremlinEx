@@ -11,14 +11,14 @@ from gremlin.base_profile import AbstractContainerAction
 from gremlin.gated_handler import GateConditionType
 from gremlin.input_item import BaseInputActionCondition, BaseModeCondition, BaseVJoyCondition, getInputIdKey
 from gremlin.input_types import InputType
-from gremlin.types import ButtonOutputMode, DeviceType, GamePadOutput, HatDirection, VjoyAction
+from gremlin.types import ButtonOutputMode, DeviceType, GamePadOutput, HatDirection, PlayMode, VjoyAction
 from gremlin.ui.joystick_device import BaseJoystickCondition
 from gremlin.ui.keyboard_device import BaseKeyboardCondition
 from gremlin.ui.state_device import BaseStateCondition
 
 
 VIRTUAL_TYPES = (DeviceType.VJoy, DeviceType.Maestro)
-INTERNAL_TYPES = (DeviceType.State, DeviceType.ModeControl, DeviceType.Settings, DeviceType.Plugins)
+INTERNAL_TYPES = (DeviceType.ModeControl, DeviceType.Settings, DeviceType.Plugins)
 KEYBOARD_TYPES = (InputType.Keyboard, InputType.KeyboardLatched)
 CONTROL_NAMES = {InputType.JoystickAxis: "Axis", InputType.JoystickButton: "Button", InputType.JoystickHat: "Hat"}
 log = logging.getLogger("system")
@@ -46,14 +46,25 @@ def _markdown_table(headers, rows):
     return [row_text(headers), row_text(["---"] * len(headers)), *(row_text(row) for row in rows), ""]
 
 
+def _control_label(device, kind, index):
+    label = f"{kind} {index}"
+    if device and device.device_type == DeviceType.Loopback and kind in ("Axis", "Button"):
+        names = device.axis_names if kind == "Axis" else device.data.get("button_names", {})
+        if name := names.get(index):
+            label += f" ({name})"
+    return label
+
+
 @dataclass
 class InputBinding:
     device_key: str
     device_name: str
     mode: str
     item: object
+    device_type: DeviceType = DeviceType.NotSet
     actions: list = field(default_factory=list)
     key_conditions: list = field(default_factory=list)
+    conditions: list[tuple[str, str]] = field(default_factory=list)
 
     @cached_property
     def input_name(self):
@@ -87,6 +98,7 @@ class ProfileStatistics:
     bindings: list[InputBinding] = field(default_factory=list)
     profile_output_bindings: list = field(default_factory=list)
     virtual_names: dict = field(default_factory=dict)
+    loopback_device: object = None
 
     def sections(self):
         """Return the table data shared by the dialog and the Markdown export."""
@@ -116,12 +128,20 @@ class ProfileStatistics:
             ("MIDI input commands mapped", self.input_types["MIDI"]),
             ("States defined", self.totals["states"]),
             ("States used", self.totals["used_states"]),
+            ("States mapped", self.input_types["States"]),
+            ("Loopback axes mapped", self.totals["loopback_axes"]),
+            ("Loopback buttons mapped", self.totals["loopback_buttons"]),
             ("Expression states used", self.totals["used_expressions"]),
             ("Expression states defined", self.totals["expressions"]),
         ]
         for name, (count, longest) in self.lengths.items():
             summary.extend(((f"{name} definitions", count), (f"Longest {name.lower()} (steps)", longest)))
         actions = sorted(self.actions.items(), key=lambda row: (-row[1], row[0].casefold()))
+        tts = [
+            ("Legacy Text to Speech actions", self.totals["legacy_tts_actions"]),
+            ("Play Sound actions using TTS (local)", self.totals["play_sound_local_tts"]),
+            ("TTS phrases configured in the profile", self.totals["tts_phrases"]),
+        ]
         usage = []
         for kind, definitions in (("Container", self.containers), ("Action", self.actions)):
             for name, count in sorted(definitions.items(), key=lambda row: (-row[1], row[0].casefold())):
@@ -137,13 +157,24 @@ class ProfileStatistics:
             for direction, mapping in (("Input", self.inputs), ("Output", self.outputs))
             for name, kind in sorted(mapping.values(), key=lambda row: (row[1], row[0].casefold()))
         ]
+        device_mappings = sorted(
+            (
+                (binding.device_name, binding.mode, binding.input_name, self._binding_targets(binding))
+                for binding in self.bindings
+                if binding.device_type in (DeviceType.State, DeviceType.Loopback)
+            ),
+            key=lambda row: tuple(value.casefold() for value in row),
+        )
         return (
             ("Overview", ("Metric", "Count"), summary),
             ("Actions", ("Action", "Count"), actions),
+            ("Conditions", ("Mode", "Input device", "Input", "Mapping", "Condition details"), self.condition_bindings),
+            ("TTS", ("Metric", "Count"), tts),
             ("Mapping Usage", ("Kind", "Name", "Definitions", "Mappings using it", "% of all mappings"), usage),
             ("Modes", ("Mode", "Mapped inputs", "Axes", "Keyboard", "OSC", "MIDI", "Actions", "Conditions"), modes),
             ("Mode Parenting", ("Mode", "Parent mode"), mode_parents),
             ("Devices", ("Direction", "Type", "Device or destination"), devices),
+            ("State and Loopback Mappings", ("Device", "Mode", "Input", "Maps to"), device_mappings),
             ("Output Bindings", ("Output", "Input device", "Input", "Mode", "Mapping chain"), self.output_bindings),
         )
 
@@ -177,10 +208,10 @@ class ProfileStatistics:
         if not device or mode is None or VjoyAction.is_command(mode):
             return ()
         if VjoyAction.is_axis_action(mode) or mode == VjoyAction.VJoySetAxisStepped:
-            return (f"{device.name} Axis {action.vjoy_axis_id}",)
+            return (f"{device.name} {_control_label(device, 'Axis', action.vjoy_axis_id)}",)
         if VjoyAction.is_hat_action(mode):
             return (f"{device.name} Hat {action.vjoy_hat_id}",)
-        return (f"{device.name} Button {action.vjoy_button_id}",)
+        return (f"{device.name} {_control_label(device, 'Button', action.vjoy_button_id)}",)
 
     def _action_outputs(self, action):
         match action.tag:
@@ -246,21 +277,27 @@ class ProfileStatistics:
         return ""
 
     @cached_property
-    def output_bindings(self):
-        rows = list(self.profile_output_bindings)
+    def _binding_device_names(self):
         device_keys = defaultdict(set)
         for binding in self.bindings:
             device_keys[binding.device_name].add(binding.device_key)
+        return {
+            (name, key): f"{name} ({key})" if len(keys) > 1 else name
+            for name, keys in device_keys.items()
+            for key in keys
+        }
+
+    @cached_property
+    def output_bindings(self):
+        rows = list(self.profile_output_bindings)
         for binding in self.bindings:
-            device = binding.device_name
-            if len(device_keys[device]) > 1:
-                device = f"{device} ({binding.device_key})"
+            device = self._binding_device_names[binding.device_name, binding.device_key]
             for mapping in binding.actions:
                 chain = " → ".join(mapping.chain)
                 action = mapping.action
                 if action.tag == "vjoyremap" and action.action_mode == VjoyAction.VJoyHatToButton and action.virtual_device:
                     for button, directions in self._hat_buttons(action).items():
-                        output = f"{action.virtual_device.name} Button {button}"
+                        output = f"{action.virtual_device.name} {_control_label(action.virtual_device, 'Button', button)}"
                         hat_condition = f"Hat direction {' or '.join(directions)}"
                         rows.append((output, device, binding.input_name, binding.mode, f"{chain} [if {hat_condition}]"))
                 else:
@@ -286,13 +323,16 @@ class ProfileStatistics:
             destination = device.name if device else "Unassigned virtual output"
             if mode == VjoyAction.VJoyHatToButton:
                 buttons = self._hat_buttons(action)
-                targets = ", ".join(f"Button {index} ({' or '.join(buttons[index])})" for index in sorted(buttons)) or "No buttons assigned"
+                targets = ", ".join(
+                    f"{_control_label(device, 'Button', index)} ({' or '.join(buttons[index])})"
+                    for index in sorted(buttons)
+                ) or "No buttons assigned"
             elif VjoyAction.is_axis_action(mode) or mode == VjoyAction.VJoySetAxisStepped:
-                targets = f"Axis {action.vjoy_axis_id}"
+                targets = _control_label(device, "Axis", action.vjoy_axis_id)
             elif VjoyAction.is_hat_action(mode):
                 targets = f"Hat {action.vjoy_hat_id}"
             else:
-                targets = f"Button {action.vjoy_button_id}"
+                targets = _control_label(device, "Button", action.vjoy_button_id)
             return f"{destination} {targets} ({label})"
         if action.tag == "remap":
             kind = {InputType.JoystickAxis: "Axis", InputType.JoystickHat: "Hat"}.get(action.input_type, "Button")
@@ -318,6 +358,17 @@ class ProfileStatistics:
     def _binding_targets(self, binding):
         return " · ".join(" → ".join(mapping.chain) for mapping in binding.actions) or "No actions defined"
 
+    @cached_property
+    def condition_bindings(self):
+        rows = []
+        for binding in self.bindings:
+            device = self._binding_device_names[binding.device_name, binding.device_key]
+            rows.extend(
+                (binding.mode, device, binding.input_name, mapping, conditions)
+                for mapping, conditions in binding.conditions
+            )
+        return sorted(rows, key=lambda row: tuple(value.casefold() for value in row))
+
     def condition_label(self, condition):
         comparison = getattr(condition, "comparison", "")
         if isinstance(condition, BaseStateCondition):
@@ -329,9 +380,16 @@ class ProfileStatistics:
             if not device and isinstance(condition, BaseVJoyCondition):
                 device = self._virtual_name(condition.vjoy_id)
             control = CONTROL_NAMES.get(getattr(condition, "input_type", None), "Control")
-            target = f"{device or 'Joystick'} {control} {getattr(condition, 'input_id', '?')}"
+            index = getattr(condition, "input_id", "?")
+            loopback = self.loopback_device
+            if isinstance(condition, BaseJoystickCondition) and loopback and condition.device_guid == loopback.device_guid:
+                target = f"{loopback.name} {_control_label(loopback, control, index)}"
+            else:
+                target = f"{device or 'Joystick'} {control} {index}"
             if control == "Axis" and (limits := getattr(condition, "range", None)):
                 comparison = f"{comparison} [{limits[0]:g}, {limits[1]:g}]".strip()
+                if not getattr(condition, "use_calibrated_data", True):
+                    comparison += " (raw axis)"
         elif isinstance(condition, BaseModeCondition):
             target = f"Mode {condition.mode}"
         elif isinstance(condition, BaseInputActionCondition):
@@ -341,6 +399,8 @@ class ProfileStatistics:
         label = " ".join(filter(None, (target, comparison)))
         if delay := getattr(condition, "delay", 0):
             label += f" (delay {delay:g} s)"
+        if getattr(condition, "ignore_release", False):
+            label += " (ignore release)"
         return label
 
     @cached_property
@@ -408,7 +468,7 @@ def _state_key(value):
 
 
 def _input_kind(device_type, device, name):
-    if device_type in VIRTUAL_TYPES or (device and device.is_virtual):
+    if device_type in (*VIRTUAL_TYPES, DeviceType.Loopback) or (device and device.is_virtual):
         return "Virtual"
     # Button panels and keypads can present as generic joystick/gamepad HID devices.
     label = name.casefold()
@@ -416,7 +476,7 @@ def _input_kind(device_type, device, name):
         return "Other"
     if device and device.is_gamepad:
         return "Gamepad"
-    if device_type == DeviceType.Joystick and (not device or device.axis_count or device.usage == 0x04):
+    if device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii) and (not device or device.axis_count or device.usage == 0x04):
         return "Joystick"
     return "Other"
 
@@ -430,6 +490,9 @@ class _Collector:
         self.state_keys = {_state_key(state.key) for state in self.states}
         self.devices = {str(device.device_guid): device for device in joystick_handling.all_joystick_devices()}
         self.devices.update({str(node.device_guid): node.device for node in profile.devices.values() if node.device})
+        if loopback := getattr(profile, "loopback", None):
+            self.stats.loopback_device = loopback.device
+            self.devices[str(loopback.device.device_guid)] = loopback.device
         self.virtuals = joystick_handling.virtual_device_map()
         self.input_keys = defaultdict(set)
         self.osc_commands = set()
@@ -484,6 +547,8 @@ class _Collector:
             mode_counts["conditions"] += 1
             if isinstance(condition, BaseStateCondition):
                 self.used_states.add(_state_key(condition.key))
+                if condition.key:
+                    self.input_device("states", "State", DeviceType.State)
             elif isinstance(condition, BaseVJoyCondition):
                 self.virtual_input(condition.vjoy_id)
             elif isinstance(condition, BaseJoystickCondition):
@@ -502,6 +567,8 @@ class _Collector:
     def macro_step(self, step):
         if isinstance(step, macro.StateAction):
             self.used_states.add(_state_key(step.key))
+            if step.key:
+                self.output("State", "State")
         elif isinstance(step, macro.VJoyMacroAction):
             self.virtual_output(step.device_guid or step.vjoy_id)
         elif isinstance(step, macro.JoystickAction):
@@ -522,8 +589,12 @@ class _Collector:
                 for step in action.sequence:
                     self.macro_step(step)
             case "map_to_state":
-                self.used_states.update(_state_key(state.key) for state in action.target_states())
-                self.used_states.update(_state_key(key) for key in action.hat_map.values())
+                keys = {_state_key(state.key) for state in action.target_states()}
+                keys.update(_state_key(key) for key in action.hat_map.values())
+                keys.discard("")
+                if keys:
+                    self.used_states.update(keys)
+                    self.output("State", "State")
             case "vjoyremap":
                 if not VjoyAction.is_command(action.action_mode):
                     self.virtual_output(device=action.virtual_device)
@@ -550,8 +621,17 @@ class _Collector:
                 self.output("Stream Deck", action.device_id)
             case "gex-map-to-application":
                 self.output("Application", action.program or action.window_title)
-            case "play-sound":
-                self.output("Audio", action.audio_device or "Default audio device")
+            case "text-to-speech" | "play-sound":
+                if action.tag == "text-to-speech":
+                    self.output("Audio", "Default audio device")
+                    self.stats.totals["legacy_tts_actions"] += 1
+                else:
+                    self.output("Audio", action.audio_device or "Default audio device")
+                    if action.mode == PlayMode.PyTTS:
+                        self.stats.totals["play_sound_local_tts"] += 1
+                    elif action.mode != PlayMode.EdgeAI:
+                        return
+                self.stats.totals["tts_phrases"] += sum(bool(phrase.strip()) for phrase in (action.text or "").split("|"))
             case "virpil-led":
                 if action.device:
                     self.stats.outputs["Controller", str(action.device.device_guid)] = (action.device.name, "Controller")
@@ -561,22 +641,26 @@ class _Collector:
                     self.output(kind, name)
 
     def mapping(self, binding, mode_counts):
-        pending = [(binding.item, (), frozenset())]
+        pending = [(binding.item, (), (), frozenset())]
         seen = set()
         container_types = set()
         while pending:
-            current, parent_chain, ancestors = pending.pop()
+            current, parent_chain, parent_location, ancestors = pending.pop()
             if current is None or id(current) in ancestors:
                 continue
             ancestors = ancestors | {id(current)}
             count = id(current) not in seen
             seen.add(id(current))
-            for container in current.containers:
+            for position, container in enumerate(current.containers, start=1):
                 name = getattr(container, "name", None) or container.tag
+                location_name = f"{name} (container {position})" if len(current.containers) > 1 else name
+                container_location = (*parent_location, location_name)
                 if count:
                     self.stats.containers[name] += 1
                 container_types.add(name)
                 condition = self.conditions(container, mode_counts, binding, count=count)
+                if condition:
+                    binding.conditions.append((" → ".join(container_location), condition))
                 state = getattr(container, "state", None) if container.tag == "state" else None
                 gates = []
                 if state:
@@ -592,36 +676,41 @@ class _Collector:
                 if gates:
                     condition = " AND ".join(([f"({condition})"] if condition else []) + gates)
                 sets = container.get_action_sets()
-                if count and container.tag in ("chain", "sequence"):
+                has_steps = container.tag in ("chain", "sequence")
+                if count and has_steps:
                     self.length(container.tag.capitalize(), len(sets))
                 for index, actions in enumerate(sets, start=1):
-                    container_label = f"{name} (step {index})" if container.tag in ("chain", "sequence") else name
+                    container_label = f"{name} (step {index})" if has_steps else name
+                    location = (*parent_location, f"{location_name} (step {index})") if has_steps else container_location
                     if condition:
                         container_label += f" [if {condition}]"
                     chain = (*parent_chain, container_label)
-                    for action in actions or ():
+                    for action_index, action in enumerate(actions or (), start=1):
                         if action is None:
                             continue
                         if count:
                             self.action(action, mode_counts)
                         label = self.stats._action_label(action)
+                        action_name = f"{action.name} (action {action_index})" if len(actions) > 1 else action.name
+                        action_location = (*location, action_name)
                         condition_text = self.conditions(action, mode_counts, binding, count=count)
                         if condition_text:
+                            binding.conditions.append((" → ".join(action_location), condition_text))
                             label += f" [if {condition_text}]"
                         action_chain = (*chain, label)
                         binding.actions.append(MappedAction(action, action_chain))
                         if isinstance(action, AbstractContainerAction):
-                            pending.extend((child, action_chain, ancestors) for child in action._item_data_map.values())
+                            pending.extend((child, action_chain, action_location, ancestors) for child in action._item_data_map.values())
                         if action.tag == "gated-axis":
                             for data in action.gates:
                                 for gate in data.getGates():
                                     for trigger, child in gate.item_data_map.items():
                                         branch = f"{GateConditionType.to_display_name(trigger)} at {gate.value:g}"
-                                        pending.append((child, (*action_chain, branch), ancestors))
+                                        pending.append((child, (*action_chain, branch), (*action_location, branch), ancestors))
                                 for axis_range in data.getRanges():
                                     for trigger, child in axis_range.item_data_map.items():
                                         branch = f"{GateConditionType.to_display_name(trigger)} [{axis_range.range_min:g}, {axis_range.range_max:g}]"
-                                        pending.append((child, (*action_chain, branch), ancestors))
+                                        pending.append((child, (*action_chain, branch), (*action_location, branch), ancestors))
         self.stats.mapping_usage.update(("Container", name) for name in container_types)
         self.stats.mapping_usage.update(("Action", name) for name in {mapping.action.name for mapping in binding.actions})
 
@@ -638,6 +727,7 @@ class _Collector:
             InputType.JoystickHat: "Hats",
             InputType.OpenSoundControl: "OSC",
             InputType.Midi: "MIDI",
+            InputType.State: "States",
         }.get(input_type, "Keyboard" if input_type in KEYBOARD_TYPES else "Other")
         mode_counts[label] += 1
         if input_type in KEYBOARD_TYPES:
@@ -651,7 +741,7 @@ class _Collector:
         self.input_keys[label].add((guid, label if label == "Keyboard" else input_type, identity))
         self.input_device(guid, name, device_type)
         device_name = self.stats.inputs.get(guid, (name, None))[0]
-        binding = InputBinding(guid or "states", device_name or "States", mode or "Profile-wide", item)
+        binding = InputBinding(guid, device_name or str(guid), mode or "Profile-wide", item, device_type=device_type)
         self.stats.bindings.append(binding)
         self.mapping(binding, mode_counts)
 
@@ -678,7 +768,7 @@ class _Collector:
                 self.used_states.update(token for token in tokens if token != key and token in self.state_keys)
             if state.containers:
                 self.mapped_states.add(id(state))
-                self.input_mapping(state, None)
+                self.input_mapping(state, None, "states", DeviceType.State, "State")
         for item in self.profile.voice.getVoices():
             self.input_mapping(item, None, "voice", DeviceType.Voice, "Voice")
         for entry in self.profile.merge_axes:
@@ -723,6 +813,10 @@ class _Collector:
             condition_keys=len(self.condition_keys),
         )
         self.stats.input_types.update({name: len(keys) for name, keys in self.input_keys.items()})
+        if loopback := self.stats.loopback_device:
+            guid = str(loopback.device_guid)
+            self.stats.totals["loopback_axes"] = sum(key[0] == guid for key in self.input_keys["Axes"])
+            self.stats.totals["loopback_buttons"] = sum(key[0] == guid for key in self.input_keys["Buttons"])
         return self.stats
 
 

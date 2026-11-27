@@ -2976,6 +2976,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             config = gremlin.config.Configuration()
             connected_only = not config.vjoy_show_disconnected
             device_list = gremlin.joystick_handling.virtual_devices(connected_only)
+            loopback = gremlin.joystick_handling.active_loopback()
+            if loopback is not None:
+                device_list.append(loopback.device)
             for dev in device_list:
                 self.virtual_device_selector_widget.addItem(dev.name, dev)
 
@@ -2998,6 +3001,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                         break
             if index != -1:
                 self.virtual_device_selector_widget.setCurrentIndex(index)
+            elif virtual_device is not None and virtual_device.device_type == DeviceType.Loopback:
+                self.virtual_device_selector_widget.setCurrentIndex(-1)
+                self.setWarning("Loopback is disabled.")
+                return
             else:
                 # change the action ID
                 syslog.warning(
@@ -3537,7 +3544,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         for device in devices:
             buttons = [
                 input_id
-                for input_id in range(1, device.button_count + 1)
+                for input_id in device.get_button_input_ids()
                 if not (
                     self.action_data.hardware_raw_input_type == InputType.JoystickButton
                     and device.device_guid == self.action_data.hardware_device_guid
@@ -4427,7 +4434,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 valid_list = list(device.axis_id_map.keys())
             case InputType.JoystickButton:
                 used_list = list(extra_data["buttons"].keys())
-                valid_list = list(range(1, device.button_count))
+                valid_list = list(device.get_button_input_ids())
             case InputType.JoystickHat:
                 used_list = list(extra_data["hats"].keys())
                 valid_list = list(range(1, device.hat_count))
@@ -4518,16 +4525,16 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 VjoyAction.VJoyMergeAxis,
             ):
                 axis_ids = range(1, device.axis_count + 1)
-                if action_mode == VjoyAction.VJoyBumpAxis and device.axis_id_map:
+                if device.device_type == DeviceType.Loopback or (action_mode == VjoyAction.VJoyBumpAxis and device.axis_id_map):
                     axis_ids = device.axis_id_map
                 for id in axis_ids:
-                    axis_name = device.get_axis_name(id)
-                    if not axis_name.lower().startswith("axis"):
+                    axis_name = device.axis_names[id] if device.device_type == DeviceType.Loopback else device.get_axis_name(id)
+                    if device.device_type != DeviceType.Loopback and not axis_name.lower().startswith("axis"):
                         axis_name = f"Axis {axis_name}"
                     self.virtual_output_selector_widget.addItem(f"{axis_name}", id)
 
                 output_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_input_id)
-                if output_index != -1:
+                if output_index != -1 or device.device_type == DeviceType.Loopback:
                     self.virtual_output_selector_widget.setCurrentIndex(output_index)
 
             elif input_type in VJoyRemapWidget.input_type_buttons or action_mode in (VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
@@ -4540,9 +4547,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     VjoyAction.VJoyAxisToButton,
                     VjoyAction.VJoyHatToButton,
                 ):
-                    count = device.button_count
-                    for id in range(1, count + 1):
-                        self.virtual_output_selector_widget.addItem(f"Button {id}", id)
+                    button_ids = device.get_button_input_ids()
+                    for id in button_ids:
+                        self.virtual_output_selector_widget.addItem(device.get_button_name(id), id)
                     input_id = self.action_data.vjoy_input_id
 
                     index = self._get_output_index()
@@ -4551,7 +4558,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                             self.virtual_output_selector_widget.setCurrentIndex(index)
                             self._update_button_state(input_id, True)
 
-                    if input_id < 1 or input_id > count:
+                    if input_id not in button_ids:
+                        if device.device_type == DeviceType.Loopback:
+                            self.virtual_output_selector_widget.setCurrentIndex(-1)
                         self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
                         return
                 elif action_mode in (
@@ -5093,7 +5102,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
         used_list = state.used_button_list(self.action_data.virtual_device_guid)
 
-        for id in range(1, button_count + 1):
+        for id in self.action_data.virtual_device.get_button_input_ids():
             # else:
             # use used push button
             marker = id in used_list
@@ -5174,7 +5183,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # update the selector
         with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
-            self.virtual_output_selector_widget.setCurrentIndex(button_id - 1)
+            self.virtual_output_selector_widget.setCurrentIndex(self.virtual_output_selector_widget.findData(button_id))
 
         self._update_button_state(button_id, True)
 
@@ -5465,13 +5474,19 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         device = getattr(self.action_data, "virtual_device", None)
         return device is not None and device.device_type == DeviceType.Maestro
 
+    def _is_loopback_target(self):
+        device = self.action_data.virtual_device
+        return device is not None and device.device_type == DeviceType.Loopback
+
     def _output_key(self, device_id):
-        return self.action_data.virtual_device.device_guid if self._is_maestro_target() else device_id
+        return self.action_data.virtual_device.device_guid if self._is_maestro_target() or self._is_loopback_target() else device_id
 
     def _target_device(self, device_id):
         target = joystick_handling.get_output_target(self._output_key(device_id))
         if target is not None:
             return target.device
+        if self._is_loopback_target():
+            return None
         # Keep configured metadata available for remote-only output.
         if self._is_maestro_target():
             device = self.action_data.virtual_device
@@ -5485,7 +5500,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         return joystick_handling.get_output_device(self._output_key(device_id))
 
     def _can_broadcast(self):
-        return not self._is_maestro_target() or gremlin.config.Configuration().enable_remote_broadcast
+        return not self._is_loopback_target() and (
+            not self._is_maestro_target() or gremlin.config.Configuration().enable_remote_broadcast
+        )
 
     def _send_flags(self):
         if not self._can_broadcast():
@@ -5557,7 +5574,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
 
         # check the button is found
-        elif VjoyAction.is_button_action(action_data.action_mode) and not 1 <= self.vjoy_input_id <= dev.button_count:
+        elif VjoyAction.is_button_action(action_data.action_mode) and self.vjoy_input_id not in dev.get_button_input_ids():
             self._valid = False
             if self.verbose:
                 syslog.warning(
@@ -5923,7 +5940,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 if dev:
                     # Keep hardware input_id intact for later get_button(device_guid, input_id).
                     vjoy_button_id = self.action_data.vjoy_button_id
-                    if vjoy_button_id > 0 and vjoy_button_id <= dev.button_count:
+                    if vjoy_button_id in dev.get_button_input_ids():
                         self._output_device(vjoy_id).button(vjoy_button_id).is_pressed = self.action_data.button_start_value
                     else:
                         syslog.warning(f"VJOY: unable to set output button [{vjoy_button_id}] for vjoy [{vjoy_id}] (not found)")
@@ -9220,9 +9237,13 @@ Supports axis merging, curved output, command, hat and button mappings.
                         device_type = DeviceType.VJoy
                     case "maestro":
                         device_type = DeviceType.Maestro
+                    case "loopback":
+                        device_type = DeviceType.Loopback
 
             virtual_id = safe_read(node, "virtual-id", int, -1)
-            if virtual_id != -1:
+            if device_type == DeviceType.Loopback:
+                self.virtual_device = gremlin.joystick_handling.getDevice(gremlin.shared_state.loopback_tab_guid)
+            elif virtual_id != -1:
                 device_map = gremlin.joystick_handling.virtual_device_map()
                 if device_type in device_map:
                     if virtual_id in device_map[device_type]:

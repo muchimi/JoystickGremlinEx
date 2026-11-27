@@ -883,7 +883,7 @@ class MaestroController:
     instance_token: str | None = None
     hid_parent_id_prefix: str | None = None
     hid_path: str | None = None
-    hid_index: int | None = None  # zero-based position in the complete HIDAPI scan
+    hid_index: int | None = None  # zero-based position in the HIDAPI scan
     windows_order: int | None = None  # one-based position among active GEX joysticks
     hid_order_valid: bool | None = None
     native_guids: tuple = ()  # HID/XUSB aliases verified against this instance
@@ -1089,7 +1089,7 @@ class Maestro:
             self.connect()
             self.LoadActiveControllers()
             self.populateDeviceList()
-            self.sync(force=True)
+            self.sync(force=True, inputs_scanned=True)
             syslog.info(f"MAESTRO: connected to Maestro Bridge service {len(self._controller_map)} managed controllers")
         except (OSError, RuntimeError, ValueError, IndexError) as error:
             syslog.error("MAESTRO: could not initialize Maestro Bridge service: %s", error)
@@ -1935,15 +1935,16 @@ class Maestro:
         if self.enabled:
             self.LoadActiveControllers()
             self.populateDeviceList()
-            self.sync(force=True)
+            self.sync(force=True, inputs_scanned=True)
 
-    def sync(self, force=False) -> bool:
+    def sync(self, force=False, *, inputs_scanned=False) -> bool:
         if not self.enabled or self._stopping.is_set() or not (self._dirty or force):
             return False
         with self._sync_lock:
             if self._sync_worker is not None:
                 return False
-            self.syncDinput()
+            if not inputs_scanned:
+                self.syncDinput()
             if not self._compare_list():
                 self._dirty = False
                 return False
@@ -1962,7 +1963,7 @@ class Maestro:
                     self._dirty = False
                     if gremlin.event_handler.EventListener().deferDeviceChanges():
                         return
-                    self.populateDeviceList()
+                    self.populateDeviceList(inputs_scanned=True)
                     gremlin.joystick_handling.joystick_devices_initialization()
                     return
                 if time.monotonic() >= deadline:
@@ -1999,6 +2000,7 @@ class Maestro:
         """Correlate actual HID paths to bridge instance tokens, not transport slots."""
         verbose = gremlin.config.Configuration().verbose_mode_maestro
         with self._lock:
+            definitions = self._known_service_devices or {}
             controllers = [
                 controller
                 for controller in self._controller_map.values()
@@ -2008,7 +2010,7 @@ class Maestro:
             ]
         if not self._local_service or not controllers:
             return
-        from gremlin.maestro_identity import inspect_hid_order
+        from gremlin.maestro_identity import inspect_hid_order, joystick_number
 
         scan_error = None
         try:
@@ -2016,7 +2018,18 @@ class Maestro:
 
             # Unselected bridge devices still occupy positions in Windows.
             identities = self.client.list("/maestro_devices")
-            rows = enumerate_devices()
+            endpoint = f"maestro://{self.client.host}:{self.client.port}"
+            joystick_definitions = [
+                definitions.get(f"{endpoint}/{row['id']}", {})
+                for row in identities if joystick_number(row.get("id")) is not None
+            ]
+            if not joystick_definitions:
+                rows = []
+            elif all(d.get("kind") == "custom" and d.get("vendorId") == GEX_VENDOR_ID for d in joystick_definitions):
+                # A single filtered scan preserves the relative order of these controllers.
+                rows = enumerate_devices(GEX_VENDOR_ID)
+            else:
+                rows = enumerate_devices()
         except (OSError, RuntimeError, TimeoutError, ValueError) as error:
             scan_error = str(error)
             identities = [{"id": c.id, "instanceToken": c.instance_token} for c in controllers]
@@ -2292,7 +2305,7 @@ class Maestro:
         """Generate a stable GUID for the given controller based on its ID and the host endpoint."""
         return dinput.GUID(uuid.uuid5(uuid.NAMESPACE_URL, controller.key))
 
-    def populateDeviceList(self):
+    def populateDeviceList(self, *, inputs_scanned=False):
         """Publish selected service devices to Gremlin's virtual device registry.
 
         Use native DirectInput identities where they can be matched uniquely.
@@ -2302,7 +2315,8 @@ class Maestro:
         from gremlin import joystick_handling
         from gremlin.types import DeviceCategory, DeviceType
 
-        self.syncDinput()
+        if not inputs_scanned:
+            self.syncDinput()
         devices = []
         with self._lock:
             for index, controller in self._controller_map.items():
@@ -2672,7 +2686,7 @@ class Maestro:
             if reload:
                 self.LoadActiveControllers()
             self.populateDeviceList()
-            self.sync(force=True)
+            self.sync(force=True, inputs_scanned=True)
         except Exception:
             syslog.exception("MAESTRO: device list refresh failed")
 

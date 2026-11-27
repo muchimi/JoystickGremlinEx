@@ -3,7 +3,7 @@
 var
   DependencyRestartRequired: Boolean;
   BridgeStatusChecked, BridgeInstalled, BridgeCanInstall, VjoyInstalled: Boolean;
-  BridgeInstalledVersion, BridgeLatestVersion: String;
+  BridgeInstalledVersion, BridgeLatestVersion, BridgeAction: String;
   BridgeConnectionState, BridgeConnectionMessage: String;
   BridgeCheckProgress: TOutputProgressWizardPage;
   BridgeConnectionLabel: TNewStaticText;
@@ -39,7 +39,7 @@ end;
 
 procedure CheckMaestroBridgeStatus(ConnectionOnly: Boolean);
 var
-  StatusFile, Params, BridgeAction: String;
+  StatusFile, Params: String;
   ExitCode: Integer;
 begin
   if BridgeStatusChecked and not ConnectionOnly then exit;
@@ -69,7 +69,10 @@ begin
   if BridgeCheckProgress = nil then
     BridgeCheckProgress := CreateOutputProgressPage('Optional components', 'Checking GEX Maestro Bridge');
   if not WizardSilent then begin
-    BridgeCheckProgress.SetText('Testing the bridge OSC connection on localhost...', '');
+    if ConnectionOnly then
+      BridgeCheckProgress.SetText('Testing the bridge OSC connection on localhost...', '')
+    else
+      BridgeCheckProgress.SetText('Checking the installed bridge and published updates...', '');
     BridgeCheckProgress.Show;
   end;
   try
@@ -118,6 +121,8 @@ begin
     Result := 'GEX Maestro Bridge is already installed (version unavailable; upgrade not offered)'
   else if BridgeLatestVersion = '' then
     Result := 'GEX Maestro Bridge ' + BridgeInstalledVersion + ' is already installed (update check unavailable)'
+  else if BridgeAction = 'path_unavailable' then
+    Result := 'GEX Maestro Bridge ' + BridgeLatestVersion + ' is available (installed executable could not be located)'
   else
     Result := 'GEX Maestro Bridge ' + BridgeInstalledVersion + ' is already installed (latest: ' + BridgeLatestVersion + '; no upgrade needed)';
 end;

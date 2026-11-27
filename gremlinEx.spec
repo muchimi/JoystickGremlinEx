@@ -3,8 +3,9 @@
 import os
 import runpy
 import sys
+from importlib.util import find_spec
 
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs, copy_metadata
 
 block_cipher = None
 
@@ -62,6 +63,12 @@ if os.path.isdir("gremlin/ui/obs_overlay/packs"):
 
 added_files.extend(collect_data_files("faster_whisper"))
 added_files.extend(collect_data_files("rapidocr"))
+space_mouse_imports = []
+if find_spec("pyspacemouse") is not None:
+    added_files.extend(collect_data_files("pyspacemouse", includes=["devices.toml"]))
+    added_files.extend(copy_metadata("pyspacemouse"))
+    # easyhid uses CFFI to open the HIDAPI DLL bundled below.
+    space_mouse_imports = ["gremlin.ui.space_mouse", "pyspacemouse", "easyhid", "cffi", "_cffi_backend", "pycparser"]
 
 added_files.extend(action_plugins_files)
 added_files.extend(icon_files)
@@ -250,7 +257,7 @@ a = Analysis(
         "OdenGraphQt",
         "qtpy",
         "av",
-        ] +  collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt') + collect_submodules('rapidocr'),
+        ] + space_mouse_imports + collect_submodules('encodings') + collect_submodules('av') + collect_submodules('OdenGraphQt') + collect_submodules('rapidocr'),
     hookspath=None,
     runtime_hooks=["pyi_rth_onnxruntime.py"],
     excludes=["torch",

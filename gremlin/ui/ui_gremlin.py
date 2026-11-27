@@ -16,22 +16,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from PySide6 import QtCore, QtGui, QtWidgets
 import logging
-from gremlin.ui.ui_common import QRememberMainWindow
+
+from PySide6 import QtCore, QtGui, QtWidgets
+
 from gremlin.ui.ui_common import (
     Buttons,
     Icons,
     QEmptyWidget,
+    QRememberMainWindow,
     QTabHeader,
     load_icon,
 )
 
-
 syslog = logging.getLogger("system")
 
 
-class Ui_Gremlin(object):
+class Ui_Gremlin:
     def build(self, main_window: QRememberMainWindow):
 
         # main content panel - holds the device tabs
@@ -172,6 +173,8 @@ class Ui_Gremlin(object):
         self.actionDeviceInformation.setObjectName("actionDeviceInformation")
         self.actionAbout = QtGui.QAction(main_window)
         self.actionAbout.setObjectName("actionAbout")
+        self.actionCheckForUpdates = QtGui.QAction(main_window)
+        self.actionCheckForUpdates.setObjectName("actionCheckForUpdates")
         self.actionManageCustomModules = QtGui.QAction(main_window)
         self.actionManageCustomModules.setObjectName("actionManageCustomModules")
         self.actionInputRepeater = QtGui.QAction(main_window)
@@ -302,6 +305,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionOptions)
         # self.menuTools.addAction(self.actionLogDisplay)
         self.menuTools.addAction(self.actionLogEdit)
+        self.menu_Help.addAction(self.actionCheckForUpdates)
         self.menu_Help.addAction(self.actionAbout)
 
         self.menuActions.addAction(self.actionCreate1to1Mapping)
@@ -366,12 +370,12 @@ class Ui_Gremlin(object):
         profile_converter.convert_legacy(profile.profile_file)
 
     def _handle_convert_tts(self):
-        import gremlin.util
-        import gremlin.profile
         import gremlin.event_handler
         import gremlin.ktts
+        import gremlin.profile
         import gremlin.shared_state
         import gremlin.sound
+        import gremlin.util
 
         profile = gremlin.shared_state.current_profile
         new_file = profile.convertTTSToPlaySound()
@@ -417,6 +421,7 @@ class Ui_Gremlin(object):
         # self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About..."))
+        self.actionCheckForUpdates.setText(_translate("GremlinEx", "Check for &Updates..."))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
         self.actionInputRepeater.setText(_translate("GremlinEx", "Input Repeater"))
         self.actionReloadDevices.setText(_translate("GremlinEx", "Reload Devices"))

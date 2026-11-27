@@ -30,6 +30,7 @@ The messageloop only runs when a callback exists.
 import ctypes as ct
 import ctypes.wintypes as w
 import win32api, win32gui, win32con
+from winerror import ERROR_INSUFFICIENT_BUFFER
 import threading
 import enum
 import gremlin.types
@@ -61,6 +62,7 @@ class RawInputCon:
     RIDEV_INPUTSINK = 0x00000100
     RID_HEADER = 0x10000005
     RID_INPUT = 0x10000003
+    RIDI_DEVICEINFO = 0x2000000B
     WM_INPUT = 0x00FF
     HID_USAGE_PAGE_GENERIC = 0x01
     HID_USAGE_GENERIC_MOUSE = 0x02
@@ -79,6 +81,19 @@ class RAWINPUTDEVICE(ct.Structure):
                 ('usUsage', w.USHORT),
                 ('dwFlags', w.DWORD),
                 ('hwndTarget', w.HWND))
+
+class RAWINPUTDEVICELIST(ct.Structure):
+    _fields_ = (('hDevice', w.HANDLE), ('dwType', w.DWORD))
+
+class RID_DEVICE_INFO_HID(ct.Structure):
+    _fields_ = (('dwVendorId', w.DWORD), ('dwProductId', w.DWORD), ('dwVersionNumber', w.DWORD),
+                ('usUsagePage', w.USHORT), ('usUsage', w.USHORT))
+
+class RID_DEVICE_INFO_DATA(ct.Union):
+    _fields_ = (('hid', RID_DEVICE_INFO_HID), ('keyboard', w.DWORD * 6))
+
+class RID_DEVICE_INFO(ct.Structure):
+    _fields_ = (('cbSize', w.DWORD), ('dwType', w.DWORD), ('data', RID_DEVICE_INFO_DATA))
 
 class RAWINPUTHEADER(ct.Structure):
     _fields_ = (('dwType', w.DWORD),
@@ -161,6 +176,12 @@ def boolcheck(result, func, args):
     return None
 
 user32 = ct.WinDLL('user32', use_last_error=True)
+GetRawInputDeviceList = user32.GetRawInputDeviceList
+GetRawInputDeviceList.argtypes = ct.POINTER(RAWINPUTDEVICELIST), w.PUINT, w.UINT
+GetRawInputDeviceList.restype = w.UINT
+GetRawInputDeviceInfoW = user32.GetRawInputDeviceInfoW
+GetRawInputDeviceInfoW.argtypes = w.HANDLE, w.UINT, ct.POINTER(RID_DEVICE_INFO), w.PUINT
+GetRawInputDeviceInfoW.restype = w.UINT
 GetRawInputData = user32.GetRawInputData
 GetRawInputData.argtypes = HRAWINPUT, w.UINT, w.LPVOID, w.PUINT, w.UINT
 GetRawInputData.restype = w.UINT
@@ -190,6 +211,41 @@ TranslateMessage.restype = w.BOOL
 DispatchMessageW = user32.DispatchMessageW
 DispatchMessageW.argtypes = ct.POINTER(w.MSG),
 DispatchMessageW.restype = LRESULT
+
+
+def attached_hid_products(usage_page, usage):
+    """Get VID/PID pairs for attached HID collections without opening them."""
+    failed = w.UINT(-1).value
+    device_size = ct.sizeof(RAWINPUTDEVICELIST)
+    count = w.UINT()
+    for _ in range(3):
+        if GetRawInputDeviceList(None, ct.byref(count), device_size) == failed:
+            raise ct.WinError(ct.get_last_error())
+        if not count.value:
+            return set()
+        devices = (RAWINPUTDEVICELIST * count.value)()
+        found = GetRawInputDeviceList(devices, ct.byref(count), device_size)
+        if found != failed:
+            break
+        if ct.get_last_error() != ERROR_INSUFFICIENT_BUFFER:
+            raise ct.WinError(ct.get_last_error())
+    else:
+        raise ct.WinError(ERROR_INSUFFICIENT_BUFFER)
+
+    products = set()
+    info_size = ct.sizeof(RID_DEVICE_INFO)
+    for device in devices[:found]:
+        if device.dwType != RawInputCon.RIM_TYPEHID:
+            continue
+        info = RID_DEVICE_INFO(cbSize=info_size)
+        size = w.UINT(info_size)
+        if GetRawInputDeviceInfoW(device.hDevice, RawInputCon.RIDI_DEVICEINFO, ct.byref(info), ct.byref(size)) == failed:
+            continue  # The device may have been unplugged since enumeration.
+        hid = info.data.hid
+        if (hid.usUsagePage, hid.usUsage) == (usage_page, usage):
+            products.add((hid.dwVendorId, hid.dwProductId))
+    return products
+
 
 # globals
 _raw_input_hooked = False

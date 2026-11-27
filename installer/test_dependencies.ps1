@@ -89,7 +89,7 @@ function Invoke-WebRequest {
     param([switch]$UseBasicParsing, $Uri, $Headers, $OutFile, $TimeoutSec)
     $script:Downloads++
     [IO.File]::WriteAllBytes($OutFile, (New-Object byte[] 2048))
-    if ($script:VersionAfterDownload) { $script:RegistryValues["$script:BridgeUninstallKey|DisplayVersion"] = $script:VersionAfterDownload }
+    if ($script:VersionAfterDownload) { $script:ExecutableVersions[$script:BridgeExecutable] = $script:VersionAfterDownload }
 }
 function Start-Process {
     param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru, $WindowStyle, $Verb)
@@ -218,14 +218,21 @@ try {
         [pscustomobject]@{name = 'GEXMaestroBridgeSetup-0.1.10-x64.exe';
             browser_download_url = 'https://github.com/muchimi/GEXMaestroBridgeService/releases/download/0.1.10/GEXMaestroBridgeSetup-0.1.10-x64.exe'})}
     $script:InstalledKeys = @($uninstallKey)
+    $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
+    Assert-True ((Get-BridgeUpdateStatus).Action -eq 'path_unavailable') 'Do not offer a new install over an upgrade whose executable cannot be located.'
+    $consoleDir = 'D:\Console Bridge'
+    $script:BridgeExecutable = Join-Path $consoleDir 'GEXMaestroBridgeService.exe'
+    $script:RegistryValues["$uninstallKey|InstallLocation"] = $consoleDir
     foreach ($version in @('0.1.9', '0.1.10', '0.1.10.0', '0.1.11', 'unknown')) {
-        $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = $version}
+        $script:RegistryValues["$uninstallKey|DisplayVersion"] = $version
+        $script:ExecutableVersions[$script:BridgeExecutable] = $version
         $status = Get-BridgeUpdateStatus
         $expectedAction = if ($version -eq '0.1.9') { 'upgrade' } else { 'none' }
         Assert-True ($status.Action -eq $expectedAction) "Only offer an upgrade when a newer version is confirmed: installed $version."
         Assert-True ($status.LatestVersion -eq [version]'0.1.10.0') 'Report the available stable release version.'
     }
     $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
+    $script:ExecutableVersions = @{}
     $script:ApiFails = $true
     $status = Get-BridgeUpdateStatus
     Assert-True ($status.Installed -and $status.InstalledVersion -eq [version]'0.1.9.0') 'Keep installed version information when offline.'
@@ -240,7 +247,8 @@ try {
     $status = Get-BridgeUpdateStatus
     Assert-True ($status.Action -eq 'install' -and $script:LastApi) 'Offer bridge installation when vJoy is installed and the bridge is absent.'
     $script:InstalledKeys = @($uninstallKey, 'SYSTEM\CurrentControlSet\Services\vjoy')
-    $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
+    $script:RegistryValues = @{"$uninstallKey|InstallLocation" = $consoleDir}
+    $script:ExecutableVersions[$script:BridgeExecutable] = '0.1.9'
     $status = Get-BridgeUpdateStatus
     Assert-True ($status.Action -eq 'upgrade') 'Offer a confirmed upgrade for an existing bridge even when vJoy is installed.'
     $statusPath = Join-Path $stage 'bridge-status.ini'
@@ -248,32 +256,39 @@ try {
     $statusLines = Get-Content -LiteralPath $statusPath
     Assert-True ($statusLines -contains 'Installed=1' -and $statusLines -contains 'InstalledVersion=0.1.9' -and
         $statusLines -contains 'LatestVersion=0.1.10' -and $statusLines -contains 'Action=upgrade') 'Export the version and offer decision for the installer UI.'
-    $script:RegistryValues["$uninstallKey|DisplayVersion"] = '0.1.11'
+    $script:ExecutableVersions[$script:BridgeExecutable] = '0.1.11'
     Assert-True (-not (Test-DependencyNeeded bridge $status.Release.Version)) 'Rechecking after a concurrent upgrade prevents a downgrade.'
-    $script:BridgeUninstallKey = $uninstallKey
     $script:ChildExitCode = 3010
     foreach ($version in @('0.1.9', '0.1.10', '0.1.11', 'unknown')) {
-        $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = $version}
+        $script:ExecutableVersions[$script:BridgeExecutable] = $version
         $script:Downloads = $script:SetupsStarted = 0
         $code = Invoke-DependencyInstall bridge $false
         if ($version -eq '0.1.9') {
             Assert-True ($code -eq 3010 -and $script:Downloads -eq 1 -and $script:SetupsStarted -eq 1) 'Launch a confirmed upgrade and preserve its restart exit code.'
+            Assert-True ($script:LastArguments -contains '/DIR="D:\Console Bridge"') 'Upgrade in the registered console folder, including spaces.'
         } else {
             Assert-True ($code -eq 0 -and $script:Downloads -eq 0 -and $script:SetupsStarted -eq 0) "Skip downloads and setup when an upgrade is not needed or confirmed: $version."
         }
     }
-    $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
+    $script:InstalledKeys = @($serviceKey)
+    $script:RegistryValues = @{"$serviceKey|ImagePath" = '"' + $customExecutable + '" --receive-port 9123'}
+    $script:BridgeExecutable = $customExecutable
+    $script:ExecutableVersions = @{$customExecutable = '0.1.9'}
+    Invoke-DependencyInstall bridge $true | Out-Null
+    Assert-True ($script:LastArguments -contains '/DIR="C:\Bridge Test Folder"' -and $script:LastArguments -contains '/VERYSILENT') 'Upgrade in the registered service folder during silent setup.'
+
     $script:VersionAfterDownload = '0.1.11'
     $script:SetupsStarted = 0
     Assert-True ((Invoke-DependencyInstall bridge $false) -eq 0 -and $script:SetupsStarted -eq 0) 'Do not launch an older installer if another process upgrades the bridge during download.'
     $script:VersionAfterDownload = ''
     $script:ApiFails = $true
-    $script:RegistryValues = @{"$uninstallKey|DisplayVersion" = '0.1.9'}
+    $script:ExecutableVersions[$script:BridgeExecutable] = '0.1.9'
     $script:Downloads = $script:SetupsStarted = 0
-    Assert-True ((Invoke-DependencyInstall bridge $false) -eq 0 -and $script:Downloads -eq 0 -and $script:SetupsStarted -eq 0) 'An unavailable release check must not trigger an installed-bridge download.'
+    Assert-True ((Invoke-DependencyInstall bridge $false) -eq 1 -and $script:Downloads -eq 0 -and $script:SetupsStarted -eq 0) 'Report a failed release check after the user selects the update.'
     $script:ApiFails = $false
     $script:InstalledKeys = @()
     $script:RegistryValues = @{}
+    $script:ExecutableVersions = @{}
 
     foreach ($name in @('hidhide', 'bridge')) {
         $repo = if ($name -eq 'hidhide') { 'nefarius/HidHide' } else { 'muchimi/GEXMaestroBridgeService' }

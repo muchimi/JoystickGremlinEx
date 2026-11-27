@@ -371,6 +371,8 @@ class CodeRunner:
                     from gremlin.ui.star_citizen import get_device
 
                     get_device()
+                if device.device_type == DeviceType.Loopback and not config.startup_loopback_enabled:
+                    continue
 
                 device_name = device.name
                 if verbose:
@@ -783,6 +785,8 @@ class CodeRunner:
             ec.registerCallbacks(eh.callbacks)
 
             self._configure_startup_outputs(profile)
+            if config.startup_loopback_enabled:
+                profile.loopback.start(emit=False)
 
             # hook profiles - this tells all functors to hook runtime events
             el.profile_hook.emit()
@@ -804,6 +808,8 @@ class CodeRunner:
             # change to the start mode
             syslog.info(f"PROFILE START: Using profile start mode: '{mode}'")
             self.event_handler.change_mode(mode, force_update=True, startup=True)
+            if load_state and config.startup_loopback_enabled:
+                profile.loopback.start()
 
             return load_state
 

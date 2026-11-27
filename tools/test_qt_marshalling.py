@@ -370,14 +370,15 @@ class TimelineTests(unittest.TestCase):
         exec(compile(ast.Module(body=definitions("gremlin/ui/ui_common.py", {
             "AxesTimeline", "TimeLinePlotWidget",
         }), type_ignores=[]), "ui_common.py", "exec"), namespace)
-        device = NS(is_virtual=False, name="Test device", device_guid="test", axis_count=1,
-                    axis_sequence_to_input_id=lambda i: i + 1, get_axis_name=lambda i: "X",
-                    getAxisInputIdList=lambda: [1])
+        device = NS(is_virtual=False, name="Test device", device_guid="test",
+                    get_axis_name=lambda i: f"Axis {i}", getAxisInputIdList=lambda: [1, 23])
         before = set(threading.enumerate())
         viewer = namespace["AxesTimeline"](device)
         pump_until(lambda: len(reads) >= 3)
         self.assertTrue(all(reads))
         self.assertEqual(viewer.plot_widget._series[1], [-0.5, -0.5])
+        self.assertEqual(viewer.plot_widget._series[23], [-0.5, -0.5])
+        self.assertEqual(viewer.plot_widget.series_pen(23).color().name(), "#ff0000")
         self.assertEqual(set(threading.enumerate()), before)
         timers = viewer.findChildren(QtCore.QTimer)
         self.assertEqual(len(timers), 2)

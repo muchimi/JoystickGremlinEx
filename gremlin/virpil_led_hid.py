@@ -124,6 +124,25 @@ def build_feature_report(board: int, local_led: int, r: int, g: int, b: int) -> 
     return bytes(data)
 
 
+def _open_hid_handle(vid: int, pid: int, path: bytes | None):
+    """Open a device with either Python binding for HIDAPI."""
+    if hasattr(hid, "device"):
+        device = hid.device()
+        if path is None:
+            device.open(vid, pid)
+        else:
+            device.open_path(path)
+        return device
+
+    return hid.Device(vid, pid) if path is None else hid.Device(path=path)
+
+
+def _send_led_report(device, report: bytes):
+    written = device.send_feature_report(report)
+    if written < len(report):
+        raise OSError(f"Incomplete HID feature report: {written} of {len(report)} bytes")
+
+
 @SingletonDecorator
 class VirpilLedHid:
     """Keeps Virpil HID devices open and sends LED feature reports."""
@@ -131,7 +150,7 @@ class VirpilLedHid:
     def __init__(self):
         self._lock = threading.RLock()
         # key: (vid, pid) -> hid.Device
-        self._devices: dict[tuple[int, int], hid.Device] = {}
+        self._devices = {}  # HIDAPI handles, keyed by (VID, PID)
         # paths that failed recently — avoid hammering logs
         self._fail_logged: set[tuple[int, int]] = set()
 
@@ -178,7 +197,7 @@ class VirpilLedHid:
                 paths.append(path)
         return paths
 
-    def _open_device(self, vid: int, pid: int) -> hid.Device | None:
+    def _open_device(self, vid: int, pid: int):
         """Open the first HID interface that can be opened for vid/pid."""
         vid = int(vid)
         pid = int(pid)
@@ -187,18 +206,14 @@ class VirpilLedHid:
 
         if not paths:
             try:
-                device = hid.Device(vid, pid)
-                device.nonblocking = 1
-                return device
+                return _open_hid_handle(vid, pid, None)
             except Exception as exc:
                 syslog.warning(f"VIRPIL HID: open failed for {vid:04X}:{pid:04X}: {exc}")
                 return None
 
         for path in paths:
             try:
-                device = hid.Device(path=path)
-                device.nonblocking = 1
-                return device
+                return _open_hid_handle(vid, pid, path)
             except Exception as exc:
                 last_error = exc
                 continue
@@ -220,12 +235,8 @@ class VirpilLedHid:
         for path in paths:
             device = None
             try:
-                if path is None:
-                    device = hid.Device(vid, pid)
-                else:
-                    device = hid.Device(path=path)
-                device.nonblocking = 1
-                device.send_feature_report(report)
+                device = _open_hid_handle(vid, pid, path)
+                _send_led_report(device, report)
                 self._devices[key] = device
                 self._fail_logged.discard(key)
                 syslog.info(f"VIRPIL HID: opened device {vid:04X}:{pid:04X}")
@@ -244,7 +255,7 @@ class VirpilLedHid:
             self._fail_logged.add(key)
         return False
 
-    def _get_device(self, vid: int, pid: int) -> hid.Device | None:
+    def _get_device(self, vid: int, pid: int):
         key = (int(vid), int(pid))
         device = self._devices.get(key)
         if device is not None:
@@ -276,7 +287,7 @@ class VirpilLedHid:
             device = self._devices.get(key)
             if device is not None:
                 try:
-                    device.send_feature_report(report)
+                    _send_led_report(device, report)
                     return True
                 except Exception as exc:
                     try:

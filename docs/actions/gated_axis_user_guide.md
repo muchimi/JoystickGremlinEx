@@ -8,7 +8,7 @@ This guide is based on the supplied action and the available supporting gate-han
 
 ## Contents
 
-- [Gated Axis — User Guide](#gated-axis--user-guide)
+- [Gated Axis — User Guide](#gated-axis-user-guide)
   - [Contents](#contents)
   - [Before you start](#before-you-start)
   - [Understand gates and ranges](#understand-gates-and-ranges)
@@ -112,7 +112,7 @@ This example sends a command when an axis crosses a detent in the increasing dir
 5. Double-click that gate's handle, or right-click it and select **Configure...**.
 6. In the gate configuration dialog, select **Condition: Cross (inc)**.
 7. Add a container and the required output action inside that tab.
-8. Configure the nested action's output. For example, use Keyboard Ex in Pulse mode to send a short command.
+8. Configure the nested action's output. For example, use **Pulse Single** in **Map to Keyboard/Mouse Ex** to send a short command.
 9. Close the configuration dialog and save the profile.
 10. Move across the gate in both directions while observing the event display.
 11. Start the profile and confirm that the target application receives the intended command.
@@ -120,6 +120,10 @@ This example sends a command when an axis crosses a detent in the increasing dir
 The increasing condition should respond when the axis crosses from below the gate to above it. Moving back uses the decreasing direction, which can have a different mapping.
 
 ## Add and position gates
+
+![Gated Axis editor showing the live axis marker, the Add and Normalize controls, and three gates at -1.000, 0.600, and 1.000.](../assets/gated_axis_guide_editor.png)
+
+The middle gate at **0.600** divides the axis into two ranges. The small arrow beneath the slider marks the current input position.
 
 ### Add a gate at the physical control position
 
@@ -177,6 +181,10 @@ Display Mode controls the representation of values. It is separate from the rang
 Open a gate through its configuration control, by double-clicking its slider handle, or through the right-click **Configure...** command.
 
 Use **Gate Description** to give it a meaningful name, such as “Idle detent” or “Boost threshold.” Add containers/actions separately on the condition tabs you need.
+
+![Gate Configuration with the Cross (inc) tab selected and Map to Keyboard/Mouse Ex set to send F10 with Pulse Single.](../assets/gated_axis_guide_cross_increasing.png)
+
+In this example, crossing the **Boost threshold** from below sends **F10** for **120 ms**.
 
 | Gate condition | When it triggers | Example |
 | --- | --- | --- |
@@ -266,6 +274,8 @@ Use Normal to preserve the source's position. Use Rebased when a small part of t
 
 Select **Ranged**, then enter **Range Min** and **Range Max** under **Scaling options**.
 
+![Range Configuration with In Range selected, Ranged output mode, and scaling limits of 0.000 and 1.000 for the Boost zone.](../assets/gated_axis_guide_range_scaling.png)
+
 For a physical interval of `0.60` to `1.00`, output limits of `0.00` and `1.00` produce:
 
 | Source position | Ranged output |
@@ -314,6 +324,8 @@ Enable **Show events** to display **Range events** and **Gate events**. Use the 
 - **All** selects every event type for display.
 - **None** hides all event types from these lists.
 - Individual checkboxes select the displayed categories.
+
+![Show events enabled with gate-crossing, range-entry, and range-exit filters selected. Range events and Gate events appear side by side.](../assets/gated_axis_guide_events.png)
 
 These are **display filters**. They do not disable the action mappings. Likewise, hiding Show events does not turn off the Gated Axis action.
 

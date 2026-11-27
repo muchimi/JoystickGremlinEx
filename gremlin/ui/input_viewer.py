@@ -285,6 +285,20 @@ class VisualizationConfig:
         return fname
 
 
+def _viewer_loopback_device():
+    loopback = gremlin.joystick_handling.active_loopback()
+    if loopback and (loopback.device.axis_count or loopback.device.button_count):
+        return loopback.device
+    return None
+
+
+def _viewer_input_devices():
+    devices = gremlin.joystick_handling.all_joystick_devices()
+    if loopback := _viewer_loopback_device():
+        devices = [loopback, *devices]
+    return [device for device in devices if device.connected and not device.disabled]
+
+
 class VisualizationSelector(QtWidgets.QWidget):
     """Presents a list of devices and visualization widgets."""
 
@@ -317,8 +331,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
     def _available_devices(self):
         """Include connected inputs and outputs, retaining the user's tab order."""
-        devices = [device for device in gremlin.joystick_handling.all_joystick_devices()
-                   if device.connected and not device.disabled]
+        devices = _viewer_input_devices()
         # Use the native row to identify duplicate interfaces for the same
         # Maestro service. Display the bridge's output layout when it differs.
         devices.sort(key=lambda device: (
@@ -610,6 +623,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         if service_key:
             device = next((candidate for candidate in self._devices
                            if getattr(candidate, "data", {}).get("maestro_key") == service_key), device)
+        if not any(candidate.key == device.key for candidate in self._devices):
+            self._reload_selector_ui()
         for key, widget in self._selector_widgets.items():
             if key[0] != device.key or not Shiboken.isValid(widget):
                 continue
@@ -670,10 +685,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         # Clear active visualizers and their saved selections before rebuilding.
         self.viewer._clear_all()
-        self._devices = [
-            device for device in gremlin.joystick_handling.all_joystick_devices()
-            if device.key in mapped_devices and device.connected and not device.disabled
-        ]
+        self._devices = [device for device in _viewer_input_devices() if device.key in mapped_devices]
         self._update_selector_ui()
 
         for key, widget in self._selector_widgets.items():
@@ -909,6 +921,7 @@ class InputViewerDialog(BaseDialogUi):
         self._visualizer_width: int = None  # width of the visualizers
         self._layout_width: int = None  # last width applied to visualizers to avoid redundant work
         self._viewer_widget_map = {}  # holds all the view items
+        self._loopback = None
 
         self._lock = threading.Lock()
         self.setMinimumHeight(800)
@@ -1113,6 +1126,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         el.profile_loaded.connect(self.refresh)
         el.profile_unhook.connect(self.reload)
         el.device_initialized.connect(self.refresh)
+        el.refresh_devices.connect(self.refresh)
 
     @property
     def visualizerWidth(self) -> int:
@@ -1200,6 +1214,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         with QtCore.QSignalBlocker(self.virtual_device_selector):
             self.virtual_device_selector.clear()
             devices = gremlin.joystick_handling.virtual_devices()
+            if loopback := _viewer_loopback_device():
+                devices = [*devices, loopback]
             for device in sorted(devices, key=lambda dev: (dev.name.casefold(), str(dev.device_guid))):
                 if device.connected and not device.disabled:
                     self.virtual_device_selector.addItem(device.name, device.device_guid)
@@ -1209,6 +1225,15 @@ States can be toggled by clicking on the state button.  Expression states will u
             self.virtual_device_selector.autoSize()
         self.select_virtual_widget.setEnabled(self.virtual_device_selector.count() > 0)
 
+    def _observe_loopback(self, loopback):
+        if self._loopback is loopback:
+            return
+        if self._loopback is not None:
+            self._loopback.definitions_changed.disconnect(self.refresh)
+        self._loopback = loopback
+        if loopback is not None:
+            loopback.definitions_changed.connect(self.refresh)
+
     @with_wait_cursor
     def load_viewer_widgets(self):
         """loads the view widgets for all device inputs"""
@@ -1217,6 +1242,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.views.clear()
         self._viewer_widget_map = {}
         self._device_key_map = {}
+        self._observe_loopback(gremlin.joystick_handling.active_loopback())
         self._update_virtual_selector()
 
         # state visualizer
@@ -1394,6 +1420,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         el.profile_loaded.disconnect(self.refresh)
         el.profile_unhook.disconnect(self.reload)
         el.device_initialized.disconnect(self.refresh)
+        el.refresh_devices.disconnect(self.refresh)
+        self._observe_loopback(None)
 
         self._cleanup_joystick_widgets()
 

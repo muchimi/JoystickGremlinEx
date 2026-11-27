@@ -62,6 +62,7 @@ class RegistryRefreshChecks(unittest.TestCase):
                                  verbose_mode_extra=False, verbose_mode_joystick=False, verbose_mode_maestro=False,
                                  hid_list_enabled=False)
         self.gremlin = ModuleType("gremlin")
+        self.gremlin.shared_state = NS(loopback_tab_guid="loopback-guid", current_profile=None)
         self.gremlin.util = ModuleType("gremlin.util")
         self.gremlin.config = NS(Configuration=lambda: config)
         self.listener = listener_fixture()

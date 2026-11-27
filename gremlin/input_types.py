@@ -41,6 +41,9 @@ class InputType(enum.IntEnum):
     Voice = 14  # Voice input
     OverlayButton = 15  # Overlay HUD button (profile XML / events; UI uses JoystickButton)
     StarCitizen = 16  # Star Citizen specific input
+    SpaceMouse = 17  # source of standard axis and button events from a SpaceMouse
+    Loopback = 18  # source of standard axis and button events from an internal output
+    Tobii = 19  # source of standard axis events from Tobii Game Hub
 
     @staticmethod
     def to_string(value) -> str:
@@ -105,6 +108,12 @@ class InputType(enum.IntEnum):
                 return "Overlay"
             case InputType.StarCitizen:
                 return "StarCitizen"
+            case InputType.SpaceMouse:
+                return "SpaceMouse"
+            case InputType.Tobii:
+                return "Tobii"
+            case InputType.Loopback:
+                return "Loopback"
             case _:
                 return f"Don't know how to handle {value}"
 
@@ -121,7 +130,7 @@ class InputType(enum.IntEnum):
 
     @staticmethod
     def to_display_name(value) -> str:
-        if value == InputType.StarCitizen:
+        if value in (InputType.StarCitizen, InputType.SpaceMouse, InputType.Loopback, InputType.Tobii):
             return _InputType_to_display_lookup[value]
         if value in _InputType_to_display_lookup:
             return _InputType_to_string_lookup[value]
@@ -161,6 +170,9 @@ _InputType_to_string_lookup = {
     InputType.Voice: "voice",
     InputType.OverlayButton: "overlay",
     InputType.StarCitizen: "star-citizen",
+    InputType.SpaceMouse: "space-mouse",
+    InputType.Tobii: "tobii",
+    InputType.Loopback: "loopback",
 }
 
 _InputType_to_display_lookup = {
@@ -180,6 +192,9 @@ _InputType_to_display_lookup = {
     InputType.Voice: "Voice",
     InputType.OverlayButton: "Overlay Button",
     InputType.StarCitizen: "Star Citizen",
+    InputType.SpaceMouse: "SpaceMouse",
+    InputType.Tobii: "Tobii",
+    InputType.Loopback: "Loopback",
 }
 
 
@@ -220,4 +235,10 @@ _InputType_to_enum_lookup = {
     "OverlayButton": InputType.OverlayButton,
     "star-citizen": InputType.StarCitizen,
     "StarCitizen": InputType.StarCitizen,
+    "space-mouse": InputType.SpaceMouse,
+    "SpaceMouse": InputType.SpaceMouse,
+    "tobii": InputType.Tobii,
+    "Tobii": InputType.Tobii,
+    "loopback": InputType.Loopback,
+    "Loopback": InputType.Loopback,
 }

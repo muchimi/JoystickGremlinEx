@@ -259,6 +259,11 @@ class Event:
             return self.extra_data["override_input_type"]
         return self.event_type
 
+    @property
+    def source_input_type(self):
+        """Return the backend input type, when it differs from the mapping type."""
+        return (self.extra_data or {}).get("source_input_type", self.event_type)
+
     def fake_button(self, is_pressed=True, clone=False):
         """converts the event to a fake button"""
         e = self.clone() if clone else self
@@ -885,6 +890,7 @@ class EventListener(QtCore.QObject):
         self.keyboard_hook.start()
 
         self.device_change_event.connect(self._device_changed_cb)
+        self.refresh_devices.connect(self._device_changed_cb)
 
         # internal event on process change
         self._process_device_change.connect(self._process_device_change_cb)
@@ -1227,6 +1233,11 @@ class EventListener(QtCore.QObject):
         raw_value = gremlin.util.scale_to_range(raw_axis_value, source_min=-32768, source_max=32767, target_min=-1.0, target_max=1.0)
         value = raw_value
         extra_data = {"settled": True}
+        device = self._valid_device_map.get(device_guid)
+        if device is not None and device.device_type == DeviceType.SpaceMouse:
+            extra_data["source_input_type"] = InputType.SpaceMouse
+        elif device is not None and device.device_type == DeviceType.Tobii:
+            extra_data["source_input_type"] = InputType.Tobii
 
         if self._has_calibration(device_guid, input_id):
             value = self._apply_calibration_ex(device_guid, input_id, raw_axis_value)
@@ -1544,6 +1555,7 @@ class EventListener(QtCore.QObject):
         eh._mode_timers.schedule(delay, lambda: eh._execute_callbacks(event_enter_released, m2_list, f2_list))
 
     def _device_changed_cb(self):
+        self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
         self._init_joysticks()
 
     def mouseEnabled(self):
@@ -1930,6 +1942,11 @@ class EventListener(QtCore.QObject):
         input_id = event.input_index
         value = event.value
 
+        # A SpaceMouse report already carries the button state. Buffered HID
+        # reports can arrive together, so their dispatch times cannot debounce edges.
+        if event_type == dinput.InputType.Button and device.device_type == DeviceType.SpaceMouse:
+            return False
+
         # A GUID prevents two controllers with the same vendor and product
         # IDs from sharing filter/debounce state.
         device_id = getattr(device, "device_guid", None)
@@ -2098,14 +2115,11 @@ class EventListener(QtCore.QObject):
     #     return True
 
     def _dinput_event_handler(self, data):
-        """Callback for joystick events.
+        """Convert a native DirectInput callback into a joystick input sample."""
+        self.process_joystick_input(dinput.InputEvent(data))
 
-        The handler converts the event data into a signal which is then
-        emitted.  IMPORTANT: Applies any calibration and curvature to the data before firing other events.
-
-        :param data the joystick event
-        """
-
+    def process_joystick_input(self, dinput_event: dinput.InputEvent, *, final=False):
+        """Apply the joystick filters, calibration and curves and queue the event."""
         import vjoy.vjoy
 
         if not gremlin.joystick_handling.joystick_initialized():
@@ -2121,19 +2135,25 @@ class EventListener(QtCore.QObject):
         verbose = self._verbose_dinput  # or (self._verbose_perf and self._verbose_extra)
         verbose_extra = self._verbose_dinput_extra
 
-        dinput_event = dinput.InputEvent(data)
         device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(dinput_event.device_guid)
 
         if device is None:
             if verbose:
-                syslog.info(f"DINPUT EVENT: device not found: [{device.name}]: {dinput_event}")
+                syslog.info(f"DINPUT EVENT: device not found: {dinput_event}")
             return
 
         # Filter virtual output-only devices before scheduling axis settling.
         if device.is_virtual and self.js.inputIgnored(device.device_guid):
             return
 
-        if self._dinput_event_filter(device, dinput_event):
+        if final:
+            if device.disabled:
+                return
+            key = (device.device_guid, dinput_event.input_type, dinput_event.input_index)
+            with self._axis_settle_condition:
+                self._axis_settle_timers.pop(key, None)
+                self._debounce_map.pop(key, None)
+        elif self._dinput_event_filter(device, dinput_event):
             # filtered out
             if verbose:
                 syslog.info(f"DINPUT EVENT: event filtered: [{device.name}]: {dinput_event}")
@@ -2151,7 +2171,7 @@ class EventListener(QtCore.QObject):
         if is_virtual and device.device_type == DeviceType.VJoy:
             input_type = None
             vjoy_id = device.vjoy_id
-            if self.js.inputIgnored(data.device_guid):
+            if self.js.inputIgnored(dinput_event.device_guid):
                 # ignore if the device is set to input ignore
                 if verbose:
                     syslog.info(f"Ignore input: {device.name} input: {dinput_event.input_index} type: {dinput_event.input_type}")
@@ -2195,11 +2215,15 @@ class EventListener(QtCore.QObject):
             value = raw_value
 
             # apply spam filter
-            if not AxisState().shouldProcess(dinput_event):
+            if not AxisState().shouldProcess(dinput_event) and not final:
                 # filtered out
                 return
 
             extra_data = {}
+            if device.device_type == DeviceType.SpaceMouse:
+                extra_data["source_input_type"] = InputType.SpaceMouse
+            elif device.device_type == DeviceType.Tobii:
+                extra_data["source_input_type"] = InputType.Tobii
 
             if self._has_calibration(dinput_event.device_guid, dinput_event.input_index):
                 # apply input calibration
@@ -2236,7 +2260,7 @@ class EventListener(QtCore.QObject):
                 syslog.info(f"DINPUT BUTTON: {dinput_event}")
 
             # apply spam filter
-            if not DInputState().shouldProcess(dinput_event):
+            if not DInputState().shouldProcess(dinput_event) and not final:
                 # filtered out
                 return
             is_pressed = dinput_event.value == 1
@@ -2247,6 +2271,7 @@ class EventListener(QtCore.QObject):
                 is_pressed=is_pressed,
                 is_virtual=is_virtual,
                 value=is_pressed,
+                extra_data={"source_input_type": InputType.SpaceMouse} if device.device_type == DeviceType.SpaceMouse else None,
             )
 
             event_list.append(dinput_event)
@@ -4290,6 +4315,15 @@ class EventHandler(QtCore.QObject):
     @execution_guard.boundary
     def _execute_callbacks(self, event, m_list, f_list):
         """triggers callbacks"""
+        if getattr(event, "source_input_type", None) == InputType.Loopback:
+            from gremlin.ui.loopback import dispatch_context
+
+            with dispatch_context(event):
+                if m_list:
+                    self._trigger_callbacks(m_list, event)
+                if f_list:
+                    self._trigger_functor_callbacks(f_list, event)
+            return
         if m_list:
             self._trigger_callbacks(m_list, event)
 
@@ -5001,8 +5035,8 @@ class DInputData:
         )
 
     def _read_axis(self):
-        """reads the current value of an axis from DINPUT"""
-        return dinput.DILL.get_axis(self.device_guid, self.input_id)
+        """Read the raw axis value from the registered joystick provider."""
+        return gremlin.joystick_handling.get_axis(self.device_guid, self.input_id, normalized=False)
 
     def process_input(self, raw_value):
         """
@@ -5371,6 +5405,10 @@ class AxisState:
                     return input_item.curve_data
         except Exception:
             pass
+
+        # A Loopback control can have no saved input item in the active mode.
+        if device_guid == getattr(gremlin.shared_state, "loopback_tab_guid", None):
+            return None
 
         item = self.getItem(device_guid, input_id)
         if item:

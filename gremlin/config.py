@@ -100,6 +100,12 @@ STAR_CITIZEN_ENABLED = (
     else True
 )
 
+TOBII_ENABLED = (
+    "GEX_TOBII_ENABLED" in os.environ and os.environ["GEX_TOBII_ENABLED"].lower() in ("1", "true", "yes")
+    if "GEX_TOBII_ENABLED" in os.environ
+    else False  # disable for now while testing is happening
+)
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
@@ -188,6 +194,8 @@ class Configuration(QtCore.QObject):
 
         self.reload()
         self._startup_star_citizen_enabled = self.star_citizen_enabled
+        self._startup_loopback_enabled = self.loopback_enabled
+        self._startup_space_mouse_enabled = self.space_mouse_enabled
 
     def logModuleOptions(self):
         """Logs the status of various module options."""
@@ -2345,6 +2353,16 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.StarCitizen in self.verbose_mode
 
     @property
+    def verbose_mode_space_mouse(self):
+        """true if verbose mode for Space Mouse"""
+        return self.verbose and VerboseMode.SpaceMouse in self.verbose_mode
+
+    @property
+    def verbose_mode_tobii(self):
+        """true if verbose mode for Tobii"""
+        return self.verbose and VerboseMode.Tobii in self.verbose_mode
+
+    @property
     def osc_input_port(self):
         """OSC listen port"""
         port = self._get_data("osc_port", 8000)
@@ -2757,7 +2775,7 @@ class Configuration(QtCore.QObject):
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
-            case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
+            case DeviceType.Maestro | DeviceType.Joystick | DeviceType.SpaceMouse | DeviceType.Tobii | DeviceType.VJoy:
                 if isinstance(input_id, str) and input_id.isnumeric():
                     input_id = int(input_id)
                 else:
@@ -2835,6 +2853,15 @@ class Configuration(QtCore.QObject):
                         input_id = 1
                     input_type = InputType.StarCitizen
                     save_input_id = input_id
+
+            case DeviceType.Tobii:
+                save_input_id = input_id
+                input_type = InputType.Tobii
+
+            case DeviceType.Loopback:
+                save_input_id = input_id
+                input_type = InputType.Loopback
+
             case _:
                 assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
 
@@ -4617,6 +4644,62 @@ class Configuration(QtCore.QObject):
         self._set_data("star_citizen_enabled", value)
 
     @property
+    def loopback_enabled(self) -> bool:
+        return self._get_data("loopback_enabled", True)
+
+    @loopback_enabled.setter
+    def loopback_enabled(self, value: bool):
+        self._set_data("loopback_enabled", value)
+
+    @property
+    def startup_loopback_enabled(self) -> bool:
+        return self._startup_loopback_enabled
+
+    @property
+    def tobii_enabled(self) -> bool:
+        return TOBII_ENABLED and self._get_data("tobii_enabled", False)
+
+    @tobii_enabled.setter
+    def tobii_enabled(self, value: bool):
+        self._set_data("tobii_enabled", value)
+
+    @property
+    def tobii_gaze_enabled(self) -> bool:
+        return self._get_data("tobii_gaze_enabled", False)
+
+    @tobii_gaze_enabled.setter
+    def tobii_gaze_enabled(self, value: bool):
+        self._set_data("tobii_gaze_enabled", value)
+
+    @property
+    def tobii_port(self) -> int:
+        return self._get_data("tobii_port", 4242)
+
+    @tobii_port.setter
+    def tobii_port(self, value: int):
+        self._set_data("tobii_port", value)
+
+    @property
     def startup_star_citizen_enabled(self) -> bool:
         """Return the Star Citizen module setting for this session."""
         return self._startup_star_citizen_enabled
+
+    @property
+    def space_mouse_enabled(self) -> bool:
+        return self._get_data("space_mouse_enabled", True)
+
+    @space_mouse_enabled.setter
+    def space_mouse_enabled(self, value: bool):
+        self._set_data("space_mouse_enabled", value)
+
+    @property
+    def startup_space_mouse_enabled(self) -> bool:
+        return self._startup_space_mouse_enabled
+
+    @property
+    def check_for_updates_enabled(self) -> bool:
+        return self._get_data("check_for_updates_enabled", True)
+
+    @check_for_updates_enabled.setter
+    def check_for_updates_enabled(self, value: bool):
+        self._set_data("check_for_updates_enabled", value)

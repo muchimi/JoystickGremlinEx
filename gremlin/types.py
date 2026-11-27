@@ -303,11 +303,14 @@ class DeviceType(IntEnum):
     Overlay = 14  # OBS / on-screen overlay designer tab
     Afcs = 15  # AFCS visual axis-flow designer tab
     StarCitizen = 16  # Star Citizen telemetry device
+    SpaceMouse = 17  # 3Dconnexion HID controller
+    Loopback = 18  # internal virtual axes and buttons
+    Tobii = 19  # Tobii Game Hub head pose
 
     @staticmethod
     def tab_order_group(value: DeviceType, category: DeviceCategory | None = None) -> int:
         """Default display group for hardware, virtual inputs, and system tabs."""
-        if value == DeviceType.Joystick:
+        if value in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii):
             return 2 if category == DeviceCategory.Special else 0
         if value in (DeviceType.VJoy, DeviceType.Maestro):
             return 1
@@ -323,6 +326,8 @@ class DeviceType(IntEnum):
         return value in (
             DeviceType.NotSet,
             DeviceType.Joystick,
+            DeviceType.SpaceMouse,
+            DeviceType.Tobii,
             DeviceType.ModeControl,
             DeviceType.StarCitizen,
         )
@@ -395,6 +400,9 @@ _DeviceType_to_display_name = {
     DeviceType.Overlay: "Overlay",
     DeviceType.Afcs: "AFCS",
     DeviceType.StarCitizen: "Star Citizen",
+    DeviceType.SpaceMouse: "SpaceMouse",
+    DeviceType.Tobii: "Tobii",
+    DeviceType.Loopback: "Loopback",
 }
 
 _DeviceType_to_string_lookup = {
@@ -415,6 +423,9 @@ _DeviceType_to_string_lookup = {
     DeviceType.Overlay: "overlay",
     DeviceType.Afcs: "afcs",
     DeviceType.StarCitizen: "star-citizen",
+    DeviceType.SpaceMouse: "space-mouse",
+    DeviceType.Tobii: "tobii",
+    DeviceType.Loopback: "loopback",
 }
 
 
@@ -436,6 +447,9 @@ _DeviceType_to_enum_lookup = {
     "overlay": DeviceType.Overlay,
     "afcs": DeviceType.Afcs,
     "star-citizen": DeviceType.StarCitizen,
+    "space-mouse": DeviceType.SpaceMouse,
+    "tobii": DeviceType.Tobii,
+    "loopback": DeviceType.Loopback,
 }
 
 
@@ -1101,7 +1115,9 @@ class VerboseMode(IntFlag):
     Plugin = auto()
     Voice = auto()
     Maestro = auto()  # maestro mode
-    StarCitizen = auto() #
+    StarCitizen = auto() # star citizen telemetry server on the game
+    SpaceMouse = auto()  # space mouse
+    Tobii = auto()  # tobii eye tracker
     All = (
         Keyboard
         | Joystick
@@ -1149,6 +1165,8 @@ class VerboseMode(IntFlag):
         | Voice
         | Maestro
         | StarCitizen
+        | SpaceMouse
+        | Tobii
     )
 
     def __contains__(self, item):
@@ -1178,6 +1196,7 @@ class TabDeviceType(int, Enum):
     Overlay = 16
     Afcs = 17
     StarCitizen = 18
+    Loopback = 19
 
 
 class GamePadOutput(Enum):

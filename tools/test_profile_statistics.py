@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from gremlin.input_types import InputType
-from gremlin.types import ActivationRule, ButtonOutputMode, DeviceType, GamePadOutput, HatDirection, VjoyAction
+from gremlin.types import ActivationRule, ButtonOutputMode, DeviceType, GamePadOutput, HatDirection, PlayMode, VjoyAction
 
 
 class StateCondition(SimpleNamespace):
@@ -24,6 +24,10 @@ class VirtualCondition(SimpleNamespace):
 
 
 class KeyboardCondition(SimpleNamespace):
+    pass
+
+
+class JoystickCondition(SimpleNamespace):
     pass
 
 
@@ -112,11 +116,11 @@ class ProfileStatisticsTests(unittest.TestCase):
         expected = {
             "Mapped axes": 1, "Keyboard inputs mapped": 1, "OSC input commands mapped": 1,
             "OSC output commands mapped": 1, "MIDI input commands mapped": 1, "Virtual devices used as input": 1,
-            "Virtual devices enabled as input": 1, "Input devices in use": 7, "Joysticks in use": 1,
-            "Gamepads in use": 1, "Other input devices in use": 4, "States defined": 3,
+            "Virtual devices enabled as input": 1, "Input devices in use": 8, "Joysticks in use": 1,
+            "Gamepads in use": 1, "Other input devices in use": 5, "States defined": 3,
             "States used": 2, "Expression states used": 1, "Conditions": 5, "Longest macro (steps)": 3,
             "Longest sequence (steps)": 2, "Longest chain (steps)": 2, "Actions defined": 11,
-            "Output devices and destinations in use": 2,
+            "Output devices and destinations in use": 3,
         }
         for label, count in expected.items():
             self.assertEqual(summary[label], count, label)
@@ -133,6 +137,10 @@ class ProfileStatisticsTests(unittest.TestCase):
         self.assertEqual(rows, [("Default", "No parent"), ("Flight", "Default"), ("Empty", "Flight")])
         self.assertIn("## Mode Parenting\n\n| Mode | Parent mode |", report)
         self.assertIn("| Empty | Flight |", report)
+        self.assertIn("## Conditions\n\n| Mode | Input device | Input | Mapping | Condition details |", report)
+        self.assertIn("| Default | Flight stick | 1 | Sequence | State armed on |", report)
+        self.assertIn("| Default | Flight stick | 1 | Sequence (step 1) → Virtual Remap (action 1) | State ready on OR State armed off |", report)
+        self.assertTrue(any(row[-1].endswith("AND Keyboard Left Shift pressed") for row in stats.condition_bindings))
         self.assertNotIn("## Input Keybinds", report)
         self.assertNotIn("## Bindings by Device", report)
 
@@ -195,6 +203,44 @@ class ProfileStatisticsTests(unittest.TestCase):
         self.assertEqual(sections["Mapping Usage"], [])
         self.assertEqual(sections["Mode Parenting"], [("Default", "No parent"), ("Flight", "Profile-wide")])
 
+    def test_tts_counts_legacy_actions_local_play_sound_and_configured_phrases(self):
+        def play_sound(mode, text):
+            return action("Play Sound", "play-sound", mode=mode, text=text, audio_device=None)
+
+        stick = device("Flight stick", DeviceType.Joystick)
+        legacy = action("(legacy) Text to Speech", "text-to-speech", text="Ready | Set | ")
+        nested_item = input_item(InputType.JoystickButton, 1, container("basic", [play_sound(PlayMode.PyTTS, "Ready")]))
+        nested = ContainerAction(name="Nested", tag="nested", conditions=[], _item_data_map={0: nested_item})
+        node = profile_device(stick, Default=[input_item(InputType.JoystickButton, 1, container("basic", [
+            legacy,
+            nested,
+            play_sound(PlayMode.PyTTS, None),
+            play_sound(PlayMode.EdgeAI, "One\ntwo | Three"),
+            play_sound(PlayMode.AudioFile, "Old phrase | Old alternative"),
+            play_sound(PlayMode.Stop, "Old phrase"),
+        ]))])
+        profile = SimpleNamespace(
+            name="TTS Test", devices={node.device_guid: node}, get_modes=lambda: ["Default"],
+            modeTree=lambda: mode_tree(Default=None),
+            state=SimpleNamespace(getStates=dict), voice=SimpleNamespace(getVoices=list),
+            settings=SimpleNamespace(getVirtualAsInputList=lambda kind: []), merge_axes=[], _start_state={},
+        )
+        collect = self._collector(stick)
+        stats = collect(profile, "Master")
+        sections = {title: dict(rows) for title, _, rows in stats.sections() if title == "TTS"}
+        self.assertEqual(sections["TTS"], {
+            "Legacy Text to Speech actions": 1,
+            "Play Sound actions using TTS (local)": 2,
+            "TTS phrases configured in the profile": 5,
+        })
+        report = stats.to_markdown()
+        self.assertIn("## TTS", report)
+        self.assertIn("| TTS phrases configured in the profile | 5 |", report)
+
+        profile.devices.clear()
+        sections = {title: rows for title, _, rows in collect(profile, "Master").sections()}
+        self.assertEqual([count for _, count in sections["TTS"]], [0, 0, 0])
+
     def test_hat_outputs_have_their_own_directions_and_skip_noop(self):
         stick = device("Flight stick", DeviceType.Joystick)
         bridge = device("gex-1", DeviceType.Maestro, virtual=True)
@@ -217,6 +263,70 @@ class ProfileStatisticsTests(unittest.TestCase):
         for row, direction in zip(rows, (HatDirection.North, HatDirection.East)):
             self.assertTrue(row[-1].endswith(f"[if Hat direction {HatDirection.to_display_name(direction)}]"))
 
+    def test_state_and_loopback_mappings_are_in_default_statistics(self):
+        loopback = device("Loopback", DeviceType.Loopback, axes=2)
+        loopback.axis_names = {1: "Trim", 2: "Unused axis"}
+        loopback.data = {"button_names": {1: "Hold"}}
+        remap = action("Virtual Remap", "vjoyremap", action_mode=VjoyAction.VJoyButtonPress,
+                       virtual_device=loopback, vjoy_button_id=1, merge_data=[])
+        state = input_item(InputType.State, "ready", container("basic", [remap]),
+                           key="ready", display_name="ready", isExpression=False)
+        unused = input_item(InputType.State, "unused", key="unused", isExpression=False)
+        set_state = action("Map to State", "map_to_state", target_states=lambda: [state], hat_map={})
+        trim = input_item(InputType.JoystickAxis, 1, container("basic", [action("Pause")]), short_display_name="Axis Trim")
+        hold = input_item(InputType.JoystickButton, 1, container("basic", [set_state]), short_display_name="Hold")
+        node = profile_device(loopback, Default=[trim, hold], Flight=[trim], Empty=[input_item(InputType.JoystickAxis, 2)])
+        profile = SimpleNamespace(
+            name="State and Loopback", devices={node.device_guid: node}, loopback=SimpleNamespace(device=loopback),
+            get_modes=lambda: ["Default", "Flight", "Empty"], modeTree=lambda: mode_tree(Default=None, Flight="Default", Empty=None),
+            state=SimpleNamespace(getStates=lambda: {state.key: state, unused.key: unused}), voice=SimpleNamespace(getVoices=list),
+            settings=SimpleNamespace(getVirtualAsInputList=lambda kind: []), merge_axes=[], _start_state={},
+        )
+
+        stats = self._collector(loopback)(profile, "Master")
+        sections = {title: rows for title, _, rows in stats.sections()}
+        summary = dict(sections["Overview"])
+        self.assertEqual(summary["States mapped"], 1)
+        self.assertEqual(summary["Loopback axes mapped"], 1)
+        self.assertEqual(summary["Loopback buttons mapped"], 1)
+        self.assertEqual(summary["Virtual devices enabled as input"], 0)
+        self.assertIn(("Input", "Virtual", "Loopback"), sections["Devices"])
+        self.assertIn(("Input", "Other", "State"), sections["Devices"])
+        self.assertIn(("Output", "State", "State"), sections["Devices"])
+        self.assertEqual(
+            [row[:3] for row in sections["State and Loopback Mappings"]],
+            [("Loopback", "Default", "Axis Trim"), ("Loopback", "Default", "Hold"),
+             ("Loopback", "Flight", "Axis Trim"), ("State", "Profile-wide", "ready")],
+        )
+        self.assertIn(("State ready", "Loopback", "Hold", "Default"), [row[:4] for row in stats.output_bindings])
+        self.assertIn(("Loopback Button 1 (Hold)", "State", "ready", "Profile-wide"), [row[:4] for row in stats.output_bindings])
+        self.assertIn("| Loopback | Default | Axis Trim | Basic → Pause |", stats.to_markdown())
+
+    def test_conditions_show_nested_mapping_and_control_details(self):
+        loopback = device("Loopback", DeviceType.Loopback, axes=1)
+        loopback.axis_names = {1: "Trim"}
+        stick = device("Flight stick", DeviceType.Joystick)
+        condition = JoystickCondition(
+            device_guid=loopback.device_guid, device_name="", input_type=InputType.JoystickAxis, input_id=1,
+            comparison="inside", range=(-0.5, 0.5), delay=0.25, use_calibrated_data=False,
+        )
+        child = input_item(InputType.JoystickButton, 1, container("basic", conditions=[condition]))
+        nested = ContainerAction(name="Nested", tag="test-container", conditions=[], _item_data_map={0: child})
+        node = profile_device(stick, Flight=[input_item(
+            InputType.JoystickButton, 1, container("basic", [nested]), short_display_name="Button 1",
+        )])
+        profile = SimpleNamespace(
+            name="Conditions", devices={node.device_guid: node}, loopback=SimpleNamespace(device=loopback),
+            get_modes=lambda: ["Flight"], modeTree=lambda: mode_tree(Flight=None),
+            state=SimpleNamespace(getStates=dict), voice=SimpleNamespace(getVoices=list),
+            settings=SimpleNamespace(getVirtualAsInputList=lambda kind: []), merge_axes=[], _start_state={},
+        )
+        stats = self._collector(loopback)(profile, "Master")
+        self.assertEqual(stats.condition_bindings, [
+            ("Flight", "Flight stick", "Button 1", "Basic → Nested → Basic",
+             "Loopback Axis 1 (Trim) inside [-0.5, 0.5] (raw axis) (delay 0.25 s)"),
+        ])
+
     def _collector(self, bridge):
         path = ROOT / "gremlin" / "profile_statistics.py"
         tree = ast.parse(path.read_bytes())
@@ -224,9 +334,9 @@ class ProfileStatisticsTests(unittest.TestCase):
         module = ModuleType("profile_statistics_checks")
         module.__dict__.update(
             InputType=InputType, DeviceType=DeviceType, GamePadOutput=GamePadOutput, VjoyAction=VjoyAction,
-            ButtonOutputMode=ButtonOutputMode, HatDirection=HatDirection,
+            ButtonOutputMode=ButtonOutputMode, HatDirection=HatDirection, PlayMode=PlayMode,
             AbstractContainerAction=ContainerAction, BaseStateCondition=StateCondition, BaseVJoyCondition=VirtualCondition,
-            BaseKeyboardCondition=KeyboardCondition, BaseJoystickCondition=type("JoystickCondition", (), {}),
+            BaseKeyboardCondition=KeyboardCondition, BaseJoystickCondition=JoystickCondition,
             BaseModeCondition=type("ModeCondition", (), {}), BaseInputActionCondition=type("InputCondition", (), {}),
             getInputIdKey=lambda input_id: input_id,
             joystick_handling=SimpleNamespace(all_joystick_devices=lambda: [bridge], virtual_device_map=dict),

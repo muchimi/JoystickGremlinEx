@@ -44,9 +44,9 @@ ctypes.CDLL(dll_path)
 import hid
 
 
-def enumerate_devices():
+def enumerate_devices(vendor_id=0):
     """Read a fresh HIDAPI snapshot, preserving Windows' enumeration order."""
-    return list(hid.enumerate())
+    return list(hid.enumerate(vendor_id, 0))
 
 
 from gremlin.singleton_decorator import SingletonDecorator

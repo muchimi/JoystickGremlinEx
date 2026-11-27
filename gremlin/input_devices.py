@@ -415,7 +415,7 @@ class JoystickWrapper:
         def value(self):
             # FIXME: This bypasses calibration and any other possible
             #        mappings we might do in the future
-            return DILL.get_axis(self._joystick_guid, self._index) / float(32768)
+            return gremlin.joystick_handling.get_axis(self._joystick_guid, self._index, normalized=False) / float(32768)
 
     class Button(Input):
         """Represents a single button of a joystick."""
@@ -425,7 +425,8 @@ class JoystickWrapper:
 
         @property
         def is_pressed(self):
-            return DILL.get_button(self._joystick_guid, self._index)
+            device = gremlin.joystick_handling.getDevice(self._joystick_guid)
+            return device.get_button(self._index) if device else False
 
     class Hat(Input):
         """Represents a single hat of a joystick,"""
@@ -596,6 +597,10 @@ class JoystickProxy:
         :param device_guid GUID of the joystick device
         :return the corresponding joystick device
         """
+        loopback_guid = gremlin.shared_state.loopback_tab_guid
+        if device_guid == loopback_guid or device_guid == str(loopback_guid):
+            return gremlin.joystick_handling.active_loopback()
+
         if device_guid not in JoystickProxy.joystick_devices:
             # If the device exists add process it and add it, otherwise throw
             # an exception
@@ -860,8 +865,11 @@ class CallbackActions:
     def _release_callback_prototype(self, vjoy_input, is_local=False, is_remote=False, force_remote=False, client_list=None) -> None:
         key, button_id = vjoy_input
         device = gremlin.joystick_handling.get_virtual_device(key)
-        if device is None or not 0 < button_id <= device.button_count:
+        if device is None or button_id not in device.get_button_input_ids():
             syslog.warning("Attempted to release a missing virtual output button: %s %s", key, button_id)
+            return
+        if device.device_type == gremlin.types.DeviceType.Loopback:
+            gremlin.joystick_handling.set_button(key, button_id, False)
             return
         if is_local:
             gremlin.joystick_handling.set_button(key, button_id, False)

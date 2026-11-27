@@ -30,8 +30,7 @@ from typing import Callable
 from lxml import etree
 from psygnal import Signal
 from PySide6 import QtCore, QtGui, QtNetwork, QtWidgets
-from PySide6.QtCore import QMimeData, QPoint, Qt
-from PySide6.QtGui import QDrag, QPixmap
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView, QLabel, QListWidget, QListWidgetItem
 
 import dinput
@@ -272,9 +271,7 @@ class NetworkComputerPicker(QOperationDialog):
 
     def _populate(self, computers):
         if not computers:
-            self.status_widget.setText(
-                f"Windows Network Discovery returned no computers with IPv4 addresses. Enter the {self._target} address manually."
-            )
+            self.status_widget.setText(f"Windows Network Discovery returned no computers with IPv4 addresses. Enter the {self._target} address manually.")
             return
 
         for name, address in computers:
@@ -1102,6 +1099,13 @@ class OptionsDialog(BaseDialogUi):
             widget_only=True,
         )
 
+        check_for_updates_widget = QDataCheckbox(
+            "Check for updates",
+            checked=self.config.check_for_updates_enabled,
+            callback=self._handle_check_for_updates_changed,
+            tooltip="If enabled, GremlinEx will check for updates on startup.",
+        )
+
         column_widget = QtWidgets.QWidget()
         column_widget.setContentsMargins(0, 0, 0, 0)
         column_layout = QtWidgets.QGridLayout(column_widget)
@@ -1114,6 +1118,7 @@ class OptionsDialog(BaseDialogUi):
         col1_layout.addWidget(self.start_minimized)
         col1_layout.addWidget(self.start_with_windows)
         col1_layout.addWidget(self.numlock_enabled)
+        col1_layout.addWidget(check_for_updates_widget)
 
         # column 2
         col2_layout.addWidget(self.persist_clipboard)
@@ -1610,9 +1615,7 @@ class OptionsDialog(BaseDialogUi):
             tooltip="Select the GremlinEx broadcast server's IPv4 address.",
             clicked=self._remote_control_server_ip_select,
         )
-        discover_test_host_button = _network_computer_browse_button(
-            self, self._set_remote_server_address, target="GEX master server", label="Discover…"
-        )
+        discover_test_host_button = _network_computer_browse_button(self, self._set_remote_server_address, target="GEX master server", label="Discover…")
         self._remote_test_host_container = getHContainer(
             [self._remote_test_host, select_test_host_button, discover_test_host_button], "GEX Master Server IPv4:", widget_only=True
         )
@@ -1647,6 +1650,9 @@ class OptionsDialog(BaseDialogUi):
 
         content_widget = QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Remote Control")
+
+    def _handle_check_for_updates_changed(self, checked: bool):
+        self.config.check_for_updates = checked
 
     def _handle_firewall_check(self):
         """Checks firewall rules and applies the accepted settings to Options."""
@@ -2689,6 +2695,30 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 "GEX_STAR_CITIZEN_ENABLED",
             ),
             (
+                "loopback",
+                "Loopback",
+                "Enable the internal Loopback device and its virtual outputs after restarting GremlinEx.",
+                "",
+            ),
+            (
+                "space_mouse",
+                "Space Mouse",
+                "Enable 3Dconnexion Space Mouse inputs after restarting GremlinEx.",
+                "",
+            ),
+            (
+                "tobii",
+                "Tobii Head Tracking",
+                "Receive six head-tracking axes from Tobii Game Hub on this computer after restarting GremlinEx.",
+                "",
+            ),
+            (
+                "tobii_gaze",
+                "Tobii Eye Gaze",
+                "Read gaze coordinates from the local GEX Bridge after restarting GremlinEx.",
+                "",
+            ),
+            (
                 "maestro",
                 "Maestro",
                 "When set, GremlinEx enables the Maestro bridge module for interacting with HID Maestro virtual controllers.",
@@ -2705,6 +2735,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             "voice": self.config.isDeviceVisible(gremlin.shared_state.voice_tab_guid),
             "octavi": self.config.isDeviceVisible(gremlin.shared_state.octavi_tab_guid),
             "star_citizen": self.config.isDeviceVisible(gremlin.shared_state.star_citizen_tab_guid),
+            "loopback": self.config.isDeviceVisible(gremlin.shared_state.loopback_tab_guid),
             "maestro": self.config.maestro_enabled,
         }
 
@@ -2731,12 +2762,20 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     enabled = gremlin.config.STAR_CITIZEN_ENABLED
                     if not enabled:
                         description = f"Disabled by {env_var}."
+                case "loopback":
+                    value = self.config.loopback_enabled
+                case "space_mouse":
+                    value = self.config.space_mouse_enabled
+                case "tobii":
+                    value = self.config.tobii_enabled
+                case "tobii_gaze":
+                    value = self.config.tobii_gaze_enabled
                 case "maestro":
                     value = self.config.maestro_enabled
                     enabled = False
             checkbox = QDataCheckbox(name, value=value, data=data, tooltip=description, callbackEx=self._handle_module_enabled_changed)
             checkbox.setEnabled(enabled)
-            if env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
+            if env_var and env_var in os.environ and os.environ[env_var].lower() in ("1", "true", "yes"):
                 var_widget = QtWidgets.QLabel(f"({env_var} set)")
                 widget = getHContainer([checkbox, var_widget, "||"], widget_only=True)
             else:
@@ -2744,6 +2783,13 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
             widgets.append(widget)
 
+        port_widget = QIntLineEdit(
+            value=self.config.tobii_port,
+            min_range=1,
+            max_range=65535,
+            callback=lambda value: setattr(self.config, "tobii_port", value),
+        )
+        widgets.append(getHContainer(port_widget, "Tobii UDP port", widget_only=True))
         widget = getVContainer(widgets, widget_only=True, left_margin=8)
         page_layout.addWidget(widget)
 
@@ -2802,6 +2848,16 @@ Enabled modules may not show until the device filter is updated.
                 self.config.star_citizen_enabled = checked
                 if checked and not self._module_visible_map[data]:
                     self.config.setDeviceVisible(gremlin.shared_state.star_citizen_tab_guid, True)
+            case "loopback":
+                self.config.loopback_enabled = checked
+                if checked and not self._module_visible_map[data]:
+                    self.config.setDeviceVisible(gremlin.shared_state.loopback_tab_guid, True)
+            case "space_mouse":
+                self.config.space_mouse_enabled = checked
+            case "tobii":
+                self.config.tobii_enabled = checked
+            case "tobii_gaze":
+                self.config.tobii_gaze_enabled = checked
             case "maestro":
                 self.config.maestro_enabled = checked
                 # update visibility of tool
@@ -4948,7 +5004,7 @@ class DeviceInformationDialog(BaseDialogUi):
         devices = [
             device
             for device in gremlin.joystick_handling.display_devices(self.profile, refresh=True)
-            if device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro) and not device.disabled
+            if device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.Maestro) and not device.disabled
         ]
 
         connected_devices = [d for d in devices if d.connected and not d.is_virtual]  # list of connected hardware devices
@@ -5259,7 +5315,7 @@ class SubstituteDialog(QRememberDialog):
         self.main_layout.addWidget(self.header_container_widget)
         self.main_layout.addStretch()
 
-        self._profile_devices = [device for device in profile.devices.values() if device.type == gremlin.types.DeviceType.Joystick]
+        self._profile_devices = [device for device in profile.devices.values() if device.type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii)]
         self._profile_devices.sort(key=lambda x: x.name.casefold())
 
         # populate devices currently connected
@@ -5517,10 +5573,14 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
         self.data = data
         self.visible_widget = QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self)
         self.name_widget = QLabel(name)
-        joystick = data.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro)
+        tobii_receiver = data.data.get("tobii_receiver") if data.device_type == DeviceType.Tobii else None
+        receiver = tobii_receiver() if tobii_receiver is not None else None
+        joystick = data.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.Maestro)
         disconnected = joystick and not data.connected
         self.name_widget.setProperty("deviceDisconnected", disconnected)
-        if disconnected:
+        if receiver is not None:
+            self.name_widget.setToolTip(receiver.status)
+        elif disconnected:
             self.name_widget.setText(f"{name} (disconnected)")
             self.name_widget.setToolTip("Disconnected device referenced by the current profile")
         self.visible_widget.setAccessibleName(name)
@@ -5603,13 +5663,22 @@ class DeviceDisplayDialog(QRememberDialog):
 
         list_widget = ReorderListWidget(self)
 
-        all_devices = sorted(
-            gremlin.joystick_handling.display_devices(refresh=True),
-            key=lambda device: (DeviceType.tab_order_group(device.device_type, device.device_category), (device.name or "").casefold()),
-        )
+        all_devices = gremlin.joystick_handling.display_devices(refresh=True)
+        loopback = gremlin.joystick_handling.active_loopback()
+        if loopback is not None and all(device.device_guid != loopback.device.device_guid for device in all_devices):
+            all_devices.append(loopback.device)
+        all_devices.sort(key=lambda device: (DeviceType.tab_order_group(device.device_type, device.device_category), (device.name or "").casefold()))
 
         device: TabData
         self.visible_map = dict(self.config.device_visible_map)
+        self._space_mouse_filter = None
+        if self.config.startup_space_mouse_enabled:
+            self._space_mouse_filter = QDataCheckbox(
+                "Space Mouse",
+                value=self.visible_map.get(gremlin.shared_state.space_mouse_filter_id, True),
+                tooltip="Show Space Mouse tabs when devices are available. Individual device filters still apply.",
+            )
+            self.main_layout.addWidget(self._space_mouse_filter)
         self._order_changed = False
         list_widget.model().rowsMoved.connect(self._handle_order_changed)
         device: dinput.DeviceSummary
@@ -5720,12 +5789,14 @@ class DeviceDisplayDialog(QRememberDialog):
 
     def _handle_save_order(self, widget):
         """Save visibility without serializing device positions."""
-        tab_map = self._get_current_map()
-        if tab_map:
+        visibility = dict(self._get_current_map().values())
+        if self._space_mouse_filter is not None:
+            visibility[gremlin.shared_state.space_mouse_filter_id] = self._space_mouse_filter.isChecked()
+        if visibility:
             fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Device Visibility", gremlin.shared_state.data_path, "JSON files (*.json)")
             if fname != "":
                 try:
-                    data = json.dumps(dict(tab_map.values()), indent=4, sort_keys=True)
+                    data = json.dumps(visibility, indent=4, sort_keys=True)
                     with open(fname, "w", encoding="utf-8") as h:
                         h.write(data)
                         h.flush()
@@ -5762,6 +5833,8 @@ class DeviceDisplayDialog(QRememberDialog):
 
     def _set_all_devices_visible(self, visible: bool):
         """Keep row indicators and saved visibility values in sync."""
+        if self._space_mouse_filter is not None:
+            self._space_mouse_filter.setChecked(visible)
         for index in range(self._list_widget.count()):
             item = self._list_widget.item(index)
             row = self._list_widget.itemWidget(item)
@@ -5799,6 +5872,9 @@ class DeviceDisplayDialog(QRememberDialog):
                         visible = loaded_visibility.get(gremlin.util.normalize_guid(device_id), visible)
                         rows[index] = (device, visible)
                 self.visible_map.update(loaded_visibility)
+                space_mouse_id = gremlin.shared_state.space_mouse_filter_id
+                if self._space_mouse_filter is not None and space_mouse_id in loaded_visibility:
+                    self._space_mouse_filter.setChecked(loaded_visibility[space_mouse_id])
                 self._populate_list_widget(rows)
 
                 self.config.last_reorder_file = fname
@@ -5824,7 +5900,13 @@ class DeviceDisplayDialog(QRememberDialog):
         self._order_changed = True
 
     def _device_enabled(self, device):
-        if not device.connected and device.device_type in (DeviceType.Joystick, DeviceType.VJoy, DeviceType.Maestro):
+        if device.device_type == DeviceType.Loopback:
+            return self.config.startup_loopback_enabled
+        if device.device_type == DeviceType.SpaceMouse and not self.config.startup_space_mouse_enabled:
+            return False
+        if device.device_type == DeviceType.Tobii and device.data.get("tobii_receiver"):
+            return True
+        if not device.connected and device.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy, DeviceType.Maestro):
             profile = gremlin.shared_state.current_profile
             if profile is None:
                 return False
@@ -5898,6 +5980,8 @@ class DeviceDisplayDialog(QRememberDialog):
                 self.visible_map[device.device_id] = visible
         if self._order_changed:
             self.config.tab_list = tab_map
+        if self._space_mouse_filter is not None:
+            self.visible_map[gremlin.shared_state.space_mouse_filter_id] = self._space_mouse_filter.isChecked()
         self.config.device_visible_map = dict(self.visible_map)
 
         # this will cause tab movement and/or tab redraw if devices visibility changed

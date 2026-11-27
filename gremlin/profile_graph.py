@@ -1574,7 +1574,7 @@ class DeviceRemapDialogUI(BaseDialogUi):
         row += 1
 
         for device_node in device_nodes:
-            if device_node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+            if device_node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy):
                 source_device: DeviceSummary = self._source_map[device_node.device_guid]
 
                 enable_widget = QDataCheckbox("Enable", data=device_node)
@@ -1683,7 +1683,7 @@ class DeviceRemapDialogUI(BaseDialogUi):
         selected_index = None
         device_id = device_node.device_id
         match device_node.device_type:
-            case DeviceType.Joystick:
+            case DeviceType.Joystick | DeviceType.SpaceMouse | DeviceType.Tobii:
                 devices = gremlin.joystick_handling.all_joystick_devices()
                 device: DeviceSummary
                 for index, device in enumerate(devices):
@@ -1985,6 +1985,10 @@ class ProfileDeviceNode(ProfileBaseNode):
                 device.axismap_list[i] = am
             device.button_count = 128
             device.hat_count = 4
+            if device_type == DeviceType.SpaceMouse:
+                device.set_space_mouse_layout(128)
+            elif device_type == DeviceType.Tobii:
+                device.set_tobii_layout()
             device.input_enabled = True  # enable as input
             device._connected = False
         if device.device_type is None:
@@ -2736,7 +2740,7 @@ class ProfileGraph:
 
         # get devices
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
-        device_guids = [node.device_guid for node in device_nodes if node.device_type == DeviceType.Joystick]
+        device_guids = [node.device_guid for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii)]
         for device_guid in device_guids:
             info = gremlin.joystick_handling.getDevice(device_guid)
             if not info:
@@ -2747,7 +2751,8 @@ class ProfileGraph:
         """gets a list of joystick devices defined in the profile"""
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
         device_list = [
-            node.device for node in device_nodes if node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled
+            node.device for node in device_nodes
+            if node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.SpaceMouse, DeviceType.Tobii, DeviceType.VJoy) and not node.device.disabled
         ]
         return device_list
 

@@ -2571,7 +2571,11 @@ class Sound:
             if self.ensureFFmpeg():
                 import subprocess
 
-                process = subprocess.run([self._ffmpeg_exe, "-i", mp3_file, wav_file], capture_output=True)
+                process = subprocess.run(
+                    [self._ffmpeg_exe, "-i", mp3_file, wav_file],
+                    capture_output=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
                 if process.returncode != 0:
                     syslog.error(f"FFmpeg: conversion failed: {process.stderr.decode()}")
                     return False

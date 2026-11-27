@@ -17,71 +17,40 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
-from PySide6 import QtCore, QtWidgets
+from functools import partial
 
+from psygnal import Signal
+from PySide6 import QtCore, QtWidgets
+from shiboken6 import Shiboken
+
+import gremlin.config
 import gremlin.event_handler
 import gremlin.input_item
 import gremlin.joystick_handling
-from gremlin.remote import RemoteClientOptionsWidget
 import gremlin.shared_state
-import gremlin.ui.ui_common
-import gremlin.config
-from gremlin.types import DeviceType
-from gremlin.ui.ui_common import QDataPushButton, getVContainer, getHContainer, QDataCheckbox, Buttons, QInfoBox
-from dinput import DeviceSummary
-import gremlin.util
-from psygnal import Signal
-from gremlin.ui.qdatawidget import QDataWidget
-from shiboken6 import Shiboken
 import gremlin.tabstate
-from functools import partial
-
+import gremlin.ui.ui_common
+import gremlin.util
+from dinput import DeviceSummary
+from gremlin.remote import RemoteClientOptionsWidget
+from gremlin.types import DeviceType
+from gremlin.ui.qdatawidget import QDataWidget
 from gremlin.ui.ui_common import (
-    Buttons,
-    clear_layout,
-    Color,
-    ConfirmBox,
-    get_text_width,
-    getGridContainer,
-    getHContainer,
-    getLayoutWidgetHeight,
-    getVContainer,
     Icons,
-    InputListenerWidget,
-    QArrowPairWidget,
-    QAutoResizeStackedWidget,
-    QAxisRepeaterProgressbar,
-    QCurveWidget,
-    QDataCheckbox,
-    QDataComboBox,
-    QDataLabel,
-    QDataLineEdit,
-    QDataPushButton,
-    QDataRadioButton,
-    QDataRadioButtonGroup,
-    QDataWidget,
-    QDelayWidget,
-    QExecuteWidget,
-    QFloatLineEdit,
-    QFrameBox,
-    QHatSelectorComboBox,
-    QHorizontalLine,
-    QHorizontalSeparator,
-    QIconLabel,
-    QIntLineEdit,
-    QProgressBar,
-    QShowAtCursorDialog,
-    QSideBarContainer,
-    QSyncModeWidget,
-    QUsedPushButton,
-    QWarningWidget,
-    synchronize_grids,
-    QFailoverWidget,
-)
-from gremlin.ui.ui_common import (
     ModeSelectorWidget,
     QButtonGrid,
+    QDataCheckbox,
+    QDataPushButton,
+    QDataWidget,
+    QDelayWidget,
+    QFailoverWidget,
+    QFloatLineEdit,
+    QInfoBox,
     QRememberDialog,
+    clear_layout,
+    getGridContainer,
+    getHContainer,
+    getVContainer,
 )
 
 
@@ -211,6 +180,11 @@ class ProfileSettingsWidget(QDataWidget):
         self.scroll_layout.addWidget(label_widget)
 
         widgets = [mode_widget, remote_clients_group, delay_widget, virtual_as_input_widget, grid_widget, label_widget]
+        loopback = gremlin.joystick_handling.active_loopback()
+        if loopback is not None:
+            from gremlin.ui.loopback.tab import LoopbackStartupWidget
+
+            widgets.append(LoopbackStartupWidget(loopback))
 
         # holds all the inputs in a vertical box
         widget = getVContainer(widgets, widget_only=True)
@@ -279,7 +253,7 @@ class DefaultModeSelector(QtWidgets.QWidget):
         super().__init__(parent)
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.setContentsMargins
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.selector_widget = ModeSelectorWidget(text="Profile Start Mode:")
         self.selector_widget.setContentsMargins(0, 0, 0, 0)
